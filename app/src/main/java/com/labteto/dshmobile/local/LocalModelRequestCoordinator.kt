@@ -7,6 +7,9 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalStreamingPreviewOwner
+import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
+import java.util.UUID
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -26,8 +29,7 @@ internal class LocalModelRequestCoordinator(
     private val historyCompactor: LocalHistoryCompactor,
     private val toolSchemas: (LocalAgentRunPolicy) -> JsonArray,
     private val defaultEventLog: () -> LocalSessionEventLog,
-    private val resetPreview: () -> Unit,
-    private val publishPreview: (String) -> Unit,
+    private val streamingPreviewStore: LocalStreamingPreviewStore,
     private val persistOverflowCompaction: (LocalHarnessState, LocalHistorySummaryMode) -> Unit,
     private val maxStreamPreviewChars: Int = 4_096,
     private val streamPreviewIntervalMs: Long = 50L,
@@ -48,6 +50,15 @@ internal class LocalModelRequestCoordinator(
         overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
     ): LocalModelReply {
         val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
+        val previewOwner = if (publishPreviewEnabled) {
+            LocalStreamingPreviewOwner(
+                sessionId = snapshot.sessionId,
+                requestId = UUID.randomUUID().toString(),
+                usageMode = snapshot.usageMode,
+            )
+        } else {
+            null
+        }
         val log = requestLog ?: defaultEventLog()
         val logMessages = redactModelImages(messages)
         val contextChars = logMessages.sumOf { it.toString().length }
@@ -93,7 +104,7 @@ internal class LocalModelRequestCoordinator(
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
                     is AgentRequestEvent.AttemptStarted -> {
-                        if (previewGuard()) resetPreview()
+                        previewOwner?.takeIf { previewGuard() }?.let(streamingPreviewStore::begin)
                     }
                     is AgentRequestEvent.AttemptFailed -> {
                         AppLog.warn(
@@ -154,13 +165,26 @@ internal class LocalModelRequestCoordinator(
         var overflowRound = 0
         while (true) {
             try {
-                return executor.execute {
+                return try {
+                    executor.execute {
                     val streamPreview = LocalStreamPreview(
                         maxChars = maxStreamPreviewChars,
                         minIntervalMs = streamPreviewIntervalMs,
                         clockMs = { System.nanoTime() / 1_000_000 },
                         publish = { preview ->
-                            if (publishPreviewEnabled && previewGuard()) publishPreview(preview)
+                            previewOwner
+                                ?.takeIf { previewGuard() }
+                                ?.let { streamingPreviewStore.publishAssistant(it, preview) }
+                        },
+                    )
+                    val reasoningPreview = LocalStreamPreview(
+                        maxChars = maxStreamPreviewChars,
+                        minIntervalMs = streamPreviewIntervalMs,
+                        clockMs = { System.nanoTime() / 1_000_000 },
+                        publish = { preview ->
+                            previewOwner
+                                ?.takeIf { previewGuard() }
+                                ?.let { streamingPreviewStore.publishReasoning(it, preview) }
                         },
                     )
                     val streamFilter = streamFilterPhrases
@@ -177,6 +201,7 @@ internal class LocalModelRequestCoordinator(
                                 onDelta = { delta ->
                                     val visible = streamFilter?.append(delta.content)?.text ?: delta.content
                                     streamPreview.append(visible)
+                                    reasoningPreview.append(delta.reasoning)
                                 },
                             )
                         } catch (error: LocalModelException) {
@@ -199,8 +224,11 @@ internal class LocalModelRequestCoordinator(
                         }
                         streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
                         streamPreview.flush()
+                        reasoningPreview.flush()
                         reply
                     }
+                } finally {
+                    previewOwner?.let(streamingPreviewStore::clear)
                 }
             } catch (error: Throwable) {
                 if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
