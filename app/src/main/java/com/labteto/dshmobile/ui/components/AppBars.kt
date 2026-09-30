@@ -30,6 +30,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
@@ -65,9 +66,9 @@ fun DsTopBar(
             modifier = Modifier.weight(1f).padding(horizontal = DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(title, style = DsType.titleSerif20, color = colors.labelPrimary, maxLines = 1)
+            Text(title, style = DsType.titleSerif20.withReadingWeight(), color = colors.labelPrimary, maxLines = 1)
             subtitle?.takeIf(String::isNotBlank)?.let {
-                Text(it, style = DsType.caption11, color = colors.labelTertiary, maxLines = 1)
+                Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary, maxLines = 1)
             }
         }
         if (actionIcon != null && onAction != null) {
