@@ -118,7 +118,19 @@ internal class LocalModelConfigurationCoordinator(
         val key = apiKey.trim().takeIf(String::isNotEmpty)
             ?: apiKeys.getFor(modelProfileId(name, url))
             ?: return "请先填写该模型的密钥"
-        return tester.test(key, url, name)
+        val protocol = LocalModelPresets.find(name, url)?.protocol
+            ?: LocalModelProtocol.CHAT_COMPLETIONS
+        return tester.test(key, url, name, protocol)
+    }
+
+    suspend fun deepSeekSearchApiKeyOrNull(): String? {
+        val candidates = profiles.read()
+            .filter(LocalModelProfile::canBackDeepSeekSearch)
+            .sortedBy { if (it.model.equals(DEFAULT_MODEL, ignoreCase = true)) 0 else 1 }
+        candidates.forEach { profile ->
+            apiKeys.getFor(profile.id)?.let { return it }
+        }
+        return null
     }
 
     fun readProfiles(): List<LocalModelProfile> = profiles.read()
