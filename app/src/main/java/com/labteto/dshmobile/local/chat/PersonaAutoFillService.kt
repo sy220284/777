@@ -1,13 +1,14 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.model.LocalModelGateway
-
 import com.labteto.dshmobile.local.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageContext
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -325,13 +326,15 @@ class PersonaAutoFillService @Inject constructor(
             tools = JsonArray(emptyList()),
             temperature = 0.2,
         )
-        usageTracker.record(
-            model = model,
-            usage = reply.usage,
-            requestId = reply.requestId,
-            context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.PERSONA_AUTOFILL),
-            promptBreakdown = reply.promptBreakdown,
-        )
+        withContext(Dispatchers.IO) {
+            usageTracker.record(
+                model = model,
+                usage = reply.usage,
+                requestId = reply.requestId,
+                context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.PERSONA_AUTOFILL),
+                promptBreakdown = reply.promptBreakdown,
+            )
+        }
 
         val raw = reply.content?.trim().orEmpty()
         if (raw.isBlank()) error("模型没有返回可用的人设")
@@ -349,7 +352,7 @@ class PersonaAutoFillService @Inject constructor(
             )
             val repairedReply = runCatching {
                 modelGateway.complete(
-                    baseUrl = baseUrl,
+                            baseUrl = baseUrl,
                     model = model,
                     messages = repairMessages,
                     tools = JsonArray(emptyList()),
@@ -358,13 +361,15 @@ class PersonaAutoFillService @Inject constructor(
             }.getOrElse {
                 throw IllegalStateException("AI 返回的人设格式无法解析，请再试一次", firstCause)
             }
-            usageTracker.record(
-                model = model,
-                usage = repairedReply.usage,
-                requestId = repairedReply.requestId,
-                context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.PERSONA_AUTOFILL),
-                promptBreakdown = repairedReply.promptBreakdown,
-            )
+            withContext(Dispatchers.IO) {
+                usageTracker.record(
+                    model = model,
+                    usage = repairedReply.usage,
+                    requestId = repairedReply.requestId,
+                    context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.PERSONA_AUTOFILL),
+                    promptBreakdown = repairedReply.promptBreakdown,
+                )
+            }
 
             val repairedRaw = repairedReply.content?.trim().orEmpty()
             if (repairedRaw.isBlank()) {

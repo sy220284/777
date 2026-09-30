@@ -1,13 +1,14 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.model.LocalModelGateway
-
 import com.labteto.dshmobile.local.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageContext
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -104,13 +105,15 @@ class PersonaInspectionService @Inject constructor(
             ),
             tools = JsonArray(emptyList()),
         )
-        usageTracker.record(
-            model = model,
-            usage = reply.usage,
-            requestId = reply.requestId,
-            context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.PERSONA_INSPECTION),
-            promptBreakdown = reply.promptBreakdown,
-        )
+        withContext(Dispatchers.IO) {
+            usageTracker.record(
+                model = model,
+                usage = reply.usage,
+                requestId = reply.requestId,
+                context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.PERSONA_INSPECTION),
+                promptBreakdown = reply.promptBreakdown,
+            )
+        }
         val raw = reply.content?.trim().orEmpty()
         if (raw.isBlank()) error("人物检查没有返回结果")
 

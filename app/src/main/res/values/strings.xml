@@ -1230,7 +1230,7 @@
 <string name="usage_conversations">Conversations</string>
 <string name="usage_tasks">Tasks</string>
 <string name="usage_empty_detail">Detailed tracking starts with this version. New requests will appear here automatically.</string>
-<string name="usage_detailed_since">Detailed tracking since %1$s</string>
+<string name="usage_detailed_since">Detailed tracking since %1$s. Details cover up to 90 days and 10,000 requests; lifetime totals are retained.</string>
 <string name="usage_legacy_notice">Earlier usage remains in the device total, but cannot be reliably split by day, conversation, task or agent.</string>
 <string name="usage_log_empty">No request-level token records yet.</string>
 <string name="usage_exact_badge">API reported</string>

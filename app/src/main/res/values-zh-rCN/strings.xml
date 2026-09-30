@@ -1229,7 +1229,7 @@
 <string name="usage_conversations">对话消耗</string>
 <string name="usage_tasks">任务消耗</string>
 <string name="usage_empty_detail">详细统计从本版本开始记录，产生新的模型请求后会自动显示。</string>
-<string name="usage_detailed_since">详细统计始于 %1$s</string>
+<string name="usage_detailed_since">详细统计始于 %1$s。明细保留最近90天、最多10000条请求；累计用量持续保留。</string>
 <string name="usage_legacy_notice">此前用量仍保留在本机累计中，但无法可靠拆分到日期、对话、任务或代理。</string>
 <string name="usage_log_empty">还没有请求级 Token 记录。</string>
 <string name="usage_exact_badge">API 实报</string>

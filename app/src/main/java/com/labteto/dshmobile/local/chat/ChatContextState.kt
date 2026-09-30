@@ -12,8 +12,10 @@ import kotlinx.serialization.Serializable
 data class ChatContextState(
     val scene: ChatSceneState = ChatSceneState(),
     val continuity: ChatContinuityState = ChatContinuityState(),
-    val processedThroughSequence: Long = 0L,
+    val processedThroughSequence: Long = -1L,
     val pendingTurns: List<ChatPendingTurn> = emptyList(),
+    val pendingThroughSequence: Long = -1L,
+    val pendingArchiveReady: Boolean = false,
     /** Recent deterministic hard-scene transitions. Raw transcript remains the canonical history. */
     val sceneEvents: List<ChatSceneEvent> = emptyList(),
     val generation: Long = 0L,
@@ -85,13 +87,26 @@ internal fun ChatContextState.normalized(): ChatContextState {
     )
 }
 
+internal const val MAX_PENDING_CONTEXT_TURNS = 64
+private const val MAX_PENDING_TURN_CHARS = 4_000
+
 internal fun ChatContextState.enqueuePending(turn: ChatPendingTurn): ChatContextState {
     if (turn.sequence <= processedThroughSequence) return this
     val next = (pendingTurns + turn)
         .distinctBy { pending -> pending.sequence to pending.assistantMessageId }
         .sortedBy(ChatPendingTurn::sequence)
-    return copy(pendingTurns = next)
+    return copy(pendingTurns = next, pendingThroughSequence = maxOf(pendingThroughSequence, turn.sequence))
+        .boundedPendingWindow()
 }
+
+internal fun ChatContextState.boundedPendingWindow(): ChatContextState = copy(
+    pendingThroughSequence = maxOf(pendingThroughSequence, pendingTurns.maxOfOrNull { it.sequence } ?: -1L),
+    pendingTurns = pendingTurns.sortedBy(ChatPendingTurn::sequence).takeLast(MAX_PENDING_CONTEXT_TURNS).map { pending ->
+        pending.copy(userMessage = pending.userMessage.take(MAX_PENDING_TURN_CHARS),
+            assistantMessage = pending.assistantMessage.take(MAX_PENDING_TURN_CHARS))
+    },
+)
+
 
 internal fun ChatContextState.applySceneTurn(
     userMessage: String,

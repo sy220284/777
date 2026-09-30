@@ -203,7 +203,7 @@ harness-core / Android runtime / MCP / device
 
 - API 密钥由 Android Keystore 加密。
 - 写文件、编辑文件、执行高风险命令受审批和能力边界约束。
-- 本机执行限制在应用私有工作区；Webhook 只监听回环地址。
+- 本机文件工具受规范化路径边界约束：包含应用私有工作区与获准的用户共享存储根目录。Shell 以工作区作为默认目录，可执行应用权限允许的命令；Webhook 只监听回环地址。
 - 远程访问要求配对 HTTPS 中继，详见 [docs/SECURITY.md](docs/SECURITY.md)。
 - Agent 可以实际执行文件、命令与设备操作；请只启用你理解并信任的能力。
 
