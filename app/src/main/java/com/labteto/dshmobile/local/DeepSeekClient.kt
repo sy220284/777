@@ -168,8 +168,10 @@ class DeepSeekClient @Inject constructor(
                 var totalBytes = 0
                 var sawStreamData = false
                 var sawTerminalFrame = false
-                responseBody.charStream().buffered().use { reader ->
-                    while (true) {
+                // Response 统一由 withCancellableModelResponse 收尾，避免成功后 reader.close()
+                // 的连接异常覆盖已完成结果并触发重复请求。
+                val reader = responseBody.charStream().buffered()
+                while (true) {
                         val line = reader.readLine() ?: break
                         totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
                         if (totalBytes > MAX_MODEL_RESPONSE_BYTES) {
@@ -243,7 +245,6 @@ class DeepSeekClient @Inject constructor(
                                 ?.let(acc.arguments::append)
                         }
                     }
-                }
                 if (!sawStreamData) {
                     if (fallback.isBlank()) {
                         throw LocalModelException(
