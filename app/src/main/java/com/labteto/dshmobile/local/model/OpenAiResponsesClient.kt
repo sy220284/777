@@ -337,18 +337,31 @@ class OpenAiResponsesClient @Inject constructor(
             tools.forEachIndexed { index, element ->
                 val source = element as? JsonObject
                     ?: throw invalidToolSchema(index, null, "工具定义必须是对象")
+                source["type"]?.let { typeElement ->
+                    val sourceType = typeElement as? JsonPrimitive
+                    if (sourceType == null || !sourceType.isString || sourceType.content != "function") {
+                        throw invalidToolSchema(index, null, "工具 type 必须是 function")
+                    }
+                }
                 val function = source["function"] as? JsonObject
                     ?: throw invalidToolSchema(index, null, "工具定义缺少 function")
-                val name = (function["name"] as? JsonPrimitive)
+                val namePrimitive = function["name"] as? JsonPrimitive
+                val name = namePrimitive
+                    ?.takeIf(JsonPrimitive::isString)
                     ?.contentOrNull
                     ?.trim()
                     ?.takeIf(String::isNotEmpty)
-                    ?: throw invalidToolSchema(index, null, "工具定义缺少 name")
-                val description = (function["description"] as? JsonPrimitive)
-                    ?.contentOrNull
-                    ?.trim()
-                    ?.takeIf(String::isNotEmpty)
-                    ?: "调用 $name 工具。"
+                    ?: throw invalidToolSchema(index, null, "工具 name 必须是非空字符串")
+                val description = when (val value = function["description"]) {
+                    null, JsonNull -> "调用 $name 工具。"
+                    is JsonPrimitive -> {
+                        if (!value.isString) {
+                            throw invalidToolSchema(index, name, "description 必须是字符串")
+                        }
+                        value.content.trim().takeIf(String::isNotEmpty) ?: "调用 $name 工具。"
+                    }
+                    else -> throw invalidToolSchema(index, name, "description 必须是字符串")
+                }
                 val strict = responseFunctionStrict(
                     index = index,
                     name = name,
