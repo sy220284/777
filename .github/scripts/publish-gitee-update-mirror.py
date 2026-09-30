@@ -173,6 +173,52 @@ def upload_attachment(
         ) from error
 
 
+def extract_branch_commit_sha(branch: object) -> str:
+    if not isinstance(branch, dict):
+        raise RuntimeError("Gitee 镜像仓库默认分支信息格式异常")
+    commit = branch.get("commit")
+    commit_sha = str(commit.get("sha") if isinstance(commit, dict) else "").strip()
+    if not re.fullmatch(r"[0-9a-fA-F]{40}", commit_sha):
+        raise RuntimeError("无法从 Gitee 镜像仓库默认分支解析有效 commit SHA")
+    return commit_sha
+
+
+def resolve_release_target(owner: str, repo: str, token: str) -> tuple[str, str]:
+    """Resolve the mirror default branch to an immutable commit SHA.
+
+    Gitee documents target_commitish as accepting a branch or commit SHA, but its Release API can
+    fail while creating the backing tag when branch-name resolution is stale. Resolving the branch
+    first makes the release target explicit and also gives an actionable error for an uninitialized
+    mirror repository.
+    """
+    project = api_request("GET", f"/repos/{owner}/{repo}", token)
+    if not isinstance(project, dict):
+        raise RuntimeError("无法读取 Gitee 镜像仓库信息")
+    if project.get("private") is True:
+        raise RuntimeError("Gitee 更新镜像仓库必须公开，否则客户端无法匿名下载")
+
+    default_branch = str(project.get("default_branch") or "master").strip()
+    if not default_branch:
+        raise RuntimeError("Gitee 镜像仓库没有默认分支，请先初始化仓库")
+
+    encoded_branch = urllib.parse.quote(default_branch, safe="")
+    branch = api_request(
+        "GET",
+        f"/repos/{owner}/{repo}/branches/{encoded_branch}",
+        token,
+        allow_404=True,
+    )
+    if branch is None:
+        raise RuntimeError(
+            f"Gitee 镜像仓库默认分支 {default_branch} 不存在；"
+            "请确认仓库已至少有一次初始提交"
+        )
+    commit_sha = extract_branch_commit_sha(branch)
+
+    print(f"Gitee 镜像发布目标：{default_branch} @ {commit_sha[:12]}")
+    return default_branch, commit_sha
+
+
 def ensure_release(owner: str, repo: str, tag: str, token: str) -> dict:
     encoded_tag = urllib.parse.quote(tag, safe="")
     release = api_request(
@@ -184,12 +230,7 @@ def ensure_release(owner: str, repo: str, tag: str, token: str) -> dict:
     if release is not None:
         return release
 
-    project = api_request("GET", f"/repos/{owner}/{repo}", token)
-    if not isinstance(project, dict):
-        raise RuntimeError("无法读取 Gitee 镜像仓库信息")
-    if project.get("private") is True:
-        raise RuntimeError("Gitee 更新镜像仓库必须公开，否则客户端无法匿名下载")
-    default_branch = str(project.get("default_branch") or "master")
+    _, target_sha = resolve_release_target(owner, repo, token)
 
     release = api_request(
         "POST",
@@ -199,7 +240,7 @@ def ensure_release(owner: str, repo: str, tag: str, token: str) -> dict:
             "tag_name": tag,
             "name": tag,
             "body": "777 国内更新镜像。正式发行源仍同步发布到 GitHub。",
-            "target_commitish": default_branch,
+            "target_commitish": target_sha,
             "prerelease": False,
         },
     )
@@ -359,6 +400,24 @@ def self_test() -> None:
         pass
     else:
         raise AssertionError("路径穿越文件名不应被接受")
+
+    # Keep branch parsing deterministic. Live branch resolution is covered by the release workflow
+    # because it requires the repository secret.
+    sample_branch = {
+        "name": "main",
+        "commit": {"sha": "0123456789abcdef0123456789abcdef01234567"},
+    }
+    assert (
+        extract_branch_commit_sha(sample_branch)
+        == "0123456789abcdef0123456789abcdef01234567"
+    )
+    for invalid_branch in ({}, {"commit": {}}, {"commit": {"sha": "abc"}}):
+        try:
+            extract_branch_commit_sha(invalid_branch)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("无效 Gitee 分支 commit SHA 不应被接受")
 
     print("Gitee 更新镜像发布脚本自检通过。")
 
