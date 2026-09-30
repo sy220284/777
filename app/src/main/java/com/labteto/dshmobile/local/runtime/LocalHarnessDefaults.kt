@@ -41,7 +41,6 @@ internal const val MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL = 8
 internal const val ATTACHMENT_GC_INTERVAL_MILLIS = 24L * 60L * 60L * 1000L
 internal const val LOCAL_PROJECT_ID = "local-workspace"
 internal const val PROJECTION_BASELINE_EVENT = "session/projection-baseline"
-
 internal val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
     "android_vscreen_status",
     "android_vscreen_launch",
