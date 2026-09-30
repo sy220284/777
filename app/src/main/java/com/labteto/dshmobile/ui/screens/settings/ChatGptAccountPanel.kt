@@ -72,7 +72,7 @@ internal fun ChatGptAccountPanel(
                 DsStatusPill(
                     state = when {
                         selected?.sharingEnabled == true && state.phase == ChatGptAuthPhase.CONNECTED -> DsStatus.Done
-                        state.phase == ChatGptAuthPhase.ERROR -> DsStatus.Error
+                        state.phase == ChatGptAuthPhase.ERROR -> DsStatus.Failed
                         else -> DsStatus.Neutral
                     },
                     label = when {
@@ -91,7 +91,7 @@ internal fun ChatGptAccountPanel(
                     color = colors.labelTertiary,
                 )
                 DsButton(
-                    text = "Continue with ChatGPT",
+                    text = stringResource(R.string.chatgpt_continue),
                     onClick = {
                         viewModel.connectChatGpt { error ->
                             error?.let(report)
