@@ -430,8 +430,11 @@ class OpenAiResponsesClient @Inject constructor(
             else -> throw invalidToolSchema(index, name, "parameters 必须是 JSON Schema 对象")
         }
         val type = source["type"]
-        if (type != null && !schemaTypeContains(type, "object")) {
-            throw invalidToolSchema(index, name, "parameters 根节点 type 必须是 object")
+        if (type != null) {
+            val rootType = type as? JsonPrimitive
+            if (rootType == null || !rootType.isString || rootType.content != "object") {
+                throw invalidToolSchema(index, name, "parameters 根节点 type 必须是 object")
+            }
         }
         val normalized = buildJsonObject {
             source.forEach { (key, item) -> put(key, item) }
