@@ -25,6 +25,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
@@ -97,7 +98,7 @@ internal fun LocalConversationErrorCard(
         ) {
             Text(
                 message,
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.error,
             )
             when {
