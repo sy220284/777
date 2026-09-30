@@ -31,7 +31,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -40,10 +39,10 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
-import com.labteto.dshmobile.ui.theme.LocalDsReadingPreferences
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 import java.util.Locale
 
@@ -64,7 +63,6 @@ import java.util.Locale
 fun UserBubble(text: String, modifier: Modifier = Modifier) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
-    val readingPreferences = LocalDsReadingPreferences.current
     val bubbleColor = backgroundState.surfaceColor(
         base = colors.userBubble,
         region = BackgroundRegion.MIDDLE,
@@ -76,13 +74,7 @@ fun UserBubble(text: String, modifier: Modifier = Modifier) {
     } else {
         colors.borderL3
     }
-    val bubbleStyle = DsType.bubbleText.copy(
-        fontWeight = when (readingPreferences.textWeightAdjustment) {
-            2 -> FontWeight.SemiBold
-            1 -> FontWeight.Medium
-            else -> FontWeight.Normal
-        },
-    )
+    val bubbleStyle = DsType.chatBody.withReadingWeight()
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
         Text(
             text,
