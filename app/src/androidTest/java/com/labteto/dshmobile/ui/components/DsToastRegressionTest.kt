@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.components
 
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import com.labteto.dshmobile.ui.theme.DshTheme
