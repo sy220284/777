@@ -1,0 +1,221 @@
+package com.labteto.dshmobile.ui.screens.settings
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
+import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonSize
+import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsStatus
+import com.labteto.dshmobile.ui.components.DsStatusPill
+import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.DsSpacing
+import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
+
+@Composable
+internal fun ChatGptAccountPanel(
+    state: ChatGptUiState,
+    viewModel: SettingsViewModel,
+    report: (String) -> Unit,
+) {
+    val colors = DsTheme.colors
+    val selected = state.selectedAccount
+    val busy = state.phase in setOf(
+        ChatGptAuthPhase.PREPARING,
+        ChatGptAuthPhase.WAITING_FOR_BROWSER,
+        ChatGptAuthPhase.EXCHANGING_CODE,
+        ChatGptAuthPhase.VALIDATING_IDENTITY,
+        ChatGptAuthPhase.LOADING_MODELS,
+    )
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+    ) {
+        Column(
+            modifier = Modifier.padding(DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.chatgpt_account_title),
+                        style = DsType.std14Strong,
+                        color = colors.labelPrimary,
+                    )
+                    Text(
+                        stringResource(R.string.chatgpt_account_hint),
+                        style = DsType.caption11,
+                        color = colors.labelSecondary,
+                    )
+                }
+                DsStatusPill(
+                    state = when {
+                        selected?.sharingEnabled == true && state.phase == ChatGptAuthPhase.CONNECTED -> DsStatus.Done
+                        state.phase == ChatGptAuthPhase.ERROR -> DsStatus.Error
+                        else -> DsStatus.Neutral
+                    },
+                    label = when {
+                        selected?.sharingEnabled == true && state.phase == ChatGptAuthPhase.CONNECTED ->
+                            stringResource(R.string.chatgpt_connected)
+                        busy -> stringResource(R.string.chatgpt_connecting)
+                        else -> stringResource(R.string.chatgpt_not_connected)
+                    },
+                )
+            }
+
+            if (selected == null) {
+                Text(
+                    stringResource(R.string.chatgpt_privacy_hint),
+                    style = DsType.caption11,
+                    color = colors.labelTertiary,
+                )
+                DsButton(
+                    text = "Continue with ChatGPT",
+                    onClick = {
+                        viewModel.connectChatGpt { error ->
+                            error?.let(report)
+                        }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                Text(
+                    selected.displayName?.takeIf(String::isNotBlank)
+                        ?: selected.email?.takeIf(String::isNotBlank)
+                        ?: stringResource(R.string.chatgpt_account_fallback),
+                    style = DsType.std14Strong,
+                    color = colors.labelPrimary,
+                )
+                selected.email?.takeIf { it != selected.displayName }?.let {
+                    Text(it, style = DsType.caption11, color = colors.labelTertiary)
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    DsPill(text = stringResource(R.string.chatgpt_plan_usage))
+                    DsPill(text = stringResource(R.string.chatgpt_model_count, state.models.size))
+                }
+
+                if (state.accounts.size > 1) {
+                    Text(
+                        stringResource(R.string.chatgpt_saved_accounts),
+                        style = DsType.caption11,
+                        color = colors.labelTertiary,
+                    )
+                    state.accounts.forEach { account ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        ) {
+                            Text(
+                                account.displayName?.takeIf(String::isNotBlank)
+                                    ?: account.email.orEmpty().ifBlank { stringResource(R.string.chatgpt_account_fallback) },
+                                style = DsType.small13,
+                                color = colors.labelSecondary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (account.id == state.selectedAccountId) {
+                                DsPill(text = stringResource(R.string.chatgpt_current_account), selected = true)
+                            } else {
+                                DsButton(
+                                    text = stringResource(R.string.chatgpt_use_account),
+                                    onClick = {
+                                        viewModel.selectChatGptAccount(account.id) { error ->
+                                            error?.let(report)
+                                        }
+                                    },
+                                    enabled = !busy,
+                                    size = DsButtonSize.Small,
+                                    variant = DsButtonVariant.Ghost,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    DsButton(
+                        text = stringResource(R.string.chatgpt_reauthorize),
+                        onClick = {
+                            viewModel.connectChatGpt(selected.id) { error ->
+                                error?.let(report)
+                            }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.weight(1f),
+                        size = DsButtonSize.Small,
+                        variant = DsButtonVariant.Outline,
+                    )
+                    DsButton(
+                        text = stringResource(R.string.chatgpt_disconnect),
+                        onClick = {
+                            viewModel.disconnectChatGptAccount(selected.id) { error ->
+                                error?.let(report)
+                            }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.weight(1f),
+                        size = DsButtonSize.Small,
+                        variant = DsButtonVariant.Ghost,
+                    )
+                }
+                DsButton(
+                    text = stringResource(R.string.chatgpt_add_account),
+                    onClick = {
+                        viewModel.connectChatGpt { error ->
+                            error?.let(report)
+                        }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Ghost,
+                )
+            }
+
+            if (busy) {
+                Text(
+                    when (state.phase) {
+                        ChatGptAuthPhase.WAITING_FOR_BROWSER -> stringResource(R.string.chatgpt_waiting_browser)
+                        ChatGptAuthPhase.EXCHANGING_CODE -> stringResource(R.string.chatgpt_exchanging)
+                        ChatGptAuthPhase.VALIDATING_IDENTITY -> stringResource(R.string.chatgpt_validating)
+                        ChatGptAuthPhase.LOADING_MODELS -> stringResource(R.string.chatgpt_loading_models)
+                        else -> stringResource(R.string.chatgpt_connecting)
+                    },
+                    style = DsType.caption11,
+                    color = colors.labelSecondary,
+                )
+            }
+            state.error?.let {
+                Text(it, style = DsType.caption11, color = colors.error)
+            }
+        }
+    }
+}
