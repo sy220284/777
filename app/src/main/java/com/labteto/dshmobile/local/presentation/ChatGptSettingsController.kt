@@ -31,6 +31,7 @@ internal class ChatGptSettingsController(
 
     suspend fun cancelAuthorization() = auth.cancelPendingAuthorization()
 
+    /** Refresh auth state after the real probe so terminal credential failures surface immediately. */
     suspend fun test(id: String): String {
         val result = testAccount(id)
         if (state.value.selectedAccountId == id) {
