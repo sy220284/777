@@ -821,6 +821,35 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun thirdPartyResponsesStillRejectsMalformedCommonSchemaShapes() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"vendor_bad_tool",
+                "strict":false,
+                "parameters":{
+                    "type":"object",
+                    "properties":"not-an-object"
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload(
+                model = "vendor-responses-model",
+                messages = emptyList(),
+                tools = tools,
+                temperature = null,
+                planSharing = false,
+                includeEncryptedReasoning = false,
+                enforceOpenAiToolSchema = false,
+            )
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("properties"))
+    }
+
+    @Test
     fun officialOpenAiApiKeyResponsesEnforcesOpenAiStrictSchemaRules() {
         val tools = Json.parseToJsonElement("""[
             {"type":"function","function":{

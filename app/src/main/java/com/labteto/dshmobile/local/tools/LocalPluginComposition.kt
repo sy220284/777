@@ -161,7 +161,17 @@ internal class LocalPluginComposition(
                 else -> "chatgpt-plan"
             }
         },
-        routeProvider = routeProvider,
+        routeProvider = {
+            routeProvider()?.let { route -> route.copy(profile = modelGateway.activeProfile()) }
+        },
+        routeKeyProvider = { route ->
+            val profile = route.profile
+            when {
+                profile == null || !modelGateway.hasCredential(profile) -> null
+                profile.authKind == com.labteto.dshmobile.local.LocalModelAuthKind.API_KEY -> apiKeys.getFor(profile.id)
+                else -> "chatgpt-plan"
+            }
+        },
         analyzer = visionClient,
         workspaceRoot = workspaceRoot,
         imageSupportProvider = imageSupportProvider,

@@ -8,6 +8,8 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -17,6 +19,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
+    @Test
+    fun toolContextInheritsFrozenRunProfileAndDoesNotLeakAfterScope() = runBlocking {
+        val registry = ToolRegistry()
+        val observed = mutableListOf<LocalModelProfile?>()
+        registry.register(HarnessTool("vision_status", buildJsonObject {}, ToolAccess.READ_ONLY,
+            ToolApprovalPolicy.NEVER, executor = HarnessToolExecutor { context, _, _ ->
+                observed += context.attributes["model_profile"] as? LocalModelProfile
+                ToolResult("ok")
+            }))
+        val profile = LocalModelProfile("route-a", "same-model", "https://route-a.example/v1")
+        val coordinator = coordinator(registry)
+        withContext(LocalModelRunContext(profile)) {
+            coordinator.execute(LocalToolCall("c1", "vision_status", JsonObject(emptyMap()), "{}"), true)
+        }
+        coordinator.execute(LocalToolCall("c2", "vision_status", JsonObject(emptyMap()), "{}"), true)
+        assertEquals(listOf(profile, null), observed)
+    }
+
     @Test
     fun unknownToolReturnsStructuredFailure() = runBlocking {
         val coordinator = coordinator(ToolRegistry())

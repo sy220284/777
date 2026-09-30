@@ -500,7 +500,7 @@ internal fun LocalModelSettingsCard(
                             overflow = TextOverflow.Ellipsis,
                         )
                         ModelCapabilityTags(
-                            LocalModelPresets.capabilitiesFor(profile.model, profile.baseUrl),
+                            LocalModelPresets.clientCapabilitiesFor(profile.model, profile.baseUrl),
                         )
                     }
                     DsMenu(
@@ -592,7 +592,11 @@ internal fun LocalModelSettingsCard(
                                 color = colors.labelTertiary,
                             )
                         }
-                        ModelCapabilityTags(preset.capabilities)
+                        ModelCapabilityTags(LocalModelPresets.clientCapabilitiesFor(preset.model, preset.baseUrl))
+                        if (preset.capabilities.any { it == LocalModelCapability.VIDEO || it == LocalModelCapability.AUDIO }) {
+                            Text(stringResource(R.string.local_model_media_not_connected),
+                                style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+                        }
                     }
                 }
                 if (custom) LocalModelProtocolPicker(protocol) { protocol = it; testStatus = null }

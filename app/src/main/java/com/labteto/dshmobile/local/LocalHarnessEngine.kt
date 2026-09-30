@@ -2792,6 +2792,7 @@ class LocalHarnessEngine @Inject constructor(
                 workspaceRoot = File(workspace.path),
                 mode = LocalImageInputMode.NATIVE,
                 budget = imageRequestBudget,
+                maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.model, snapshot.baseUrl),
             )
 
             eventLog.append("turn/start", buildJsonObject {
@@ -3155,7 +3156,8 @@ class LocalHarnessEngine @Inject constructor(
                     snapshot.baseUrl,
                     snapshot.model,
                 )
-                if (hasLocalImageRefs(durableRequestMessages) && selectedMode == LocalImageInputMode.TOOL) {
+                if (hasLocalImageRefs(durableRequestMessages) &&
+                    imageCapabilities.state(snapshot.baseUrl, snapshot.model) == LocalImageCapability.UNSUPPORTED) {
                     throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
                 }
                 val requestMessages = prepareLocalMultimodalMessages(
@@ -3163,6 +3165,7 @@ class LocalHarnessEngine @Inject constructor(
                     workspaceRoot = File(workspace.path),
                     mode = selectedMode,
                     budget = imageRequestBudget,
+                    maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.model, snapshot.baseUrl),
                 )
                 val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
                 val rawReply = try {

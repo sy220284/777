@@ -131,16 +131,14 @@ internal object OpenAiResponsesToolAdapter {
             if (type == null) put("type", "object")
             if ("properties" !in source) put("properties", buildJsonObject {})
         }
-        if (enforceOpenAiToolSchema) {
-            validateResponseParameterSchema(
-                index = index,
-                name = name,
-                schema = normalized,
-                path = "parameters",
-                strict = strict,
-                enforceOpenAiToolSchema = true,
-            )
-        }
+        validateResponseParameterSchema(
+            index = index,
+            name = name,
+            schema = normalized,
+            path = "parameters",
+            strict = strict,
+            enforceOpenAiToolSchema = enforceOpenAiToolSchema,
+        )
         return normalized
     }
 

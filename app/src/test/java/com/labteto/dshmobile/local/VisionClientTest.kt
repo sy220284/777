@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -14,6 +15,25 @@ import org.junit.Test
 class VisionClientTest {
     private val json = Json { ignoreUnknownKeys = true }
     private val client = VisionClient(OkHttpClient(), json)
+
+    @Test
+    fun providerImageLimitCountsDecodedBytesAndPaddingBeforeNetwork() = runBlocking {
+        var requested = false
+        val transport = OkHttpClient.Builder().addInterceptor {
+            requested = true
+            throw AssertionError("Oversized image reached network")
+        }.build()
+        val limit = LocalModelPresets.maxNativeImageBytesFor("MiniMax-M3", "https://api.minimaxi.com/v1")
+        // limit and limit+1 have the same encoded length; padding distinguishes the extra byte.
+        val encodedLength = ((limit + 2) / 3 * 4).toInt()
+        val image = "data:image/png;base64," + "A".repeat(encodedLength - 1) + "="
+        val error = runCatching { VisionClient(transport, json).analyze(
+            "test", "https://api.minimaxi.com/v1", "MiniMax-M3", "test", image,
+        ) }.exceptionOrNull()
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error?.message.orEmpty().contains("上传大小限制"))
+        assertTrue(!requested)
+    }
 
     @Test
     fun payloadUsesOpenAiCompatibleImagePartWithoutLeakingIntoTextHistory() {
