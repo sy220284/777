@@ -208,7 +208,7 @@ class LocalHarnessEngine @Inject constructor(
     )
     private val webTools = LocalWebTools(
         web = web,
-        searchKeyProvider = modelConfiguration::deepSeekSearchApiKeyOrNull,
+        searchKeyProvider = LocalDeepSeekSearchCredentialResolver(modelConfiguration::readProfiles, apiKeys)::resolve,
         workspace = workspace,
         json = json,
     )
@@ -4028,10 +4028,8 @@ class LocalHarnessEngine @Inject constructor(
             "job_output" -> jobs.output(args.string("job_id"), boundSessionId)
             "job_kill" -> jobs.kill(args.string("job_id"), boundSessionId)
             "web_search" -> {
-                val key = modelConfiguration.deepSeekSearchApiKeyOrNull()
-                    ?: error("网页搜索需要单独配置 DeepSeek 官方 API Key")
                 val queries = args["queries"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-                web.search(key, queries, tokenUsageBridge.resolve(boundSessionId, call.id, TokenUsageAction.WEB_SEARCH, queries.firstOrNull()))
+                webTools.search(queries, tokenUsageBridge.resolve(boundSessionId, call.id, TokenUsageAction.WEB_SEARCH, queries.firstOrNull()))
             }
             "web_fetch" -> {
                 val input = args.string("url")
