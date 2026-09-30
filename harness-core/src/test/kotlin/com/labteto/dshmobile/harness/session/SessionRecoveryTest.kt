@@ -59,6 +59,35 @@ class SessionRecoveryTest {
         }
     }
 
+
+    @Test
+    fun providerNeutralToolMetadataRecoversWithoutOpenAiToolCalls() {
+        val directory = Files.createTempDirectory("session-recovery-canonical").toFile()
+        try {
+            val log = SessionEventLog(directory.resolve("events.jsonl"), json, maxBytes = 4_096, clock = { 1L })
+            log.append("turn/start", buildJsonObject { })
+            log.append("step/start", buildJsonObject { put("step", 4) })
+            log.append("assistant/message", buildJsonObject {
+                put("role", "assistant")
+                put("content", "")
+                put("model_tool_calls", buildJsonArray {
+                    add(buildJsonObject {
+                        put("id", "canonical-call")
+                        put("name", "read")
+                    })
+                })
+            })
+
+            val repaired = SessionRecovery.repairInterruptedTail(log)
+
+            assertEquals(listOf("canonical-call"), repaired.toolResults.map { it.callId })
+            assertEquals("read", repaired.toolResults.single().name)
+            assertEquals(SessionRecovery.TOOL_NOT_STARTED, repaired.toolResults.single().code)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     @Test
     fun balancedTurnNeedsNoRepair() {
         val directory = Files.createTempDirectory("session-recovery-balanced").toFile()
