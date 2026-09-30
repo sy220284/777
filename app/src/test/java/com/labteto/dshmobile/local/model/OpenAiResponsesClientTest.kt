@@ -50,6 +50,7 @@ class OpenAiResponsesClientTest {
             """data: {"type":"response.completed","response":{"id":"resp-terminal","output":[{"type":"message","content":[{"type":"output_text","text":"完成"}]}],"usage":{"input_tokens":7,"output_tokens":3}}}""" + "\n"
         val bytes = Buffer().writeUtf8(terminalFrame)
         var sourceReads = 0
+        var sourceCloses = 0
         val source = object : Source {
             override fun read(sink: Buffer, byteCount: Long): Long {
                 sourceReads += 1
@@ -58,7 +59,10 @@ class OpenAiResponsesClientTest {
             }
 
             override fun timeout(): Timeout = Timeout.NONE
-            override fun close() = Unit
+            override fun close() {
+                sourceCloses += 1
+                throw IOException("stream was reset: CANCEL while closing")
+            }
         }.buffer()
         val transport = OkHttpClient.Builder()
             .addInterceptor { chain ->
@@ -99,6 +103,7 @@ class OpenAiResponsesClientTest {
         assertEquals(7L, reply.usage.promptTokens)
         assertEquals(3L, reply.usage.completionTokens)
         assertEquals(1, sourceReads)
+        assertEquals(1, sourceCloses)
     }
 
     @Test
