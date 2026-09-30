@@ -90,6 +90,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
 internal fun LocalModeDrawer(
@@ -144,7 +145,7 @@ internal fun LocalModeDrawer(
     }
 
     ModalDrawerSheet(
-        drawerContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG, base = colors.sidebar),
+        drawerContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.DRAWER, base = colors.sidebar),
         modifier = Modifier.fillMaxHeight(),
     ) {
         Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
@@ -160,7 +161,7 @@ internal fun LocalModeDrawer(
                 ) {
                     Text(
                         stringResource(R.string.app_name),
-                        style = DsType.large20,
+                        style = DsType.large20.withReadingWeight(),
                         color = colors.labelPrimary,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
@@ -275,7 +276,7 @@ internal fun LocalModeDrawer(
                     item(key = "drawer-no-sessions") {
                         Text(
                             stringResource(R.string.chatlist_search_empty),
-                            style = DsType.small13,
+                            style = DsType.small13.withReadingWeight(),
                             color = colors.labelTertiary,
                             modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
                         )
@@ -330,7 +331,7 @@ internal fun LocalModeDrawer(
                         ) {
                             Text(
                                 stringResource(R.string.local_selected_count, selectedIds.size),
-                                style = DsType.small13Strong,
+                                style = DsType.small13Strong.withReadingWeight(),
                                 color = colors.labelPrimary,
                                 modifier = Modifier.weight(1f),
                             )
@@ -428,7 +429,7 @@ private fun DrawerPrimaryAction(
         Spacer(Modifier.width(DsSpacing.small))
         Text(
             title,
-            style = DsType.base16,
+            style = DsType.base16Strong.withReadingWeight(),
             color = colors.labelPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -456,7 +457,7 @@ private fun DrawerSectionTitle(
     ) {
         Text(
             title,
-            style = DsType.std14,
+            style = DsType.std14.withReadingWeight(),
             color = DsTheme.colors.labelTertiary,
             modifier = Modifier.weight(1f),
         )
@@ -509,7 +510,10 @@ private fun LocalSessionDrawerRow(
             .clip(DsShapes.row)
             .background(
                 animateColorAsState(
-                    targetValue = if (current || selected) colors.sidebarNavActive else colors.sidebar,
+                    targetValue = colors.wallpaperSurface(
+                        level = WallpaperSurfaceLevel.CARD,
+                        base = if (current || selected) colors.sidebarNavActive else colors.sidebar,
+                    ),
                     animationSpec = DsAnimations.interactionColor,
                     label = "sessionRowBackground",
                 ).value,
@@ -538,7 +542,7 @@ private fun LocalSessionDrawerRow(
             summaryPreview?.let { preview ->
                 Text(
                     preview,
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -550,7 +554,7 @@ private fun LocalSessionDrawerRow(
             ) {
                 Text(
                     relativeTime(updatedAt),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelCaption,
                     maxLines = 1,
                 )

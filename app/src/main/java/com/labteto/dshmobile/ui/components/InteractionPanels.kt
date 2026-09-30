@@ -31,6 +31,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
@@ -82,7 +83,7 @@ fun ApprovalPanel(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         stringResource(R.string.approval_title),
-                        style = DsType.small13Strong,
+                        style = DsType.small13Strong.withReadingWeight(),
                         color = colors.warnLabel,
                     )
                 }
@@ -92,7 +93,7 @@ fun ApprovalPanel(
                 ) {
                     Text(
                         stringResource(R.string.approval_reason, displayReason),
-                        style = DsType.small13,
+                        style = DsType.small13.withReadingWeight(),
                         color = colors.labelSecondary,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -171,7 +172,7 @@ internal fun PlanReviewPanel(
                 ) {
                     Text(
                         stringResource(R.string.plan_review_title),
-                        style = DsType.small13Strong,
+                        style = DsType.small13Strong.withReadingWeight(),
                         color = colors.warnLabel,
                     )
                 }

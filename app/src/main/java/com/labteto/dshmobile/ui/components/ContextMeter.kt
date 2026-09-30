@@ -30,6 +30,7 @@ import com.labteto.dshmobile.ui.theme.Ds
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
  * How full the model's context window is, split by what is filling it.
@@ -98,7 +99,7 @@ fun ContextMeterDetail(
         if (ratio != null) {
             Text(
                 stringResource(R.string.chat_context_used, (ratio * 100).toInt()),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelSecondary,
             )
         }
@@ -118,6 +119,6 @@ private fun LegendDot(label: String, color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Spacer(Modifier.size(6.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(4.dp))
-        Text(label, style = DsType.caption11, color = DsTheme.colors.labelTertiary)
+        Text(label, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelTertiary)
     }
 }

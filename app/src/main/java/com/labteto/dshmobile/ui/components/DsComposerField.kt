@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
  * Compact multiline field shared by all conversation composers.
@@ -44,7 +45,7 @@ fun DsComposerField(
             .onFocusChanged { onFocusedChange(it.isFocused) }
             .padding(horizontal = DsSpacing.small, vertical = DsSpacing.tiny),
         enabled = enabled,
-        textStyle = DsType.std14.copy(
+        textStyle = DsType.std14.withReadingWeight().copy(
             color = if (enabled) colors.labelPrimary else colors.labelTertiary,
         ),
         cursorBrush = SolidColor(colors.accent),
@@ -57,7 +58,7 @@ fun DsComposerField(
                 if (value.isEmpty()) {
                     Text(
                         placeholder,
-                        style = DsType.std14,
+                        style = DsType.std14.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
                 }

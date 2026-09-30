@@ -36,6 +36,9 @@ import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
 /** Button variants mirroring the harness primary/info/ghost/outline/danger palette. */
@@ -76,7 +79,7 @@ fun DsButton(
     }
     val background = when {
         !enabled -> when (variant) {
-            DsButtonVariant.Ghost, DsButtonVariant.Outline -> colors.bgLayer2
+            DsButtonVariant.Ghost, DsButtonVariant.Outline -> colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, base = colors.bgLayer2)
             else -> fill.copy(alpha = 0.4f)
         }
         hovered -> when (variant) {
@@ -126,7 +129,7 @@ fun DsButton(
             if (text.isNotEmpty()) {
                 Text(
                     text,
-                    style = if (normal) DsType.std14Strong else DsType.small13Strong,
+                    style = (if (normal) DsType.std14Strong else DsType.small13Strong).withReadingWeight(),
                     color = contentColor,
                     maxLines = 1,
                 )

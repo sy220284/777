@@ -39,6 +39,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 
 /**
@@ -60,14 +61,14 @@ internal fun ModelsSheet(
     val colors = DsTheme.colors
     DsBottomSheet(title = stringResource(R.string.models_title), onDismiss = onDismiss) {
         if (models == null) {
-            Text(stringResource(R.string.common_loading), style = DsType.std14, color = colors.labelTertiary)
+            Text(stringResource(R.string.common_loading), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
             return@DsBottomSheet
         }
         val current = models.current
         if (!models.routable) {
             Text(
                 stringResource(R.string.models_unroutable),
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.warnLabel,
             )
         }
@@ -82,7 +83,7 @@ internal fun ModelsSheet(
                 // At the section weight this used the group read as loud as its own contents.
                 Text(
                     group.name,
-                    style = DsType.xsmall12,
+                    style = DsType.xsmall12.withReadingWeight(),
                     color = colors.labelTertiary,
                     modifier = Modifier.padding(
                         start = DsSpacing.small,
@@ -106,7 +107,7 @@ internal fun ModelsSheet(
             models.failures.forEach { failure ->
                 Text(
                     stringResource(R.string.err_model_unavailable, "${failure.name}: ${failure.message}"),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.warnLabel,
                     modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.tiny),
                 )
@@ -157,7 +158,7 @@ private fun ModelRow(
                 Column(Modifier.weight(1f)) {
                     Text(
                         model.name,
-                        style = DsType.std14Strong,
+                        style = DsType.std14Strong.withReadingWeight(),
                         color = if (selected) colors.accent else colors.labelPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -165,7 +166,7 @@ private fun ModelRow(
                     model.description?.takeIf { it.isNotBlank() }?.let {
                         Text(
                             it,
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelTertiary,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -195,7 +196,7 @@ private fun ModelRow(
                     // harness gives the tier list a pane with a title; here the title is one line.
                     Text(
                         stringResource(R.string.models_reasoning_effort),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
                     DsSegmented(

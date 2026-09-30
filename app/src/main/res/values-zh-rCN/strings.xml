@@ -232,7 +232,7 @@
     <string name="settings_component_transparency">组件透明度</string>
     <string name="settings_surface_clearer">更清晰</string>
     <string name="settings_surface_airier">更通透</string>
-    <string name="settings_component_transparency_hint">只调整自定义背景上的卡片、输入区和浮层；各组件仍保留自己的可读性安全范围。</string>
+    <string name="settings_component_transparency_hint">调整自定义背景上的卡片、输入区、侧栏、弹窗与菜单；主操作按钮保持清晰实色，各组件仍保留可读性安全范围。</string>
     <string name="settings_appearance_light">浅色</string>
     <string name="settings_appearance_dark">深色</string>
     <string name="settings_appearance_matte_black">磨砂黑</string>

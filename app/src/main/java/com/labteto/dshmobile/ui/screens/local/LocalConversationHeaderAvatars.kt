@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.local.LocalGroupChatMember
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -50,7 +51,7 @@ internal fun GroupChatMemberAvatar(member: LocalGroupChatMember, active: Boolean
             } else {
                 Text(
                     member.displayName.trim().take(1).ifBlank { "·" },
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = if (active) colors.characterAccent else colors.labelSecondary,
                     maxLines = 1,
                 )
@@ -82,7 +83,7 @@ internal fun LocalPersonaHeaderAvatar(name: String, portraitPath: String) {
             } else {
                 Text(
                     name.trim().take(1).ifBlank { "·" },
-                    style = DsType.small13Strong,
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = colors.characterAccent,
                 )
             }

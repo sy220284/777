@@ -40,6 +40,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
  * The `+` sheet: everything you can add to a message that is not the message.
@@ -184,7 +185,7 @@ internal fun CommandSheet(
                         else -> R.string.chat_composer_mode_queue_hint
                     },
                 ),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
                 modifier = Modifier.padding(top = DsSpacing.small),
             )
@@ -196,7 +197,7 @@ internal fun CommandSheet(
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                placeholder = { Text(stringResource(R.string.common_search), style = DsType.std14) },
+                placeholder = { Text(stringResource(R.string.common_search), style = DsType.std14.withReadingWeight()) },
                 colors = dialogTextFieldColors(),
             )
         }
@@ -206,12 +207,12 @@ internal fun CommandSheet(
         when {
             !commandsAvailable -> Text(
                 stringResource(R.string.chat_commands_unavailable),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             filteredCommands.isEmpty() -> Text(
                 stringResource(R.string.chat_commands_empty),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             else -> Column {
@@ -246,12 +247,12 @@ internal fun CommandSheet(
         when {
             skillsLoading -> Text(
                 stringResource(R.string.common_loading),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             filteredSkills.isEmpty() -> Text(
                 stringResource(R.string.skills_empty),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             else -> Column {
@@ -302,7 +303,7 @@ internal fun SheetRow(
         Column(Modifier.weight(1f)) {
             Text(
                 title,
-                style = DsType.std14Strong,
+                style = DsType.std14Strong.withReadingWeight(),
                 color = if (enabled) colors.labelPrimary else colors.labelTertiary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -310,7 +311,7 @@ internal fun SheetRow(
             if (subtitle != null) {
                 Text(
                     subtitle,
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -321,7 +322,7 @@ internal fun SheetRow(
             Spacer(Modifier.width(DsSpacing.small))
             Text(
                 trailing,
-                style = DsType.caption11.copy(fontFamily = DsType.codeFont),
+                style = DsType.caption11.withReadingWeight().copy(fontFamily = DsType.codeFont),
                 color = colors.labelCaption,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

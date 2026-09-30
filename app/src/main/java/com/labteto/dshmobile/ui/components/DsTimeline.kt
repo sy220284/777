@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /** One entry on a [DsTimeline]: a run receipt, a step, an audit line. */
 data class DsTimelineItem(
@@ -80,7 +81,7 @@ fun DsTimeline(
                 }
                 Text(
                     item.text,
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelSecondary,
                     modifier = Modifier
                         .weight(1f)

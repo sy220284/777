@@ -34,6 +34,7 @@ import com.labteto.dshmobile.ui.screens.tools.ToolsScreen
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.ThemePreference
 
@@ -267,14 +268,14 @@ private fun RemoteRelayStatus(
                 stringResource(
                     if (failed) R.string.relay_status_failed_title else R.string.relay_status_connecting_title,
                 ),
-                style = DsType.large20,
+                style = DsType.large20.withReadingWeight(),
                 color = colors.labelPrimary,
             )
             Text(
                 stringResource(
                     if (failed) R.string.relay_status_failed_body else R.string.relay_status_connecting_body,
                 ),
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
             )
             if (failed) {

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
 /**
@@ -42,21 +43,21 @@ fun EmptyHero(
     ) {
         Text(
             headline,
-            style = DsType.hero26,
+            style = DsType.hero26.withReadingWeight(),
             color = colors.labelPrimary,
             textAlign = TextAlign.Center,
         )
         subtitle?.let {
             Text(
                 it,
-                style = DsType.base16,
+                style = DsType.base16.withReadingWeight(),
                 color = colors.labelSecondary,
                 textAlign = TextAlign.Center,
             )
         }
         Text(
             stringResource(R.string.app_name),
-            style = DsType.xsmall12.copy(fontFamily = DsType.codeFont, color = colors.accent),
+            style = DsType.xsmall12.withReadingWeight().copy(fontFamily = DsType.codeFont, color = colors.accent),
             color = colors.accent,
             modifier = Modifier
                 .clip(RoundedCornerShape(24.dp))

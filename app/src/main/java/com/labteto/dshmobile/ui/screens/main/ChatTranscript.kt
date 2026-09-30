@@ -40,6 +40,7 @@ import com.labteto.dshmobile.ui.components.EmptyHero
 import com.labteto.dshmobile.ui.components.skeleton
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
  * How close to the far end of the list — the oldest message — a reader must get before the next
@@ -172,7 +173,7 @@ internal fun ChatTranscript(
         ) {
             Text(
                 stringResource(R.string.chat_view_mode),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = DsTheme.colors.labelTertiary,
                 modifier = Modifier.weight(1f),
             )
@@ -294,7 +295,7 @@ private fun LoadOlderRow(
             Spacer(Modifier.width(8.dp))
             Text(
                 stringResource(R.string.chat_loading_older),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
         }

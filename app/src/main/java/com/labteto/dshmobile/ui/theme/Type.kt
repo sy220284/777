@@ -28,9 +28,9 @@ object DsType {
 
     // UI roles
     val display24 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 32.sp)
-    val hero26 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 26.sp, lineHeight = 32.sp)
-    val large20 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 20.sp, lineHeight = 28.sp)
-    val titleSerif20 = TextStyle(fontFamily = titleFont, fontWeight = FontWeight.Medium, fontSize = 20.sp, lineHeight = 28.sp)
+    val hero26 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 32.sp)
+    val large20 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
+    val titleSerif20 = TextStyle(fontFamily = titleFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
     val base16 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
     val base16Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp)
     val std14 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 23.sp)
@@ -41,38 +41,47 @@ object DsType {
     val caption11 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 16.sp)
     val caption11Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp)
 
-    // Composer / rows / bubbles
-    val bubbleText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 17.sp, lineHeight = 26.sp)
+    // Composer / rows / chat
+    // User and assistant body text deliberately share the exact same metrics. Role distinction comes
+    // from container, alignment and colour rather than an accidental font-size mismatch.
+    val chatBody = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 17.sp, lineHeight = 26.sp)
+    val bubbleText = chatBody
     val rowText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 21.sp)
     val tabText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 18.sp)
     val dockTitle = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 24.sp)
     val statsText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 20.sp)
 }
 
-@Composable
-fun TextStyle.withReadingWeight(): TextStyle {
-    val adjustment = LocalDsReadingPreferences.current.textWeightAdjustment
-    if (adjustment <= 0) return this
+fun TextStyle.adjustedReadingWeight(adjustment: Int): TextStyle {
+    val level = adjustment.coerceIn(0, 2)
+    if (level <= 0) return this
     val current = fontWeight ?: FontWeight.Normal
     val target = when {
         current >= FontWeight.Bold -> current
-        adjustment >= 2 && current >= FontWeight.Medium -> FontWeight.Bold
-        adjustment >= 2 -> FontWeight.SemiBold
+        level >= 2 && current >= FontWeight.Medium -> FontWeight.Bold
+        level >= 2 -> FontWeight.SemiBold
         current >= FontWeight.Medium -> FontWeight.SemiBold
         else -> FontWeight.Medium
     }
     return copy(fontWeight = target)
 }
 
-/** Material 3 mapping: sizes follow DsType, colors come from DsColors. */
-val DsTypography = Typography(
-    displayLarge = DsType.display24,
-    headlineMedium = DsType.large20,
-    titleMedium = DsType.std14Strong,
-    bodyLarge = DsType.base16,
-    bodyMedium = DsType.std14,
-    bodySmall = DsType.small13,
-    labelLarge = DsType.std14Strong,
-    labelMedium = DsType.small13Strong,
-    labelSmall = DsType.caption11,
+@Composable
+fun TextStyle.withReadingWeight(): TextStyle =
+    adjustedReadingWeight(LocalDsReadingPreferences.current.textWeightAdjustment)
+
+/** Material 3 mapping: sizes follow DsType and weight follows the app-wide reading preference. */
+fun dsTypography(textWeightAdjustment: Int): Typography = Typography(
+    displayLarge = DsType.display24.adjustedReadingWeight(textWeightAdjustment),
+    headlineMedium = DsType.large20.adjustedReadingWeight(textWeightAdjustment),
+    titleMedium = DsType.std14Strong.adjustedReadingWeight(textWeightAdjustment),
+    bodyLarge = DsType.base16.adjustedReadingWeight(textWeightAdjustment),
+    bodyMedium = DsType.std14.adjustedReadingWeight(textWeightAdjustment),
+    bodySmall = DsType.small13.adjustedReadingWeight(textWeightAdjustment),
+    labelLarge = DsType.std14Strong.adjustedReadingWeight(textWeightAdjustment),
+    labelMedium = DsType.small13Strong.adjustedReadingWeight(textWeightAdjustment),
+    labelSmall = DsType.caption11.adjustedReadingWeight(textWeightAdjustment),
 )
+
+/** Kept for previews/tests that need the unadjusted baseline. */
+val DsTypography = dsTypography(0)

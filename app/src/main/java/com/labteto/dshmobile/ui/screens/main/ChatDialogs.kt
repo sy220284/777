@@ -21,6 +21,7 @@ import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /** A single-field rename dialog, shared by the session and workspace rename paths. */
 @Composable
@@ -37,7 +38,7 @@ internal fun RenameDialog(
             onValueChange = { text = it },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            placeholder = { Text(title, style = DsType.std14) },
+            placeholder = { Text(title, style = DsType.std14.withReadingWeight()) },
             colors = dialogTextFieldColors(),
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -67,7 +68,7 @@ internal fun ConfirmDialog(
     onConfirm: () -> Unit,
 ) {
     DsDialog(title = title, onDismiss = onDismiss) {
-        Text(body, style = DsType.std14, color = DsTheme.colors.labelSecondary)
+        Text(body, style = DsType.std14.withReadingWeight(), color = DsTheme.colors.labelSecondary)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             DsButton(
                 text = stringResource(R.string.common_cancel),

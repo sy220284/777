@@ -37,6 +37,9 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
 internal fun GroupChatMemberPickerSheet(
@@ -81,14 +84,14 @@ internal fun GroupChatMemberPickerSheet(
                 MIN_GROUP_CHAT_MEMBERS,
                 MAX_GROUP_CHAT_MEMBERS,
             ),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = DsTheme.colors.labelSecondary,
         )
 
         if (entries.isEmpty()) {
             Text(
                 stringResource(R.string.local_group_chat_no_characters),
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = DsTheme.colors.labelSecondary,
             )
         } else {
@@ -102,7 +105,7 @@ internal fun GroupChatMemberPickerSheet(
             if (filteredEntries.isEmpty()) {
                 Text(
                     stringResource(R.string.persona_gallery_no_match),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                 )
             } else {
@@ -128,11 +131,10 @@ internal fun GroupChatMemberPickerSheet(
                                         }
                                     },
                                 ),
-                            color = if (checked) {
-                                DsTheme.colors.accent.copy(alpha = 0.08f)
-                            } else {
-                                DsTheme.colors.bgLayer1
-                            },
+                            color = DsTheme.colors.wallpaperSurface(
+                                WallpaperSurfaceLevel.CARD,
+                                base = if (checked) DsTheme.colors.accentTertiary else DsTheme.colors.bgLayer1,
+                            ),
                         ) {
                             Row(
                                 modifier = Modifier
@@ -147,7 +149,7 @@ internal fun GroupChatMemberPickerSheet(
                                 ) {
                                     Text(
                                         entry.persona.name.trim().take(1).ifBlank { avatarFallback },
-                                        style = DsType.std14Strong,
+                                        style = DsType.std14Strong.withReadingWeight(),
                                         color = DsTheme.colors.characterAccent,
                                         modifier = Modifier.padding(DsSpacing.small),
                                     )
@@ -155,13 +157,13 @@ internal fun GroupChatMemberPickerSheet(
                                 Column(Modifier.weight(1f)) {
                                     Text(
                                         entry.persona.name,
-                                        style = DsType.std14Strong,
+                                        style = DsType.std14Strong.withReadingWeight(),
                                         color = DsTheme.colors.labelPrimary,
                                     )
                                     entry.persona.identity.takeIf(String::isNotBlank)?.let {
                                         Text(
                                             it,
-                                            style = DsType.caption11,
+                                            style = DsType.caption11.withReadingWeight(),
                                             color = DsTheme.colors.labelSecondary,
                                             maxLines = 1,
                                         )
@@ -185,7 +187,7 @@ internal fun GroupChatMemberPickerSheet(
                 selected.size,
                 MAX_GROUP_CHAT_MEMBERS,
             ),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = DsTheme.colors.labelTertiary,
         )
         DsButton(

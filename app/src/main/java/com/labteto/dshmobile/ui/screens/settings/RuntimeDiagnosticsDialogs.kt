@@ -23,6 +23,7 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -42,7 +43,7 @@ internal fun NetworkDiagnosticDialog(
     DsDialog(title = stringResource(R.string.settings_runtime_network_diagnostic_title), onDismiss = onDismiss) {
         Text(
             stringResource(R.string.settings_runtime_network_diagnostic_intro),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
         OutlinedTextField(
@@ -71,7 +72,7 @@ internal fun NetworkDiagnosticDialog(
             SelectionContainer {
                 Text(
                     it,
-                    style = DsType.mdCode,
+                    style = DsType.mdCode.withReadingWeight(),
                     color = colors.labelPrimary,
                     modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp).verticalScroll(rememberScrollState()),
                 )
@@ -94,18 +95,18 @@ internal fun EnvironmentInfoDialog(
     DsDialog(title = stringResource(R.string.settings_runtime_environment_title), onDismiss = onDismiss) {
         Text(
             stringResource(R.string.settings_runtime_environment_intro),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
         SelectionContainer {
             Text(
                 text,
-                style = DsType.mdCode,
+                style = DsType.mdCode.withReadingWeight(),
                 color = colors.labelPrimary,
                 modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
             )
         }
-        Text(stringResource(R.string.settings_diagnostic_events, events.size), style = DsType.small13, color = colors.labelSecondary)
+        Text(stringResource(R.string.settings_diagnostic_events, events.size), style = DsType.small13.withReadingWeight(), color = colors.labelSecondary)
         DsButton(
             text = stringResource(if (errorsOnly) R.string.settings_diagnostic_show_all else R.string.settings_diagnostic_errors_only),
             onClick = { errorsOnly = !errorsOnly },
@@ -117,7 +118,7 @@ internal fun EnvironmentInfoDialog(
                 if (visible.isEmpty()) emptyEvents else visible.joinToString("\n") {
                     "${eventTime.format(Date(it.timestampMillis))} ${it.level}/${it.tag} ${it.throwableType.orEmpty()} ${it.message.replace("\n", " ").take(240)}"
                 },
-                style = DsType.mdCode,
+                style = DsType.mdCode.withReadingWeight(),
                 color = colors.labelPrimary,
                 modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).verticalScroll(rememberScrollState()),
             )

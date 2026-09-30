@@ -30,6 +30,7 @@ import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 
 /**
@@ -58,7 +59,7 @@ internal fun PresetsSheet(
         if (entries.isEmpty()) {
             Text(
                 stringResource(R.string.presets_empty),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
             return@DsBottomSheet
@@ -86,7 +87,7 @@ internal fun PresetsSheet(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 entry.displayName(),
-                                style = DsType.std14Strong,
+                                style = DsType.std14Strong.withReadingWeight(),
                                 color = when {
                                     selected -> colors.accent
                                     selectable -> colors.labelPrimary
@@ -108,12 +109,12 @@ internal fun PresetsSheet(
                             }
                         }
                         entry.displayDescription()?.let {
-                            Text(it, style = DsType.caption11, color = colors.labelTertiary)
+                            Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                         }
                         entry.broken?.let {
                             Text(
                                 stringResource(R.string.presets_broken, it),
-                                style = DsType.caption11,
+                                style = DsType.caption11.withReadingWeight(),
                                 color = colors.warnLabel,
                             )
                         }

@@ -71,6 +71,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
  * Something picked and waiting to be sent with the next message.
@@ -253,7 +254,7 @@ internal fun Composer(
     }
 
     DsConversationComposer(modifier = modifier) {
-        if (preparing) Text(stringResource(R.string.photos_preparing), style = DsType.caption11)
+        if (preparing) Text(stringResource(R.string.photos_preparing), style = DsType.caption11.withReadingWeight())
         if (attachments.isNotEmpty()) AttachmentStrip(attachments, onRemoveAttachment, onRetryAttachment)
 
         Row(
@@ -476,7 +477,7 @@ private fun FileAttachmentChip(file: PendingAttachment.File, onRetry: () -> Unit
         Column {
             Text(
                 file.name,
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -487,7 +488,7 @@ private fun FileAttachmentChip(file: PendingAttachment.File, onRetry: () -> Unit
                     is FileUploadState.Ready -> fileSizeText(state.file.bytes)
                     is FileUploadState.Failed -> stringResource(R.string.chat_attachment_upload_failed)
                 },
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = if (failed) colors.error else colors.labelTertiary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

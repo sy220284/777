@@ -22,6 +22,7 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 
 @Composable
@@ -41,7 +42,7 @@ internal fun GroupAnnouncementSheet(
 
     DsBottomSheet(title = stringResource(R.string.local_group_announcement_title), onDismiss = onDismiss) {
         Text(stringResource(R.string.local_group_announcement_hint),
-            style = DsType.small13, color = DsTheme.colors.labelSecondary)
+            style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelSecondary)
         OutlinedTextField(
             value = draft,
             onValueChange = { draft = it.take(2_000); error = null },
@@ -88,7 +89,7 @@ internal fun GroupAnnouncementSheet(
             modifier = Modifier.fillMaxWidth(),
             variant = DsButtonVariant.Outline,
         )
-        error?.let { Text(it, style = DsType.caption11, color = DsTheme.colors.error) }
+        error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
         DsButton(
             text = stringResource(R.string.local_group_announcement_save),
             onClick = {

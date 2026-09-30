@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
  * A row that shows a stored value (model name, endpoint, masked key…) and opens an editor.
@@ -63,10 +64,10 @@ fun DsValueRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, style = DsType.std14, color = colors.labelSecondary)
+            Text(label, style = DsType.std14.withReadingWeight(), color = colors.labelSecondary)
             Text(
                 display,
-                style = DsType.std14Strong,
+                style = DsType.std14Strong.withReadingWeight(),
                 color = if (value.isNullOrBlank()) colors.labelTertiary else colors.labelPrimary,
                 maxLines = 1,
                 softWrap = false,
@@ -74,7 +75,7 @@ fun DsValueRow(
                 fontFamily = if (masked) FontFamily.Monospace else FontFamily.Default,
             )
             hint?.let {
-                Text(it, style = DsType.caption11, color = colors.labelCaption, maxLines = 2)
+                Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelCaption, maxLines = 2)
             }
         }
         configured?.let { ok ->

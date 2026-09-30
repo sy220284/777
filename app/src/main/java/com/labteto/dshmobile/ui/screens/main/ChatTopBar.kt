@@ -38,6 +38,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
@@ -74,7 +75,7 @@ internal fun ChatTopBar(
         ) {
             Text(
                 title,
-                style = DsType.base16Strong,
+                style = DsType.base16Strong.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -169,14 +170,14 @@ private fun ModelChip(
         if (models != null && !models.routable) StateDot(StateDotState.Warning, size = 6.dp)
         Text(
             modelLabel,
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = if (loading && models == null) colors.labelTertiary else colors.labelSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
         effort?.let {
-            Text(it.name, style = DsType.caption11, color = colors.labelTertiary, maxLines = 1)
+            Text(it.name, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary, maxLines = 1)
         }
         Icon(
             Icons.Filled.KeyboardArrowDown,

@@ -271,7 +271,10 @@ internal fun LocalMessageRow(
                     }
                 }
                 val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
-                MarkdownText(visibleContent)
+                MarkdownText(
+                    visibleContent,
+                    bodyStyle = if (chatMode) DsType.chatBody else DsType.mdBody,
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),

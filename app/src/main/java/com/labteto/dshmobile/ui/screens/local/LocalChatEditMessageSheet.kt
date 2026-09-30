@@ -25,6 +25,7 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 
 @Composable
@@ -51,7 +52,7 @@ internal fun LocalChatEditMessageSheet(
     ) {
         Text(
             stringResource(R.string.local_edit_user_message_hint),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
         OutlinedTextField(
@@ -66,7 +67,7 @@ internal fun LocalChatEditMessageSheet(
             enabled = !submitting,
         )
         error?.let { messageText ->
-            Text(messageText, style = DsType.small13, color = colors.error)
+            Text(messageText, style = DsType.small13.withReadingWeight(), color = colors.error)
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
