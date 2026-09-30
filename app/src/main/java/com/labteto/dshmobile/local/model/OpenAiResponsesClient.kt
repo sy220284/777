@@ -100,8 +100,10 @@ class OpenAiResponsesClient @Inject constructor(
                 val streamedContent = StringBuilder()
                 val streamedReasoning = StringBuilder()
                 var totalBytes = 0
-                responseBody.charStream().buffered().use { reader ->
-                    while (true) {
+                // Response 生命周期由 withCancellableModelResponse 统一关闭；这里不要单独 use(reader)，
+                // 否则成功终态后的 reader.close() 异常仍可能把成功请求翻成失败。
+                val reader = responseBody.charStream().buffered()
+                while (true) {
                         val line = reader.readLine() ?: break
                         totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
                         if (totalBytes > MAX_STREAM_BYTES) {
@@ -169,7 +171,6 @@ class OpenAiResponsesClient @Inject constructor(
                             }
                         }
                     }
-                }
                 val completed = completedResponse ?: throw LocalModelException(
                     code = "RESPONSES_STREAM_INCOMPLETE",
                     message = "Responses API 流在 response.completed 前结束",
