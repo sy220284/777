@@ -23,8 +23,9 @@ internal suspend fun <T> withCancellableModelResponse(
     }
     var response: Response? = null
     try {
-        response = call.execute()
-        read(response)
+        val opened = call.execute()
+        response = opened
+        read(opened)
     } catch (error: Exception) {
         // A closed socket caused by user cancellation must not become a retryable network error.
         ensureActive()
