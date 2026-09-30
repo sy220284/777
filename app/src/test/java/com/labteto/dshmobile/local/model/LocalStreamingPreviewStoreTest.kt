@@ -64,6 +64,20 @@ class LocalStreamingPreviewStoreTest {
     }
 
     @Test
+    fun sameOwnerBeginClearsPartialPreviewBeforeRetry() {
+        val store = LocalStreamingPreviewStore()
+        val owner = store.newOwner("session-a", "request-1", LocalUsageMode.WORK)
+
+        store.begin(owner)
+        store.publishAssistant(owner, "上一尝试的半截回复")
+        store.begin(owner)
+
+        assertEquals("session-a", store.state.value.sessionId)
+        assertEquals("request-1", store.state.value.requestId)
+        assertEquals("", store.state.value.assistant)
+    }
+
+    @Test
     fun exactOwnerClearRetiresPreview() {
         val store = LocalStreamingPreviewStore()
         val owner = store.newOwner("session-a", "request-1", LocalUsageMode.WORK)
