@@ -26,6 +26,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
 /** One choice in a [DsSegmented] track. */
@@ -111,7 +112,7 @@ private fun DsSegment(
     ) {
         Text(
             label,
-            style = DsType.tabText,
+            style = DsType.tabText.withReadingWeight(),
             color = when {
                 !enabled -> colors.labelDimmed
                 selected -> colors.accent
