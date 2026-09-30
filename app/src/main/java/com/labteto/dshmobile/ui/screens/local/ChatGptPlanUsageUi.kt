@@ -55,6 +55,13 @@ internal fun isChatGptPlanUsageError(message: String?): Boolean {
         value.contains("CHATGPT_PLAN_USAGE_UNAVAILABLE")
 }
 
+internal fun isChatGptModelRecoveryError(message: String?): Boolean =
+    message.orEmpty().let {
+        it.contains("ChatGPT 模型已不可用") ||
+            it.contains("ChatGPT 账户授权") ||
+            it.contains("模型来源与请求不一致")
+    }
+
 @Composable
 internal fun LocalConversationErrorCard(
     sendRejectMessage: String?,
@@ -66,11 +73,7 @@ internal fun LocalConversationErrorCard(
     val message = sendRejectMessage ?: stateError ?: return
     val uriHandler = LocalUriHandler.current
     val usageError = sendRejectMessage == null && isChatGptPlanUsageError(stateError)
-    val modelRecovery = sendRejectMessage == null && stateError.orEmpty().let {
-        it.contains("ChatGPT 模型已不可用") ||
-            it.contains("ChatGPT 账户授权") ||
-            it.contains("模型来源与请求不一致")
-    }
+    val modelRecovery = sendRejectMessage == null && isChatGptModelRecoveryError(stateError)
     val colors = DsTheme.colors
 
     Surface(
