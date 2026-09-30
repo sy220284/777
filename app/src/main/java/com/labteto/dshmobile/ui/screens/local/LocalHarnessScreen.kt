@@ -78,6 +78,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
+import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.chatBranchInfo
@@ -159,6 +160,7 @@ fun LocalHarnessScreen(
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
+    val activeModelProfile by viewModel.activeModelProfile.collectAsStateWithLifecycle()
     val sendFeedback by viewModel.sendFeedbackState.collectAsStateWithLifecycle()
     val gallery by viewModel.gallery.collectAsStateWithLifecycle()
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
@@ -343,6 +345,7 @@ fun LocalHarnessScreen(
                 )
                 else -> LocalConversationSurface(
                     state = state,
+                    activeModelProfile = activeModelProfile,
                     sendFeedback = sendFeedback,
                     streamingState = viewModel.streamingState,
                     gallery = gallery,
@@ -620,6 +623,7 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 @Composable
 private fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
+    activeModelProfile: LocalModelProfile?,
     sendFeedback: LocalSendFeedbackState,
     streamingState: StateFlow<LocalHarnessStreamingState>,
     gallery: List<PersonaGalleryEntry>,
@@ -1632,7 +1636,7 @@ private fun LocalConversationSurface(
     if (showModelPicker) {
         LocalModelPickerSheet(
             profiles = state.modelProfiles,
-            activeProfileId = state.activeModelProfileId,
+            activeProfileId = activeModelProfile?.id,
             onSelect = onSelectModel,
             onConfigure = onConfigure,
             onDismiss = { showModelPicker = false },
