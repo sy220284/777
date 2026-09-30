@@ -1,0 +1,62 @@
+name: Gitee v174 Status
+
+'on':
+  push:
+    branches:
+      - ops/gitee-v174-status
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query Gitee v174 release
+        env:
+          UPDATE_MIRROR_BASE_URL: ${{ vars.UPDATE_MIRROR_BASE_URL }}
+          GITEE_MIRROR_ACCESS_TOKEN: ${{ secrets.GITEE_MIRROR_ACCESS_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.parse, urllib.request
+
+          base = os.environ["UPDATE_MIRROR_BASE_URL"].strip().rstrip("/") + "/"
+          token = os.environ["GITEE_MIRROR_ACCESS_TOKEN"].strip()
+          tag = "v0.12.0-777.174"
+
+          parsed = urllib.parse.urlsplit(base)
+          parts = [p for p in parsed.path.split("/") if p]
+          owner, repo = parts
+          api = "https://gitee.com/api/v5"
+          headers = {
+              "Accept": "application/json",
+              "Authorization": f"Bearer {token}",
+              "User-Agent": "777-gitee-status/1",
+          }
+
+          def get(path):
+              req = urllib.request.Request(api + path, headers=headers)
+              with urllib.request.urlopen(req, timeout=45) as resp:
+                  body = resp.read()
+                  return json.loads(body.decode("utf-8")) if body else None
+
+          release = get(f"/repos/{owner}/{repo}/releases/tags/{urllib.parse.quote(tag, safe='')}")
+          print("release:", json.dumps({
+              "id": release.get("id"),
+              "tag_name": release.get("tag_name"),
+              "name": release.get("name"),
+          }, ensure_ascii=False))
+
+          rid = int(release["id"])
+          attachments = get(f"/repos/{owner}/{repo}/releases/{rid}/attach_files?per_page=100")
+          compact = []
+          for item in attachments or []:
+              compact.append({
+                  "id": item.get("id"),
+                  "name": item.get("name"),
+                  "size": item.get("size"),
+                  "download_url": item.get("download_url") or item.get("browser_download_url"),
+              })
+          print("attachments:", json.dumps(compact, ensure_ascii=False))
+          PY
