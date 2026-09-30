@@ -3322,9 +3322,18 @@ class LocalHarnessEngine @Inject constructor(
                         activeToolCalls = event.toolCalls
                         startedToolCallIds.clear()
                         completedToolCallIds.clear()
+                        val assistantData = runTranscript.withTranscript(
+                            reply.message,
+                            transcriptMessages,
+                        )
                         val assistantEvent = runEventLog.append(
                             "assistant/message",
-                            runTranscript.withTranscript(reply.message, transcriptMessages),
+                            JsonObject(
+                                assistantData + (
+                                    LOCAL_MODEL_TOOL_CALLS_EVENT_KEY to
+                                        modelToolCallEventData(reply.toolCalls)
+                                    ),
+                            ),
                         )
                         if (beforeAssistant.usageMode == LocalUsageMode.CHAT && event.toolCalls.isEmpty()) {
                             finalChatAssistant = transcriptMessages.lastOrNull { message ->
