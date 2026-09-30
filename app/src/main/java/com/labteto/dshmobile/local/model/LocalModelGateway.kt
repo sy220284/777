@@ -18,8 +18,9 @@ class LocalModelGateway @Inject constructor(
     private val chatCompletions: DeepSeekClient,
     private val responses: OpenAiResponsesClient,
 ) {
+    val activeProfileState = credentials.activeProfile
     fun activate(profile: LocalModelProfile) = credentials.activate(profile)
-
+    fun clearActive() = credentials.clearActive()
     fun activeProfile(): LocalModelProfile? = credentials.active()
 
     suspend fun hasCredential(profile: LocalModelProfile): Boolean =
