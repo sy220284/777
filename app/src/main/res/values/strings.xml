@@ -1301,4 +1301,11 @@
     <string name="chatgpt_model_source">ChatGPT plan · %1$s</string>
 
     <string name="chatgpt_continue">Continue with ChatGPT</string>
+    <string name="chatgpt_account_short">Account</string>
+    <string name="chatgpt_using_plan">Using ChatGPT plan</string>
+    <string name="chatgpt_manage_usage">Manage usage</string>
+    <string name="chatgpt_switch_model_source">Switch model source</string>
+    <string name="chatgpt_welcome_title">You’re using your ChatGPT plan</string>
+    <string name="chatgpt_welcome_body">Eligible AI requests use your ChatGPT plan or available credits. You can review and manage this app’s usage anytime in ChatGPT settings.</string>
+    <string name="chatgpt_welcome_confirm">Got it</string>
 </resources>
