@@ -2997,6 +2997,12 @@ class LocalHarnessEngine @Inject constructor(
         val runHistory = binding?.modelHistory ?: modelHistory
         val runTranscript = binding?.transcriptRuntime ?: transcriptRuntime
         val runSessionId = binding?.sessionId ?: currentSessionId
+        if (currentSessionId == runSessionId && _state.value.sessionId == runSessionId) {
+            // Streaming preview is process-wide. A Chat turn intentionally does not publish raw
+            // deltas, so clear any preview left by the previous visible Work turn before rendering
+            // the Chat "replying" row; otherwise stale Work text appears as the new Chat answer.
+            _streamingState.value = LocalHarnessStreamingState()
+        }
         val runPolicy = localAgentRunPolicy(runState.value.usageMode)
         clearRunCapabilities(binding)
         if (runState.value.usageMode == LocalUsageMode.WORK && runCatching { githubCredentials.configured() }.getOrDefault(false))
@@ -3545,6 +3551,10 @@ class LocalHarnessEngine @Inject constructor(
                 )
             }
             persist(binding)
+            if (currentSessionId == runSessionId && _state.value.sessionId == runSessionId) {
+                // Do not retain a completed Work preview for the next visible Chat turn.
+                _streamingState.value = LocalHarnessStreamingState()
+            }
             val completedJob = currentCoroutineContext()[Job]
             if (binding == null) {
                 synchronized(runStateLock) {
