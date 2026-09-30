@@ -1197,39 +1197,15 @@ private fun LocalConversationSurface(
         val sendRejectMessage = sendFeedback.rejectReason
             ?.takeIf { sendFeedback.sessionId == state.sessionId }
             ?.let { reason -> localSendRejectMessage(reason, sendFeedback.rejectLimit) }
-        if (sendRejectMessage != null || state.error != null) {
-            Surface(
-                color = colors.warnTertiary,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
-            ) {
-                Row(
-                    Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                ) {
-                    Text(
-                        sendRejectMessage ?: (
-                            stringResource(R.string.agent_operation_generic) + " · " +
-                                stringResource(R.string.agent_operation_status_failed)
-                            ),
-                        style = DsType.small13,
-                        color = colors.error,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (sendRejectMessage == null) {
-                        state.messages.lastOrNull { message -> message.role == "user" }?.let { lastRequest ->
-                            DsButton(
-                                stringResource(R.string.local_restore_request),
-                                { drafts[state.sessionId] = lastRequest.content },
-                                variant = DsButtonVariant.Ghost,
-                                size = DsButtonSize.Small,
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        LocalConversationErrorCard(
+            sendRejectMessage = sendRejectMessage,
+            stateError = state.error,
+            restoreRequest = state.messages.lastOrNull { it.role == "user" }?.content,
+            onRestoreRequest = { drafts[state.sessionId] = it },
+            onSwitchModelSource = {
+                if (state.modelProfiles.isNotEmpty()) showModelPicker = true else onConfigure()
+            },
+        )
         attachmentError?.let {
             Text(
                 it,
@@ -1402,6 +1378,7 @@ private fun LocalConversationSurface(
             surfaceColor = composerSurfaceColor,
             shadowElevation = if (backgroundState.hasImage) 0.dp else 1.dp,
         ) {
+            ChatGptPlanUsageBar(activeModelProfile)
             if (attachments.isNotEmpty()) {
                 attachments.forEachIndexed { index, attachment ->
                     ImportedAttachmentRow(
@@ -1655,8 +1632,7 @@ private fun LocalConversationSurface(
     if (showModelPicker) {
         LocalModelPickerSheet(
             profiles = state.modelProfiles,
-            currentModel = state.model,
-            currentBaseUrl = state.baseUrl,
+            activeProfileId = state.activeModelProfileId,
             onSelect = onSelectModel,
             onConfigure = onConfigure,
             onDismiss = { showModelPicker = false },
