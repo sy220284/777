@@ -323,7 +323,17 @@ def verify_or_upload(
             # ambiguity into an idempotent recovery path.
             recovered = False
             for discovery_attempt in range(UPLOAD_DISCOVERY_ATTEMPTS):
-                refreshed = existing_attachments(owner, repo, release_id, token)
+                try:
+                    refreshed = existing_attachments(owner, repo, release_id, token)
+                except Exception as discovery_error:
+                    print(
+                        f"::warning::Gitee 上传后状态查询失败 "
+                        f"{discovery_attempt + 1}/{UPLOAD_DISCOVERY_ATTEMPTS}："
+                        f"{file_path.name}：{discovery_error}",
+                        file=sys.stderr,
+                    )
+                    refreshed = {}
+
                 if file_path.name in refreshed:
                     try:
                         actual_sha, actual_size = sha256_public(public_url)
