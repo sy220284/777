@@ -77,6 +77,21 @@ class LocalStreamingPreviewStoreTest {
     }
 
     @Test
+    fun olderRequestFromAnotherSessionCanClaimWhenThatSessionBecomesVisible() {
+        val store = LocalStreamingPreviewStore()
+        val background = store.newOwner("session-b", "request-b", LocalUsageMode.WORK)
+        val later = store.newOwner("session-a", "request-a", LocalUsageMode.WORK)
+
+        store.begin(later)
+        store.publishAssistant(later, "A")
+        store.publishAssistant(background, "B 恢复可见")
+
+        assertEquals("session-b", store.state.value.sessionId)
+        assertEquals("request-b", store.state.value.requestId)
+        assertEquals("B 恢复可见", store.state.value.assistant)
+    }
+
+    @Test
     fun visibleSessionCanClaimPreviewWithoutLettingPreviousSessionClearIt() {
         val store = LocalStreamingPreviewStore()
         val first = store.newOwner("session-a", "request-a", LocalUsageMode.WORK)
