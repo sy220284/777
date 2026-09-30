@@ -160,6 +160,8 @@ android-17-instrumented
 - OAuth callback 编码、state/nonce/PKCE 与 ID Token 验证路径。
 - access token 过期时 single-flight refresh，refresh token 轮换后原子替换。
 - Responses 请求固定 `store=false`、`stream=true`；不发送套餐共享暂不支持的采样字段。
+- ChatGPT 套餐共享的 function/custom tools 必须按 SIWC 预览契约放入 namespace；标准 API Key Responses 继续使用普通顶层 function tools，不相互污染协议。
+- 协议选择以模型档案的认证类型与协议为边界：ChatGPT 套餐固定走受限 Responses 契约；API Key 的 Responses / Chat Completions 保持各自原有行为。
 - system message 不进入 Responses input，转换为 `instructions`。
 - 文本、图片、function tool、function_call_output 和 continuation item 转换。
 - `response.completed`、`response.failed`、`response.incomplete` 与流中断分别处理。

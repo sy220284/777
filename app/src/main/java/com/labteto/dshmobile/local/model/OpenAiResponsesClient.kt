@@ -174,7 +174,7 @@ class OpenAiResponsesClient @Inject constructor(
         put("store", false)
         put("stream", true)
         put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
-        if (tools.isNotEmpty()) put("tools", responseTools(tools))
+        if (tools.isNotEmpty()) put("tools", responseTools(tools, planSharing))
         if (!planSharing) temperature?.let { put("temperature", it) }
         // ChatGPT plan sharing rejects sampling controls; API-key Responses keeps its own contract.
     }
@@ -257,17 +257,33 @@ class OpenAiResponsesClient @Inject constructor(
         }
     }
 
-    private fun responseTools(tools: JsonArray): JsonArray = buildJsonArray {
-        tools.forEach { element ->
-            val source = element as? JsonObject ?: return@forEach
-            val function = source["function"] as? JsonObject ?: return@forEach
-            val name = function["name"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+    private fun responseTools(
+        tools: JsonArray,
+        planSharing: Boolean,
+    ): JsonArray {
+        val functions = buildJsonArray {
+            tools.forEach { element ->
+                val source = element as? JsonObject ?: return@forEach
+                val function = source["function"] as? JsonObject ?: return@forEach
+                val name = function["name"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                add(buildJsonObject {
+                    put("type", "function")
+                    put("name", name)
+                    function["description"]?.let { put("description", it) }
+                    function["parameters"]?.let { put("parameters", it) }
+                    function["strict"]?.let { put("strict", it) }
+                })
+            }
+        }
+        if (!planSharing || functions.isEmpty()) return functions
+
+        // Sign in with ChatGPT 套餐共享预览要求 function/custom tools 位于 namespace
+        // 或 additional_tools 中。只在套餐共享契约下包装，标准 Responses API 保持原形。
+        return buildJsonArray {
             add(buildJsonObject {
-                put("type", "function")
-                put("name", name)
-                function["description"]?.let { put("description", it) }
-                function["parameters"]?.let { put("parameters", it) }
-                function["strict"]?.let { put("strict", it) }
+                put("type", "namespace")
+                put("name", CHATGPT_PLAN_TOOL_NAMESPACE)
+                put("tools", functions)
             })
         }
     }
@@ -563,5 +579,6 @@ class OpenAiResponsesClient @Inject constructor(
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
         private const val MAX_STREAM_BYTES = 32 * 1024 * 1024
         private const val ERROR_BODY_LIMIT = 8_000
+        private const val CHATGPT_PLAN_TOOL_NAMESPACE = "local"
     }
 }

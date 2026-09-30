@@ -150,7 +150,7 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
-    fun convertsChatCompletionsToolsToResponsesFunctionShape() {
+    fun chatGptPlanWrapsFunctionToolsInNamespace() {
         val tools = JsonArray(
             listOf(
                 buildJsonObject {
@@ -175,11 +175,51 @@ class OpenAiResponsesClientTest {
             }),
             tools = tools,
             temperature = null,
+            planSharing = true,
+        )
+
+        val namespace = payload["tools"]!!.jsonArray.single().jsonObject
+        assertEquals("namespace", namespace["type"]?.jsonPrimitive?.content)
+        assertEquals("local", namespace["name"]?.jsonPrimitive?.content)
+        val function = namespace["tools"]!!.jsonArray.single().jsonObject
+        assertEquals("function", function["type"]?.jsonPrimitive?.content)
+        assertEquals("read_file", function["name"]?.jsonPrimitive?.content)
+        assertTrue(function["parameters"] is JsonObject)
+    }
+
+    @Test
+    fun apiKeyResponsesKeepsFlatFunctionTools() {
+        val tools = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("type", "function")
+                    put("function", buildJsonObject {
+                        put("name", "read_file")
+                        put("description", "读取文件")
+                        put("parameters", buildJsonObject {
+                            put("type", "object")
+                            put("properties", buildJsonObject {})
+                        })
+                    })
+                },
+            ),
+        )
+
+        val payload = client.buildPayload(
+            model = "gpt-test",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "读取")
+            }),
+            tools = tools,
+            temperature = null,
+            planSharing = false,
         )
 
         val function = payload["tools"]!!.jsonArray.single().jsonObject
         assertEquals("function", function["type"]?.jsonPrimitive?.content)
         assertEquals("read_file", function["name"]?.jsonPrimitive?.content)
+        assertFalse("tools" in function)
         assertTrue(function["parameters"] is JsonObject)
     }
 
