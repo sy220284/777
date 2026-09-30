@@ -12,7 +12,7 @@
 | [PROTOCOL.md](PROTOCOL.md) | 当前远程 Web 协议与本机 Session / Agent 协议边界 |
 | [COMPATIBILITY.md](COMPATIBILITY.md) | 当前 Android、ABI、本机语义参考和远程 Harness / relay 支持矩阵 |
 | [SECURITY.md](SECURITY.md) | 凭据、工作区、工具、恢复、Web、设备、数据和更新安全边界 |
-| [UPDATE-MIRROR.zh-CN.md](UPDATE-MIRROR.zh-CN.md) | 无域名 / 无 CDN 的 OSS 国内更新镜像配置、发布与回退链 |
+| [UPDATE-MIRROR.zh-CN.md](UPDATE-MIRROR.zh-CN.md) | 无域名 / 无 CDN / 无备案的 Gitee 国内更新镜像配置、发布与回退链 |
 | [ANDROID-HARNESS-STATUS.zh-CN.md](ANDROID-HARNESS-STATUS.zh-CN.md) | 当前 Android 原生 Harness 已实现能力与平台限制 |
 | [ANDROID-HARNESS-ROADMAP.zh-CN.md](ANDROID-HARNESS-ROADMAP.zh-CN.md) | 当前版本之后仍需继续收敛的架构与工程工作 |
 | [VALIDATION.md](VALIDATION.md) | CI、差分验证、Android 16 / 17、架构与性能门禁 |
