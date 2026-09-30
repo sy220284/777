@@ -1,9 +1,10 @@
 package com.labteto.dshmobile.local
 
 import android.content.SharedPreferences
-import com.labteto.dshmobile.local.model.LocalModelCredentialResolver
+import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelMutationGate
 import com.labteto.dshmobile.local.model.LocalModelProfileStore
+import com.labteto.dshmobile.local.model.LocalModelStartupMigrator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import kotlinx.serialization.json.Json
 
@@ -17,15 +18,16 @@ internal data class LocalModelConfigurationResult(
         get() = profiles.map(LocalModelProfile::model).distinct().sorted()
 }
 
-/** Coordinates model routes while profile persistence and credential storage stay separate. */
+/** Coordinates model-route mutations; storage, migration and credential resolution stay extracted. */
 internal class LocalModelConfigurationCoordinator(
     preferences: SharedPreferences,
     private val apiKeys: LocalApiKeyStore,
-    private val credentials: LocalModelCredentialResolver,
+    private val gateway: LocalModelGateway,
     private val tester: LocalModelConnectionTester,
     json: Json,
 ) {
     private val profiles = LocalModelProfileStore(preferences, json)
+    private val startup = LocalModelStartupMigrator(preferences, profiles, apiKeys, gateway)
 
     suspend fun save(apiKey: String, model: String, baseUrl: String): LocalModelConfigurationResult =
         LocalModelMutationGate.run {
@@ -53,21 +55,7 @@ internal class LocalModelConfigurationCoordinator(
         accountId: String,
         models: List<ChatGptModelOption>,
     ): List<LocalModelProfile> = LocalModelMutationGate.run {
-        val all = profiles.read().filterNot {
-            it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
-        } + models.map { option ->
-            LocalModelProfile(
-                id = modelProfileId(option.slug, OPENAI_BASE_URL, LocalModelAuthKind.CHATGPT_PLAN, accountId),
-                model = option.slug,
-                baseUrl = OPENAI_BASE_URL,
-                provider = "ChatGPT",
-                authKind = LocalModelAuthKind.CHATGPT_PLAN,
-                protocol = LocalModelProtocol.RESPONSES,
-                credentialRef = accountId,
-                displayName = option.displayName,
-            )
-        }
-        all.distinctBy(LocalModelProfile::id).also(profiles::write)
+        profiles.replaceChatGpt(accountId, models)
     }
 
     suspend fun select(
@@ -75,7 +63,7 @@ internal class LocalModelConfigurationCoordinator(
         all: List<LocalModelProfile> = profiles.read(),
     ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
         val selected = all.firstOrNull { it.id == id } ?: return@run null
-        require(credentials.hasCredential(selected)) { credentialError(selected) }
+        require(gateway.hasCredential(selected)) { credentialError(selected) }
         activate(selected)
         LocalModelConfigurationResult(true, selected.model, selected.baseUrl, all)
     }
@@ -87,9 +75,9 @@ internal class LocalModelConfigurationCoordinator(
     ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
         val all = profiles.read()
         val removed = all.firstOrNull { it.id == id } ?: return@run null
-        val wasActive = profiles.active(currentModel, currentBaseUrl, all)?.id == id
+        val activeRemoved = profiles.active(currentModel, currentBaseUrl, all)?.id == id
         if (removed.authKind == LocalModelAuthKind.API_KEY) apiKeys.clearFor(id)
-        finishRemoval(all.filterNot { it.id == id }, wasActive, currentModel, currentBaseUrl)
+        finishRemoval(all.filterNot { it.id == id }, activeRemoved, currentModel, currentBaseUrl)
     }
 
     suspend fun removeChatGptAccount(
@@ -103,9 +91,10 @@ internal class LocalModelConfigurationCoordinator(
         }
         if (removed.isEmpty()) return@run null
         val activeId = profiles.active(currentModel, currentBaseUrl, all)?.id
+        val removedIds = removed.mapTo(hashSetOf(), LocalModelProfile::id)
         finishRemoval(
-            all.filterNot { it.id in removed.map(LocalModelProfile::id).toSet() },
-            removed.any { it.id == activeId },
+            all.filterNot { it.id in removedIds },
+            activeId in removedIds,
             currentModel,
             currentBaseUrl,
         )
@@ -121,21 +110,7 @@ internal class LocalModelConfigurationCoordinator(
         finishRemoval(all.filterNot { it.id == active?.id }, true, currentModel, currentBaseUrl)
     }
 
-    suspend fun prepareStartup(model: String, baseUrl: String) {
-        if (!profiles.hasV3()) {
-            if (profiles.hasV2()) profiles.migrateV2IfNeeded()
-            else {
-                val names = if (apiKeys.hasLegacyCredential()) legacyConfiguredModelNames(model) else emptyList()
-                val migrated = names.map { LocalModelProfile(modelProfileId(it, baseUrl), it, baseUrl) }
-                profiles.write(migrated)
-                apiKeys.migrate(migrated.map(LocalModelProfile::id))
-            }
-        }
-        val all = profiles.read()
-        apiKeys.migrate(all.filter { it.authKind == LocalModelAuthKind.API_KEY }.map(LocalModelProfile::id))
-        profiles.active(model, baseUrl, all)?.takeIf { credentials.hasCredential(it) }
-            ?.let(credentials::activate) ?: apiKeys.activate(modelProfileId(model, baseUrl))
-    }
+    suspend fun prepareStartup(model: String, baseUrl: String) = startup.prepare(model, baseUrl)
 
     suspend fun test(apiKey: String, model: String, baseUrl: String): String {
         if (model.isBlank()) return "请选择模型"
@@ -149,17 +124,17 @@ internal class LocalModelConfigurationCoordinator(
     }
 
     fun readProfiles(): List<LocalModelProfile> = profiles.read()
-    fun activeProfile(model: String, baseUrl: String, all: List<LocalModelProfile> = profiles.read()) =
-        profiles.active(model, baseUrl, all)
-    fun legacyConfiguredModelNames(model: String): List<String> =
-        (profilesLegacyModels() + model).map(String::trim).filter(String::isNotBlank).distinct().sorted()
-    fun normalizeModel(model: String): String = model.trim().ifBlank { DEFAULT_MODEL }.let {
-        if (it.equals("deepseek-chat", true) || it.equals("deepseek-reasoner", true)) DEFAULT_MODEL else it
-    }
 
-    private fun profilesLegacyModels(): Set<String> = legacyPreferences().getStringSet("configured_models", emptySet()).orEmpty()
-    private fun legacyPreferences(): SharedPreferences = legacyPrefs
-    private val legacyPrefs = preferences
+    fun activeProfile(
+        model: String,
+        baseUrl: String,
+        all: List<LocalModelProfile> = profiles.read(),
+    ): LocalModelProfile? = profiles.active(model, baseUrl, all)
+
+    fun normalizeModel(model: String): String =
+        model.trim().ifBlank { DEFAULT_MODEL }.let {
+            if (it.equals("deepseek-chat", true) || it.equals("deepseek-reasoner", true)) DEFAULT_MODEL else it
+        }
 
     private suspend fun finishRemoval(
         remaining: List<LocalModelProfile>,
@@ -168,21 +143,21 @@ internal class LocalModelConfigurationCoordinator(
         currentBaseUrl: String,
     ): LocalModelConfigurationResult {
         profiles.write(remaining)
-        val next = if (activeRemoved) remaining.firstOrNull()
-        else profiles.active(currentModel, currentBaseUrl, remaining)
-        val usable = next?.takeIf { credentials.hasCredential(it) }
-        if (usable != null) activate(usable) else reset()
+        val candidate = if (activeRemoved) remaining.firstOrNull()
+            else profiles.active(currentModel, currentBaseUrl, remaining)
+        val next = candidate?.takeIf { gateway.hasCredential(it) }
+        if (next != null) activate(next) else reset()
         return LocalModelConfigurationResult(
-            configured = usable != null,
-            model = usable?.model ?: DEFAULT_MODEL,
-            baseUrl = usable?.baseUrl ?: DEFAULT_BASE_URL,
+            configured = next != null,
+            model = next?.model ?: DEFAULT_MODEL,
+            baseUrl = next?.baseUrl ?: DEFAULT_BASE_URL,
             profiles = remaining,
         )
     }
 
     private fun activate(profile: LocalModelProfile) {
         profiles.setActive(profile)
-        credentials.activate(profile)
+        gateway.activate(profile)
     }
 
     private fun reset() {
@@ -190,13 +165,12 @@ internal class LocalModelConfigurationCoordinator(
         apiKeys.activate(modelProfileId(DEFAULT_MODEL, DEFAULT_BASE_URL))
     }
 
-    private fun credentialError(profile: LocalModelProfile) =
+    private fun credentialError(profile: LocalModelProfile): String =
         if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) "ChatGPT 账户授权不可用，请重新连接"
         else "该模型密钥不可用，请编辑配置重新填写"
 
     companion object {
         const val DEFAULT_MODEL = "deepseek-flash"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
-        const val OPENAI_BASE_URL = "https://api.openai.com/v1"
     }
 }
