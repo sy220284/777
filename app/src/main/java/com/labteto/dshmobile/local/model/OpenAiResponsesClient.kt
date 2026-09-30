@@ -96,6 +96,8 @@ class OpenAiResponsesClient @Inject constructor(
                     retryable = true,
                 )
                 var completedResponse: JsonObject? = null
+                val streamedContent = StringBuilder()
+                val streamedReasoning = StringBuilder()
                 var totalBytes = 0
                 responseBody.charStream().buffered().use { reader ->
                     while (true) {
@@ -124,18 +126,27 @@ class OpenAiResponsesClient @Inject constructor(
                             "response.output_text.delta" -> {
                                 event["delta"]?.jsonPrimitive?.contentOrNull
                                     ?.takeIf(String::isNotEmpty)
-                                    ?.let { onDelta(LocalModelDelta(content = it)) }
+                                    ?.let { delta ->
+                                        streamedContent.append(delta)
+                                        onDelta(LocalModelDelta(content = delta))
+                                    }
                             }
                             "response.reasoning_text.delta",
                             "response.reasoning_summary_text.delta" -> {
                                 event["delta"]?.jsonPrimitive?.contentOrNull
                                     ?.takeIf(String::isNotEmpty)
-                                    ?.let { onDelta(LocalModelDelta(reasoning = it)) }
+                                    ?.let { delta ->
+                                        streamedReasoning.append(delta)
+                                        onDelta(LocalModelDelta(reasoning = delta))
+                                    }
                             }
                             "response.refusal.delta" -> {
                                 event["delta"]?.jsonPrimitive?.contentOrNull
                                     ?.takeIf(String::isNotEmpty)
-                                    ?.let { onDelta(LocalModelDelta(content = it)) }
+                                    ?.let { delta ->
+                                        streamedContent.append(delta)
+                                        onDelta(LocalModelDelta(content = delta))
+                                    }
                             }
                             "error" -> throw streamError(event, planSharing, requestId, retryAfterMs)
                             "response.failed" -> throw responseFailure(
@@ -161,7 +172,12 @@ class OpenAiResponsesClient @Inject constructor(
                     message = "Responses API 流在 response.completed 前结束",
                     retryable = true,
                 )
-                parseCompleted(completed, promptBreakdown)
+                parseCompleted(
+                    response = completed,
+                    promptBreakdown = promptBreakdown,
+                    streamedContent = streamedContent.toString(),
+                    streamedReasoning = streamedReasoning.toString(),
+                )
             }
         } catch (error: LocalModelException) {
             throw error
@@ -220,12 +236,30 @@ class OpenAiResponsesClient @Inject constructor(
 
     private fun responseInput(messages: List<JsonObject>): JsonArray = buildJsonArray {
         messages.forEach { message ->
+            val role = message["role"]?.jsonPrimitive?.contentOrNull.orEmpty()
             val raw = message[RESPONSES_OUTPUT_KEY] as? JsonArray
             if (raw != null) {
                 raw.forEach(::add)
-                return@forEach
+                val streamedFallback = (message["content"] as? JsonPrimitive)
+                    ?.contentOrNull
+                    ?.takeIf(String::isNotBlank)
+                val rawHasFunctionCall = raw.any { item ->
+                    (item as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull == "function_call"
+                }
+                val rawHasAssistantText = raw.any { item ->
+                    val obj = item as? JsonObject ?: return@any false
+                    obj["type"]?.jsonPrimitive?.contentOrNull == "message" &&
+                        responseMessageText((obj["content"] as? JsonArray) ?: JsonArray(emptyList())).isNotBlank()
+                }
+                if (
+                    role != "assistant" ||
+                    streamedFallback == null ||
+                    rawHasFunctionCall ||
+                    rawHasAssistantText
+                ) {
+                    return@forEach
+                }
             }
-            val role = message["role"]?.jsonPrimitive?.contentOrNull.orEmpty()
             if (role == "tool") {
                 val callId = message["tool_call_id"]?.jsonPrimitive?.contentOrNull
                     ?: return@forEach
@@ -330,9 +364,11 @@ class OpenAiResponsesClient @Inject constructor(
         }
     }
 
-    private fun parseCompleted(
+    internal fun parseCompleted(
         response: JsonObject,
         promptBreakdown: TokenPromptBreakdown,
+        streamedContent: String = "",
+        streamedReasoning: String = "",
     ): LocalModelReply {
         val output = response["output"] as? JsonArray ?: JsonArray(emptyList())
         val content = StringBuilder()
@@ -363,9 +399,13 @@ class OpenAiResponsesClient @Inject constructor(
                 }
             }
         }
+        val settledContent = content.toString().takeIf(String::isNotBlank)
+            ?: streamedContent.takeIf(String::isNotBlank)
+        val settledReasoning = reasoning.toString().takeIf(String::isNotBlank)
+            ?: streamedReasoning.takeIf(String::isNotBlank)
         val message = buildJsonObject {
             put("role", "assistant")
-            if (content.isNotEmpty()) put("content", content.toString()) else put("content", JsonNull)
+            if (settledContent != null) put("content", settledContent) else put("content", JsonNull)
             if (toolCalls.isNotEmpty()) {
                 put("tool_calls", buildJsonArray {
                     toolCalls.forEach { call ->
@@ -384,8 +424,8 @@ class OpenAiResponsesClient @Inject constructor(
         }
         return LocalModelReply(
             message = message,
-            content = content.toString().takeIf(String::isNotBlank),
-            reasoning = reasoning.toString().takeIf(String::isNotBlank),
+            content = settledContent,
+            reasoning = settledReasoning,
             toolCalls = toolCalls,
             usage = parseUsage(response["usage"] as? JsonObject),
             requestId = response["id"]?.jsonPrimitive?.contentOrNull ?: UUID.randomUUID().toString(),
