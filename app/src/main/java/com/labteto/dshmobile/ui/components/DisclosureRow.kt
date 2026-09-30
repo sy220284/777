@@ -44,6 +44,7 @@ import com.labteto.dshmobile.ui.theme.DsColors
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
 /** How a disclosure row's subject is doing; drives the leading slot and the title shimmer. */
@@ -137,7 +138,7 @@ fun DisclosureRow(
             val titleModifier = if (running) Modifier.shimmer(runningBrush(colors)) else Modifier
             Text(
                 title,
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -149,7 +150,7 @@ fun DisclosureRow(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     summary,
-                    style = DsType.std14,
+                    style = DsType.std14.withReadingWeight(),
                     color = colors.labelTertiary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -224,7 +225,7 @@ private fun DisclosureRowPreview() {
             ) {
                 Text(
                     "Expanded body",
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelTertiary,
                     modifier = Modifier.padding(4.dp),
                 )
