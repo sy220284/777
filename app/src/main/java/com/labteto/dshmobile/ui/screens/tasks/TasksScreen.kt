@@ -509,7 +509,7 @@ fun TasksScreen(
                     }
                 }
             }
-
+        }
         }
         DsToastHost(toast, Modifier.safeDrawingPadding())
     }
