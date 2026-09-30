@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.LocalModelReply
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -54,10 +55,11 @@ class LocalCanonicalModelCodecTest {
     }
 
     @Test
-    fun providerToolMetadataSurvivesCanonicalRoundTrip() {
+    fun chatPrivateReasoningAndToolMetadataAreReplayedOnlyOnTheSameRoute() {
         val source = buildJsonObject {
             put("role", "assistant")
             put("content", "")
+            put("reasoning_content", "隐藏推理")
             put("tool_calls", buildJsonArray {
                 add(buildJsonObject {
                     put("id", "call-1")
@@ -74,21 +76,45 @@ class LocalCanonicalModelCodecTest {
             })
         }
 
-        val canonical = LocalCanonicalModelCodec.message(source)
-        val history = LocalCanonicalModelCodec.toHistoryMessage(canonical)
+        val canonicalized = LocalCanonicalModelCodec.canonicalizeReply(
+            reply = LocalModelReply(
+                message = source,
+                content = null,
+                reasoning = "隐藏推理",
+                toolCalls = emptyList(),
+            ),
+            adapterId = LocalModelAdapterIds.OPENAI_CHAT,
+            routeFingerprint = "gemini-route",
+        )
+        val history = canonicalized.message
+        assertNotNull(history[LOCAL_MODEL_REPLAY_KEY])
+        val durableCall = history["tool_calls"]!!.jsonArray.single().jsonObject
+        assertNull(durableCall["extra_content"])
+        assertNull(durableCall["function"]!!.jsonObject["vendor_flag"])
+
         val restored = LocalCanonicalModelCodec.message(history)
-        val wire = LocalCanonicalModelCodec.toLegacyMessages(
+        val sameRoute = LocalCanonicalModelCodec.toLegacyMessages(
             listOf(restored),
             LocalModelAdapterIds.OPENAI_CHAT,
-            "same-route",
+            "gemini-route",
         ).single()
-        val call = wire["tool_calls"]!!.jsonArray.single().jsonObject
-
+        val sameCall = sameRoute["tool_calls"]!!.jsonArray.single().jsonObject
+        assertEquals("隐藏推理", sameRoute["reasoning_content"]!!.jsonPrimitive.content)
         assertEquals(
             "sig-1",
-            call["extra_content"]!!.jsonObject["google"]!!.jsonObject["thought_signature"]!!.jsonPrimitive.content,
+            sameCall["extra_content"]!!.jsonObject["google"]!!.jsonObject["thought_signature"]!!.jsonPrimitive.content,
         )
-        assertEquals("kept", call["function"]!!.jsonObject["vendor_flag"]!!.jsonPrimitive.content)
+        assertEquals("kept", sameCall["function"]!!.jsonObject["vendor_flag"]!!.jsonPrimitive.content)
+
+        val changedRoute = LocalCanonicalModelCodec.toLegacyMessages(
+            listOf(restored),
+            LocalModelAdapterIds.OPENAI_CHAT,
+            "deepseek-route",
+        ).single()
+        val changedCall = changedRoute["tool_calls"]!!.jsonArray.single().jsonObject
+        assertNull(changedRoute["reasoning_content"])
+        assertNull(changedCall["extra_content"])
+        assertNull(changedCall["function"]!!.jsonObject["vendor_flag"])
     }
 
     @Test
