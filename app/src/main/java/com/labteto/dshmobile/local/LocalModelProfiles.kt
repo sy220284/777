@@ -11,6 +11,7 @@ enum class LocalModelAuthKind {
 enum class LocalModelProtocol {
     CHAT_COMPLETIONS,
     RESPONSES,
+    ANTHROPIC_MESSAGES,
 }
 
 /** A saved route references a credential without embedding any secret in its durable ID. */
@@ -370,9 +371,10 @@ object LocalModelPresets {
             imageInputSupported = false,
         ),
         LocalModelPreset(
-            provider = "Claude（兼容接口）",
+            provider = "Claude",
             model = "claude-opus-5-5",
             baseUrl = "https://api.anthropic.com/v1",
+            protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
             capabilities = setOf(
                 LocalModelCapability.TEXT,
                 LocalModelCapability.IMAGE,
@@ -380,9 +382,10 @@ object LocalModelPresets {
             imageInputSupported = true,
         ),
         LocalModelPreset(
-            provider = "Claude（兼容接口）",
+            provider = "Claude",
             model = "claude-sonnet-5",
             baseUrl = "https://api.anthropic.com/v1",
+            protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
             capabilities = setOf(
                 LocalModelCapability.TEXT,
                 LocalModelCapability.IMAGE,
@@ -390,9 +393,10 @@ object LocalModelPresets {
             imageInputSupported = true,
         ),
         LocalModelPreset(
-            provider = "Claude（兼容接口）",
+            provider = "Claude",
             model = "claude-fable-5-1",
             baseUrl = "https://api.anthropic.com/v1",
+            protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
             capabilities = setOf(
                 LocalModelCapability.TEXT,
                 LocalModelCapability.IMAGE,
