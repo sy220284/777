@@ -9,8 +9,8 @@ class LocalStreamingPreviewStoreTest {
     @Test
     fun staleRequestCannotOverwriteOrClearNewerPreviewInSameSession() {
         val store = LocalStreamingPreviewStore()
-        val old = LocalStreamingPreviewOwner("session-a", "request-old", LocalUsageMode.WORK)
-        val fresh = LocalStreamingPreviewOwner("session-a", "request-new", LocalUsageMode.WORK)
+        val old = store.newOwner("session-a", "request-old", LocalUsageMode.WORK)
+        val fresh = store.newOwner("session-a", "request-new", LocalUsageMode.WORK)
 
         store.begin(old)
         store.publishAssistant(old, "旧请求")
@@ -48,9 +48,25 @@ class LocalStreamingPreviewStoreTest {
     }
 
     @Test
+    fun olderSameSessionRetryCannotReclaimPreviewAfterNewerRequestStarts() {
+        val store = LocalStreamingPreviewStore()
+        val old = store.newOwner("session-a", "request-old", LocalUsageMode.WORK)
+        val fresh = store.newOwner("session-a", "request-new", LocalUsageMode.WORK)
+
+        store.begin(old)
+        store.begin(fresh)
+        store.publishAssistant(fresh, "新请求")
+        store.begin(old)
+        store.publishAssistant(old, "旧请求重试")
+
+        assertEquals("request-new", store.state.value.requestId)
+        assertEquals("新请求", store.state.value.assistant)
+    }
+
+    @Test
     fun exactOwnerClearRetiresPreviewAndReasoningUsesSameOwnership() {
         val store = LocalStreamingPreviewStore()
-        val owner = LocalStreamingPreviewOwner("session-a", "request-1", LocalUsageMode.WORK)
+        val owner = store.newOwner("session-a", "request-1", LocalUsageMode.WORK)
 
         store.begin(owner)
         store.publishReasoning(owner, "正在分析")
@@ -63,8 +79,8 @@ class LocalStreamingPreviewStoreTest {
     @Test
     fun visibleSessionCanClaimPreviewWithoutLettingPreviousSessionClearIt() {
         val store = LocalStreamingPreviewStore()
-        val first = LocalStreamingPreviewOwner("session-a", "request-a", LocalUsageMode.WORK)
-        val second = LocalStreamingPreviewOwner("session-b", "request-b", LocalUsageMode.WORK)
+        val first = store.newOwner("session-a", "request-a", LocalUsageMode.WORK)
+        val second = store.newOwner("session-b", "request-b", LocalUsageMode.WORK)
 
         store.begin(first)
         store.publishAssistant(first, "A")
