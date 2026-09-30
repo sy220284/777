@@ -6,6 +6,7 @@ import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.observability.AppLog
+import com.labteto.dshmobile.local.model.LocalModelGateway
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -32,7 +33,6 @@ internal class LocalModelRequestCoordinator(
     private val streamPreviewIntervalMs: Long = 50L,
 ) {
     suspend fun complete(
-        key: String,
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
         step: Int,
