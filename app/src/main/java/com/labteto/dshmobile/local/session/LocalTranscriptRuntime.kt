@@ -44,21 +44,12 @@ internal class LocalTranscriptRuntime(
     fun applyMessages(
         messages: List<LocalHarnessMessage>,
         eventSequence: Long,
-        clearStreamingPreview: Boolean = false,
     ) {
-        if (messages.isNotEmpty() || clearStreamingPreview) {
+        if (messages.isNotEmpty()) {
             state.update { current ->
                 current.copy(
-                    messages = if (messages.isEmpty()) {
-                        current.messages
-                    } else {
-                        (current.messages + messages).takeLast(runtimeWindowMessages)
-                    },
-                    transcriptIndex = if (messages.isEmpty()) {
-                        current.transcriptIndex
-                    } else {
-                        appendLocalTranscriptRuntimeIndex(current.transcriptIndex, messages)
-                    },
+                    messages = (current.messages + messages).takeLast(runtimeWindowMessages),
+                    transcriptIndex = appendLocalTranscriptRuntimeIndex(current.transcriptIndex, messages),
                 )
             }
         }
