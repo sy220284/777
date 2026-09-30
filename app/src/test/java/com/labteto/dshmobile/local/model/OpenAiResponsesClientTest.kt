@@ -583,7 +583,7 @@ class OpenAiResponsesClientTest {
         ]""").jsonArray
 
         val error = runCatching {
-            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = false)
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
         }.exceptionOrNull() as? LocalModelException
 
         assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
@@ -635,7 +635,7 @@ class OpenAiResponsesClientTest {
         ]""").jsonArray
 
         val error = runCatching {
-            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = false)
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
         }.exceptionOrNull() as? LocalModelException
 
         assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
