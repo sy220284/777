@@ -65,37 +65,10 @@ private data class UpdateManifest(
 )
 
 @Serializable
-private data class MirrorAsset(
-    val name: String = "",
-    val path: String = "",
-    val size: Long = -1L,
-    val sha256: String = "",
+private data class GiteeRelease(
+    @SerialName("tag_name") val tagName: String = "",
+    val prerelease: Boolean = false,
 )
-
-@Serializable
-private data class MirrorPatch(
-    val fromVersion: String = "",
-    val toVersion: String = "",
-    val algorithm: String = "",
-    val path: String = "",
-    val size: Long = -1L,
-    val sha256: String = "",
-    val sourceSha256: String = "",
-    val targetSha256: String = "",
-)
-
-@Serializable
-private data class MirrorLatest(
-    val schema: Int = 0,
-    val version: String = "",
-    val apk: MirrorAsset = MirrorAsset(),
-    val patches: List<MirrorPatch> = emptyList(),
-)
-
-private sealed interface MirrorCheckResult
-private data class MirrorSuccess(val update: AvailableUpdate?) : MirrorCheckResult
-private object MirrorUnavailable : MirrorCheckResult
-
 data class DeltaPatch(
     val fromVersion: String,
     val toVersion: String,
@@ -137,15 +110,23 @@ private fun normalizeVersion(value: String): String =
 
 private val RELEASE_VERSION_PATTERN = Regex("""[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+""")
 private val SHA256_PATTERN = Regex("[0-9a-fA-F]{64}")
-private val SAFE_MIRROR_PATH_PATTERN = Regex("[A-Za-z0-9._/-]+")
+private val SAFE_ASSET_NAME_PATTERN = Regex("[A-Za-z0-9._-]+")
 
-internal fun parseUpdateMirrorBaseUrl(value: String): HttpUrl? {
+internal data class GiteeMirrorRepository(
+    val base: HttpUrl,
+    val owner: String,
+    val repo: String,
+)
+
+internal fun parseGiteeMirrorRepository(value: String): GiteeMirrorRepository? {
     val normalized = value.trim().takeIf(String::isNotEmpty)
         ?.trimEnd('/')
         ?.plus("/")
         ?: return null
     val url = normalized.toHttpUrlOrNull() ?: return null
     if (url.scheme != "https" ||
+        url.host != "gitee.com" ||
+        url.port != 443 ||
         url.query != null ||
         url.fragment != null ||
         url.username.isNotEmpty() ||
@@ -153,30 +134,22 @@ internal fun parseUpdateMirrorBaseUrl(value: String): HttpUrl? {
     ) {
         return null
     }
-    return url
+    val segments = url.pathSegments.filter(String::isNotEmpty)
+    if (segments.size != 2 || segments.any { !SAFE_ASSET_NAME_PATTERN.matches(it) }) return null
+    return GiteeMirrorRepository(url, segments[0], segments[1])
 }
 
-internal fun resolveMirrorAssetUrl(base: HttpUrl, relativePath: String): String? {
-    val path = relativePath.trim()
-    if (path.isEmpty() ||
-        path.startsWith("/") ||
-        '\\' in path ||
-        !SAFE_MIRROR_PATH_PATTERN.matches(path)
+internal fun giteeReleaseAssetUrl(
+    mirror: GiteeMirrorRepository,
+    tag: String,
+    name: String,
+): String? {
+    if (!tag.matches(Regex("""v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+""")) ||
+        !SAFE_ASSET_NAME_PATTERN.matches(name)
     ) {
         return null
     }
-    val segments = path.split('/')
-    if (segments.any { it.isEmpty() || it == "." || it == ".." }) return null
-
-    val resolved = base.resolve(path) ?: return null
-    if (resolved.scheme != "https" ||
-        resolved.host != base.host ||
-        resolved.port != base.port ||
-        !resolved.encodedPath.startsWith(base.encodedPath)
-    ) {
-        return null
-    }
-    return resolved.toString()
+    return mirror.base.resolve("releases/download/$tag/$name")?.toString()
 }
 
 /** Accept only this repository's published release URLs before constructing asset links. */
@@ -256,9 +229,9 @@ internal fun shouldUsePatchChain(apkSize: Long?, patches: List<DeltaPatch>): Boo
  * Manual release checker.
  *
  * Nothing calls this at application startup. Each explicit Settings tap performs a fresh request.
- * A configured mainland mirror is authoritative while reachable, so a normal domestic update check
- * does not touch GitHub. Invalid or unreachable mirror metadata falls back to the existing GitHub
- * release chain. Every payload is still verified by digest, package name and signing certificate.
+ * A configured Gitee release mirror is checked first, so a normal mainland update check does not
+ * depend on GitHub. Missing, invalid or unreachable Gitee metadata falls back to the existing
+ * GitHub release chain. Every payload is still verified by digest, package name and signer.
  */
 @Singleton
 class UpdateChecker internal constructor(
@@ -269,7 +242,7 @@ class UpdateChecker internal constructor(
     constructor(client: OkHttpClient) : this(client, BuildConfig.UPDATE_MIRROR_BASE_URL)
 
     private val json = Json { ignoreUnknownKeys = true }
-    private val mirrorBase = parseUpdateMirrorBaseUrl(mirrorBaseUrl)
+    private val mirrorRepository = parseGiteeMirrorRepository(mirrorBaseUrl)
 
     private val mirrorClient = client.newBuilder()
         .connectTimeout(5, TimeUnit.SECONDS)
@@ -300,93 +273,116 @@ class UpdateChecker internal constructor(
     }
 
     private suspend fun checkMirror(currentVersion: String): MirrorCheckResult {
-        val base = mirrorBase ?: return MirrorUnavailable
-        val latestUrl = base.resolve("latest.json") ?: return MirrorUnavailable
+        val mirror = mirrorRepository ?: return MirrorUnavailable
+        val latestApi = "https://gitee.com/api/v5/repos/${mirror.owner}/${mirror.repo}/releases/latest"
         val request = Request.Builder()
-            .url(latestUrl)
+            .url(latestApi)
             .header("Accept", "application/json")
             .header("Cache-Control", "no-cache")
             .get()
             .build()
 
+        val release = try {
+            val body = executeMirrorText(request, "检查 Gitee 国内发行版")
+            json.decodeFromString(GiteeRelease.serializer(), body)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            return MirrorUnavailable
+        }
+        if (release.prerelease) return MirrorUnavailable
+
+        val version = normalizeVersion(release.tagName)
+        if (!RELEASE_VERSION_PATTERN.matches(version)) return MirrorUnavailable
+        if (!isNewerVersion(version, currentVersion)) return MirrorSuccess(null)
+
+        val tag = "v$version"
+        val manifestUrl = giteeReleaseAssetUrl(mirror, tag, UPDATE_MANIFEST_NAME)
+            ?: return MirrorUnavailable
+        val manifestRequest = Request.Builder()
+            .url(manifestUrl)
+            .header("Accept", "application/json, application/octet-stream")
+            .header("Cache-Control", "no-cache")
+            .get()
+            .build()
         val manifest = try {
-            val body = executeMirrorText(request, "检查国内更新镜像")
-            json.decodeFromString(MirrorLatest.serializer(), body)
+            val body = executeMirrorBytes(
+                manifestRequest,
+                "读取 Gitee 更新清单",
+                MAX_MANIFEST_BYTES,
+            )
+            json.decodeFromString(UpdateManifest.serializer(), body.toString(Charsets.UTF_8))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
             return MirrorUnavailable
         }
 
-        val update = try {
-            mirrorUpdateFromManifest(base, manifest, currentVersion)
+        return try {
+            MirrorSuccess(giteeUpdateFromManifest(mirror, tag, manifest, currentVersion))
         } catch (_: Exception) {
-            return MirrorUnavailable
+            MirrorUnavailable
         }
-        return MirrorSuccess(
-            update.takeIf { isNewerVersion(it.version, currentVersion) },
-        )
     }
 
-    private fun mirrorUpdateFromManifest(
-        base: HttpUrl,
-        manifest: MirrorLatest,
+    private fun giteeUpdateFromManifest(
+        mirror: GiteeMirrorRepository,
+        tag: String,
+        manifest: UpdateManifest,
         currentVersion: String,
     ): AvailableUpdate {
-        require(manifest.schema == MIRROR_SCHEMA) { "更新镜像 schema 不受支持" }
-        val version = normalizeVersion(manifest.version)
-        require(RELEASE_VERSION_PATTERN.matches(version)) { "更新镜像版本号无效" }
+        val version = normalizeVersion(tag)
+        require(manifest.schema == UPDATE_MANIFEST_SCHEMA) { "Gitee 更新清单 schema 不受支持" }
+        require(normalizeVersion(manifest.targetVersion) == version) { "Gitee 更新清单版本不一致" }
 
-        val apk = manifest.apk
-        require(apk.name.matches(Regex("[A-Za-z0-9._-]+")) && apk.name.endsWith(".apk")) {
-            "更新镜像 APK 名称无效"
-        }
-        require(apk.size in 1..MAX_MIRROR_APK_BYTES) { "更新镜像 APK 大小无效" }
+        val apk = manifest.targetApk
+        require(
+            SAFE_ASSET_NAME_PATTERN.matches(apk.name) &&
+                apk.name.endsWith(".apk", ignoreCase = true)
+        ) { "Gitee 更新清单 APK 名称无效" }
+        require(apk.size in 1..MAX_MIRROR_APK_BYTES) { "Gitee 更新清单 APK 大小无效" }
         val apkSha = apk.sha256.takeIf(SHA256_PATTERN::matches)?.lowercase()
-            ?: error("更新镜像 APK SHA-256 无效")
-        val apkUrl = resolveMirrorAssetUrl(base, apk.path)
-            ?: error("更新镜像 APK 路径无效")
+            ?: error("Gitee 更新清单 APK SHA-256 无效")
+        val apkUrl = giteeReleaseAssetUrl(mirror, tag, apk.name)
+            ?: error("Gitee APK 下载地址无效")
 
-        val patches = manifest.patches.map { patch ->
-            require(normalizeVersion(patch.toVersion) == version) { "更新镜像增量目标版本不匹配" }
-            require(RELEASE_VERSION_PATTERN.matches(normalizeVersion(patch.fromVersion))) {
-                "更新镜像增量来源版本无效"
-            }
-            require(patch.algorithm == SUPPORTED_PATCH_ALGORITHM) { "更新镜像增量算法不受支持" }
-            require(patch.size in 1..MAX_MIRROR_PATCH_BYTES) { "更新镜像增量包大小无效" }
+        val directPatches = manifest.patches.filter {
+            normalizeVersion(it.fromVersion) == normalizeVersion(currentVersion) &&
+                normalizeVersion(it.toVersion) == version
+        }
+        require(directPatches.size <= 1) { "Gitee 更新清单包含重复的直接增量包" }
+        val candidatePatches = directPatches.map { patch ->
+            require(patch.algorithm == SUPPORTED_PATCH_ALGORITHM) { "Gitee 增量算法不受支持" }
+            require(SAFE_ASSET_NAME_PATTERN.matches(patch.asset)) { "Gitee 增量包名称无效" }
+            require(patch.size in 1..MAX_MIRROR_PATCH_BYTES) { "Gitee 增量包大小无效" }
             val patchSha = patch.sha256.takeIf(SHA256_PATTERN::matches)?.lowercase()
-                ?: error("更新镜像增量包 SHA-256 无效")
+                ?: error("Gitee 增量包 SHA-256 无效")
             val sourceSha = patch.sourceSha256.takeIf(SHA256_PATTERN::matches)?.lowercase()
-                ?: error("更新镜像增量来源 SHA-256 无效")
+                ?: error("Gitee 增量来源 SHA-256 无效")
             val targetSha = patch.targetSha256.takeIf(SHA256_PATTERN::matches)?.lowercase()
-                ?: error("更新镜像增量目标 SHA-256 无效")
-            require(targetSha == apkSha) { "更新镜像增量目标摘要与 APK 不一致" }
-            val patchUrl = resolveMirrorAssetUrl(base, patch.path)
-                ?: error("更新镜像增量包路径无效")
+                ?: error("Gitee 增量目标 SHA-256 无效")
+            require(targetSha == apkSha) { "Gitee 增量目标摘要与 APK 不一致" }
 
             DeltaPatch(
                 fromVersion = normalizeVersion(patch.fromVersion),
                 toVersion = version,
                 algorithm = patch.algorithm,
-                url = patchUrl,
-                name = patch.path.substringAfterLast('/'),
+                url = giteeReleaseAssetUrl(mirror, tag, patch.asset)
+                    ?: error("Gitee 增量包下载地址无效"),
+                name = patch.asset,
                 size = patch.size,
                 expectedSha256 = patchSha,
                 sourceSha256 = sourceSha,
                 targetSha256 = targetSha,
             )
         }
-
-        val direct = patches.filter {
-            normalizeVersion(it.fromVersion) == normalizeVersion(currentVersion) &&
-                normalizeVersion(it.toVersion) == version
-        }
-        require(direct.size <= 1) { "更新镜像包含重复的直接增量包" }
-        val patchChain = direct.takeIf { shouldUsePatchChain(apk.size, it) }.orEmpty()
+        val patchChain = candidatePatches.takeIf {
+            shouldUsePatchChain(apk.size, it)
+        }.orEmpty()
 
         return AvailableUpdate(
             version = version,
-            url = "https://github.com/$REPO/releases/tag/v$version",
+            url = mirror.base.resolve("releases/tag/$tag").toString(),
             apkUrl = apkUrl,
             apkName = apk.name,
             apkSize = apk.size,
@@ -712,7 +708,6 @@ class UpdateChecker internal constructor(
             "https://api.github.com/repos/$REPO/releases?per_page=$MAX_RELEASES_TO_SCAN"
         const val UPDATE_MANIFEST_NAME = "update-manifest.json"
         const val UPDATE_MANIFEST_SCHEMA = 1
-        const val MIRROR_SCHEMA = 1
         const val SUPPORTED_PATCH_ALGORITHM = "hdiffpatch-window-zstd-v1"
 
         val ListSerializer = kotlinx.serialization.builtins.ListSerializer(GithubRelease.serializer())
