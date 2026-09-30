@@ -132,6 +132,30 @@ class SessionEventLog(
         newestFirst.asReversed()
     }
 
+    /** One bounded chronological page newer than the cursor; old segments are skipped. */
+    fun pageAfter(sequenceExclusive: Long, limit: Int = DEFAULT_PAGE_EVENTS): List<SessionEvent> = synchronized(lock) {
+        val wanted = limit.coerceIn(1, MAX_PAGE_EVENTS)
+        val result = ArrayList<SessionEvent>(wanted)
+        val sources = orderedFilesUnsafe()
+        val relevant = ArrayDeque<File>()
+        for (source in sources.asReversed()) {
+            val last = readLastValidEventUnsafe(source) ?: continue
+            if (last.sequence <= sequenceExclusive) break
+            relevant.addFirst(source)
+        }
+        for (source in relevant) {
+            source.eventReader().use { reader ->
+                while (result.size < wanted) {
+                    val line = reader.readLine() ?: break
+                    val event = decodeEventOrNull(line) ?: continue
+                    if (event.sequence > sequenceExclusive) result += event
+                }
+            }
+            if (result.size >= wanted) break
+        }
+        result
+    }
+
     /**
      * Visit durable events newer than [sequenceExclusive] without materializing the tail.
      *

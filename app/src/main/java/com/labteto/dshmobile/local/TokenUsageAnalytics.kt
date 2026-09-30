@@ -2,7 +2,11 @@ package com.labteto.dshmobile.local
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.labteto.dshmobile.local.usage.TokenUsageDatabase
+import com.labteto.dshmobile.local.usage.UsageLifetimeTotals
+import com.labteto.dshmobile.local.usage.boundedForStorage
 import com.labteto.dshmobile.local.usage.distinctForAccounting
+import com.labteto.dshmobile.local.usage.normalizedForAccounting
 import com.labteto.dshmobile.local.usage.nonNegativeUsageDifference
 import com.labteto.dshmobile.local.usage.saturatingUsageAdd
 import com.labteto.dshmobile.local.usage.saturatingUsageCostAdd
@@ -111,6 +115,7 @@ data class TokenUsageRecord(
     val totalTokens: Long get() = saturatingUsageAdd(inputTokens, outputTokens)
 }
 
+@Serializable
 data class TokenUsageAggregate(
     val inputTokens: Long = 0L,
     val cacheHitTokens: Long = 0L,
@@ -419,37 +424,64 @@ class TokenUsageAnalyticsStore @Inject constructor(
     private val json: Json,
 ) {
     private val lock = Any()
-    private val seenRequestIds = LinkedHashSet<String>()
     private val directory = File(context.filesDir, "usage").apply { mkdirs() }
-    private val ledger = LocalSessionEventLog(
-        file = File(directory, "token_usage.jsonl"),
-        json = json,
-        maxBytes = MAX_LEDGER_SEGMENT_BYTES,
-    )
+    private val legacy = LocalSessionEventLog(File(directory, "token_usage.jsonl"), json)
+    private val database = TokenUsageDatabase(context, json)
+    private var accumulator: TokenUsageAccumulator? = null
+    private var accumulatorZone: ZoneId? = null
+    private var lifetime = UsageLifetimeTotals()
+    private var retainedDay = Long.MIN_VALUE
     private val _revision = MutableStateFlow(0L)
     val revision: StateFlow<Long> = _revision.asStateFlow()
 
-    init {
-        ledger.pageBefore(limit = RECENT_DEDUPE_IDS).forEach { event ->
-            decode(event)?.requestId?.takeIf(String::isNotBlank)?.let(seenRequestIds::add)
-        }
-    }
-
     fun append(record: TokenUsageRecord): Boolean = synchronized(lock) {
-        val id = record.requestId.ifBlank { UUID.randomUUID().toString() }
-        if (!seenRequestIds.add(id)) return@synchronized false
-        trimSeenIds()
-        val normalized = if (id == record.requestId) record else record.copy(requestId = id)
-        ledger.append(
-            USAGE_EVENT_TYPE,
-            json.encodeToJsonElement(TokenUsageRecord.serializer(), normalized).jsonObject,
-        )
+        ensureLoaded()
+        val safe = record.boundedForStorage()
+        val normalized = if (safe.requestId.isBlank()) safe.copy(requestId = UUID.randomUUID().toString()) else safe
+        val result = database.append(normalized)
+        if (!result.inserted) return@synchronized false
+        lifetime = result.totals
+        retainedDay = System.currentTimeMillis() / 86_400_000L
+        if (result.pruned) rebuildAccumulator() else checkNotNull(accumulator).add(normalized)
         _revision.value = _revision.value + 1L
         true
     }
 
-    fun snapshot(): TokenUsageAnalyticsSnapshot =
-        aggregateTokenUsageRecords(allRecords(), ZoneId.systemDefault())
+    fun snapshot(): TokenUsageAnalyticsSnapshot = synchronized(lock) {
+        ensureLoaded()
+        if (accumulatorZone != ZoneId.systemDefault()) rebuildAccumulator()
+        checkNotNull(accumulator).snapshot().let { detail ->
+            detail.copy(
+                trackedSince = lifetime.since,
+                tracked = lifetime.tracked,
+                chat = detail.chat.copy(aggregate = lifetime.chat),
+                work = detail.work.copy(aggregate = lifetime.work),
+            )
+        }
+    }
+
+    private fun ensureLoaded() {
+        val today = System.currentTimeMillis() / 86_400_000L
+        if (accumulator != null) {
+            if (retainedDay != today) {
+                if (database.enforceRetention()) rebuildAccumulator()
+                retainedDay = today
+            }
+            return
+        }
+        database.migrate(legacy)
+        lifetime = database.lifetimeTotals()
+        database.enforceRetention()
+        rebuildAccumulator()
+        retainedDay = today
+    }
+    private fun rebuildAccumulator() {
+        val zone = ZoneId.systemDefault()
+        val next = TokenUsageAccumulator(zone)
+        database.retainedRecords().forEach(next::add)
+        accumulator = next
+        accumulatorZone = zone
+    }
 
     fun groupDetail(kind: TokenUsageGroupKind, key: String): TokenUsageGroupDetail? {
         val records = allRecords().distinctForAccounting().filter { record ->
@@ -513,133 +545,123 @@ class TokenUsageAnalyticsStore @Inject constructor(
         )
     }
 
-    fun recordById(requestId: String): TokenUsageRecord? =
-        allRecords().firstOrNull { it.requestId == requestId }
-
-    private fun allRecords(): Sequence<TokenUsageRecord> =
-        ledger.events().mapNotNull(::decode)
-
-    private fun decode(event: LocalSessionEventLog.Event): TokenUsageRecord? {
-        if (event.type != USAGE_EVENT_TYPE) return null
-        return runCatching {
-            json.decodeFromJsonElement(TokenUsageRecord.serializer(), event.data)
-        }.getOrNull()
+    fun recordById(requestId: String): TokenUsageRecord? = synchronized(lock) {
+        ensureLoaded()
+        database.recordById(requestId)
     }
 
-    private fun trimSeenIds() {
-        while (seenRequestIds.size > RECENT_DEDUPE_IDS) {
-            val iterator = seenRequestIds.iterator()
-            if (!iterator.hasNext()) return
-            iterator.next()
-            iterator.remove()
-        }
+    private fun allRecords(): Sequence<TokenUsageRecord> = synchronized(lock) {
+        ensureLoaded()
+        database.retainedRecords().asSequence()
     }
 
-    private companion object {
-        const val USAGE_EVENT_TYPE = "usage/request"
-        const val RECENT_DEDUPE_IDS = 1_024
-        const val DETAIL_RECORDS = 300
-        const val MAX_LEDGER_SEGMENT_BYTES = 8L * 1024L * 1024L
-    }
+    private companion object { const val DETAIL_RECORDS = 300 }
 }
 
 internal fun aggregateTokenUsageRecords(
     records: Sequence<TokenUsageRecord>,
     zone: ZoneId = ZoneId.systemDefault(),
-): TokenUsageAnalyticsSnapshot {
-        val total = MutableTokenAggregate()
-        val chat = MutableTokenAggregate()
-        val work = MutableTokenAggregate()
-        val dayBuckets = linkedMapOf<Long, MutableDayBucket>()
-        val sessionGroups = linkedMapOf<String, MutableGroup>()
-        val taskGroups = linkedMapOf<String, MutableGroup>()
-        val chatActions = linkedMapOf<TokenUsageAction, MutableTokenAggregate>()
-        val workActions = linkedMapOf<TokenUsageAction, MutableTokenAggregate>()
-        val chatTurns = linkedSetOf<String>()
-        val workRuns = linkedSetOf<String>()
-        val recent = ArrayDeque<TokenUsageRecord>()
-        var trackedSince = 0L
-        var chatTurnInputTokens = 0L
-        val directVisibleReplies = linkedMapOf<String, TokenUsageRecord>()
-        var groupVisibleReplyOutputTokens = 0L
-        var groupVisibleReplyTotalTokens = 0L
-        var groupVisibleReplyCount = 0
-        var workMainTokens = 0L
-        var workSubagentTokens = 0L
-        var workTaskInputTokens = 0L
-        var workTaskOutputTokens = 0L
+): TokenUsageAnalyticsSnapshot = TokenUsageAccumulator(zone).apply {
+    records.distinctForAccounting().forEach(::add)
+}.snapshot()
 
-        records.distinctForAccounting().forEach { record ->
-            if (trackedSince == 0L || record.timestamp < trackedSince) trackedSince = record.timestamp
-            total.add(record)
-            val epochDay = Instant.ofEpochMilli(record.timestamp).atZone(zone).toLocalDate().toEpochDay()
-            val day = dayBuckets.getOrPut(epochDay, ::MutableDayBucket)
-            when (record.context.mode) {
-                LocalUsageMode.CHAT -> {
-                    chat.add(record)
-                    day.chat.add(record)
-                    chatActions.getOrPut(record.context.action, ::MutableTokenAggregate).add(record)
-                    record.context.turnId?.takeIf(String::isNotBlank)?.let { turnId ->
-                        chatTurns += turnId
-                        chatTurnInputTokens = saturatingUsageAdd(chatTurnInputTokens, record.inputTokens)
-                        when (record.context.action) {
-                            TokenUsageAction.CHAT_REPLY,
-                            TokenUsageAction.CHAT_REPAIR,
-                            -> {
-                                val previous = directVisibleReplies[turnId]
-                                if (previous == null || record.timestamp >= previous.timestamp) {
-                                    directVisibleReplies[turnId] = record
-                                }
+/** Bounded by the retained request window in the store; updates do not reread the archive. */
+internal class TokenUsageAccumulator(private val zone: ZoneId) {
+    private val total = MutableTokenAggregate()
+    private val chat = MutableTokenAggregate()
+    private val work = MutableTokenAggregate()
+    private val dayBuckets = linkedMapOf<Long, MutableDayBucket>()
+    private val sessionGroups = linkedMapOf<String, MutableGroup>()
+    private val taskGroups = linkedMapOf<String, MutableGroup>()
+    private val chatActions = linkedMapOf<TokenUsageAction, MutableTokenAggregate>()
+    private val workActions = linkedMapOf<TokenUsageAction, MutableTokenAggregate>()
+    private val chatTurns = linkedSetOf<String>()
+    private val workRuns = linkedSetOf<String>()
+    private val recent = ArrayDeque<TokenUsageRecord>()
+    private var trackedSince = 0L
+    private var chatTurnInputTokens = 0L
+    private val directVisibleReplies = linkedMapOf<String, TokenUsageRecord>()
+    private var groupVisibleReplyOutputTokens = 0L
+    private var groupVisibleReplyTotalTokens = 0L
+    private var groupVisibleReplyCount = 0
+    private var workMainTokens = 0L
+    private var workSubagentTokens = 0L
+    private var workTaskInputTokens = 0L
+    private var workTaskOutputTokens = 0L
+
+    fun add(raw: TokenUsageRecord) {
+        val record = raw.normalizedForAccounting()
+        if (trackedSince == 0L || record.timestamp < trackedSince) trackedSince = record.timestamp
+        total.add(record)
+        val epochDay = Instant.ofEpochMilli(record.timestamp).atZone(zone).toLocalDate().toEpochDay()
+        val day = dayBuckets.getOrPut(epochDay, ::MutableDayBucket)
+        when (record.context.mode) {
+            LocalUsageMode.CHAT -> {
+                chat.add(record)
+                day.chat.add(record)
+                chatActions.getOrPut(record.context.action, ::MutableTokenAggregate).add(record)
+                record.context.turnId?.takeIf(String::isNotBlank)?.let { turnId ->
+                    chatTurns += turnId
+                    chatTurnInputTokens = saturatingUsageAdd(chatTurnInputTokens, record.inputTokens)
+                    when (record.context.action) {
+                        TokenUsageAction.CHAT_REPLY,
+                        TokenUsageAction.CHAT_REPAIR,
+                        -> {
+                            val previous = directVisibleReplies[turnId]
+                            if (previous == null || record.timestamp >= previous.timestamp) {
+                                directVisibleReplies[turnId] = record
                             }
-                            else -> Unit
                         }
-                    }
-                    if (record.context.action == TokenUsageAction.GROUP_REPLY) {
-                        groupVisibleReplyOutputTokens = saturatingUsageAdd(groupVisibleReplyOutputTokens, record.outputTokens)
-                        groupVisibleReplyTotalTokens = saturatingUsageAdd(groupVisibleReplyTotalTokens, record.totalTokens)
-                        groupVisibleReplyCount += 1
-                    }
-                    record.context.sessionId?.takeIf(String::isNotBlank)?.let { sessionId ->
-                        sessionGroups.getOrPut(sessionId) {
-                            MutableGroup(
-                                key = sessionId,
-                                title = record.context.sessionTitle.orEmpty(),
-                                mode = LocalUsageMode.CHAT,
-                            )
-                        }.add(record)
+                        else -> Unit
                     }
                 }
-                LocalUsageMode.WORK -> {
-                    work.add(record)
-                    day.work.add(record)
-                    workActions.getOrPut(record.context.action, ::MutableTokenAggregate).add(record)
-                    val taskRunId = record.context.parentRunId?.takeIf(String::isNotBlank)
-                        ?: record.context.runId?.takeIf(String::isNotBlank)
-                    taskRunId?.let { runId ->
-                        workRuns += runId
-                        workTaskInputTokens = saturatingUsageAdd(workTaskInputTokens, record.inputTokens)
-                        workTaskOutputTokens = saturatingUsageAdd(workTaskOutputTokens, record.outputTokens)
-                        taskGroups.getOrPut(runId) {
-                            MutableGroup(
-                                key = runId,
-                                title = record.context.taskLabel.orEmpty(),
-                                mode = LocalUsageMode.WORK,
-                            )
-                        }.add(record)
-                    }
-                    when (record.context.runKind) {
-                        LocalAgentRunKind.FOREGROUND.name.lowercase() ->
-                            workMainTokens = saturatingUsageAdd(workMainTokens, record.totalTokens)
-                        LocalAgentRunKind.SUBAGENT.name.lowercase() ->
-                            workSubagentTokens = saturatingUsageAdd(workSubagentTokens, record.totalTokens)
-                    }
+                if (record.context.action == TokenUsageAction.GROUP_REPLY) {
+                    groupVisibleReplyOutputTokens = saturatingUsageAdd(groupVisibleReplyOutputTokens, record.outputTokens)
+                    groupVisibleReplyTotalTokens = saturatingUsageAdd(groupVisibleReplyTotalTokens, record.totalTokens)
+                    groupVisibleReplyCount += 1
                 }
-                null -> day.other.add(record)
+                record.context.sessionId?.takeIf(String::isNotBlank)?.let { sessionId ->
+                    sessionGroups.getOrPut(sessionId) {
+                        MutableGroup(
+                            key = sessionId,
+                            title = record.context.sessionTitle.orEmpty(),
+                            mode = LocalUsageMode.CHAT,
+                        )
+                    }.add(record)
+                }
             }
-            recent.addLast(record)
-            if (recent.size > RECENT_TOKEN_LOG_RECORDS) recent.removeFirst()
+            LocalUsageMode.WORK -> {
+                work.add(record)
+                day.work.add(record)
+                workActions.getOrPut(record.context.action, ::MutableTokenAggregate).add(record)
+                val taskRunId = record.context.parentRunId?.takeIf(String::isNotBlank)
+                    ?: record.context.runId?.takeIf(String::isNotBlank)
+                taskRunId?.let { runId ->
+                    workRuns += runId
+                    workTaskInputTokens = saturatingUsageAdd(workTaskInputTokens, record.inputTokens)
+                    workTaskOutputTokens = saturatingUsageAdd(workTaskOutputTokens, record.outputTokens)
+                    taskGroups.getOrPut(runId) {
+                        MutableGroup(
+                            key = runId,
+                            title = record.context.taskLabel.orEmpty(),
+                            mode = LocalUsageMode.WORK,
+                        )
+                    }.add(record)
+                }
+                when (record.context.runKind) {
+                    LocalAgentRunKind.FOREGROUND.name.lowercase() ->
+                        workMainTokens = saturatingUsageAdd(workMainTokens, record.totalTokens)
+                    LocalAgentRunKind.SUBAGENT.name.lowercase() ->
+                        workSubagentTokens = saturatingUsageAdd(workSubagentTokens, record.totalTokens)
+                }
+            }
+            null -> day.other.add(record)
         }
+        recent.addLast(record)
+        if (recent.size > RECENT_TOKEN_LOG_RECORDS) recent.removeFirst()
+    }
 
+    fun snapshot(): TokenUsageAnalyticsSnapshot {
         val chatTurnCount = chatTurns.size
         val directReplyOutputTokens = directVisibleReplies.values.fold(0L) { total, record ->
             saturatingUsageAdd(total, record.outputTokens)
@@ -688,7 +710,7 @@ internal fun aggregateTokenUsageRecords(
                 .sortedByDescending(TokenUsageGroupSummary::lastUsedAt),
             recentRecords = recent.toList().asReversed(),
         )
-    
+    }
 }
 
 private class MutableTokenAggregate {

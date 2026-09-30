@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.harness.tools
 
+import com.labteto.dshmobile.harness.registry.RegistryEntries
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -54,38 +55,22 @@ data class HarnessTool(
     val executor: HarnessToolExecutor,
 )
 
-class ToolRegistry {
-    private val tools = linkedMapOf<String, HarnessTool>()
-
-    @Synchronized
-    fun register(tool: HarnessTool, replace: Boolean = false) {
-        require(tool.name.isNotBlank()) { "工具名不能为空" }
-        if (!replace) require(tool.name !in tools) { "工具已注册：${tool.name}" }
-        tools[tool.name] = tool
-    }
-
-    @Synchronized
+class ToolRegistry private constructor(
+    private val tools: RegistryEntries<HarnessTool>,
+    private val admission: ToolLifecycleAdmission,
+) {
+    constructor() : this(RegistryEntries(), ToolLifecycleAdmission())
+    fun register(tool: HarnessTool, replace: Boolean = false) = tools.register(tool.name, tool, replace)
     fun unregister(name: String): HarnessTool? = tools.remove(name)
-
-    @Synchronized
-    fun get(name: String): HarnessTool? = tools[name]
-
-    @Synchronized
-    fun names(): List<String> = tools.keys.toList()
-
-    @Synchronized
-    fun schemas(): JsonArray = JsonArray(tools.values.map(HarnessTool::schema))
-
-    /** Internal transaction snapshot used by the plugin lifecycle manager. */
-    @Synchronized
-    internal fun snapshot(): Map<String, HarnessTool> = LinkedHashMap(tools)
-
-    /** Restore the exact pre-lifecycle tool surface after a failed plugin transition. */
-    @Synchronized
-    internal fun restore(snapshot: Map<String, HarnessTool>) {
-        tools.clear()
-        tools.putAll(snapshot)
-    }
+    fun get(name: String): HarnessTool? = tools.get(name)
+    fun names(): List<String> = tools.snapshot().keys.toList()
+    fun schemas(): JsonArray = JsonArray(tools.snapshot().values.map(HarnessTool::schema))
+    internal fun snapshot(): Map<String, HarnessTool> = tools.snapshot()
+    internal fun restore(snapshot: Map<String, HarnessTool>) = tools.restore(snapshot)
+    internal fun fork(): ToolRegistry = ToolRegistry(tools.fork(), admission)
+    internal fun publishTo(destination: ToolRegistry) = tools.publishTo(destination.tools)
+    internal fun markLifecycleSafe(safe: Boolean) = admission.markSafe(safe)
+    internal suspend fun <T> lifecycleTransition(block: suspend () -> T): T = admission.transition(block)
 
     suspend fun execute(
         name: String,
@@ -93,7 +78,18 @@ class ToolRegistry {
         rawArguments: String = input.toString(),
         context: ToolContext = ToolContext(),
     ): ToolResult {
-        val tool = synchronized(this) { tools[name] } ?: return ToolResult(
+        if (!admission.beginCall()) return ToolResult("插件生命周期切换中或资源状态异常，请稍后重试或停用异常插件：$name", isError = true)
+        return try {
+            executeAdmitted(name, input, rawArguments, context)
+        } finally {
+            admission.endCall()
+        }
+    }
+
+    private suspend fun executeAdmitted(
+        name: String, input: JsonObject, rawArguments: String, context: ToolContext,
+    ): ToolResult {
+        val tool = tools.get(name) ?: return ToolResult(
             content = "未知工具：$name",
             isError = true,
         )

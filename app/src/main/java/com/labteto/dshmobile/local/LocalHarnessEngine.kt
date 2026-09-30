@@ -63,7 +63,8 @@ import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.canonicalFactLines
 import com.labteto.dshmobile.local.chat.commitProcessed
-import com.labteto.dshmobile.local.chat.enqueuePending
+import com.labteto.dshmobile.local.chat.enqueuePendingDurably
+import com.labteto.dshmobile.local.chat.boundDurablePending
 import com.labteto.dshmobile.local.chat.rebaseGeneration
 import com.labteto.dshmobile.local.chat.restoreBranchContext
 import com.labteto.dshmobile.local.chat.withContextForPlanner
@@ -1429,7 +1430,7 @@ class LocalHarnessEngine @Inject constructor(
             snapshot = branchParentContext,
             legacyState = baseState,
             previousGeneration = previousGeneration,
-        )
+        ).boundDurablePending(eventLog, if (state.groupChat.enabled) "group" else "direct")
         val baseContext = replayedContext.copy(continuity = recoveredBaseContext.continuity)
         val editedModelMessage = editedChatUserModelMessage(
             eventLog = eventLog,
@@ -1538,7 +1539,7 @@ class LocalHarnessEngine @Inject constructor(
             snapshot = chatBranchLastContext(selected),
             legacyState = snapshot?.first,
             previousGeneration = state.chatContext.generation,
-        )
+        ).boundDurablePending(eventLog, if (state.groupChat.enabled) "group" else "direct")
         modelHistory.reset(
             buildDurableChatModelHistory(
                 eventLog = eventLog,
@@ -1611,7 +1612,7 @@ class LocalHarnessEngine @Inject constructor(
                 snapshot = chatBranchParentContext(branches, messageId),
                 legacyState = baseState,
                 previousGeneration = state.chatContext.generation,
-            )
+            ).boundDurablePending(eventLog, if (state.groupChat.enabled) "group" else "direct")
             _state.update {
                 it.copy(
                     chatState = baseState.withoutLegacyConversationContext(),
@@ -2067,7 +2068,7 @@ class LocalHarnessEngine @Inject constructor(
                 )
                 current.copy(
                     chatState = nextChatState,
-                    chatContext = baseContext.enqueuePending(pending),
+                    chatContext = baseContext.enqueuePendingDurably(pending, eventLog),
                 )
             }
         }
@@ -2932,7 +2933,7 @@ class LocalHarnessEngine @Inject constructor(
                                 snapshot = oldNode.chatContextAfter,
                                 legacyState = oldNode.chatStateAfter,
                                 previousGeneration = current.chatContext.generation,
-                            ),
+                            ).boundDurablePending(eventLog),
                             replySuggestions = oldNode.replySuggestionsAfter,
                         )
                     }
@@ -5035,7 +5036,7 @@ class LocalHarnessEngine @Inject constructor(
             gallerySaveSuppressedThrough = stored.gallerySaveSuppressedThrough,
             chatPersona = chatPersonaStore.get(stored.personaId),
             chatState = stored.chatState.withoutLegacyConversationContext(),
-            chatContext = stored.chatContext.withLegacyFallback(stored.chatState),
+            chatContext = stored.chatContext.withLegacyFallback(stored.chatState).boundDurablePending(eventLog),
             replySuggestions = stored.replySuggestions,
             chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !stored.groupChat.enabled) {
                 restoreMaterializedChatBranchState(
@@ -5048,7 +5049,7 @@ class LocalHarnessEngine @Inject constructor(
                 LocalChatBranchState()
             },
             groupChat = if (stored.usageMode == LocalUsageMode.CHAT) {
-                stored.groupChat.migrateLegacyConversationContext()
+                stored.groupChat.migrateLegacyConversationContext().let { it.copy(context = it.context.boundDurablePending(eventLog, "group")) }
             } else {
                 LocalGroupChatState()
             },

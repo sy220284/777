@@ -46,6 +46,9 @@ class LocalSessionEventLog(
         event.toLocalEvent()
     }
 
+    fun pageAfter(sequenceExclusive: Long, limit: Int = 80): List<Event> =
+        delegate.pageAfter(sequenceExclusive, limit).map { it.toLocalEvent() }
+
     /**
      * Stream durable events in sequence order without materializing the whole session in memory.
      * UI projections such as conversation files only keep their compact projection state.

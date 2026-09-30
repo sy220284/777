@@ -61,3 +61,13 @@ internal fun Sequence<TokenUsageRecord>.distinctForAccounting(): Sequence<TokenU
         yield(record)
     }
 }
+
+/** Diagnostic labels cannot turn an otherwise valid API accounting record into an oversized row. */
+internal fun TokenUsageRecord.boundedForStorage(): TokenUsageRecord = normalizedForAccounting().copy(
+    model = model.take(128),
+    context = context.copy(
+        sessionTitle = context.sessionTitle?.take(256),
+        taskLabel = context.taskLabel?.take(256),
+        runKind = context.runKind?.take(64),
+    ),
+)

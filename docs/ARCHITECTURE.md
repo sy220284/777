@@ -118,7 +118,7 @@ Recovery does not blindly replay side effects. A started tool whose result is un
 
 Platform-specific providers are built by `LocalPluginCompositionFactory` / `LocalPluginComposition`, not by the Engine.
 
-Built-in plugins are described by `PluginDescriptor` and registered in a `PluginCatalog`. `PluginManager` resolves dependency order and minimum versions before lifecycle mutation, prevents disabling providers with active dependents, and keeps descriptor/catalog state synchronized with the live registry. Runtime replacement uses `PluginRegistry.replace`: registry mutations are isolated, failed replacements clean up the candidate and reinstall the previous plugin before restoring the original registry surface.
+Built-in plugins are described by `PluginDescriptor` and registered in a `PluginCatalog`. `PluginManager` resolves dependency order and minimum versions before lifecycle mutation, prevents disabling providers with active dependents, and keeps descriptor/catalog state synchronized with the live registry. Runtime replacement uses `PluginRegistry.replace`: registry mutations are staged and published together after admitted tool calls drain (up to 30 seconds). Failed replacements clean up the candidate and reinstall the previous plugin, publishing the newly created resources instead of old closed references. If resource restoration or cleanup fails, tools fail closed until the failed plugin is successfully disabled. UI management resolves the active instance under the lifecycle mutation lock. The Android composition rejects hot replacement or disabling of runtime/device providers that are also retained by long-lived owners; changing these providers requires restarting the runtime.
 
 Startup plugin installation remains atomic. Dynamic MCP disconnect stops new admission, drains in-flight calls, unregisters tools, then closes transport. Downstream Agent code depends on capability contracts rather than Android UI classes. External DEX/JAR loading is intentionally outside this trust boundary until the plugin API is stable; the current hot-swap contract applies to trusted in-process plugin definitions.
 
@@ -130,7 +130,7 @@ Relationship memory uses a stable subject key; Gallery identity wins over copied
 
 ### Token usage and observability
 
-`TokenUsageAnalyticsStore` keeps a request-level ledger. API-reported input/output usage is the total; prompt sections are diagnostic attribution only and are not added again.
+`TokenUsageAnalyticsStore` migrates the legacy JSONL ledger transactionally into SQLite. Request insertion, deduplication and lifetime totals commit together; a failed write can be retried with the same request id. Request details retain at most 90 days and 10,000 records (shrinking to 9,000 after overflow), with a 4 KiB per-record bound. Lifetime totals are retained independently. The bounded projection updates incrementally; reopening, retention cleanup and time-zone changes rebuild it from the retained window. Averages, action splits and groups describe that window, while headline aggregates remain lifetime totals. Deduplication covers retained request identities; callers must use a new id for a new request and avoid replaying expired requests. API-reported input/output usage is the total; prompt sections are diagnostic attribution only and are not added again.
 
 `LocalTokenUsageContextBridge` maps internal model-consuming actions such as Web and Vision back to their parent run.
 
@@ -197,3 +197,7 @@ CI treats architectural boundaries as executable constraints, including:
 When a ratchet fails, the fix is to move responsibility to the correct boundary—not to raise the budget.
 
 See [AGENTS.md](../AGENTS.md) for repository-wide engineering and merge rules.
+
+### Pending chat continuity
+
+The request-time pending window retains at most 64 turns with 4,000 characters per message. Full pending facts are persisted as `chat/pending-turn` events before eviction; consolidation reads paged events after the processed cursor and selects the oldest unfinished batch with bounded memory. Direct, proactive and group chat use the same store with separate scopes. Legacy active queues are archived before bounding. Continuations copy unfinished facts in bounded batches into the new session log and assign its sequences; old processed cursors are reset. Imported prefix facts remain available across branches in the new conversation. Branch restoration filters archived facts by active message ids when alternatives exist. A consolidation commit preserves newer pending turns and deterministic scene updates and rejects competing cursor changes.

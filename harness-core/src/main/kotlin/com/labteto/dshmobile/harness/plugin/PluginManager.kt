@@ -93,6 +93,13 @@ class PluginManager(
         catalog.register(definition, replace = true)
     }
 
+    /** UI management calls resolve the current instance and cannot overlap lifecycle mutation. */
+    suspend fun <T> withActivePlugin(id: String, block: suspend (HarnessPlugin, HarnessContext) -> T): T =
+        mutationMutex.withLock {
+            val plugin = registry.activePlugin(id) ?: error("插件未启用或运行态异常：$id")
+            block(plugin, registry.context)
+        }
+
     fun installedPluginIds(): List<String> = registry.ids()
 
     fun descriptors(): List<PluginDescriptor> = catalog.descriptors()
