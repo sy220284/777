@@ -1300,4 +1300,5 @@
     <string name="chatgpt_loading_models">Loading models available to this ChatGPT account…</string>
     <string name="chatgpt_model_source">ChatGPT plan · %1$s</string>
 
+    <string name="chatgpt_continue">Continue with ChatGPT</string>
 </resources>
