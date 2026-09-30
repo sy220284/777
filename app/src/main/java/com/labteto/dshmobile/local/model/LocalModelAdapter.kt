@@ -22,7 +22,13 @@ internal data class LocalResolvedModelRoute(
     val capabilities: LocalModelRuntimeCapabilities,
 ) {
     val fingerprint: String by lazy {
-        val raw = listOf(protocol.name, normalizeModelBaseUrl(baseUrl), model.trim()).joinToString("\u0000")
+        val raw = listOf(
+            protocol.name,
+            authKind.name,
+            profileId.orEmpty(),
+            normalizeModelBaseUrl(baseUrl),
+            model.trim(),
+        ).joinToString("\u0000")
         MessageDigest.getInstance("SHA-256").digest(raw.toByteArray())
             .joinToString("") { "%02x".format(it) }
     }
