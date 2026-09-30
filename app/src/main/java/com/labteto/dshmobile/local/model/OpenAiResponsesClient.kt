@@ -542,6 +542,7 @@ class OpenAiResponsesClient @Inject constructor(
                     itemSchema,
                     "$path.items",
                     strict,
+                    enforceOpenAiToolSchema,
                     depth + 1,
                 )
             } else if (strict && enforceOpenAiToolSchema) {
@@ -569,6 +570,7 @@ class OpenAiResponsesClient @Inject constructor(
                     childSchema,
                     "$path.anyOf[$anyOfIndex]",
                     strict,
+                    enforceOpenAiToolSchema,
                     depth + 1,
                 )
             }
@@ -590,6 +592,7 @@ class OpenAiResponsesClient @Inject constructor(
                     childSchema,
                     "$path.\$defs.$definitionName",
                     strict,
+                    enforceOpenAiToolSchema,
                     depth + 1,
                 )
             }
