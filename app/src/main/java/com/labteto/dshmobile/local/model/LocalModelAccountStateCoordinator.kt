@@ -21,22 +21,29 @@ internal class LocalModelAccountStateCoordinator(
         selectFirst: Boolean,
     ) {
         require(!isBusy()) { "请先结束当前任务再切换模型账户" }
+        val before = state.value
         val profiles = configuration.saveChatGptModels(accountId, models)
-        val selected = if (selectFirst) {
+        val requested = if (selectFirst) {
             profiles.firstOrNull {
                 it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
             }
         } else {
             null
         }
-        val result = selected?.let { configuration.select(it.id, profiles) }
+        val result = requested?.let { configuration.select(it.id, profiles) }
+        val active = result?.activeProfileId
+            ?.let { id -> profiles.firstOrNull { it.id == id } }
+            ?: configuration.activeProfile(before.model, before.baseUrl, profiles)
+        val configured = active != null && gateway.hasCredential(active)
+        active?.takeIf { configured }?.let(gateway::activate)
         state.update { current ->
             current.copy(
-                configured = result?.configured ?: current.configured,
-                model = result?.model ?: current.model,
-                baseUrl = result?.baseUrl ?: current.baseUrl,
+                configured = configured,
+                model = result?.model ?: active?.model ?: current.model,
+                baseUrl = result?.baseUrl ?: active?.baseUrl ?: current.baseUrl,
                 configuredModels = profiles.map(LocalModelProfile::model).distinct().sorted(),
                 modelProfiles = profiles,
+                activeModelProfileId = active?.id,
                 error = if (models.isEmpty()) "当前 ChatGPT 账户没有可用于套餐共享的模型" else null,
             )
         }
@@ -60,6 +67,7 @@ internal class LocalModelAccountStateCoordinator(
                 baseUrl = result.baseUrl,
                 configuredModels = result.configuredModels,
                 modelProfiles = result.profiles,
+                activeModelProfileId = result.activeProfileId,
                 error = null,
             )
         }
