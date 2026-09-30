@@ -67,6 +67,22 @@ class ChatGptAuthCoordinator @Inject constructor(
 
     suspend fun connect(existingAccountId: String? = null): ChatGptAccountRecord {
         val existing = existingAccountId?.let { accounts.get(it) }
+        return connectAttempt(
+            existingAccountId = existingAccountId,
+            existing = existing,
+            requestedClientId = existing?.clientId ?: CHATGPT_DYNAMIC_CLIENT_ID,
+            firstRegistration = existing == null,
+            allowInvalidGrantRetry = true,
+        )
+    }
+
+    private suspend fun connectAttempt(
+        existingAccountId: String?,
+        existing: ChatGptAccountRecord?,
+        requestedClientId: String,
+        firstRegistration: Boolean,
+        allowInvalidGrantRetry: Boolean,
+    ): ChatGptAccountRecord {
         _state.value = currentState(
             phase = ChatGptAuthPhase.PREPARING,
             selectedAccountId = existingAccountId ?: _state.value.selectedAccountId,
@@ -81,7 +97,6 @@ class ChatGptAuthCoordinator @Inject constructor(
         )
         val listener = callbackServer.open()
         try {
-            val requestedClientId = existing?.clientId ?: CHATGPT_DYNAMIC_CLIENT_ID
             val builder = CHATGPT_AUTHORIZE_URL.toHttpUrl().newBuilder()
                 .addQueryParameter("client_id", requestedClientId)
                 .addQueryParameter("ext_agent_host_id", hostId)
@@ -93,9 +108,9 @@ class ChatGptAuthCoordinator @Inject constructor(
                 .addQueryParameter("nonce", nonce)
                 .addQueryParameter("code_challenge_method", "S256")
                 .addQueryParameter("code_challenge", challenge)
-            if (existing == null) {
+            if (firstRegistration) {
                 builder.addQueryParameter("agent_name_hint", CHATGPT_AGENT_NAME)
-            } else {
+            } else if (existing != null) {
                 existing.idToken.takeIf(String::isNotBlank)?.let {
                     builder.addQueryParameter("id_token_hint", it)
                 }
@@ -122,10 +137,10 @@ class ChatGptAuthCoordinator @Inject constructor(
             val code = callback.code?.takeIf(String::isNotBlank)
                 ?: error("ChatGPT OAuth 回调缺少授权码")
             val issuedClientId = when {
-                existing == null -> callback.clientId?.takeIf(String::isNotBlank)
+                firstRegistration -> callback.clientId?.takeIf(String::isNotBlank)
                     ?: error("ChatGPT 首次注册未返回 issued client_id")
-                callback.clientId == null -> existing.clientId
-                callback.clientId == existing.clientId -> existing.clientId
+                callback.clientId == null -> requestedClientId
+                callback.clientId == requestedClientId -> requestedClientId
                 else -> error("ChatGPT OAuth 返回了不匹配的 client_id")
             }
 
@@ -134,12 +149,26 @@ class ChatGptAuthCoordinator @Inject constructor(
                 selectedAccountId = existingAccountId ?: _state.value.selectedAccountId,
                 error = null,
             )
-            var token = sessions.exchangeAuthorizationCode(
-                clientId = issuedClientId,
-                code = code,
-                verifier = pkceVerifier,
-                redirectUri = listener.redirectUri,
-            )
+            var token = try {
+                sessions.exchangeAuthorizationCode(
+                    clientId = issuedClientId,
+                    code = code,
+                    verifier = pkceVerifier,
+                    redirectUri = listener.redirectUri,
+                )
+            } catch (error: ChatGptOAuthTokenException) {
+                if (allowInvalidGrantRetry && error.oauthCode == "invalid_grant") {
+                    listener.close()
+                    return connectAttempt(
+                        existingAccountId = existingAccountId,
+                        existing = existing,
+                        requestedClientId = issuedClientId,
+                        firstRegistration = false,
+                        allowInvalidGrantRetry = false,
+                    )
+                }
+                throw error
+            }
             if (token.scopes.isEmpty() && !callback.scope.isNullOrBlank()) {
                 token = token.copy(
                     scopes = callback.scope.split(' ')
