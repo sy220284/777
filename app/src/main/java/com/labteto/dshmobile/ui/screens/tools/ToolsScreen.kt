@@ -59,6 +59,7 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -287,12 +288,12 @@ fun ToolsScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                         Text(
                             stringResource(R.string.tools_capability_group),
-                            style = DsType.std14,
+                            style = DsType.std14.withReadingWeight(),
                             color = colors.labelTertiary,
                         )
                         Text(
                             stringResource(R.string.tools_capability_group_hint),
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelTertiary,
                         )
                     }
@@ -347,7 +348,7 @@ fun ToolsScreen(
 
                     Text(
                         stringResource(R.string.tools_connection_group),
-                        style = DsType.std14,
+                        style = DsType.std14.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
                     DsGroupCard {
@@ -373,7 +374,7 @@ fun ToolsScreen(
                     state.remotePlugins?.let { inventory ->
                         Text(
                             stringResource(R.string.tools_remote_extensions),
-                            style = DsType.std14,
+                            style = DsType.std14.withReadingWeight(),
                             color = colors.labelTertiary,
                         )
                         DsGroupCard {
@@ -382,7 +383,7 @@ fun ToolsScreen(
                                     R.string.tools_remote_inventory,
                                     inventory.entries.size,
                                 ),
-                                style = DsType.caption11,
+                                style = DsType.caption11.withReadingWeight(),
                                 color = colors.labelTertiary,
                             )
                             inventory.entries.forEach { entry ->
@@ -406,7 +407,7 @@ fun ToolsScreen(
                                     Column(Modifier.weight(1f)) {
                                         Text(
                                             shortPluginName(entry.moduleName),
-                                            style = DsType.small13,
+                                            style = DsType.small13.withReadingWeight(),
                                             color = colors.labelPrimary,
                                         )
                                         Text(
@@ -414,7 +415,7 @@ fun ToolsScreen(
                                                 entry.fiberPhase,
                                                 entry.enabled,
                                             ),
-                                            style = DsType.caption11,
+                                            style = DsType.caption11.withReadingWeight(),
                                             color = colors.labelTertiary,
                                         )
                                     }
@@ -479,7 +480,7 @@ fun ToolsScreen(
             if (state.servers.isEmpty()) {
                 Text(
                     stringResource(R.string.tools_no_services),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
             } else {
@@ -495,7 +496,7 @@ fun ToolsScreen(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 server.id,
-                                style = DsType.std14Strong,
+                                style = DsType.std14Strong.withReadingWeight(),
                                 color = colors.labelPrimary,
                             )
                             Text(
@@ -504,7 +505,7 @@ fun ToolsScreen(
                                     server.transport.uppercase(),
                                     server.tools.size,
                                 ),
-                                style = DsType.caption11,
+                                style = DsType.caption11.withReadingWeight(),
                                 color = colors.labelTertiary,
                             )
                         }
@@ -559,7 +560,7 @@ fun ToolsScreen(
         ) {
             Text(
                 stringResource(R.string.tools_github_clear_confirm_body),
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
             )
             Row(
