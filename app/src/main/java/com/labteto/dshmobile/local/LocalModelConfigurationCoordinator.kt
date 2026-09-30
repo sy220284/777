@@ -123,16 +123,6 @@ internal class LocalModelConfigurationCoordinator(
         return tester.test(key, url, name, protocol)
     }
 
-    suspend fun deepSeekSearchApiKeyOrNull(): String? {
-        val candidates = profiles.read()
-            .filter { it.canBackDeepSeekSearch() }
-            .sortedBy { if (it.model.equals(DEFAULT_MODEL, ignoreCase = true)) 0 else 1 }
-        candidates.forEach { profile ->
-            apiKeys.getFor(profile.id)?.let { return it }
-        }
-        return null
-    }
-
     fun readProfiles(): List<LocalModelProfile> = profiles.read()
 
     fun activeProfile(model: String, baseUrl: String, all: List<LocalModelProfile> = profiles.read()) =
