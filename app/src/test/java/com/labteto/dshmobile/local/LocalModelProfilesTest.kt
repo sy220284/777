@@ -28,6 +28,25 @@ class LocalModelProfilesTest {
         assertEquals(first, modelProfileId(" shared-model ", "https://service-a.example/v1/"))
     }
 
+    @Test fun representativeProvidersKeepTheirDeclaredTransportProtocols() {
+        val chatCompletionRoutes = listOf(
+            "deepseek-flash" to "https://api.deepseek.com",
+            "MiniMax-M3" to "https://api.minimaxi.com/v1",
+            "gemini-3.8-flash" to "https://generativelanguage.googleapis.com/v1beta/openai",
+            "qwen3.8-max" to "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
+        chatCompletionRoutes.forEach { (model, baseUrl) ->
+            assertEquals(
+                LocalModelProtocol.CHAT_COMPLETIONS,
+                LocalModelPresets.find(model, baseUrl)?.protocol,
+            )
+        }
+        assertEquals(
+            LocalModelProtocol.RESPONSES,
+            LocalModelPresets.find("gpt-6-astra", "https://api.openai.com/v1")?.protocol,
+        )
+    }
+
     @Test fun providerPresetsUseDomesticRoutesWithoutRegionSuffixes() {
         val providers = LocalModelPresets.entries.map { it.provider }
         assertFalse(providers.any { it.contains("海外") || it.contains("国际") || it.contains("中国") })
