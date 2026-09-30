@@ -20,16 +20,7 @@ internal class LocalStreamPreview(
         if (delta.isEmpty()) return
         if (delta.length >= maxChars) {
             text.clear()
-            var start = delta.length - maxChars
-            if (
-                start > 0 &&
-                start < delta.length &&
-                Character.isLowSurrogate(delta[start]) &&
-                Character.isHighSurrogate(delta[start - 1])
-            ) {
-                start += 1
-            }
-            text.append(delta, start, delta.length)
+            text.append(takeLastWithoutSplittingSurrogatePair(delta, maxChars))
         } else {
             var overflow = text.length + delta.length - maxChars
             if (
