@@ -4,6 +4,8 @@ import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionStorageStatus
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import java.io.OutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,13 +26,37 @@ data class LocalSettingsMemoryContext(
 @Singleton
 class LocalSettingsRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
+    private val chatGptAuth: ChatGptAuthCoordinator,
 ) {
     val state: Flow<LocalHarnessSettingsState> =
         engine.state.map { it.toSettingsUiState() }.distinctUntilChanged()
     val initialState: LocalHarnessSettingsState get() = engine.state.value.toSettingsUiState()
+    val chatGptState: kotlinx.coroutines.flow.StateFlow<ChatGptUiState> = chatGptAuth.state
 
     fun memoryContext(): LocalSettingsMemoryContext = engine.state.value.let {
         LocalSettingsMemoryContext(it.conversationMode, it.projectId, it.lineageId)
+    }
+
+    suspend fun refreshChatGpt() {
+        chatGptAuth.refresh()
+        val state = chatGptAuth.state.value
+        val accountId = state.selectedAccountId ?: return
+        engine.syncChatGptModels(accountId, state.models, selectFirst = false)
+    }
+
+    suspend fun connectChatGpt(existingAccountId: String? = null) {
+        val account = chatGptAuth.connect(existingAccountId)
+        engine.syncChatGptModels(account.id, chatGptAuth.state.value.models, selectFirst = true)
+    }
+
+    suspend fun selectChatGptAccount(id: String) {
+        chatGptAuth.selectAccount(id)
+        engine.syncChatGptModels(id, chatGptAuth.state.value.models, selectFirst = true)
+    }
+
+    suspend fun disconnectChatGptAccount(id: String) {
+        engine.removeChatGptAccountProfiles(id)
+        chatGptAuth.disconnect(id)
     }
 
     fun configureModel(apiKey: String, model: String, baseUrl: String) =
