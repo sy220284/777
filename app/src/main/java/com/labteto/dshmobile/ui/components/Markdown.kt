@@ -45,6 +45,8 @@ import com.labteto.dshmobile.ui.theme.DsColors
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
@@ -449,7 +451,7 @@ private fun MarkdownTable(block: MdBlock.Table) {
             TableAlignment.END -> TextAlign.End
         }
 
-        Row(Modifier.background(colors.bgLayer1)) {
+        Row(Modifier.background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))) {
             block.header.forEachIndexed { column, cell ->
                 InlineMarkdown(
                     cell,
@@ -516,7 +518,7 @@ private fun CodeBlock(
                     lang != null -> lang
                     else -> "code"
                 },
-                style = DsType.caption11Strong.copy(fontFamily = DsType.codeFont, color = colors.labelCaption),
+                style = DsType.caption11Strong.withReadingWeight().copy(fontFamily = DsType.codeFont, color = colors.labelCaption),
                 color = colors.labelCaption,
                 modifier = Modifier.weight(1f),
             )
@@ -535,7 +537,7 @@ private fun CodeBlock(
         }
         Text(
             code,
-            style = DsType.mdCode,
+            style = DsType.mdCode.withReadingWeight(),
             color = colors.labelPrimary,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
         )
