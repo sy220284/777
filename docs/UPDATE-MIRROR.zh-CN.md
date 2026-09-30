@@ -25,12 +25,12 @@ Gitee Release 本身提供：
 main 通过 CI
 → 构建正式签名 APK
 → 生成完整包 / 增量包 / SHA256SUMS / update-manifest
-→ 创建或复用同版本 Gitee Release
+→ 先发布 GitHub Release
+→ 再创建或复用同版本 Gitee Release
 → 上传 APK / 增量包 / 校验文件
 → 公网回读并做 SHA-256 + 大小校验
 → 最后上传 update-manifest.json
 → 确认 Gitee latest 已指向本版
-→ 发布 GitHub Release
 ```
 
 `update-manifest.json` 最后上传。发布未完成时，客户端读不到有效清单，会把 Gitee 视为临时不可用并回退 GitHub，不会拿到半套更新资产。
@@ -105,20 +105,23 @@ Release workflow 跳过 Gitee 镜像
 
 ## 镜像一致性
 
-启用镜像后，Gitee 发布步骤位于 GitHub Release 之前，并且不是可忽略失败。
+启用镜像后，GitHub Release 作为正式发行主源优先创建，Gitee 随后同步同一套已经校验过的资产。
 
 因此：
 
 ```text
+GitHub Release 成功
+→ 用户可立即获得正式版
+
 Gitee 成功
-→ 才继续 GitHub Release
+→ 国内镜像追平同版本
 
 Gitee 失败
-→ 本次正式发布停止
-→ 不产生 GitHub 新正式版
+→ Workflow 标记失败，便于重跑镜像步骤
+→ 已创建的 GitHub Release 不回滚
 ```
 
-这样 Gitee 不会长期落后于 GitHub 正式版。
+这样 Gitee 的网络耗时或临时故障不会阻塞 GitHub 正式版发布；国内镜像仍通过同版本、同文件和 SHA-256 / 大小回读校验保持一致。
 
 同一个 tag 的附件视为不可变。如果 Gitee 已存在同名附件，发布脚本会从公开下载地址重新读取并比较大小和 SHA-256：
 
