@@ -27,7 +27,7 @@ internal class LocalModelConfigurationCoordinator(
 ) {
     private val profiles = LocalModelProfileStore(preferences, json)
     private val startup = LocalModelStartupMigrator(preferences, profiles, apiKeys, gateway)
-    suspend fun save(apiKey: String, model: String, baseUrl: String): LocalModelConfigurationResult =
+    suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): LocalModelConfigurationResult =
         LocalModelMutationGate.run {
             require(model.isNotBlank()) { "模型名称不能为空" }
             val name = normalizeModel(model)
@@ -41,7 +41,7 @@ internal class LocalModelConfigurationCoordinator(
                 model = name,
                 baseUrl = url,
                 provider = preset?.provider.orEmpty(),
-                protocol = preset?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS,
+                protocol = protocol ?: profiles.read().firstOrNull { it.id == id }?.protocol ?: preset?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS,
             )
             val all = profiles.read().filterNot { it.id == id } + profile
             profiles.write(all)
@@ -110,7 +110,7 @@ internal class LocalModelConfigurationCoordinator(
 
     suspend fun prepareStartup(model: String, baseUrl: String) = startup.prepare(model, baseUrl)
 
-    suspend fun test(apiKey: String, model: String, baseUrl: String): String {
+    suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): String {
         if (model.isBlank()) return "请选择模型"
         val name = normalizeModel(model)
         val url = runCatching { normalizeModelBaseUrl(baseUrl) }
@@ -118,7 +118,7 @@ internal class LocalModelConfigurationCoordinator(
         val key = apiKey.trim().takeIf(String::isNotEmpty)
             ?: apiKeys.getFor(modelProfileId(name, url))
             ?: return "请先填写该模型的密钥"
-        return tester.test(key, url, name)
+        return tester.test(key, url, name, protocol ?: profiles.read().firstOrNull { it.id == modelProfileId(name, url) }?.protocol ?: LocalModelPresets.protocolFor(name, url))
     }
 
     fun readProfiles(): List<LocalModelProfile> = profiles.read()

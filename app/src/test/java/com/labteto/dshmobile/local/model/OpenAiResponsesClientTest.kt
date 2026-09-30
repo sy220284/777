@@ -23,6 +23,74 @@ class OpenAiResponsesClientTest {
     )
 
     @Test
+    fun exactReportedCancelWithoutSpaceIsRetryable() {
+        val error = client.networkFailure(IOException("stream was reset:CANCEL"))
+        assertEquals("MODEL_NETWORK", error.code)
+        assertTrue(error.retryable)
+        assertFalse(error.message.orEmpty().contains("CANCEL"))
+    }
+
+    @Test
+    fun legacyToolHistoryKeepsCallsBeforeOutputsWhenSwitchingProtocols() {
+        val history = Json.parseToJsonElement("""[
+            {"role":"user","content":"读取文件"},
+            {"role":"assistant","content":null,"tool_calls":[
+                {"id":"call-one","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"a.txt\"}"}},
+                {"id":"call-two","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"b.txt\"}"}}
+            ]},
+            {"role":"tool","tool_call_id":"call-one","content":"A"},
+            {"role":"tool","tool_call_id":"call-two","content":"B"}
+        ]""").jsonArray.map { it.jsonObject }
+        listOf(false, true).forEach { plan ->
+            val input = client.buildPayload("gpt-test", history, JsonArray(emptyList()), null,
+                planSharing = plan)["input"]!!.jsonArray
+            assertEquals(5, input.size)
+            assertEquals("function_call", input[1].jsonObject["type"]!!.jsonPrimitive.content)
+            assertEquals("call-one", input[1].jsonObject["call_id"]!!.jsonPrimitive.content)
+            assertEquals("{\"path\":\"a.txt\"}", input[1].jsonObject["arguments"]!!.jsonPrimitive.content)
+            assertEquals("call-two", input[2].jsonObject["call_id"]!!.jsonPrimitive.content)
+            assertEquals("function_call_output", input[3].jsonObject["type"]!!.jsonPrimitive.content)
+            assertEquals("call-one", input[3].jsonObject["call_id"]!!.jsonPrimitive.content)
+            assertEquals("call-two", input[4].jsonObject["call_id"]!!.jsonPrimitive.content)
+        }
+    }
+
+    @Test
+    fun nativeResponsesContinuationDoesNotDuplicateLegacyCalls() {
+        val message = Json.parseToJsonElement("""{
+            "role":"assistant","content":null,
+            "tool_calls":[{"id":"call-one","function":{"name":"read_file","arguments":"{}"}}],
+            "_dsh_responses_output":[
+                {"type":"reasoning","id":"reason-one","encrypted_content":"encrypted"},
+                {"type":"function_call","call_id":"call-one","name":"read_file","arguments":"{}"}
+            ]
+        }""").jsonObject
+        val input = client.buildPayload("gpt-test", listOf(message), JsonArray(emptyList()), null)["input"]!!.jsonArray
+        assertEquals(message[OpenAiResponsesClient.RESPONSES_OUTPUT_KEY], input)
+        assertEquals(2, input.size)
+    }
+
+    @Test
+    fun optionalToolArgumentsStayNonStrictUnlessExplicitlyDeclared() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{"name":"read_file","parameters":{
+                "type":"object","properties":{"path":{"type":"string"},"start_line":{"type":"integer"}},
+                "required":["path"],"additionalProperties":false}}},
+            {"type":"function","function":{"name":"strict_tool","strict":true,"parameters":{
+                "type":"object","properties":{},"required":[],"additionalProperties":false}}}
+        ]""").jsonArray
+        listOf(false, true).forEach { plan ->
+            val payload = client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = plan)
+            val emitted = payload["tools"]!!.jsonArray.let {
+                if (plan) it.single().jsonObject["tools"]!!.jsonArray else it
+            }
+            assertEquals("false", emitted[0].jsonObject["strict"]!!.jsonPrimitive.content)
+            assertEquals("true", emitted[1].jsonObject["strict"]!!.jsonPrimitive.content)
+            assertEquals(tools[0].jsonObject["function"]!!.jsonObject["parameters"], emitted[0].jsonObject["parameters"])
+        }
+    }
+
+    @Test
     fun responsesEndpointKeepsPlanSharingOnOpenAiAndHonorsApiKeyBaseUrl() {
         assertEquals("https://api.openai.com/v1/responses", client.responsesEndpoint("https://proxy.example.com/v1", true))
         assertEquals("https://proxy.example.com/v1/responses", client.responsesEndpoint("https://proxy.example.com/v1", false))

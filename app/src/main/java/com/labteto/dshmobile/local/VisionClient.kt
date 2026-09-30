@@ -137,21 +137,19 @@ class VisionClient @Inject constructor(
                 }
                 val root = json.parseToJsonElement(body).jsonObject
                 val result = parseRoot(root)
-                if (isDeepSeekEndpoint(baseUrl)) {
-                    usageTracker.get().record(
-                        model = model,
-                        usage = parseDeepSeekOpenAiUsage(root),
-                        requestId = UUID.randomUUID().toString(),
-                        context = usageContext?.copy(
-                            action = TokenUsageAction.VISION,
-                            taskLabel = usageContext.taskLabel ?: prompt.take(120),
-                        ) ?: TokenUsageContext(
-                            mode = LocalUsageMode.WORK,
-                            action = TokenUsageAction.VISION,
-                            taskLabel = prompt.take(120),
-                        ),
-                    )
-                }
+                usageTracker.get().record(
+                    model = model,
+                    usage = parseDeepSeekOpenAiUsage(root),
+                    requestId = UUID.randomUUID().toString(),
+                    context = usageContext?.copy(
+                        action = TokenUsageAction.VISION,
+                        taskLabel = usageContext.taskLabel ?: prompt.take(120),
+                    ) ?: TokenUsageContext(
+                        mode = LocalUsageMode.WORK,
+                        action = TokenUsageAction.VISION,
+                        taskLabel = prompt.take(120),
+                    ),
+                )
                 result
             }
         } catch (error: LocalModelException) {
@@ -229,12 +227,6 @@ class VisionClient @Inject constructor(
             else -> ""
         }.trim().ifBlank { error("当前模型返回了空文本") }
     }
-
-    private fun isDeepSeekEndpoint(baseUrl: String): Boolean = runCatching {
-        val normalized = normalizeModelBaseUrl(baseUrl)
-        val host = java.net.URI(normalized).host.orEmpty().lowercase()
-        host == "api.deepseek.com" || host.endsWith(".deepseek.com")
-    }.getOrDefault(false)
 
     private fun endpoint(baseUrl: String): String {
         val clean = normalizeModelBaseUrl(baseUrl).trimEnd('/')

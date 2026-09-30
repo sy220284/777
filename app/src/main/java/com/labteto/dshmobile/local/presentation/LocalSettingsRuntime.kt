@@ -42,10 +42,10 @@ class LocalSettingsRuntime @Inject constructor(
     suspend fun selectChatGptAccount(id: String) = chatGpt.select(id)
     suspend fun disconnectChatGptAccount(id: String): String? = chatGpt.disconnect(id)
     fun configureModel(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)
-    suspend fun saveModel(apiKey: String, model: String, baseUrl: String) = engine.saveModelConfiguration(apiKey, model, baseUrl)
+    suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null) = engine.saveModelConfiguration(apiKey, model, baseUrl, protocol)
     fun selectModel(id: String) = engine.selectModel(id)
     fun removeModel(id: String) = engine.removeModelProfile(id)
-    suspend fun testModel(apiKey: String, model: String, baseUrl: String) = engine.testModelConfiguration(apiKey, model, baseUrl)
+    suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null) = engine.testModelConfiguration(apiKey, model, baseUrl, protocol)
     fun configureImageInputMode(mode: LocalImageInputMode) = engine.configureImageInputMode(mode)
     fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int) = engine.configureRuntimeLimits(main, subagent, attempts)
     fun configurePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean) =

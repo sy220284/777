@@ -169,6 +169,14 @@ android-17-instrumented
 - DeepSeek 官方网页搜索只允许读取 DeepSeek 官方 API Key，不得把 OpenAI、Gemini、Qwen、ChatGPT OAuth 等当前模型凭据误发给 DeepSeek 搜索接口。
 - system message 不进入 Responses input，转换为 `instructions`。
 - 文本、图片、function tool、function_call_output 和 continuation item 转换。
+- 切换到 Responses 时，旧 Chat Completions 的每个 tool_call 都转换为同 call_id 的 function_call；原始 Responses output 优先重放，不重复添加调用。
+- Responses function schema 显式保留 strict 设置；未声明时使用 non-strict，不能把可选工具参数隐式变成必填。
+- 子代理按 profileId 绑定独立 model/baseUrl/protocol/authKind/credentialRef；不得修改父代理活动档案。同名 API/套餐或多账户模型必须消除来源歧义。
+- list_subagent_models 只展示有凭据的已保存档案，不硬编码 DeepSeek 列表。
+- 自定义 API 协议选择要同时用于保存和连接测试，并在重新加载、替换 Key 后保留。
+- 套餐模型目录结构异常必须报错，不得静默解释为空目录而覆盖已有档案；标准 API data[].id 不能被当作套餐共享授权依据。
+- Vision 对所有供应商记录实际 API usage；价格未知时不得套用其他供应商价格。
+- HTTP/2 `stream was reset:CANCEL`（冒号无空格）和有空格的形式使用同一断流分类；用户主动取消仍遵守 coroutine cancellation。
 - `response.completed`、`response.failed`、`response.incomplete` 与流中断分别处理。
 - 套餐共享错误按 OpenAI 官方语义区分：用量限制、用量暂不可查、用户/工作区不可用、能力不支持、路由不支持、授权上下文异常。
 - `subscription_sharing_usage_limit_exceeded` 只表示当前共享请求受限，不推断整个 Plus/Pro 套餐已经耗尽或自行推断重置时间。

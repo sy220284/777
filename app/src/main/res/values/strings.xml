@@ -1325,4 +1325,6 @@
     <string name="chatgpt_welcome_title">You’re using your ChatGPT plan</string>
     <string name="chatgpt_welcome_body">Eligible AI requests use your ChatGPT plan or available credits. You can review and manage this app’s usage anytime in ChatGPT settings.</string>
     <string name="chatgpt_welcome_confirm">Got it</string>
+    <string name="local_model_protocol_value">API protocol: %1$s</string>
+    <string name="local_model_request_endpoint">Request endpoint: %1$s</string>
 </resources>

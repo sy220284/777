@@ -238,7 +238,8 @@ class OpenAiResponsesClient @Inject constructor(
             }
             if (role == "system") return@forEach
             if (role !in setOf("developer", "user", "assistant")) return@forEach
-            add(buildJsonObject {
+            val calls = if (role == "assistant") message["tool_calls"] as? JsonArray else null
+            if (calls.isNullOrEmpty() || message["content"] !in listOf(null, JsonNull)) add(buildJsonObject {
                 put("role", role)
                 val content = message["content"]
                 when (content) {
@@ -248,6 +249,18 @@ class OpenAiResponsesClient @Inject constructor(
                     else -> put("content", content.toString())
                 }
             })
+            calls.orEmpty().forEach { element ->
+                val call = element as? JsonObject ?: error("工具调用历史格式无效")
+                val function = call["function"] as? JsonObject ?: error("工具调用历史缺少 function")
+                add(buildJsonObject {
+                    put("type", "function_call")
+                    put("call_id", call["id"]?.jsonPrimitive?.contentOrNull
+                        ?.takeIf(String::isNotBlank) ?: error("工具调用历史缺少 call_id"))
+                    put("name", function["name"]?.jsonPrimitive?.contentOrNull
+                        ?.takeIf(String::isNotBlank) ?: error("工具调用历史缺少 name"))
+                    put("arguments", function["arguments"]?.jsonPrimitive?.contentOrNull ?: "{}")
+                })
+            }
         }
     }
 
@@ -290,7 +303,7 @@ class OpenAiResponsesClient @Inject constructor(
                     put("name", name)
                     function["description"]?.let { put("description", it) }
                     function["parameters"]?.let { put("parameters", it) }
-                    function["strict"]?.let { put("strict", it) }
+                    put("strict", function["strict"] ?: JsonPrimitive(false))
                 })
             }
         }

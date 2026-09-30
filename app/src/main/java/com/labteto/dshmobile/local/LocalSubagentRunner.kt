@@ -145,8 +145,13 @@ internal class LocalSubagentRunner(
             mutableListOf()
         }
         val progress = ArrayDeque<String>()
-        val snapshot = state.value
-        val routeModel = modelOverride?.trim()?.takeIf(String::isNotEmpty)?.take(120) ?: snapshot.model
+        val runProfile = try { modelGateway.profileForRun(modelOverride) } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            return LocalSubagentResult(LocalSubagentStatus.FAILED,
+                "[subagent][$subagentId] ${error.message}", (error as? LocalModelException)?.code ?: "NO_MODEL_CREDENTIAL")
+        }
+        val snapshot = state.value.copy(model = runProfile.model, baseUrl = runProfile.baseUrl)
+        val routeModel = runProfile.model
         val runHistoryBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
         val stepLimit = adaptiveAgentStepLimit(
             configuredBase = maxSteps,
@@ -166,12 +171,15 @@ internal class LocalSubagentRunner(
             put("agent_id", subagentId)
             put("background_job_id", backgroundJobId ?: "")
             put("model", routeModel)
+            put("profile_id", runProfile.id)
+            put("auth_kind", runProfile.authKind.name)
+            put("protocol", runProfile.protocol.name)
+            put("base_url", runProfile.baseUrl)
             put("max_steps", stepLimit)
             put("task", task.take(2_000))
             virtualScreenId?.let { put("virtual_screen_id", it) }
         })
-        val activeProfile = modelGateway.activeProfile()
-        if (activeProfile == null || !modelGateway.hasCredential(activeProfile)) {
+        if (!modelGateway.hasCredential(runProfile)) {
             val output = "[subagent][$subagentId][NO_MODEL_CREDENTIAL] 子代理无法读取当前模型凭据"
             eventLog().append("subagent/end", buildJsonObject {
                 put("agent_id", subagentId)
@@ -283,6 +291,7 @@ internal class LocalSubagentRunner(
                     val nativeImagesSent = hasMaterializedImageUrls(preparedHistory)
                     val reply = try {
                         completeSubagentStep(
+                            profile = runProfile,
                             key = key,
                             baseUrl = snapshot.baseUrl,
                             model = routeModel,
@@ -546,6 +555,7 @@ internal class LocalSubagentRunner(
     }
 
     private suspend fun completeSubagentStep(
+        profile: com.labteto.dshmobile.local.LocalModelProfile,
         key: String,
         baseUrl: String,
         model: String,
@@ -615,6 +625,7 @@ internal class LocalSubagentRunner(
                     resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
                         try {
                             modelGateway.complete(
+                                profile = profile,
                                 model = model,
                                 baseUrl = baseUrl,
                                 messages = activeHistory,

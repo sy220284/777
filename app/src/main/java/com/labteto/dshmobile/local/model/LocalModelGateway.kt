@@ -20,6 +20,7 @@ class LocalModelGateway @Inject constructor(
     private val credentials: LocalModelCredentialResolver,
     private val chatCompletions: DeepSeekClient,
     private val responses: OpenAiResponsesClient,
+    private val routes: LocalModelRouteCatalog,
 ) {
     val activeProfileState = credentials.activeProfile
     fun activate(profile: LocalModelProfile) = credentials.activate(profile)
@@ -29,14 +30,22 @@ class LocalModelGateway @Inject constructor(
     suspend fun hasCredential(profile: LocalModelProfile): Boolean =
         credentials.hasCredential(profile)
 
+    suspend fun availableProfiles(): List<LocalModelProfile> =
+        routes.profiles().filter { credentials.hasCredential(it) }
+
+    suspend fun profileForRun(selection: String? = null): LocalModelProfile =
+        selectRunModelProfile(availableProfiles(), credentials.active(), selection).also {
+            require(credentials.hasCredential(it)) { "所选模型凭据不可用" }
+        }
+
     suspend fun complete(
         model: String,
         baseUrl: String,
         messages: List<JsonObject>,
         tools: JsonArray,
         temperature: Double? = null,
+        profile: LocalModelProfile? = credentials.active(),
     ): LocalModelReply {
-        val profile = credentials.active()
         val resolved = credentials.resolve(model, baseUrl, profile)
         val routedTemperature = LocalModelPresets.samplingTemperatureFor(model, baseUrl, temperature)
         return if (usesResponses(profile, resolved.authKind)) {
@@ -68,8 +77,8 @@ class LocalModelGateway @Inject constructor(
         tools: JsonArray,
         temperature: Double? = null,
         onDelta: (LocalModelDelta) -> Unit = {},
+        profile: LocalModelProfile? = credentials.active(),
     ): LocalModelReply {
-        val profile = credentials.active()
         val resolved = credentials.resolve(model, baseUrl, profile)
         val routedTemperature = LocalModelPresets.samplingTemperatureFor(model, baseUrl, temperature)
         return if (usesResponses(profile, resolved.authKind)) {

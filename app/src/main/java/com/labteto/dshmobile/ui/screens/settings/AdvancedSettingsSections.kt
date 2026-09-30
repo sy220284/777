@@ -54,6 +54,7 @@ import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.LocalModelCapability
 import com.labteto.dshmobile.local.LocalModelAuthKind
 import com.labteto.dshmobile.local.LocalModelPresets
+import com.labteto.dshmobile.local.LocalModelProtocol
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
@@ -440,6 +441,7 @@ internal fun LocalModelSettingsCard(
     var showEditor by remember { mutableStateOf(false) }
     var model by remember { mutableStateOf(LocalModelPresets.entries.first().model) }
     var baseUrl by remember { mutableStateOf(LocalModelPresets.entries.first().baseUrl) }
+    var protocol by remember { mutableStateOf(LocalModelProtocol.CHAT_COMPLETIONS) }
     var custom by remember { mutableStateOf(false) }
     var apiKey by remember { mutableStateOf("") }
     var testStatus by remember { mutableStateOf<String?>(null) }
@@ -455,6 +457,7 @@ internal fun LocalModelSettingsCard(
     val editRoute: (String, String) -> Unit = { name, url ->
         model = name
         baseUrl = url
+        protocol = local.modelProfiles.firstOrNull { it.authKind == LocalModelAuthKind.API_KEY && it.model == name && it.baseUrl == url }?.protocol ?: LocalModelPresets.protocolFor(name, url)
         apiKey = ""
         testStatus = null
     }
@@ -577,7 +580,7 @@ internal fun LocalModelSettingsCard(
                     Text(baseUrl, style = DsType.caption11, color = colors.labelTertiary)
                     selectedPreset?.let { preset ->
                         Text(
-                            stringResource(R.string.local_model_chat_endpoint, preset.chatEndpoint),
+                            stringResource(R.string.local_model_request_endpoint, if (protocol == LocalModelProtocol.RESPONSES) "${preset.baseUrl.trimEnd('/')}/responses" else preset.chatEndpoint),
                             style = DsType.caption11,
                             color = colors.labelTertiary,
                         )
@@ -591,6 +594,7 @@ internal fun LocalModelSettingsCard(
                         ModelCapabilityTags(preset.capabilities)
                     }
                 }
+                if (custom) LocalModelProtocolPicker(protocol) { protocol = it; testStatus = null }
                 OutlinedTextField(apiKey, onValueChange = { apiKey = it.take(8000); testStatus = null },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     label = { Text(stringResource(if (savedRoute) R.string.advanced_replace_model_key
@@ -606,9 +610,10 @@ internal fun LocalModelSettingsCard(
                         val testedModel = model
                         val testedUrl = baseUrl
                         val testedKey = apiKey
+                        val testedProtocol = protocol
                         scope.launch {
-                            val result = viewModel.testLocalModel(testedKey, testedModel, testedUrl)
-                            if (model == testedModel && baseUrl == testedUrl && apiKey == testedKey) {
+                            val result = viewModel.testLocalModel(testedKey, testedModel, testedUrl, testedProtocol)
+                            if (model == testedModel && baseUrl == testedUrl && apiKey == testedKey && protocol == testedProtocol) {
                                 testStatus = result
                             }
                             testing = false
@@ -621,7 +626,7 @@ internal fun LocalModelSettingsCard(
                     } else {
                         saving = true
                         scope.launch {
-                            val result = runCatching { viewModel.saveLocalModel(apiKey, model, baseUrl) }
+                            val result = runCatching { viewModel.saveLocalModel(apiKey, model, baseUrl, protocol) }
                             saving = false
                             result.onSuccess {
                                 apiKey = ""

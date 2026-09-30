@@ -10,7 +10,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -131,20 +130,7 @@ class ChatGptSessionManager @Inject constructor(
                 throw IOException("读取 ChatGPT 模型列表失败（HTTP ${response.code}）")
             }
             val root = json.parseToJsonElement(body).jsonObject
-            (root["models"] as? JsonArray)
-                .orEmpty()
-                .mapNotNull { it as? JsonObject }
-                .filter { it["visibility"]?.jsonPrimitive?.contentOrNull == "list" }
-                .mapNotNull { item ->
-                    val slug = item["slug"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
-                        ?: return@mapNotNull null
-                    ChatGptModelOption(
-                        slug = slug,
-                        displayName = item["display_name"]?.jsonPrimitive?.contentOrNull
-                            ?.takeIf(String::isNotBlank)
-                            ?: slug,
-                    )
-                }
+            parseChatGptPlanModels(root)
         }
     }
 

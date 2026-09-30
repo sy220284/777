@@ -776,9 +776,9 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String) {
+    internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null) {
         require(!isRunBusy()) { "请先结束当前任务再切换模型" }
-        val result = modelConfiguration.save(apiKey, model, baseUrl)
+        val result = modelConfiguration.save(apiKey, model, baseUrl, protocol)
         imageCapabilities.clearRoute(result.baseUrl, result.model)
         _state.update {
             it.copy(
@@ -852,8 +852,8 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    internal suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String): String =
-        modelConfiguration.test(apiKey, model, baseUrl)
+    internal suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): String =
+        modelConfiguration.test(apiKey, model, baseUrl, protocol)
 
     /** Choose how user image attachments reach the local model. */
     internal fun configureImageInputMode(mode: LocalImageInputMode) =
@@ -4131,7 +4131,7 @@ class LocalHarnessEngine @Inject constructor(
                     parentCallId = call.id,
                     maxSteps = executionState.value.subagentMaxSteps,
                 )
-            "list_subagent_models" -> "${executionState.value.model}（当前父代理模型）\ndeepseek-flash\ndeepseek-v4-pro"
+            "list_subagent_models" -> modelGateway.availableProfiles().joinToString("\n") { "${it.id} | ${it.model} | ${it.provider} | ${it.authKind} | ${it.baseUrl}" }
             "list_agents" -> jobs.listAgents(boundSessionId)
             "send_message" -> jobs.send(args.string("agent_id"), args.string("message"), boundSessionId)
             "interrupt_agent" -> jobs.kill(args.string("agent_id"), boundSessionId)

@@ -11,6 +11,7 @@ import java.util.UUID
 import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,6 +44,23 @@ class LocalModelProfileStoreAndroidTest {
         store.write(listOf(second))
 
         assertNull(store.active(second.model, second.baseUrl, listOf(second)))
+    }
+
+    @Test
+    fun customResponsesRouteSurvivesReloadWithoutBecomingAPlanAccount() {
+        val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
+        val json = Json { ignoreUnknownKeys = true }
+        val store = LocalModelProfileStore(preferences, json)
+        val route = LocalModelProfile(
+            modelProfileId("custom", "https://custom.example/v1"), "custom", "https://custom.example/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+        )
+        store.write(listOf(route))
+        store.setActive(route)
+        val reloaded = LocalModelProfileStore(preferences, json)
+        assertEquals(route, reloaded.read().single())
+        assertEquals(route, reloaded.active(route.model, route.baseUrl))
+        assertEquals(LocalModelAuthKind.API_KEY, reloaded.read().single().authKind)
     }
 
     private fun planProfile(accountId: String) = LocalModelProfile(

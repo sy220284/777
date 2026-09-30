@@ -1,0 +1,42 @@
+package com.labteto.dshmobile.local.model
+
+import android.content.Context
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelProfile
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.serialization.json.Json
+
+/** Reads route metadata only; each run resolves the selected route's own credential. */
+@Singleton
+class LocalModelRouteCatalog @Inject constructor(
+    @ApplicationContext context: Context,
+    json: Json,
+) {
+    private val store = LocalModelProfileStore(
+        context.getSharedPreferences("local_harness", Context.MODE_PRIVATE), json,
+    )
+
+    fun profiles(): List<LocalModelProfile> = store.read()
+}
+
+internal fun selectRunModelProfile(
+    profiles: List<LocalModelProfile>,
+    active: LocalModelProfile?,
+    selection: String?,
+): LocalModelProfile {
+    val requested = selection?.trim()?.takeIf(String::isNotEmpty)
+    if (requested == null) return active ?: throw LocalModelException(
+        "NO_MODEL_CREDENTIAL", "请先选择模型账户或 API Key", false,
+    )
+    profiles.firstOrNull { it.id == requested }?.let { return it }
+    val matches = profiles.filter { it.model == requested }
+    if (matches.size == 1) return matches.single()
+    throw LocalModelException(
+        "SUBAGENT_MODEL_ROUTE_UNAVAILABLE",
+        if (matches.isEmpty()) "子代理模型尚未配置，请先保存该模型的连接"
+        else "同名模型存在多个来源，请使用 list_subagent_models 返回的 profileId",
+        false,
+    )
+}
