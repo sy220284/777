@@ -64,15 +64,14 @@ class LocalStreamingPreviewStoreTest {
     }
 
     @Test
-    fun exactOwnerClearRetiresPreviewAndReasoningUsesSameOwnership() {
+    fun exactOwnerClearRetiresPreview() {
         val store = LocalStreamingPreviewStore()
         val owner = store.newOwner("session-a", "request-1", LocalUsageMode.WORK)
 
         store.begin(owner)
-        store.publishReasoning(owner, "正在分析")
-        assertEquals("正在分析", store.state.value.reasoning)
-
+        store.publishAssistant(owner, "处理中")
         store.clear(owner)
+
         assertEquals(LocalHarnessStreamingState(), store.state.value)
     }
 
