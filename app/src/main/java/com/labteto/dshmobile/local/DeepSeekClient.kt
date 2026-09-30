@@ -57,10 +57,13 @@ class DeepSeekClient @Inject constructor(
             put("messages", JsonArray(messages))
             put("stream", false)
             temperature?.let { put("temperature", it) }
+            if (
+                toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING &&
+                (tools.isNotEmpty() || temperature != null)
+            ) {
+                put("reasoning_effort", "none")
+            }
             if (tools.isNotEmpty()) {
-                if (toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING) {
-                    put("reasoning_effort", "none")
-                }
                 put("tools", tools)
                 if (shouldSendToolChoice(baseUrl, model)) put("tool_choice", "auto")
             }
@@ -124,10 +127,13 @@ class DeepSeekClient @Inject constructor(
             put("stream", true)
             temperature?.let { put("temperature", it) }
             put("stream_options", buildJsonObject { put("include_usage", true) })
+            if (
+                toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING &&
+                (tools.isNotEmpty() || temperature != null)
+            ) {
+                put("reasoning_effort", "none")
+            }
             if (tools.isNotEmpty()) {
-                if (toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING) {
-                    put("reasoning_effort", "none")
-                }
                 put("tools", tools)
                 if (shouldSendToolChoice(baseUrl, model)) put("tool_choice", "auto")
             }

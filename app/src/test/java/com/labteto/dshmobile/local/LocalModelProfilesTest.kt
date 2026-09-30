@@ -51,6 +51,41 @@ class LocalModelProfilesTest {
         )
     }
 
+    @Test fun samplingControlsFollowModelCapabilitiesWithoutChangingOtherProviders() {
+        assertEquals(
+            null,
+            LocalModelPresets.samplingTemperatureFor(
+                "gpt-6-astra",
+                "https://api.openai.com/v1",
+                0.85,
+            ),
+        )
+        assertEquals(
+            0.85,
+            LocalModelPresets.samplingTemperatureFor(
+                "gpt-6-sol",
+                "https://api.openai.com/v1",
+                0.85,
+            ),
+        )
+        assertEquals(
+            0.85,
+            LocalModelPresets.samplingTemperatureFor(
+                "deepseek-flash",
+                "https://api.deepseek.com",
+                0.85,
+            ),
+        )
+        assertEquals(
+            0.85,
+            LocalModelPresets.samplingTemperatureFor(
+                "gemini-3.8-flash",
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+                0.85,
+            ),
+        )
+    }
+
     @Test fun providerPresetsUseDomesticRoutesWithoutRegionSuffixes() {
         val providers = LocalModelPresets.entries.map { it.provider }
         assertFalse(providers.any { it.contains("海外") || it.contains("国际") || it.contains("中国") })

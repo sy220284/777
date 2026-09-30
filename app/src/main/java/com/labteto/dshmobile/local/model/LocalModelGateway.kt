@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.DeepSeekClient
 import com.labteto.dshmobile.local.LocalModelAuthKind
 import com.labteto.dshmobile.local.LocalModelDelta
 import com.labteto.dshmobile.local.LocalModelProfile
+import com.labteto.dshmobile.local.LocalModelPresets
 import com.labteto.dshmobile.local.LocalModelProtocol
 import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.usesResponsesTransport
@@ -37,6 +38,7 @@ class LocalModelGateway @Inject constructor(
     ): LocalModelReply {
         val profile = credentials.active()
         val resolved = credentials.resolve(model, baseUrl, profile)
+        val routedTemperature = LocalModelPresets.samplingTemperatureFor(model, baseUrl, temperature)
         return if (usesResponses(profile, resolved.authKind)) {
             responses.completeStreaming(
                 accessToken = resolved.bearerToken,
@@ -44,7 +46,7 @@ class LocalModelGateway @Inject constructor(
                 model = model,
                 messages = messages,
                 tools = tools,
-                temperature = temperature,
+                temperature = routedTemperature,
                 planSharing = resolved.authKind == LocalModelAuthKind.CHATGPT_PLAN,
             )
         } else {
@@ -54,7 +56,7 @@ class LocalModelGateway @Inject constructor(
                 model = model,
                 messages = sanitizeForChatCompletions(messages),
                 tools = tools,
-                temperature = temperature,
+                temperature = routedTemperature,
             )
         }
     }
@@ -69,6 +71,7 @@ class LocalModelGateway @Inject constructor(
     ): LocalModelReply {
         val profile = credentials.active()
         val resolved = credentials.resolve(model, baseUrl, profile)
+        val routedTemperature = LocalModelPresets.samplingTemperatureFor(model, baseUrl, temperature)
         return if (usesResponses(profile, resolved.authKind)) {
             responses.completeStreaming(
                 accessToken = resolved.bearerToken,
@@ -76,7 +79,7 @@ class LocalModelGateway @Inject constructor(
                 model = model,
                 messages = messages,
                 tools = tools,
-                temperature = temperature,
+                temperature = routedTemperature,
                 planSharing = resolved.authKind == LocalModelAuthKind.CHATGPT_PLAN,
                 onDelta = onDelta,
             )
@@ -87,7 +90,7 @@ class LocalModelGateway @Inject constructor(
                 model = model,
                 messages = sanitizeForChatCompletions(messages),
                 tools = tools,
-                temperature = temperature,
+                temperature = routedTemperature,
                 onDelta = onDelta,
             )
         }

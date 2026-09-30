@@ -92,6 +92,7 @@ data class LocalModelPreset(
         } else {
             LocalModelProtocol.CHAT_COMPLETIONS
         },
+    val temperatureSupported: Boolean = true,
 ) {
     val chatEndpoint: String
         get() = baseUrl.trimEnd('/') + "/chat/completions"
@@ -254,6 +255,7 @@ object LocalModelPresets {
             imageInputSupported = true,
             modelsEndpoint = "https://api.openai.com/v1/models",
             toolCallingMode = LocalModelToolCallingMode.RESPONSES_ONLY,
+            temperatureSupported = false,
         ),
         LocalModelPreset(
             provider = "OpenAI",
@@ -420,4 +422,7 @@ object LocalModelPresets {
 
     fun protocolFor(model: String, baseUrl: String): LocalModelProtocol =
         find(model, baseUrl)?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS
+
+    fun samplingTemperatureFor(model: String, baseUrl: String, requested: Double?): Double? =
+        requested?.takeIf { find(model, baseUrl)?.temperatureSupported != false }
 }
