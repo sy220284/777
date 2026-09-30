@@ -152,7 +152,15 @@ internal object OpenAiResponsesToolAdapter {
         path: String,
         strict: Boolean,
         enforceOpenAiToolSchema: Boolean,
+        depth: Int,
     ) {
+        if (strict && enforceOpenAiToolSchema && depth > MAX_STRICT_SCHEMA_DEPTH) {
+            throw invalidToolSchema(
+                index,
+                name,
+                "$path 超过 OpenAI strict schema 的最大 $MAX_STRICT_SCHEMA_DEPTH 层嵌套",
+            )
+        }
         val properties = schema["properties"]?.let { element ->
             element as? JsonObject
                 ?: throw invalidToolSchema(index, name, "$path.properties 必须是对象")
@@ -233,6 +241,7 @@ internal object OpenAiResponsesToolAdapter {
                 "$path.properties.$propertyName",
                 strict,
                 enforceOpenAiToolSchema,
+                depth + 1,
             )
         }
 
@@ -378,6 +387,7 @@ internal object OpenAiResponsesToolAdapter {
     private const val CHATGPT_PLAN_TOOL_NAMESPACE = "local"
     private const val CHATGPT_PLAN_TOOL_NAMESPACE_DESCRIPTION =
         "777 本机 Harness 工具，用于文件、终端、网页、任务、设备与已启用扩展能力。"
+    private const val MAX_STRICT_SCHEMA_DEPTH = 10
     private val STRICT_UNSUPPORTED_SCHEMA_KEYWORDS = setOf(
         "allOf",
         "not",
