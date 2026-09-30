@@ -198,13 +198,18 @@ class LocalHarnessEngine @Inject constructor(
     private val toolOutputStore = LocalToolOutputStore(
         File(context.noBackupFilesDir, "local-harness/tool-output"),
     )
-    private val webTools = LocalWebTools(web, apiKeys, workspace, json)
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
     private val modelConfiguration = LocalModelConfigurationCoordinator(
         preferences = preferences,
         apiKeys = apiKeys,
         gateway = modelGateway,
         tester = modelConnectionTester,
+        json = json,
+    )
+    private val webTools = LocalWebTools(
+        web = web,
+        searchKeyProvider = modelConfiguration::deepSeekSearchApiKeyOrNull,
+        workspace = workspace,
         json = json,
     )
     private val approvalPreferences = LocalApprovalPreferences(preferences)
@@ -4023,7 +4028,8 @@ class LocalHarnessEngine @Inject constructor(
             "job_output" -> jobs.output(args.string("job_id"), boundSessionId)
             "job_kill" -> jobs.kill(args.string("job_id"), boundSessionId)
             "web_search" -> {
-                val key = apiKeys.get() ?: error("网页搜索无法读取模型密钥")
+                val key = modelConfiguration.deepSeekSearchApiKeyOrNull()
+                    ?: error("网页搜索需要单独配置 DeepSeek 官方 API Key")
                 val queries = args["queries"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
                 web.search(key, queries, tokenUsageBridge.resolve(boundSessionId, call.id, TokenUsageAction.WEB_SEARCH, queries.firstOrNull()))
             }
