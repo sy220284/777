@@ -258,6 +258,7 @@ jobs:
           DSH_KEYSTORE_PASSWORD: ${{ env.DSH_RELEASE_PASSWORD }}
           DSH_KEY_ALIAS: 777-release
           DSH_KEY_PASSWORD: ${{ env.DSH_RELEASE_PASSWORD }}
+          DSH_UPDATE_MIRROR_BASE_URL: ${{ vars.UPDATE_MIRROR_BASE_URL }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
       - name: Verify Android 16 APK
@@ -439,3 +440,15 @@ jobs:
           files: |
             .release-assets/*
           generate_release_notes: true
+
+      - name: Publish mainland OSS update mirror
+        if: steps.freshness.outputs.current == 'true'
+        continue-on-error: true
+        env:
+          UPDATE_MIRROR_BASE_URL: ${{ vars.UPDATE_MIRROR_BASE_URL }}
+          UPDATE_OSS_ACCESS_KEY_ID: ${{ secrets.UPDATE_OSS_ACCESS_KEY_ID }}
+          UPDATE_OSS_ACCESS_KEY_SECRET: ${{ secrets.UPDATE_OSS_ACCESS_KEY_SECRET }}
+        run: |
+          python3 .github/scripts/publish-oss-update-mirror.py \
+            --asset-dir .release-assets \
+            --version "$DSH_VERSION_NAME"
