@@ -4733,7 +4733,8 @@ class LocalHarnessEngine @Inject constructor(
         requestLog = requestLog ?: binding?.eventLog,
         temperature = temperature,
         previewGuard = {
-            binding == null || currentSessionId == binding.sessionId
+            currentSessionId == snapshot.sessionId &&
+                _state.value.sessionId == snapshot.sessionId
         },
         overflowPersister = binding?.let { runBinding ->
             { snapshot, mode -> persistOverflowCompaction(snapshot, mode, runBinding) }
