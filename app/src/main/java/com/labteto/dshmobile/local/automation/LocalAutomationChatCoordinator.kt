@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.applySceneTurn
@@ -36,7 +37,7 @@ internal class LocalAutomationChatCoordinator(
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
     private val chatReplyCoordinator: LocalChatReplyCoordinator,
     private val usageTracker: DeepSeekUsageTracker,
-    private val apiKeys: LocalApiKeyStore,
+    private val modelGateway: LocalModelGateway,
     private val modelRequestCoordinator: LocalModelRequestCoordinator,
     private val chatRelationshipMemoryContext: (String, LocalHarnessState) -> String,
     private val recordStyleGuardHits: (List<String>) -> Unit,
@@ -316,7 +317,11 @@ internal class LocalAutomationChatCoordinator(
                     stableContext = chatContext.stablePrompt,
                     dynamicContext = dynamicContext,
                 )
-                val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
+                val activeProfile = modelGateway.activeProfile()
+                require(activeProfile != null && modelGateway.hasCredential(activeProfile)) {
+                    "请先配置模型账户或 API Key"
+                }
+                val key = ""
 
                 boundEventLog.append("turn/start", buildJsonObject {
                     put("model", boundState.model)
@@ -509,7 +514,6 @@ internal class LocalAutomationChatCoordinator(
         messages: List<JsonObject>,
         allowContextOverflowRecovery: Boolean = true,
     ): LocalModelReply = modelRequestCoordinator.complete(
-        key = key,
         snapshot = snapshot,
         messages = messages,
         step = CHAT_POST_TURN_MODEL_STEP + 200,
