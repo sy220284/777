@@ -161,7 +161,7 @@ internal class LocalPluginComposition(
     private val builtinPlugin = LocalBuiltinPlugin(executeBuiltin)
 
     val virtualDisplayProvider: HarnessVirtualDisplayProvider
-        get() = deviceProvider
+        get() = registry.context.capabilities.require("android-device", HarnessVirtualDisplayProvider::class)
 
     private val pluginCatalog = PluginCatalog(
         listOf(
@@ -215,9 +215,22 @@ internal class LocalPluginComposition(
 
     suspend fun enablePlugin(id: String): List<String> = pluginManager.enable(id)
 
-    suspend fun disablePlugin(id: String): Boolean = pluginManager.disable(id)
+    suspend fun disablePlugin(id: String): Boolean {
+        requireReloadablePlugin(id)
+        return pluginManager.disable(id)
+    }
 
-    suspend fun replacePlugin(definition: PluginDefinition) = pluginManager.replace(definition)
+    suspend fun replacePlugin(definition: PluginDefinition) {
+        // These providers are shared with long-lived subagent/runtime owners outside the tool view.
+        requireReloadablePlugin(definition.descriptor.id)
+        pluginManager.replace(definition)
+    }
+
+    private fun requireReloadablePlugin(id: String) {
+        require(id !in setOf("android-runtime", "android-device")) {
+            "平台资源仍被运行任务持有，请重启运行环境后更换或停用"
+        }
+    }
 
     fun installedPluginIds(): List<String> = pluginManager.installedPluginIds()
 
@@ -226,26 +239,28 @@ internal class LocalPluginComposition(
     fun lifecycleSnapshots(): List<PluginLifecycleSnapshot> = pluginManager.lifecycleSnapshots()
 
     suspend fun validateGitHubCredential(token: String): GitHubConnectorStatus =
-        githubPlugin.validateCredential(token)
+        pluginManager.withActivePlugin("github-connector") { plugin, _ ->
+            (plugin as? GitHubConnectorPlugin ?: error("GitHub 插件管理接口不兼容")).validateCredential(token)
+        }
 
-    suspend fun mcpServers(): List<McpServerSnapshot> = mcpPlugin.serverSnapshots()
+    suspend fun mcpServers(): List<McpServerSnapshot> = withMcp { plugin, _ -> plugin.serverSnapshots() }
 
-    suspend fun connectMcpHttp(serverId: String, endpoint: String): String =
-        mcpPlugin.connectHttpFromUi(registry.context, serverId, endpoint)
+    suspend fun connectMcpHttp(serverId: String, endpoint: String): String = withMcp { plugin, active ->
+        plugin.connectHttpFromUi(active, serverId, endpoint)
+    }
 
-    suspend fun connectMcpStdio(
-        serverId: String,
-        command: List<String>,
-        workingDirectory: String?,
-    ): String = mcpPlugin.connectStdioFromUi(
-        registry.context,
-        serverId,
-        command,
-        workingDirectory,
-    )
+    suspend fun connectMcpStdio(serverId: String, command: List<String>, workingDirectory: String?): String =
+        withMcp { plugin, active -> plugin.connectStdioFromUi(active, serverId, command, workingDirectory) }
 
-    suspend fun disconnectMcp(serverId: String): String =
-        mcpPlugin.disconnectFromUi(registry.context, serverId)
+    suspend fun disconnectMcp(serverId: String): String = withMcp { plugin, active ->
+        plugin.disconnectFromUi(active, serverId)
+    }
+
+    private suspend fun <T> withMcp(block: suspend (McpToolBridgePlugin, HarnessContext) -> T): T =
+        pluginManager.withActivePlugin("mcp-bridge") { plugin, active ->
+            block(plugin as? McpToolBridgePlugin ?: error("MCP 插件管理接口不兼容"), active)
+        }
+
 }
 
 private fun pluginDefinition(

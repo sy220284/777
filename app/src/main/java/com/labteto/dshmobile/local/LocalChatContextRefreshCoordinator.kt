@@ -7,7 +7,8 @@ import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.commitProcessed
-import com.labteto.dshmobile.local.chat.enqueuePending
+import com.labteto.dshmobile.local.chat.enqueuePendingDurably
+import com.labteto.dshmobile.local.chat.loadPendingBatch
 import com.labteto.dshmobile.local.chat.groundContinuityEvidence
 import com.labteto.dshmobile.local.chat.withContextForPlanner
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
@@ -273,7 +274,7 @@ internal class LocalChatContextRefreshCoordinator(
                         assistantMessage = assistantMessage,
                         sequence = sequence,
                     )
-                val nextContext = baseContext.enqueuePending(
+                val nextContext = baseContext.enqueuePendingDurably(
                     ChatPendingTurn(
                         sequence = sequence,
                         userMessageId = resolvedSourceUserMessageId,
@@ -283,6 +284,7 @@ internal class LocalChatContextRefreshCoordinator(
                         assistantMessage = assistantMessage,
                         generation = baseContext.generation,
                     ),
+                    boundEventLog,
                 )
                 generation = nextContext.generation
                 val nextBranches = if (current.transcriptIndex.branchingEligible) {
@@ -326,12 +328,12 @@ internal class LocalChatContextRefreshCoordinator(
         val baseContext = before.chatContext
         if (baseContext.generation != expectedGeneration) return
 
-        val pending = baseContext.pendingTurns.asSequence()
-            .filter { it.sequence > baseContext.processedThroughSequence }
-            .filter { it.generation == expectedGeneration }
-            .sortedBy(ChatPendingTurn::sequence)
-            .take(PENDING_BATCH)
-            .toList()
+        val pending = baseContext.loadPendingBatch(
+            boundEventLog, PENDING_BATCH,
+            activeBranchMessageIds = if (hasChatBranchAlternatives(before.chatBranches)) {
+                activeChatBranchMessages(before.chatBranches).mapTo(hashSetOf()) { it.id }
+            } else null,
+        )
         if (pending.isEmpty()) return
 
         val plannerState = before.chatState.withContextForPlanner(baseContext)
@@ -396,22 +398,24 @@ internal class LocalChatContextRefreshCoordinator(
             pendingTurns = pending,
         )
         val deterministicState = plan.state.withoutLegacyConversationContext()
-        val nextContext = baseContext.commitProcessed(
-            scene = baseContext.scene,
-            continuity = groundedContinuity,
-            throughSequence = throughSequence,
-        )
+        var nextContext = baseContext
         var applied = false
         state.update { current ->
             val currentContext = current.chatContext
             if (
                 current.sessionId != expectedSessionId ||
                 currentContext.generation != expectedGeneration ||
-                current.chatState != expectedBaseState
+                current.chatState != expectedBaseState ||
+                currentContext.processedThroughSequence != baseContext.processedThroughSequence
             ) {
                 current
             } else {
                 applied = true
+                nextContext = currentContext.commitProcessed(
+                    scene = currentContext.scene,
+                    continuity = groundedContinuity,
+                    throughSequence = throughSequence,
+                )
                 current.copy(
                     // The legacy mirror keeps old gallery/session data readable. Generation uses
                     // conversation-scoped chatContext as the canonical continuity state.

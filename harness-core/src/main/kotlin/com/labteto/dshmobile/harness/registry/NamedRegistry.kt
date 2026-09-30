@@ -1,42 +1,17 @@
 package com.labteto.dshmobile.harness.registry
 
-/** Thread-safe named registry used by plugins for models, commands, events, projections and settings. */
-class NamedRegistry<T : Any> {
-    private val entries = linkedMapOf<String, T>()
-
-    @Synchronized
-    fun register(id: String, value: T, replace: Boolean = false) {
-        require(id.isNotBlank()) { "注册项编号不能为空" }
-        if (!replace) require(id !in entries) { "注册项已存在：$id" }
-        entries[id] = value
-    }
-
-    @Synchronized
+/** Thread-safe named registry with isolated lifecycle staging. */
+class NamedRegistry<T : Any> private constructor(private val entries: RegistryEntries<T>) {
+    constructor() : this(RegistryEntries())
+    fun register(id: String, value: T, replace: Boolean = false) = entries.register(id, value, replace)
     fun unregister(id: String): T? = entries.remove(id)
-
-    @Synchronized
-    fun get(id: String): T? = entries[id]
-
-    @Synchronized
+    fun get(id: String): T? = entries.get(id)
     fun require(id: String): T = get(id) ?: error("注册项不存在：$id")
-
-    @Synchronized
-    fun ids(): List<String> = entries.keys.toList()
-
-    @Synchronized
-    fun values(): List<T> = entries.values.toList()
-
-    @Synchronized
-    fun clear() = entries.clear()
-
-    /** Internal transaction snapshot used by the plugin lifecycle manager. */
-    @Synchronized
-    internal fun snapshot(): Map<String, T> = LinkedHashMap(entries)
-
-    /** Restore the exact pre-lifecycle named surface after a failed plugin transition. */
-    @Synchronized
-    internal fun restore(snapshot: Map<String, T>) {
-        entries.clear()
-        entries.putAll(snapshot)
-    }
+    fun ids(): List<String> = snapshot().keys.toList()
+    fun values(): List<T> = snapshot().values.toList()
+    fun clear() = entries.restore(emptyMap())
+    internal fun snapshot(): Map<String, T> = entries.snapshot()
+    internal fun restore(snapshot: Map<String, T>) = entries.restore(snapshot)
+    internal fun fork(): NamedRegistry<T> = NamedRegistry(entries.fork())
+    internal fun publishTo(destination: NamedRegistry<T>) = entries.publishTo(destination.entries)
 }

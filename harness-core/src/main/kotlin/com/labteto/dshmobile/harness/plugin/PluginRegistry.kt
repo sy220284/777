@@ -3,6 +3,7 @@ package com.labteto.dshmobile.harness.plugin
 import com.labteto.dshmobile.harness.capability.CapabilityDescriptor
 import com.labteto.dshmobile.harness.capability.CapabilityRegistry
 import com.labteto.dshmobile.harness.registry.NamedRegistry
+import com.labteto.dshmobile.harness.registry.RegistryEntries
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import kotlinx.coroutines.NonCancellable
@@ -19,6 +20,21 @@ data class HarnessContext(
     val models: NamedRegistry<Any> = NamedRegistry(),
     val settings: NamedRegistry<Any> = NamedRegistry(),
 )
+
+private fun HarnessContext.fork(): HarnessContext = RegistryEntries.atomic {
+    HarnessContext(tools.fork(), capabilities.fork(), events.fork(), projections.fork(),
+        commands.fork(), models.fork(), settings.fork())
+}
+
+private fun HarnessContext.publishTo(destination: HarnessContext) = RegistryEntries.atomic {
+    tools.publishTo(destination.tools)
+    capabilities.publishTo(destination.capabilities)
+    events.publishTo(destination.events)
+    projections.publishTo(destination.projections)
+    commands.publishTo(destination.commands)
+    models.publishTo(destination.models)
+    settings.publishTo(destination.settings)
+}
 
 interface HarnessPlugin {
     val id: String
@@ -74,9 +90,9 @@ private fun HarnessContext.restoreRegistries(snapshot: HarnessRegistrySnapshot) 
  * Serializes plugin lifecycle transitions and makes registry changes transactional.
  *
  * A failed install/uninstall can otherwise leave tools or capabilities partially registered while
- * the plugin bookkeeping says the opposite. Registry surfaces are restored exactly on failure,
- * while plugin cleanup is attempted in a non-cancellable section so external resources are not
- * abandoned when a lifecycle coroutine is cancelled.
+ * the plugin bookkeeping says the opposite. Changes remain staged until commit; replacement
+ * rollback publishes reinstalled resources. Uncertain resource state blocks tool admission until
+ * cleanup succeeds. Failure cleanup is attempted in a non-cancellable section.
  */
 class PluginRegistry(
     val context: HarnessContext = HarnessContext(),
@@ -84,9 +100,14 @@ class PluginRegistry(
     private val installed = linkedMapOf<String, HarnessPlugin>()
     private val lifecycle = linkedMapOf<String, PluginLifecycleSnapshot>()
     private val lifecycleMutex = Mutex()
+    private val pendingCleanup = linkedMapOf<String, HarnessPlugin>()
 
     suspend fun install(plugin: HarnessPlugin) = lifecycleMutex.withLock {
-        installLocked(plugin)
+        context.tools.lifecycleTransition {
+            val staged = context.fork()
+            installLocked(plugin, staged)
+            publishInstalled(staged, listOf(plugin))
+        }
     }
 
     /**
@@ -105,39 +126,40 @@ class PluginRegistry(
             "插件批次包含已安装插件：" + ids.filter(activeIds::contains).joinToString()
         }
 
-        val registryBefore = context.snapshotRegistries()
         val installedBefore = synchronized(this) { LinkedHashMap(installed) }
         val lifecycleBefore = synchronized(this) { LinkedHashMap(lifecycle) }
         val installedByBatch = mutableListOf<HarnessPlugin>()
         var current: HarnessPlugin? = null
 
-        try {
-            batch.forEach { plugin ->
-                current = plugin
-                installLocked(plugin)
-                installedByBatch += plugin
-            }
-        } catch (error: Throwable) {
-            withContext(NonCancellable) {
-                installedByBatch.asReversed().forEach { plugin ->
-                    runCatching { plugin.uninstall(context) }
+        context.tools.lifecycleTransition {
+            val staged = context.fork()
+            try {
+                batch.forEach { plugin ->
+                    current = plugin
+                    installLocked(plugin, staged)
+                    installedByBatch += plugin
                 }
-            }
-            context.restoreRegistries(registryBefore)
-            synchronized(this) {
-                installed.clear()
-                installed.putAll(installedBefore)
-                lifecycle.clear()
-                lifecycle.putAll(lifecycleBefore)
-                current?.let { failed ->
-                    lifecycle[failed.id] = PluginLifecycleSnapshot(
-                        id = failed.id,
-                        state = PluginLifecycleState.FAILED,
-                        lastError = error.message ?: error::class.java.simpleName,
-                    )
+                publishInstalled(staged, batch)
+            } catch (error: Throwable) {
+                withContext(NonCancellable) {
+                    installedByBatch.asReversed().forEach { plugin ->
+                        runCatching { plugin.uninstall(staged) }.exceptionOrNull()?.let(error::addSuppressed)
+                    }
                 }
+                synchronized(this) {
+                    installed.clear()
+                    installed.putAll(installedBefore)
+                    lifecycle.clear()
+                    lifecycle.putAll(lifecycleBefore)
+                    current?.let { failed ->
+                        lifecycle[failed.id] = PluginLifecycleSnapshot(
+                            failed.id, PluginLifecycleState.FAILED,
+                            error.message ?: error::class.java.simpleName,
+                        )
+                    }
+                }
+                throw error
             }
-            throw error
         }
     }
 
@@ -149,33 +171,39 @@ class PluginRegistry(
      * replacement cleanup or previous-plugin restoration fails, the lifecycle remains FAILED.
      */
     suspend fun replace(plugin: HarnessPlugin) = lifecycleMutex.withLock {
-        replaceLocked(plugin)
+        context.tools.lifecycleTransition { replaceLocked(plugin) }
     }
 
     suspend fun uninstall(id: String): Boolean = lifecycleMutex.withLock {
         val plugin = synchronized(this) { installed[id] } ?: return@withLock false
-        val registryBefore = context.snapshotRegistries()
-        synchronized(this) {
-            lifecycle[id] = PluginLifecycleSnapshot(id, PluginLifecycleState.UNINSTALLING)
-        }
-
-        try {
-            plugin.uninstall(context)
+        context.tools.lifecycleTransition {
+            val staged = context.fork()
             synchronized(this) {
-                installed.remove(id)
-                lifecycle.remove(id)
+                lifecycle[id] = PluginLifecycleSnapshot(id, PluginLifecycleState.UNINSTALLING)
             }
-            true
-        } catch (error: Throwable) {
-            context.restoreRegistries(registryBefore)
-            synchronized(this) {
-                lifecycle[id] = PluginLifecycleSnapshot(
-                    id = id,
-                    state = PluginLifecycleState.FAILED,
-                    lastError = error.message ?: error::class.java.simpleName,
-                )
+            try {
+                pendingCleanup[id]?.uninstall(staged)
+                pendingCleanup.remove(id)
+                plugin.uninstall(staged)
+                staged.publishTo(context)
+                synchronized(this) {
+                    installed.remove(id)
+                    lifecycle.remove(id)
+                    context.tools.markLifecycleSafe(installed.keys.none {
+                        lifecycle[it]?.state == PluginLifecycleState.FAILED
+                    })
+                }
+                true
+            } catch (error: Throwable) {
+                context.tools.markLifecycleSafe(false)
+                synchronized(this) {
+                    lifecycle[id] = PluginLifecycleSnapshot(
+                        id, PluginLifecycleState.FAILED,
+                        error.message ?: error::class.java.simpleName,
+                    )
+                }
+                throw error
             }
-            throw error
         }
     }
 
@@ -191,13 +219,17 @@ class PluginRegistry(
     @Synchronized
     fun lifecycleSnapshot(id: String): PluginLifecycleSnapshot? = lifecycle[id]
 
+    @Synchronized
+    fun activePlugin(id: String): HarnessPlugin? =
+        installed[id].takeIf { lifecycle[id]?.state == PluginLifecycleState.ACTIVE }
+
     private suspend fun replaceLocked(plugin: HarnessPlugin) {
         require(plugin.id.isNotBlank()) { "插件编号不能为空" }
         val previous = synchronized(this) { installed[plugin.id] }
             ?: error("插件未安装：${plugin.id}")
         if (previous === plugin) return
 
-        val registryBefore = context.snapshotRegistries()
+        val staged = context.fork()
         var removedPrevious = false
         var replacementStarted = false
         var registryWithoutPrevious: HarnessRegistrySnapshot? = null
@@ -209,12 +241,13 @@ class PluginRegistry(
         }
 
         try {
-            previous.uninstall(context)
+            previous.uninstall(staged)
             removedPrevious = true
-            registryWithoutPrevious = context.snapshotRegistries()
+            registryWithoutPrevious = staged.snapshotRegistries()
 
             replacementStarted = true
-            plugin.install(context)
+            plugin.install(staged)
+            staged.publishTo(context)
             synchronized(this) {
                 installed[plugin.id] = plugin
                 lifecycle[plugin.id] = PluginLifecycleSnapshot(
@@ -227,18 +260,20 @@ class PluginRegistry(
             var restoreFailure: Throwable? = null
             withContext(NonCancellable) {
                 if (replacementStarted) {
-                    cleanupFailure = runCatching { plugin.uninstall(context) }.exceptionOrNull()
+                    cleanupFailure = runCatching { plugin.uninstall(staged) }.exceptionOrNull()
+                    if (cleanupFailure != null) pendingCleanup[plugin.id] = plugin
                 }
                 if (removedPrevious) {
-                    context.restoreRegistries(checkNotNull(registryWithoutPrevious))
-                    restoreFailure = runCatching { previous.install(context) }.exceptionOrNull()
+                    staged.restoreRegistries(checkNotNull(registryWithoutPrevious))
+                    restoreFailure = runCatching { previous.install(staged) }.exceptionOrNull()
+                    if (restoreFailure == null) staged.publishTo(context)
                 }
-                context.restoreRegistries(registryBefore)
             }
 
             cleanupFailure?.let(error::addSuppressed)
             restoreFailure?.let(error::addSuppressed)
             val restored = removedPrevious && cleanupFailure == null && restoreFailure == null
+            if (!restored) context.tools.markLifecycleSafe(false)
             synchronized(this) {
                 installed[plugin.id] = previous
                 lifecycle[plugin.id] = PluginLifecycleSnapshot(
@@ -265,25 +300,31 @@ class PluginRegistry(
         }
     }
 
-    private suspend fun installLocked(plugin: HarnessPlugin) {
+    private fun publishInstalled(staged: HarnessContext, plugins: List<HarnessPlugin>) = RegistryEntries.atomic {
+        staged.publishTo(context)
+        synchronized(this) {
+            plugins.forEach { plugin ->
+                installed[plugin.id] = plugin
+                lifecycle[plugin.id] = PluginLifecycleSnapshot(plugin.id, PluginLifecycleState.ACTIVE)
+            }
+        }
+    }
+
+    private suspend fun installLocked(plugin: HarnessPlugin, staged: HarnessContext) {
         require(plugin.id.isNotBlank()) { "插件编号不能为空" }
         synchronized(this) {
             require(plugin.id !in installed) { "插件已安装：${plugin.id}" }
             lifecycle[plugin.id] = PluginLifecycleSnapshot(plugin.id, PluginLifecycleState.INSTALLING)
         }
 
-        val registryBefore = context.snapshotRegistries()
+        val registryBefore = staged.snapshotRegistries()
         try {
-            plugin.install(context)
-            synchronized(this) {
-                installed[plugin.id] = plugin
-                lifecycle[plugin.id] = PluginLifecycleSnapshot(plugin.id, PluginLifecycleState.ACTIVE)
-            }
+            plugin.install(staged)
         } catch (error: Throwable) {
             withContext(NonCancellable) {
-                runCatching { plugin.uninstall(context) }
+                runCatching { plugin.uninstall(staged) }.exceptionOrNull()?.let(error::addSuppressed)
             }
-            context.restoreRegistries(registryBefore)
+            staged.restoreRegistries(registryBefore)
             synchronized(this) {
                 lifecycle[plugin.id] = PluginLifecycleSnapshot(
                     id = plugin.id,

@@ -8,6 +8,8 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageContext
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -42,13 +44,15 @@ class GroupAnnouncementService @Inject constructor(
             },
         )
         val reply = modelClient.complete(key, baseUrl, model, messages, JsonArray(emptyList()))
-        usageTracker.record(
-            model = model,
-            usage = reply.usage,
-            requestId = reply.requestId,
-            context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.GROUP_ANNOUNCEMENT),
-            promptBreakdown = reply.promptBreakdown,
-        )
+        withContext(Dispatchers.IO) {
+            usageTracker.record(
+                model = model,
+                usage = reply.usage,
+                requestId = reply.requestId,
+                context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.GROUP_ANNOUNCEMENT),
+                promptBreakdown = reply.promptBreakdown,
+            )
+        }
         return reply.content?.trim()?.take(2_000)?.takeIf(String::isNotBlank)
             ?: error("模型没有生成可用的群公告")
     }

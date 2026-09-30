@@ -8,7 +8,8 @@ import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.applySceneTurn
-import com.labteto.dshmobile.local.chat.enqueuePending
+import com.labteto.dshmobile.local.chat.enqueuePendingDurably
+import com.labteto.dshmobile.local.chat.loadPendingBatch
 import com.labteto.dshmobile.local.chat.withContextForPlanner
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import java.io.File
@@ -569,7 +570,7 @@ internal class LocalGroupChatTurnExecutor(
                             assistantMessage = content,
                             sequence = assistantEvent.sequence,
                         )
-                        .enqueuePending(
+                        .enqueuePendingDurably(
                         ChatPendingTurn(
                             sequence = assistantEvent.sequence,
                             userMessageId = beforeAssistant.transcriptIndex.latestUserMessageId.orEmpty(),
@@ -579,6 +580,8 @@ internal class LocalGroupChatTurnExecutor(
                             assistantMessage = content,
                             generation = currentGroup.context.generation,
                         ),
+                        eventLog,
+                        scope = "group",
                     )
                     currentGroup = currentGroup.copy(context = pendingContext)
                     _state.update { current ->
@@ -617,13 +620,12 @@ internal class LocalGroupChatTurnExecutor(
 
             require(deliveredReplies > 0) { "群聊角色这一轮都没有给出可用回复" }
 
-            val sharedPendingForRefresh = currentGroup.context.pendingTurns
-                .asSequence()
-                .filter { it.sequence > currentGroup.context.processedThroughSequence }
-                .filter { it.generation == currentGroup.context.generation }
-                .sortedBy(ChatPendingTurn::sequence)
-                .take(GROUP_POST_TURN_PENDING_BATCH)
-                .toList()
+            val sharedPendingForRefresh = currentGroup.context.loadPendingBatch(
+                eventLog, GROUP_POST_TURN_PENDING_BATCH, scope = "group",
+                activeBranchMessageIds = if (hasChatBranchAlternatives(_state.value.chatBranches)) {
+                    com.labteto.dshmobile.local.activeChatBranchMessages(_state.value.chatBranches).mapTo(hashSetOf()) { it.id }
+                } else null,
+            )
             val refreshBatch = refreshGroupMemberStates(
                 replies = repliesForStateUpdate,
                 userMessage = input,

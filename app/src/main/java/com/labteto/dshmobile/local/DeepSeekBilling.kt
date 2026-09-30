@@ -340,6 +340,22 @@ class DeepSeekUsageTracker @Inject constructor(
             null
         }
         synchronized(lock) {
+            if (!analyticsStore.append(
+                TokenUsageRecord(
+                    requestId = requestId,
+                    timestamp = epochMillis,
+                    model = model,
+                    context = context,
+                    inputTokens = if (usage.reported) normalized.promptTokens else 0L,
+                    cacheHitTokens = if (usage.reported) normalized.cacheHitTokens else 0L,
+                    cacheMissTokens = if (usage.reported) miss else 0L,
+                    outputTokens = if (usage.reported) normalized.completionTokens else 0L,
+                    reasoningTokens = if (usage.reported) normalized.reasoningTokens else 0L,
+                    estimatedCostCny = cost ?: 0.0,
+                    reported = usage.reported,
+                    promptBreakdown = promptBreakdown,
+                ),
+            )) return
             val next = accumulateDeepSeekUsage(
                 current = _state.value,
                 model = model,
@@ -350,22 +366,6 @@ class DeepSeekUsageTracker @Inject constructor(
             persist(next)
             _state.value = next
         }
-        analyticsStore.append(
-            TokenUsageRecord(
-                requestId = requestId,
-                timestamp = epochMillis,
-                model = model,
-                context = context,
-                inputTokens = if (usage.reported) normalized.promptTokens else 0L,
-                cacheHitTokens = if (usage.reported) normalized.cacheHitTokens else 0L,
-                cacheMissTokens = if (usage.reported) miss else 0L,
-                outputTokens = if (usage.reported) normalized.completionTokens else 0L,
-                reasoningTokens = if (usage.reported) normalized.reasoningTokens else 0L,
-                estimatedCostCny = cost ?: 0.0,
-                reported = usage.reported,
-                promptBreakdown = promptBreakdown,
-            ),
-        )
     }
 
     fun analyticsSnapshot(): TokenUsageAnalyticsSnapshot = analyticsStore.snapshot()
