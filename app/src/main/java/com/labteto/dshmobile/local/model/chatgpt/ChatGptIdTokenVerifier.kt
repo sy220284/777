@@ -32,7 +32,7 @@ class ChatGptIdTokenVerifier @Inject constructor(
     @Volatile private var cachedJwks: JsonObject? = null
     @Volatile private var cachedAtMillis: Long = 0L
 
-    suspend fun verify(
+    internal suspend fun verify(
         idToken: String,
         clientId: String,
         nonce: String,
