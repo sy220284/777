@@ -50,6 +50,7 @@ class ModelProtocolContractTest {
         val body = listOf(
             """data: {"choices":[{"delta":{"tool_calls":[{"index":1,"id":"call-b","function":{"name":"read","arguments":"{}"},"extra_content":{"google":{"thought_signature":"sig-b"}}},{"index":0,"id":"call-a","function":{"name":"read","arguments":"{"},"extra_content":{"google":{"thought_signature":"sig-a"}}}]}}]}""",
             """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"}"},"extra_content":{"google":{"other":"kept"}}}]},"finish_reason":"tool_calls"}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"extra_content":null},{"index":1,"extra_content":{"google":{"thought_signature":null}}}]}}]}""",
             "data: [DONE]",
         ).joinToString("\n\n")
         val reply = chat(body).completeStreaming("test", "https://test.example/v1", "test", messages, emptyTools)

@@ -461,7 +461,9 @@ internal fun mergeModelMetadata(previous: JsonObject, next: JsonObject): JsonObj
     JsonObject(previous.toMutableMap().apply {
         next.forEach { (key, value) ->
             val old = get(key)
-            put(key, if (old is JsonObject && value is JsonObject) mergeModelMetadata(old, value) else value)
+            if (value !is JsonNull || old == null) {
+                put(key, if (old is JsonObject && value is JsonObject) mergeModelMetadata(old, value) else value)
+            }
         }
     })
 
