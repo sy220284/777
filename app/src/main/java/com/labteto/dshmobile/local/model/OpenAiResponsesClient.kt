@@ -78,7 +78,8 @@ class OpenAiResponsesClient @Inject constructor(
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
         try {
-            runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
+            val response = runInterruptible { modelHttp.newCall(request).execute() }
+            try {
                 val requestId = response.header("x-request-id")
                     ?: response.header("openai-request-id")
                 val retryAfterMs = parseRetryAfterMillis(response.header("Retry-After"))
@@ -101,8 +102,8 @@ class OpenAiResponsesClient @Inject constructor(
                 val streamedContent = StringBuilder()
                 val streamedReasoning = StringBuilder()
                 var totalBytes = 0
-                responseBody.charStream().buffered().use { reader ->
-                    responseStream@ while (true) {
+                val reader = responseBody.charStream().buffered()
+                responseStream@ while (true) {
                         val line = reader.readLine() ?: break
                         totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
                         if (totalBytes > MAX_STREAM_BYTES) {
@@ -171,7 +172,6 @@ class OpenAiResponsesClient @Inject constructor(
                             }
                         }
                     }
-                }
                 val completed = completedResponse ?: throw LocalModelException(
                     code = "RESPONSES_STREAM_INCOMPLETE",
                     message = "Responses API 流在 response.completed 前结束",
@@ -183,6 +183,10 @@ class OpenAiResponsesClient @Inject constructor(
                     streamedContent = streamedContent.toString(),
                     streamedReasoning = streamedReasoning.toString(),
                 )
+            } finally {
+                // Cleanup failures after a terminal frame must never overturn an already-settled
+                // response. Before a terminal frame, the primary read/protocol error still wins.
+                runCatching { response.close() }
             }
         } catch (error: LocalModelException) {
             throw error
