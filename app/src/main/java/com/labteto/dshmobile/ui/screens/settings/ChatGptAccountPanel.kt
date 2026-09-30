@@ -220,9 +220,13 @@ internal fun ChatGptAccountPanel(
                                 modifier = Modifier.weight(1f),
                             )
                             DsButton(
-                                text = useAccountLabel,
+                                text = if (account.sharingEnabled) useAccountLabel else reauthorizeLabel,
                                 onClick = {
-                                    viewModel.selectChatGptAccount(account.id) { error -> error?.let(report) }
+                                    if (account.sharingEnabled) {
+                                        viewModel.selectChatGptAccount(account.id) { error -> error?.let(report) }
+                                    } else {
+                                        viewModel.connectChatGpt(account.id) { error -> error?.let(report) }
+                                    }
                                 },
                                 enabled = !busy,
                                 size = DsButtonSize.Small,
@@ -239,9 +243,11 @@ internal fun ChatGptAccountPanel(
                                         )
                                     },
                                     items = buildList {
-                                        add(MenuItem(text = reauthorizeLabel) {
-                                            viewModel.connectChatGpt(account.id) { error -> error?.let(report) }
-                                        })
+                                        if (account.sharingEnabled) {
+                                            add(MenuItem(text = reauthorizeLabel) {
+                                                viewModel.connectChatGpt(account.id) { error -> error?.let(report) }
+                                            })
+                                        }
                                         add(MenuItem(text = removeRegistrationLabel, danger = true) {
                                             removeAccountId = account.id
                                         })
