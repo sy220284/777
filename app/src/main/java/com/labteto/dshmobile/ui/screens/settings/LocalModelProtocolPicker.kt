@@ -16,6 +16,7 @@ internal fun LocalModelProtocolPicker(
     val names = mapOf(
         LocalModelProtocol.CHAT_COMPLETIONS to "Chat Completions",
         LocalModelProtocol.RESPONSES to "Responses",
+        LocalModelProtocol.ANTHROPIC_MESSAGES to "Anthropic Messages",
     )
     DsMenu(
         anchor = { Text(stringResource(R.string.local_model_protocol_value, names.getValue(protocol))) },
