@@ -8,6 +8,10 @@ name: Gitee Repair v174
 permissions:
   contents: read
 
+concurrency:
+  group: gitee-repair-v174
+  cancel-in-progress: true
+
 jobs:
   repair:
     runs-on: ubuntu-latest
