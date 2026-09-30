@@ -874,7 +874,11 @@ private fun UsageAggregateHero(
 @Composable
 private fun CompactMetric(label: String, value: String, modifier: Modifier = Modifier) {
     val colors = DsTheme.colors
-    Surface(modifier = modifier, shape = DsShapes.row, color = colors.bgLayer1) {
+    Surface(
+        modifier = modifier,
+        shape = DsShapes.row,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+    ) {
         Column(
             modifier = Modifier.padding(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),

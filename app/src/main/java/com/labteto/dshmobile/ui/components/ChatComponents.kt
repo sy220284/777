@@ -117,7 +117,7 @@ fun ThinkingRow(
         }
         Text(
             summary ?: "Thinking…",
-            style = DsType.mdSmall.copy(color = colors.labelTertiary),
+            style = DsType.mdSmall.withReadingWeight().copy(color = colors.labelTertiary),
             color = colors.labelTertiary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -158,7 +158,7 @@ fun ConnectionBanner(message: String) {
         Spacer(Modifier.width(8.dp))
         Text(
             message,
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = DsTheme.colors.onAccent,
             modifier = Modifier.weight(1f),
         )
@@ -184,7 +184,7 @@ fun StatsLine(
     }
     Text(
         text,
-        style = DsType.statsText.copy(color = colors.labelCaption, fontFeatureSettings = "tnum"),
+        style = DsType.statsText.withReadingWeight().copy(color = colors.labelCaption, fontFeatureSettings = "tnum"),
         color = colors.labelCaption,
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth(),

@@ -96,6 +96,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 
 @Composable
@@ -265,7 +266,7 @@ internal fun LocalMessageRow(
                     message.speakerName?.takeIf(String::isNotBlank)?.let { speaker ->
                         Text(
                             speaker,
-                            style = DsType.small13Strong,
+                            style = DsType.small13Strong.withReadingWeight(),
                             color = colors.characterAccent,
                         )
                     }
@@ -328,7 +329,7 @@ private fun MessageVariantControls(
     )
     Text(
         text = stringResource(R.string.local_variant_position, info.index + 1, info.count),
-        style = DsType.caption11,
+        style = DsType.caption11.withReadingWeight(),
         color = colors.labelTertiary,
     )
     CompactMessageAction(
@@ -424,7 +425,7 @@ internal fun ChatThinkingRow(
         StateDot(StateDotState.Running, size = 8.dp)
         Text(
             stringResource(R.string.local_process_thinking),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = DsTheme.colors.labelTertiary,
         )
     }
@@ -478,13 +479,13 @@ internal fun WorkProcessRow(
                 ) {
                     Text(
                         stringResource(R.string.local_work_process),
-                        style = DsType.small13Strong,
+                        style = DsType.small13Strong.withReadingWeight(),
                         color = colors.labelPrimary,
                     )
                     preview?.let {
                         Text(
                             it,
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelTertiary,
                             maxLines = 1,
                         )
@@ -578,7 +579,7 @@ private fun WorkProcessOperationRow(
         DsIconBox(icon = icon, family = family)
         Text(
             stringResource(agentOperationLabelRes(kind)),
-            style = DsType.std14,
+            style = DsType.std14.withReadingWeight(),
             color = colors.labelSecondary,
             modifier = Modifier.weight(1f),
         )
