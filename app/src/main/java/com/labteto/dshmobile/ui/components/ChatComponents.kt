@@ -25,11 +25,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -38,6 +40,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
+import com.labteto.dshmobile.ui.theme.LocalDsReadingPreferences
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -61,21 +64,29 @@ import java.util.Locale
 fun UserBubble(text: String, modifier: Modifier = Modifier) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
+    val readingPreferences = LocalDsReadingPreferences.current
     val bubbleColor = backgroundState.surfaceColor(
         base = colors.userBubble,
         region = BackgroundRegion.MIDDLE,
         minAlpha = 0.76f,
         maxAlpha = 0.96f,
     )
-    val borderColor = if (backgroundState.hasImage && backgroundState.adaptiveContrast) {
-        colors.borderL3.copy(alpha = 0.78f)
+    val borderColor = if (backgroundState.hasImage) {
+        if (backgroundState.darkTheme) Color.White.copy(alpha = 0.28f) else Color.Black.copy(alpha = 0.24f)
     } else {
         colors.borderL3
     }
+    val bubbleStyle = DsType.bubbleText.copy(
+        fontWeight = when (readingPreferences.textWeightAdjustment) {
+            2 -> FontWeight.SemiBold
+            1 -> FontWeight.Medium
+            else -> FontWeight.Normal
+        },
+    )
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
         Text(
             text,
-            style = DsType.bubbleText,
+            style = bubbleStyle,
             color = colors.labelPrimary,
             modifier = Modifier
                 .widthIn(max = minOf(525.dp, maxWidth * 0.82f))

@@ -45,6 +45,7 @@ import com.labteto.dshmobile.ui.theme.DsColors
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
 val LocalFileOpener = staticCompositionLocalOf<(String) -> Unit> { {} }
@@ -331,17 +332,18 @@ private fun parseInlineSegments(text: String): List<InlineSegment> {
 @Composable
 private fun InlineMarkdown(text: String, style: TextStyle, modifier: Modifier = Modifier) {
     val colors = DsTheme.colors
-    val codeStyle = style.copy(
+    val effectiveStyle = style.withReadingWeight()
+    val codeStyle = effectiveStyle.copy(
         fontFamily = DsType.codeFont,
         color = colors.labelPrimary,
     )
-    val result = remember(text, style, codeStyle, colors) {
+    val result = remember(text, effectiveStyle, codeStyle, colors) {
         buildInlineContent(text, codeStyle, colors)
     }
     val openFile = LocalFileOpener.current
     val uriHandler = LocalUriHandler.current
     ClickableText(
-        result, modifier = modifier, style = style,
+        result, modifier = modifier, style = effectiveStyle,
         onClick = { offset ->
             result.getStringAnnotations("url", offset, offset).firstOrNull()?.item?.let { url ->
                 if (url.startsWith("https://") || url.startsWith("http://")) runCatching { uriHandler.openUri(url) }
