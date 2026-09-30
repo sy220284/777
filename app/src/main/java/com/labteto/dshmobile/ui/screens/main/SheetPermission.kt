@@ -37,6 +37,7 @@ import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /** The permission-preset picker. `custom` is a derived state, so it is never offered as a target. */
 @Composable
@@ -64,7 +65,7 @@ internal fun PermissionMenu(
                 Column(Modifier.weight(1f)) {
                     Text(
                         displayPermissionPreset(option.value, option.name),
-                        style = DsType.std14Strong,
+                        style = DsType.std14Strong.withReadingWeight(),
                         color = if (selected) colors.accent else colors.labelPrimary,
                     )
                     val description = option.description
@@ -74,7 +75,7 @@ internal fun PermissionMenu(
                             null
                         }
                     if (description != null) {
-                        Text(description, style = DsType.caption11, color = colors.labelTertiary)
+                        Text(description, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                     }
                 }
                 if (selected) {
@@ -92,7 +93,7 @@ internal fun PermissionMenu(
         if (select.currentValue !in select.selectable.map { it.value }) {
             Text(
                 stringResource(R.string.permission_custom_hint),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.warnLabel,
             )
         }
@@ -110,7 +111,7 @@ internal fun FullAccessConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Uni
     DsDialog(title = stringResource(R.string.permission_confirm_title), onDismiss = onDismiss) {
         Text(
             stringResource(R.string.permission_confirm_body),
-            style = DsType.std14,
+            style = DsType.std14.withReadingWeight(),
             color = colors.labelSecondary,
         )
         Row(
@@ -122,7 +123,7 @@ internal fun FullAccessConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Uni
             Checkbox(checked = acknowledged, onCheckedChange = { acknowledged = it })
             Text(
                 stringResource(R.string.permission_confirm_ack),
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelPrimary,
             )
         }
