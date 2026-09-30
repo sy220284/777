@@ -27,7 +27,6 @@ internal class LocalModelConfigurationCoordinator(
 ) {
     private val profiles = LocalModelProfileStore(preferences, json)
     private val startup = LocalModelStartupMigrator(preferences, profiles, apiKeys, gateway)
-
     suspend fun save(apiKey: String, model: String, baseUrl: String): LocalModelConfigurationResult =
         LocalModelMutationGate.run {
             require(model.isNotBlank()) { "模型名称不能为空" }
