@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -86,7 +87,9 @@ fun DsPill(
             .heightIn(min = if (onClick != null) DsSpacing.touchTarget else 24.dp)
             .then(
                 if (onClick != null) {
-                    Modifier.clickable(
+                    Modifier
+                        .widthIn(min = DsSpacing.touchTarget)
+                        .clickable(
                         interactionSource = interactionSource,
                         indication = null,
                         role = Role.Button,
