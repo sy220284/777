@@ -430,16 +430,7 @@ jobs:
             echo "构建期间 main 已出现影响构建的变更：$MAIN_SHA，本次旧版本不发布。"
           fi
 
-      - name: Publish Gitee mainland update mirror
-        if: steps.freshness.outputs.current == 'true'
-        env:
-          UPDATE_MIRROR_BASE_URL: ${{ vars.UPDATE_MIRROR_BASE_URL }}
-          GITEE_MIRROR_ACCESS_TOKEN: ${{ secrets.GITEE_MIRROR_ACCESS_TOKEN }}
-        run: |
-          python3 .github/scripts/publish-gitee-update-mirror.py \
-            --asset-dir .release-assets \
-            --version "$DSH_VERSION_NAME"
-
+      # GitHub 是正式发行主源：构建与校验通过后立即发布，不再等待国内镜像上传。
       - name: Publish GitHub Release
         if: steps.freshness.outputs.current == 'true'
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
@@ -450,3 +441,15 @@ jobs:
           files: |
             .release-assets/*
           generate_release_notes: true
+
+      # Gitee 是国内分发镜像。失败时本次 Workflow 仍会标红，便于单独重跑，
+      # 但已经成功创建的 GitHub Release 不回滚、不再被镜像耗时阻塞。
+      - name: Publish Gitee mainland update mirror
+        if: steps.freshness.outputs.current == 'true'
+        env:
+          UPDATE_MIRROR_BASE_URL: ${{ vars.UPDATE_MIRROR_BASE_URL }}
+          GITEE_MIRROR_ACCESS_TOKEN: ${{ secrets.GITEE_MIRROR_ACCESS_TOKEN }}
+        run: |
+          python3 .github/scripts/publish-gitee-update-mirror.py \
+            --asset-dir .release-assets \
+            --version "$DSH_VERSION_NAME"
