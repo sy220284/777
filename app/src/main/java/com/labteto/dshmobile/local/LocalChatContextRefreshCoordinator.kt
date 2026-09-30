@@ -265,6 +265,8 @@ internal class LocalChatContextRefreshCoordinator(
         var generation: Long? = null
         var branchSnapshotUpdated = false
         state.update { current ->
+            generation = null
+            branchSnapshotUpdated = false
             if (current.sessionId != expectedSessionId) {
                 current
             } else {
@@ -401,6 +403,7 @@ internal class LocalChatContextRefreshCoordinator(
         var nextContext = baseContext
         var applied = false
         state.update { current ->
+            applied = false
             val currentContext = current.chatContext
             if (
                 current.sessionId != expectedSessionId ||
