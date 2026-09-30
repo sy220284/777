@@ -152,6 +152,23 @@ android-17-instrumented
 - Runtime / APK 布局和实际执行。
 
 
+### 多模型协议运行时
+
+专项验证必须用同一组语义契约覆盖所有已注册协议，而不是只验证“请求能返回文本”：
+
+- Chat Completions、Responses API Key、ChatGPT 套餐 Responses、Anthropic Messages 均验证文本、图片、工具调用、工具续轮、usage、截断、错误和取消。
+- DeepSeek、MiniMax、Kimi、GLM、Gemini OpenAI-compatible、Qwen 的既有协议必须保持 Chat Completions，不因新增 Adapter 改写供应商 payload。
+- 官方 Claude 档案使用 Anthropic Messages；旧官方 Claude 档案迁移到原生协议，自定义兼容地址保留用户保存的协议。
+- Anthropic 流式事件至少覆盖 `message_start/content_block_start/content_block_delta/content_block_stop/message_delta/message_stop`；`text_delta`、`thinking_delta`、`signature_delta`、`input_json_delta` 必须按块正确组装。
+- Anthropic thinking/signature 和 tool_use 仅在相同 adapter + auth/profile + baseUrl + model 路由中无损 replay；切换账户、模型、地址或协议后不得把供应商私有状态发往新路由。
+- Responses continuation 同样通过通用 replay envelope 保存；通用 `_dsh_model_replay` 只能存在本地历史，禁止作为未知 wire 字段发送给任何供应商。
+- Gemini `thought_signature` 等 Chat-Completions 私有工具 metadata 在 Canonical round-trip 中保持，但只能由对应 Chat adapter 投影回 wire。
+- 新会话的 Agent 事件使用 provider-neutral `model_tool_calls` 做恢复判定；旧会话继续兼容 legacy `tool_calls`，迁移不能中断历史恢复。
+- 前台 Run、子代理与工具链冻结模型 profile；运行中切换 UI active profile 不得改变已经启动的模型请求、Vision 或工具子调用。
+- Vision 生产请求必须携带冻结 profile 并重新进入统一 Gateway；不得退回自行拼接 `/chat/completions` 的可变活动模型旁路。
+- Retry 只在同一路由执行；不得因网络、429 或 5xx 自动切换供应商/API Key，避免重复工具副作用和隐式计费。
+- 模型能力由 route capability snapshot 描述；图片上限、采样字段和协议能力必须保留 #345 已验证的供应商差异。
+
 ### ChatGPT 套餐模型
 
 专项验证至少覆盖：
