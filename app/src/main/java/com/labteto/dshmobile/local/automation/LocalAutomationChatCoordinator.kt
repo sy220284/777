@@ -351,7 +351,6 @@ internal class LocalAutomationChatCoordinator(
 
                 if (isNearDuplicateProactive(content, recentTranscript)) {
                     val retryRawReply = completeAutomationChat(
-                        key = key,
                         snapshot = boundState,
                         messages = withEphemeralContext(
                             requestMessages,
@@ -390,7 +389,6 @@ internal class LocalAutomationChatCoordinator(
                     initial = reply,
                     retryRaw = { repairHint ->
                         completeAutomationChat(
-                            key = key,
                             snapshot = boundState,
                             messages = withEphemeralContext(requestMessages, repairHint),
                         )
