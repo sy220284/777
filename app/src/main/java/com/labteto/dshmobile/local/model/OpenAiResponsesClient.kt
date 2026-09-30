@@ -61,13 +61,15 @@ class OpenAiResponsesClient @Inject constructor(
         onDelta: (LocalModelDelta) -> Unit = {},
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
+        val openAiContract = usesOpenAiResponsesContract(baseUrl, planSharing)
         val payload = buildPayload(
             model = model,
             messages = messages,
             tools = tools,
             temperature = temperature,
             planSharing = planSharing,
-            includeEncryptedReasoning = shouldIncludeEncryptedReasoning(baseUrl, planSharing),
+            includeEncryptedReasoning = openAiContract,
+            enforceOpenAiToolSchema = openAiContract,
         )
         val request = Request.Builder()
             .url(responsesEndpoint(baseUrl, planSharing))
@@ -200,6 +202,7 @@ class OpenAiResponsesClient @Inject constructor(
         temperature: Double?,
         planSharing: Boolean = true,
         includeEncryptedReasoning: Boolean = true,
+        enforceOpenAiToolSchema: Boolean = planSharing,
     ): JsonObject = buildJsonObject {
         put("model", model)
         responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
@@ -209,7 +212,9 @@ class OpenAiResponsesClient @Inject constructor(
         if (includeEncryptedReasoning) {
             put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
         }
-        if (tools.isNotEmpty()) put("tools", responseTools(tools, planSharing))
+        if (tools.isNotEmpty()) {
+            put("tools", responseTools(tools, planSharing, enforceOpenAiToolSchema))
+        }
         if (!planSharing) temperature?.let { put("temperature", it) }
         // ChatGPT plan sharing rejects sampling controls; API-key Responses keeps its own contract.
     }
@@ -326,6 +331,7 @@ class OpenAiResponsesClient @Inject constructor(
     private fun responseTools(
         tools: JsonArray,
         planSharing: Boolean,
+        enforceOpenAiToolSchema: Boolean,
     ): JsonArray {
         val functions = buildJsonArray {
             tools.forEachIndexed { index, element ->
@@ -353,6 +359,7 @@ class OpenAiResponsesClient @Inject constructor(
                     name = name,
                     value = function["parameters"],
                     strict = strict,
+                    enforceOpenAiToolSchema = enforceOpenAiToolSchema,
                 )
                 add(buildJsonObject {
                     put("type", "function")
@@ -402,6 +409,7 @@ class OpenAiResponsesClient @Inject constructor(
         name: String,
         value: JsonElement?,
         strict: Boolean,
+        enforceOpenAiToolSchema: Boolean,
     ): JsonObject {
         val source = when (value) {
             null, JsonNull -> emptyResponseFunctionParameters()
@@ -423,6 +431,7 @@ class OpenAiResponsesClient @Inject constructor(
             schema = normalized,
             path = "parameters",
             strict = strict,
+            enforceOpenAiToolSchema = enforceOpenAiToolSchema,
             depth = 1,
         )
         return normalized
@@ -434,9 +443,10 @@ class OpenAiResponsesClient @Inject constructor(
         schema: JsonObject,
         path: String,
         strict: Boolean,
+        enforceOpenAiToolSchema: Boolean,
         depth: Int,
     ) {
-        if (strict && depth > MAX_STRICT_SCHEMA_DEPTH) {
+        if (strict && enforceOpenAiToolSchema && depth > MAX_STRICT_SCHEMA_DEPTH) {
             throw invalidToolSchema(index, name, "$path 超过 OpenAI strict schema 的最大 10 层嵌套")
         }
         val properties = schema["properties"]?.let { element ->
@@ -457,10 +467,10 @@ class OpenAiResponsesClient @Inject constructor(
                 }
                 primitive.content
             }.also { names ->
-                if (strict && names.size != names.toSet().size) {
+                if (strict && enforceOpenAiToolSchema && names.size != names.toSet().size) {
                     throw invalidToolSchema(index, name, "$path.required 不能包含重复字段")
                 }
-                if (strict && properties != null) {
+                if (strict && enforceOpenAiToolSchema && properties != null) {
                     val unknown = names.filterNot(properties::containsKey)
                     if (unknown.isNotEmpty()) {
                         throw invalidToolSchema(
@@ -473,9 +483,16 @@ class OpenAiResponsesClient @Inject constructor(
             }
         }
 
-        validateAdditionalProperties(index, name, schema, path, strict)
+        validateAdditionalProperties(
+            index,
+            name,
+            schema,
+            path,
+            strict,
+            enforceOpenAiToolSchema,
+        )
 
-        if (strict && schemaDeclaresObject(schema)) {
+        if (strict && enforceOpenAiToolSchema && schemaDeclaresObject(schema)) {
             val propertyNames = properties?.keys.orEmpty()
             val requiredNames = required?.toSet().orEmpty()
             val missing = propertyNames.filterNot(requiredNames::contains)
@@ -489,11 +506,11 @@ class OpenAiResponsesClient @Inject constructor(
         }
 
         STRICT_UNSUPPORTED_SCHEMA_KEYWORDS.firstOrNull(schema::containsKey)?.let { keyword ->
-            if (strict) {
+            if (strict && enforceOpenAiToolSchema) {
                 throw invalidToolSchema(
                     index,
                     name,
-                    "$path 在 strict=true 时不支持 JSON Schema 关键字 $keyword",
+                    "$path 在 OpenAI strict=true 时不支持 JSON Schema 关键字 $keyword",
                 )
             }
         }
@@ -511,6 +528,7 @@ class OpenAiResponsesClient @Inject constructor(
                 childSchema,
                 "$path.properties.$propertyName",
                 strict,
+                enforceOpenAiToolSchema,
                 depth + 1,
             )
         }
@@ -526,7 +544,7 @@ class OpenAiResponsesClient @Inject constructor(
                     strict,
                     depth + 1,
                 )
-            } else if (strict) {
+            } else if (strict && enforceOpenAiToolSchema) {
                 throw invalidToolSchema(
                     index,
                     name,
@@ -584,6 +602,7 @@ class OpenAiResponsesClient @Inject constructor(
         schema: JsonObject,
         path: String,
         strict: Boolean,
+        enforceOpenAiToolSchema: Boolean,
     ) {
         val additional = schema["additionalProperties"]
         if (additional != null && additional != JsonNull) {
@@ -601,7 +620,7 @@ class OpenAiResponsesClient @Inject constructor(
                 )
             }
         }
-        if (strict && schemaDeclaresObject(schema)) {
+        if (strict && enforceOpenAiToolSchema && schemaDeclaresObject(schema)) {
             val disabled = (additional as? JsonPrimitive)
                 ?.takeUnless(JsonPrimitive::isString)
                 ?.content
@@ -958,7 +977,10 @@ class OpenAiResponsesClient @Inject constructor(
         return if (clean.endsWith("/responses")) clean else "$clean/responses"
     }
 
-    internal fun shouldIncludeEncryptedReasoning(baseUrl: String, planSharing: Boolean): Boolean {
+    internal fun shouldIncludeEncryptedReasoning(baseUrl: String, planSharing: Boolean): Boolean =
+        usesOpenAiResponsesContract(baseUrl, planSharing)
+
+    internal fun usesOpenAiResponsesContract(baseUrl: String, planSharing: Boolean): Boolean {
         if (planSharing) return true
         return runCatching {
             java.net.URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.openai.com", ignoreCase = true)
