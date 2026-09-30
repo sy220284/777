@@ -366,10 +366,36 @@ class SettingsViewModel @Inject constructor(
 
     fun connectChatGpt(existingAccountId: String? = null, onDone: (String?) -> Unit = {}) {
         viewModelScope.launch {
-            runCatching { localHarness.connectChatGpt(existingAccountId) }
-                .onSuccess { onDone(null) }
-                .onFailure { onDone(it.message ?: "ChatGPT 登录失败") }
+            try {
+                localHarness.connectChatGpt(existingAccountId)
+                onDone(null)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onDone(error.message ?: "ChatGPT 登录失败")
+            }
         }
+    }
+
+    fun restartChatGptAuthorization(existingAccountId: String? = null, onDone: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                localHarness.restartChatGptAuthorization(existingAccountId)
+                onDone(null)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onDone(error.message ?: "重新开始 ChatGPT 授权失败")
+            }
+        }
+    }
+
+    fun cancelChatGptAuthorization() {
+        viewModelScope.launch { localHarness.cancelChatGptAuthorization() }
+    }
+
+    fun testChatGptAccount(id: String, onDone: (String) -> Unit) {
+        viewModelScope.launch { onDone(localHarness.testChatGptAccount(id)) }
     }
 
     fun selectChatGptAccount(id: String, onDone: (String?) -> Unit = {}) {
@@ -385,6 +411,14 @@ class SettingsViewModel @Inject constructor(
             runCatching { localHarness.disconnectChatGptAccount(id) }
                 .onSuccess { warning -> onDone(warning) }
                 .onFailure { onDone(it.message ?: "断开 ChatGPT 账户失败") }
+        }
+    }
+
+    fun removeChatGptAccount(id: String, onDone: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching { localHarness.removeChatGptAccount(id) }
+                .onSuccess { warning -> onDone(warning) }
+                .onFailure { onDone(it.message ?: "移除 ChatGPT 授权记录失败") }
         }
     }
 

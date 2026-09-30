@@ -115,10 +115,7 @@ class LocalModelGateway @Inject constructor(
             accessToken = apiKey,
             baseUrl = baseUrl,
             model = model,
-            messages = listOf(buildJsonObject {
-                put("role", "user")
-                put("content", "Reply with OK.")
-            }),
+            messages = probeMessages(),
             tools = JsonArray(emptyList()),
             planSharing = false,
         )
@@ -126,13 +123,24 @@ class LocalModelGateway @Inject constructor(
             apiKey = apiKey,
             baseUrl = baseUrl,
             model = model,
-            messages = listOf(buildJsonObject {
-                put("role", "user")
-                put("content", "Reply with OK.")
-            }),
+            messages = probeMessages(),
             tools = JsonArray(emptyList()),
         )
     }
+
+    suspend fun probeProfile(profile: LocalModelProfile): LocalModelReply =
+        complete(
+            model = profile.model,
+            baseUrl = profile.baseUrl,
+            messages = probeMessages(),
+            tools = JsonArray(emptyList()),
+            profile = profile,
+        )
+
+    private fun probeMessages(): List<JsonObject> = listOf(buildJsonObject {
+        put("role", "user")
+        put("content", "Reply with exactly: OK")
+    })
 
     private fun usesResponses(
         profile: LocalModelProfile?,

@@ -16,4 +16,23 @@ class ChatGptAuthorizationRecoveryTest {
         assertFalse(shouldRetryChatGptAuthorization("access_denied", allowed = true))
         assertFalse(shouldRetryChatGptAuthorization(null, allowed = true))
     }
+
+    @Test
+    fun terminalRefreshFailuresInvalidateOnlyTheRenewableSession() {
+        listOf(
+            "invalid_grant",
+            "invalid_refresh_token",
+            "token_expired",
+            "refresh_token_expired",
+            "refresh_token_invalidated",
+            "refresh_token_reused",
+        ).forEach { assertTrue(shouldInvalidateChatGptRefreshToken(it)) }
+    }
+
+    @Test
+    fun temporaryRefreshFailuresKeepCredentialsForARealRetry() {
+        listOf(null, "temporarily_unavailable", "server_error", "invalid_client").forEach {
+            assertFalse(shouldInvalidateChatGptRefreshToken(it))
+        }
+    }
 }

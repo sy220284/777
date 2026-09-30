@@ -44,7 +44,18 @@ class ChatGptSessionManager @Inject constructor(
             if (latest.accessTokenExpiresAtEpochSeconds > secondNow + REFRESH_EARLY_SECONDS) {
                 return@withLock latest.accessToken
             }
-            val refreshed = refresh(latest)
+            val refreshed = try {
+                refresh(latest)
+            } catch (error: ChatGptOAuthTokenException) {
+                if (shouldInvalidateChatGptRefreshToken(error.oauthCode)) {
+                    accounts.clearCredentials(accountId)
+                    throw ChatGptOAuthTokenException(
+                        oauthCode = error.oauthCode,
+                        message = "ChatGPT 登录已过期或已被撤销，请重新授权",
+                    )
+                }
+                throw error
+            }
             accounts.put(refreshed, select = accounts.selectedId() == accountId)
             refreshed.accessToken
         }

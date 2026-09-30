@@ -1305,7 +1305,7 @@
     <string name="chatgpt_account_fallback">ChatGPT account</string>
     <string name="chatgpt_plan_usage">ChatGPT plan</string>
     <string name="chatgpt_model_count">%1$d models</string>
-    <string name="chatgpt_saved_accounts">Saved ChatGPT accounts</string>
+    <string name="chatgpt_saved_accounts">Saved authorizations</string>
     <string name="chatgpt_current_account">Current</string>
     <string name="chatgpt_use_account">Use</string>
     <string name="chatgpt_reauthorize">Reconnect</string>
@@ -1318,7 +1318,7 @@
     <string name="chatgpt_model_source">ChatGPT plan · %1$s</string>
 
     <string name="chatgpt_continue">Continue with ChatGPT</string>
-    <string name="chatgpt_account_short">Account</string>
+    <string name="chatgpt_account_short">Authorization</string>
     <string name="chatgpt_using_plan">Using ChatGPT plan</string>
     <string name="chatgpt_manage_usage">Manage usage</string>
     <string name="chatgpt_switch_model_source">Switch model source</string>
@@ -1327,4 +1327,16 @@
     <string name="chatgpt_welcome_confirm">Got it</string>
     <string name="local_model_protocol_value">API protocol: %1$s</string>
     <string name="local_model_request_endpoint">Request endpoint: %1$s</string>
+    <string name="chatgpt_session_persistence_hint">Authorization renews automatically; long inactivity, revocation, or invalid credentials require signing in again.</string>
+    <string name="chatgpt_test_connection">Test connection</string>
+    <string name="chatgpt_testing_connection">Testing…</string>
+    <string name="chatgpt_test_hint">Sends one tiny test request to verify that a plan model can actually complete a response, using a small amount of plan usage.</string>
+    <string name="chatgpt_retry_authorization">Cancel and retry</string>
+    <string name="chatgpt_cancel_authorization">Cancel authorization</string>
+    <string name="chatgpt_account_actions">Authorization actions</string>
+    <string name="chatgpt_remove_registration">Remove authorization</string>
+    <string name="chatgpt_remove_registration_title">Remove this authorization?</string>
+    <string name="chatgpt_remove_registration_body">This revokes the authorization and removes this saved registration from the device. It does not delete your ChatGPT account.</string>
+    <string name="chatgpt_remove_registration_confirm">Remove</string>
+    <string name="chatgpt_cancel">Cancel</string>
 </resources>

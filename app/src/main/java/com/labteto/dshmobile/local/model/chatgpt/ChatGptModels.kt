@@ -53,6 +53,7 @@ data class ChatGptUiState(
     val selectedAccountId: String? = null,
     val models: List<ChatGptModelOption> = emptyList(),
     val error: String? = null,
+    val pendingAccountId: String? = null,
 ) {
     val selectedAccount: ChatGptAccountSummary?
         get() = accounts.firstOrNull { it.id == selectedAccountId }
@@ -68,6 +69,16 @@ internal class ChatGptOAuthTokenException(
 
 internal fun shouldRetryChatGptAuthorization(oauthCode: String?, allowed: Boolean): Boolean =
     allowed && oauthCode == "invalid_grant"
+
+internal fun shouldInvalidateChatGptRefreshToken(oauthCode: String?): Boolean =
+    oauthCode in setOf(
+        "invalid_grant",
+        "invalid_refresh_token",
+        "token_expired",
+        "refresh_token_expired",
+        "refresh_token_invalidated",
+        "refresh_token_reused",
+    )
 
 internal data class ChatGptTokenResponse(
     val accessToken: String,

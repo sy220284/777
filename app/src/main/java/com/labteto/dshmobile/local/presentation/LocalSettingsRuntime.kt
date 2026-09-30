@@ -29,6 +29,7 @@ class LocalSettingsRuntime @Inject constructor(
         auth = chatGptAuth,
         syncModels = engine::syncChatGptModels,
         removeProfiles = engine::removeChatGptAccountProfiles,
+        testAccount = engine::testChatGptAccount,
     )
     val state: Flow<LocalHarnessSettingsState> = engine.state.map { it.toSettingsUiState() }.distinctUntilChanged()
     val initialState get() = engine.state.value.toSettingsUiState()
@@ -39,8 +40,12 @@ class LocalSettingsRuntime @Inject constructor(
     }
     suspend fun refreshChatGpt() = chatGpt.refresh()
     suspend fun connectChatGpt(existingAccountId: String? = null) = chatGpt.connect(existingAccountId)
+    suspend fun restartChatGptAuthorization(existingAccountId: String? = null) = chatGpt.restart(existingAccountId)
+    suspend fun cancelChatGptAuthorization() = chatGpt.cancelAuthorization()
+    suspend fun testChatGptAccount(id: String): String = chatGpt.test(id)
     suspend fun selectChatGptAccount(id: String) = chatGpt.select(id)
     suspend fun disconnectChatGptAccount(id: String): String? = chatGpt.disconnect(id)
+    suspend fun removeChatGptAccount(id: String): String? = chatGpt.remove(id)
     fun configureModel(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)
     suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null) = engine.saveModelConfiguration(apiKey, model, baseUrl, protocol)
     fun selectModel(id: String) = engine.selectModel(id)

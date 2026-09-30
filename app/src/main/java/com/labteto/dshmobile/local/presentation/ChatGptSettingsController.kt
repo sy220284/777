@@ -10,21 +10,27 @@ internal class ChatGptSettingsController(
     private val auth: ChatGptAuthCoordinator,
     private val syncModels: suspend (String, List<ChatGptModelOption>, Boolean) -> Unit,
     private val removeProfiles: suspend (String) -> Unit,
+    private val testAccount: suspend (String) -> String,
 ) {
     val state: StateFlow<ChatGptUiState> = auth.state
 
     suspend fun refresh() {
         auth.refresh()
-        val snapshot = auth.state.value
-        if (snapshot.phase == com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.CONNECTED) {
-            snapshot.selectedAccountId?.let { syncModels(it, snapshot.models, false) }
-        }
+        syncSelectedIfConnected()
     }
 
     suspend fun connect(existingAccountId: String? = null) {
         val account = auth.connect(existingAccountId)
         syncModels(account.id, auth.state.value.models, true)
     }
+
+    suspend fun restart(existingAccountId: String? = null) {
+        val account = auth.restartAuthorization(existingAccountId)
+        syncModels(account.id, auth.state.value.models, true)
+    }
+
+    suspend fun cancelAuthorization() = auth.cancelPendingAuthorization()
+    suspend fun test(id: String): String = testAccount(id)
 
     suspend fun select(id: String) {
         auth.selectAccount(id)
@@ -38,10 +44,21 @@ internal class ChatGptSettingsController(
     suspend fun disconnect(id: String): String? {
         removeProfiles(id)
         val warning = auth.disconnect(id)
+        syncSelectedIfConnected()
+        return warning
+    }
+
+    suspend fun remove(id: String): String? {
+        removeProfiles(id)
+        val warning = auth.remove(id)
+        syncSelectedIfConnected()
+        return warning
+    }
+
+    private suspend fun syncSelectedIfConnected() {
         val snapshot = auth.state.value
         if (snapshot.phase == com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.CONNECTED) {
             snapshot.selectedAccountId?.let { syncModels(it, snapshot.models, false) }
         }
-        return warning
     }
 }
