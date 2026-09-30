@@ -65,6 +65,7 @@ internal fun ChatGptAccountPanel(
     val removeRegistrationLabel = stringResource(R.string.chatgpt_remove_registration)
     val accountActionsLabel = stringResource(R.string.chatgpt_account_actions)
     val selected = state.selectedAccount
+    val otherAccounts = state.accounts.filterNot { it.id == state.selectedAccountId }
 
     LaunchedEffect(state.connected) {
         if (state.connected && !welcomePrefs.getBoolean("plan_welcome_seen_v1", false)) {
@@ -150,11 +151,34 @@ internal fun ChatGptAccountPanel(
                 selected.email?.takeIf { it != selected.displayName }?.let {
                     Text(it, style = DsType.caption11, color = colors.labelTertiary)
                 }
-                Text(
-                    "$accountShortLabel ${selected.id.takeLast(6)}",
-                    style = DsType.caption11,
-                    color = colors.labelTertiary,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "$accountShortLabel ${selected.id.takeLast(6)}",
+                        style = DsType.caption11,
+                        color = colors.labelTertiary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (!busy) {
+                        DsMenu(
+                            anchor = {
+                                Icon(
+                                    Icons.Filled.MoreVert,
+                                    contentDescription = accountActionsLabel,
+                                    tint = colors.labelSecondary,
+                                    modifier = Modifier.padding(10.dp),
+                                )
+                            },
+                            items = listOf(
+                                MenuItem(text = removeRegistrationLabel, danger = true) {
+                                    removeAccountId = selected.id
+                                },
+                            ),
+                        )
+                    }
+                }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                     verticalAlignment = Alignment.CenterVertically,
@@ -168,13 +192,13 @@ internal fun ChatGptAccountPanel(
                     color = colors.labelTertiary,
                 )
 
-                if (state.accounts.size > 1) {
+                if (otherAccounts.isNotEmpty()) {
                     Text(
                         stringResource(R.string.chatgpt_saved_accounts),
                         style = DsType.caption11,
                         color = colors.labelTertiary,
                     )
-                    state.accounts.forEach { account ->
+                    otherAccounts.forEach { account ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -195,19 +219,15 @@ internal fun ChatGptAccountPanel(
                                 color = colors.labelSecondary,
                                 modifier = Modifier.weight(1f),
                             )
-                            if (account.id == state.selectedAccountId) {
-                                DsPill(text = stringResource(R.string.chatgpt_current_account), selected = true)
-                            } else {
-                                DsButton(
-                                    text = useAccountLabel,
-                                    onClick = {
-                                        viewModel.selectChatGptAccount(account.id) { error -> error?.let(report) }
-                                    },
-                                    enabled = !busy,
-                                    size = DsButtonSize.Small,
-                                    variant = DsButtonVariant.Ghost,
-                                )
-                            }
+                            DsButton(
+                                text = useAccountLabel,
+                                onClick = {
+                                    viewModel.selectChatGptAccount(account.id) { error -> error?.let(report) }
+                                },
+                                enabled = !busy,
+                                size = DsButtonSize.Small,
+                                variant = DsButtonVariant.Ghost,
+                            )
                             if (!busy) {
                                 DsMenu(
                                     anchor = {
@@ -219,11 +239,6 @@ internal fun ChatGptAccountPanel(
                                         )
                                     },
                                     items = buildList {
-                                        if (account.id != state.selectedAccountId) {
-                                            add(MenuItem(text = useAccountLabel) {
-                                                viewModel.selectChatGptAccount(account.id) { error -> error?.let(report) }
-                                            })
-                                        }
                                         add(MenuItem(text = reauthorizeLabel) {
                                             viewModel.connectChatGpt(account.id) { error -> error?.let(report) }
                                         })

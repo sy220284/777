@@ -1305,7 +1305,7 @@
     <string name="chatgpt_account_fallback">ChatGPT account</string>
     <string name="chatgpt_plan_usage">ChatGPT plan</string>
     <string name="chatgpt_model_count">%1$d models</string>
-    <string name="chatgpt_saved_accounts">Saved authorizations</string>
+    <string name="chatgpt_saved_accounts">Other authorizations</string>
     <string name="chatgpt_current_account">Current</string>
     <string name="chatgpt_use_account">Use</string>
     <string name="chatgpt_reauthorize">Reconnect</string>

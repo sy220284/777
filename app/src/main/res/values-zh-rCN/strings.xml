@@ -1304,7 +1304,7 @@
     <string name="chatgpt_account_fallback">ChatGPT 账户</string>
     <string name="chatgpt_plan_usage">ChatGPT 套餐</string>
     <string name="chatgpt_model_count">%1$d 个模型</string>
-    <string name="chatgpt_saved_accounts">已保存的授权记录</string>
+    <string name="chatgpt_saved_accounts">其他授权记录</string>
     <string name="chatgpt_current_account">当前</string>
     <string name="chatgpt_use_account">使用</string>
     <string name="chatgpt_reauthorize">重新授权</string>

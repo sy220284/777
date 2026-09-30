@@ -400,28 +400,40 @@ class SettingsViewModel @Inject constructor(
 
     fun selectChatGptAccount(id: String, onDone: (String?) -> Unit = {}) {
         viewModelScope.launch {
-            runCatching { localHarness.selectChatGptAccount(id) }
-                .onSuccess { onDone(null) }
-                .onFailure { onDone(it.message ?: "切换 ChatGPT 账户失败") }
+            try {
+                localHarness.selectChatGptAccount(id)
+                onDone(null)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onDone(error.message ?: "切换 ChatGPT 账户失败")
+            }
         }
     }
 
     fun disconnectChatGptAccount(id: String, onDone: (String?) -> Unit = {}) {
         viewModelScope.launch {
-            runCatching { localHarness.disconnectChatGptAccount(id) }
-                .onSuccess { warning -> onDone(warning) }
-                .onFailure { onDone(it.message ?: "断开 ChatGPT 账户失败") }
+            try {
+                onDone(localHarness.disconnectChatGptAccount(id))
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onDone(error.message ?: "断开 ChatGPT 账户失败")
+            }
         }
     }
 
     fun removeChatGptAccount(id: String, onDone: (String?) -> Unit = {}) {
         viewModelScope.launch {
-            runCatching { localHarness.removeChatGptAccount(id) }
-                .onSuccess { warning -> onDone(warning) }
-                .onFailure { onDone(it.message ?: "移除 ChatGPT 授权记录失败") }
+            try {
+                onDone(localHarness.removeChatGptAccount(id))
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onDone(error.message ?: "移除 ChatGPT 授权记录失败")
+            }
         }
     }
-
     fun refreshChatGpt() {
         viewModelScope.launch { runCatching { localHarness.refreshChatGpt() } }
     }

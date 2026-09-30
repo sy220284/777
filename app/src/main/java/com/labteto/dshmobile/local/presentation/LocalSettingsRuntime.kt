@@ -4,8 +4,8 @@ import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionStorageStatus
-import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountConnectionTester
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanConnectionTester
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import java.io.OutputStream
 import javax.inject.Inject
@@ -25,13 +25,13 @@ data class LocalSettingsMemoryContext(
 class LocalSettingsRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
     chatGptAuth: ChatGptAuthCoordinator,
-    chatGptTester: ChatGptAccountConnectionTester,
+    chatGptPlanTester: ChatGptPlanConnectionTester,
 ) {
     private val chatGpt = ChatGptSettingsController(
         auth = chatGptAuth,
         syncModels = engine::syncChatGptModels,
         removeProfiles = engine::removeChatGptAccountProfiles,
-        testAccount = chatGptTester::test,
+        testAccount = chatGptPlanTester::test,
     )
     val state: Flow<LocalHarnessSettingsState> = engine.state.map { it.toSettingsUiState() }.distinctUntilChanged()
     val initialState get() = engine.state.value.toSettingsUiState()
