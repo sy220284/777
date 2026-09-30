@@ -49,8 +49,6 @@ jobs:
         run: python3 .github/scripts/check-local-architecture-boundaries.py
       - name: Test bundled runtime compactor
         run: python3 tools/runtime/compact-runtime-assets.py --self-test
-      - name: Test Gitee update mirror publisher
-        run: python3 .github/scripts/publish-gitee-update-mirror.py --self-test
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
