@@ -40,6 +40,8 @@ enum class WallpaperSurfaceLevel {
     CARD,
     INPUT,
     FLOATING,
+    SHEET,
+    DRAWER,
     DIALOG,
     MENU,
 }
@@ -111,13 +113,13 @@ data class AppBackgroundState(
         return base.copy(alpha = adjustedSurfaceAlpha(alpha, minAlpha, maxAlpha))
     }
 
-    private fun adjustedSurfaceAlpha(alpha: Float, minAlpha: Float, maxAlpha: Float): Float {
-        val preference = surfaceTransparency.coerceIn(0f, 1f)
-        val adjustment = (0.5f - preference) * 0.28f
-        val lower = (minAlpha - 0.12f).coerceAtLeast(0.18f)
-        val upper = (maxAlpha + 0.10f).coerceAtMost(0.98f)
-        return (alpha + adjustment).coerceIn(lower, upper)
-    }
+    private fun adjustedSurfaceAlpha(alpha: Float, minAlpha: Float, maxAlpha: Float): Float =
+        resolveWallpaperAlpha(
+            adaptiveAlpha = alpha,
+            minAlpha = minAlpha,
+            maxAlpha = maxAlpha,
+            transparency = surfaceTransparency,
+        )
 
 
     /**
@@ -138,12 +140,14 @@ data class AppBackgroundState(
 
         val (minAlpha, maxAlpha, fallbackAlpha) = when (level) {
             WallpaperSurfaceLevel.PAGE -> Triple(0f, 0f, 0f)
-            WallpaperSurfaceLevel.CHROME -> Triple(0.10f, 0.30f, 0.16f)
-            WallpaperSurfaceLevel.CARD -> Triple(0.44f, 0.68f, 0.54f)
-            WallpaperSurfaceLevel.INPUT -> Triple(0.46f, 0.70f, 0.56f)
-            WallpaperSurfaceLevel.FLOATING -> Triple(0.58f, 0.78f, 0.66f)
-            WallpaperSurfaceLevel.DIALOG -> Triple(0.70f, 0.86f, 0.78f)
-            WallpaperSurfaceLevel.MENU -> Triple(0.74f, 0.88f, 0.82f)
+            WallpaperSurfaceLevel.CHROME -> Triple(0.08f, 0.28f, 0.16f)
+            WallpaperSurfaceLevel.CARD -> Triple(0.30f, 0.62f, 0.46f)
+            WallpaperSurfaceLevel.INPUT -> Triple(0.34f, 0.66f, 0.50f)
+            WallpaperSurfaceLevel.FLOATING -> Triple(0.40f, 0.70f, 0.55f)
+            WallpaperSurfaceLevel.SHEET -> Triple(0.44f, 0.72f, 0.58f)
+            WallpaperSurfaceLevel.DRAWER -> Triple(0.40f, 0.68f, 0.54f)
+            WallpaperSurfaceLevel.DIALOG -> Triple(0.50f, 0.76f, 0.63f)
+            WallpaperSurfaceLevel.MENU -> Triple(0.56f, 0.82f, 0.69f)
         }
 
         if (!adaptiveContrast || analysis == null) {
@@ -156,6 +160,26 @@ data class AppBackgroundState(
             maxAlpha = maxAlpha,
         )
     }
+}
+
+/**
+ * Applies the user's transparency preference after adaptive contrast has picked a safe baseline.
+ *
+ * 0 means clearer/more opaque and 1 means airier/more transparent. Adaptive analysis still nudges
+ * the result, but the user's choice now has enough range to be visible across cards, drawers,
+ * sheets and dialogs instead of being almost completely clamped away.
+ */
+internal fun resolveWallpaperAlpha(
+    adaptiveAlpha: Float,
+    minAlpha: Float,
+    maxAlpha: Float,
+    transparency: Float,
+): Float {
+    val preference = transparency.coerceIn(0f, 1f)
+    val adjustment = (0.5f - preference) * 0.46f
+    val lower = (minAlpha - 0.18f).coerceAtLeast(0.14f)
+    val upper = (maxAlpha + 0.08f).coerceAtMost(0.98f)
+    return (adaptiveAlpha + adjustment).coerceIn(lower, upper)
 }
 
 /** The image painted behind the whole app shell, or null for the plain theme colour. */
@@ -358,6 +382,8 @@ fun DsColors.wallpaperSurface(
         WallpaperSurfaceLevel.CARD -> bgLayer1
         WallpaperSurfaceLevel.INPUT -> bgLayer2
         WallpaperSurfaceLevel.FLOATING -> bgModulePlatform
+        WallpaperSurfaceLevel.SHEET -> bgLayer2
+        WallpaperSurfaceLevel.DRAWER -> sidebar
         WallpaperSurfaceLevel.DIALOG -> bgLayer2
         WallpaperSurfaceLevel.MENU -> bgLayer3
     },
