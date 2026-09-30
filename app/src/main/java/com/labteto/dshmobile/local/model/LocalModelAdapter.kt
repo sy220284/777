@@ -125,13 +125,13 @@ internal class AnthropicMessagesAdapter @Inject constructor(
 }
 
 @Singleton
-internal class LocalModelAdapterRegistry @Inject constructor(
+class LocalModelAdapterRegistry @Inject internal constructor(
     chat: OpenAiCompatibleChatAdapter,
     responses: OpenAiResponsesAdapter,
     anthropic: AnthropicMessagesAdapter,
 ) {
     private val adapters = listOf(chat, responses, anthropic).associateBy(LocalModelAdapter::protocol)
 
-    fun adapter(protocol: LocalModelProtocol): LocalModelAdapter =
+    internal fun adapter(protocol: LocalModelProtocol): LocalModelAdapter =
         adapters[protocol] ?: error("未注册模型协议适配器：$protocol")
 }
