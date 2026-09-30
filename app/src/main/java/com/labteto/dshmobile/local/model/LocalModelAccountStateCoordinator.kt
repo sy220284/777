@@ -36,6 +36,13 @@ internal class LocalModelAccountStateCoordinator(
             ?: configuration.activeProfile(before.model, before.baseUrl, profiles)
         val configured = active != null && gateway.hasCredential(active)
         active?.takeIf { configured }?.let(gateway::activate)
+        val removedActiveChatGptModel = active == null &&
+            before.activeModelProfileId != null &&
+            before.modelProfiles.any {
+                it.id == before.activeModelProfileId &&
+                    it.authKind == LocalModelAuthKind.CHATGPT_PLAN &&
+                    it.credentialRef == accountId
+            }
         state.update { current ->
             current.copy(
                 configured = configured,
@@ -44,7 +51,11 @@ internal class LocalModelAccountStateCoordinator(
                 configuredModels = profiles.map(LocalModelProfile::model).distinct().sorted(),
                 modelProfiles = profiles,
                 activeModelProfileId = active?.id,
-                error = if (models.isEmpty()) "当前 ChatGPT 账户没有可用于套餐共享的模型" else null,
+                error = when {
+                    models.isEmpty() -> "当前 ChatGPT 账户没有可用于套餐共享的模型"
+                    removedActiveChatGptModel -> "当前 ChatGPT 模型已不可用，请重新选择模型"
+                    else -> null
+                },
             )
         }
     }
