@@ -176,16 +176,6 @@ internal class LocalModelRequestCoordinator(
                                     ?.let { streamingPreviewStore.publishAssistant(it, preview) }
                             },
                         )
-                        val reasoningPreview = LocalStreamPreview(
-                            maxChars = maxStreamPreviewChars,
-                            minIntervalMs = streamPreviewIntervalMs,
-                            clockMs = { System.nanoTime() / 1_000_000 },
-                            publish = { preview ->
-                                previewOwner
-                                    ?.takeIf { previewGuard() }
-                                    ?.let { streamingPreviewStore.publishReasoning(it, preview) }
-                            },
-                        )
                         val streamFilter = streamFilterPhrases
                             .takeIf { it.isNotEmpty() }
                             ?.let(::ChatStreamFilter)
@@ -201,7 +191,6 @@ internal class LocalModelRequestCoordinator(
                                         val visible =
                                             streamFilter?.append(delta.content)?.text ?: delta.content
                                         streamPreview.append(visible)
-                                        reasoningPreview.append(delta.reasoning)
                                     },
                                 )
                             } catch (error: LocalModelException) {
@@ -226,7 +215,6 @@ internal class LocalModelRequestCoordinator(
                                 ?.takeIf(String::isNotEmpty)
                                 ?.let(streamPreview::append)
                             streamPreview.flush()
-                            reasoningPreview.flush()
                             reply
                         }
                     }
