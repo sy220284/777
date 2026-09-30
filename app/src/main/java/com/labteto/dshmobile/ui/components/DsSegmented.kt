@@ -83,7 +83,7 @@ fun DsSegmented(
                 // A stretched track is a primary control rather than an inline one, so its segments
                 // get a button's height. 24dp is a comfortable inline chip and an uncomfortably
                 // small thing to hit when it is the first decision on a screen.
-                minHeight = if (stretch) 36.dp else 24.dp,
+                minHeight = DsSpacing.touchTarget,
                 modifier = Modifier.weight(1f, fill = stretch),
             )
         }
