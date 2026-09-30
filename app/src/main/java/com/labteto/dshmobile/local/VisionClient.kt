@@ -84,8 +84,10 @@ class VisionClient @Inject constructor(
         require(model.isNotBlank()) { "当前模型名称为空" }
         require(prompt.isNotBlank()) { "图片分析要求不能为空" }
         validateImageDataUrl(imageDataUrl)
-        val encodedLength = imageDataUrl.substringAfter(',', "").length.toLong()
-        require(encodedLength <= ((LocalModelPresets.maxNativeImageBytesFor(model, baseUrl) + 2) / 3) * 4) {
+        val encodedLength = (imageDataUrl.length - imageDataUrl.indexOf(',') - 1).toLong()
+        val padding = if (imageDataUrl.endsWith("==")) 2 else if (imageDataUrl.endsWith("=")) 1 else 0
+        require(encodedLength % 4 == 0L && encodedLength / 4 * 3 - padding <=
+            LocalModelPresets.maxNativeImageBytesFor(model, baseUrl)) {
             "图片超过当前模型的上传大小限制，请压缩后重试"
         }
 
