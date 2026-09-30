@@ -38,6 +38,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
@@ -99,7 +100,7 @@ internal fun ExecutionStatusCard(
                     StateDot(if (state.running) StateDotState.Running else StateDotState.Idle)
                     Text(
                         stringResource(R.string.local_run_center),
-                        style = DsType.base16Strong,
+                        style = DsType.base16Strong.withReadingWeight(),
                         color = colors.labelPrimary,
                     )
                 }
@@ -109,11 +110,11 @@ internal fun ExecutionStatusCard(
                 Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                     Text(
                         stringResource(R.string.local_run_current_goal),
-                        style = DsType.caption11Strong,
+                        style = DsType.caption11Strong.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
-                    Text(goal.description, style = DsType.std14Strong, color = colors.labelPrimary)
-                    Text(goal.status, style = DsType.caption11, color = colors.labelSecondary)
+                    Text(goal.description, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
+                    Text(goal.status, style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }
             }
 
@@ -124,7 +125,7 @@ internal fun ExecutionStatusCard(
             if (state.pendingApproval != null || state.pendingQuestion != null) {
                 Text(
                     stringResource(R.string.local_workflow_waiting_user),
-                    style = DsType.small13Strong,
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = colors.warnLabel,
                 )
             }
@@ -133,13 +134,13 @@ internal fun ExecutionStatusCard(
                 Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                     Text(
                         stringResource(R.string.local_run_plan),
-                        style = DsType.caption11Strong,
+                        style = DsType.caption11Strong.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
                     state.plan.take(5).forEachIndexed { index, step ->
                         Text(
                             (index + 1).toString().padStart(2, '0') + "  " + step,
-                            style = DsType.small13,
+                            style = DsType.small13.withReadingWeight(),
                             color = colors.labelSecondary,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -152,7 +153,7 @@ internal fun ExecutionStatusCard(
                 Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                     Text(
                         stringResource(R.string.local_run_tasks_progress, completed, total),
-                        style = DsType.caption11Strong,
+                        style = DsType.caption11Strong.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
                     state.todos.take(5).forEach { todo ->
@@ -163,7 +164,7 @@ internal fun ExecutionStatusCard(
                         }
                         Text(
                             marker + "  " + todo.content,
-                            style = DsType.small13,
+                            style = DsType.small13.withReadingWeight(),
                             color = if (todo.status == "completed") {
                                 colors.labelTertiary
                             } else {
@@ -180,7 +181,7 @@ internal fun ExecutionStatusCard(
                 Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                     Text(
                         stringResource(R.string.local_run_background),
-                        style = DsType.caption11Strong,
+                        style = DsType.caption11Strong.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
                     state.jobs.take(4).forEach { job ->
@@ -200,7 +201,7 @@ internal fun ExecutionStatusCard(
                                 ) {
                                     Text(
                                         job.label,
-                                        style = DsType.small13,
+                                        style = DsType.small13.withReadingWeight(),
                                         color = colors.labelSecondary,
                                         modifier = Modifier.weight(1f),
                                         maxLines = 2,
@@ -208,7 +209,7 @@ internal fun ExecutionStatusCard(
                                     )
                                     Text(
                                         localJobStatusLabel(job.status),
-                                        style = DsType.caption11,
+                                        style = DsType.caption11.withReadingWeight(),
                                         color = colors.labelTertiary,
                                     )
                                     DsButton(
@@ -235,14 +236,14 @@ internal fun ExecutionStatusCard(
                                 ) {
                                         Text(
                                             stringResource(R.string.local_run_job_output),
-                                            style = DsType.caption11Strong,
+                                            style = DsType.caption11Strong.withReadingWeight(),
                                             color = colors.labelTertiary,
                                         )
                                         Text(
                                             expandedJobOutput.ifBlank {
                                                 stringResource(R.string.local_run_job_output_empty)
                                             },
-                                            style = DsType.caption11,
+                                            style = DsType.caption11.withReadingWeight(),
                                             color = colors.labelSecondary,
                                             maxLines = 12,
                                             overflow = TextOverflow.Ellipsis,
@@ -287,7 +288,7 @@ internal fun ExecutionStatusCard(
             if (state.queuedInputCount > 0) {
                 Text(
                     stringResource(R.string.local_queue_count, state.queuedInputCount),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelSecondary,
                 )
             }
@@ -302,22 +303,22 @@ internal fun ExecutionStatusCard(
                 visible = technicalDetailsExpanded,
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
-                    Text(resourceSummary, style = DsType.caption11, color = colors.labelSecondary)
-                    Text(pressureSummary, style = DsType.caption11, color = colors.labelSecondary)
-                    Text(contextSummary, style = DsType.caption11, color = colors.labelTertiary)
-                    Text(contextSourceSummary, style = DsType.caption11, color = colors.labelTertiary)
+                    Text(resourceSummary, style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                    Text(pressureSummary, style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                    Text(contextSummary, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
+                    Text(contextSourceSummary, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                     if (
                         state.conversationMode == LocalConversationMode.CONTINUATION &&
                         !state.handoffSummary.isNullOrBlank()
                     ) {
                         Text(
                             stringResource(R.string.local_context_handoff),
-                            style = DsType.caption11Strong,
+                            style = DsType.caption11Strong.withReadingWeight(),
                             color = colors.labelTertiary,
                         )
                         Text(
                             state.handoffSummary.orEmpty(),
-                            style = DsType.caption11,
+                            style = DsType.caption11.withReadingWeight(),
                             color = colors.labelSecondary,
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis,
