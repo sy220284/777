@@ -90,11 +90,11 @@ fun DsPill(
                     Modifier
                         .widthIn(min = DsSpacing.touchTarget)
                         .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        role = Role.Button,
-                        onClick = onClick,
-                    )
+                            interactionSource = interactionSource,
+                            indication = null,
+                            role = Role.Button,
+                            onClick = onClick,
+                        )
                 } else {
                     Modifier
                 },
