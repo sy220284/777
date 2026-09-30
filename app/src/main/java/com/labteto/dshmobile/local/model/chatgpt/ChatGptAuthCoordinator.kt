@@ -7,6 +7,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -25,6 +26,7 @@ class ChatGptAuthCoordinator @Inject constructor(
     private val verifier: ChatGptIdTokenVerifier,
 ) {
     private val random = SecureRandom()
+    private val authInProgress = AtomicBoolean(false)
     private val _state = MutableStateFlow(ChatGptUiState())
     val state: StateFlow<ChatGptUiState> = _state.asStateFlow()
 
@@ -66,14 +68,20 @@ class ChatGptAuthCoordinator @Inject constructor(
     }
 
     suspend fun connect(existingAccountId: String? = null): ChatGptAccountRecord {
-        val existing = existingAccountId?.let { accounts.get(it) }
-        return connectAttempt(
-            existingAccountId = existingAccountId,
-            existing = existing,
-            requestedClientId = existing?.clientId ?: CHATGPT_DYNAMIC_CLIENT_ID,
-            firstRegistration = existing == null,
-            allowInvalidGrantRetry = true,
-        )
+        check(authInProgress.compareAndSet(false, true)) { "ChatGPT 授权正在进行，请完成当前授权" }
+        try {
+            val existing = existingAccountId?.let { accounts.get(it) }
+            val pendingClientId = if (existing == null) hostIdentity.pendingClientId() else null
+            return connectAttempt(
+                existingAccountId = existingAccountId,
+                existing = existing,
+                requestedClientId = existing?.clientId ?: pendingClientId ?: CHATGPT_DYNAMIC_CLIENT_ID,
+                firstRegistration = existing == null && pendingClientId == null,
+                allowInvalidGrantRetry = true,
+            )
+        } finally {
+            authInProgress.set(false)
+        }
     }
 
     private suspend fun connectAttempt(
@@ -143,6 +151,7 @@ class ChatGptAuthCoordinator @Inject constructor(
                 callback.clientId == requestedClientId -> requestedClientId
                 else -> error("ChatGPT OAuth 返回了不匹配的 client_id")
             }
+            if (firstRegistration) hostIdentity.rememberPendingClientId(issuedClientId)
 
             _state.value = currentState(
                 phase = ChatGptAuthPhase.EXCHANGING_CODE,
@@ -212,6 +221,7 @@ class ChatGptAuthCoordinator @Inject constructor(
                 savedAtEpochSeconds = now,
             )
             accounts.put(record, select = true)
+            hostIdentity.clearPendingClientId(issuedClientId)
 
             _state.value = currentState(
                 phase = ChatGptAuthPhase.LOADING_MODELS,
