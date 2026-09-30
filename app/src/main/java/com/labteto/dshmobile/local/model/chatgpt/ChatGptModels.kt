@@ -95,6 +95,7 @@ internal const val CHATGPT_JWKS_URL = "https://auth.openai.com/.well-known/jwks.
 internal const val CHATGPT_OPENID_CONFIGURATION_URL = "https://auth.openai.com/.well-known/openid-configuration"
 internal const val CHATGPT_MODELS_URL = "https://api.openai.com/v1/models"
 internal const val CHATGPT_RESPONSES_URL = "https://api.openai.com/v1/responses"
+internal const val CHATGPT_USAGE_URL = "https://chatgpt.com/#settings/Usage"
 internal const val CHATGPT_DYNAMIC_CLIENT_ID = "dynamic_agent_client"
 internal const val CHATGPT_AGENT_NAME = "神言神语"
 internal const val CHATGPT_SCOPES = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct"
