@@ -90,24 +90,44 @@ The Engine has CI-enforced line, dependency and public-surface ratchets. New res
 
 ### Model accounts and transport
 
-本机模型层把“账户凭据”和“模型协议”分开处理：
+本机模型运行时把账户、路由、通用语义和供应商线协议拆成独立边界：
 
 ```text
-Chat / Work / Agent
-        │
-        ▼
-LocalModelGateway
-   ├─ LocalModelCredentialResolver
-   │    ├─ API Key
-   │    └─ ChatGPT OAuth plan
-   └─ transport
-        ├─ Chat Completions
-        └─ OpenAI Responses
+Chat / Work / Agent / Automation / Vision
+                  │
+                  ▼
+          LocalModelGateway
+                  │
+        resolve once per run/request
+                  ▼
+        LocalResolvedModelRoute
+      ├─ profile / auth identity
+      ├─ provider / model / baseUrl
+      ├─ protocol / capabilities
+      └─ replay route fingerprint
+                  │
+                  ▼
+       Canonical model vocabulary
+      ├─ message/content/reasoning
+      ├─ tool definition/call/result
+      └─ provider-neutral replay envelope
+                  │
+                  ▼
+       LocalModelAdapterRegistry
+      ├─ OpenAI-compatible Chat Completions
+      ├─ OpenAI Responses
+      └─ Anthropic Messages
 ```
 
 API Key 档案继续兼容既有 `model + baseUrl` 标识；ChatGPT 套餐档案额外绑定认证类型和账户身份，避免同一 OpenAI 模型在 API Key 与套餐登录之间覆盖凭据。ChatGPT 登录后的模型目录以 OpenAI 返回的可见模型为准，不把套餐模型永久写死在客户端预设中。
 
-ChatGPT 套餐请求通过 Responses API，客户端保留完整 continuation items，因为套餐共享请求使用 `store=false`。系统提示转换为 Responses `instructions`，工具调用转换回本机 `LocalToolCall`，因此上层 Agent loop 不依赖具体传输协议。
+模型调用开始后，前台 Agent、子代理及其工具通过 `LocalModelRunContext` 继承冻结的 profile；Vision 优先读取同一运行上下文，禁止在一个已启动 Run 内重新查询可变 active profile。普通设置页连通测试等非 Run 操作才按显式 profile 或当前活动档案解析。
+
+上层 Agent、历史压缩和恢复逻辑依赖 Canonical 消息/工具语义，不把供应商私有字段作为控制协议。供应商继续执行请求所需的私有状态存放在 `LocalModelReplayEnvelope`；它绑定 adapter、认证类型、profile、base URL 和 model 的路由指纹。同一路由可无损重放 Responses continuation、Anthropic thinking/signature 等状态；模型、协议、地址或账户变化时自动丢弃私有 replay，只保留通用文本和工具语义。
+
+ChatGPT 套餐始终使用 OpenAI Responses；普通 Responses API Key 保持自己的 base URL。DeepSeek、MiniMax、Kimi、GLM、Gemini OpenAI-compatible 与 Qwen 继续走既有 Chat Completions 客户端，不因新增协议改变 payload、reasoning、工具调用或流式语义。官方 Claude 档案使用 Anthropic Messages，旧官方 Claude 档案在加载时迁移；自定义兼容代理不会被强制改协议。
+
+Responses、Chat Completions 与 Anthropic 的工具 schema、流事件、错误、取消和 provider-private replay 都封装在各自 Adapter/Client 内。ChatGPT 套餐的 SIWC 限制仍只作用于 OpenAI Responses Adapter，不传播到其他供应商。
 
 ### Send path
 
