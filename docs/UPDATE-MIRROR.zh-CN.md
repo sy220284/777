@@ -164,3 +164,5 @@ Gitee 对较大的 Release 附件偶尔会出现“文件已经接收，但 API 
 5. 更新下载地址来自 `gitee.com`。
 6. APK 仍通过摘要、包名、签名证书和版本号校验。
 7. 临时让 Gitee 请求失败时，客户端仍能进入 GitHub 回退链。
+
+<!-- current-main-validation -->
