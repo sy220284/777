@@ -1,8 +1,8 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.DeepSeekClient
+import com.labteto.dshmobile.local.model.LocalModelGateway
+
 import com.labteto.dshmobile.local.DeepSeekUsageTracker
-import com.labteto.dshmobile.local.LocalApiKeyStore
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
@@ -42,8 +42,7 @@ data class PersonaInspectionResult(
  */
 @Singleton
 class PersonaInspectionService @Inject constructor(
-    private val apiKeys: LocalApiKeyStore,
-    private val modelClient: DeepSeekClient,
+    private val modelGateway: LocalModelGateway,
     private val usageTracker: DeepSeekUsageTracker,
     private val json: Json,
 ) {
@@ -53,8 +52,6 @@ class PersonaInspectionService @Inject constructor(
         persona: PersonaProfile,
         messages: List<LocalHarnessMessage>,
     ): PersonaInspectionResult {
-        val apiKey = apiKeys.get()?.trim()?.takeIf(String::isNotEmpty)
-            ?: error("请先在模型设置里配置密钥")
         val dialogue = messages
             .filter { it.role == "user" || it.role == "assistant" }
             .takeLast(MAX_CONTEXT_MESSAGES)
@@ -92,8 +89,7 @@ class PersonaInspectionService @Inject constructor(
             append(dialogue)
         }
 
-        val reply = modelClient.complete(
-            apiKey = apiKey,
+        val reply = modelGateway.complete(
             baseUrl = baseUrl,
             model = model,
             messages = listOf(
