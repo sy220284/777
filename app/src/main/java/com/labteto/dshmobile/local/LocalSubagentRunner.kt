@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
 import com.labteto.dshmobile.harness.agent.*
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
@@ -26,8 +27,8 @@ internal fun inheritedHistoryBeforeToolCall(
     if (parentCallId.isNullOrBlank()) return history.toMutableList()
     val boundary = history.indexOfLast { message ->
         message["role"]?.jsonPrimitive?.contentOrNull == "assistant" &&
-            message["tool_calls"]?.jsonArray.orEmpty().any { element ->
-                element.jsonObject["id"]?.jsonPrimitive?.contentOrNull == parentCallId
+            LocalCanonicalModelCodec.canonicalToolCalls(message).any { call ->
+                call.id == parentCallId
             }
     }
     return if (boundary >= 0) history.take(boundary).toMutableList() else history.toMutableList()
