@@ -1707,7 +1707,7 @@ class LocalHarnessEngine @Inject constructor(
                     ),
                 )
             }
-            transcriptRuntime.applyMessages(transcript, event.sequence, clearStreamingPreview = true)
+            transcriptRuntime.applyMessages(transcript, event.sequence)
             checkpointModelHistory("work/regenerated")
             persist()
         } catch (cancelled: CancellationException) {
@@ -2062,7 +2062,6 @@ class LocalHarnessEngine @Inject constructor(
         transcriptRuntime.applyMessages(
             listOf(proactiveMessage),
             assistantEventSequence,
-            clearStreamingPreview = true,
         )
         _state.update { current ->
             if (current.sessionId != session.id) {
@@ -2871,7 +2870,6 @@ class LocalHarnessEngine @Inject constructor(
             transcriptRuntime.applyMessages(
                 transcriptMessages,
                 assistantEvent.sequence,
-                clearStreamingPreview = true,
             )
             val assistantTranscript = transcriptMessages.lastOrNull()
             if (
@@ -3350,7 +3348,7 @@ class LocalHarnessEngine @Inject constructor(
                         }
                         runHistory.append(reply.message)
                         updateContextMetrics(binding)
-                        runTranscript.applyMessages(transcriptMessages, assistantEvent.sequence, clearStreamingPreview = true)
+                        runTranscript.applyMessages(transcriptMessages, assistantEvent.sequence)
                         if (
                             beforeAssistant.usageMode == LocalUsageMode.CHAT &&
                             !beforeAssistant.groupChat.enabled &&
