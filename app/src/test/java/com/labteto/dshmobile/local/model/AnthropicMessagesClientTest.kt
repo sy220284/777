@@ -92,7 +92,7 @@ class AnthropicMessagesClientTest {
 
         val changedRoute = route(model = "claude-opus-5-5")
         val changed = client.buildPayload(changedRoute, listOf(message), emptyList(), null)
-            ["messages"]!!.jsonArray.single().jsonObject["content"]!!.jsonArray
+            .getValue("messages").jsonArray.single().jsonObject.getValue("content").jsonArray
         assertFalse(changed.any {
             it.jsonObject["type"]?.jsonPrimitive?.content == "thinking"
         })
