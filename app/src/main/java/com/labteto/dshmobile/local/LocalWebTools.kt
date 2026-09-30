@@ -10,6 +10,15 @@ internal class LocalWebTools(
     private val workspace: LocalWorkspace,
     private val json: Json,
 ) {
+    suspend fun search(
+        queries: List<String>,
+        usageContext: TokenUsageContext? = null,
+    ): String {
+        val key = searchKeyProvider()
+            ?: error("网页搜索需要单独配置 DeepSeek 官方 API Key")
+        return web.search(key, queries, usageContext)
+    }
+
     suspend fun fetch(
         input: String,
         maxBytes: Int,
