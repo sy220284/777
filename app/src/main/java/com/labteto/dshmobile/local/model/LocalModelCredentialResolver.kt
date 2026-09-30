@@ -7,6 +7,8 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountStore
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptSessionManager
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 data class LocalResolvedCredential(
     val bearerToken: String,
@@ -19,16 +21,18 @@ class LocalModelCredentialResolver @Inject constructor(
     private val chatGptAccounts: ChatGptAccountStore,
     private val chatGptSessions: ChatGptSessionManager,
 ) {
-    @Volatile private var activeProfile: LocalModelProfile? = null
+    private val _activeProfile = MutableStateFlow<LocalModelProfile?>(null)
+    val activeProfile = _activeProfile.asStateFlow()
 
     fun activate(profile: LocalModelProfile) {
-        activeProfile = profile
+        _activeProfile.value = profile
         if (profile.authKind == LocalModelAuthKind.API_KEY) {
             apiKeys.activate(profile.id)
         }
     }
 
-    fun active(): LocalModelProfile? = activeProfile
+    fun clearActive() { _activeProfile.value = null }
+    fun active(): LocalModelProfile? = _activeProfile.value
 
     suspend fun hasCredential(profile: LocalModelProfile): Boolean =
         when (profile.authKind) {
@@ -40,13 +44,13 @@ class LocalModelCredentialResolver @Inject constructor(
     suspend fun resolve(
         model: String,
         baseUrl: String,
-        profile: LocalModelProfile? = activeProfile,
+        profile: LocalModelProfile? = active(),
         provisionalApiKey: String? = null,
     ): LocalResolvedCredential {
         provisionalApiKey?.trim()?.takeIf(String::isNotEmpty)?.let {
             return LocalResolvedCredential(it, LocalModelAuthKind.API_KEY)
         }
-        val selected = profile ?: activeProfile ?: error("本机模型尚未配置凭据")
+        val selected = profile ?: active() ?: error("本机模型尚未配置凭据")
         require(
             selected.model == model &&
                 selected.baseUrl.trimEnd('/') == baseUrl.trimEnd('/'),
