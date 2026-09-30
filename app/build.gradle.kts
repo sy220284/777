@@ -1,5 +1,3 @@
-import java.net.URI
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -17,39 +15,6 @@ plugins {
  * fallback is what a local `assembleRelease` builds.
  */
 val dshVersionName: String = System.getenv("DSH_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: rootProject.file(".github/release-version").readText().trim()
-
-val dshUpdateMirrorBaseUrl: String = System.getenv("DSH_UPDATE_MIRROR_BASE_URL")
-    ?.trim()
-    ?.takeIf { it.isNotEmpty() }
-    ?.trimEnd('/')
-    ?.plus("/")
-    .orEmpty()
-
-if (dshUpdateMirrorBaseUrl.isNotEmpty()) {
-    val mirrorUri = runCatching { URI(dshUpdateMirrorBaseUrl) }.getOrNull()
-    val mirrorPath = mirrorUri?.path
-        ?.trim('/')
-        ?.split('/')
-        ?.filter(String::isNotEmpty)
-        .orEmpty()
-    require(
-        mirrorUri != null &&
-            mirrorUri.scheme.equals("https", ignoreCase = true) &&
-            mirrorUri.host.equals("gitee.com", ignoreCase = true) &&
-            mirrorUri.port in listOf(-1, 443) &&
-            mirrorUri.rawQuery == null &&
-            mirrorUri.rawFragment == null &&
-            mirrorUri.userInfo == null &&
-            mirrorPath.size == 2 &&
-            mirrorPath.all { it.matches(Regex("[A-Za-z0-9._-]+")) }
-    ) {
-        "DSH_UPDATE_MIRROR_BASE_URL 必须是 https://gitee.com/<owner>/<repo>/"
-    }
-}
-
-val escapedUpdateMirrorBaseUrl = dshUpdateMirrorBaseUrl
-    .replace("\\", "\\\\")
-    .replace("\"", "\\\"")
 
 val dshForkRevision: Int = dshVersionName
     .substringAfter('-', "")
@@ -193,11 +158,6 @@ android {
         targetSdk = 36
         versionCode = dshVersionCode
         versionName = dshVersionName
-        buildConfigField(
-            "String",
-            "UPDATE_MIRROR_BASE_URL",
-            "\"" + escapedUpdateMirrorBaseUrl + "\"",
-        )
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters.addAll(bundledRuntimeAbis) }
         vectorDrawables { useSupportLibrary = true }
