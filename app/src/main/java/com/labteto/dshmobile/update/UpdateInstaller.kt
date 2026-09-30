@@ -36,8 +36,8 @@ class UpdateInstaller @Inject constructor(
     @ApplicationContext private val context: Context,
     client: OkHttpClient,
 ) {
-    // Update payloads can come from the mainland mirror or GitHub and are large. Keep them off
-    // HTTP/2 so a broken mobile/proxy stream does not surface as stream was reset:CANCEL, and allow
+    // Update payloads can come from Gitee or GitHub and are large. Keep them off HTTP/2 so a
+    // broken mobile/proxy stream does not surface as stream was reset:CANCEL, and allow
     // a longer idle period on mobile networks.
     private val downloadClient = client.newBuilder()
         .connectTimeout(15, TimeUnit.SECONDS)
