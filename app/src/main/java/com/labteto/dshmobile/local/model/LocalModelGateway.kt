@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.LocalModelToolCallingMode
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -43,7 +44,7 @@ class LocalModelGateway @Inject constructor(
         messages: List<JsonObject>,
         tools: JsonArray,
         temperature: Double? = null,
-        profile: LocalModelProfile? = credentials.active(),
+        profile: LocalModelProfile? = null,
     ): LocalModelReply =
         completeResolved(
             route = resolveRoute(model, baseUrl, profile),
@@ -61,7 +62,7 @@ class LocalModelGateway @Inject constructor(
         tools: JsonArray,
         temperature: Double? = null,
         onDelta: (LocalModelDelta) -> Unit = {},
-        profile: LocalModelProfile? = credentials.active(),
+        profile: LocalModelProfile? = null,
     ): LocalModelReply =
         completeResolved(
             route = resolveRoute(model, baseUrl, profile),
@@ -113,16 +114,19 @@ class LocalModelGateway @Inject constructor(
         baseUrl: String,
         profile: LocalModelProfile?,
     ): LocalResolvedModelRoute {
-        val resolved = credentials.resolve(model, baseUrl, profile)
+        val effectiveProfile = profile
+            ?: currentCoroutineContext()[LocalModelRunContext]?.profile
+            ?: credentials.active()
+        val resolved = credentials.resolve(model, baseUrl, effectiveProfile)
         val preset = LocalModelPresets.find(model, baseUrl)
         val protocol = when (resolved.authKind) {
             LocalModelAuthKind.CHATGPT_PLAN -> LocalModelProtocol.RESPONSES
             LocalModelAuthKind.API_KEY ->
-                profile?.protocol ?: preset?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS
+                effectiveProfile?.protocol ?: preset?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS
         }
         return LocalResolvedModelRoute(
-            profileId = profile?.id,
-            provider = profile?.provider?.takeIf(String::isNotBlank) ?: preset?.provider.orEmpty(),
+            profileId = effectiveProfile?.id,
+            provider = effectiveProfile?.provider?.takeIf(String::isNotBlank) ?: preset?.provider.orEmpty(),
             model = model,
             baseUrl = baseUrl,
             authKind = resolved.authKind,
