@@ -761,6 +761,52 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun namespaceFunctionCallKeepsNamespaceAcrossContinuation() {
+        val response = Json.parseToJsonElement("""{
+            "id":"resp-namespace-call",
+            "output":[
+                {
+                    "type":"function_call",
+                    "id":"fc-1",
+                    "call_id":"call-1",
+                    "name":"read",
+                    "namespace":"local",
+                    "arguments":"{\"path\":\"a.txt\"}"
+                }
+            ]
+        }""").jsonObject
+        val reply = client.parseCompleted(
+            response = response,
+            promptBreakdown = TokenPromptBreakdown(),
+        )
+        assertEquals(1, reply.toolCalls.size)
+        assertEquals("read", reply.toolCalls.single().name)
+        assertEquals("call-1", reply.toolCalls.single().id)
+
+        val rawCall = reply.message[OpenAiResponsesClient.RESPONSES_OUTPUT_KEY]!!
+            .jsonArray.single().jsonObject
+        assertEquals("local", rawCall["namespace"]?.jsonPrimitive?.content)
+
+        val toolOutput = buildJsonObject {
+            put("role", "tool")
+            put("tool_call_id", "call-1")
+            put("content", "ok")
+        }
+        val nextInput = client.buildPayload(
+            model = "gpt-test",
+            messages = listOf(reply.message, toolOutput),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = true,
+        )["input"]!!.jsonArray
+
+        assertEquals("function_call", nextInput[0].jsonObject["type"]?.jsonPrimitive?.content)
+        assertEquals("local", nextInput[0].jsonObject["namespace"]?.jsonPrimitive?.content)
+        assertEquals("function_call_output", nextInput[1].jsonObject["type"]?.jsonPrimitive?.content)
+        assertEquals("call-1", nextInput[1].jsonObject["call_id"]?.jsonPrimitive?.content)
+    }
+
+    @Test
     fun apiKeyResponsesKeepsFlatFunctionTools() {
         val tools = JsonArray(
             listOf(
