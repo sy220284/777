@@ -85,7 +85,7 @@ class VisionClient @Inject constructor(
 
         val gateway = runCatching { modelGateway.get() }.getOrNull()
         val activeProfile = gateway?.activeProfile()
-        if (activeProfile?.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
+        if (activeProfile?.usesResponsesTransport() == true) {
             val messages = buildPayload(model, prompt, imageDataUrl)["messages"]
                 ?.jsonArray
                 ?.map { it.jsonObject }
