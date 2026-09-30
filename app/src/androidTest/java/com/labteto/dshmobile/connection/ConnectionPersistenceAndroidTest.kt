@@ -82,6 +82,28 @@ class ConnectionPersistenceAndroidTest {
     }
 
     @Test
+    fun appearanceReadingPreferencesDefaultClampAndPersist() = withStore { dataStore, _ ->
+        val store = HostsStore(dataStore, RelayCredentialStore(dataStore), context)
+        val defaults = store.settingsOnce()
+        assertEquals(1.0f, defaults.textScale)
+        assertEquals(0, defaults.textWeightAdjustment)
+        assertEquals(0.5f, defaults.wallpaperSurfaceTransparency)
+
+        store.setSetting {
+            it.copy(
+                textScale = 1.2f,
+                textWeightAdjustment = 2,
+                wallpaperSurfaceTransparency = 0.8f,
+            )
+        }
+
+        val saved = store.settingsOnce()
+        assertEquals(1.2f, saved.textScale)
+        assertEquals(2, saved.textWeightAdjustment)
+        assertEquals(0.8f, saved.wallpaperSurfaceTransparency)
+    }
+
+    @Test
     fun repairingWithoutANewPinClearsTheOldFingerprint() = withStore { dataStore, _ ->
         val store = HostsStore(dataStore, RelayCredentialStore(dataStore), context)
         store.rememberHost(
