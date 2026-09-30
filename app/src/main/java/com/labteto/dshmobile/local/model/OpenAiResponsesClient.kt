@@ -104,73 +104,73 @@ class OpenAiResponsesClient @Inject constructor(
                 // 否则成功终态后的 reader.close() 异常仍可能把成功请求翻成失败。
                 val reader = responseBody.charStream().buffered()
                 while (true) {
-                        val line = reader.readLine() ?: break
-                        totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
-                        if (totalBytes > MAX_STREAM_BYTES) {
+                    val line = reader.readLine() ?: break
+                    totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
+                    if (totalBytes > MAX_STREAM_BYTES) {
+                        throw LocalModelException(
+                            code = "MODEL_RESPONSE_TOO_LARGE",
+                            message = "Responses API 流式响应超过本机安全上限",
+                            retryable = false,
+                        )
+                    }
+                    if (!line.startsWith("data:")) continue
+                    val data = line.removePrefix("data:").trim()
+                    if (data.isBlank() || data == "[DONE]") continue
+                    val event = runCatching { json.parseToJsonElement(data).jsonObject }
+                        .getOrElse { cause ->
                             throw LocalModelException(
-                                code = "MODEL_RESPONSE_TOO_LARGE",
-                                message = "Responses API 流式响应超过本机安全上限",
-                                retryable = false,
+                                code = "RESPONSES_PROTOCOL_ERROR",
+                                message = "Responses API 返回了无法解析的数据帧",
+                                retryable = true,
+                                cause = cause,
                             )
                         }
-                        if (!line.startsWith("data:")) continue
-                        val data = line.removePrefix("data:").trim()
-                        if (data.isBlank() || data == "[DONE]") continue
-                        val event = runCatching { json.parseToJsonElement(data).jsonObject }
-                            .getOrElse { cause ->
-                                throw LocalModelException(
-                                    code = "RESPONSES_PROTOCOL_ERROR",
-                                    message = "Responses API 返回了无法解析的数据帧",
-                                    retryable = true,
-                                    cause = cause,
-                                )
-                            }
-                        when (event["type"]?.jsonPrimitive?.contentOrNull) {
-                            "response.output_text.delta" -> {
-                                event["delta"]?.jsonPrimitive?.contentOrNull
-                                    ?.takeIf(String::isNotEmpty)
-                                    ?.let { delta ->
-                                        streamedContent.append(delta)
-                                        onDelta(LocalModelDelta(content = delta))
-                                    }
-                            }
-                            "response.reasoning_text.delta",
-                            "response.reasoning_summary_text.delta" -> {
-                                event["delta"]?.jsonPrimitive?.contentOrNull
-                                    ?.takeIf(String::isNotEmpty)
-                                    ?.let { delta ->
-                                        streamedReasoning.append(delta)
-                                        onDelta(LocalModelDelta(reasoning = delta))
-                                    }
-                            }
-                            "response.refusal.delta" -> {
-                                event["delta"]?.jsonPrimitive?.contentOrNull
-                                    ?.takeIf(String::isNotEmpty)
-                                    ?.let { delta ->
-                                        streamedContent.append(delta)
-                                        onDelta(LocalModelDelta(content = delta))
-                                    }
-                            }
-                            "error" -> throw streamError(event, planSharing, requestId, retryAfterMs)
-                            "response.failed" -> throw responseFailure(
-                                event = event,
-                                planSharing = planSharing,
-                                requestId = requestId,
-                                retryAfterMs = retryAfterMs,
-                            )
-                            "response.incomplete" -> throw LocalModelException(
-                                code = "RESPONSES_INCOMPLETE",
-                                message = incompleteReason(event),
-                                retryable = false,
-                            )
-                            "response.completed" -> {
-                                completedResponse = event["response"] as? JsonObject
-                                    ?: throw responseProtocolError("completed 事件缺少 response")
-                                // completed 是成功终态；不要再读取 EOF，避免终态后的连接收尾异常触发整轮重试。
-                                break
-                            }
+                    when (event["type"]?.jsonPrimitive?.contentOrNull) {
+                        "response.output_text.delta" -> {
+                            event["delta"]?.jsonPrimitive?.contentOrNull
+                                ?.takeIf(String::isNotEmpty)
+                                ?.let { delta ->
+                                    streamedContent.append(delta)
+                                    onDelta(LocalModelDelta(content = delta))
+                                }
+                        }
+                        "response.reasoning_text.delta",
+                        "response.reasoning_summary_text.delta" -> {
+                            event["delta"]?.jsonPrimitive?.contentOrNull
+                                ?.takeIf(String::isNotEmpty)
+                                ?.let { delta ->
+                                    streamedReasoning.append(delta)
+                                    onDelta(LocalModelDelta(reasoning = delta))
+                                }
+                        }
+                        "response.refusal.delta" -> {
+                            event["delta"]?.jsonPrimitive?.contentOrNull
+                                ?.takeIf(String::isNotEmpty)
+                                ?.let { delta ->
+                                    streamedContent.append(delta)
+                                    onDelta(LocalModelDelta(content = delta))
+                                }
+                        }
+                        "error" -> throw streamError(event, planSharing, requestId, retryAfterMs)
+                        "response.failed" -> throw responseFailure(
+                            event = event,
+                            planSharing = planSharing,
+                            requestId = requestId,
+                            retryAfterMs = retryAfterMs,
+                        )
+                        "response.incomplete" -> throw LocalModelException(
+                            code = "RESPONSES_INCOMPLETE",
+                            message = incompleteReason(event),
+                            retryable = false,
+                        )
+                        "response.completed" -> {
+                            completedResponse = event["response"] as? JsonObject
+                                ?: throw responseProtocolError("completed 事件缺少 response")
+                            // completed 是成功终态；不要再读取 EOF，避免终态后的连接收尾异常触发整轮重试。
+                            break
                         }
                     }
+                }
                 val completed = completedResponse ?: throw LocalModelException(
                     code = "RESPONSES_STREAM_INCOMPLETE",
                     message = "Responses API 流在 response.completed 前结束",
