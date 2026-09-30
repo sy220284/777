@@ -49,7 +49,7 @@ internal fun LocalUsageModePill(
     )
 
     Surface(
-        modifier = Modifier.fillMaxWidth().widthIn(max = 264.dp).height(52.dp),
+        modifier = Modifier.fillMaxWidth().widthIn(max = 264.dp).height(56.dp),
         shape = DsShapes.pillFull,
         color = containerColor,
         border = BorderStroke(1.dp, colors.borderL2),
@@ -67,7 +67,7 @@ internal fun LocalUsageModePill(
                 modifier = Modifier
                     .offset(x = indicatorOffset)
                     .width(segmentWidth)
-                    .height(44.dp),
+                    .height(48.dp),
                 shape = DsShapes.pillFull,
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP, colors.bgLayer1),
                 border = BorderStroke(1.dp, colors.borderL1),
@@ -84,7 +84,7 @@ internal fun LocalUsageModePill(
                     Box(
                         modifier = Modifier
                             .width(segmentWidth)
-                            .height(44.dp)
+                            .height(48.dp)
                             .clip(DsShapes.pillFull)
                             .selectable(
                                 selected = selected == mode,
