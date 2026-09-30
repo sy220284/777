@@ -67,6 +67,42 @@ class ChatGptSessionManager @Inject constructor(
         return requestToken(form)
     }
 
+    suspend fun revoke(accountId: String) {
+        val current = accounts.get(accountId) ?: return
+        if (current.refreshToken.isBlank()) return
+        val revocationEndpoint = withContext(Dispatchers.IO) {
+            val discovery = Request.Builder()
+                .url(CHATGPT_OPENID_CONFIGURATION_URL)
+                .get()
+                .build()
+            runInterruptible { http.newCall(discovery).execute() }.use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val body = response.body?.string().orEmpty()
+                runCatching {
+                    json.parseToJsonElement(body).jsonObject["revocation_endpoint"]
+                        ?.jsonPrimitive?.contentOrNull
+                }.getOrNull()
+            }
+        } ?: return
+        withContext(Dispatchers.IO) {
+            val form = FormBody.Builder()
+                .add("token", current.refreshToken)
+                .add("token_type_hint", "refresh_token")
+                .add("client_id", current.clientId)
+                .build()
+            val request = Request.Builder()
+                .url(revocationEndpoint)
+                .post(form)
+                .header("Accept", "application/json")
+                .build()
+            runInterruptible { http.newCall(request).execute() }.use { response ->
+                if (!response.isSuccessful) {
+                    throw IOException("撤销 ChatGPT renewable session 失败（HTTP ${response.code}）")
+                }
+            }
+        }
+    }
+
     suspend fun listModels(accountId: String): List<ChatGptModelOption> = withContext(Dispatchers.IO) {
         val token = accessToken(accountId)
         val request = Request.Builder()
