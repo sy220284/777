@@ -85,6 +85,7 @@ import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelCredentialResolver
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
@@ -783,6 +784,49 @@ class LocalHarnessEngine @Inject constructor(
             )
         }
     }
+    internal suspend fun syncChatGptModels(
+        accountId: String,
+        models: List<ChatGptModelOption>,
+        selectFirst: Boolean = true,
+    ) {
+        require(!isRunBusy()) { "请先结束当前任务再切换模型账户" }
+        val profiles = modelConfiguration.saveChatGptModels(accountId, models)
+        val chatGptProfiles = profiles.filter {
+            it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
+        }
+        val selected = if (selectFirst) chatGptProfiles.firstOrNull() else null
+        val result = selected?.let { modelConfiguration.select(it.id, profiles) }
+        _state.update { current ->
+            current.copy(
+                configured = result?.configured ?: current.configured,
+                model = result?.model ?: current.model,
+                baseUrl = result?.baseUrl ?: current.baseUrl,
+                configuredModels = profiles.map(LocalModelProfile::model).distinct().sorted(),
+                modelProfiles = profiles,
+                error = if (models.isEmpty()) "当前 ChatGPT 账户没有可用于套餐共享的模型" else null,
+            )
+        }
+    }
+
+    internal suspend fun removeChatGptAccountProfiles(accountId: String) {
+        require(!isRunBusy()) { "请先结束当前任务再断开模型账户" }
+        val result = modelConfiguration.removeChatGptAccount(accountId) ?: return
+        val profiles = result.profiles
+        val active = modelConfiguration.activeProfile(result.model, result.baseUrl, profiles)
+        val configured = active != null && modelCredentials.hasCredential(active)
+        active?.takeIf { configured }?.let(modelCredentials::activate)
+        _state.update { current ->
+            current.copy(
+                configured = configured,
+                model = result.model,
+                baseUrl = result.baseUrl,
+                configuredModels = result.configuredModels,
+                modelProfiles = profiles,
+                error = null,
+            )
+        }
+    }
+
     /** Switch the active route and its corresponding encrypted key together. */
     internal fun selectModel(id: String) {
         scope.launch {
