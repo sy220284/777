@@ -53,10 +53,11 @@ class OpenAiResponsesClient @Inject constructor(
         messages: List<JsonObject>,
         tools: JsonArray,
         temperature: Double? = null,
+        planSharing: Boolean,
         onDelta: (LocalModelDelta) -> Unit = {},
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
-        val payload = buildPayload(model, messages, tools, temperature)
+        val payload = buildPayload(model, messages, tools, temperature, planSharing)
         val request = Request.Builder()
             .url(CHATGPT_RESPONSES_URL)
             .header("Authorization", "Bearer $accessToken")
@@ -67,7 +68,7 @@ class OpenAiResponsesClient @Inject constructor(
             runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
                 if (!response.isSuccessful) {
                     val body = response.body?.string().orEmpty().take(ERROR_BODY_LIMIT)
-                    throw httpError(response.code, body)
+                    throw httpError(response.code, body, planSharing)
                 }
                 val responseBody = response.body ?: throw LocalModelException(
                     code = "RESPONSES_STREAM_INCOMPLETE",
@@ -153,7 +154,8 @@ class OpenAiResponsesClient @Inject constructor(
         model: String,
         messages: List<JsonObject>,
         tools: JsonArray,
-        @Suppress("UNUSED_PARAMETER") temperature: Double?,
+        temperature: Double?,
+        planSharing: Boolean = true,
     ): JsonObject = buildJsonObject {
         put("model", model)
         responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
@@ -162,8 +164,8 @@ class OpenAiResponsesClient @Inject constructor(
         put("stream", true)
         put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
         if (tools.isNotEmpty()) put("tools", responseTools(tools))
-        // ChatGPT plan sharing currently rejects temperature/top_p and other sampling controls.
-        // Keep the parameter on the gateway contract for API-key transports, but never forward it here.
+        if (!planSharing) temperature?.let { put("temperature", it) }
+        // ChatGPT plan sharing rejects sampling controls; API-key Responses keeps its own contract.
     }
 
     private fun responseInstructions(messages: List<JsonObject>): String =
@@ -377,7 +379,7 @@ class OpenAiResponsesClient @Inject constructor(
         return if (reason.isNullOrBlank()) "Responses API 未完整完成本次请求" else "Responses API 未完整完成：$reason"
     }
 
-    private fun httpError(status: Int, body: String): LocalModelException {
+    private fun httpError(status: Int, body: String, planSharing: Boolean): LocalModelException {
         val parsed = runCatching {
             val error = json.parseToJsonElement(body).jsonObject["error"] as? JsonObject
             error?.get("code")?.jsonPrimitive?.contentOrNull to
@@ -386,17 +388,17 @@ class OpenAiResponsesClient @Inject constructor(
         val remoteCode = parsed?.first
         val detail = parsed?.second
         return when {
-            remoteCode == "subscription_sharing_usage_limit_exceeded" -> LocalModelException(
+            planSharing && remoteCode == "subscription_sharing_usage_limit_exceeded" -> LocalModelException(
                 "CHATGPT_PLAN_LIMIT_REACHED",
                 "ChatGPT 套餐用量已达到当前上限，请在 ChatGPT 中管理应用用量。",
                 false,
             )
-            remoteCode == "subscription_sharing_usage_unavailable" -> LocalModelException(
+            planSharing && remoteCode == "subscription_sharing_usage_unavailable" -> LocalModelException(
                 "CHATGPT_PLAN_USAGE_UNAVAILABLE",
                 "ChatGPT 套餐用量当前不可用，请检查账户权限或稍后重试。",
                 false,
             )
-            status == 401 || status == 403 -> LocalModelException(
+            planSharing && (status == 401 || status == 403) -> LocalModelException(
                 "CHATGPT_AUTH_REVOKED",
                 "ChatGPT 套餐授权已失效，请在设置中重新连接账户。",
                 false,
