@@ -855,7 +855,6 @@ class LocalHarnessEngine @Inject constructor(
     internal suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): String =
         modelConfiguration.test(apiKey, model, baseUrl, protocol)
 
-
     /** Choose how user image attachments reach the local model. */
     internal fun configureImageInputMode(mode: LocalImageInputMode) =
         settingsCoordinator.configureImageInputMode(mode)

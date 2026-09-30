@@ -119,8 +119,11 @@ class ChatGptAuthCoordinator @Inject constructor(
         )
         val listener = callbackServer.open()
         activeListener = listener
-        if (cancellationRequested) listener.close()
         try {
+            if (cancellationRequested) {
+                listener.close()
+                throw CancellationException("ChatGPT 授权已取消")
+            }
             val builder = CHATGPT_AUTHORIZE_URL.toHttpUrl().newBuilder()
                 .addQueryParameter("client_id", requestedClientId)
                 .addQueryParameter("ext_agent_host_id", hostId)
@@ -255,6 +258,7 @@ class ChatGptAuthCoordinator @Inject constructor(
             )
             return record
         } catch (cancelled: CancellationException) {
+            if (cancellationRequested) restoreAfterCancelledAuthorization()
             throw cancelled
         } catch (error: Throwable) {
             if (cancellationRequested) {

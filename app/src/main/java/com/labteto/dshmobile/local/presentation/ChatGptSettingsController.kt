@@ -30,7 +30,15 @@ internal class ChatGptSettingsController(
     }
 
     suspend fun cancelAuthorization() = auth.cancelPendingAuthorization()
-    suspend fun test(id: String): String = testAccount(id)
+
+    suspend fun test(id: String): String {
+        val result = testAccount(id)
+        if (state.value.selectedAccountId == id) {
+            auth.refresh()
+            syncSelectedIfConnected()
+        }
+        return result
+    }
 
     suspend fun select(id: String) {
         auth.selectAccount(id)
