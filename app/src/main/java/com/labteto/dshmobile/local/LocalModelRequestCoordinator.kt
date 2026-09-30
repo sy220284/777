@@ -166,65 +166,69 @@ internal class LocalModelRequestCoordinator(
             try {
                 return try {
                     executor.execute {
-                    val streamPreview = LocalStreamPreview(
-                        maxChars = maxStreamPreviewChars,
-                        minIntervalMs = streamPreviewIntervalMs,
-                        clockMs = { System.nanoTime() / 1_000_000 },
-                        publish = { preview ->
-                            previewOwner
-                                ?.takeIf { previewGuard() }
-                                ?.let { streamingPreviewStore.publishAssistant(it, preview) }
-                        },
-                    )
-                    val reasoningPreview = LocalStreamPreview(
-                        maxChars = maxStreamPreviewChars,
-                        minIntervalMs = streamPreviewIntervalMs,
-                        clockMs = { System.nanoTime() / 1_000_000 },
-                        publish = { preview ->
-                            previewOwner
-                                ?.takeIf { previewGuard() }
-                                ?.let { streamingPreviewStore.publishReasoning(it, preview) }
-                        },
-                    )
-                    val streamFilter = streamFilterPhrases
-                        .takeIf { it.isNotEmpty() }
-                        ?.let(::ChatStreamFilter)
-                    resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                        val reply = try {
-                            modelGateway.completeStreaming(
-                                baseUrl = snapshot.baseUrl,
-                                model = snapshot.model,
-                                messages = activeMessages,
-                                tools = tools,
-                                temperature = temperature,
-                                onDelta = { delta ->
-                                    val visible = streamFilter?.append(delta.content)?.text ?: delta.content
-                                    streamPreview.append(visible)
-                                    reasoningPreview.append(delta.reasoning)
-                                },
-                            )
-                        } catch (error: LocalModelException) {
-                            log.append("request/provider-error", buildJsonObject {
-                                put("step", step)
-                                put("code", error.code)
-                                error.status?.let { put("status", it) }
-                                error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
-                                error.requestId?.let { put("request_id", it) }
-                                error.providerCode?.let { put("provider_code", it) }
-                                error.providerParam?.let { put("provider_param", it) }
-                                error.cause?.let { cause ->
-                                    put("cause_type", cause::class.java.simpleName)
-                                    cause.message?.takeIf(String::isNotBlank)?.let {
-                                        put("cause_detail", it.take(800))
+                        val streamPreview = LocalStreamPreview(
+                            maxChars = maxStreamPreviewChars,
+                            minIntervalMs = streamPreviewIntervalMs,
+                            clockMs = { System.nanoTime() / 1_000_000 },
+                            publish = { preview ->
+                                previewOwner
+                                    ?.takeIf { previewGuard() }
+                                    ?.let { streamingPreviewStore.publishAssistant(it, preview) }
+                            },
+                        )
+                        val reasoningPreview = LocalStreamPreview(
+                            maxChars = maxStreamPreviewChars,
+                            minIntervalMs = streamPreviewIntervalMs,
+                            clockMs = { System.nanoTime() / 1_000_000 },
+                            publish = { preview ->
+                                previewOwner
+                                    ?.takeIf { previewGuard() }
+                                    ?.let { streamingPreviewStore.publishReasoning(it, preview) }
+                            },
+                        )
+                        val streamFilter = streamFilterPhrases
+                            .takeIf { it.isNotEmpty() }
+                            ?.let(::ChatStreamFilter)
+                        resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                            val reply = try {
+                                modelGateway.completeStreaming(
+                                    baseUrl = snapshot.baseUrl,
+                                    model = snapshot.model,
+                                    messages = activeMessages,
+                                    tools = tools,
+                                    temperature = temperature,
+                                    onDelta = { delta ->
+                                        val visible =
+                                            streamFilter?.append(delta.content)?.text ?: delta.content
+                                        streamPreview.append(visible)
+                                        reasoningPreview.append(delta.reasoning)
+                                    },
+                                )
+                            } catch (error: LocalModelException) {
+                                log.append("request/provider-error", buildJsonObject {
+                                    put("step", step)
+                                    put("code", error.code)
+                                    error.status?.let { put("status", it) }
+                                    error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
+                                    error.requestId?.let { put("request_id", it) }
+                                    error.providerCode?.let { put("provider_code", it) }
+                                    error.providerParam?.let { put("provider_param", it) }
+                                    error.cause?.let { cause ->
+                                        put("cause_type", cause::class.java.simpleName)
+                                        cause.message?.takeIf(String::isNotBlank)?.let {
+                                            put("cause_detail", it.take(800))
+                                        }
                                     }
-                                }
-                            })
-                            throw error
+                                })
+                                throw error
+                            }
+                            streamFilter?.flush()?.text
+                                ?.takeIf(String::isNotEmpty)
+                                ?.let(streamPreview::append)
+                            streamPreview.flush()
+                            reasoningPreview.flush()
+                            reply
                         }
-                        streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
-                        streamPreview.flush()
-                        reasoningPreview.flush()
-                        reply
                     }
                 } finally {
                     previewOwner?.let(streamingPreviewStore::clear)
