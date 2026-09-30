@@ -1,9 +1,7 @@
 package com.labteto.dshmobile.ui.components
 
-import androidx.compose.ui.test.fetchSemanticsNode
-import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNode
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertTrue
