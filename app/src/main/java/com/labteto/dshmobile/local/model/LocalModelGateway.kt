@@ -1,14 +1,12 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.DeepSeekClient
 import com.labteto.dshmobile.local.LocalModelAuthKind
 import com.labteto.dshmobile.local.LocalModelDelta
 import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.LocalModelPresets
-import com.labteto.dshmobile.local.LocalModelToolCallingMode
 import com.labteto.dshmobile.local.LocalModelProtocol
 import com.labteto.dshmobile.local.LocalModelReply
-import com.labteto.dshmobile.local.usesResponsesTransport
+import com.labteto.dshmobile.local.LocalModelToolCallingMode
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.JsonArray
@@ -19,11 +17,11 @@ import kotlinx.serialization.json.put
 @Singleton
 class LocalModelGateway @Inject constructor(
     private val credentials: LocalModelCredentialResolver,
-    private val chatCompletions: DeepSeekClient,
-    private val responses: OpenAiResponsesClient,
+    private val adapters: LocalModelAdapterRegistry,
     private val routes: LocalModelRouteCatalog,
 ) {
     val activeProfileState = credentials.activeProfile
+
     fun activate(profile: LocalModelProfile) = credentials.activate(profile)
     fun clearActive() = credentials.clearActive()
     fun activeProfile(): LocalModelProfile? = credentials.active()
@@ -46,32 +44,15 @@ class LocalModelGateway @Inject constructor(
         tools: JsonArray,
         temperature: Double? = null,
         profile: LocalModelProfile? = credentials.active(),
-    ): LocalModelReply {
-        val resolved = credentials.resolve(model, baseUrl, profile)
-        val routedTemperature = LocalModelPresets.samplingTemperatureFor(model, baseUrl, temperature)
-            .takeUnless { usesResponses(profile, resolved.authKind) &&
-                LocalModelPresets.toolCallingModeFor(model, baseUrl) == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING }
-        return if (usesResponses(profile, resolved.authKind)) {
-            responses.completeStreaming(
-                accessToken = resolved.bearerToken,
-                baseUrl = baseUrl,
-                model = model,
-                messages = messages,
-                tools = tools,
-                temperature = routedTemperature,
-                planSharing = resolved.authKind == LocalModelAuthKind.CHATGPT_PLAN,
-            )
-        } else {
-            chatCompletions.complete(
-                apiKey = resolved.bearerToken,
-                baseUrl = baseUrl,
-                model = model,
-                messages = sanitizeForChatCompletions(messages),
-                tools = tools,
-                temperature = routedTemperature,
-            )
-        }
-    }
+    ): LocalModelReply =
+        completeResolved(
+            route = resolveRoute(model, baseUrl, profile),
+            messages = messages,
+            tools = tools,
+            temperature = temperature,
+            streaming = false,
+            onDelta = {},
+        )
 
     suspend fun completeStreaming(
         model: String,
@@ -81,55 +62,40 @@ class LocalModelGateway @Inject constructor(
         temperature: Double? = null,
         onDelta: (LocalModelDelta) -> Unit = {},
         profile: LocalModelProfile? = credentials.active(),
-    ): LocalModelReply {
-        val resolved = credentials.resolve(model, baseUrl, profile)
-        val routedTemperature = LocalModelPresets.samplingTemperatureFor(model, baseUrl, temperature)
-            .takeUnless { usesResponses(profile, resolved.authKind) &&
-                LocalModelPresets.toolCallingModeFor(model, baseUrl) == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING }
-        return if (usesResponses(profile, resolved.authKind)) {
-            responses.completeStreaming(
-                accessToken = resolved.bearerToken,
-                baseUrl = baseUrl,
-                model = model,
-                messages = messages,
-                tools = tools,
-                temperature = routedTemperature,
-                planSharing = resolved.authKind == LocalModelAuthKind.CHATGPT_PLAN,
-                onDelta = onDelta,
-            )
-        } else {
-            chatCompletions.completeStreaming(
-                apiKey = resolved.bearerToken,
-                baseUrl = baseUrl,
-                model = model,
-                messages = sanitizeForChatCompletions(messages),
-                tools = tools,
-                temperature = routedTemperature,
-                onDelta = onDelta,
-            )
-        }
-    }
+    ): LocalModelReply =
+        completeResolved(
+            route = resolveRoute(model, baseUrl, profile),
+            messages = messages,
+            tools = tools,
+            temperature = temperature,
+            streaming = true,
+            onDelta = onDelta,
+        )
 
     suspend fun probeApiKey(
         apiKey: String,
         model: String,
         baseUrl: String,
         protocol: LocalModelProtocol,
-    ): LocalModelReply = when (protocol) {
-        LocalModelProtocol.RESPONSES -> responses.completeStreaming(
-            accessToken = apiKey,
-            baseUrl = baseUrl,
+    ): LocalModelReply {
+        val preset = LocalModelPresets.find(model, baseUrl)
+        val route = LocalResolvedModelRoute(
+            profileId = null,
+            provider = preset?.provider.orEmpty(),
             model = model,
-            messages = probeMessages(),
-            tools = JsonArray(emptyList()),
-            planSharing = false,
+            baseUrl = baseUrl,
+            authKind = LocalModelAuthKind.API_KEY,
+            protocol = protocol,
+            bearerToken = apiKey,
+            capabilities = LocalModelPresets.runtimeCapabilitiesFor(model, baseUrl, protocol),
         )
-        LocalModelProtocol.CHAT_COMPLETIONS -> chatCompletions.complete(
-            apiKey = apiKey,
-            baseUrl = baseUrl,
-            model = model,
+        return completeResolved(
+            route = route,
             messages = probeMessages(),
             tools = JsonArray(emptyList()),
+            temperature = null,
+            streaming = true,
+            onDelta = {},
         )
     }
 
@@ -142,25 +108,64 @@ class LocalModelGateway @Inject constructor(
             profile = profile,
         )
 
+    internal suspend fun resolveRoute(
+        model: String,
+        baseUrl: String,
+        profile: LocalModelProfile?,
+    ): LocalResolvedModelRoute {
+        val resolved = credentials.resolve(model, baseUrl, profile)
+        val preset = LocalModelPresets.find(model, baseUrl)
+        val protocol = when (resolved.authKind) {
+            LocalModelAuthKind.CHATGPT_PLAN -> LocalModelProtocol.RESPONSES
+            LocalModelAuthKind.API_KEY ->
+                profile?.protocol ?: preset?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS
+        }
+        return LocalResolvedModelRoute(
+            profileId = profile?.id,
+            provider = profile?.provider?.takeIf(String::isNotBlank) ?: preset?.provider.orEmpty(),
+            model = model,
+            baseUrl = baseUrl,
+            authKind = resolved.authKind,
+            protocol = protocol,
+            bearerToken = resolved.bearerToken,
+            capabilities = LocalModelPresets.runtimeCapabilitiesFor(model, baseUrl, protocol),
+        )
+    }
+
+    private suspend fun completeResolved(
+        route: LocalResolvedModelRoute,
+        messages: List<JsonObject>,
+        tools: JsonArray,
+        temperature: Double?,
+        streaming: Boolean,
+        onDelta: (LocalModelDelta) -> Unit,
+    ): LocalModelReply {
+        val routedTemperature = LocalModelPresets.samplingTemperatureFor(
+            route.model,
+            route.baseUrl,
+            temperature,
+        ).takeUnless {
+            route.protocol == LocalModelProtocol.RESPONSES &&
+                LocalModelPresets.toolCallingModeFor(
+                    route.model,
+                    route.baseUrl,
+                ) == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING
+        }
+        val request = LocalModelAdapterRequest(
+            route = route,
+            messages = LocalCanonicalModelCodec.messages(messages),
+            tools = LocalCanonicalModelCodec.tools(tools),
+            temperature = routedTemperature,
+        )
+        return adapters.adapter(route.protocol).complete(
+            request = request,
+            streaming = streaming,
+            onDelta = onDelta,
+        )
+    }
+
     private fun probeMessages(): List<JsonObject> = listOf(buildJsonObject {
         put("role", "user")
         put("content", "Reply with exactly: OK")
     })
-
-    private fun usesResponses(
-        profile: LocalModelProfile?,
-        authKind: LocalModelAuthKind,
-    ): Boolean =
-        authKind == LocalModelAuthKind.CHATGPT_PLAN ||
-            profile?.usesResponsesTransport() == true
-
-    private fun sanitizeForChatCompletions(messages: List<JsonObject>): List<JsonObject> =
-        messages.map { source ->
-            if (OpenAiResponsesClient.RESPONSES_OUTPUT_KEY !in source) return@map source
-            buildJsonObject {
-                source.forEach { (name, value) ->
-                    if (name != OpenAiResponsesClient.RESPONSES_OUTPUT_KEY) put(name, value)
-                }
-            }
-        }
 }
