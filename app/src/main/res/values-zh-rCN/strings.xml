@@ -1299,4 +1299,5 @@
     <string name="chatgpt_loading_models">正在读取该 ChatGPT 账户可用的模型…</string>
     <string name="chatgpt_model_source">ChatGPT 套餐 · %1$s</string>
 
+    <string name="chatgpt_continue">继续使用 ChatGPT</string>
 </resources>
