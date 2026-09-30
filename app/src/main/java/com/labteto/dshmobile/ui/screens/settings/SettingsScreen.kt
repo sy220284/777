@@ -42,6 +42,7 @@ import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -86,6 +87,8 @@ import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsMenu
+import com.labteto.dshmobile.ui.components.DsSegment
+import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.MenuItem
@@ -100,6 +103,7 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -115,6 +119,7 @@ import kotlinx.coroutines.withContext
 enum class SettingsDestination {
     ROOT,
     GENERAL,
+    APPEARANCE,
     CHAT,
     MODELS,
     PRICING,
@@ -135,6 +140,7 @@ private fun SettingsDestination.parentDestination(): SettingsDestination? = when
     SettingsDestination.PERMISSIONS,
     SettingsDestination.NOTIFICATIONS,
     SettingsDestination.ADVANCED -> SettingsDestination.ROOT
+    SettingsDestination.APPEARANCE,
     SettingsDestination.CHAT -> SettingsDestination.GENERAL
     SettingsDestination.PRICING,
     SettingsDestination.USAGE -> SettingsDestination.MODELS
@@ -251,6 +257,7 @@ fun SettingsScreen(
     val title = when (page) {
         SettingsDestination.ROOT -> stringResource(R.string.settings_title)
         SettingsDestination.GENERAL -> stringResource(R.string.settings_page_general)
+        SettingsDestination.APPEARANCE -> stringResource(R.string.settings_page_appearance)
         SettingsDestination.CHAT -> stringResource(R.string.settings_page_chat)
         SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
         SettingsDestination.PRICING -> stringResource(R.string.settings_page_pricing)
@@ -378,16 +385,15 @@ fun SettingsScreen(
                     SettingsDestination.GENERAL -> {
                         SettingsCard(stringResource(R.string.settings_general), Icons.Outlined.Language) {
                             LanguageRow(settings) { tag -> viewModel.set { it.copy(localeOverride = tag) } }
-                            AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
-                            AccentThemeRow(settings) { key -> viewModel.set { it.copy(accentTheme = key) } }
-                            BackgroundRow(
-                                path = settings.backgroundImagePath,
-                                adaptiveContrast = settings.backgroundAdaptiveContrast,
-                                onAdaptiveContrastChange = { enabled ->
-                                    viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) }
-                                },
-                                onPick = { uri -> viewModel.setBackgroundImage(uri) },
-                                onClear = { viewModel.clearBackgroundImage() },
+                        }
+                        DsGroupCard {
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Tune,
+                                title = stringResource(R.string.settings_page_appearance),
+                                subtitle = stringResource(R.string.settings_appearance_reading_subtitle),
+                                iconFamily = DsIconFamily.Cyan,
+                                value = stringResource(R.string.settings_text_scale_value, (settings.textScale * 100).toInt()),
+                                onClick = { page = SettingsDestination.APPEARANCE },
                             )
                         }
                         SettingsCard(stringResource(R.string.chatlist_title), Icons.Outlined.History) {
@@ -411,6 +417,39 @@ fun SettingsScreen(
                                     },
                                 ),
                                 onClick = { page = SettingsDestination.CHAT },
+                            )
+                        }
+                    }
+
+                    SettingsDestination.APPEARANCE -> {
+                        SettingsCard(stringResource(R.string.settings_appearance_preview), Icons.Outlined.Tune) {
+                            AppearanceReadingPreview(settings)
+                        }
+                        SettingsCard(stringResource(R.string.settings_appearance), Icons.Outlined.Tune) {
+                            AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
+                            AccentThemeRow(settings) { key -> viewModel.set { it.copy(accentTheme = key) } }
+                            ReadingPreferencesRow(
+                                settings = settings,
+                                onTextScaleChange = { value ->
+                                    viewModel.set { it.copy(textScale = value.coerceIn(0.9f, 1.3f)) }
+                                },
+                                onTextWeightChange = { value ->
+                                    viewModel.set { it.copy(textWeightAdjustment = value.coerceIn(0, 2)) }
+                                },
+                                onTransparencyChange = { value ->
+                                    viewModel.set {
+                                        it.copy(wallpaperSurfaceTransparency = value.coerceIn(0f, 1f))
+                                    }
+                                },
+                            )
+                            BackgroundRow(
+                                path = settings.backgroundImagePath,
+                                adaptiveContrast = settings.backgroundAdaptiveContrast,
+                                onAdaptiveContrastChange = { enabled ->
+                                    viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) }
+                                },
+                                onPick = { uri -> viewModel.setBackgroundImage(uri) },
+                                onClear = { viewModel.clearBackgroundImage() },
                             )
                         }
                     }
@@ -997,6 +1036,118 @@ private fun appearanceLabel(preference: String): String = when (preference) {
     "dark" -> stringResource(R.string.settings_appearance_dark)
     "matte_black" -> stringResource(R.string.settings_appearance_matte_black)
     else -> stringResource(R.string.settings_appearance_system)
+}
+
+@Composable
+private fun AppearanceReadingPreview(settings: AppSettings) {
+    val colors = DsTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.bgLayer1, DsShapes.block)
+            .border(1.dp, colors.borderL2, DsShapes.block)
+            .padding(DsSpacing.medium),
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        Text(
+            stringResource(R.string.settings_appearance_preview_assistant),
+            style = DsType.base16.withReadingWeight(),
+            color = colors.labelPrimary,
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Text(
+                stringResource(R.string.settings_appearance_preview_user),
+                style = DsType.base16Strong.withReadingWeight(),
+                color = colors.labelPrimary,
+                modifier = Modifier
+                    .background(colors.userBubble, DsShapes.bubble)
+                    .border(1.dp, colors.borderL3, DsShapes.bubble)
+                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+            )
+        }
+        Text(
+            stringResource(R.string.settings_appearance_preview_hint),
+            style = DsType.small13,
+            color = colors.labelSecondary,
+        )
+    }
+}
+
+@Composable
+private fun ReadingPreferencesRow(
+    settings: AppSettings,
+    onTextScaleChange: (Float) -> Unit,
+    onTextWeightChange: (Int) -> Unit,
+    onTransparencyChange: (Float) -> Unit,
+) {
+    val colors = DsTheme.colors
+    Text(
+        stringResource(R.string.settings_text_size),
+        style = DsType.std14Strong,
+        color = colors.labelPrimary,
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        Text(stringResource(R.string.settings_text_smaller), style = DsType.small13, color = colors.labelSecondary)
+        Slider(
+            value = settings.textScale,
+            onValueChange = onTextScaleChange,
+            valueRange = 0.9f..1.3f,
+            steps = 7,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            stringResource(R.string.settings_text_scale_value, (settings.textScale * 100).toInt()),
+            style = DsType.small13Strong,
+            color = colors.labelPrimary,
+        )
+    }
+
+    Text(
+        stringResource(R.string.settings_text_weight),
+        style = DsType.std14Strong,
+        color = colors.labelPrimary,
+    )
+    DsSegmented(
+        segments = listOf(
+            DsSegment("0", stringResource(R.string.settings_text_weight_standard)),
+            DsSegment("1", stringResource(R.string.settings_text_weight_medium)),
+            DsSegment("2", stringResource(R.string.settings_text_weight_bold)),
+        ),
+        selectedKey = settings.textWeightAdjustment.toString(),
+        onSelect = { onTextWeightChange(it.toIntOrNull() ?: 0) },
+        stretch = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+
+    Text(
+        stringResource(R.string.settings_component_transparency),
+        style = DsType.std14Strong,
+        color = colors.labelPrimary,
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        Text(stringResource(R.string.settings_surface_clearer), style = DsType.small13, color = colors.labelSecondary)
+        Slider(
+            value = settings.wallpaperSurfaceTransparency,
+            onValueChange = onTransparencyChange,
+            valueRange = 0f..1f,
+            steps = 9,
+            modifier = Modifier.weight(1f),
+        )
+        Text(stringResource(R.string.settings_surface_airier), style = DsType.small13, color = colors.labelSecondary)
+    }
+    Text(
+        stringResource(R.string.settings_component_transparency_hint),
+        style = DsType.small13,
+        color = colors.labelSecondary,
+    )
 }
 
 @Composable

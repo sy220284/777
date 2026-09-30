@@ -63,6 +63,9 @@ fun AppRoot(
         accentKey = settings.accentTheme,
         backgroundPath = settings.backgroundImagePath,
         backgroundAdaptiveContrast = settings.backgroundAdaptiveContrast,
+        textScale = settings.textScale,
+        textWeightAdjustment = settings.textWeightAdjustment,
+        wallpaperSurfaceTransparency = settings.wallpaperSurfaceTransparency,
     ) {
         var rootSurface by rememberSaveable { mutableStateOf(RootSurface.LOCAL) }
         var overlay by rememberSaveable { mutableStateOf<RootOverlay?>(null) }

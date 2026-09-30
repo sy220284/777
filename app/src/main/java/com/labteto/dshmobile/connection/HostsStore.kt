@@ -5,6 +5,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.labteto.dshmobile.DshApplication
 import com.labteto.dshmobile.core.wire.WireJson
@@ -32,6 +34,9 @@ class HostsStore @Inject constructor(
         val BACKGROUND = booleanPreferencesKey("background")
         val BACKGROUND_IMAGE = stringPreferencesKey("background_image_path")
         val BACKGROUND_ADAPTIVE_CONTRAST = booleanPreferencesKey("background_adaptive_contrast")
+        val TEXT_SCALE = floatPreferencesKey("text_scale")
+        val TEXT_WEIGHT_ADJUSTMENT = intPreferencesKey("text_weight_adjustment")
+        val WALLPAPER_SURFACE_TRANSPARENCY = floatPreferencesKey("wallpaper_surface_transparency")
         val NOTIFY_TURN = booleanPreferencesKey("notify_turn")
         val NOTIFY_GOAL = booleanPreferencesKey("notify_goal")
         val NOTIFY_ACTION = booleanPreferencesKey("notify_action")
@@ -218,6 +223,10 @@ class HostsStore @Inject constructor(
             accentTheme = prefs[Keys.ACCENT_THEME] ?: "celadon",
             backgroundImagePath = prefs[Keys.BACKGROUND_IMAGE],
             backgroundAdaptiveContrast = prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] ?: true,
+            textScale = (prefs[Keys.TEXT_SCALE] ?: 1.0f).coerceIn(0.9f, 1.3f),
+            textWeightAdjustment = (prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] ?: 0).coerceIn(0, 2),
+            wallpaperSurfaceTransparency =
+                (prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] ?: 0.5f).coerceIn(0f, 1f),
             localeOverride = when (val tag = prefs[Keys.LOCALE]) {
                 "en" -> "en"
                 "zh", "zh-CN", "zh_CN" -> "zh-CN"
@@ -258,6 +267,10 @@ class HostsStore @Inject constructor(
             next.backgroundImagePath?.let { prefs[Keys.BACKGROUND_IMAGE] = it }
                 ?: prefs.remove(Keys.BACKGROUND_IMAGE)
             prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] = next.backgroundAdaptiveContrast
+            prefs[Keys.TEXT_SCALE] = next.textScale.coerceIn(0.9f, 1.3f)
+            prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] = next.textWeightAdjustment.coerceIn(0, 2)
+            prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] =
+                next.wallpaperSurfaceTransparency.coerceIn(0f, 1f)
             next.localeOverride?.let { prefs[Keys.LOCALE] = it } ?: prefs.remove(Keys.LOCALE)
             committed = next
         }

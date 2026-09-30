@@ -8,6 +8,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 
 /** Theme preference exposed by the app Appearance row. */
 enum class ThemePreference { LIGHT, DARK, MATTE_BLACK, SYSTEM }
@@ -186,6 +188,13 @@ object DsThemeTokens {
 /** The full DeepSeek palette as a CompositionLocal. */
 val LocalDsColors = staticCompositionLocalOf { DsThemeTokens.light }
 
+data class DsReadingPreferences(
+    val textScale: Float = 1f,
+    val textWeightAdjustment: Int = 0,
+)
+
+val LocalDsReadingPreferences = staticCompositionLocalOf { DsReadingPreferences() }
+
 object DsTheme {
     val colors: DsColors
         @Composable get() = LocalDsColors.current
@@ -237,6 +246,9 @@ fun DshTheme(
     accentKey: String? = null,
     backgroundPath: String? = null,
     backgroundAdaptiveContrast: Boolean = true,
+    textScale: Float = 1f,
+    textWeightAdjustment: Int = 0,
+    wallpaperSurfaceTransparency: Float = 0.5f,
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -255,7 +267,20 @@ fun DshTheme(
     val palette = AccentPalettes.of(accentKey)
     val themed = if (palette.key == AccentPalettes.DEFAULT.key) ds else ds.withAccent(palette, dark)
     val scheme = if (dark) materialDarkScheme(themed) else materialLightScheme(themed)
-    CompositionLocalProvider(LocalDsColors provides themed) {
+    val currentDensity = LocalDensity.current
+    val clampedTextScale = textScale.coerceIn(0.9f, 1.3f)
+    val readingPreferences = DsReadingPreferences(
+        textScale = clampedTextScale,
+        textWeightAdjustment = textWeightAdjustment.coerceIn(0, 2),
+    )
+    CompositionLocalProvider(
+        LocalDsColors provides themed,
+        LocalDsReadingPreferences provides readingPreferences,
+        LocalDensity provides Density(
+            density = currentDensity.density,
+            fontScale = currentDensity.fontScale * clampedTextScale,
+        ),
+    ) {
         // Inside the theme, outside MaterialTheme: the image has to sit under every screen, and
         // screens draw their own Material surfaces on top of whatever is beneath them.
         AppBackgroundHost(
@@ -263,6 +288,7 @@ fun DshTheme(
             adaptiveEnabled = backgroundAdaptiveContrast,
             darkTheme = dark,
             surfaceBase = themed.bgBase,
+            surfaceTransparency = wallpaperSurfaceTransparency.coerceIn(0f, 1f),
         ) {
             MaterialTheme(
                 colorScheme = scheme,
