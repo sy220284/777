@@ -31,6 +31,8 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
 @Composable
 internal fun LocalUsageModePill(
@@ -40,18 +42,11 @@ internal fun LocalUsageModePill(
 ) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
-    val containerColor = if (backgroundState.hasImage && backgroundState.adaptiveContrast) {
-        backgroundState.surfaceColor(
-            base = colors.bgModulePlatform,
-            region = BackgroundRegion.TOP,
-            minAlpha = 0.28f,
-            maxAlpha = 0.48f,
-        )
-    } else if (backgroundState.hasImage) {
-        colors.bgModulePlatform.copy(alpha = 0.28f)
-    } else {
-        colors.bgModulePlatform
-    }
+    val containerColor = colors.wallpaperSurface(
+        level = WallpaperSurfaceLevel.FLOATING,
+        region = BackgroundRegion.TOP,
+        base = colors.bgModulePlatform,
+    )
 
     Surface(
         modifier = Modifier.fillMaxWidth().widthIn(max = 264.dp).height(52.dp),
@@ -74,7 +69,7 @@ internal fun LocalUsageModePill(
                     .width(segmentWidth)
                     .height(44.dp),
                 shape = DsShapes.pillFull,
-                color = colors.bgLayer1,
+                color = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP, colors.bgLayer1),
                 border = BorderStroke(1.dp, colors.borderL1),
                 shadowElevation = 2.dp,
             ) {}
@@ -101,7 +96,7 @@ internal fun LocalUsageModePill(
                     ) {
                         Text(
                             stringResource(labelRes),
-                            style = if (selected == mode) DsType.std14Strong else DsType.std14,
+                            style = (if (selected == mode) DsType.std14Strong else DsType.std14).withReadingWeight(),
                             color = if (selected == mode) colors.labelPrimary else colors.labelSecondary,
                         )
                     }
