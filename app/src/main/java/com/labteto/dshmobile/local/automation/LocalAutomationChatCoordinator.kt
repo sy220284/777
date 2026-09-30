@@ -318,10 +318,7 @@ internal class LocalAutomationChatCoordinator(
                     dynamicContext = dynamicContext,
                 )
                 val activeProfile = modelGateway.activeProfile()
-                require(activeProfile != null && modelGateway.hasCredential(activeProfile)) {
-                    "请先配置模型账户或 API Key"
-                }
-                val key = ""
+                require(activeProfile != null && modelGateway.hasCredential(activeProfile)) { "请先配置模型账户或 API Key" }
 
                 boundEventLog.append("turn/start", buildJsonObject {
                     put("model", boundState.model)
@@ -331,7 +328,6 @@ internal class LocalAutomationChatCoordinator(
                     put("persona_id", persona.id)
                 })
                 val rawReply = completeAutomationChat(
-                    key = key,
                     snapshot = boundState,
                     messages = requestMessages,
                 )
@@ -509,7 +505,6 @@ internal class LocalAutomationChatCoordinator(
     }
 
     private suspend fun completeAutomationChat(
-        key: String,
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
         allowContextOverflowRecovery: Boolean = true,
