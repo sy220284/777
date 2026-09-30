@@ -41,7 +41,9 @@ private fun encodeTranscriptMessage(message: LocalHarnessMessage): JsonObject =
     )
 
 internal fun assistantModelMessageFromEvent(data: JsonObject): JsonObject =
-    (data["message"] as? JsonObject) ?: JsonObject(data - "transcript" - "replaces")
+    (data["message"] as? JsonObject) ?: JsonObject(
+        data - "transcript" - "replaces" - LOCAL_MODEL_TOOL_CALLS_EVENT_KEY,
+    )
 
 internal fun projectSessionTranscriptTail(
     snapshotMessages: List<LocalHarnessMessage>,
