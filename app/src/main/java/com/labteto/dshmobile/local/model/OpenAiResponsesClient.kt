@@ -425,15 +425,17 @@ class OpenAiResponsesClient @Inject constructor(
             if (type == null) put("type", "object")
             if ("properties" !in source) put("properties", buildJsonObject {})
         }
-        validateResponseParameterSchema(
-            index = index,
-            name = name,
-            schema = normalized,
-            path = "parameters",
-            strict = strict,
-            enforceOpenAiToolSchema = enforceOpenAiToolSchema,
-            depth = 1,
-        )
+        if (enforceOpenAiToolSchema) {
+            validateResponseParameterSchema(
+                index = index,
+                name = name,
+                schema = normalized,
+                path = "parameters",
+                strict = strict,
+                enforceOpenAiToolSchema = true,
+                depth = 1,
+            )
+        }
         return normalized
     }
 
