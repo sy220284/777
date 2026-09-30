@@ -82,6 +82,7 @@ data class AppBackgroundState(
     val analysis: BackgroundAnalysis? = null,
     val adaptiveContrast: Boolean = true,
     val darkTheme: Boolean = false,
+    val surfaceTransparency: Float = 0.5f,
 ) {
     val hasImage: Boolean get() = image != null
 
@@ -92,7 +93,10 @@ data class AppBackgroundState(
         maxAlpha: Float,
     ): Color {
         val stats = analysis?.region(region)
-        if (!hasImage || !adaptiveContrast || stats == null) return base
+        if (!hasImage) return base
+        if (!adaptiveContrast || stats == null) {
+            return base.copy(alpha = adjustedSurfaceAlpha(base.alpha.coerceAtLeast(0.76f), 0.62f, 1f))
+        }
 
         val complexity = (stats.contrast * 0.52f + stats.detail * 0.48f).coerceIn(0f, 1f)
         // Light text needs more protection over bright pictures; dark text needs more over dark ones.
@@ -104,7 +108,15 @@ data class AppBackgroundState(
                 luminanceMismatch * 0.22f +
                 saturationPenalty * 0.08f
             ).coerceIn(minAlpha, maxAlpha)
-        return base.copy(alpha = alpha)
+        return base.copy(alpha = adjustedSurfaceAlpha(alpha, minAlpha, maxAlpha))
+    }
+
+    private fun adjustedSurfaceAlpha(alpha: Float, minAlpha: Float, maxAlpha: Float): Float {
+        val preference = surfaceTransparency.coerceIn(0f, 1f)
+        val adjustment = (0.5f - preference) * 0.28f
+        val lower = (minAlpha - 0.12f).coerceAtLeast(0.18f)
+        val upper = (maxAlpha + 0.10f).coerceAtMost(0.98f)
+        return (alpha + adjustment).coerceIn(lower, upper)
     }
 
 
@@ -135,7 +147,7 @@ data class AppBackgroundState(
         }
 
         if (!adaptiveContrast || analysis == null) {
-            return base.copy(alpha = fallbackAlpha)
+            return base.copy(alpha = adjustedSurfaceAlpha(fallbackAlpha, minAlpha, maxAlpha))
         }
         return surfaceColor(
             base = base,
@@ -169,6 +181,7 @@ fun AppBackgroundHost(
     adaptiveEnabled: Boolean = true,
     darkTheme: Boolean = false,
     surfaceBase: Color = Color.Transparent,
+    surfaceTransparency: Float = 0.5f,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -178,6 +191,7 @@ fun AppBackgroundHost(
         analysis = loaded?.analysis,
         adaptiveContrast = adaptiveEnabled,
         darkTheme = darkTheme,
+        surfaceTransparency = surfaceTransparency.coerceIn(0f, 1f),
     )
     CompositionLocalProvider(
         LocalAppBackground provides loaded?.image,
