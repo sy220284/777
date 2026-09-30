@@ -448,7 +448,7 @@ class OpenAiResponsesClient @Inject constructor(
         requestId: String?,
         retryAfterMs: Long?,
     ): LocalModelException = LocalModelException(
-        code = "$prefix_$code",
+        code = "${prefix}_$code",
         message = detail,
         retryable = code in setOf("server_error", "server_overloaded", "rate_limit_exceeded"),
         providerRetryAfterMs = retryAfterMs,
