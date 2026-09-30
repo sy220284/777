@@ -66,17 +66,6 @@ internal class LocalStreamingPreviewStore {
         }
     }
 
-    fun publishReasoning(owner: LocalStreamingPreviewOwner, text: String) {
-        if (text.isEmpty()) return
-        mutableState.update { current ->
-            when {
-                current.requestId == owner.requestId -> current.copy(reasoning = text)
-                current.accepts(owner) -> owner.emptyState().copy(reasoning = text)
-                else -> current
-            }
-        }
-    }
-
     fun clear(owner: LocalStreamingPreviewOwner) {
         mutableState.update { current ->
             if (current.sessionId == owner.sessionId && current.requestId == owner.requestId) {
