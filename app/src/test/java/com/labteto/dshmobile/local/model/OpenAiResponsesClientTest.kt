@@ -46,10 +46,8 @@ class OpenAiResponsesClientTest {
 
     @Test
     fun completedEventSettlesBeforeTrailingTransportResetAndKeepsReportedUsage() = runBlocking {
-        val terminalFrame = """
-            data: {"type":"response.completed","response":{"id":"resp-terminal","output":[{"type":"message","content":[{"type":"output_text","text":"完成"}]}],"usage":{"input_tokens":7,"output_tokens":3}}}
-            
-        """.trimIndent()
+        val terminalFrame =
+            """data: {"type":"response.completed","response":{"id":"resp-terminal","output":[{"type":"message","content":[{"type":"output_text","text":"完成"}]}],"usage":{"input_tokens":7,"output_tokens":3}}}""" + "\n"
         val bytes = Buffer().writeUtf8(terminalFrame)
         var sourceReads = 0
         val source = object : Source {
