@@ -168,6 +168,13 @@ internal object LocalCanonicalModelCodec {
 
     fun hasToolCalls(message: JsonObject): Boolean = canonicalToolCalls(message).isNotEmpty()
 
+    fun compatibleReplay(
+        message: LocalCanonicalMessage,
+        adapterId: String,
+        routeFingerprint: String,
+    ): LocalModelReplayEnvelope? =
+        message.replay?.takeIf { replayCompatible(it, adapterId, routeFingerprint) }
+
     fun canonicalizeReply(
         reply: LocalModelReply,
         adapterId: String,
