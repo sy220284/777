@@ -41,6 +41,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsColors
+import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -78,7 +79,7 @@ fun DisclosureRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 24.dp)
+                .heightIn(min = if (onToggle != null) DsSpacing.touchTarget else 24.dp)
                 .then(
                     if (onToggle != null) {
                         Modifier

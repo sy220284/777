@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,6 +51,8 @@ import com.labteto.dshmobile.local.TokenUsageModeAnalytics
 import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsSegment
+import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -588,29 +591,17 @@ private fun UsageEfficiency(mode: LocalUsageMode, analytics: TokenUsageModeAnaly
 
 @Composable
 private fun UsageRangeSelector(selectedIndex: Int, onSelect: (Int) -> Unit) {
-    val colors = DsTheme.colors
     val labels = listOf(
         stringResource(R.string.usage_range_7),
         stringResource(R.string.usage_range_30),
         stringResource(R.string.usage_range_90),
     )
-    Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-        labels.forEachIndexed { index, label ->
-            val selected = index == selectedIndex
-            Text(
-                text = label,
-                style = DsType.caption11,
-                color = if (selected) colors.accent else colors.labelTertiary,
-                modifier = Modifier
-                    .clip(DsShapes.pillFull)
-                    .background(if (selected) colors.accentTertiary else colors.bgLayer2)
-                    .clickable { onSelect(index) }
-                    .padding(horizontal = DsSpacing.small, vertical = DsSpacing.tiny),
-            )
-        }
-    }
+    DsSegmented(
+        segments = labels.mapIndexed { index, label -> DsSegment(index.toString(), label) },
+        selectedKey = selectedIndex.toString(),
+        onSelect = { key -> key.toIntOrNull()?.let(onSelect) },
+    )
 }
-
 @Composable
 private fun UsageDayChart(
     days: List<Pair<Long, TokenUsageAggregate>>,
@@ -642,7 +633,7 @@ private fun UsageDayChart(
             }
             Column(
                 modifier = Modifier
-                    .width(28.dp)
+                    .width(DsSpacing.touchTarget)
                     .clickable { onSelect(epochDay) },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
@@ -703,6 +694,7 @@ private fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = DsSpacing.touchTarget)
             .clickable(onClick = onClick)
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.medium),
         verticalAlignment = Alignment.CenterVertically,
@@ -754,6 +746,7 @@ private fun UsageRequestRow(record: TokenUsageRecord, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = DsSpacing.touchTarget)
             .clickable(onClick = onClick)
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
         verticalAlignment = Alignment.CenterVertically,

@@ -55,6 +55,7 @@ import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.data.WorkspaceRow
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsGroupCard
@@ -387,31 +388,37 @@ fun ChatListDrawer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(DsShapes.row)
-                .clickable { newWorkspaceOpen = true }
-                .padding(vertical = DsSpacing.small),
+                .heightIn(min = DsSpacing.touchTarget),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Icons.Filled.Add,
-                contentDescription = null,
-                tint = colors.labelTertiary,
-                modifier = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(DsSpacing.small))
-            Text(
-                stringResource(R.string.chatlist_new_workspace),
-                style = DsType.std14,
-                color = colors.labelSecondary,
-                modifier = Modifier.weight(1f),
-            )
-            if (workspaces.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = DsSpacing.touchTarget)
+                    .clip(DsShapes.row)
+                    .clickable { newWorkspaceOpen = true }
+                    .padding(horizontal = DsSpacing.tiny),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = null,
+                    tint = colors.labelTertiary,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(DsSpacing.small))
                 Text(
-                    stringResource(R.string.chatlist_manage_workspaces),
-                    style = DsType.small13Strong,
-                    color = colors.accent,
-                    modifier = Modifier.clickable { manageWorkspacesOpen = true }
-                        .padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+                    stringResource(R.string.chatlist_new_workspace),
+                    style = DsType.std14,
+                    color = colors.labelSecondary,
+                )
+            }
+            if (workspaces.isNotEmpty()) {
+                DsButton(
+                    text = stringResource(R.string.chatlist_manage_workspaces),
+                    onClick = { manageWorkspacesOpen = true },
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Ghost,
                 )
             }
         }
@@ -787,14 +794,11 @@ private fun SessionRowItem(
             }
             if (childCount > 0) {
                 Spacer(Modifier.width(DsSpacing.xsmall))
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                DsIconButton(
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = stringResource(R.string.chatlist_subagents),
-                    tint = colors.labelTertiary,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .graphicsLayer { rotationZ = chevronRotation }
-                        .clickable(onClick = onToggleChildren),
+                    onClick = onToggleChildren,
+                    modifier = Modifier.graphicsLayer { rotationZ = chevronRotation },
                 )
             }
         }
@@ -873,6 +877,7 @@ private fun SearchResultRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.row)
             .clickable {
                 scope.launch {

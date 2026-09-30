@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -31,6 +32,7 @@ fun ToggleRow(label: String, checked: Boolean, hint: String? = null, onChange: (
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.row)
             .clickable(onClick = onChange)
             .padding(vertical = DsSpacing.small),
