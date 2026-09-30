@@ -221,7 +221,6 @@ data class LocalHarnessState(
     val baseUrl: String = "https://api.deepseek.com",
     val configuredModels: List<String> = emptyList(),
     val modelProfiles: List<LocalModelProfile> = emptyList(),
-    val activeModelProfileId: String? = null,
     val mainMaxSteps: Int = 16,
     val subagentMaxSteps: Int = 20,
     val modelAttempts: Int = 3,
