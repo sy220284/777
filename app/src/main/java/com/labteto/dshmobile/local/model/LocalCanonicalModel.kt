@@ -127,16 +127,55 @@ internal object LocalCanonicalModelCodec {
     fun tools(source: JsonArray): List<LocalCanonicalToolDefinition> = source.mapIndexed { index, raw ->
         val objectValue = raw as? JsonObject
             ?: error("工具定义第 ${index + 1} 项必须是对象")
-        val function = objectValue["function"] as? JsonObject ?: objectValue
-        val name = function["name"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
-        require(name.isNotEmpty()) { "工具定义第 ${index + 1} 项缺少 name" }
-        val description = function["description"]?.jsonPrimitive?.contentOrNull
-            ?.trim()?.takeIf(String::isNotEmpty) ?: "调用 $name 工具。"
-        val parameters = function["parameters"] as? JsonObject ?: buildJsonObject {
-            put("type", "object")
-            put("properties", buildJsonObject {})
+        val declaredType = objectValue["type"]
+        if (declaredType != null) {
+            val type = (declaredType as? JsonPrimitive)
+                ?.takeIf(JsonPrimitive::isString)
+                ?.contentOrNull
+                ?: error("工具定义第 ${index + 1} 项的 type 必须是字符串")
+            require(type == "function") {
+                "工具定义第 ${index + 1} 项暂不支持 type=$type"
+            }
         }
-        val strict = (function["strict"] as? JsonPrimitive)?.booleanOrNull
+        val functionElement = objectValue["function"]
+        val function = when (functionElement) {
+            null -> objectValue
+            is JsonObject -> functionElement
+            else -> error("工具定义第 ${index + 1} 项的 function 必须是对象")
+        }
+        val nameElement = function["name"]
+            ?: error("工具定义第 ${index + 1} 项缺少 name")
+        val name = (nameElement as? JsonPrimitive)
+            ?.takeIf(JsonPrimitive::isString)
+            ?.contentOrNull
+            ?.trim()
+            .orEmpty()
+        require(name.isNotEmpty()) { "工具定义第 ${index + 1} 项的 name 必须是非空字符串" }
+
+        val description = when (val value = function["description"]) {
+            null -> "调用 $name 工具。"
+            is JsonPrimitive -> value.takeIf(JsonPrimitive::isString)
+                ?.contentOrNull
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+                ?: if (value.isString) "调用 $name 工具。"
+                else error("工具 $name 的 description 必须是字符串")
+            else -> error("工具 $name 的 description 必须是字符串")
+        }
+        val parameters = when (val value = function["parameters"]) {
+            null -> buildJsonObject {
+                put("type", "object")
+                put("properties", buildJsonObject {})
+            }
+            is JsonObject -> value
+            else -> error("工具 $name 的 parameters 必须是 JSON 对象")
+        }
+        val strict = when (val value = function["strict"]) {
+            null -> null
+            is JsonPrimitive -> value.booleanOrNull
+                ?: error("工具 $name 的 strict 必须是布尔值")
+            else -> error("工具 $name 的 strict 必须是布尔值")
+        }
         LocalCanonicalToolDefinition(name, description, parameters, strict)
     }
 
