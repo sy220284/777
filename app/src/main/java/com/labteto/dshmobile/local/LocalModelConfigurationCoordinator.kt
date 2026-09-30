@@ -89,10 +89,10 @@ internal class LocalModelConfigurationCoordinator(
         }
         if (removed.isEmpty()) return@run null
         val activeId = profiles.active(currentModel, currentBaseUrl, all)?.id
-        val removedIds = removed.mapTo(hashSetOf(), LocalModelProfile::id)
+        val removedIds = removed.mapTo(hashSetOf()) { it.id }
         finishRemoval(
             all.filterNot { it.id in removedIds },
-            activeId in removedIds,
+            activeId != null && activeId in removedIds,
             currentModel,
             currentBaseUrl,
         )
