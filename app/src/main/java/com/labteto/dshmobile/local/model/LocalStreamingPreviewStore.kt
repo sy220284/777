@@ -21,6 +21,16 @@ internal data class LocalStreamingPreviewOwner(
  * A stale request can never overwrite or clear a newer request from the same session, and UI can
  * reject previews that belong to another session or product mode.
  */
+internal fun LocalHarnessStreamingState.forSurface(
+    sessionId: String,
+    usageMode: LocalUsageMode,
+): LocalHarnessStreamingState =
+    if (this.sessionId == sessionId && this.usageMode == usageMode) {
+        this
+    } else {
+        LocalHarnessStreamingState()
+    }
+
 internal class LocalStreamingPreviewStore {
     private val mutableState = MutableStateFlow(LocalHarnessStreamingState())
     val state: StateFlow<LocalHarnessStreamingState> = mutableState.asStateFlow()
