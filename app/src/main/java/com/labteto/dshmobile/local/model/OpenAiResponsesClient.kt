@@ -100,7 +100,10 @@ class OpenAiResponsesClient @Inject constructor(
                 val streamedContent = StringBuilder()
                 val streamedReasoning = StringBuilder()
                 var totalBytes = 0
-                responseBody.charStream().buffered().use { reader ->
+                // Response 生命周期由 withCancellableModelResponse 统一关闭；这里不要单独 use(reader)，
+                // 否则成功终态后的 reader.close() 异常仍可能把成功请求翻成失败。
+                val reader = responseBody.charStream().buffered()
+                run {
                     while (true) {
                         val line = reader.readLine() ?: break
                         totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
@@ -164,6 +167,7 @@ class OpenAiResponsesClient @Inject constructor(
                             "response.completed" -> {
                                 completedResponse = event["response"] as? JsonObject
                                     ?: throw responseProtocolError("completed 事件缺少 response")
+                                // completed 是成功终态；不要再读取 EOF，避免终态后的连接收尾异常触发整轮重试。
                                 break
                             }
                         }
