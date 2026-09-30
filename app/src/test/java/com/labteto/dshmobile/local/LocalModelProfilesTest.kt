@@ -58,6 +58,10 @@ class LocalModelProfilesTest {
             LocalModelPresets.protocolFor("gpt-6-astra", "https://api.openai.com/v1"),
         )
         assertEquals(
+            LocalModelProtocol.ANTHROPIC_MESSAGES,
+            LocalModelPresets.protocolFor("claude-sonnet-5-5", "https://api.anthropic.com/v1"),
+        )
+        assertEquals(
             LocalModelProtocol.CHAT_COMPLETIONS,
             LocalModelPresets.protocolFor("custom-model", "https://custom.example/v1"),
         )
@@ -193,6 +197,14 @@ class LocalModelProfilesTest {
             LocalModelToolCallingMode.RESPONSES_ONLY,
             LocalModelPresets.toolCallingModeFor("gpt-6-astra", "https://api.openai.com/v1"),
         )
+        val claudeRuntime = LocalModelPresets.runtimeCapabilitiesFor(
+            "claude-sonnet-5-5",
+            "https://api.anthropic.com/v1",
+        )
+        assertTrue(claudeRuntime.streaming)
+        assertTrue(claudeRuntime.toolCalling)
+        assertTrue(claudeRuntime.replay)
+        assertEquals(true, claudeRuntime.imageInput)
     }
 
     @Test fun latestDistinctModelsAreAvailablePerExistingProvider() {
@@ -227,7 +239,7 @@ class LocalModelProfilesTest {
         )
         assertEquals(
             setOf("claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1"),
-            models("Claude（兼容接口）"),
+            models("Claude"),
         )
     }
 
