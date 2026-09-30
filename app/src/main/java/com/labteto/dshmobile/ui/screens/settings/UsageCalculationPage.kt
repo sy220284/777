@@ -58,6 +58,9 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
 import java.text.NumberFormat
 import java.time.Instant
@@ -143,7 +146,7 @@ internal fun UsageCalculationPage(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.bgLayer1,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
     ) {
         Column(
             modifier = Modifier.padding(DsSpacing.medium),
@@ -152,7 +155,7 @@ internal fun UsageCalculationPage(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.usage_daily_title),
-                    style = DsType.std14Strong,
+                    style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
                     modifier = Modifier.weight(1f),
                 )
@@ -170,14 +173,14 @@ internal fun UsageCalculationPage(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         formatEpochDay(day),
-                        style = DsType.small13Strong,
+                        style = DsType.small13Strong.withReadingWeight(),
                         color = colors.labelPrimary,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
                         "${stringResource(R.string.usage_calculation_input)} ${formatTokens(aggregate.inputTokens)} · " +
                             "${stringResource(R.string.usage_calculation_output)} ${formatTokens(aggregate.outputTokens)}",
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
                 }
@@ -201,7 +204,7 @@ internal fun UsageCalculationPage(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
-            color = colors.bgLayer1,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
         ) {
             Column {
                 val visibleGroups = if (showAllGroups) groups else groups.take(12)
@@ -255,13 +258,13 @@ internal fun UsageCalculationPage(
                             DateFormat.getDateInstance(DateFormat.MEDIUM)
                                 .format(Date(analytics.trackedSince)),
                         ),
-                        style = DsType.small13Strong,
+                        style = DsType.small13Strong.withReadingWeight(),
                         color = colors.labelPrimary,
                     )
                 }
                 Text(
                     stringResource(R.string.usage_legacy_notice),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelSecondary,
                 )
             }
@@ -280,20 +283,20 @@ internal fun UsageCalculationPage(
             ) {
                 Text(
                     stringResource(R.string.usage_calculation_partial),
-                    style = DsType.small13Strong,
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = colors.warnLabel,
                 )
                 if (usage.unreportedRequestCount > 0L) {
                     Text(
                         stringResource(R.string.local_usage_unreported, usage.unreportedRequestCount),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
                 }
                 if (usage.unpricedTokens > 0L) {
                     Text(
                         stringResource(R.string.local_usage_unpriced, formatNumber(usage.unpricedTokens)),
-                        style = DsType.caption11,
+                        style = DsType.caption11.withReadingWeight(),
                         color = colors.labelSecondary,
                     )
                 }
@@ -303,7 +306,7 @@ internal fun UsageCalculationPage(
 
     Text(
         stringResource(R.string.usage_calculation_disclaimer),
-        style = DsType.caption11,
+        style = DsType.caption11.withReadingWeight(),
         color = colors.labelTertiary,
     )
     DsButton(
@@ -327,7 +330,7 @@ internal fun UsageLogPage(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.bgLayer1,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
     ) {
         Column {
             val records = analytics.recentRecords.take(120)
@@ -359,7 +362,7 @@ internal fun UsageGroupDetailPage(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
-            color = colors.bgLayer1,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
         ) {
             Column {
                 detail.agents.forEachIndexed { index, agent ->
@@ -375,7 +378,7 @@ internal fun UsageGroupDetailPage(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
-            color = colors.bgLayer1,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
         ) {
             Column {
                 detail.actions.forEachIndexed { index, item ->
@@ -390,7 +393,7 @@ internal fun UsageGroupDetailPage(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.bgLayer1,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
     ) {
         Column {
             val records = detail.records.take(120)
@@ -427,7 +430,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.bgLayer1,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
     ) {
         Column(
             modifier = Modifier.padding(DsSpacing.medium),
@@ -458,7 +461,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
                     R.string.usage_calculation_reasoning_note,
                     formatNumber(record.reasoningTokens),
                 ),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
         }
@@ -471,7 +474,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
     } ?: record.model
     Text(
         "$modelStep · ${formatTime(record.timestamp)}",
-        style = DsType.caption11,
+        style = DsType.caption11.withReadingWeight(),
         color = colors.labelTertiary,
     )
 }
@@ -495,29 +498,29 @@ private fun DeviceUsageHero(usage: DeepSeekUsageSnapshot) {
         ) {
             Text(
                 stringResource(R.string.usage_device_total),
-                style = DsType.small13Strong,
+                style = DsType.small13Strong.withReadingWeight(),
                 color = colors.labelSecondary,
             )
             Text(
                 formatTokens(usage.totalTokens),
-                style = DsType.display24,
+                style = DsType.display24.withReadingWeight(),
                 color = colors.labelPrimary,
             )
             Text(
                 "${stringResource(R.string.usage_calculation_input)} ${formatTokens(usage.inputTokens)} · " +
                     "${stringResource(R.string.usage_calculation_output)} ${formatTokens(usage.outputTokens)} · " +
                     "¥${String.format(Locale.US, "%.4f", usage.estimatedCostCny)}",
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelSecondary,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.local_usage_cache_hit_rate),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                     modifier = Modifier.weight(1f),
                 )
-                Text(cacheValue, style = DsType.small13Strong, color = colors.labelPrimary)
+                Text(cacheValue, style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
             }
         }
     }
@@ -680,7 +683,7 @@ private fun UsageDayChart(
                 }
                 Text(
                     LocalDate.ofEpochDay(epochDay).dayOfMonth.toString(),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = if (selected) colors.labelPrimary else colors.labelTertiary,
                 )
             }
@@ -705,7 +708,7 @@ private fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
         ) {
             Text(
                 group.title,
-                style = DsType.std14Strong,
+                style = DsType.std14Strong.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -720,14 +723,14 @@ private fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
                 } else {
                     stringResource(R.string.usage_turn_count, group.turnCount)
                 },
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
                 maxLines = 1,
             )
         }
         Text(
             formatTokens(group.aggregate.totalTokens),
-            style = DsType.small13Strong,
+            style = DsType.small13Strong.withReadingWeight(),
             color = colors.labelPrimary,
         )
         Spacer(Modifier.width(DsSpacing.small))
@@ -757,24 +760,24 @@ private fun UsageRequestRow(record: TokenUsageRecord, onClick: () -> Unit) {
         ) {
             Text(
                 actionLabel(record.context.action),
-                style = DsType.small13Strong,
+                style = DsType.small13Strong.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
             )
             Text(
                 "${formatTime(record.timestamp)} · ${record.model}" +
                     record.context.agentId?.let { " · $it" }.orEmpty(),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text(formatTokens(record.totalTokens), style = DsType.small13Strong, color = colors.labelPrimary)
+            Text(formatTokens(record.totalTokens), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
             Text(
                 "↓${formatTokens(record.inputTokens)}  ↑${formatTokens(record.outputTokens)}",
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelSecondary,
             )
         }
@@ -796,7 +799,7 @@ private fun PromptBreakdownCard(breakdown: TokenPromptBreakdown) {
         ) {
             Text(
                 stringResource(R.string.usage_estimated_badge),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.characterAccent,
             )
             PromptLine(stringResource(R.string.usage_prompt_system), breakdown.systemBaseTokens)
@@ -814,7 +817,7 @@ private fun PromptBreakdownCard(breakdown: TokenPromptBreakdown) {
             )
             Text(
                 stringResource(R.string.usage_prompt_note),
-                style = DsType.caption11,
+                style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
         }
@@ -846,22 +849,22 @@ private fun UsageAggregateHero(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     title,
-                    style = DsType.small13Strong,
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = colors.labelSecondary,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 badge?.let {
-                    Text(it, style = DsType.caption11, color = colors.accent)
+                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.accent)
                 }
             }
-            Text(formatTokens(aggregate.totalTokens), style = DsType.display24, color = colors.labelPrimary)
+            Text(formatTokens(aggregate.totalTokens), style = DsType.display24.withReadingWeight(), color = colors.labelPrimary)
             Text(
                 "${stringResource(R.string.usage_calculation_input)} ${formatTokens(aggregate.inputTokens)} · " +
                     "${stringResource(R.string.usage_calculation_output)} ${formatTokens(aggregate.outputTokens)} · " +
                     "¥${String.format(Locale.US, "%.4f", aggregate.estimatedCostCny)}",
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelSecondary,
             )
         }
@@ -876,10 +879,10 @@ private fun CompactMetric(label: String, value: String, modifier: Modifier = Mod
             modifier = Modifier.padding(DsSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
-            Text(label, style = DsType.caption11, color = colors.labelTertiary, maxLines = 1)
+            Text(label, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary, maxLines = 1)
             Text(
                 value,
-                style = DsType.large20,
+                style = DsType.large20.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -890,7 +893,7 @@ private fun CompactMetric(label: String, value: String, modifier: Modifier = Mod
 
 @Composable
 private fun SectionHeading(text: String) {
-    Text(text, style = DsType.std14Strong, color = DsTheme.colors.labelPrimary)
+    Text(text, style = DsType.std14Strong.withReadingWeight(), color = DsTheme.colors.labelPrimary)
 }
 
 @Composable
@@ -900,12 +903,12 @@ private fun EmptyUsageDetail(message: String? = null) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.row,
-        color = colors.bgLayer1,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
     ) {
         Text(
             resolvedMessage,
             modifier = Modifier.padding(DsSpacing.medium),
-            style = DsType.small13,
+            style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
     }
@@ -920,9 +923,9 @@ private fun UsageValueLine(label: String, value: String, padded: Boolean = true)
             .then(if (padded) Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = DsType.small13, color = colors.labelSecondary, modifier = Modifier.weight(1f))
+        Text(label, style = DsType.small13.withReadingWeight(), color = colors.labelSecondary, modifier = Modifier.weight(1f))
         if (value.isNotEmpty()) {
-            Text(value, style = DsType.small13Strong, color = colors.labelPrimary)
+            Text(value, style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
         }
     }
 }
