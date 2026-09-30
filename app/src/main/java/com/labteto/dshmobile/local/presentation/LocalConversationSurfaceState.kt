@@ -59,7 +59,7 @@ data class LocalConversationSurfaceState(
     val pendingQuestion: LocalQuestion? = null,
 )
 
-internal fun LocalHarnessState.toChatSurfaceUiState(): LocalConversationSurfaceState =
+internal fun LocalHarnessState.toChatSurfaceUiState(activeModelProfileId: String? = null): LocalConversationSurfaceState =
     LocalConversationSurfaceState(
         loading = loading,
         configured = configured,
@@ -85,7 +85,7 @@ internal fun LocalHarnessState.toChatSurfaceUiState(): LocalConversationSurfaceS
         activeModelProfileId = activeModelProfileId,
     )
 
-internal fun LocalHarnessState.toWorkSurfaceUiState(): LocalConversationSurfaceState =
+internal fun LocalHarnessState.toWorkSurfaceUiState(activeModelProfileId: String? = null): LocalConversationSurfaceState =
     LocalConversationSurfaceState(
         loading = loading,
         configured = configured,
