@@ -25,15 +25,23 @@ val dshUpdateMirrorBaseUrl: String = System.getenv("DSH_UPDATE_MIRROR_BASE_URL")
 
 if (dshUpdateMirrorBaseUrl.isNotEmpty()) {
     val mirrorUri = runCatching { java.net.URI(dshUpdateMirrorBaseUrl) }.getOrNull()
+    val mirrorPath = mirrorUri?.path
+        ?.trim('/')
+        ?.split('/')
+        ?.filter(String::isNotEmpty)
+        .orEmpty()
     require(
         mirrorUri != null &&
             mirrorUri.scheme.equals("https", ignoreCase = true) &&
-            !mirrorUri.host.isNullOrBlank() &&
+            mirrorUri.host.equals("gitee.com", ignoreCase = true) &&
+            mirrorUri.port in listOf(-1, 443) &&
             mirrorUri.rawQuery == null &&
             mirrorUri.rawFragment == null &&
-            mirrorUri.userInfo == null
+            mirrorUri.userInfo == null &&
+            mirrorPath.size == 2 &&
+            mirrorPath.all { it.matches(Regex("[A-Za-z0-9._-]+")) }
     ) {
-        "DSH_UPDATE_MIRROR_BASE_URL 必须是无用户信息、查询参数和片段的 HTTPS 根地址"
+        "DSH_UPDATE_MIRROR_BASE_URL 必须是 https://gitee.com/<owner>/<repo>/"
     }
 }
 
