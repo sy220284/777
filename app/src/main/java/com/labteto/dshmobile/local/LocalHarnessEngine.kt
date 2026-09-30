@@ -85,6 +85,7 @@ import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelAccountStateCoordinator
+import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.profile.UserProfile
@@ -269,6 +270,7 @@ class LocalHarnessEngine @Inject constructor(
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
+    private val streamingPreviewStore = LocalStreamingPreviewStore()
     private val modelRequestCoordinator by lazy {
         LocalModelRequestCoordinator(
             modelGateway = modelGateway,
@@ -276,12 +278,7 @@ class LocalHarnessEngine @Inject constructor(
             historyCompactor = historyCompactor,
             toolSchemas = ::modelToolSchemas,
             defaultEventLog = { eventLog },
-            resetPreview = {
-                _streamingState.value = LocalHarnessStreamingState()
-            },
-            publishPreview = { preview ->
-                _streamingState.update { it.copy(assistant = preview) }
-            },
+            streamingPreviewStore = streamingPreviewStore,
             persistOverflowCompaction = ::persistForegroundOverflowCompaction,
             maxStreamPreviewChars = MAX_STREAM_PREVIEW_CHARS,
             streamPreviewIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
@@ -340,10 +337,9 @@ class LocalHarnessEngine @Inject constructor(
                 LocalHarnessSettingsCoordinator.loadChatStyleGuardCustomPhrases(preferences),
         ),
     )
-    private val _streamingState = MutableStateFlow(LocalHarnessStreamingState())
     private val _sendFeedbackState = MutableStateFlow(LocalSendFeedbackState())
     internal val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
-    internal val streamingState: StateFlow<LocalHarnessStreamingState> = _streamingState.asStateFlow()
+    internal val streamingState: StateFlow<LocalHarnessStreamingState> = streamingPreviewStore.state
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
 
     private val modelAccountStateCoordinator by lazy {
@@ -2997,12 +2993,6 @@ class LocalHarnessEngine @Inject constructor(
         val runHistory = binding?.modelHistory ?: modelHistory
         val runTranscript = binding?.transcriptRuntime ?: transcriptRuntime
         val runSessionId = binding?.sessionId ?: currentSessionId
-        if (currentSessionId == runSessionId && _state.value.sessionId == runSessionId) {
-            // Streaming preview is process-wide. A Chat turn intentionally does not publish raw
-            // deltas, so clear any preview left by the previous visible Work turn before rendering
-            // the Chat "replying" row; otherwise stale Work text appears as the new Chat answer.
-            _streamingState.value = LocalHarnessStreamingState()
-        }
         val runPolicy = localAgentRunPolicy(runState.value.usageMode)
         clearRunCapabilities(binding)
         if (runState.value.usageMode == LocalUsageMode.WORK && runCatching { githubCredentials.configured() }.getOrDefault(false))
@@ -3551,10 +3541,6 @@ class LocalHarnessEngine @Inject constructor(
                 )
             }
             persist(binding)
-            if (currentSessionId == runSessionId && _state.value.sessionId == runSessionId) {
-                // Do not retain a completed Work preview for the next visible Chat turn.
-                _streamingState.value = LocalHarnessStreamingState()
-            }
             val completedJob = currentCoroutineContext()[Job]
             if (binding == null) {
                 synchronized(runStateLock) {
