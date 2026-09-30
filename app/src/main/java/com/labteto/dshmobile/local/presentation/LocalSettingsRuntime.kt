@@ -57,6 +57,10 @@ class LocalSettingsRuntime @Inject constructor(
     suspend fun disconnectChatGptAccount(id: String) {
         engine.removeChatGptAccountProfiles(id)
         chatGptAuth.disconnect(id)
+        val state = chatGptAuth.state.value
+        state.selectedAccountId?.let { nextAccountId ->
+            engine.syncChatGptModels(nextAccountId, state.models, selectFirst = false)
+        }
     }
 
     fun configureModel(apiKey: String, model: String, baseUrl: String) =
