@@ -112,7 +112,7 @@ Agent 具备读取 / 修改工作区文件、执行进程、访问网络和调�
 - 客户端只根据固定 Gitee 仓库、正式版 tag 和经过校验的安全文件名构造附件 URL，不接受镜像元数据提供任意下载地址。
 - Gitee 发布令牌只存在 GitHub Actions Secret，不进入 APK、日志或客户端状态。
 - 版本资产先上传并从公开下载地址做 SHA-256 / 大小回读校验，`update-manifest.json` 最后上传。
-- 启用镜像后 Gitee 发布是正式发布前置门禁，失败时不会继续创建新的 GitHub Release。
+- GitHub Release 是正式发行主源，构建与校验通过后优先发布；Gitee 随后同步同一套资产，镜像失败会让 Workflow 标记失败以便重跑，但不会回滚已经发布的 GitHub Release。
 - 同一个版本的镜像附件不可变；发现已有同名附件内容不同会停止发布。
 
 无论资产来自 Gitee 还是 GitHub，应用内更新都必须验证：
