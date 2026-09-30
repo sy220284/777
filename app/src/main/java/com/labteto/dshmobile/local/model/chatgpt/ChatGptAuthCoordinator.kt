@@ -157,7 +157,7 @@ class ChatGptAuthCoordinator @Inject constructor(
                     redirectUri = listener.redirectUri,
                 )
             } catch (error: ChatGptOAuthTokenException) {
-                if (allowInvalidGrantRetry && error.oauthCode == "invalid_grant") {
+                if (shouldRetryChatGptAuthorization(error.oauthCode, allowInvalidGrantRetry)) {
                     listener.close()
                     return connectAttempt(
                         existingAccountId = existingAccountId,
