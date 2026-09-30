@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelGateway
 import java.io.ByteArrayOutputStream
 import java.net.SocketTimeoutException
 import java.util.UUID
@@ -37,6 +38,7 @@ class VisionClient @Inject constructor(
     private val http: OkHttpClient,
     private val json: Json,
     private val usageTracker: javax.inject.Provider<DeepSeekUsageTracker>,
+    private val modelGateway: javax.inject.Provider<LocalModelGateway>,
 ) : LocalVisionAnalyzer {
     internal constructor(
         http: OkHttpClient,
@@ -45,6 +47,7 @@ class VisionClient @Inject constructor(
         http,
         json,
         javax.inject.Provider { error("测试构造器没有用量追踪器") },
+        javax.inject.Provider { error("测试构造器没有模型网关") },
     )
     private val client = http.newBuilder()
         .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -79,6 +82,37 @@ class VisionClient @Inject constructor(
         require(model.isNotBlank()) { "当前模型名称为空" }
         require(prompt.isNotBlank()) { "图片分析要求不能为空" }
         validateImageDataUrl(imageDataUrl)
+
+        val gateway = runCatching { modelGateway.get() }.getOrNull()
+        val activeProfile = gateway?.activeProfile()
+        if (activeProfile?.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
+            val messages = buildPayload(model, prompt, imageDataUrl)["messages"]
+                ?.jsonArray
+                ?.map { it.jsonObject }
+                ?: error("图片分析请求构造失败")
+            val reply = gateway.complete(
+                model = model,
+                baseUrl = baseUrl,
+                messages = messages,
+                tools = JsonArray(emptyList()),
+            )
+            usageTracker.get().record(
+                model = model,
+                usage = reply.usage,
+                requestId = reply.requestId,
+                context = usageContext?.copy(
+                    action = TokenUsageAction.VISION,
+                    taskLabel = usageContext.taskLabel ?: prompt.take(120),
+                ) ?: TokenUsageContext(
+                    mode = LocalUsageMode.WORK,
+                    action = TokenUsageAction.VISION,
+                    taskLabel = prompt.take(120),
+                ),
+                promptBreakdown = reply.promptBreakdown,
+            )
+            return@withContext reply.content?.trim()?.takeIf(String::isNotBlank)
+                ?: error("当前模型返回了空文本")
+        }
 
         val payload = buildPayload(model, prompt, imageDataUrl)
         val request = Request.Builder()
