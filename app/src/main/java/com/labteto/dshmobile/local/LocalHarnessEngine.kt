@@ -782,7 +782,6 @@ class LocalHarnessEngine @Inject constructor(
                 baseUrl = result.baseUrl,
                 configuredModels = result.configuredModels,
                 modelProfiles = result.profiles,
-                activeModelProfileId = result.activeProfileId,
                 error = null,
             )
         }
@@ -803,7 +802,7 @@ class LocalHarnessEngine @Inject constructor(
             val selected = current.modelProfiles.firstOrNull { it.id == id } ?: return@launch
             if (
                 current.loading || current.running || isRunBusy() ||
-                selected.id == current.activeModelProfileId
+                selected.id == modelGateway.activeProfile()?.id
             ) return@launch
             runCatching { modelConfiguration.select(id, current.modelProfiles) }
                 .onSuccess { result ->
@@ -815,7 +814,6 @@ class LocalHarnessEngine @Inject constructor(
                                 baseUrl = result.baseUrl,
                                 modelProfiles = result.profiles,
                                 configuredModels = result.configuredModels,
-                                activeModelProfileId = result.activeProfileId,
                                 error = null,
                             )
                         }
@@ -840,7 +838,6 @@ class LocalHarnessEngine @Inject constructor(
                             baseUrl = result.baseUrl,
                             modelProfiles = result.profiles,
                             configuredModels = result.configuredModels,
-                            activeModelProfileId = result.activeProfileId,
                         )
                     }
                 }
@@ -2370,7 +2367,6 @@ class LocalHarnessEngine @Inject constructor(
                             baseUrl = result.baseUrl,
                             modelProfiles = result.profiles,
                             configuredModels = result.configuredModels,
-                            activeModelProfileId = result.activeProfileId,
                         )
                     }
                 } finally {
@@ -5032,7 +5028,6 @@ class LocalHarnessEngine @Inject constructor(
             baseUrl = baseUrl,
             configuredModels = modelProfiles.map(LocalModelProfile::model).distinct().sorted(),
             modelProfiles = modelProfiles,
-            activeModelProfileId = activeModelProfile?.id,
             mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
             subagentMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
             modelAttempts = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
