@@ -575,6 +575,33 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun strictResponsesToolRejectsRootAnyOf() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"root_union",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{},
+                    "required":[],
+                    "additionalProperties":false,
+                    "anyOf":[
+                        {"type":"object","properties":{},"required":[],"additionalProperties":false}
+                    ]
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("根对象"))
+        assertTrue(error?.message.orEmpty().contains("anyOf"))
+    }
+
+    @Test
     fun strictResponsesToolAcceptsRequiredNullableOptionalField() {
         val tools = Json.parseToJsonElement("""[
             {"type":"function","function":{
