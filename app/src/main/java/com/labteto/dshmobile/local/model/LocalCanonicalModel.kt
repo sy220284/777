@@ -18,7 +18,7 @@ import kotlinx.serialization.json.put
 
 internal const val LOCAL_MODEL_REPLAY_KEY = "_dsh_model_replay"
 
-internal enum class LocalCanonicalRole {
+enum class LocalCanonicalRole {
     SYSTEM,
     DEVELOPER,
     USER,
@@ -26,7 +26,7 @@ internal enum class LocalCanonicalRole {
     TOOL,
 }
 
-internal sealed interface LocalCanonicalContent {
+sealed interface LocalCanonicalContent {
     data class Text(val text: String) : LocalCanonicalContent
     data class Reasoning(val text: String) : LocalCanonicalContent
     data class Image(val dataUrl: String, val detail: String? = null) : LocalCanonicalContent
@@ -45,13 +45,13 @@ internal sealed interface LocalCanonicalContent {
     data class Raw(val value: JsonObject) : LocalCanonicalContent
 }
 
-internal data class LocalModelReplayEnvelope(
+data class LocalModelReplayEnvelope(
     val adapterId: String,
     val routeFingerprint: String?,
     val payload: JsonObject,
 )
 
-internal data class LocalCanonicalMessage(
+data class LocalCanonicalMessage(
     val role: LocalCanonicalRole,
     val content: List<LocalCanonicalContent>,
     val replay: LocalModelReplayEnvelope? = null,
