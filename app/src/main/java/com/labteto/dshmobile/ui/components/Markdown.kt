@@ -43,6 +43,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsColors
 import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -523,16 +524,20 @@ private fun CodeBlock(
                 modifier = Modifier.weight(1f),
             )
             if (allowCopy) {
-                Icon(
-                    Icons.Filled.ContentCopy,
-                    contentDescription = "Copy code",
-                    tint = colors.labelTertiary,
+                Box(
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(DsSpacing.touchTarget)
                         .clip(DsShapes.chip)
-                        .clickable { clipboard.setText(AnnotatedString(code)) }
-                        .padding(2.dp),
-                )
+                        .clickable { clipboard.setText(AnnotatedString(code)) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.ContentCopy,
+                        contentDescription = "Copy code",
+                        tint = colors.labelTertiary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
         }
         Text(
