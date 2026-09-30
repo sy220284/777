@@ -417,4 +417,7 @@ object LocalModelPresets {
 
     fun toolCallingModeFor(model: String, baseUrl: String): LocalModelToolCallingMode =
         find(model, baseUrl)?.toolCallingMode ?: LocalModelToolCallingMode.CHAT_COMPLETIONS
+
+    fun protocolFor(model: String, baseUrl: String): LocalModelProtocol =
+        find(model, baseUrl)?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS
 }

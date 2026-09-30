@@ -38,12 +38,16 @@ class LocalModelProfilesTest {
         chatCompletionRoutes.forEach { (model, baseUrl) ->
             assertEquals(
                 LocalModelProtocol.CHAT_COMPLETIONS,
-                LocalModelPresets.find(model, baseUrl)?.protocol,
+                LocalModelPresets.protocolFor(model, baseUrl),
             )
         }
         assertEquals(
             LocalModelProtocol.RESPONSES,
-            LocalModelPresets.find("gpt-6-astra", "https://api.openai.com/v1")?.protocol,
+            LocalModelPresets.protocolFor("gpt-6-astra", "https://api.openai.com/v1"),
+        )
+        assertEquals(
+            LocalModelProtocol.CHAT_COMPLETIONS,
+            LocalModelPresets.protocolFor("custom-model", "https://custom.example/v1"),
         )
     }
 

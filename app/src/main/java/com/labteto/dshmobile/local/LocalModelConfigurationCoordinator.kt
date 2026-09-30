@@ -118,9 +118,7 @@ internal class LocalModelConfigurationCoordinator(
         val key = apiKey.trim().takeIf(String::isNotEmpty)
             ?: apiKeys.getFor(modelProfileId(name, url))
             ?: return "请先填写该模型的密钥"
-        val protocol = LocalModelPresets.find(name, url)?.protocol
-            ?: LocalModelProtocol.CHAT_COMPLETIONS
-        return tester.test(key, url, name, protocol)
+        return tester.test(key, url, name, LocalModelPresets.protocolFor(name, url))
     }
 
     fun readProfiles(): List<LocalModelProfile> = profiles.read()
