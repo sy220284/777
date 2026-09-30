@@ -172,79 +172,79 @@ class DeepSeekClient @Inject constructor(
                 // 的连接异常覆盖已完成结果并触发重复请求。
                 val reader = responseBody.charStream().buffered()
                 while (true) {
-                        val line = reader.readLine() ?: break
-                        totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
-                        if (totalBytes > MAX_MODEL_RESPONSE_BYTES) {
-                            throw LocalModelException(
-                                code = "MODEL_RESPONSE_TOO_LARGE",
-                                message = "模型流式响应超过 ${MAX_MODEL_RESPONSE_BYTES} 字节上限",
-                                retryable = false,
-                            )
-                        }
-                        if (!line.startsWith("data:")) {
-                            if (line.isNotBlank()) fallback.append(line)
-                            continue
-                        }
-                        sawStreamData = true
-                        val data = line.removePrefix("data:").trim()
-                        if (data.isBlank()) continue
-                        if (data == "[DONE]") {
-                            sawTerminalFrame = true
-                            break
-                        }
-                        val root = try {
-                            json.parseToJsonElement(data) as? JsonObject
-                                ?: throw streamProtocolError("模型流式响应数据帧不是 JSON 对象")
-                        } catch (error: LocalModelException) {
-                            throw error
-                        } catch (error: Exception) {
-                            throw streamProtocolError("模型流式响应包含无法解析的数据帧", error)
-                        }
-                        if (root["error"] != null && root["error"] !is JsonNull) {
-                            throw LocalModelException(
-                                code = "MODEL_STREAM_ERROR",
-                                message = "模型流式请求失败：${providerErrorDetail(root.toString(), json) ?: "未知错误"}",
-                                retryable = false,
-                                requestId = requestId,
-                            )
-                        }
-                        (root["usage"] as? JsonObject)?.let { streamUsage = it }
-                        val firstChoice = (root["choices"] as? JsonArray)
-                            ?.firstOrNull() as? JsonObject
-                        val finishReason = (firstChoice?.get("finish_reason") as? JsonPrimitive)
-                            ?.contentOrNull
-                        if (!finishReason.isNullOrBlank()) {
-                            requireCompleteFinishReason(finishReason)
-                            sawTerminalFrame = true
-                        }
-                        val delta = firstChoice?.get("delta") as? JsonObject
-                        if (delta == null) continue
-                        val textDelta = assistantText(delta["content"]).orEmpty() +
-                            (delta["refusal"] as? JsonPrimitive)?.contentOrNull.orEmpty()
-                        val reasoningDelta = (delta["reasoning_content"] as? JsonPrimitive)
-                            ?.contentOrNull.orEmpty()
-                        if (textDelta.isNotEmpty()) content.append(textDelta)
-                        if (reasoningDelta.isNotEmpty()) reasoning.append(reasoningDelta)
-                        if (textDelta.isNotEmpty() || reasoningDelta.isNotEmpty()) {
-                            onDelta(LocalModelDelta(textDelta, reasoningDelta))
-                        }
-                        (delta["tool_calls"] as? JsonArray).orEmpty().forEach { element ->
-                            val item = element as? JsonObject
-                                ?: throw streamProtocolError("模型流式工具调用数据帧格式错误")
-                            val index = (item["index"] as? JsonPrimitive)?.intOrNull ?: 0
-                            val acc = toolCalls.getOrPut(index) { StreamToolCall() }
-                            acc.metadata = mergeModelMetadata(acc.metadata, JsonObject(item.filterKeys {
-                                it !in setOf("index", "id", "type", "function")
-                            }))
-                            (item["id"] as? JsonPrimitive)?.contentOrNull
-                                ?.takeIf(String::isNotBlank)?.let { acc.id = it }
-                            val function = item["function"] as? JsonObject
-                            (function?.get("name") as? JsonPrimitive)?.contentOrNull
-                                ?.takeIf(String::isNotBlank)?.let { acc.name = it }
-                            (function?.get("arguments") as? JsonPrimitive)?.contentOrNull
-                                ?.let(acc.arguments::append)
-                        }
+                    val line = reader.readLine() ?: break
+                    totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
+                    if (totalBytes > MAX_MODEL_RESPONSE_BYTES) {
+                        throw LocalModelException(
+                            code = "MODEL_RESPONSE_TOO_LARGE",
+                            message = "模型流式响应超过 ${MAX_MODEL_RESPONSE_BYTES} 字节上限",
+                            retryable = false,
+                        )
                     }
+                    if (!line.startsWith("data:")) {
+                        if (line.isNotBlank()) fallback.append(line)
+                        continue
+                    }
+                    sawStreamData = true
+                    val data = line.removePrefix("data:").trim()
+                    if (data.isBlank()) continue
+                    if (data == "[DONE]") {
+                        sawTerminalFrame = true
+                        break
+                    }
+                    val root = try {
+                        json.parseToJsonElement(data) as? JsonObject
+                            ?: throw streamProtocolError("模型流式响应数据帧不是 JSON 对象")
+                    } catch (error: LocalModelException) {
+                        throw error
+                    } catch (error: Exception) {
+                        throw streamProtocolError("模型流式响应包含无法解析的数据帧", error)
+                    }
+                    if (root["error"] != null && root["error"] !is JsonNull) {
+                        throw LocalModelException(
+                            code = "MODEL_STREAM_ERROR",
+                            message = "模型流式请求失败：${providerErrorDetail(root.toString(), json) ?: "未知错误"}",
+                            retryable = false,
+                            requestId = requestId,
+                        )
+                    }
+                    (root["usage"] as? JsonObject)?.let { streamUsage = it }
+                    val firstChoice = (root["choices"] as? JsonArray)
+                        ?.firstOrNull() as? JsonObject
+                    val finishReason = (firstChoice?.get("finish_reason") as? JsonPrimitive)
+                        ?.contentOrNull
+                    if (!finishReason.isNullOrBlank()) {
+                        requireCompleteFinishReason(finishReason)
+                        sawTerminalFrame = true
+                    }
+                    val delta = firstChoice?.get("delta") as? JsonObject
+                    if (delta == null) continue
+                    val textDelta = assistantText(delta["content"]).orEmpty() +
+                        (delta["refusal"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                    val reasoningDelta = (delta["reasoning_content"] as? JsonPrimitive)
+                        ?.contentOrNull.orEmpty()
+                    if (textDelta.isNotEmpty()) content.append(textDelta)
+                    if (reasoningDelta.isNotEmpty()) reasoning.append(reasoningDelta)
+                    if (textDelta.isNotEmpty() || reasoningDelta.isNotEmpty()) {
+                        onDelta(LocalModelDelta(textDelta, reasoningDelta))
+                    }
+                    (delta["tool_calls"] as? JsonArray).orEmpty().forEach { element ->
+                        val item = element as? JsonObject
+                            ?: throw streamProtocolError("模型流式工具调用数据帧格式错误")
+                        val index = (item["index"] as? JsonPrimitive)?.intOrNull ?: 0
+                        val acc = toolCalls.getOrPut(index) { StreamToolCall() }
+                        acc.metadata = mergeModelMetadata(acc.metadata, JsonObject(item.filterKeys {
+                            it !in setOf("index", "id", "type", "function")
+                        }))
+                        (item["id"] as? JsonPrimitive)?.contentOrNull
+                            ?.takeIf(String::isNotBlank)?.let { acc.id = it }
+                        val function = item["function"] as? JsonObject
+                        (function?.get("name") as? JsonPrimitive)?.contentOrNull
+                            ?.takeIf(String::isNotBlank)?.let { acc.name = it }
+                        (function?.get("arguments") as? JsonPrimitive)?.contentOrNull
+                            ?.let(acc.arguments::append)
+                    }
+                }
                 if (!sawStreamData) {
                     if (fallback.isBlank()) {
                         throw LocalModelException(
