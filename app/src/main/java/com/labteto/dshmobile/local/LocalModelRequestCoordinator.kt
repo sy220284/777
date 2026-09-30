@@ -106,6 +106,11 @@ internal class LocalModelRequestCoordinator(
                         previewOwner?.takeIf { previewGuard() }?.let(streamingPreviewStore::begin)
                     }
                     is AgentRequestEvent.AttemptFailed -> {
+                        if (event.willRetry) {
+                            previewOwner
+                                ?.takeIf { previewGuard() }
+                                ?.let(streamingPreviewStore::begin)
+                        }
                         AppLog.warn(
                             "LocalModelRequest",
                             "主智能体模型请求失败 model=${snapshot.model} step=$step attempt=${event.attempt} " +
