@@ -430,6 +430,16 @@ jobs:
             echo "构建期间 main 已出现影响构建的变更：$MAIN_SHA，本次旧版本不发布。"
           fi
 
+      - name: Publish Gitee mainland update mirror
+        if: steps.freshness.outputs.current == 'true'
+        env:
+          UPDATE_MIRROR_BASE_URL: ${{ vars.UPDATE_MIRROR_BASE_URL }}
+          GITEE_MIRROR_ACCESS_TOKEN: ${{ secrets.GITEE_MIRROR_ACCESS_TOKEN }}
+        run: |
+          python3 .github/scripts/publish-gitee-update-mirror.py \
+            --asset-dir .release-assets \
+            --version "$DSH_VERSION_NAME"
+
       - name: Publish GitHub Release
         if: steps.freshness.outputs.current == 'true'
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
@@ -440,15 +450,3 @@ jobs:
           files: |
             .release-assets/*
           generate_release_notes: true
-
-      - name: Publish mainland OSS update mirror
-        if: steps.freshness.outputs.current == 'true'
-        continue-on-error: true
-        env:
-          UPDATE_MIRROR_BASE_URL: ${{ vars.UPDATE_MIRROR_BASE_URL }}
-          UPDATE_OSS_ACCESS_KEY_ID: ${{ secrets.UPDATE_OSS_ACCESS_KEY_ID }}
-          UPDATE_OSS_ACCESS_KEY_SECRET: ${{ secrets.UPDATE_OSS_ACCESS_KEY_SECRET }}
-        run: |
-          python3 .github/scripts/publish-oss-update-mirror.py \
-            --asset-dir .release-assets \
-            --version "$DSH_VERSION_NAME"
