@@ -60,13 +60,15 @@ class OpenAiResponsesClient @Inject constructor(
         onDelta: (LocalModelDelta) -> Unit = {},
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
+        val openAiContract = usesOpenAiResponsesContract(baseUrl, planSharing)
         val payload = buildPayload(
             model = model,
             messages = messages,
             tools = tools,
             temperature = temperature,
             planSharing = planSharing,
-            includeEncryptedReasoning = shouldIncludeEncryptedReasoning(baseUrl, planSharing),
+            includeEncryptedReasoning = openAiContract,
+            enforceOpenAiToolSchema = openAiContract,
         )
         val request = Request.Builder()
             .url(responsesEndpoint(baseUrl, planSharing))
@@ -98,7 +100,10 @@ class OpenAiResponsesClient @Inject constructor(
                 val streamedContent = StringBuilder()
                 val streamedReasoning = StringBuilder()
                 var totalBytes = 0
-                responseBody.charStream().buffered().use { reader ->
+                // Response 生命周期由 withCancellableModelResponse 统一关闭；这里不要单独 use(reader)，
+                // 否则成功终态后的 reader.close() 异常仍可能把成功请求翻成失败。
+                val reader = responseBody.charStream().buffered()
+                run {
                     while (true) {
                         val line = reader.readLine() ?: break
                         totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
@@ -162,6 +167,7 @@ class OpenAiResponsesClient @Inject constructor(
                             "response.completed" -> {
                                 completedResponse = event["response"] as? JsonObject
                                     ?: throw responseProtocolError("completed 事件缺少 response")
+                                // completed 是成功终态；不要再读取 EOF，避免终态后的连接收尾异常触发整轮重试。
                                 break
                             }
                         }
@@ -200,6 +206,7 @@ class OpenAiResponsesClient @Inject constructor(
         temperature: Double?,
         planSharing: Boolean = true,
         includeEncryptedReasoning: Boolean = true,
+        enforceOpenAiToolSchema: Boolean = planSharing,
     ): JsonObject = buildJsonObject {
         put("model", model)
         responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
@@ -209,7 +216,9 @@ class OpenAiResponsesClient @Inject constructor(
         if (includeEncryptedReasoning) {
             put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
         }
-        if (tools.isNotEmpty()) put("tools", responseTools(tools, planSharing))
+        if (tools.isNotEmpty()) {
+            put("tools", responseTools(tools, planSharing, enforceOpenAiToolSchema))
+        }
         if (!planSharing) temperature?.let { put("temperature", it) }
         // ChatGPT plan sharing rejects sampling controls; API-key Responses keeps its own contract.
     }
@@ -342,34 +351,12 @@ class OpenAiResponsesClient @Inject constructor(
     private fun responseTools(
         tools: JsonArray,
         planSharing: Boolean,
-    ): JsonArray {
-        val functions = buildJsonArray {
-            tools.forEach { element ->
-                val source = element as? JsonObject ?: return@forEach
-                val function = source["function"] as? JsonObject ?: return@forEach
-                val name = function["name"]?.jsonPrimitive?.contentOrNull ?: return@forEach
-                add(buildJsonObject {
-                    put("type", "function")
-                    put("name", name)
-                    function["description"]?.let { put("description", it) }
-                    function["parameters"]?.let { put("parameters", it) }
-                    put("strict", function["strict"] ?: JsonPrimitive(false))
-                })
-            }
-        }
-        if (!planSharing || functions.isEmpty()) return functions
-
-        // Sign in with ChatGPT 套餐共享预览要求 function/custom tools 位于 namespace
-        // 或 additional_tools 中。只在套餐共享契约下包装，标准 Responses API 保持原形。
-        return buildJsonArray {
-            add(buildJsonObject {
-                put("type", "namespace")
-                put("name", CHATGPT_PLAN_TOOL_NAMESPACE)
-                put("description", "本机 Harness 工具，用于已授权的文件、设备和任务操作。")
-                put("tools", functions)
-            })
-        }
-    }
+        enforceOpenAiToolSchema: Boolean,
+    ): JsonArray = OpenAiResponsesToolAdapter.adapt(
+        tools = tools,
+        planSharing = planSharing,
+        enforceOpenAiToolSchema = enforceOpenAiToolSchema,
+    )
 
     internal fun responseMessageText(parts: JsonArray): String = buildString {
         parts.forEach { part ->
@@ -683,7 +670,10 @@ class OpenAiResponsesClient @Inject constructor(
         return if (clean.endsWith("/responses")) clean else "$clean/responses"
     }
 
-    internal fun shouldIncludeEncryptedReasoning(baseUrl: String, planSharing: Boolean): Boolean {
+    internal fun shouldIncludeEncryptedReasoning(baseUrl: String, planSharing: Boolean): Boolean =
+        usesOpenAiResponsesContract(baseUrl, planSharing)
+
+    internal fun usesOpenAiResponsesContract(baseUrl: String, planSharing: Boolean): Boolean {
         if (planSharing) return true
         return runCatching {
             java.net.URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.openai.com", ignoreCase = true)
@@ -736,6 +726,5 @@ class OpenAiResponsesClient @Inject constructor(
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
         private const val MAX_STREAM_BYTES = 32 * 1024 * 1024
         private const val ERROR_BODY_LIMIT = 8_000
-        private const val CHATGPT_PLAN_TOOL_NAMESPACE = "local"
     }
 }
