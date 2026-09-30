@@ -103,6 +103,7 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -1050,13 +1051,13 @@ private fun AppearanceReadingPreview(settings: AppSettings) {
     ) {
         Text(
             stringResource(R.string.settings_appearance_preview_assistant),
-            style = DsType.base16,
+            style = DsType.base16.withReadingWeight(),
             color = colors.labelPrimary,
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Text(
                 stringResource(R.string.settings_appearance_preview_user),
-                style = DsType.base16Strong,
+                style = DsType.base16Strong.withReadingWeight(),
                 color = colors.labelPrimary,
                 modifier = Modifier
                     .background(colors.userBubble, DsShapes.bubble)
