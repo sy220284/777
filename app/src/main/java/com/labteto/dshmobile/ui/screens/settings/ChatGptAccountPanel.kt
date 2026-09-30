@@ -134,7 +134,7 @@ internal fun ChatGptAccountPanel(
                     Text(it, style = DsType.caption11, color = colors.labelTertiary)
                 }
                 Text(
-                    "$accountShortLabel ${selected.clientId.takeLast(6)}",
+                    "$accountShortLabel ${selected.id.takeLast(6)}",
                     style = DsType.caption11,
                     color = colors.labelTertiary,
                 )
@@ -169,7 +169,7 @@ internal fun ChatGptAccountPanel(
                                     append(" · ")
                                     append(accountShortLabel)
                                     append(' ')
-                                    append(account.clientId.takeLast(6))
+                                    append(account.id.takeLast(6))
                                 },
                                 style = DsType.small13,
                                 color = colors.labelSecondary,
