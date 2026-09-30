@@ -5023,8 +5023,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         val modelProfiles = modelConfiguration.readProfiles()
         val activeModelProfile = modelConfiguration.activeProfile(model, baseUrl, modelProfiles)
-        val modelConfigured =
-            activeModelProfile != null && modelGateway.hasCredential(activeModelProfile)
+        val modelConfigured = activeModelProfile != null && modelGateway.hasCredential(activeModelProfile)
         activeModelProfile?.takeIf { modelConfigured }?.let(modelGateway::activate)
         _state.value = LocalHarnessState(
             loading = false,
