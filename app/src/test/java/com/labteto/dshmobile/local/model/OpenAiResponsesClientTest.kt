@@ -487,6 +487,185 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun strictResponsesToolAcceptsRequiredNullableOptionalField() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"strict_tool",
+                "description":"严格工具",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{
+                        "query":{"type":"string"},
+                        "limit":{"type":["integer","null"]}
+                    },
+                    "required":["query","limit"],
+                    "additionalProperties":false
+                }
+            }}
+        ]""").jsonArray
+
+        val payload = client.buildPayload(
+            model = "gpt-test",
+            messages = emptyList(),
+            tools = tools,
+            temperature = null,
+            planSharing = true,
+        )
+        val function = payload["tools"]!!.jsonArray.single().jsonObject["tools"]!!
+            .jsonArray.single().jsonObject
+
+        assertEquals("true", function["strict"]!!.jsonPrimitive.content)
+        assertEquals(
+            tools.single().jsonObject["function"]!!.jsonObject["parameters"],
+            function["parameters"],
+        )
+    }
+
+    @Test
+    fun strictResponsesToolRequiresAdditionalPropertiesFalse() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"strict_tool",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{"query":{"type":"string"}},
+                    "required":["query"]
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("additionalProperties=false"))
+    }
+
+    @Test
+    fun strictResponsesToolRequiresEveryPropertyInRequired() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"strict_tool",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{
+                        "query":{"type":"string"},
+                        "limit":{"type":"integer"}
+                    },
+                    "required":["query"],
+                    "additionalProperties":false
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = false)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("limit"))
+        assertTrue(error?.message.orEmpty().contains("required"))
+    }
+
+    @Test
+    fun strictResponsesToolValidatesNestedObjectsRecursively() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"nested_tool",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{
+                        "config":{
+                            "type":"object",
+                            "properties":{"enabled":{"type":"boolean"}},
+                            "required":["enabled"]
+                        }
+                    },
+                    "required":["config"],
+                    "additionalProperties":false
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("parameters.properties.config"))
+        assertTrue(error?.message.orEmpty().contains("additionalProperties=false"))
+    }
+
+    @Test
+    fun malformedResponsesPropertiesAreRejectedEvenWhenNonStrict() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"bad_tool",
+                "strict":false,
+                "parameters":{
+                    "type":"object",
+                    "properties":"not-an-object"
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = false)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("properties"))
+    }
+
+    @Test
+    fun responsesStrictFlagMustBeJsonBoolean() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"bad_strict",
+                "strict":"true",
+                "parameters":{"type":"object","properties":{}}
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("strict"))
+        assertTrue(error?.message.orEmpty().contains("布尔"))
+    }
+
+    @Test
+    fun strictResponsesToolRejectsUnsupportedStructuredOutputKeyword() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"unsupported_schema",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{"query":{"type":"string"}},
+                    "required":["query"],
+                    "additionalProperties":false,
+                    "allOf":[{"type":"object"}]
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("allOf"))
+    }
+
+    @Test
     fun apiKeyResponsesKeepsFlatFunctionTools() {
         val tools = JsonArray(
             listOf(
