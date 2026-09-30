@@ -102,7 +102,7 @@ class OpenAiResponsesClient @Inject constructor(
                 val streamedReasoning = StringBuilder()
                 var totalBytes = 0
                 responseBody.charStream().buffered().use { reader ->
-                    while (true) {
+                    responseStream@ while (true) {
                         val line = reader.readLine() ?: break
                         totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
                         if (totalBytes > MAX_STREAM_BYTES) {
@@ -165,6 +165,9 @@ class OpenAiResponsesClient @Inject constructor(
                             "response.completed" -> {
                                 completedResponse = event["response"] as? JsonObject
                                     ?: error("Responses API completed 事件缺少 response")
+                                // response.completed 是本次推理的成功终态。收到后立即结算，避免终态之后
+                                // 的 TCP/HTTP2 收尾抖动被误判为失败并触发整轮重复请求。
+                                break@responseStream
                             }
                         }
                     }
