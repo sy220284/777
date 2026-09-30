@@ -427,7 +427,7 @@ fun SettingsScreen(
 
                     SettingsDestination.APPEARANCE -> {
                         SettingsCard(stringResource(R.string.settings_appearance_preview), Icons.Outlined.Tune) {
-                            AppearanceReadingPreview(settings)
+                            AppearanceReadingPreview()
                         }
                         SettingsCard(stringResource(R.string.settings_appearance), Icons.Outlined.Tune) {
                             AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
@@ -1043,7 +1043,7 @@ private fun appearanceLabel(preference: String): String = when (preference) {
 }
 
 @Composable
-private fun AppearanceReadingPreview(settings: AppSettings) {
+private fun AppearanceReadingPreview() {
     val colors = DsTheme.colors
     Column(
         modifier = Modifier
