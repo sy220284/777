@@ -58,6 +58,7 @@ internal fun PermissionMenu(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = DsSpacing.touchTarget)
                     .clickable { onPick(option.value) }
                     .padding(vertical = DsSpacing.small),
                 verticalAlignment = Alignment.Top,
@@ -117,6 +118,7 @@ internal fun FullAccessConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Uni
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = DsSpacing.touchTarget)
                 .clickable { acknowledged = !acknowledged },
             verticalAlignment = Alignment.CenterVertically,
         ) {
