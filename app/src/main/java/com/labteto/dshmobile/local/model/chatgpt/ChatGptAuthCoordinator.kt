@@ -246,10 +246,20 @@ class ChatGptAuthCoordinator @Inject constructor(
             }
     }
 
-    suspend fun disconnect(id: String) {
-        runCatching { sessions.revoke(id) }
+    suspend fun disconnect(id: String): String? {
+        val revokeFailure = runCatching { sessions.revoke(id) }.exceptionOrNull()
         accounts.clearCredentials(id)
+        val next = accounts.list().firstOrNull { account ->
+            account.id != id &&
+                account.sharingEnabled &&
+                account.accessToken.isNotBlank() &&
+                account.refreshToken.isNotBlank()
+        }
+        next?.let { accounts.select(it.id) }
         refresh()
+        return revokeFailure?.let {
+            "已从本机断开 ChatGPT 账户，但 OpenAI 端撤销状态未能确认；请在 ChatGPT 设置中检查应用连接。"
+        }
     }
 
     private suspend fun currentState(
