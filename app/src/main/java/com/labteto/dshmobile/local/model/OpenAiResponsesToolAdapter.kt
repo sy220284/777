@@ -139,7 +139,6 @@ internal object OpenAiResponsesToolAdapter {
                 path = "parameters",
                 strict = strict,
                 enforceOpenAiToolSchema = true,
-                depth = 1,
             )
         }
         return normalized
@@ -161,6 +160,19 @@ internal object OpenAiResponsesToolAdapter {
                 "$path 超过 OpenAI strict schema 的最大 $MAX_STRICT_SCHEMA_DEPTH 层嵌套",
             )
         }
+        if (
+            strict &&
+            enforceOpenAiToolSchema &&
+            path == "parameters" &&
+            "anyOf" in schema
+        ) {
+            throw invalidToolSchema(
+                index,
+                name,
+                "parameters 根对象在 strict=true 时不能直接使用 anyOf",
+            )
+        }
+
         val properties = schema["properties"]?.let { element ->
             element as? JsonObject
                 ?: throw invalidToolSchema(index, name, "$path.properties 必须是对象")
@@ -255,7 +267,6 @@ internal object OpenAiResponsesToolAdapter {
                     "$path.items",
                     strict,
                     enforceOpenAiToolSchema,
-                    depth + 1,
                 )
             } else if (strict && enforceOpenAiToolSchema) {
                 throw invalidToolSchema(
@@ -283,7 +294,6 @@ internal object OpenAiResponsesToolAdapter {
                     "$path.anyOf[$anyOfIndex]",
                     strict,
                     enforceOpenAiToolSchema,
-                    depth + 1,
                 )
             }
         }
@@ -305,7 +315,6 @@ internal object OpenAiResponsesToolAdapter {
                     "$path.\$defs.$definitionName",
                     strict,
                     enforceOpenAiToolSchema,
-                    depth + 1,
                 )
             }
         }
