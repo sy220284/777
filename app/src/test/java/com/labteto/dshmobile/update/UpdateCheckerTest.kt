@@ -78,7 +78,7 @@ class UpdateCheckerTest {
             "https://github.com/sy220284/777/releases/download/v0.12.0-777.50/app-release.apk",
             update?.apkUrl,
         )
-        assertEquals(listOf("gitee.com", "gitee.com", "api.github.com"), requestedHosts)
+        assertEquals(\n            listOf("gitee.com", "gitee.com", "api.github.com", "api.github.com"),\n            requestedHosts,\n        )
     }
 
     @Test
