@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalToolCatalog
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import java.io.IOException
 import java.net.SocketException
@@ -364,6 +366,124 @@ class OpenAiResponsesClientTest {
         assertEquals("function", function["type"]?.jsonPrimitive?.content)
         assertEquals("read_file", function["name"]?.jsonPrimitive?.content)
         assertTrue(function["parameters"] is JsonObject)
+    }
+
+    @Test
+    fun chatGptPlanNamespaceCarriesRequiredDescription() {
+        val tools = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("type", "function")
+                    put("function", buildJsonObject {
+                        put("name", "read_file")
+                        put("description", "读取文件")
+                        put("parameters", buildJsonObject {
+                            put("type", "object")
+                            put("properties", buildJsonObject {})
+                        })
+                    })
+                },
+            ),
+        )
+
+        val payload = client.buildPayload(
+            model = "gpt-test",
+            messages = emptyList(),
+            tools = tools,
+            temperature = null,
+            planSharing = true,
+        )
+        val namespace = payload["tools"]!!.jsonArray.single().jsonObject
+
+        assertEquals("namespace", namespace["type"]?.jsonPrimitive?.content)
+        assertEquals("local", namespace["name"]?.jsonPrimitive?.content)
+        assertTrue(namespace["description"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+        assertTrue(namespace["tools"]!!.jsonArray.isNotEmpty())
+    }
+
+    @Test
+    fun responsesFunctionToolsFillRequiredDescriptionAndParameters() {
+        val minimal = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("type", "function")
+                    put("function", buildJsonObject {
+                        put("name", "minimal_tool")
+                    })
+                },
+            ),
+        )
+
+        listOf(false, true).forEach { plan ->
+            val payload = client.buildPayload(
+                model = "gpt-test",
+                messages = emptyList(),
+                tools = minimal,
+                temperature = null,
+                planSharing = plan,
+            )
+            val emitted = payload["tools"]!!.jsonArray.let { outer ->
+                if (plan) outer.single().jsonObject["tools"]!!.jsonArray else outer
+            }.single().jsonObject
+
+            assertEquals("function", emitted["type"]?.jsonPrimitive?.content)
+            assertEquals("minimal_tool", emitted["name"]?.jsonPrimitive?.content)
+            assertTrue(emitted["description"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+            val parameters = emitted["parameters"]!!.jsonObject
+            assertEquals("object", parameters["type"]?.jsonPrimitive?.content)
+            assertTrue("properties" in parameters)
+        }
+    }
+
+    @Test
+    fun currentHarnessToolCatalogSatisfiesResponsesRequiredShape() {
+        val payload = client.buildPayload(
+            model = "gpt-test",
+            messages = emptyList(),
+            tools = LocalToolCatalog.specs,
+            temperature = null,
+            planSharing = true,
+        )
+        val namespace = payload["tools"]!!.jsonArray.single().jsonObject
+        assertTrue(namespace["description"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+
+        namespace["tools"]!!.jsonArray.forEach { element ->
+            val function = element.jsonObject
+            assertEquals("function", function["type"]?.jsonPrimitive?.content)
+            assertTrue(function["name"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+            assertTrue(function["description"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+            assertEquals("object", function["parameters"]!!.jsonObject["type"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
+    fun invalidResponsesParametersAreRejectedBeforeNetworkRequest() {
+        val tools = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("type", "function")
+                    put("function", buildJsonObject {
+                        put("name", "bad_tool")
+                        put("description", "错误工具")
+                        put("parameters", "not-a-schema")
+                    })
+                },
+            ),
+        )
+
+        val error = runCatching {
+            client.buildPayload(
+                model = "gpt-test",
+                messages = emptyList(),
+                tools = tools,
+                temperature = null,
+                planSharing = true,
+            )
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertFalse(error?.retryable ?: true)
+        assertTrue(error?.message.orEmpty().contains("parameters"))
     }
 
     @Test
