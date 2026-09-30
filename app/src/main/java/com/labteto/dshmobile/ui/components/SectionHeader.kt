@@ -17,6 +17,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
 /** Section title row with an optional right-aligned accent action. */
@@ -30,7 +31,7 @@ fun SectionHeader(
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             title,
-            style = DsType.std14Strong,
+            style = DsType.std14Strong.withReadingWeight(),
             color = colors.labelSecondary,
             modifier = Modifier.weight(1f),
         )
@@ -51,7 +52,7 @@ fun SectionHeader(
             ) {
                 Text(
                     action,
-                    style = DsType.caption11Strong,
+                    style = DsType.caption11Strong.withReadingWeight(),
                     color = colors.accent,
                 )
             }
