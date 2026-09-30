@@ -9,9 +9,7 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import kotlinx.serialization.json.Json
 
 internal data class LocalModelConfigurationResult(
-    val configured: Boolean,
-    val model: String,
-    val baseUrl: String,
+    val configured: Boolean, val model: String, val baseUrl: String,
     val profiles: List<LocalModelProfile>,
 ) {
     val configuredModels: List<String>
@@ -125,11 +123,8 @@ internal class LocalModelConfigurationCoordinator(
 
     fun readProfiles(): List<LocalModelProfile> = profiles.read()
 
-    fun activeProfile(
-        model: String,
-        baseUrl: String,
-        all: List<LocalModelProfile> = profiles.read(),
-    ): LocalModelProfile? = profiles.active(model, baseUrl, all)
+    fun activeProfile(model: String, baseUrl: String, all: List<LocalModelProfile> = profiles.read()) =
+        profiles.active(model, baseUrl, all)
 
     fun normalizeModel(model: String): String =
         model.trim().ifBlank { DEFAULT_MODEL }.let {
