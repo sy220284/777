@@ -561,6 +561,11 @@ internal class LocalSubagentRunner(
             retryable = { error ->
                 (error as? LocalModelException)?.retryable == true || error is java.io.IOException
             },
+            backoffMillis = { failedAttempt, error ->
+                (error as? LocalModelException)?.providerRetryAfterMs
+                    ?.coerceIn(0L, 60_000L)
+                    ?: (1_000L shl (failedAttempt - 1).coerceIn(0, 20))
+            },
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
                     is AgentRequestEvent.AttemptStarted -> {
@@ -608,12 +613,32 @@ internal class LocalSubagentRunner(
             try {
                 return executor.execute {
                     resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                        modelGateway.complete(
-                            model = model,
-                            baseUrl = baseUrl,
-                            messages = activeHistory,
-                            tools = tools,
-                        )
+                        try {
+                            modelGateway.complete(
+                                model = model,
+                                baseUrl = baseUrl,
+                                messages = activeHistory,
+                                tools = tools,
+                            )
+                        } catch (error: LocalModelException) {
+                            eventLog().append("subagent/provider-error", buildJsonObject {
+                                put("agent_id", subagentId)
+                                put("step", step)
+                                put("code", error.code)
+                                error.status?.let { put("status", it) }
+                                error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
+                                error.requestId?.let { put("request_id", it) }
+                                error.providerCode?.let { put("provider_code", it) }
+                                error.providerParam?.let { put("provider_param", it) }
+                                error.cause?.let { cause ->
+                                    put("cause_type", cause::class.java.simpleName)
+                                    cause.message?.takeIf(String::isNotBlank)?.let {
+                                        put("cause_detail", it.take(800))
+                                    }
+                                }
+                            })
+                            throw error
+                        }
                     }
                 }
             } catch (error: Throwable) {

@@ -471,6 +471,11 @@ class LocalModelException(
     message: String,
     val retryable: Boolean,
     cause: Throwable? = null,
+    val status: Int? = null,
+    val providerRetryAfterMs: Long? = null,
+    val requestId: String? = null,
+    val providerCode: String? = null,
+    val providerParam: String? = null,
 ) : Exception(message, cause)
 
 internal fun contextWindowExceeded(error: Throwable): Boolean {

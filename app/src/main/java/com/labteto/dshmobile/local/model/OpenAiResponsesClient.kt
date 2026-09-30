@@ -9,7 +9,10 @@ import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.estimatePromptBreakdown
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_RESPONSES_URL
 import java.io.IOException
+import java.net.SocketException
 import java.net.SocketTimeoutException
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -66,9 +69,18 @@ class OpenAiResponsesClient @Inject constructor(
             .build()
         try {
             runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
+                val requestId = response.header("x-request-id")
+                    ?: response.header("openai-request-id")
+                val retryAfterMs = parseRetryAfterMillis(response.header("Retry-After"))
                 if (!response.isSuccessful) {
                     val body = response.body?.string().orEmpty().take(ERROR_BODY_LIMIT)
-                    throw httpError(response.code, body, planSharing)
+                    throw httpError(
+                        status = response.code,
+                        body = body,
+                        planSharing = planSharing,
+                        requestId = requestId,
+                        retryAfterMs = retryAfterMs,
+                    )
                 }
                 val responseBody = response.body ?: throw LocalModelException(
                     code = "RESPONSES_STREAM_INCOMPLETE",
@@ -111,7 +123,11 @@ class OpenAiResponsesClient @Inject constructor(
                                     ?.takeIf(String::isNotEmpty)
                                     ?.let { onDelta(LocalModelDelta(reasoning = it)) }
                             }
-                            "response.failed" -> throw responseFailure(event)
+                            "response.failed" -> throw responseFailure(
+                                event = event,
+                                requestId = requestId,
+                                retryAfterMs = retryAfterMs,
+                            )
                             "response.incomplete" -> throw LocalModelException(
                                 code = "RESPONSES_INCOMPLETE",
                                 message = incompleteReason(event),
@@ -141,12 +157,7 @@ class OpenAiResponsesClient @Inject constructor(
                 cause = error,
             )
         } catch (error: IOException) {
-            throw LocalModelException(
-                code = "MODEL_NETWORK",
-                message = "Responses API 网络请求失败：${error.message ?: "网络异常"}",
-                retryable = true,
-                cause = error,
-            )
+            throw networkFailure(error)
         }
     }
 
@@ -347,29 +358,24 @@ class OpenAiResponsesClient @Inject constructor(
         )
     }
 
-    private fun responseFailure(event: JsonObject): LocalModelException {
+    private fun responseFailure(
+        event: JsonObject,
+        requestId: String?,
+        retryAfterMs: Long?,
+    ): LocalModelException {
         val response = event["response"] as? JsonObject
         val error = response?.get("error") as? JsonObject
         val code = error?.get("code")?.jsonPrimitive?.contentOrNull ?: "unknown_error"
+        val param = error?.get("param")?.jsonPrimitive?.contentOrNull
         val message = error?.get("message")?.jsonPrimitive?.contentOrNull
             ?: "Responses API 请求失败"
-        return when (code) {
-            "subscription_sharing_usage_limit_exceeded" -> LocalModelException(
-                "CHATGPT_PLAN_LIMIT_REACHED",
-                "ChatGPT 套餐用量已达到当前上限，请在 ChatGPT 中管理应用用量。",
-                false,
-            )
-            "subscription_sharing_usage_unavailable" -> LocalModelException(
-                "CHATGPT_PLAN_USAGE_UNAVAILABLE",
-                "ChatGPT 套餐用量当前不可用，请检查账户权限或稍后重试。",
-                false,
-            )
-            else -> LocalModelException(
-                code = "RESPONSES_FAILED_$code",
-                message = message,
-                retryable = code in setOf("server_error", "rate_limit_exceeded"),
-            )
-        }
+        return structuredResponseError(
+            code = code,
+            param = param,
+            detail = message,
+            requestId = requestId,
+            retryAfterMs = retryAfterMs,
+        )
     }
 
     private fun incompleteReason(event: JsonObject): String {
@@ -379,37 +385,177 @@ class OpenAiResponsesClient @Inject constructor(
         return if (reason.isNullOrBlank()) "Responses API 未完整完成本次请求" else "Responses API 未完整完成：$reason"
     }
 
-    private fun httpError(status: Int, body: String, planSharing: Boolean): LocalModelException {
-        val parsed = runCatching {
-            val error = json.parseToJsonElement(body).jsonObject["error"] as? JsonObject
-            error?.get("code")?.jsonPrimitive?.contentOrNull to
-                error?.get("message")?.jsonPrimitive?.contentOrNull
-        }.getOrNull()
-        val remoteCode = parsed?.first
-        val detail = parsed?.second
-        return when {
-            planSharing && remoteCode == "subscription_sharing_usage_limit_exceeded" -> LocalModelException(
-                "CHATGPT_PLAN_LIMIT_REACHED",
-                "ChatGPT 套餐用量已达到当前上限，请在 ChatGPT 中管理应用用量。",
-                false,
-            )
-            planSharing && remoteCode == "subscription_sharing_usage_unavailable" -> LocalModelException(
-                "CHATGPT_PLAN_USAGE_UNAVAILABLE",
-                "ChatGPT 套餐用量当前不可用，请检查账户权限或稍后重试。",
-                false,
-            )
-            planSharing && (status == 401 || status == 403) -> LocalModelException(
-                "CHATGPT_AUTH_REVOKED",
-                "ChatGPT 套餐授权已失效，请在设置中重新连接账户。",
-                false,
-            )
-            else -> LocalModelException(
-                code = remoteCode?.let { "RESPONSES_HTTP_$it" }
-                    ?: if (status == 429) "MODEL_HTTP_429" else "MODEL_HTTP_$status",
-                message = detail ?: "Responses API 请求失败（HTTP $status）",
-                retryable = status == 408 || status == 429 || status >= 500,
+    internal fun httpError(
+        status: Int,
+        body: String,
+        planSharing: Boolean,
+        requestId: String? = null,
+        retryAfterMs: Long? = null,
+    ): LocalModelException {
+        val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
+        val error = root?.get("error") as? JsonObject
+        val remoteCode = error?.get("code")?.jsonPrimitive?.contentOrNull
+        val remoteParam = error?.get("param")?.jsonPrimitive?.contentOrNull
+        val detail = error?.get("message")?.jsonPrimitive?.contentOrNull
+            ?: root?.get("detail")?.jsonPrimitive?.contentOrNull
+            ?: root?.get("message")?.jsonPrimitive?.contentOrNull
+
+        if (planSharing && remoteCode != null) {
+            return structuredResponseError(
+                code = remoteCode,
+                param = remoteParam,
+                detail = detail,
+                requestId = requestId,
+                retryAfterMs = retryAfterMs,
+                statusOverride = status,
             )
         }
+
+        if (planSharing) {
+            val message = when (status) {
+                401 -> "ChatGPT 套餐请求未通过身份或授权校验。请确认当前账户仍已授权套餐使用；若持续出现，再重新连接账户。"
+                403 -> "ChatGPT 套餐请求被权限、策略或可用地区规则拒绝。请检查 ChatGPT 账户与当前网络环境。"
+                503 -> "ChatGPT 套餐直连服务暂时不可用，777 会按有限次数退避重试。"
+                else -> detail ?: "Responses API 请求失败（HTTP $status）"
+            }
+            return LocalModelException(
+                code = when (status) {
+                    401 -> "CHATGPT_PLAN_ADMISSION_401"
+                    403 -> "CHATGPT_PLAN_ADMISSION_403"
+                    503 -> "CHATGPT_PLAN_ROUTE_UNAVAILABLE"
+                    else -> "MODEL_HTTP_$status"
+                },
+                message = detail?.takeIf(String::isNotBlank) ?: message,
+                retryable = status == 408 || status == 429 || status >= 500,
+                status = status,
+                providerRetryAfterMs = retryAfterMs,
+                requestId = requestId,
+            )
+        }
+
+        return LocalModelException(
+            code = remoteCode?.let { "RESPONSES_HTTP_$it" }
+                ?: if (status == 429) "MODEL_HTTP_429" else "MODEL_HTTP_$status",
+            message = detail ?: "Responses API 请求失败（HTTP $status）",
+            retryable = status == 408 || status == 429 || status >= 500,
+            status = status,
+            providerRetryAfterMs = retryAfterMs,
+            requestId = requestId,
+            providerCode = remoteCode,
+            providerParam = remoteParam,
+        )
+    }
+
+    private fun structuredResponseError(
+        code: String,
+        param: String?,
+        detail: String?,
+        requestId: String?,
+        retryAfterMs: Long?,
+        statusOverride: Int? = null,
+    ): LocalModelException {
+        val knownStatus = statusOverride ?: when (code) {
+            "subscription_sharing_user_not_eligible",
+            "subscription_sharing_route_not_supported",
+            "chatpass_v2_scope_not_authorized",
+            "chatpass_v2_invalid_authorization_context" -> 403
+            "subscription_sharing_usage_limit_exceeded" -> 429
+            "subscription_sharing_usage_unavailable",
+            "subscription_sharing_user_unavailable" -> 503
+            "subscription_sharing_unsupported_capability" -> 400
+            "subscription_sharing_invalid_user" -> 401
+            else -> null
+        }
+        val mapped = when (code) {
+            "subscription_sharing_usage_limit_exceeded" -> Triple(
+                "CHATGPT_PLAN_LIMIT_REACHED",
+                "ChatGPT 套餐用量请求达到当前限制。你的套餐总额度可能仍有剩余，也可能是此应用的单独限制；请在 ChatGPT「用量」中查看实际限制。",
+                false,
+            )
+            "subscription_sharing_usage_unavailable",
+            "subscription_sharing_user_unavailable" -> Triple(
+                "CHATGPT_PLAN_USAGE_UNAVAILABLE",
+                "ChatGPT 暂时无法确认套餐可用量，777 会保留登录状态并按有限次数退避重试。",
+                true,
+            )
+            "subscription_sharing_user_not_eligible" -> Triple(
+                "CHATGPT_PLAN_USER_NOT_ELIGIBLE",
+                "当前 ChatGPT 用户、工作区或策略暂不允许共享套餐用量。",
+                false,
+            )
+            "subscription_sharing_unsupported_capability" -> Triple(
+                "CHATGPT_PLAN_UNSUPPORTED_CAPABILITY",
+                buildString {
+                    append("当前 ChatGPT 套餐共享请求包含暂不支持的能力")
+                    if (!param.isNullOrBlank()) append("：").append(param)
+                    append("。请调整模型请求后再试。")
+                },
+                false,
+            )
+            "subscription_sharing_route_not_supported" -> Triple(
+                "CHATGPT_PLAN_ROUTE_NOT_SUPPORTED",
+                "当前请求路由不支持 ChatGPT 套餐共享，请检查 Responses API 调用路径。",
+                false,
+            )
+            "subscription_sharing_invalid_user" -> Triple(
+                "CHATGPT_PLAN_INVALID_USER",
+                "ChatGPT 订阅者上下文未通过验证。若该问题持续出现，请重新连接账户。",
+                false,
+            )
+            "chatpass_v2_scope_not_authorized",
+            "chatpass_v2_invalid_authorization_context" -> Triple(
+                "CHATGPT_PLAN_PERMISSION_CONTEXT_INVALID",
+                "当前 ChatGPT 授权上下文不允许这次套餐调用，请重新检查账户授权。",
+                false,
+            )
+            else -> Triple(
+                "RESPONSES_FAILED_$code",
+                detail ?: "Responses API 请求失败",
+                code in setOf("server_error", "server_overloaded", "rate_limit_exceeded"),
+            )
+        }
+        return LocalModelException(
+            code = mapped.first,
+            message = mapped.second,
+            retryable = mapped.third,
+            status = knownStatus,
+            providerRetryAfterMs = retryAfterMs,
+            requestId = requestId,
+            providerCode = code,
+            providerParam = param,
+        )
+    }
+
+    internal fun networkFailure(error: IOException): LocalModelException {
+        val interrupted = error is SocketException && listOf(
+            "connection abort",
+            "connection reset",
+            "broken pipe",
+            "socket closed",
+        ).any { marker -> error.message.orEmpty().lowercase().contains(marker) }
+        return LocalModelException(
+            code = "MODEL_NETWORK",
+            message = if (interrupted) {
+                "Responses API 流式连接中断，请检查当前网络后恢复请求。"
+            } else {
+                "Responses API 网络连接失败，请检查当前网络后重试。"
+            },
+            retryable = true,
+            cause = error,
+        )
+    }
+
+    internal fun parseRetryAfterMillis(value: String?, nowMillis: Long = System.currentTimeMillis()): Long? {
+        val raw = value?.trim()?.takeIf(String::isNotEmpty) ?: return null
+        raw.toLongOrNull()?.let { seconds ->
+            return seconds.coerceAtLeast(0L) * 1_000L
+        }
+        return runCatching {
+            val atMillis = ZonedDateTime.parse(raw, DateTimeFormatter.RFC_1123_DATE_TIME)
+                .toInstant()
+                .toEpochMilli()
+            (atMillis - nowMillis).coerceAtLeast(0L)
+        }.getOrNull()
     }
 
     companion object {

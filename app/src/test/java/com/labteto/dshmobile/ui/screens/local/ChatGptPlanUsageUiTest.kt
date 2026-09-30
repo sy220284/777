@@ -15,7 +15,7 @@ class ChatGptPlanUsageUiTest {
 
     @Test
     fun recognizesPlanUsageLimitAndUnavailableErrors() {
-        assertTrue(isChatGptPlanUsageError("ChatGPT 套餐用量已达到当前上限"))
+        assertTrue(isChatGptPlanUsageError("ChatGPT 套餐用量请求达到当前限制。你的套餐总额度可能仍有剩余"))
         assertTrue(isChatGptPlanUsageError("CHATGPT_PLAN_USAGE_UNAVAILABLE"))
         assertFalse(isChatGptPlanUsageError("普通网络错误"))
         assertFalse(isChatGptPlanUsageError(null))

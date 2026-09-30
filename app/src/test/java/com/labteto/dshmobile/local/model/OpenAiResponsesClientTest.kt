@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.model
 
+import java.net.SocketException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -65,6 +66,71 @@ class OpenAiResponsesClientTest {
         assertEquals(0.65, payload["temperature"]?.jsonPrimitive?.content?.toDouble())
         assertEquals(false, payload["store"]?.jsonPrimitive?.content?.toBoolean())
         assertEquals(true, payload["stream"]?.jsonPrimitive?.content?.toBoolean())
+    }
+
+    @Test
+    fun planUsageLimitDoesNotClaimTheWholePlanIsEmpty() {
+        val error = client.httpError(
+            status = 429,
+            body = """{"error":{"code":"subscription_sharing_usage_limit_exceeded","message":"limit"}}""",
+            planSharing = true,
+            requestId = "req-plan-limit",
+            retryAfterMs = 5_000L,
+        )
+
+        assertEquals("CHATGPT_PLAN_LIMIT_REACHED", error.code)
+        assertFalse(error.retryable)
+        assertTrue(error.message.orEmpty().contains("可能仍有剩余"))
+        assertFalse(error.message.orEmpty().contains("已用尽"))
+        assertEquals(429, error.status)
+        assertEquals(5_000L, error.providerRetryAfterMs)
+        assertEquals("req-plan-limit", error.requestId)
+        assertEquals("subscription_sharing_usage_limit_exceeded", error.providerCode)
+    }
+
+    @Test
+    fun planUsageUnavailableKeepsCredentialsAndRetries() {
+        val error = client.httpError(
+            status = 503,
+            body = """{"error":{"code":"subscription_sharing_usage_unavailable","message":"temporarily unavailable"}}""",
+            planSharing = true,
+            requestId = "req-usage-unavailable",
+        )
+
+        assertEquals("CHATGPT_PLAN_USAGE_UNAVAILABLE", error.code)
+        assertTrue(error.retryable)
+        assertEquals(503, error.status)
+        assertEquals("req-usage-unavailable", error.requestId)
+    }
+
+    @Test
+    fun directAdmissionDetailIsPreservedWithoutCallingItRevokedAuth() {
+        val error = client.httpError(
+            status = 403,
+            body = """{"detail":"serving region is not permitted"}""",
+            planSharing = true,
+            requestId = "req-admission",
+        )
+
+        assertEquals("CHATGPT_PLAN_ADMISSION_403", error.code)
+        assertFalse(error.retryable)
+        assertEquals("serving region is not permitted", error.message)
+        assertEquals("req-admission", error.requestId)
+    }
+
+    @Test
+    fun connectionAbortGetsFriendlyRetryableMessage() {
+        val error = client.networkFailure(SocketException("Software caused connection abort"))
+
+        assertEquals("MODEL_NETWORK", error.code)
+        assertTrue(error.retryable)
+        assertTrue(error.message.orEmpty().contains("流式连接中断"))
+        assertFalse(error.message.orEmpty().contains("Software caused connection abort"))
+    }
+
+    @Test
+    fun retryAfterSecondsAreConvertedToMilliseconds() {
+        assertEquals(7_000L, client.parseRetryAfterMillis("7", nowMillis = 0L))
     }
 
     @Test

@@ -23,7 +23,7 @@ class AgentRequestExecutorTest {
             maxAttempts = 3,
             retryable = { it is IOException },
             eventSink = AgentRequestEventSink { events += it },
-            backoffMillis = { 250L * it },
+            backoffMillis = { attempt, _ -> 250L * attempt },
             sleeper = { delays += it },
         )
 
