@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.TokenPromptBreakdown
 import java.io.IOException
 import java.net.SocketException
 import kotlinx.serialization.json.Json
@@ -120,6 +121,60 @@ class OpenAiResponsesClientTest {
             put("refusal", "无法完成这个请求")
         })))
         assertEquals("无法完成这个请求", text)
+    }
+
+    @Test
+    fun streamedTextSettlesWhenCompletedResponseOmitsOutputMessage() {
+        val response = Json.parseToJsonElement("""{
+            "id":"resp-stream-only",
+            "output":[],
+            "usage":{"input_tokens":4,"output_tokens":6}
+        }""").jsonObject
+
+        val reply = client.parseCompleted(
+            response = response,
+            promptBreakdown = TokenPromptBreakdown(),
+            streamedContent = "这段回复只出现在流式增量里",
+        )
+
+        assertEquals("这段回复只出现在流式增量里", reply.content)
+        assertEquals(
+            "这段回复只出现在流式增量里",
+            reply.message["content"]?.jsonPrimitive?.content,
+        )
+    }
+
+    @Test
+    fun streamedFallbackRemainsInNextTurnWhenRawOutputHasNoMessageText() {
+        val response = Json.parseToJsonElement("""{
+            "id":"resp-reasoning-only",
+            "output":[
+                {"type":"reasoning","id":"reason-1","summary":[],"encrypted_content":"encrypted"}
+            ]
+        }""").jsonObject
+        val reply = client.parseCompleted(
+            response = response,
+            promptBreakdown = TokenPromptBreakdown(),
+            streamedContent = "上一轮真实回答",
+        )
+        val nextUser = buildJsonObject {
+            put("role", "user")
+            put("content", "这是下一轮问题")
+        }
+
+        val input = client.buildPayload(
+            model = "gpt-test",
+            messages = listOf(reply.message, nextUser),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+        )["input"]!!.jsonArray
+
+        assertEquals(3, input.size)
+        assertEquals("reasoning", input[0].jsonObject["type"]?.jsonPrimitive?.content)
+        assertEquals("assistant", input[1].jsonObject["role"]?.jsonPrimitive?.content)
+        assertEquals("上一轮真实回答", input[1].jsonObject["content"]?.jsonPrimitive?.content)
+        assertEquals("user", input[2].jsonObject["role"]?.jsonPrimitive?.content)
+        assertEquals("这是下一轮问题", input[2].jsonObject["content"]?.jsonPrimitive?.content)
     }
 
     @Test

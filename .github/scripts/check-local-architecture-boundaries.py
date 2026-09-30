@@ -140,6 +140,25 @@ if state_field_count > AGGREGATE_STATE_MAX_FIELDS:
 if "streamingAssistant" in models or "streamingReasoning" in models:
     die("streaming preview must stay outside LocalHarnessState")
 
+stream_state_start = models.find("data class LocalHarnessStreamingState(")
+stream_state_end = models.find("\n)", stream_state_start)
+if stream_state_start < 0 or stream_state_end < 0:
+    die("unable to locate LocalHarnessStreamingState")
+stream_state = models[stream_state_start:stream_state_end]
+for identity_field in ("sessionId", "requestId", "usageMode"):
+    if not re.search(rf"\bval\s+{identity_field}\s*:", stream_state):
+        die(f"streaming preview must carry explicit {identity_field} ownership")
+if "MutableStateFlow(LocalHarnessStreamingState())" in engine:
+    die("LocalHarnessEngine must not own anonymous process-wide streaming preview state")
+
+stream_store_path = "app/src/main/java/com/labteto/dshmobile/local/model/LocalStreamingPreviewStore.kt"
+stream_store = read(stream_store_path)
+if "LocalStreamingPreviewOwner" not in stream_store or "requestId" not in stream_store:
+    die("streaming preview store must enforce request-scoped ownership")
+transcript_runtime = read("app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt")
+if "clearStreamingPreview" in transcript_runtime:
+    die("transcript runtime must not expose a fake streaming-preview clear flag")
+
 projection_path = "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalHarnessUiState.kt"
 projection_source = read(projection_path)
 for class_name, maximum in PROJECTION_FIELD_BUDGETS.items():

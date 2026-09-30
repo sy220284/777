@@ -7,6 +7,8 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
+import java.util.UUID
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -26,8 +28,7 @@ internal class LocalModelRequestCoordinator(
     private val historyCompactor: LocalHistoryCompactor,
     private val toolSchemas: (LocalAgentRunPolicy) -> JsonArray,
     private val defaultEventLog: () -> LocalSessionEventLog,
-    private val resetPreview: () -> Unit,
-    private val publishPreview: (String) -> Unit,
+    private val streamingPreviewStore: LocalStreamingPreviewStore,
     private val persistOverflowCompaction: (LocalHarnessState, LocalHistorySummaryMode) -> Unit,
     private val maxStreamPreviewChars: Int = 4_096,
     private val streamPreviewIntervalMs: Long = 50L,
@@ -48,6 +49,15 @@ internal class LocalModelRequestCoordinator(
         overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
     ): LocalModelReply {
         val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
+        val previewOwner = if (publishPreviewEnabled) {
+            streamingPreviewStore.newOwner(
+                sessionId = snapshot.sessionId,
+                requestId = UUID.randomUUID().toString(),
+                usageMode = snapshot.usageMode,
+            )
+        } else {
+            null
+        }
         val log = requestLog ?: defaultEventLog()
         val logMessages = redactModelImages(messages)
         val contextChars = logMessages.sumOf { it.toString().length }
@@ -93,7 +103,7 @@ internal class LocalModelRequestCoordinator(
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
                     is AgentRequestEvent.AttemptStarted -> {
-                        if (publishPreviewEnabled && previewGuard()) resetPreview()
+                        previewOwner?.takeIf { previewGuard() }?.let(streamingPreviewStore::begin)
                     }
                     is AgentRequestEvent.AttemptFailed -> {
                         AppLog.warn(
@@ -154,53 +164,62 @@ internal class LocalModelRequestCoordinator(
         var overflowRound = 0
         while (true) {
             try {
-                return executor.execute {
-                    val streamPreview = LocalStreamPreview(
-                        maxChars = maxStreamPreviewChars,
-                        minIntervalMs = streamPreviewIntervalMs,
-                        clockMs = { System.nanoTime() / 1_000_000 },
-                        publish = { preview ->
-                            if (publishPreviewEnabled && previewGuard()) publishPreview(preview)
-                        },
-                    )
-                    val streamFilter = streamFilterPhrases
-                        .takeIf { it.isNotEmpty() }
-                        ?.let(::ChatStreamFilter)
-                    resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                        val reply = try {
-                            modelGateway.completeStreaming(
-                                baseUrl = snapshot.baseUrl,
-                                model = snapshot.model,
-                                messages = activeMessages,
-                                tools = tools,
-                                temperature = temperature,
-                                onDelta = { delta ->
-                                    val visible = streamFilter?.append(delta.content)?.text ?: delta.content
-                                    streamPreview.append(visible)
-                                },
-                            )
-                        } catch (error: LocalModelException) {
-                            log.append("request/provider-error", buildJsonObject {
-                                put("step", step)
-                                put("code", error.code)
-                                error.status?.let { put("status", it) }
-                                error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
-                                error.requestId?.let { put("request_id", it) }
-                                error.providerCode?.let { put("provider_code", it) }
-                                error.providerParam?.let { put("provider_param", it) }
-                                error.cause?.let { cause ->
-                                    put("cause_type", cause::class.java.simpleName)
-                                    cause.message?.takeIf(String::isNotBlank)?.let {
-                                        put("cause_detail", it.take(800))
+                return try {
+                    executor.execute {
+                        val streamPreview = LocalStreamPreview(
+                            maxChars = maxStreamPreviewChars,
+                            minIntervalMs = streamPreviewIntervalMs,
+                            clockMs = { System.nanoTime() / 1_000_000 },
+                            publish = { preview ->
+                                previewOwner
+                                    ?.takeIf { previewGuard() }
+                                    ?.let { streamingPreviewStore.publishAssistant(it, preview) }
+                            },
+                        )
+                        val streamFilter = streamFilterPhrases
+                            .takeIf { it.isNotEmpty() }
+                            ?.let(::ChatStreamFilter)
+                        resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                            val reply = try {
+                                modelGateway.completeStreaming(
+                                    baseUrl = snapshot.baseUrl,
+                                    model = snapshot.model,
+                                    messages = activeMessages,
+                                    tools = tools,
+                                    temperature = temperature,
+                                    onDelta = { delta ->
+                                        val visible =
+                                            streamFilter?.append(delta.content)?.text ?: delta.content
+                                        streamPreview.append(visible)
+                                    },
+                                )
+                            } catch (error: LocalModelException) {
+                                log.append("request/provider-error", buildJsonObject {
+                                    put("step", step)
+                                    put("code", error.code)
+                                    error.status?.let { put("status", it) }
+                                    error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
+                                    error.requestId?.let { put("request_id", it) }
+                                    error.providerCode?.let { put("provider_code", it) }
+                                    error.providerParam?.let { put("provider_param", it) }
+                                    error.cause?.let { cause ->
+                                        put("cause_type", cause::class.java.simpleName)
+                                        cause.message?.takeIf(String::isNotBlank)?.let {
+                                            put("cause_detail", it.take(800))
+                                        }
                                     }
-                                }
-                            })
-                            throw error
+                                })
+                                throw error
+                            }
+                            streamFilter?.flush()?.text
+                                ?.takeIf(String::isNotEmpty)
+                                ?.let(streamPreview::append)
+                            streamPreview.flush()
+                            reply
                         }
-                        streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
-                        streamPreview.flush()
-                        reply
                     }
+                } finally {
+                    previewOwner?.let(streamingPreviewStore::clear)
                 }
             } catch (error: Throwable) {
                 if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error

@@ -38,6 +38,21 @@ class LocalStreamPreviewTest {
     }
 
     @Test
+    fun boundedTailNeverSplitsEmojiSurrogatePair() {
+        var now = 0L
+        val published = mutableListOf<String>()
+        val preview = LocalStreamPreview(3, 50, { now }, published::add)
+
+        preview.append("A😀B")
+        assertEquals(listOf("😀B"), published)
+
+        now = 1
+        preview.append("C")
+        preview.flush()
+        assertEquals("BC", published.last())
+    }
+
+    @Test
     fun oversizedSingleDeltaKeepsOnlyBoundedTail() {
         var now = 0L
         val published = mutableListOf<String>()

@@ -28,6 +28,22 @@ internal fun truncateWithoutSplittingSurrogatePair(value: String, maxChars: Int)
     return value.substring(0, end)
 }
 
+/** Tail-budget truncation that never starts inside a UTF-16 surrogate pair. */
+internal fun takeLastWithoutSplittingSurrogatePair(value: String, maxChars: Int): String {
+    require(maxChars >= 0) { "maxChars must be non-negative" }
+    if (value.length <= maxChars) return value
+    if (maxChars == 0) return ""
+    var start = value.length - maxChars
+    if (
+        start > 0 &&
+        Character.isLowSurrogate(value[start]) &&
+        Character.isHighSurrogate(value[start - 1])
+    ) {
+        start += 1
+    }
+    return value.substring(start)
+}
+
 internal data class LocalRetainedText(
     val text: String,
     val truncated: Boolean,

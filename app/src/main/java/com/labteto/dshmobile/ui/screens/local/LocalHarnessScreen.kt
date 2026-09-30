@@ -1193,6 +1193,7 @@ private fun LocalConversationSurface(
 
         if (state.usageMode == LocalUsageMode.WORK && state.running) {
             LocalStreamingWorkPreview(
+                sessionId = state.sessionId,
                 streamingState = streamingState,
                 surfaceColor = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
             )
