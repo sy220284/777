@@ -343,15 +343,17 @@ class OpenAiResponsesClient @Inject constructor(
                     ?.trim()
                     ?.takeIf(String::isNotEmpty)
                     ?: "调用 $name 工具。"
+                val strict = responseFunctionStrict(
+                    index = index,
+                    name = name,
+                    value = function["strict"],
+                )
                 val parameters = normalizeResponseFunctionParameters(
                     index = index,
                     name = name,
                     value = function["parameters"],
+                    strict = strict,
                 )
-                val strict = (function["strict"] as? JsonPrimitive)
-                    ?.contentOrNull
-                    ?.toBooleanStrictOrNull()
-                    ?: false
                 add(buildJsonObject {
                     put("type", "function")
                     put("name", name)
@@ -376,26 +378,237 @@ class OpenAiResponsesClient @Inject constructor(
         }
     }
 
+    private fun responseFunctionStrict(
+        index: Int,
+        name: String,
+        value: JsonElement?,
+    ): Boolean {
+        if (value == null || value == JsonNull) {
+            // Chat Completions defaults to non-strict. Responses may otherwise auto-normalize
+            // into strict mode, so emit false explicitly to preserve existing tool semantics.
+            return false
+        }
+        val primitive = value as? JsonPrimitive
+            ?: throw invalidToolSchema(index, name, "strict 必须是布尔值")
+        if (primitive.isString) {
+            throw invalidToolSchema(index, name, "strict 必须是 JSON 布尔值，不能是字符串")
+        }
+        return primitive.content.toBooleanStrictOrNull()
+            ?: throw invalidToolSchema(index, name, "strict 必须是 true 或 false")
+    }
+
     private fun normalizeResponseFunctionParameters(
         index: Int,
         name: String,
         value: JsonElement?,
+        strict: Boolean,
     ): JsonObject {
-        if (value == null || value == JsonNull) {
-            return emptyResponseFunctionParameters()
+        val source = when (value) {
+            null, JsonNull -> emptyResponseFunctionParameters()
+            is JsonObject -> value
+            else -> throw invalidToolSchema(index, name, "parameters 必须是 JSON Schema 对象")
         }
-        val source = value as? JsonObject
-            ?: throw invalidToolSchema(index, name, "parameters 必须是 JSON Schema 对象")
-        val type = (source["type"] as? JsonPrimitive)?.contentOrNull
-        if (type != null && type != "object") {
-            throw invalidToolSchema(index, name, "parameters.type 必须是 object")
+        val type = source["type"]
+        if (type != null && !schemaTypeContains(type, "object")) {
+            throw invalidToolSchema(index, name, "parameters 根节点 type 必须是 object")
         }
-        if (type == "object" && "properties" in source) return source
-        return buildJsonObject {
+        val normalized = buildJsonObject {
             source.forEach { (key, item) -> put(key, item) }
             if (type == null) put("type", "object")
             if ("properties" !in source) put("properties", buildJsonObject {})
         }
+        validateResponseParameterSchema(
+            index = index,
+            name = name,
+            schema = normalized,
+            path = "parameters",
+            strict = strict,
+            depth = 1,
+        )
+        return normalized
+    }
+
+    private fun validateResponseParameterSchema(
+        index: Int,
+        name: String,
+        schema: JsonObject,
+        path: String,
+        strict: Boolean,
+        depth: Int,
+    ) {
+        if (depth > MAX_STRICT_SCHEMA_DEPTH) {
+            throw invalidToolSchema(index, name, "$path 超过 OpenAI strict schema 的最大 10 层嵌套")
+        }
+        val properties = schema["properties"]?.let { element ->
+            element as? JsonObject
+                ?: throw invalidToolSchema(index, name, "$path.properties 必须是对象")
+        }
+        val required = schema["required"]?.let { element ->
+            val array = element as? JsonArray
+                ?: throw invalidToolSchema(index, name, "$path.required 必须是字符串数组")
+            array.mapIndexed { requiredIndex, item ->
+                val primitive = item as? JsonPrimitive
+                if (primitive == null || !primitive.isString || primitive.content.isBlank()) {
+                    throw invalidToolSchema(
+                        index,
+                        name,
+                        "$path.required[$requiredIndex] 必须是非空字符串",
+                    )
+                }
+                primitive.content
+            }.also { names ->
+                if (names.size != names.toSet().size) {
+                    throw invalidToolSchema(index, name, "$path.required 不能包含重复字段")
+                }
+                if (properties != null) {
+                    val unknown = names.filterNot(properties::containsKey)
+                    if (unknown.isNotEmpty()) {
+                        throw invalidToolSchema(
+                            index,
+                            name,
+                            "$path.required 引用了未声明字段：${unknown.joinToString()}",
+                        )
+                    }
+                }
+            }
+        }
+
+        validateAdditionalProperties(index, name, schema, path, strict)
+
+        if (strict && schemaDeclaresObject(schema)) {
+            val propertyNames = properties?.keys.orEmpty()
+            val requiredNames = required?.toSet().orEmpty()
+            val missing = propertyNames.filterNot(requiredNames::contains)
+            if (missing.isNotEmpty()) {
+                throw invalidToolSchema(
+                    index,
+                    name,
+                    "$path 在 strict=true 时所有 properties 都必须列入 required，缺少：${missing.joinToString()}",
+                )
+            }
+        }
+
+        STRICT_UNSUPPORTED_SCHEMA_KEYWORDS.firstOrNull(schema::containsKey)?.let { keyword ->
+            if (strict) {
+                throw invalidToolSchema(
+                    index,
+                    name,
+                    "$path 在 strict=true 时不支持 JSON Schema 关键字 $keyword",
+                )
+            }
+        }
+
+        properties?.forEach { (propertyName, child) ->
+            val childSchema = child as? JsonObject
+                ?: throw invalidToolSchema(
+                    index,
+                    name,
+                    "$path.properties.$propertyName 必须是 JSON Schema 对象",
+                )
+            validateResponseParameterSchema(
+                index,
+                name,
+                childSchema,
+                "$path.properties.$propertyName",
+                strict,
+                depth + 1,
+            )
+        }
+
+        (schema["items"] as? JsonObject)?.let { items ->
+            validateResponseParameterSchema(
+                index,
+                name,
+                items,
+                "$path.items",
+                strict,
+                depth + 1,
+            )
+        }
+
+        (schema["anyOf"] as? JsonArray)?.forEachIndexed { anyOfIndex, child ->
+            val childSchema = child as? JsonObject
+                ?: throw invalidToolSchema(
+                    index,
+                    name,
+                    "$path.anyOf[$anyOfIndex] 必须是 JSON Schema 对象",
+                )
+            validateResponseParameterSchema(
+                index,
+                name,
+                childSchema,
+                "$path.anyOf[$anyOfIndex]",
+                strict,
+                depth + 1,
+            )
+        }
+
+        (schema["\$defs"] as? JsonObject)?.forEach { (definitionName, child) ->
+            val childSchema = child as? JsonObject
+                ?: throw invalidToolSchema(
+                    index,
+                    name,
+                    "$path.\$defs.$definitionName 必须是 JSON Schema 对象",
+                )
+            validateResponseParameterSchema(
+                index,
+                name,
+                childSchema,
+                "$path.\$defs.$definitionName",
+                strict,
+                depth + 1,
+            )
+        }
+    }
+
+    private fun validateAdditionalProperties(
+        index: Int,
+        name: String,
+        schema: JsonObject,
+        path: String,
+        strict: Boolean,
+    ) {
+        val additional = schema["additionalProperties"]
+        if (additional != null && additional != JsonNull) {
+            val validShape = when (additional) {
+                is JsonObject -> true
+                is JsonPrimitive -> !additional.isString &&
+                    additional.content.toBooleanStrictOrNull() != null
+                else -> false
+            }
+            if (!validShape) {
+                throw invalidToolSchema(
+                    index,
+                    name,
+                    "$path.additionalProperties 必须是布尔值或 JSON Schema 对象",
+                )
+            }
+        }
+        if (strict && schemaDeclaresObject(schema)) {
+            val disabled = (additional as? JsonPrimitive)
+                ?.takeUnless(JsonPrimitive::isString)
+                ?.content
+                ?.toBooleanStrictOrNull() == false
+            if (!disabled) {
+                throw invalidToolSchema(
+                    index,
+                    name,
+                    "$path 在 strict=true 时必须设置 additionalProperties=false",
+                )
+            }
+        }
+    }
+
+    private fun schemaDeclaresObject(schema: JsonObject): Boolean =
+        schema["properties"] is JsonObject || schemaTypeContains(schema["type"], "object")
+
+    private fun schemaTypeContains(type: JsonElement?, expected: String): Boolean = when (type) {
+        is JsonPrimitive -> type.isString && type.content == expected
+        is JsonArray -> type.any { item ->
+            val primitive = item as? JsonPrimitive
+            primitive != null && primitive.isString && primitive.content == expected
+        }
+        else -> false
     }
 
     private fun emptyResponseFunctionParameters(): JsonObject = buildJsonObject {
@@ -778,5 +991,15 @@ class OpenAiResponsesClient @Inject constructor(
         private const val CHATGPT_PLAN_TOOL_NAMESPACE = "local"
         private const val CHATGPT_PLAN_TOOL_NAMESPACE_DESCRIPTION =
             "777 本机 Harness 工具，用于文件、终端、网页、任务、设备与已启用扩展能力。"
+        private const val MAX_STRICT_SCHEMA_DEPTH = 10
+        private val STRICT_UNSUPPORTED_SCHEMA_KEYWORDS = setOf(
+            "allOf",
+            "not",
+            "dependentRequired",
+            "dependentSchemas",
+            "if",
+            "then",
+            "else",
+        )
     }
 }
