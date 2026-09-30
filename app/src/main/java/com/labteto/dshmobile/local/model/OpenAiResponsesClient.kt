@@ -328,31 +328,96 @@ class OpenAiResponsesClient @Inject constructor(
         planSharing: Boolean,
     ): JsonArray {
         val functions = buildJsonArray {
-            tools.forEach { element ->
-                val source = element as? JsonObject ?: return@forEach
-                val function = source["function"] as? JsonObject ?: return@forEach
-                val name = function["name"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+            tools.forEachIndexed { index, element ->
+                val source = element as? JsonObject
+                    ?: throw invalidToolSchema(index, null, "工具定义必须是对象")
+                val function = source["function"] as? JsonObject
+                    ?: throw invalidToolSchema(index, null, "工具定义缺少 function")
+                val name = (function["name"] as? JsonPrimitive)
+                    ?.contentOrNull
+                    ?.trim()
+                    ?.takeIf(String::isNotEmpty)
+                    ?: throw invalidToolSchema(index, null, "工具定义缺少 name")
+                val description = (function["description"] as? JsonPrimitive)
+                    ?.contentOrNull
+                    ?.trim()
+                    ?.takeIf(String::isNotEmpty)
+                    ?: "调用 $name 工具。"
+                val parameters = normalizeResponseFunctionParameters(
+                    index = index,
+                    name = name,
+                    value = function["parameters"],
+                )
+                val strict = (function["strict"] as? JsonPrimitive)
+                    ?.contentOrNull
+                    ?.toBooleanStrictOrNull()
+                    ?: false
                 add(buildJsonObject {
                     put("type", "function")
                     put("name", name)
-                    function["description"]?.let { put("description", it) }
-                    function["parameters"]?.let { put("parameters", it) }
-                    put("strict", function["strict"] ?: JsonPrimitive(false))
+                    put("description", description)
+                    put("parameters", parameters)
+                    put("strict", strict)
                 })
             }
         }
         if (!planSharing || functions.isEmpty()) return functions
 
-        // Sign in with ChatGPT 套餐共享预览要求 function/custom tools 位于 namespace
-        // 或 additional_tools 中。只在套餐共享契约下包装，标准 Responses API 保持原形。
+        // Sign in with ChatGPT 套餐共享要求 function/custom tools 位于 namespace
+        // 或 additional_tools 中。namespace 自身的 description 是 Responses API 必填字段。
+        // 只在套餐共享契约下包装，标准 Responses API 保持普通顶层 function tools。
         return buildJsonArray {
             add(buildJsonObject {
                 put("type", "namespace")
                 put("name", CHATGPT_PLAN_TOOL_NAMESPACE)
+                put("description", CHATGPT_PLAN_TOOL_NAMESPACE_DESCRIPTION)
                 put("tools", functions)
             })
         }
     }
+
+    private fun normalizeResponseFunctionParameters(
+        index: Int,
+        name: String,
+        value: JsonElement?,
+    ): JsonObject {
+        if (value == null || value == JsonNull) {
+            return emptyResponseFunctionParameters()
+        }
+        val source = value as? JsonObject
+            ?: throw invalidToolSchema(index, name, "parameters 必须是 JSON Schema 对象")
+        val type = (source["type"] as? JsonPrimitive)?.contentOrNull
+        if (type != null && type != "object") {
+            throw invalidToolSchema(index, name, "parameters.type 必须是 object")
+        }
+        if (type == "object" && "properties" in source) return source
+        return buildJsonObject {
+            source.forEach { (key, item) -> put(key, item) }
+            if (type == null) put("type", "object")
+            if ("properties" !in source) put("properties", buildJsonObject {})
+        }
+    }
+
+    private fun emptyResponseFunctionParameters(): JsonObject = buildJsonObject {
+        put("type", "object")
+        put("properties", buildJsonObject {})
+        put("required", buildJsonArray {})
+        put("additionalProperties", false)
+    }
+
+    private fun invalidToolSchema(
+        index: Int,
+        name: String?,
+        detail: String,
+    ): LocalModelException = LocalModelException(
+        code = "RESPONSES_TOOL_SCHEMA_INVALID",
+        message = buildString {
+            append("Responses 工具定义无效：第 ").append(index + 1).append(" 项")
+            name?.let { append("（").append(it).append("）") }
+            append(detail)
+        },
+        retryable = false,
+    )
 
     internal fun responseMessageText(parts: JsonArray): String = buildString {
         parts.forEach { part ->
@@ -711,5 +776,7 @@ class OpenAiResponsesClient @Inject constructor(
         private const val MAX_STREAM_BYTES = 32 * 1024 * 1024
         private const val ERROR_BODY_LIMIT = 8_000
         private const val CHATGPT_PLAN_TOOL_NAMESPACE = "local"
+        private const val CHATGPT_PLAN_TOOL_NAMESPACE_DESCRIPTION =
+            "777 本机 Harness 工具，用于文件、终端、网页、任务、设备与已启用扩展能力。"
     }
 }
