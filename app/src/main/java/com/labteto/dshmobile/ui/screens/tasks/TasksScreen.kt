@@ -6,6 +6,7 @@ import android.content.Context
 import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -24,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,8 +59,10 @@ import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.DsTimeline
 import com.labteto.dshmobile.ui.components.DsTimelineItem
+import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.EmptyHero
+import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -388,7 +392,23 @@ fun TasksScreen(
     }
     BackHandler { navigateBack() }
 
-    Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+    val toast = rememberDsToast()
+    val noticeMessage = state.notice?.let { notice ->
+        stringResource(
+            when (notice) {
+                TasksNotice.CANCELLED -> R.string.tasks_cancelled
+                TasksNotice.MISSING -> R.string.tasks_missing
+                TasksNotice.RUN_STARTED -> R.string.tasks_run_started
+                TasksNotice.RUN_FAILED -> R.string.tasks_run_now_failed
+            },
+        )
+    }
+    LaunchedEffect(state.notice, noticeMessage) {
+        noticeMessage?.let(toast.second)
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(
             Modifier.fillMaxSize().safeDrawingPadding()
                 .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
@@ -489,22 +509,9 @@ fun TasksScreen(
                     }
                 }
             }
-
-            state.notice?.let { notice ->
-                Text(
-                    stringResource(
-                        when (notice) {
-                            TasksNotice.CANCELLED -> R.string.tasks_cancelled
-                            TasksNotice.MISSING -> R.string.tasks_missing
-                            TasksNotice.RUN_STARTED -> R.string.tasks_run_started
-                            TasksNotice.RUN_FAILED -> R.string.tasks_run_now_failed
-                        },
-                    ),
-                    style = DsType.small13,
-                    color = colors.labelSecondary,
-                )
-            }
         }
+        }
+        DsToastHost(toast, Modifier.safeDrawingPadding())
     }
 }
 

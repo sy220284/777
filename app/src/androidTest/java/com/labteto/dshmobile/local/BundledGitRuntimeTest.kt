@@ -43,7 +43,7 @@ class BundledGitRuntimeTest {
 
         val (versionCode, version) = gitCommand("--version")
         assertEquals("git --version failed: $version", 0, versionCode)
-        assertTrue("unexpected Git version: $version", version.contains("2.55.0"))
+        assertTrue("unexpected Git version: $version", version.contains("2.56.0"))
 
         val (initCode, initOutput) = gitCommand("init")
         assertEquals("git init failed: $initOutput", 0, initCode)

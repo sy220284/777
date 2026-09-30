@@ -286,7 +286,7 @@ fun DsPopupMenu(
                     onDismiss()
                     item.onClick()
                 },
-                modifier = Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(10.dp)),
+                modifier = Modifier.heightIn(min = com.labteto.dshmobile.ui.theme.DsSpacing.touchTarget).clip(RoundedCornerShape(10.dp)),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             )
         }

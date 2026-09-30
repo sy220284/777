@@ -76,7 +76,6 @@ class DshNotifications @Inject constructor(
         )
         val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_notification_butterfly)
-            .setLargeIcon(NotificationArtwork.largeIcon(context))
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(pending)
@@ -121,7 +120,6 @@ class DshNotifications @Inject constructor(
             id,
             NotificationCompat.Builder(context, CHANNEL_LOCAL_JOBS)
                 .setSmallIcon(R.drawable.ic_notification_butterfly)
-            .setLargeIcon(NotificationArtwork.largeIcon(context))
                 .setContentTitle(title)
                 .setContentText(text)
                 .setContentIntent(pending)

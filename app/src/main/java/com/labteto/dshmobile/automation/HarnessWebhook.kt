@@ -24,7 +24,6 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.local.automation.LocalAutomationRuntime
-import com.labteto.dshmobile.notify.NotificationArtwork
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.net.InetSocketAddress
@@ -300,7 +299,6 @@ class HarnessWebhookService : Service() {
         )
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_butterfly)
-            .setLargeIcon(NotificationArtwork.largeIcon(this))
             .setContentTitle("777 Harness Webhook")
             .setContentText("本机自动化回调服务正在运行")
             .setOngoing(true)
