@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.model.LocalCanonicalMessage
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -309,4 +310,5 @@ data class LocalModelReply(
     val usage: DeepSeekTokenUsage = DeepSeekTokenUsage(),
     val requestId: String = "",
     val promptBreakdown: TokenPromptBreakdown = TokenPromptBreakdown(),
+    val canonicalMessage: LocalCanonicalMessage? = null,
 )
