@@ -1597,7 +1597,7 @@ private fun LocalConversationSurface(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !state.running,
                     shape = DsShapes.row,
-                    color = colors.bgLayer1,
+                    color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
                     border = BorderStroke(1.dp, colors.borderL2),
                 ) {
                     Column(
