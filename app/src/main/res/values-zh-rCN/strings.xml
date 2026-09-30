@@ -1326,7 +1326,7 @@
     <string name="chatgpt_welcome_confirm">知道了</string>
     <string name="local_model_protocol_value">接口协议：%1$s</string>
     <string name="local_model_request_endpoint">请求地址：%1$s</string>
-    <string name="chatgpt_session_persistence_hint">授权会自动续期；长时间未使用、手动撤销或凭据失效时需要重新授权。</string>
+    <string name="chatgpt_session_persistence_hint">访问令牌约 1 小时；刷新令牌有效 30 天，每次成功刷新后重新获得 30 天有效期。持续正常使用可自动滚动续期，撤销或凭据失效后需重新授权。</string>
     <string name="chatgpt_test_connection">测试连接</string>
     <string name="chatgpt_testing_connection">正在测试…</string>
     <string name="chatgpt_test_hint">会发送一条极短测试请求，验证套餐模型能否实际完成响应，并消耗少量套餐额度。</string>

@@ -1327,7 +1327,7 @@
     <string name="chatgpt_welcome_confirm">Got it</string>
     <string name="local_model_protocol_value">API protocol: %1$s</string>
     <string name="local_model_request_endpoint">Request endpoint: %1$s</string>
-    <string name="chatgpt_session_persistence_hint">Authorization renews automatically; long inactivity, revocation, or invalid credentials require signing in again.</string>
+    <string name="chatgpt_session_persistence_hint">Access tokens last about 1 hour. Refresh tokens last 30 days and receive a fresh 30-day lifetime after each successful refresh. Normal continued use renews automatically; revocation or invalid credentials require authorization again.</string>
     <string name="chatgpt_test_connection">Test connection</string>
     <string name="chatgpt_testing_connection">Testing…</string>
     <string name="chatgpt_test_hint">Sends one tiny test request to verify that a plan model can actually complete a response, using a small amount of plan usage.</string>
