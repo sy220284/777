@@ -807,6 +807,49 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun responsesRejectsNonStringToolNameAndDescription() {
+        val badName = Json.parseToJsonElement("""[
+            {"type":"function","function":{"name":123,"parameters":{"type":"object","properties":{}}}}
+        ]""").jsonArray
+        val badDescription = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"bad_description",
+                "description":123,
+                "parameters":{"type":"object","properties":{}}
+            }}
+        ]""").jsonArray
+
+        val nameError = runCatching {
+            client.buildPayload("gpt-test", emptyList(), badName, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+        val descriptionError = runCatching {
+            client.buildPayload("gpt-test", emptyList(), badDescription, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", nameError?.code)
+        assertTrue(nameError?.message.orEmpty().contains("name"))
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", descriptionError?.code)
+        assertTrue(descriptionError?.message.orEmpty().contains("description"))
+    }
+
+    @Test
+    fun responsesParametersRootMustBeObjectSchema() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"bad_root",
+                "parameters":{"type":["object","null"],"properties":{}}
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("根节点"))
+    }
+
+    @Test
     fun apiKeyResponsesKeepsFlatFunctionTools() {
         val tools = JsonArray(
             listOf(
