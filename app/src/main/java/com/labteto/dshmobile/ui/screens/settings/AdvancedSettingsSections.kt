@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +52,7 @@ import com.labteto.dshmobile.local.DeepSeekPricePeriod
 import com.labteto.dshmobile.local.DeepSeekPricingState
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.LocalModelCapability
+import com.labteto.dshmobile.local.LocalModelAuthKind
 import com.labteto.dshmobile.local.LocalModelPresets
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryRecord
@@ -444,8 +446,10 @@ internal fun LocalModelSettingsCard(
     var testing by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var pendingRemoveId by remember { mutableStateOf<String?>(null) }
+    val chatGpt by viewModel.chatGptState.collectAsState()
     val savedRoute = local.modelProfiles.any {
-        it.model == model.trim() && it.baseUrl == baseUrl.trim().trimEnd('/')
+        it.authKind == LocalModelAuthKind.API_KEY &&
+            it.model == model.trim() && it.baseUrl == baseUrl.trim().trimEnd('/')
     }
     val selectedPreset = LocalModelPresets.find(model, baseUrl)
     val editRoute: (String, String) -> Unit = { name, url ->
@@ -456,6 +460,7 @@ internal fun LocalModelSettingsCard(
     }
 
     SettingsCard(stringResource(R.string.advanced_model_settings), Icons.Outlined.Cloud) {
+        ChatGptAccountPanel(chatGpt, viewModel, report)
         Text(stringResource(R.string.local_model_list_hint), style = DsType.small13,
             color = colors.labelSecondary)
         if (local.modelProfiles.isEmpty()) {
@@ -472,7 +477,7 @@ internal fun LocalModelSettingsCard(
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                            Text(profile.model, style = DsType.std14Strong, color = colors.labelPrimary,
+                            Text(profile.displayName ?: profile.model, style = DsType.std14Strong, color = colors.labelPrimary,
                                 modifier = Modifier.weight(1f, fill = false), maxLines = 1,
                                 overflow = TextOverflow.Ellipsis)
                             if (profile.model == local.model && profile.baseUrl == local.baseUrl) {
@@ -480,7 +485,11 @@ internal fun LocalModelSettingsCard(
                             }
                         }
                         Text(
-                            profile.baseUrl,
+                            if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
+                                stringResource(R.string.chatgpt_model_source, profile.model)
+                            } else {
+                                profile.baseUrl
+                            },
                             style = DsType.caption11,
                             color = colors.labelTertiary,
                             maxLines = 1,
@@ -497,15 +506,17 @@ internal fun LocalModelSettingsCard(
                             if (profile.model != local.model || profile.baseUrl != local.baseUrl)
                                 MenuItem(text = stringResource(R.string.local_model_use),
                                     onClick = { viewModel.selectLocalModel(profile.id) }) else null,
-                            MenuItem(text = stringResource(R.string.local_model_edit), onClick = {
-                                editRoute(profile.model, profile.baseUrl)
-                                custom = LocalModelPresets.entries.none {
-                                    it.model == profile.model && it.baseUrl == profile.baseUrl
-                                }
-                                showEditor = true
-                            }),
-                            MenuItem(text = stringResource(R.string.local_model_remove), danger = true,
-                                onClick = { pendingRemoveId = profile.id }),
+                            if (profile.authKind == LocalModelAuthKind.API_KEY)
+                                MenuItem(text = stringResource(R.string.local_model_edit), onClick = {
+                                    editRoute(profile.model, profile.baseUrl)
+                                    custom = LocalModelPresets.entries.none {
+                                        it.model == profile.model && it.baseUrl == profile.baseUrl
+                                    }
+                                    showEditor = true
+                                }) else null,
+                            if (profile.authKind == LocalModelAuthKind.API_KEY)
+                                MenuItem(text = stringResource(R.string.local_model_remove), danger = true,
+                                    onClick = { pendingRemoveId = profile.id }) else null,
                         ),
                     )
                 }
