@@ -59,7 +59,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -116,7 +115,6 @@ internal fun PersonaGalleryTopBar(
                 text = title,
                 style = DsType.large20.withReadingWeight(),
                 color = colors.labelPrimary,
-                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -275,9 +273,8 @@ internal fun StoryDetailSection(
         DsCard {
             Text(
                 stringResource(R.string.persona_gallery_story_relation),
-                style = DsType.std14.withReadingWeight(),
+                style = DsType.std14Strong.withReadingWeight(),
                 color = DsTheme.colors.labelPrimary,
-                fontWeight = FontWeight.SemiBold,
             )
             Text(
                 stringResource(R.string.persona_gallery_current_relation, story.chatState.relationshipState),
@@ -434,7 +431,6 @@ internal fun GalleryOverviewHeader(
                     stringResource(R.string.persona_gallery_master),
                     style = DsType.large20.withReadingWeight(),
                     color = DsTheme.colors.labelPrimary,
-                    fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     stringResource(
@@ -479,9 +475,8 @@ internal fun PersonaPresetCard(
             PersonaAvatar(preset.persona.name)
             Text(
                 preset.persona.name,
-                style = DsType.std14.withReadingWeight(),
+                style = DsType.std14Strong.withReadingWeight(),
                 color = DsTheme.colors.labelPrimary,
-                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -553,9 +548,8 @@ internal fun GalleryPersonaCard(
             }
             Text(
                 entry.persona.name,
-                style = DsType.std14.withReadingWeight(),
+                style = DsType.std14Strong.withReadingWeight(),
                 color = DsTheme.colors.labelPrimary,
-                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -722,9 +716,8 @@ internal fun GalleryStoryCard(
             Column(Modifier.weight(1f)) {
                 Text(
                     story.title.ifBlank { stringResource(R.string.persona_gallery_untitled_story) },
-                    style = DsType.std14.withReadingWeight(),
+                    style = (if (selected) DsType.std14Strong else DsType.std14).withReadingWeight(),
                     color = DsTheme.colors.labelPrimary,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -790,9 +783,8 @@ internal fun PersonaRelationshipStatusCard(story: PersonaGalleryStory) {
             Column(Modifier.weight(1f)) {
                 Text(
                     story.title.ifBlank { stringResource(R.string.persona_gallery_untitled_story) },
-                    style = DsType.std14.withReadingWeight(),
+                    style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
-                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -837,7 +829,6 @@ internal fun PersonaHero(persona: PersonaProfile, subtitle: String) {
                     persona.name,
                     style = DsType.large20.withReadingWeight(),
                     color = DsTheme.colors.labelPrimary,
-                    fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     persona.identity.ifBlank { subtitle },
@@ -867,9 +858,8 @@ private fun PersonaAvatar(name: String, large: Boolean = false) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 initial,
-                style = if (large) DsType.large20 else DsType.std14,
+                style = (if (large) DsType.large20 else DsType.std14Strong).withReadingWeight(),
                 color = DsTheme.colors.accent,
-                fontWeight = FontWeight.SemiBold,
             )
         }
     }
@@ -922,9 +912,8 @@ internal fun PersonaDetails(persona: PersonaProfile) {
     DsCard {
         Text(
             stringResource(R.string.persona_gallery_fixed_persona),
-            style = DsType.std14.withReadingWeight(),
+            style = DsType.std14Strong.withReadingWeight(),
             color = DsTheme.colors.labelPrimary,
-            fontWeight = FontWeight.SemiBold,
         )
         scalarSections.forEach { (title, value) ->
             PersonaDetailRow(title, value)
@@ -972,9 +961,8 @@ internal fun PersonaInspectionPanel(
     if (result.conflicts.isNotEmpty()) {
         Text(
             stringResource(R.string.persona_gallery_conflict_count, result.conflicts.size),
-            style = DsType.std14.withReadingWeight(),
+            style = DsType.std14Strong.withReadingWeight(),
             color = DsTheme.colors.labelPrimary,
-            fontWeight = FontWeight.SemiBold,
         )
         result.conflicts.forEach { conflict ->
             DsCard {
@@ -1009,9 +997,8 @@ internal fun PersonaInspectionPanel(
     if (result.suggestions.isNotEmpty()) {
         Text(
             stringResource(R.string.persona_gallery_suggestions_title),
-            style = DsType.std14.withReadingWeight(),
+            style = DsType.std14Strong.withReadingWeight(),
             color = DsTheme.colors.labelPrimary,
-            fontWeight = FontWeight.SemiBold,
         )
         result.suggestions.forEach { suggestion ->
             val key = suggestionKey(suggestion)
