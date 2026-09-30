@@ -36,6 +36,16 @@ class ChatGptAuthCoordinator @Inject constructor(
             _state.value = ChatGptUiState()
             return
         }
+        val selected = stored.first { it.id == selectedId }
+        if (!selected.sharingEnabled || selected.accessToken.isBlank() || selected.refreshToken.isBlank()) {
+            accounts.select(selectedId)
+            _state.value = ChatGptUiState(
+                phase = ChatGptAuthPhase.DISCONNECTED,
+                accounts = stored.map(::summary),
+                selectedAccountId = selectedId,
+            )
+            return
+        }
         runCatching {
             accounts.select(selectedId)
             val models = sessions.listModels(selectedId)
@@ -86,7 +96,9 @@ class ChatGptAuthCoordinator @Inject constructor(
             if (existing == null) {
                 builder.addQueryParameter("agent_name_hint", CHATGPT_AGENT_NAME)
             } else {
-                builder.addQueryParameter("id_token_hint", existing.idToken)
+                existing.idToken.takeIf(String::isNotBlank)?.let {
+                    builder.addQueryParameter("id_token_hint", it)
+                }
                 existing.email?.takeIf(String::isNotBlank)?.let {
                     builder.addQueryParameter("login_hint", it)
                 }
@@ -202,6 +214,15 @@ class ChatGptAuthCoordinator @Inject constructor(
 
     suspend fun selectAccount(id: String) {
         accounts.select(id)
+        val selected = accounts.get(id) ?: error("ChatGPT 账户不存在")
+        if (!selected.sharingEnabled || selected.accessToken.isBlank() || selected.refreshToken.isBlank()) {
+            _state.value = ChatGptUiState(
+                phase = ChatGptAuthPhase.DISCONNECTED,
+                accounts = accounts.list().map(::summary),
+                selectedAccountId = id,
+            )
+            return
+        }
         _state.value = currentState(
             phase = ChatGptAuthPhase.LOADING_MODELS,
             selectedAccountId = id,
@@ -226,7 +247,8 @@ class ChatGptAuthCoordinator @Inject constructor(
     }
 
     suspend fun disconnect(id: String) {
-        accounts.remove(id)
+        runCatching { sessions.revoke(id) }
+        accounts.clearCredentials(id)
         refresh()
     }
 
