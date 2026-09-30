@@ -41,8 +41,9 @@ internal class LocalModelProfileStore(
                 baseUrl = baseUrl,
                 provider = obj["provider"]?.jsonPrimitive?.contentOrNull ?: preset?.provider.orEmpty(),
                 authKind = auth,
-                protocol = obj["protocol"]?.jsonPrimitive?.contentOrNull
-                    ?.let { runCatching { LocalModelProtocol.valueOf(it) }.getOrNull() }
+                protocol = preset?.protocol?.takeIf { it == LocalModelProtocol.ANTHROPIC_MESSAGES }
+                    ?: obj["protocol"]?.jsonPrimitive?.contentOrNull
+                        ?.let { runCatching { LocalModelProtocol.valueOf(it) }.getOrNull() }
                     ?: preset?.protocol
                     ?: LocalModelProtocol.CHAT_COMPLETIONS,
                 credentialRef = credentialRef,
