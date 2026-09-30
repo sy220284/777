@@ -264,14 +264,17 @@ internal object LocalCanonicalModelCodec {
             })
         }
         message.replay?.let { replay ->
-            if (adapterId.isNotEmpty() && replayCompatible(replay, adapterId, routeFingerprint)) {
+            if (adapterId.isEmpty()) {
+                // Provider-neutral replay is durable local metadata. It must never be emitted as
+                // an arbitrary wire-message field to third-party providers.
+                put(LOCAL_MODEL_REPLAY_KEY, encodeReplay(replay))
+            } else if (replayCompatible(replay, adapterId, routeFingerprint)) {
                 if (adapterId == LocalModelAdapterIds.OPENAI_RESPONSES) {
                     (replay.payload["output"] as? JsonArray)?.let {
                         put(LEGACY_RESPONSES_OUTPUT_KEY, it)
                     }
                 }
             }
-            put(LOCAL_MODEL_REPLAY_KEY, encodeReplay(replay))
         }
     }
 
