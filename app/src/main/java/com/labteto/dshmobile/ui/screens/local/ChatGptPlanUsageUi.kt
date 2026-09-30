@@ -51,6 +51,7 @@ internal fun ChatGptPlanUsageBar(profile: LocalModelProfile?) {
 internal fun isChatGptPlanUsageError(message: String?): Boolean {
     val value = message.orEmpty()
     return value.contains("ChatGPT 套餐用量") ||
+        value.contains("ChatGPT 暂时无法确认套餐可用量") ||
         value.contains("CHATGPT_PLAN_LIMIT_REACHED") ||
         value.contains("CHATGPT_PLAN_USAGE_UNAVAILABLE")
 }
@@ -59,6 +60,11 @@ internal fun isChatGptModelRecoveryError(message: String?): Boolean =
     message.orEmpty().let {
         it.contains("ChatGPT 模型已不可用") ||
             it.contains("ChatGPT 账户授权") ||
+            it.contains("ChatGPT 套餐请求未通过身份或授权校验") ||
+            it.contains("ChatGPT 套餐请求被权限") ||
+            it.contains("当前 ChatGPT 用户、工作区或策略") ||
+            it.contains("ChatGPT 订阅者上下文未通过验证") ||
+            it.contains("当前 ChatGPT 授权上下文") ||
             it.contains("模型来源与请求不一致")
     }
 
