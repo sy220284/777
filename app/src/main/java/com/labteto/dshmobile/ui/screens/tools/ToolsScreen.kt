@@ -246,8 +246,7 @@ fun ToolsScreen(
             ToolsNotice.LOAD_FAILED,
             ToolsNotice.CONNECT_FAILED,
             ToolsNotice.DISCONNECTED,
-            ToolsNotice.DISCONNECT_FAILED,
-            -> noticeMessage?.let(toast.second)
+            ToolsNotice.DISCONNECT_FAILED -> noticeMessage?.let(toast.second)
             ToolsNotice.CONNECTING, null -> Unit
         }
     }
