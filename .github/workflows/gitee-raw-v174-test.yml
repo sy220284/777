@@ -1,0 +1,80 @@
+name: Gitee Raw v174 Test
+
+'on':
+  push:
+    branches:
+      - ops/gitee-raw-v174-test
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download v174 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/gitee-assets"
+          gh release download v0.12.0-777.174 \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern app-release.apk \
+            --dir "$RUNNER_TEMP/gitee-assets"
+          sha256sum "$RUNNER_TEMP/gitee-assets/app-release.apk" | tee "$RUNNER_TEMP/source.sha256"
+
+      - name: Push APK to Gitee asset branch
+        env:
+          GITEE_MIRROR_ACCESS_TOKEN: ${{ secrets.GITEE_MIRROR_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/gitee-asset-repo"
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+          cp "$RUNNER_TEMP/gitee-assets/app-release.apk" "$WORK/app-release.apk"
+          cp "$RUNNER_TEMP/source.sha256" "$WORK/SHA256SUMS.txt"
+          cd "$WORK"
+
+          git init
+          git config user.name "777 Release Bot"
+          git config user.email "release-bot@777.local"
+          git config http.version HTTP/1.1
+          git config http.postBuffer 524288000
+          git config http.lowSpeedLimit 1024
+          git config http.lowSpeedTime 600
+          git add app-release.apk SHA256SUMS.txt
+          git commit -m "v0.12.0-777.174 国内更新资产"
+
+          ASKPASS="$RUNNER_TEMP/gitee-askpass.sh"
+          cat > "$ASKPASS" <<'SH'
+          #!/usr/bin/env sh
+          case "$1" in
+            *Username*) printf '%s\n' "sy220284" ;;
+            *Password*) printf '%s\n' "$GITEE_MIRROR_ACCESS_TOKEN" ;;
+          esac
+          SH
+          chmod 700 "$ASKPASS"
+          export GIT_ASKPASS="$ASKPASS"
+          export GIT_TERMINAL_PROMPT=0
+
+          git remote add gitee "https://gitee.com/sy220284/777-update.git"
+          git push --force gitee HEAD:refs/heads/update-assets-test
+
+      - name: Verify public raw APK
+        run: |
+          set -euo pipefail
+          URL="https://gitee.com/sy220284/777-update/raw/update-assets-test/app-release.apk"
+          TARGET="$RUNNER_TEMP/gitee-public.apk"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --connect-timeout 20 --max-time 600 \
+            "$URL" --output "$TARGET"
+          SOURCE_SHA="$(cut -d' ' -f1 "$RUNNER_TEMP/source.sha256")"
+          TARGET_SHA="$(sha256sum "$TARGET" | awk '{print $1}')"
+          SOURCE_SIZE="$(stat -c '%s' "$RUNNER_TEMP/gitee-assets/app-release.apk")"
+          TARGET_SIZE="$(stat -c '%s' "$TARGET")"
+          echo "source_size=$SOURCE_SIZE target_size=$TARGET_SIZE"
+          echo "source_sha=$SOURCE_SHA target_sha=$TARGET_SHA"
+          test "$SOURCE_SIZE" = "$TARGET_SIZE"
+          test "$SOURCE_SHA" = "$TARGET_SHA"
