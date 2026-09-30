@@ -151,4 +151,30 @@ class LocalModelProfilesTest {
         val routes = LocalModelPresets.entries.map { modelProfileId(it.model, it.baseUrl) }
         assertEquals(routes.size, routes.toSet().size)
     }
+    @Test fun chatGptPlanAndApiKeyProfilesNeverCollide() {
+        val apiKey = modelProfileId(
+            "gpt-test",
+            "https://api.openai.com/v1",
+            LocalModelAuthKind.API_KEY,
+            null,
+        )
+        val firstAccount = modelProfileId(
+            "gpt-test",
+            "https://api.openai.com/v1",
+            LocalModelAuthKind.CHATGPT_PLAN,
+            "account-a",
+        )
+        val secondAccount = modelProfileId(
+            "gpt-test",
+            "https://api.openai.com/v1",
+            LocalModelAuthKind.CHATGPT_PLAN,
+            "account-b",
+        )
+
+        assertEquals(modelProfileId("gpt-test", "https://api.openai.com/v1"), apiKey)
+        assertNotEquals(apiKey, firstAccount)
+        assertNotEquals(firstAccount, secondAccount)
+    }
+
+
 }

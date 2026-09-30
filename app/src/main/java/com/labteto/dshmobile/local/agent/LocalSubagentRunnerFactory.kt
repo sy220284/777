@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.capability.HarnessVirtualDisplayProvider
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.memory.MemoryManager
@@ -17,8 +18,7 @@ import kotlinx.serialization.json.JsonArray
  * Centralizes LocalSubagentRunner construction so execution wiring is not repeated inside the engine.
  */
 internal class LocalSubagentRunnerFactory(
-    private val apiKeys: LocalApiKeyStore,
-    private val modelClient: DeepSeekClient,
+    private val modelGateway: LocalModelGateway,
     private val jobs: LocalJobManager,
     private val modelHistory: LocalModelHistoryBuffer,
     private val toolOutputStore: LocalToolOutputStore,
@@ -95,8 +95,7 @@ internal class LocalSubagentRunnerFactory(
         runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
         historySnapshotProvider: () -> List<kotlinx.serialization.json.JsonObject> = modelHistory::snapshot,
     ): LocalSubagentRunner = LocalSubagentRunner(
-        apiKeys = apiKeys,
-        modelClient = modelClient,
+        modelGateway = modelGateway,
         state = runnerState,
         jobs = jobs,
         historySnapshot = historySnapshotProvider,

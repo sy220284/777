@@ -33,6 +33,7 @@ import com.labteto.dshmobile.local.LocalVisionPlugin
 import com.labteto.dshmobile.local.LocalVisionRoute
 import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.VisionClient
+import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import com.labteto.dshmobile.runtime.AndroidRuntimePlugin
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
@@ -53,6 +54,7 @@ import okhttp3.OkHttpClient
 class LocalPluginCompositionFactory @Inject constructor(
     @ApplicationContext private val context: Context,
     private val apiKeys: LocalApiKeyStore,
+    private val modelGateway: LocalModelGateway,
     private val visionClient: VisionClient,
     private val githubCredentials: LocalGitHubCredentialStore,
     private val http: OkHttpClient,
@@ -74,6 +76,7 @@ class LocalPluginCompositionFactory @Inject constructor(
     ): LocalPluginComposition = LocalPluginComposition(
         context = context,
         apiKeys = apiKeys,
+        modelGateway = modelGateway,
         visionClient = visionClient,
         githubCredentials = githubCredentials,
         http = http,
@@ -96,6 +99,7 @@ class LocalPluginCompositionFactory @Inject constructor(
 internal class LocalPluginComposition(
     context: Context,
     apiKeys: LocalApiKeyStore,
+    modelGateway: LocalModelGateway,
     visionClient: VisionClient,
     githubCredentials: LocalGitHubCredentialStore,
     http: OkHttpClient,
@@ -149,7 +153,14 @@ internal class LocalPluginComposition(
     private val devicePlugin = AndroidDevicePlugin(deviceProvider)
     private val visionPlugin = LocalVisionPlugin(
         device = deviceProvider,
-        keyProvider = apiKeys::get,
+        keyProvider = {
+            val profile = modelGateway.activeProfile()
+            when {
+                profile == null || !modelGateway.hasCredential(profile) -> null
+                profile.authKind == com.labteto.dshmobile.local.LocalModelAuthKind.API_KEY -> apiKeys.get()
+                else -> "chatgpt-plan"
+            }
+        },
         routeProvider = routeProvider,
         analyzer = visionClient,
         workspaceRoot = workspaceRoot,

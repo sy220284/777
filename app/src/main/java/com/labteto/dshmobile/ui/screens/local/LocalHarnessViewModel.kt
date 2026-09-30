@@ -58,6 +58,7 @@ class LocalHarnessViewModel @Inject constructor(
     val shellState = state.projectShellState(viewModelScope)
     val chatSurfaceState = state.projectChatSurfaceState(viewModelScope)
     val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)
+    val activeModelProfile = runtime.model.activeProfile
     val workState = state.projectWorkState(viewModelScope)
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     val gallery = _gallery.asStateFlow()

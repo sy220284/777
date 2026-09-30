@@ -1278,4 +1278,34 @@
 <string name="local_send_rejected_queue_unavailable">The follow-up queue is temporarily unavailable. Your draft was kept.</string>
 <string name="usage_show_all">Show all %1$d</string>
 <string name="usage_show_recent">Show recent only</string>
+
+    <string name="chatgpt_account_title">ChatGPT account</string>
+    <string name="chatgpt_account_hint">Use your ChatGPT plan for eligible model requests without an OpenAI API key.</string>
+    <string name="chatgpt_privacy_hint">ChatGPT sign-in does not share your ChatGPT conversations or Memory with this app.</string>
+    <string name="chatgpt_connected">Connected</string>
+    <string name="chatgpt_connecting">Connecting</string>
+    <string name="chatgpt_not_connected">Not connected</string>
+    <string name="chatgpt_account_fallback">ChatGPT account</string>
+    <string name="chatgpt_plan_usage">ChatGPT plan</string>
+    <string name="chatgpt_model_count">%1$d models</string>
+    <string name="chatgpt_saved_accounts">Saved ChatGPT accounts</string>
+    <string name="chatgpt_current_account">Current</string>
+    <string name="chatgpt_use_account">Use</string>
+    <string name="chatgpt_reauthorize">Reconnect</string>
+    <string name="chatgpt_disconnect">Disconnect</string>
+    <string name="chatgpt_add_account">Add ChatGPT account</string>
+    <string name="chatgpt_waiting_browser">Complete authorization in your browser, then return here.</string>
+    <string name="chatgpt_exchanging">Completing ChatGPT authorization…</string>
+    <string name="chatgpt_validating">Verifying account identity…</string>
+    <string name="chatgpt_loading_models">Loading models available to this ChatGPT account…</string>
+    <string name="chatgpt_model_source">ChatGPT plan · %1$s</string>
+
+    <string name="chatgpt_continue">Continue with ChatGPT</string>
+    <string name="chatgpt_account_short">Account</string>
+    <string name="chatgpt_using_plan">Using ChatGPT plan</string>
+    <string name="chatgpt_manage_usage">Manage usage</string>
+    <string name="chatgpt_switch_model_source">Switch model source</string>
+    <string name="chatgpt_welcome_title">You’re using your ChatGPT plan</string>
+    <string name="chatgpt_welcome_body">Eligible AI requests use your ChatGPT plan or available credits. You can review and manage this app’s usage anytime in ChatGPT settings.</string>
+    <string name="chatgpt_welcome_confirm">Got it</string>
 </resources>

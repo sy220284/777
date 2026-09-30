@@ -83,6 +83,9 @@ import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalModelAccountStateCoordinator
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
@@ -146,7 +149,7 @@ import kotlinx.serialization.json.put
 class LocalHarnessEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     private val apiKeys: LocalApiKeyStore,
-    private val modelClient: DeepSeekClient,
+    private val modelGateway: LocalModelGateway,
     private val modelConnectionTester: LocalModelConnectionTester,
     private val usageTracker: DeepSeekUsageTracker,
     private val githubCredentials: LocalGitHubCredentialStore,
@@ -200,6 +203,7 @@ class LocalHarnessEngine @Inject constructor(
     private val modelConfiguration = LocalModelConfigurationCoordinator(
         preferences = preferences,
         apiKeys = apiKeys,
+        gateway = modelGateway,
         tester = modelConnectionTester,
         json = json,
     )
@@ -262,7 +266,7 @@ class LocalHarnessEngine @Inject constructor(
     private val historyCompactor = LocalHistoryCompactor()
     private val modelRequestCoordinator by lazy {
         LocalModelRequestCoordinator(
-            modelClient = modelClient,
+            modelGateway = modelGateway,
             resourceScheduler = resourceScheduler,
             historyCompactor = historyCompactor,
             toolSchemas = ::modelToolSchemas,
@@ -337,6 +341,9 @@ class LocalHarnessEngine @Inject constructor(
     internal val streamingState: StateFlow<LocalHarnessStreamingState> = _streamingState.asStateFlow()
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
 
+    private val modelAccountStateCoordinator by lazy {
+        LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isRunBusy)
+    }
     private val transcriptRuntime by lazy {
         LocalTranscriptRuntime(
             state = _state,
@@ -354,7 +361,7 @@ class LocalHarnessEngine @Inject constructor(
             scope = scope,
             chatTurnCoordinator = chatTurnCoordinator,
             requestPlanner = { snapshot, prompt, requestLog ->
-                apiKeys.get()?.let { key ->
+                modelRequestMarkerOrNull()?.let { key ->
                     completeWithRetry(
                         key = key,
                         snapshot = snapshot,
@@ -387,7 +394,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private val groupChatTurnExecutor by lazy {
         LocalGroupChatTurnExecutor(
-            _state, apiKeys, chatPersonaStore, chatPersonaGalleryStore, chatReplyCoordinator,
+            _state, modelGateway, chatPersonaStore, chatPersonaGalleryStore, chatReplyCoordinator,
             chatTurnCoordinator, usageTracker, json, modelHistory, transcriptRuntime,
             imageCapabilities, imageRequestBudget, workspace.path, { eventLog },
             { key, snapshot, messages, step, tools, preview, attempts, overflow, temperature ->
@@ -491,8 +498,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private val subagentRunnerFactory by lazy {
         LocalSubagentRunnerFactory(
-            apiKeys = apiKeys,
-            modelClient = modelClient,
+            modelGateway = modelGateway,
             jobs = jobs,
             modelHistory = modelHistory,
             toolOutputStore = toolOutputStore,
@@ -538,7 +544,7 @@ class LocalHarnessEngine @Inject constructor(
             chatTurnCoordinator = chatTurnCoordinator,
             chatReplyCoordinator = chatReplyCoordinator,
             usageTracker = usageTracker,
-            apiKeys = apiKeys,
+            modelGateway = modelGateway,
             modelRequestCoordinator = modelRequestCoordinator,
             chatRelationshipMemoryContext = ::chatRelationshipMemoryContext,
             recordStyleGuardHits = ::recordStyleGuardHits,
@@ -780,6 +786,15 @@ class LocalHarnessEngine @Inject constructor(
             )
         }
     }
+    internal suspend fun syncChatGptModels(
+        accountId: String,
+        models: List<ChatGptModelOption>,
+        selectFirst: Boolean = true,
+    ) = modelAccountStateCoordinator.syncChatGptModels(accountId, models, selectFirst)
+
+    internal suspend fun removeChatGptAccountProfiles(accountId: String) =
+        modelAccountStateCoordinator.removeChatGptAccountProfiles(accountId)
+
     /** Switch the active route and its corresponding encrypted key together. */
     internal fun selectModel(id: String) {
         scope.launch {
@@ -787,7 +802,7 @@ class LocalHarnessEngine @Inject constructor(
             val selected = current.modelProfiles.firstOrNull { it.id == id } ?: return@launch
             if (
                 current.loading || current.running || isRunBusy() ||
-                (selected.model == current.model && selected.baseUrl == current.baseUrl)
+                selected.id == modelGateway.activeProfile()?.id
             ) return@launch
             runCatching { modelConfiguration.select(id, current.modelProfiles) }
                 .onSuccess { result ->
@@ -1214,7 +1229,7 @@ class LocalHarnessEngine @Inject constructor(
         val expectedSessionId = snapshot.sessionId
         val expectedAssistantMessageId = assistantMessage.id
         val boundEventLog = eventLogFor(expectedSessionId)
-        val key = apiKeys.get() ?: return false
+        val key = modelRequestMarkerOrNull() ?: return false
         val prompt = chatTurnCoordinator.replySuggestionsPrompt(
             persona = snapshot.chatPersona,
             state = snapshot.chatState,
@@ -1657,7 +1672,7 @@ class LocalHarnessEngine @Inject constructor(
         _state.update { it.copy(running = true, error = null) }
         try {
             val snapshot = _state.value
-            val key = apiKeys.get() ?: error("请先配置模型密钥")
+            val key = modelRequestMarker()
             val messages = withEphemeralContext(
                 modelHistory.dropLast(1),
                 "基于本轮已有结果重写最终回复；不要调用工具或声称重新执行。",
@@ -2763,7 +2778,7 @@ class LocalHarnessEngine @Inject constructor(
                 extraTokens = estimateModelTokens(chatContext.stablePrompt) +
                     estimateModelTokens(dynamicContext),
             )
-            val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
+            val key = modelRequestMarker()
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = withChatTurnContext(
                     history = boundedChatRequestHistory(
@@ -3109,7 +3124,7 @@ class LocalHarnessEngine @Inject constructor(
                     requestPrepared = true
                 }
                 drainPendingInputsIntoHistory(binding)
-                val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
+                val key = modelRequestMarker()
                 val snapshot = runState.value
                 val tools = modelToolSchemas(runPolicy, binding)
                 // Re-check before every model step. Tool results and queued user messages can grow
@@ -4688,6 +4703,12 @@ class LocalHarnessEngine @Inject constructor(
         },
     )
 
+    private suspend fun modelRequestMarkerOrNull(): String? =
+        modelAccountStateCoordinator.requestMarkerOrNull()
+
+    private suspend fun modelRequestMarker(): String =
+        modelRequestMarkerOrNull() ?: error("请先配置模型账户或 API Key")
+
     private suspend fun completeWithRetry(
         key: String,
         snapshot: LocalHarnessState,
@@ -4703,7 +4724,6 @@ class LocalHarnessEngine @Inject constructor(
         temperature: Double? = null,
         binding: LocalWorkRunBinding? = null,
     ): LocalModelReply = modelRequestCoordinator.complete(
-        key = key,
         snapshot = snapshot,
         messages = messages,
         step = step,
@@ -4899,23 +4919,9 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun load() {
         val storedModel = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
         val model = modelConfiguration.normalizeModel(storedModel)
-        if (model != storedModel) {
-            preferences.edit().putString(KEY_MODEL, model).apply()
-        }
+        if (model != storedModel) preferences.edit().putString(KEY_MODEL, model).apply()
         val baseUrl = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
-        if (!preferences.contains(KEY_MODEL_PROFILES)) {
-            val oldModels = if (apiKeys.hasLegacyCredential()) modelConfiguration.legacyConfiguredModelNames(model) else emptyList()
-            val profiles = oldModels.map { name ->
-                LocalModelProfile(modelProfileId(name, baseUrl), name, baseUrl)
-            }
-            // Save the routes before moving the legacy secret so interrupted migration can retry.
-            preferences.edit().putString(KEY_MODEL_PROFILES, modelConfiguration.encodeProfiles(profiles)).apply()
-            apiKeys.migrate(profiles.map(LocalModelProfile::id))
-        } else {
-            apiKeys.migrate(modelConfiguration.readProfiles().filter { it.baseUrl == baseUrl }
-                .map(LocalModelProfile::id))
-        }
-        apiKeys.activate(modelProfileId(model, baseUrl))
+        modelConfiguration.prepareStartup(model, baseUrl)
         loadSession(currentSessionId, model, baseUrl)
     }
 
@@ -5011,13 +5017,17 @@ class LocalHarnessEngine @Inject constructor(
             LocalConversationMode.PROJECT,
             LocalConversationMode.CONTINUATION -> LOCAL_PROJECT_ID
         }
+        val modelProfiles = modelConfiguration.readProfiles()
+        val activeModelProfile = modelConfiguration.activeProfile(model, baseUrl, modelProfiles)
+        val modelConfigured = activeModelProfile != null && modelGateway.hasCredential(activeModelProfile)
+        activeModelProfile?.takeIf { modelConfigured }?.let(modelGateway::activate)
         _state.value = LocalHarnessState(
             loading = false,
-            configured = apiKeys.get() != null,
+            configured = modelConfigured,
             model = model,
             baseUrl = baseUrl,
-            configuredModels = modelConfiguration.readProfiles().map(LocalModelProfile::model).distinct().sorted(),
-            modelProfiles = modelConfiguration.readProfiles(),
+            configuredModels = modelProfiles.map(LocalModelProfile::model).distinct().sorted(),
+            modelProfiles = modelProfiles,
             mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
             subagentMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
             modelAttempts = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),

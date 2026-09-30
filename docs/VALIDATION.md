@@ -151,6 +151,22 @@ android-17-instrumented
 - VirtualDisplay 资源隔离。
 - Runtime / APK 布局和实际执行。
 
+
+### ChatGPT 套餐模型
+
+专项验证至少覆盖：
+
+- API Key 与 ChatGPT 套餐 profile ID 隔离。
+- OAuth callback 编码、state/nonce/PKCE 与 ID Token 验证路径。
+- access token 过期时 single-flight refresh，refresh token 轮换后原子替换。
+- Responses 请求固定 `store=false`、`stream=true`；不发送套餐共享暂不支持的采样字段。
+- system message 不进入 Responses input，转换为 `instructions`。
+- 文本、图片、function tool、function_call_output 和 continuation item 转换。
+- `response.completed`、`response.failed`、`response.incomplete` 与流中断分别处理。
+- 套餐额度不足不得静默切换到可能产生 API 费用的 API Key。
+- Chat、Work、主 Agent、子代理、Automation、群聊、人物辅助和 Vision 使用相同模型凭据解析边界。
+- 多账户切换、断开、模型被移除、进程重启和旧 `model_profiles_v2` 迁移。
+
 ## PR 放行
 
 最终验证必须针对：

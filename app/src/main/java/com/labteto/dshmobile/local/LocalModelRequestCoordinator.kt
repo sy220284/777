@@ -6,6 +6,7 @@ import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.observability.AppLog
+import com.labteto.dshmobile.local.model.LocalModelGateway
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -20,7 +21,7 @@ import kotlinx.serialization.json.put
  * recovery. The engine supplies only current product state and the durable compaction callback.
  */
 internal class LocalModelRequestCoordinator(
-    private val modelClient: DeepSeekClient,
+    private val modelGateway: LocalModelGateway,
     private val resourceScheduler: HarnessResourceScheduler,
     private val historyCompactor: LocalHistoryCompactor,
     private val toolSchemas: (LocalAgentRunPolicy) -> JsonArray,
@@ -32,7 +33,6 @@ internal class LocalModelRequestCoordinator(
     private val streamPreviewIntervalMs: Long = 50L,
 ) {
     suspend fun complete(
-        key: String,
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
         step: Int,
@@ -162,8 +162,7 @@ internal class LocalModelRequestCoordinator(
                         .takeIf { it.isNotEmpty() }
                         ?.let(::ChatStreamFilter)
                     resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                        val reply = modelClient.completeStreaming(
-                            apiKey = key,
+                        val reply = modelGateway.completeStreaming(
                             baseUrl = snapshot.baseUrl,
                             model = snapshot.model,
                             messages = activeMessages,
