@@ -73,6 +73,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -141,7 +142,7 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
                 Spacer(Modifier.width(6.dp))
                 Text(
                     stringResource(R.string.chat_error_turn),
-                    style = DsType.small13,
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.error,
                 )
             }
@@ -174,7 +175,7 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StateDot(StateDotState.Warning, size = 8.dp)
                 Spacer(Modifier.width(6.dp))
-                Text(label, style = DsType.caption11, color = colors.labelTertiary)
+                Text(label, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
             }
         }
 
@@ -183,7 +184,7 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
             Spacer(Modifier.width(6.dp))
             Text(
                 stringResource(R.string.chat_error_turn),
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.error,
             )
         }
@@ -192,10 +193,10 @@ internal fun ChatNodeItem(node: ChatNode, context: ChatNodeContext) {
 
         is WorkflowNode -> WorkflowRow(node.data)
 
-        is TitleNode -> Text(node.title, style = DsType.caption11, color = colors.labelTertiary)
+        is TitleNode -> Text(node.title, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
         is SubagentNode -> Text(
             stringResource(R.string.subagents_title),
-            style = DsType.caption11,
+            style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
         // Raw protocol/debug events are execution details. Only final deliverables remain visible.
@@ -244,12 +245,12 @@ internal fun FileChip(name: String, bytes: Long, modifier: Modifier = Modifier) 
         Column {
             Text(
                 name,
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(fileSizeText(bytes), style = DsType.caption11, color = colors.labelTertiary)
+            Text(fileSizeText(bytes), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
         }
     }
 }
