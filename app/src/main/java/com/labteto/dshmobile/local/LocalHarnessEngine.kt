@@ -855,17 +855,6 @@ class LocalHarnessEngine @Inject constructor(
     internal suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): String =
         modelConfiguration.test(apiKey, model, baseUrl, protocol)
 
-    internal suspend fun testChatGptAccount(accountId: String): String {
-        if (isRunBusy()) return "测试暂不可用：请先结束当前任务"
-        val candidates = modelGateway.availableProfiles().filter {
-            it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
-        }
-        val activeId = modelGateway.activeProfile()?.id
-        val profile = candidates.firstOrNull { it.id == activeId } ?: candidates.firstOrNull()
-            ?: return "连接失败：当前 ChatGPT 授权没有可测试的套餐模型"
-        return modelConnectionTester.testProfile(profile)
-    }
-
     /** Choose how user image attachments reach the local model. */
     internal fun configureImageInputMode(mode: LocalImageInputMode) =
         settingsCoordinator.configureImageInputMode(mode)
