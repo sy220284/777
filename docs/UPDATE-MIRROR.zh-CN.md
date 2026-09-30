@@ -26,7 +26,8 @@ main 通过 CI
 → 构建正式签名 APK
 → 生成完整包 / 增量包 / SHA256SUMS / update-manifest
 → 先发布 GitHub Release
-→ 再创建或复用同版本 Gitee Release
+→ 独立 Gitee 镜像 Job 下载同一套 GitHub Release 资产
+→ 创建或复用同版本 Gitee Release
 → 上传 APK / 增量包 / 校验文件
 → 公网回读并做 SHA-256 + 大小校验
 → 最后上传 update-manifest.json
@@ -117,13 +118,18 @@ Gitee 成功
 → 国内镜像追平同版本
 
 Gitee 失败
-→ Workflow 标记失败，便于重跑镜像步骤
+→ 仅 Gitee 镜像 Job 标记失败，可单独重跑
+→ 不重新构建 APK
 → 已创建的 GitHub Release 不回滚
 ```
 
 这样 Gitee 的网络耗时或临时故障不会阻塞 GitHub 正式版发布；国内镜像仍通过同版本、同文件和 SHA-256 / 大小回读校验保持一致。
 
-同一个 tag 的附件视为不可变。如果 Gitee 已存在同名附件，发布脚本会从公开下载地址重新读取并比较大小和 SHA-256：
+同一个 tag 的附件视为不可变。Gitee 镜像任务与 GitHub 正式发布拆成独立 Job，镜像失败后可直接复用已经发布的 GitHub Release 资产单独重跑，不会重复构建正式 APK。
+
+Gitee 对较大的 Release 附件偶尔会出现“文件已经接收，但 API 响应迟到或连接超时”。发布脚本遇到上传异常时不会立刻重复提交，而会先重新读取附件列表并从公开下载地址核对大小和 SHA-256；确认服务器已经落盘后直接继续。只有附件确实不存在时才重试上传。
+
+如果 Gitee 已存在同名附件，发布脚本会从公开下载地址重新读取并比较大小和 SHA-256：
 
 - 完全一致：复用。
 - 内容不同：停止发布，不覆盖同版本资产。
