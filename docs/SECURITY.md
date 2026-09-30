@@ -11,6 +11,21 @@ Agent 具备读取 / 修改工作区文件、执行进程、访问网络和调�
 - Token usage 日志记录 usage、模型、动作和运行归属，不要求保存完整 prompt 正文。
 - 敏感剪贴板、凭据和高权限操作保持显式权限边界。
 
+
+## ChatGPT 账户登录
+
+本机模式可以通过 OpenAI 的 “Continue with ChatGPT” 授权 ChatGPT 套餐模型调用。
+
+- OAuth 使用系统浏览器、PKCE、`state` 和 `nonce`。
+- 回调只绑定 `127.0.0.1` 的随机端口，不开放 LAN 监听。
+- 首次动态注册返回的 issued client id 与稳定主机标识持久保存。
+- ID Token 校验签名、issuer、audience、过期时间和 nonce。
+- 只有授权 scope 包含 `chatgpt.tokens.use.direct` 时才视为套餐调用可用。
+- access token、refresh token、ID Token 和账户注册记录使用 Android Keystore 加密保存，不进入 Session Event Log、模型上下文或诊断日志。
+- 多账户按 issued client id + subject 隔离；切换账户后重新读取对应可见模型。
+- ChatGPT 登录不授予 777 读取 ChatGPT 历史会话或 Memory 的权限。
+- 手机本机的 ChatGPT OAuth 凭据不会自动转发给远程 Harness；远程执行主机需要独立授权边界。
+
 ## 远程连接
 
 远程控制只支持 HTTPS 中继配对。
