@@ -89,17 +89,18 @@ Agent 具备读取 / 修改工作区文件、执行进程、访问网络和调�
 
 ## 更新
 
-应用内更新可以从构建时固定的 OSS 公网 HTTPS Endpoint 读取镜像元数据与发行资产；镜像不可达或元数据无效时回退 GitHub Release。
+应用内更新可以从构建时固定的公开 Gitee Release 镜像读取正式版元数据与发行资产；Gitee 不可达、清单缺失或清单非法时回退 GitHub Release。
 
 镜像边界：
 
-- 镜像根地址必须是 HTTPS。
-- `latest.json` 只允许返回相对资产路径，客户端把路径约束在同一 scheme / host / port 与镜像前缀下，拒绝绝对路径、路径穿越和跨域跳转。
-- OSS 上传凭据只存在 GitHub Actions Secret，不进入 APK、日志或客户端状态。
-- 版本资产先上传并做公网回读校验，`latest.json` 最后更新，避免暴露半发布状态。
-- 镜像失败不会回滚已经成功的 GitHub Release；客户端会继续走原 GitHub 回退链。
+- 镜像根地址必须是 `https://gitee.com/<owner>/<repo>/`，不接受其他 host、HTTP、用户信息、查询参数或额外路径。
+- 客户端只根据固定 Gitee 仓库、正式版 tag 和经过校验的安全文件名构造附件 URL，不接受镜像元数据提供任意下载地址。
+- Gitee 发布令牌只存在 GitHub Actions Secret，不进入 APK、日志或客户端状态。
+- 版本资产先上传并从公开下载地址做 SHA-256 / 大小回读校验，`update-manifest.json` 最后上传。
+- 启用镜像后 Gitee 发布是正式发布前置门禁，失败时不会继续创建新的 GitHub Release。
+- 同一个版本的镜像附件不可变；发现已有同名附件内容不同会停止发布。
 
-无论资产来自 OSS 还是 GitHub，应用内更新都必须验证：
+无论资产来自 Gitee 还是 GitHub，应用内更新都必须验证：
 
 - 下载完成性。
 - SHA-256。
