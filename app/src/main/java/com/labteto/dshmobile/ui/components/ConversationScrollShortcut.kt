@@ -7,6 +7,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
@@ -31,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
+import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -127,24 +129,30 @@ fun ConversationScrollShortcut(
                 if (direction == ConversationScrollTarget.START) R.string.chat_scroll_start
                 else R.string.chat_scroll_latest,
             )
-            Surface(
-                onClick = { onClick(direction) },
-                shape = CircleShape,
-                color = surfaceColor,
-                border = BorderStroke(1.dp, borderColor),
-                shadowElevation = 2.dp,
+            Box(
+                modifier = Modifier
+                    .size(DsSpacing.touchTarget)
+                    .clickable { onClick(direction) },
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier.size(40.dp),
-                    contentAlignment = Alignment.Center,
+                Surface(
+                    shape = CircleShape,
+                    color = surfaceColor,
+                    border = BorderStroke(1.dp, borderColor),
+                    shadowElevation = 2.dp,
                 ) {
-                    Icon(
-                        if (direction == ConversationScrollTarget.START) Icons.Filled.ArrowUpward
-                        else Icons.Filled.ArrowDownward,
-                        contentDescription = label,
-                        tint = colors.labelPrimary,
-                        modifier = Modifier.size(19.dp),
-                    )
+                    Box(
+                        modifier = Modifier.size(40.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (direction == ConversationScrollTarget.START) Icons.Filled.ArrowUpward
+                            else Icons.Filled.ArrowDownward,
+                            contentDescription = label,
+                            tint = colors.labelPrimary,
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
                 }
             }
         }
