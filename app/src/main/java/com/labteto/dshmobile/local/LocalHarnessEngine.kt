@@ -342,14 +342,8 @@ class LocalHarnessEngine @Inject constructor(
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
 
     private val modelAccountStateCoordinator by lazy {
-        LocalModelAccountStateCoordinator(
-            configuration = modelConfiguration,
-            gateway = modelGateway,
-            state = _state,
-            isBusy = ::isRunBusy,
-        )
+        LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isRunBusy)
     }
-
     private val transcriptRuntime by lazy {
         LocalTranscriptRuntime(
             state = _state,
