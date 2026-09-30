@@ -33,6 +33,8 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 
@@ -100,11 +102,10 @@ fun ConversationScrollShortcut(
 ) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
-    val surfaceColor = backgroundState.surfaceColor(
-        base = colors.bgLayer1,
+    val surfaceColor = colors.wallpaperSurface(
+        level = WallpaperSurfaceLevel.FLOATING,
         region = BackgroundRegion.BOTTOM,
-        minAlpha = 0.80f,
-        maxAlpha = 0.97f,
+        base = colors.bgLayer1,
     )
     val borderColor = if (backgroundState.hasImage && backgroundState.adaptiveContrast) {
         colors.borderL1.copy(alpha = 0.72f)
