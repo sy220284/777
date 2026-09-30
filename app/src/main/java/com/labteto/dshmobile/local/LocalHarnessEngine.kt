@@ -84,7 +84,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.model.LocalModelRunContext
+import com.labteto.dshmobile.local.model.withModelToolCallEventData
 import com.labteto.dshmobile.local.model.LocalModelAccountStateCoordinator
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
@@ -3014,12 +3014,6 @@ class LocalHarnessEngine @Inject constructor(
         var chatDynamicContext = ""
         val mainMaxSteps = runState.value.mainMaxSteps
         val runSnapshot = runState.value
-        val runProfile = modelGateway.activeProfile()
-            ?.takeIf { profile ->
-                profile.model == runSnapshot.model &&
-                    normalizeModelBaseUrl(profile.baseUrl) == normalizeModelBaseUrl(runSnapshot.baseUrl)
-            }
-            ?: modelGateway.profileForRun(runSnapshot.model)
         val mainStepLimit = if (runPolicy.allowToolExecution) {
             adaptiveAgentStepLimit(
                 configuredBase = mainMaxSteps,
@@ -3322,18 +3316,10 @@ class LocalHarnessEngine @Inject constructor(
                         activeToolCalls = event.toolCalls
                         startedToolCallIds.clear()
                         completedToolCallIds.clear()
-                        val assistantData = runTranscript.withTranscript(
-                            reply.message,
-                            transcriptMessages,
-                        )
                         val assistantEvent = runEventLog.append(
                             "assistant/message",
-                            JsonObject(
-                                assistantData + (
-                                    LOCAL_MODEL_TOOL_CALLS_EVENT_KEY to
-                                        modelToolCallEventData(reply.toolCalls)
-                                    ),
-                            ),
+                            runTranscript.withTranscript(reply.message, transcriptMessages)
+                                .withModelToolCallEventData(reply.toolCalls),
                         )
                         if (beforeAssistant.usageMode == LocalUsageMode.CHAT && event.toolCalls.isEmpty()) {
                             finalChatAssistant = transcriptMessages.lastOrNull { message ->
@@ -3521,9 +3507,7 @@ class LocalHarnessEngine @Inject constructor(
 
         try {
             withTimeout(FOREGROUND_TURN_TIMEOUT_MILLIS) {
-                withContext(LocalModelRunContext(runProfile)) {
-                    loop.run(input)
-                }
+                modelGateway.withFrozenRoute(runSnapshot.model, runSnapshot.baseUrl) { loop.run(input) }
             }
             if (runState.value.usageMode == LocalUsageMode.CHAT) {
                 val postTurnSnapshot = runState.value
