@@ -122,10 +122,12 @@ class LocalModelGateway @Inject constructor(
         profile: LocalModelProfile?,
     ): LocalResolvedModelRoute {
         val resolved = credentials.resolve(model, baseUrl, profile)
-        val protocol = when (resolved.authKind) {
-            LocalModelAuthKind.CHATGPT_PLAN -> LocalModelProtocol.RESPONSES
-            LocalModelAuthKind.API_KEY -> profile?.protocol ?: LocalModelPresets.protocolFor(model, baseUrl)
-        }
+        val protocol = resolveLocalModelProtocol(
+            authKind = resolved.authKind,
+            profile = profile,
+            model = model,
+            baseUrl = baseUrl,
+        )
         val preset = LocalModelPresets.find(model, baseUrl)
         return LocalResolvedModelRoute(
             profileId = profile?.id,
@@ -142,4 +144,15 @@ class LocalModelGateway @Inject constructor(
         put("role", "user")
         put("content", "Reply with exactly: OK")
     })
+}
+
+
+internal fun resolveLocalModelProtocol(
+    authKind: LocalModelAuthKind,
+    profile: LocalModelProfile?,
+    model: String,
+    baseUrl: String,
+): LocalModelProtocol = when (authKind) {
+    LocalModelAuthKind.CHATGPT_PLAN -> LocalModelProtocol.RESPONSES
+    LocalModelAuthKind.API_KEY -> profile?.protocol ?: LocalModelPresets.protocolFor(model, baseUrl)
 }
