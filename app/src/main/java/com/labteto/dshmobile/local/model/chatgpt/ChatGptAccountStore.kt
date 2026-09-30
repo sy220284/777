@@ -63,6 +63,19 @@ class ChatGptAccountStore @Inject constructor(
         dataStore.edit { it[selectedKey] = id }
     }
 
+    suspend fun clearCredentials(id: String) = mutex.withLock {
+        val current = get(id) ?: return@withLock
+        val disconnected = current.copy(
+            idToken = "",
+            accessToken = "",
+            refreshToken = "",
+            scopes = emptySet(),
+            accessTokenExpiresAtEpochSeconds = 0L,
+            savedAtEpochSeconds = System.currentTimeMillis() / 1_000L,
+        )
+        secret(id).put(json.encodeToString(disconnected))
+    }
+
     suspend fun remove(id: String) = mutex.withLock {
         secret(id).clear()
         dataStore.edit { preferences ->
