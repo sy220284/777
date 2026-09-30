@@ -71,7 +71,9 @@ internal fun LocalConversationErrorCard(
     Surface(
         color = colors.warnTertiary,
         shape = DsShapes.block,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = DsSpacing.medium),
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
