@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.LocalUsageMode
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,6 +13,7 @@ internal data class LocalStreamingPreviewOwner(
     val sessionId: String,
     val requestId: String,
     val usageMode: LocalUsageMode,
+    val generation: Long,
 )
 
 /**
@@ -32,19 +34,33 @@ internal fun LocalHarnessStreamingState.forSurface(
     }
 
 internal class LocalStreamingPreviewStore {
+    private val generation = AtomicLong(0L)
     private val mutableState = MutableStateFlow(LocalHarnessStreamingState())
     val state: StateFlow<LocalHarnessStreamingState> = mutableState.asStateFlow()
 
+    fun newOwner(
+        sessionId: String,
+        requestId: String,
+        usageMode: LocalUsageMode,
+    ): LocalStreamingPreviewOwner = LocalStreamingPreviewOwner(
+        sessionId = sessionId,
+        requestId = requestId,
+        usageMode = usageMode,
+        generation = generation.incrementAndGet(),
+    )
+
     fun begin(owner: LocalStreamingPreviewOwner) {
-        mutableState.value = owner.emptyState()
+        mutableState.update { current ->
+            if (current.accepts(owner)) owner.emptyState() else current
+        }
     }
 
     fun publishAssistant(owner: LocalStreamingPreviewOwner, text: String) {
         if (text.isEmpty()) return
         mutableState.update { current ->
             when {
-                current.sessionId != owner.sessionId -> owner.emptyState().copy(assistant = text)
                 current.requestId == owner.requestId -> current.copy(assistant = text)
+                current.accepts(owner) -> owner.emptyState().copy(assistant = text)
                 else -> current
             }
         }
@@ -54,8 +70,8 @@ internal class LocalStreamingPreviewStore {
         if (text.isEmpty()) return
         mutableState.update { current ->
             when {
-                current.sessionId != owner.sessionId -> owner.emptyState().copy(reasoning = text)
                 current.requestId == owner.requestId -> current.copy(reasoning = text)
+                current.accepts(owner) -> owner.emptyState().copy(reasoning = text)
                 else -> current
             }
         }
@@ -71,9 +87,13 @@ internal class LocalStreamingPreviewStore {
         }
     }
 
+    private fun LocalHarnessStreamingState.accepts(owner: LocalStreamingPreviewOwner): Boolean =
+        sessionId != owner.sessionId || owner.generation >= generation
+
     private fun LocalStreamingPreviewOwner.emptyState() = LocalHarnessStreamingState(
         sessionId = sessionId,
         requestId = requestId,
         usageMode = usageMode,
+        generation = generation,
     )
 }
