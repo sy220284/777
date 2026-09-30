@@ -1,8 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.DeepSeekClient
+import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.DeepSeekUsageTracker
-import com.labteto.dshmobile.local.LocalApiKeyStore
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
@@ -236,8 +235,7 @@ private fun stripTrailingJsonCommas(raw: String): String {
  */
 @Singleton
 class PersonaAutoFillService @Inject constructor(
-    private val apiKeys: LocalApiKeyStore,
-    private val modelClient: DeepSeekClient,
+    private val modelGateway: LocalModelGateway,
     private val usageTracker: DeepSeekUsageTracker,
     private val json: Json,
 ) {
@@ -248,9 +246,6 @@ class PersonaAutoFillService @Inject constructor(
         recentMessages: List<LocalHarnessMessage>,
         description: String,
     ): PersonaProfile {
-        val apiKey = apiKeys.get()?.trim()?.takeIf { it.isNotEmpty() }
-            ?: error("请先在模型设置里配置密钥")
-
         val recentContext = recentMessages
             .filter { message -> message.role == "user" || message.role == "assistant" }
             .takeLast(MAX_CONTEXT_MESSAGES)
@@ -324,8 +319,7 @@ class PersonaAutoFillService @Inject constructor(
             },
         )
 
-        val reply = modelClient.complete(
-            apiKey = apiKey,
+        val reply = modelGateway.complete(
             baseUrl = baseUrl,
             model = model,
             messages = messages,
@@ -357,9 +351,8 @@ class PersonaAutoFillService @Inject constructor(
                 },
             )
             val repairedReply = runCatching {
-                modelClient.complete(
-                    apiKey = apiKey,
-                    baseUrl = baseUrl,
+                modelGateway.complete(
+                            baseUrl = baseUrl,
                     model = model,
                     messages = repairMessages,
                     tools = JsonArray(emptyList()),

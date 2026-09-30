@@ -1277,4 +1277,34 @@
 <string name="local_send_rejected_queue_unavailable">当前执行中的补充消息队列暂时不可用；当前输入已保留。</string>
 <string name="usage_show_all">查看全部 %1$d 项</string>
 <string name="usage_show_recent">只看最近项目</string>
+
+    <string name="chatgpt_account_title">ChatGPT 账户</string>
+    <string name="chatgpt_account_hint">使用 ChatGPT 套餐调用符合条件的模型，无需配置 OpenAI API Key。</string>
+    <string name="chatgpt_privacy_hint">登录不会向本应用共享你的 ChatGPT 对话记录或 Memory。</string>
+    <string name="chatgpt_connected">已连接</string>
+    <string name="chatgpt_connecting">连接中</string>
+    <string name="chatgpt_not_connected">未连接</string>
+    <string name="chatgpt_account_fallback">ChatGPT 账户</string>
+    <string name="chatgpt_plan_usage">ChatGPT 套餐</string>
+    <string name="chatgpt_model_count">%1$d 个模型</string>
+    <string name="chatgpt_saved_accounts">已保存的 ChatGPT 账户</string>
+    <string name="chatgpt_current_account">当前</string>
+    <string name="chatgpt_use_account">使用</string>
+    <string name="chatgpt_reauthorize">重新授权</string>
+    <string name="chatgpt_disconnect">断开</string>
+    <string name="chatgpt_add_account">添加 ChatGPT 账户</string>
+    <string name="chatgpt_waiting_browser">请在浏览器完成授权，然后返回这里。</string>
+    <string name="chatgpt_exchanging">正在完成 ChatGPT 授权…</string>
+    <string name="chatgpt_validating">正在验证账户身份…</string>
+    <string name="chatgpt_loading_models">正在读取该 ChatGPT 账户可用的模型…</string>
+    <string name="chatgpt_model_source">ChatGPT 套餐 · %1$s</string>
+
+    <string name="chatgpt_continue">继续使用 ChatGPT</string>
+    <string name="chatgpt_account_short">账户</string>
+    <string name="chatgpt_using_plan">正在使用 ChatGPT 套餐</string>
+    <string name="chatgpt_manage_usage">管理使用额度</string>
+    <string name="chatgpt_switch_model_source">切换模型来源</string>
+    <string name="chatgpt_welcome_title">正在使用 ChatGPT 套餐</string>
+    <string name="chatgpt_welcome_body">符合条件的 AI 请求会使用你的 ChatGPT 套餐或可用额度。你可以随时在 ChatGPT 设置中查看和管理本应用的使用额度。</string>
+    <string name="chatgpt_welcome_confirm">知道了</string>
 </resources>

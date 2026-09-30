@@ -78,6 +78,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
+import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.chatBranchInfo
@@ -159,6 +160,7 @@ fun LocalHarnessScreen(
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
+    val activeModelProfile by viewModel.activeModelProfile.collectAsStateWithLifecycle()
     val sendFeedback by viewModel.sendFeedbackState.collectAsStateWithLifecycle()
     val gallery by viewModel.gallery.collectAsStateWithLifecycle()
     val transcriptHistory by viewModel.transcriptHistory.collectAsStateWithLifecycle()
@@ -343,6 +345,7 @@ fun LocalHarnessScreen(
                 )
                 else -> LocalConversationSurface(
                     state = state,
+                    activeModelProfile = activeModelProfile,
                     sendFeedback = sendFeedback,
                     streamingState = viewModel.streamingState,
                     gallery = gallery,
@@ -620,6 +623,7 @@ private fun ModelChoice(id: String, label: String, selected: String, onSelect: (
 @Composable
 private fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
+    activeModelProfile: LocalModelProfile?,
     sendFeedback: LocalSendFeedbackState,
     streamingState: StateFlow<LocalHarnessStreamingState>,
     gallery: List<PersonaGalleryEntry>,
@@ -1197,39 +1201,15 @@ private fun LocalConversationSurface(
         val sendRejectMessage = sendFeedback.rejectReason
             ?.takeIf { sendFeedback.sessionId == state.sessionId }
             ?.let { reason -> localSendRejectMessage(reason, sendFeedback.rejectLimit) }
-        if (sendRejectMessage != null || state.error != null) {
-            Surface(
-                color = colors.warnTertiary,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = DsSpacing.medium),
-            ) {
-                Row(
-                    Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                ) {
-                    Text(
-                        sendRejectMessage ?: (
-                            stringResource(R.string.agent_operation_generic) + " · " +
-                                stringResource(R.string.agent_operation_status_failed)
-                            ),
-                        style = DsType.small13,
-                        color = colors.error,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (sendRejectMessage == null) {
-                        state.messages.lastOrNull { message -> message.role == "user" }?.let { lastRequest ->
-                            DsButton(
-                                stringResource(R.string.local_restore_request),
-                                { drafts[state.sessionId] = lastRequest.content },
-                                variant = DsButtonVariant.Ghost,
-                                size = DsButtonSize.Small,
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        LocalConversationErrorCard(
+            sendRejectMessage = sendRejectMessage,
+            stateError = state.error,
+            restoreRequest = state.messages.lastOrNull { it.role == "user" }?.content,
+            onRestoreRequest = { drafts[state.sessionId] = it },
+            onSwitchModelSource = {
+                if (state.modelProfiles.isNotEmpty()) showModelPicker = true else onConfigure()
+            },
+        )
         attachmentError?.let {
             Text(
                 it,
@@ -1402,6 +1382,7 @@ private fun LocalConversationSurface(
             surfaceColor = composerSurfaceColor,
             shadowElevation = if (backgroundState.hasImage) 0.dp else 1.dp,
         ) {
+            ChatGptPlanUsageBar(activeModelProfile)
             if (attachments.isNotEmpty()) {
                 attachments.forEachIndexed { index, attachment ->
                     ImportedAttachmentRow(
@@ -1653,29 +1634,13 @@ private fun LocalConversationSurface(
         }
     }
     if (showModelPicker) {
-        DsBottomSheet(title = stringResource(R.string.models_title), onDismiss = { showModelPicker = false }) {
-            state.modelProfiles.forEach { profile ->
-                DsButton(
-                    text = "${profile.model}  ·  ${profile.baseUrl.substringAfter("://").substringBefore('/')}" ,
-                    onClick = {
-                        onSelectModel(profile.id)
-                        showModelPicker = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    variant = if (profile.model == state.model && profile.baseUrl == state.baseUrl)
-                        DsButtonVariant.Info else DsButtonVariant.Ghost,
-                )
-            }
-            DsButton(
-                text = stringResource(R.string.local_manage_model_config),
-                onClick = {
-                    showModelPicker = false
-                    onConfigure()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                variant = DsButtonVariant.Outline,
-            )
-        }
+        LocalModelPickerSheet(
+            profiles = state.modelProfiles,
+            activeProfileId = activeModelProfile?.id,
+            onSelect = onSelectModel,
+            onConfigure = onConfigure,
+            onDismiss = { showModelPicker = false },
+        )
     }
     if (showAttachmentPicker) {
         DsBottomSheet(title = stringResource(R.string.chat_composer_add_attachment), onDismiss = { showAttachmentPicker = false }) {

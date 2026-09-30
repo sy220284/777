@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
@@ -39,7 +40,7 @@ import kotlinx.serialization.json.put
  */
 internal class LocalGroupChatTurnExecutor(
     private val _state: MutableStateFlow<LocalHarnessState>,
-    private val apiKeys: LocalApiKeyStore,
+    private val modelGateway: LocalModelGateway,
     private val chatPersonaStore: ChatPersonaStore,
     private val chatPersonaGalleryStore: ChatPersonaGalleryStore,
     private val chatReplyCoordinator: LocalChatReplyCoordinator,
@@ -245,7 +246,7 @@ internal class LocalGroupChatTurnExecutor(
         step: Int,
     ): ChatCharacterState? {
         val snapshot = _state.value
-        val key = apiKeys.get() ?: return null
+        val key = modelRequestMarkerOrNull() ?: return null
         val sharedContext = _state.value.groupChat.context
         val plannerState = member.chatState.withContextForPlanner(sharedContext)
         val prompt = buildString {
@@ -328,7 +329,7 @@ internal class LocalGroupChatTurnExecutor(
         }
 
         val snapshot = _state.value
-        val key = apiKeys.get() ?: return GroupStateRefreshBatch(
+        val key = modelRequestMarkerOrNull() ?: return GroupStateRefreshBatch(
             states = replies.associate { it.member.galleryId to it.member.chatState },
             complete = false,
         )
@@ -447,7 +448,7 @@ internal class LocalGroupChatTurnExecutor(
             ensureSystemMessage()
             captureAutoMemoryDirective(input, sourceMessageId)
 
-            val key = apiKeys.get() ?: error("请先配置 DeepSeek API 密钥")
+            val key = modelRequestMarkerOrNull() ?: error("请先配置模型账户或 API Key")
             val members = snapshot.groupChat.members
             val cursor = snapshot.groupChat.turnCursor % members.size
             val rotated = members.drop(cursor) + members.take(cursor)
@@ -733,4 +734,9 @@ internal class LocalGroupChatTurnExecutor(
             finishTurn(currentCoroutineContext()[Job])
         }
     }
+    private suspend fun modelRequestMarkerOrNull(): String? {
+        val profile = modelGateway.activeProfile() ?: return null
+        return if (modelGateway.hasCredential(profile)) "" else null
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.harness.agent.*
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
@@ -51,8 +52,7 @@ internal fun LocalSubagentResult.requireCompletedOutput(): String {
 }
 
 internal class LocalSubagentRunner(
-    private val apiKeys: LocalApiKeyStore,
-    private val modelClient: DeepSeekClient,
+    private val modelGateway: LocalModelGateway,
     private val state: StateFlow<LocalHarnessState>,
     private val jobs: LocalJobManager,
     private val historySnapshot: () -> List<JsonObject>,
@@ -170,16 +170,17 @@ internal class LocalSubagentRunner(
             put("task", task.take(2_000))
             virtualScreenId?.let { put("virtual_screen_id", it) }
         })
-        val key = apiKeys.get()
-        if (key == null) {
-            val output = "[subagent][$subagentId][NO_API_KEY] 子代理无法读取模型密钥"
+        val activeProfile = modelGateway.activeProfile()
+        if (activeProfile == null || !modelGateway.hasCredential(activeProfile)) {
+            val output = "[subagent][$subagentId][NO_MODEL_CREDENTIAL] 子代理无法读取当前模型凭据"
             eventLog().append("subagent/end", buildJsonObject {
                 put("agent_id", subagentId)
                 put("status", "failed")
-                put("code", "NO_API_KEY")
+                put("code", "NO_MODEL_CREDENTIAL")
             })
-            return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "NO_API_KEY")
+            return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "NO_MODEL_CREDENTIAL")
         }
+        val key = ""
         val parentRunId = parentCallId?.let { callId ->
             eventLog().events()
                 .filter { event ->
@@ -607,7 +608,12 @@ internal class LocalSubagentRunner(
             try {
                 return executor.execute {
                     resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                        modelClient.complete(key, baseUrl, model, activeHistory, tools)
+                        modelGateway.complete(
+                            model = model,
+                            baseUrl = baseUrl,
+                            messages = activeHistory,
+                            tools = tools,
+                        )
                     }
                 }
             } catch (error: Throwable) {

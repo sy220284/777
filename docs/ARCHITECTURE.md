@@ -87,6 +87,28 @@ New UI and worker code should enter through the relevant capability runtime inst
 
 The Engine has CI-enforced line, dependency and public-surface ratchets. New responsibilities must move outward rather than expanding the central orchestration surface.
 
+
+### Model accounts and transport
+
+本机模型层把“账户凭据”和“模型协议”分开处理：
+
+```text
+Chat / Work / Agent
+        │
+        ▼
+LocalModelGateway
+   ├─ LocalModelCredentialResolver
+   │    ├─ API Key
+   │    └─ ChatGPT OAuth plan
+   └─ transport
+        ├─ Chat Completions
+        └─ OpenAI Responses
+```
+
+API Key 档案继续兼容既有 `model + baseUrl` 标识；ChatGPT 套餐档案额外绑定认证类型和账户身份，避免同一 OpenAI 模型在 API Key 与套餐登录之间覆盖凭据。ChatGPT 登录后的模型目录以 OpenAI 返回的可见模型为准，不把套餐模型永久写死在客户端预设中。
+
+ChatGPT 套餐请求通过 Responses API，客户端保留完整 continuation items，因为套餐共享请求使用 `store=false`。系统提示转换为 Responses `instructions`，工具调用转换回本机 `LocalToolCall`，因此上层 Agent loop 不依赖具体传输协议。
+
 ### Send path
 
 `LocalSendCoordinator` is the single local admission policy:
