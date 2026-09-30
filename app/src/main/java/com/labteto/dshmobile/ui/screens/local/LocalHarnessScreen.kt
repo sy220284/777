@@ -1653,6 +1653,7 @@ private fun LocalConversationSurface(
         }
     }
     if (showModelPicker) {
+        val chatGptPlanLabel = stringResource(R.string.chatgpt_plan_usage)
         DsBottomSheet(title = stringResource(R.string.models_title), onDismiss = { showModelPicker = false }) {
             state.modelProfiles.forEach { profile ->
                 DsButton(
@@ -1661,7 +1662,7 @@ private fun LocalConversationSurface(
                         append("  ·  ")
                         append(
                             if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-                                "ChatGPT 套餐"
+                                chatGptPlanLabel
                             } else {
                                 profile.baseUrl.substringAfter("://").substringBefore('/')
                             },
