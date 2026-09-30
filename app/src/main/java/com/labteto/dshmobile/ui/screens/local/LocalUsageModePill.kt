@@ -29,6 +29,7 @@ import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 
 @Composable
