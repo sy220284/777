@@ -156,13 +156,37 @@ class OpenAiResponsesClient @Inject constructor(
         temperature: Double?,
     ): JsonObject = buildJsonObject {
         put("model", model)
+        responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
         put("input", responseInput(messages))
         put("store", false)
         put("stream", true)
         put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
         if (tools.isNotEmpty()) put("tools", responseTools(tools))
-        temperature?.let { put("temperature", it) }
+        // ChatGPT plan sharing currently rejects temperature/top_p and other sampling controls.
+        // Keep the parameter on the gateway contract for API-key transports, but never forward it here.
+        @Suppress("UNUSED_EXPRESSION")
+        temperature
     }
+
+    private fun responseInstructions(messages: List<JsonObject>): String =
+        messages.asSequence()
+            .filter { it["role"]?.jsonPrimitive?.contentOrNull == "system" }
+            .mapNotNull { message -> responseInstructionText(message["content"]) }
+            .filter(String::isNotBlank)
+            .joinToString("\n\n")
+
+    private fun responseInstructionText(content: JsonElement?): String? =
+        when (content) {
+            is JsonPrimitive -> content.contentOrNull
+            is JsonArray -> content.mapNotNull { part ->
+                val obj = part as? JsonObject ?: return@mapNotNull null
+                when (obj["type"]?.jsonPrimitive?.contentOrNull) {
+                    "text", "input_text" -> obj["text"]?.jsonPrimitive?.contentOrNull
+                    else -> null
+                }
+            }.joinToString("\n").takeIf(String::isNotBlank)
+            else -> null
+        }
 
     private fun responseInput(messages: List<JsonObject>): JsonArray = buildJsonArray {
         messages.forEach { message ->
@@ -182,7 +206,8 @@ class OpenAiResponsesClient @Inject constructor(
                 })
                 return@forEach
             }
-            if (role !in setOf("system", "developer", "user", "assistant")) return@forEach
+            if (role == "system") return@forEach
+            if (role !in setOf("developer", "user", "assistant")) return@forEach
             add(buildJsonObject {
                 put("role", role)
                 val content = message["content"]
