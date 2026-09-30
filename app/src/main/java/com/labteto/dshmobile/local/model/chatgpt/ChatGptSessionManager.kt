@@ -50,7 +50,7 @@ class ChatGptSessionManager @Inject constructor(
         }
     }
 
-    suspend fun exchangeAuthorizationCode(
+    internal suspend fun exchangeAuthorizationCode(
         clientId: String,
         code: String,
         verifier: String,
