@@ -25,6 +25,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.takeLastWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.model.forSurface
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -94,7 +95,7 @@ internal fun LocalStreamingWorkPreview(
     val rawStream by streamingState.collectAsStateWithLifecycle()
     val stream = rawStream.forSurface(sessionId, LocalUsageMode.WORK)
     val preview = stream.assistant.let { text ->
-        if (text.length > 480) "…" + text.takeLast(480) else text
+        if (text.length > 480) "…" + takeLastWithoutSplittingSurrogatePair(text, 480) else text
     }
 
     Surface(
