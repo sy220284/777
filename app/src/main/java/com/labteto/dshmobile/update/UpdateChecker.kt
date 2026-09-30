@@ -69,6 +69,11 @@ private data class GiteeRelease(
     @SerialName("tag_name") val tagName: String = "",
     val prerelease: Boolean = false,
 )
+
+private sealed interface MirrorCheckResult
+private data class MirrorSuccess(val update: AvailableUpdate?) : MirrorCheckResult
+private data object MirrorUnavailable : MirrorCheckResult
+
 data class DeltaPatch(
     val fromVersion: String,
     val toVersion: String,
