@@ -21,6 +21,26 @@ jobs:
         with:
           ref: fix/gitee-large-asset-upload
 
+      - name: Wait for older v174 repair runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 80); do
+            ACTIVE="$(
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" \
+                --jq '[.workflow_runs[] | select(.name == "Gitee Repair v174" and (.id|tostring) != "'"$GITHUB_RUN_ID"'" and .status != "completed")] | length'
+            )"
+            if [ "$ACTIVE" -eq 0 ]; then
+              echo "旧 v174 修复任务已全部结束。"
+              exit 0
+            fi
+            echo "仍有 $ACTIVE 个旧 v174 修复任务运行中，等待..."
+            sleep 15
+          done
+          echo "::error::等待旧 v174 修复任务结束超时。"
+          exit 1
+
       - name: Download v174 GitHub release assets
         env:
           GH_TOKEN: ${{ github.token }}
