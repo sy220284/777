@@ -61,6 +61,11 @@ data class ChatGptUiState(
         get() = selectedAccount?.sharingEnabled == true && phase == ChatGptAuthPhase.CONNECTED
 }
 
+internal class ChatGptOAuthTokenException(
+    val oauthCode: String?,
+    message: String,
+) : java.io.IOException(message)
+
 internal data class ChatGptTokenResponse(
     val accessToken: String,
     val refreshToken: String?,
