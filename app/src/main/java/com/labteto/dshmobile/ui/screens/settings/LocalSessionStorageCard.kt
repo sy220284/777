@@ -17,6 +17,7 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
 internal fun LocalSessionStorageCard(
@@ -34,7 +35,7 @@ internal fun LocalSessionStorageCard(
         if (status == null) {
             Text(
                 text = stringResource(R.string.common_loading),
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
             )
         } else {
@@ -48,7 +49,7 @@ internal fun LocalSessionStorageCard(
                         formatStorageBytes(status.totalBytes),
                         formatStorageBytes(status.budgetBytes),
                     ),
-                    style = DsType.std14Strong,
+                    style = DsType.std14Strong.withReadingWeight(),
                     color = if (status.warning) colors.warnLabel else colors.labelPrimary,
                 )
                 Text(
@@ -57,7 +58,7 @@ internal fun LocalSessionStorageCard(
                         formatStorageBytes(status.freeBytes),
                         status.sessionCount,
                     ),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelSecondary,
                 )
                 Text(
@@ -66,7 +67,7 @@ internal fun LocalSessionStorageCard(
                         status.rawSegmentCount,
                         status.compressedSegmentCount,
                     ),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelSecondary,
                 )
                 Text(
@@ -77,7 +78,7 @@ internal fun LocalSessionStorageCard(
                             R.string.settings_local_session_storage_retention
                         },
                     ),
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = if (status.warning) colors.warnLabel else colors.labelTertiary,
                 )
             }
