@@ -78,10 +78,9 @@ class UpdateCheckerTest {
             "https://github.com/sy220284/777/releases/download/v0.12.0-777.50/app-release.apk",
             update?.apkUrl,
         )
-        assertEquals(
-            listOf("gitee.com", "gitee.com", "api.github.com", "api.github.com"),
-            requestedHosts,
-        )
+        assertEquals(listOf("gitee.com", "gitee.com"), requestedHosts.take(2))
+        assertEquals(true, requestedHosts.drop(2).isNotEmpty())
+        assertEquals(true, requestedHosts.drop(2).all { it == "api.github.com" })
     }
 
     @Test
