@@ -184,8 +184,9 @@ class ChatGptSessionManager @Inject constructor(
             if (!response.isSuccessful) {
                 val code = root?.get("error")?.jsonPrimitive?.contentOrNull
                 val detail = root?.get("error_description")?.jsonPrimitive?.contentOrNull
-                throw IOException(
-                    listOfNotNull(
+                throw ChatGptOAuthTokenException(
+                    oauthCode = code,
+                    message = listOfNotNull(
                         "ChatGPT OAuth token 请求失败（HTTP ${response.code}）",
                         code,
                         detail,
