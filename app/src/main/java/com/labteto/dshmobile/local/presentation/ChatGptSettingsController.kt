@@ -35,7 +35,6 @@ internal class ChatGptSettingsController(
         val result = testAccount(id)
         if (state.value.selectedAccountId == id) {
             auth.refresh()
-            syncSelectedIfConnected()
         }
         return result
     }
