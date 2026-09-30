@@ -151,6 +151,8 @@ jobs:
     if: needs.check-release.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      published: ${{ steps.freshness.outputs.current }}
     permissions:
       contents: write
       actions: read
@@ -442,14 +444,38 @@ jobs:
             .release-assets/*
           generate_release_notes: true
 
-      # Gitee 是国内分发镜像。失败时本次 Workflow 仍会标红，便于单独重跑，
-      # 但已经成功创建的 GitHub Release 不回滚、不再被镜像耗时阻塞。
+  gitee-mirror:
+    needs: [check-release, release]
+    if: needs.release.result == 'success' && needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.check-release.outputs.release_sha }}
+
+      # GitHub Release 已经是正式主源。镜像任务直接复用其不可变资产，
+      # 因此 Gitee 慢或失败时可以单独重跑，无需重新构建 APK。
+      - name: Download published GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check-release.outputs.version }}
+        run: |
+          set -euo pipefail
+          rm -rf .release-assets
+          mkdir -p .release-assets
+          gh release download "v$VERSION" --dir .release-assets
+          ls -lh .release-assets
+
       - name: Publish Gitee mainland update mirror
-        if: steps.freshness.outputs.current == 'true'
         env:
           UPDATE_MIRROR_BASE_URL: ${{ vars.UPDATE_MIRROR_BASE_URL }}
           GITEE_MIRROR_ACCESS_TOKEN: ${{ secrets.GITEE_MIRROR_ACCESS_TOKEN }}
+          VERSION: ${{ needs.check-release.outputs.version }}
         run: |
           python3 .github/scripts/publish-gitee-update-mirror.py \
             --asset-dir .release-assets \
-            --version "$DSH_VERSION_NAME"
+            --version "$VERSION"
