@@ -36,6 +36,7 @@ internal class LocalModelStartupMigrator(
         if (active != null && gateway.hasCredential(active)) {
             gateway.activate(active)
         } else {
+            gateway.clearActive()
             apiKeys.activate(modelProfileId(model, baseUrl))
         }
     }
