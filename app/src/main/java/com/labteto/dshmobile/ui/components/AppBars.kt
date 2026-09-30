@@ -127,7 +127,7 @@ fun DsSegmentedTabs(
             ) {
                 Text(
                     label,
-                    style = if (selected) DsType.small13Strong else DsType.small13,
+                    style = (if (selected) DsType.small13Strong else DsType.small13).withReadingWeight(),
                     color = if (selected) colors.labelPrimary else colors.labelSecondary,
                     maxLines = 1,
                 )
