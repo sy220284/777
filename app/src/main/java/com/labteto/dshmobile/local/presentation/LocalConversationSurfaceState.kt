@@ -78,9 +78,6 @@ internal fun LocalHarnessState.toChatSurfaceUiState(): LocalConversationSurfaceS
         groupActiveSpeakerName = groupActiveSpeakerName,
         conversationMode = conversationMode,
         personaCorrectionNotice = personaCorrectionNotice,
-        model = model,
-        baseUrl = baseUrl,
-        modelProfiles = modelProfiles,
     )
 
 internal fun LocalHarnessState.toWorkSurfaceUiState(): LocalConversationSurfaceState =
