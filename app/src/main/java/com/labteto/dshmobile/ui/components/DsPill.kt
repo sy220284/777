@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -80,20 +81,28 @@ fun DsPill(
     }
 
     Box(
-        modifier = modifier.heightIn(
-            min = if (onClick != null) DsSpacing.touchTarget else 24.dp,
-        ),
+        modifier = modifier
+            .heightIn(min = if (onClick != null) DsSpacing.touchTarget else 24.dp)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = onClick,
+                    )
+                } else {
+                    Modifier
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            onClick = onClick ?: {},
             modifier = Modifier
                 .height(24.dp)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
                 },
-            enabled = onClick != null,
             shape = shape,
             color = background,
             contentColor = contentColor,
@@ -104,7 +113,6 @@ fun DsPill(
             } else {
                 null
             },
-            interactionSource = interactionSource,
         ) {
             Box(
                 modifier = Modifier.padding(horizontal = 10.dp),
