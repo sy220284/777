@@ -46,13 +46,14 @@ class LocalModelCredentialResolver @Inject constructor(
         provisionalApiKey?.trim()?.takeIf(String::isNotEmpty)?.let {
             return LocalResolvedCredential(it, LocalModelAuthKind.API_KEY)
         }
-        val selected = profile
-            ?.takeIf { it.model == model && it.baseUrl.trimEnd('/') == baseUrl.trimEnd('/') }
-            ?: activeProfile
-            ?: error("本机模型尚未配置凭据")
+        val selected = profile ?: activeProfile ?: error("本机模型尚未配置凭据")
+        require(
+            selected.model == model &&
+                selected.baseUrl.trimEnd('/') == baseUrl.trimEnd('/'),
+        ) { "当前模型来源与请求不一致，请重新选择模型" }
         return when (selected.authKind) {
             LocalModelAuthKind.API_KEY -> {
-                val key = apiKeys.getFor(selected.id) ?: apiKeys.get()
+                val key = apiKeys.getFor(selected.id)
                     ?: error("当前模型 API Key 不可用")
                 LocalResolvedCredential(key, LocalModelAuthKind.API_KEY)
             }
