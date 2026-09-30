@@ -253,11 +253,12 @@ internal fun shouldUsePatchChain(apkSize: Long?, patches: List<DeltaPatch>): Boo
 }
 
 /**
- * Manual GitHub release checker.
+ * Manual release checker.
  *
  * Nothing calls this at application startup. Each explicit Settings tap performs a fresh request.
- * Recent release metadata is fetched so consecutive differential packages can be chained; if any
- * edge is missing or inconsistent the caller simply receives the full APK fallback.
+ * A configured mainland mirror is authoritative while reachable, so a normal domestic update check
+ * does not touch GitHub. Invalid or unreachable mirror metadata falls back to the existing GitHub
+ * release chain. Every payload is still verified by digest, package name and signing certificate.
  */
 @Singleton
 class UpdateChecker internal constructor(
