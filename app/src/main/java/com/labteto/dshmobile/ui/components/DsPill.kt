@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
@@ -23,6 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -77,37 +79,44 @@ fun DsPill(
         else -> colors.labelSecondary
     }
 
-    Surface(
-        onClick = onClick ?: {},
-        modifier = modifier
-            .height(24.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            },
-        enabled = onClick != null,
-        shape = shape,
-        color = background,
-        contentColor = contentColor,
-        // Outlined only when it is a trigger: with every chip now carrying a fill, the hairline is
-        // what is left to say "this one does something" without a hover state to say it for you.
-        border = if (onClick != null && !warn && !selected) {
-            BorderStroke(1.dp, colors.borderL2)
-        } else {
-            null
-        },
-        interactionSource = interactionSource,
+    Box(
+        modifier = modifier.heightIn(
+            min = if (onClick != null) DsSpacing.touchTarget else 24.dp,
+        ),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier.padding(horizontal = 10.dp),
-            contentAlignment = Alignment.Center
+        Surface(
+            onClick = onClick ?: {},
+            modifier = Modifier
+                .height(24.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                },
+            enabled = onClick != null,
+            shape = shape,
+            color = background,
+            contentColor = contentColor,
+            // Outlined only when it is a trigger: with every chip now carrying a fill, the hairline is
+            // what is left to say "this one does something" without a hover state to say it for you.
+            border = if (onClick != null && !warn && !selected) {
+                BorderStroke(1.dp, colors.borderL2)
+            } else {
+                null
+            },
+            interactionSource = interactionSource,
         ) {
-            Text(
-                text,
-                style = DsType.xsmall12.withReadingWeight(),
-                color = contentColor,
-                maxLines = 1,
-            )
+            Box(
+                modifier = Modifier.padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text,
+                    style = DsType.xsmall12.withReadingWeight(),
+                    color = contentColor,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
