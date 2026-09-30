@@ -1,8 +1,11 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalToolCatalog
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import java.io.IOException
 import java.net.SocketException
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -11,7 +14,17 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody
+import okio.Buffer
+import okio.BufferedSource
+import okio.Source
+import okio.Timeout
+import okio.buffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -29,6 +42,68 @@ class OpenAiResponsesClientTest {
         assertEquals("MODEL_NETWORK", error.code)
         assertTrue(error.retryable)
         assertFalse(error.message.orEmpty().contains("CANCEL"))
+    }
+
+    @Test
+    fun completedEventSettlesBeforeTrailingTransportResetAndKeepsReportedUsage() = runBlocking {
+        val terminalFrame =
+            """data: {"type":"response.completed","response":{"id":"resp-terminal","output":[{"type":"message","content":[{"type":"output_text","text":"完成"}]}],"usage":{"input_tokens":7,"output_tokens":3}}}""" + "\n"
+        val bytes = Buffer().writeUtf8(terminalFrame)
+        var sourceReads = 0
+        var sourceCloses = 0
+        val source = object : Source {
+            override fun read(sink: Buffer, byteCount: Long): Long {
+                sourceReads += 1
+                if (bytes.size > 0L) return bytes.read(sink, byteCount)
+                throw IOException("stream was reset: CANCEL")
+            }
+
+            override fun timeout(): Timeout = Timeout.NONE
+            override fun close() {
+                sourceCloses += 1
+                throw IOException("stream was reset: CANCEL while closing")
+            }
+        }.buffer()
+        val transport = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .header("Content-Type", "text/event-stream")
+                    .body(object : ResponseBody() {
+                        override fun contentType(): MediaType = "text/event-stream".toMediaType()
+                        override fun contentLength(): Long = -1L
+                        override fun source(): BufferedSource = source
+                    })
+                    .build()
+            }
+            .build()
+        val terminalClient = OpenAiResponsesClient(
+            transport,
+            Json { ignoreUnknownKeys = true },
+        )
+
+        val reply = terminalClient.completeStreaming(
+            accessToken = "test-token",
+            baseUrl = "https://api.openai.com/v1",
+            model = "gpt-test",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "测试")
+            }),
+            tools = JsonArray(emptyList()),
+            planSharing = true,
+        )
+
+        assertEquals("resp-terminal", reply.requestId)
+        assertEquals("完成", reply.content)
+        assertTrue(reply.usage.reported)
+        assertEquals(7L, reply.usage.promptTokens)
+        assertEquals(3L, reply.usage.completionTokens)
+        assertEquals(1, sourceReads)
+        assertEquals(1, sourceCloses)
     }
 
     @Test
@@ -212,7 +287,27 @@ class OpenAiResponsesClientTest {
         assertEquals(false, payload["store"]?.jsonPrimitive?.content?.toBoolean())
         assertEquals(true, payload["stream"]?.jsonPrimitive?.content?.toBoolean())
         assertFalse("temperature" in payload)
-        assertFalse("top_p" in payload)
+        val unsupported = listOf(
+            "background",
+            "conversation",
+            "max_output_tokens",
+            "max_tool_calls",
+            "metadata",
+            "moderation",
+            "multi_agent",
+            "prompt",
+            "prompt_cache_retention",
+            "safety_identifier",
+            "temperature",
+            "top_logprobs",
+            "top_p",
+            "truncation",
+            "user",
+            "previous_response_id",
+        )
+        unsupported.forEach { field ->
+            assertFalse("ChatGPT 套餐请求不得发送 $field", field in payload)
+        }
 
         val input = payload["input"]!!.jsonArray
         assertEquals(1, input.size)
@@ -364,6 +459,523 @@ class OpenAiResponsesClientTest {
         assertEquals("function", function["type"]?.jsonPrimitive?.content)
         assertEquals("read_file", function["name"]?.jsonPrimitive?.content)
         assertTrue(function["parameters"] is JsonObject)
+    }
+
+    @Test
+    fun chatGptPlanNamespaceCarriesRequiredDescription() {
+        val tools = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("type", "function")
+                    put("function", buildJsonObject {
+                        put("name", "read_file")
+                        put("description", "读取文件")
+                        put("parameters", buildJsonObject {
+                            put("type", "object")
+                            put("properties", buildJsonObject {})
+                        })
+                    })
+                },
+            ),
+        )
+
+        val payload = client.buildPayload(
+            model = "gpt-test",
+            messages = emptyList(),
+            tools = tools,
+            temperature = null,
+            planSharing = true,
+        )
+        val namespace = payload["tools"]!!.jsonArray.single().jsonObject
+
+        assertEquals("namespace", namespace["type"]?.jsonPrimitive?.content)
+        assertEquals("local", namespace["name"]?.jsonPrimitive?.content)
+        assertTrue(namespace["description"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+        assertTrue(namespace["tools"]!!.jsonArray.isNotEmpty())
+    }
+
+    @Test
+    fun responsesFunctionToolsFillRequiredDescriptionAndParameters() {
+        val minimal = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("type", "function")
+                    put("function", buildJsonObject {
+                        put("name", "minimal_tool")
+                    })
+                },
+            ),
+        )
+
+        listOf(false, true).forEach { plan ->
+            val payload = client.buildPayload(
+                model = "gpt-test",
+                messages = emptyList(),
+                tools = minimal,
+                temperature = null,
+                planSharing = plan,
+            )
+            val emitted = payload["tools"]!!.jsonArray.let { outer ->
+                if (plan) outer.single().jsonObject["tools"]!!.jsonArray else outer
+            }.single().jsonObject
+
+            assertEquals("function", emitted["type"]?.jsonPrimitive?.content)
+            assertEquals("minimal_tool", emitted["name"]?.jsonPrimitive?.content)
+            assertTrue(emitted["description"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+            val parameters = emitted["parameters"]!!.jsonObject
+            assertEquals("object", parameters["type"]?.jsonPrimitive?.content)
+            assertTrue("properties" in parameters)
+        }
+    }
+
+    @Test
+    fun currentHarnessToolCatalogSatisfiesResponsesRequiredShape() {
+        val payload = client.buildPayload(
+            model = "gpt-test",
+            messages = emptyList(),
+            tools = LocalToolCatalog.specs,
+            temperature = null,
+            planSharing = true,
+        )
+        val namespace = payload["tools"]!!.jsonArray.single().jsonObject
+        assertTrue(namespace["description"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+
+        namespace["tools"]!!.jsonArray.forEach { element ->
+            val function = element.jsonObject
+            assertEquals("function", function["type"]?.jsonPrimitive?.content)
+            assertTrue(function["name"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+            assertTrue(function["description"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+            assertEquals("object", function["parameters"]!!.jsonObject["type"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
+    fun invalidResponsesParametersAreRejectedBeforeNetworkRequest() {
+        val tools = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("type", "function")
+                    put("function", buildJsonObject {
+                        put("name", "bad_tool")
+                        put("description", "错误工具")
+                        put("parameters", "not-a-schema")
+                    })
+                },
+            ),
+        )
+
+        val error = runCatching {
+            client.buildPayload(
+                model = "gpt-test",
+                messages = emptyList(),
+                tools = tools,
+                temperature = null,
+                planSharing = true,
+            )
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertFalse(error?.retryable ?: true)
+        assertTrue(error?.message.orEmpty().contains("parameters"))
+    }
+
+    @Test
+    fun strictResponsesToolRejectsRootAnyOf() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"root_union",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{},
+                    "required":[],
+                    "additionalProperties":false,
+                    "anyOf":[
+                        {"type":"object","properties":{},"required":[],"additionalProperties":false}
+                    ]
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("根对象"))
+        assertTrue(error?.message.orEmpty().contains("anyOf"))
+    }
+
+    @Test
+    fun strictResponsesToolAcceptsRequiredNullableOptionalField() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"strict_tool",
+                "description":"严格工具",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{
+                        "query":{"type":"string"},
+                        "limit":{"type":["integer","null"]}
+                    },
+                    "required":["query","limit"],
+                    "additionalProperties":false
+                }
+            }}
+        ]""").jsonArray
+
+        val payload = client.buildPayload(
+            model = "gpt-test",
+            messages = emptyList(),
+            tools = tools,
+            temperature = null,
+            planSharing = true,
+        )
+        val function = payload["tools"]!!.jsonArray.single().jsonObject["tools"]!!
+            .jsonArray.single().jsonObject
+
+        assertEquals("true", function["strict"]!!.jsonPrimitive.content)
+        assertEquals(
+            tools.single().jsonObject["function"]!!.jsonObject["parameters"],
+            function["parameters"],
+        )
+    }
+
+    @Test
+    fun strictResponsesToolRequiresAdditionalPropertiesFalse() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"strict_tool",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{"query":{"type":"string"}},
+                    "required":["query"]
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("additionalProperties=false"))
+    }
+
+    @Test
+    fun strictResponsesToolRequiresEveryPropertyInRequired() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"strict_tool",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{
+                        "query":{"type":"string"},
+                        "limit":{"type":"integer"}
+                    },
+                    "required":["query"],
+                    "additionalProperties":false
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("limit"))
+        assertTrue(error?.message.orEmpty().contains("required"))
+    }
+
+    @Test
+    fun strictResponsesToolValidatesNestedObjectsRecursively() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"nested_tool",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{
+                        "config":{
+                            "type":"object",
+                            "properties":{"enabled":{"type":"boolean"}},
+                            "required":["enabled"]
+                        }
+                    },
+                    "required":["config"],
+                    "additionalProperties":false
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("parameters.properties.config"))
+        assertTrue(error?.message.orEmpty().contains("additionalProperties=false"))
+    }
+
+    @Test
+    fun malformedResponsesPropertiesAreRejectedEvenWhenNonStrict() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"bad_tool",
+                "strict":false,
+                "parameters":{
+                    "type":"object",
+                    "properties":"not-an-object"
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("properties"))
+    }
+
+    @Test
+    fun responsesStrictFlagMustBeJsonBoolean() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"bad_strict",
+                "strict":"true",
+                "parameters":{"type":"object","properties":{}}
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("strict"))
+        assertTrue(error?.message.orEmpty().contains("布尔"))
+    }
+
+    @Test
+    fun strictResponsesToolRejectsUnsupportedStructuredOutputKeyword() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"unsupported_schema",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{"query":{"type":"string"}},
+                    "required":["query"],
+                    "additionalProperties":false,
+                    "allOf":[{"type":"object"}]
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("allOf"))
+    }
+
+    @Test
+    fun thirdPartyResponsesDoesNotInheritOpenAiStrictSchemaRules() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"vendor_tool",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{
+                        "required_value":{"type":"string"},
+                        "optional_value":{"type":"string"}
+                    },
+                    "required":["required_value"]
+                }
+            }}
+        ]""").jsonArray
+
+        val payload = client.buildPayload(
+            model = "vendor-responses-model",
+            messages = emptyList(),
+            tools = tools,
+            temperature = null,
+            planSharing = false,
+            includeEncryptedReasoning = false,
+            enforceOpenAiToolSchema = false,
+        )
+
+        val function = payload["tools"]!!.jsonArray.single().jsonObject
+        assertEquals("true", function["strict"]!!.jsonPrimitive.content)
+        assertEquals(
+            tools.single().jsonObject["function"]!!.jsonObject["parameters"],
+            function["parameters"],
+        )
+    }
+
+    @Test
+    fun thirdPartyResponsesStillRejectsMalformedCommonSchemaShapes() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"vendor_bad_tool",
+                "strict":false,
+                "parameters":{
+                    "type":"object",
+                    "properties":"not-an-object"
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload(
+                model = "vendor-responses-model",
+                messages = emptyList(),
+                tools = tools,
+                temperature = null,
+                planSharing = false,
+                includeEncryptedReasoning = false,
+                enforceOpenAiToolSchema = false,
+            )
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("properties"))
+    }
+
+    @Test
+    fun officialOpenAiApiKeyResponsesEnforcesOpenAiStrictSchemaRules() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"openai_tool",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{
+                        "required_value":{"type":"string"},
+                        "optional_value":{"type":"string"}
+                    },
+                    "required":["required_value"]
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload(
+                model = "gpt-test",
+                messages = emptyList(),
+                tools = tools,
+                temperature = null,
+                planSharing = false,
+                includeEncryptedReasoning = true,
+                enforceOpenAiToolSchema = true,
+            )
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("additionalProperties=false"))
+    }
+
+    @Test
+    fun openAiResponsesContractDetectionSeparatesOfficialAndCustomRoutes() {
+        assertTrue(client.usesOpenAiResponsesContract("https://api.openai.com/v1", false))
+        assertTrue(client.usesOpenAiResponsesContract("https://proxy.example.com/v1", true))
+        assertFalse(client.usesOpenAiResponsesContract("https://proxy.example.com/v1", false))
+    }
+
+    @Test
+    fun namespaceFunctionCallKeepsNamespaceAcrossContinuation() {
+        val response = Json.parseToJsonElement("""{
+            "id":"resp-namespace-call",
+            "output":[
+                {
+                    "type":"function_call",
+                    "id":"fc-1",
+                    "call_id":"call-1",
+                    "name":"read",
+                    "namespace":"local",
+                    "arguments":"{\"path\":\"a.txt\"}"
+                }
+            ]
+        }""").jsonObject
+        val reply = client.parseCompleted(
+            response = response,
+            promptBreakdown = TokenPromptBreakdown(),
+        )
+        assertEquals(1, reply.toolCalls.size)
+        assertEquals("read", reply.toolCalls.single().name)
+        assertEquals("call-1", reply.toolCalls.single().id)
+
+        val rawCall = reply.message[OpenAiResponsesClient.RESPONSES_OUTPUT_KEY]!!
+            .jsonArray.single().jsonObject
+        assertEquals("local", rawCall["namespace"]?.jsonPrimitive?.content)
+
+        val toolOutput = buildJsonObject {
+            put("role", "tool")
+            put("tool_call_id", "call-1")
+            put("content", "ok")
+        }
+        val nextInput = client.buildPayload(
+            model = "gpt-test",
+            messages = listOf(reply.message, toolOutput),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = true,
+        )["input"]!!.jsonArray
+
+        assertEquals("function_call", nextInput[0].jsonObject["type"]?.jsonPrimitive?.content)
+        assertEquals("local", nextInput[0].jsonObject["namespace"]?.jsonPrimitive?.content)
+        assertEquals("function_call_output", nextInput[1].jsonObject["type"]?.jsonPrimitive?.content)
+        assertEquals("call-1", nextInput[1].jsonObject["call_id"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun responsesRejectsNonStringToolNameAndDescription() {
+        val badName = Json.parseToJsonElement("""[
+            {"type":"function","function":{"name":123,"parameters":{"type":"object","properties":{}}}}
+        ]""").jsonArray
+        val badDescription = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"bad_description",
+                "description":123,
+                "parameters":{"type":"object","properties":{}}
+            }}
+        ]""").jsonArray
+
+        val nameError = runCatching {
+            client.buildPayload("gpt-test", emptyList(), badName, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+        val descriptionError = runCatching {
+            client.buildPayload("gpt-test", emptyList(), badDescription, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", nameError?.code)
+        assertTrue(nameError?.message.orEmpty().contains("name"))
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", descriptionError?.code)
+        assertTrue(descriptionError?.message.orEmpty().contains("description"))
+    }
+
+    @Test
+    fun responsesParametersRootMustBeObjectSchema() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"bad_root",
+                "parameters":{"type":["object","null"],"properties":{}}
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload("gpt-test", emptyList(), tools, null, planSharing = true)
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("根节点"))
     }
 
     @Test
