@@ -25,6 +25,10 @@ VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$")
 SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 GITEE_MAX_RELEASE_ASSET_BYTES = 100_000_000
 MAX_ATTEMPTS = 3
+UPLOAD_MAX_ATTEMPTS = 3
+UPLOAD_TIMEOUT_SECONDS = 300
+UPLOAD_DISCOVERY_ATTEMPTS = 6
+UPLOAD_DISCOVERY_DELAY_SECONDS = 5
 API_BASE = "https://gitee.com/api/v5"
 
 
@@ -144,13 +148,11 @@ def upload_attachment(
         "--silent",
         "--show-error",
         "--location",
-        "--retry",
-        "2",
-        "--retry-all-errors",
+        "--http1.1",
         "--connect-timeout",
         "20",
         "--max-time",
-        "300",
+        str(UPLOAD_TIMEOUT_SECONDS),
         "--request",
         "POST",
         "--header",
@@ -297,18 +299,74 @@ def verify_or_upload(
         print(f"已存在并验证：{file_path.name}")
         return
 
-    upload_attachment(
-        f"/repos/{owner}/{repo}/releases/{release_id}/attach_files",
-        token,
-        file_path,
-    )
-    actual_sha, actual_size = sha256_public(public_url)
-    if actual_size != expected_size or actual_sha != expected_sha:
-        raise RuntimeError(
-            f"Gitee 附件公开回读校验失败：{file_path.name} "
-            f"size={actual_size}/{expected_size} sha256={actual_sha}/{expected_sha}"
-        )
-    print(f"已上传并验证：{file_path.name} ({expected_size} bytes)")
+    upload_path = f"/repos/{owner}/{repo}/releases/{release_id}/attach_files"
+    last_upload_error: Exception | None = None
+
+    for upload_attempt in range(UPLOAD_MAX_ATTEMPTS):
+        try:
+            upload_attachment(upload_path, token, file_path)
+        except Exception as error:
+            last_upload_error = error
+            print(
+                f"::warning::Gitee 附件上传第 {upload_attempt + 1}/{UPLOAD_MAX_ATTEMPTS} 次"
+                f"未收到成功响应：{file_path.name}：{error}",
+                file=sys.stderr,
+            )
+
+            # Gitee occasionally accepts a large multipart upload but delays or drops the API
+            # response. Before retrying the same immutable asset, rediscover the attachment and
+            # verify the public bytes. This prevents duplicate uploads and turns response-timeout
+            # ambiguity into an idempotent recovery path.
+            recovered = False
+            for discovery_attempt in range(UPLOAD_DISCOVERY_ATTEMPTS):
+                refreshed = existing_attachments(owner, repo, release_id, token)
+                if file_path.name in refreshed:
+                    try:
+                        actual_sha, actual_size = sha256_public(public_url)
+                    except RuntimeError:
+                        actual_sha = ""
+                        actual_size = -1
+
+                    if actual_size == expected_size and actual_sha == expected_sha:
+                        print(
+                            f"上传响应超时但附件已落盘并验证：{file_path.name} "
+                            f"({expected_size} bytes)"
+                        )
+                        recovered = True
+                        break
+
+                    if actual_size >= 0 and (
+                        actual_size != expected_size or actual_sha != expected_sha
+                    ):
+                        raise RuntimeError(
+                            f"Gitee 上传异常后发现同名附件内容不一致：{file_path.name}；"
+                            "版本资产必须保持不可变"
+                        )
+
+                if discovery_attempt + 1 < UPLOAD_DISCOVERY_ATTEMPTS:
+                    time.sleep(UPLOAD_DISCOVERY_DELAY_SECONDS)
+
+            if recovered:
+                return
+
+            if upload_attempt + 1 >= UPLOAD_MAX_ATTEMPTS:
+                raise RuntimeError(
+                    f"Gitee 附件上传重试耗尽：{file_path.name}：{last_upload_error}"
+                ) from error
+
+            time.sleep(upload_attempt + 1)
+            continue
+
+        actual_sha, actual_size = sha256_public(public_url)
+        if actual_size != expected_size or actual_sha != expected_sha:
+            raise RuntimeError(
+                f"Gitee 附件公开回读校验失败：{file_path.name} "
+                f"size={actual_size}/{expected_size} sha256={actual_sha}/{expected_sha}"
+            )
+        print(f"已上传并验证：{file_path.name} ({expected_size} bytes)")
+        return
+
+    raise RuntimeError(f"Gitee 附件上传失败：{file_path.name}：{last_upload_error}")
 
 
 def publish(asset_dir: Path, version: str) -> None:
