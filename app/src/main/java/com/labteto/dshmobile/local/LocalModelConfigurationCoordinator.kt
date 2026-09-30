@@ -157,7 +157,7 @@ internal class LocalModelConfigurationCoordinator(
     }
 
     private fun reset() {
-        profiles.clearActive(DEFAULT_MODEL, DEFAULT_BASE_URL)
+        profiles.clearActive(DEFAULT_MODEL, DEFAULT_BASE_URL); gateway.clearActive()
         apiKeys.activate(modelProfileId(DEFAULT_MODEL, DEFAULT_BASE_URL))
     }
 
