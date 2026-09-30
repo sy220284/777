@@ -45,7 +45,7 @@ fun DsComposerField(
             .onFocusChanged { onFocusedChange(it.isFocused) }
             .padding(horizontal = DsSpacing.small, vertical = DsSpacing.tiny),
         enabled = enabled,
-        textStyle = DsType.std14.copy(
+        textStyle = DsType.std14.withReadingWeight().copy(
             color = if (enabled) colors.labelPrimary else colors.labelTertiary,
         ),
         cursorBrush = SolidColor(colors.accent),
