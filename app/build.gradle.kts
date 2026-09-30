@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -24,7 +26,7 @@ val dshUpdateMirrorBaseUrl: String = System.getenv("DSH_UPDATE_MIRROR_BASE_URL")
     .orEmpty()
 
 if (dshUpdateMirrorBaseUrl.isNotEmpty()) {
-    val mirrorUri = runCatching { java.net.URI(dshUpdateMirrorBaseUrl) }.getOrNull()
+    val mirrorUri = runCatching { URI(dshUpdateMirrorBaseUrl) }.getOrNull()
     val mirrorPath = mirrorUri?.path
         ?.trim('/')
         ?.split('/')
