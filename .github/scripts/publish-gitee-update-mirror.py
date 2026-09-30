@@ -70,8 +70,8 @@ def api_request(
         "User-Agent": "777-release-mirror/1",
     }
     if payload is not None:
-        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        headers["Content-Type"] = "application/json"
+        data = urllib.parse.urlencode(payload).encode("utf-8")
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
 
     last_error: Exception | None = None
     for attempt in range(MAX_ATTEMPTS):
@@ -200,7 +200,7 @@ def ensure_release(owner: str, repo: str, tag: str, token: str) -> dict:
             "name": tag,
             "body": "777 国内更新镜像。正式发行源仍同步发布到 GitHub。",
             "target_commitish": default_branch,
-            "prerelease": False,
+            "prerelease": "false",
         },
     )
     if not isinstance(release, dict) or not release.get("id"):
