@@ -7,7 +7,6 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.model.LocalStreamingPreviewOwner
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import java.util.UUID
 import kotlinx.serialization.json.JsonArray
@@ -51,7 +50,7 @@ internal class LocalModelRequestCoordinator(
     ): LocalModelReply {
         val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
         val previewOwner = if (publishPreviewEnabled) {
-            LocalStreamingPreviewOwner(
+            streamingPreviewStore.newOwner(
                 sessionId = snapshot.sessionId,
                 requestId = UUID.randomUUID().toString(),
                 usageMode = snapshot.usageMode,
