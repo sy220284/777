@@ -352,7 +352,7 @@ internal fun CompactMessageAction(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.size(32.dp),
+        modifier = Modifier.size(DsSpacing.touchTarget),
         shape = RoundedCornerShape(8.dp),
         color = androidx.compose.ui.graphics.Color.Transparent,
     ) {
