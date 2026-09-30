@@ -1,11 +1,13 @@
 package com.labteto.dshmobile.local
 
+import kotlinx.coroutines.CancellationException
 import java.util.Base64
 import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
+import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
@@ -23,6 +25,7 @@ data class LocalVisionRoute(
     val baseUrl: String,
     val model: String,
     val usageContext: TokenUsageContext? = null,
+    val profile: LocalModelProfile? = null,
 )
 
 fun interface LocalVisionAnalyzer {
@@ -49,6 +52,7 @@ class LocalVisionPlugin(
     private val imageSupportProvider: (LocalVisionRoute) -> Boolean? = { route ->
         LocalModelPresets.documentedImageInputSupport(route.model, route.baseUrl)
     },
+    private val routeKeyProvider: suspend (LocalVisionRoute) -> String? = { keyProvider() },
 ) : HarnessPlugin {
     override val id: String = "local-vision"
     private val analysisCache = workspaceRoot?.let { root ->
@@ -65,9 +69,9 @@ class LocalVisionPlugin(
                 ),
                 access = ToolAccess.READ_ONLY,
                 approvalPolicy = ToolApprovalPolicy.NEVER,
-                executor = HarnessToolExecutor { _, _, _ ->
-                    val route = routeProvider()
-                    val key = keyProvider()
+                executor = HarnessToolExecutor { toolContext, _, _ ->
+                    val route = routeFor(toolContext)
+                    val key = route?.let { routeKeyProvider(it) }
                     ToolResult(
                         when {
                             route == null || key.isNullOrBlank() -> "当前模型尚未配置"
@@ -92,6 +96,7 @@ class LocalVisionPlugin(
                 timeoutMillis = 240_000L,
                 executor = HarnessToolExecutor { toolContext, input, _ ->
                     analyze(
+                        fixedRoute = routeFor(toolContext),
                         prompt = input.requiredString("prompt"),
                         usageContext = usageContextProvider(
                             toolContext.sessionId,
@@ -117,6 +122,7 @@ class LocalVisionPlugin(
                 timeoutMillis = 240_000L,
                 executor = HarnessToolExecutor { toolContext, input, _ ->
                     analyze(
+                        fixedRoute = routeFor(toolContext),
                         prompt = input.requiredString("prompt"),
                         usageContext = usageContextProvider(
                             toolContext.sessionId,
@@ -145,8 +151,8 @@ class LocalVisionPlugin(
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 240_000L,
                 executor = HarnessToolExecutor { toolContext, input, _ ->
-                    val route = routeProvider()
-                    val key = keyProvider()
+                    val route = routeFor(toolContext)
+                    val key = route?.let { routeKeyProvider(it) }
                     if (route == null || key.isNullOrBlank()) {
                         return@HarnessToolExecutor ToolResult(
                             "当前模型尚未配置，请先在模型设置中选择模型并填写接口地址和密钥",
@@ -199,15 +205,22 @@ class LocalVisionPlugin(
         context.tools.unregister("vision_analyze_file")
     }
 
+    private fun routeFor(context: ToolContext): LocalVisionRoute? =
+        (context.attributes["model_profile"] as? LocalModelProfile)?.let {
+            LocalVisionRoute(it.baseUrl, it.model, profile = it)
+        } ?: routeProvider()
+
     private suspend fun analyze(
+        fixedRoute: LocalVisionRoute?,
         prompt: String,
         usageContext: TokenUsageContext?,
         screenshotCapability: String,
         screenshotArguments: Map<String, String>,
     ): ToolResult {
-        val route = routeProvider()
+        val route = fixedRoute
             ?: return ToolResult("当前模型尚未配置，请先在模型设置中选择模型并填写密钥", isError = true)
-        if (keyProvider().isNullOrBlank()) {
+        val key = routeKeyProvider(route)
+        if (key.isNullOrBlank()) {
             return ToolResult("当前模型密钥尚未配置，请先在模型设置中填写密钥", isError = true)
         }
         if (imageSupportProvider(route) == false) {
@@ -221,6 +234,8 @@ class LocalVisionPlugin(
             prompt = prompt,
             imageDataUrl = imageDataUrl,
             intro = "分析这张 Android 界面截图。\n若用户要求点击目标，请给出目标中心的原始截图像素坐标 x/y，并描述用于复核的可见特征。",
+            fixedRoute = route,
+            fixedKey = key,
             usageContext = usageContext,
         )
     }
@@ -238,7 +253,7 @@ class LocalVisionPlugin(
         if (imageSupportProvider(route) == false) {
             return ToolResult("当前模型不支持图片理解，请切换支持图片的模型后重试。", isError = true)
         }
-        val key = fixedKey ?: keyProvider()
+        val key = fixedKey ?: routeKeyProvider(route)
             ?: return ToolResult("当前模型密钥尚未配置", isError = true)
         val boundedPrompt = buildString {
             appendLine(intro)
@@ -256,6 +271,7 @@ class LocalVisionPlugin(
         }.fold(
             onSuccess = { ToolResult(it) },
             onFailure = { error ->
+                if (error is CancellationException) throw error
                 if (imageInputUnsupported(error)) {
                     ToolResult("当前模型不支持图片理解，请切换支持图片的模型后重试。", isError = true)
                 } else {

@@ -1338,4 +1338,5 @@
     <string name="chatgpt_remove_registration_body">这会撤销当前授权并删除本机保存的这条注册记录，不会删除你的 ChatGPT 账号。</string>
     <string name="chatgpt_remove_registration_confirm">移除</string>
     <string name="chatgpt_cancel">取消</string>
+    <string name="local_model_media_not_connected">当前支持文字和图片；音视频理解暂未开放。</string>
 </resources>

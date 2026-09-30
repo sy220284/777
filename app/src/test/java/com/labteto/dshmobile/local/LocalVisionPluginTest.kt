@@ -14,6 +14,37 @@ import java.nio.file.Files
 
 class LocalVisionPluginTest {
     @Test
+    fun scopedModelRouteAndCredentialOverrideForegroundAcrossVisionTools() = runTest {
+        val device = RecordingDevice()
+        val analyzer = RecordingAnalyzer()
+        val registry = PluginRegistry()
+        val selected = LocalModelProfile("subagent-profile", "subagent-model", "https://subagent.example/v1",
+            protocol = LocalModelProtocol.RESPONSES)
+        registry.install(LocalVisionPlugin(
+            device = device,
+            keyProvider = { null },
+            routeProvider = { LocalVisionRoute("https://foreground.example/v1", "foreground-model") },
+            routeKeyProvider = { route -> if (route.profile == selected) "subagent-secret" else null },
+            analyzer = analyzer,
+        ))
+        listOf("vision_analyze_screen", "vision_analyze_vscreen").forEach { name ->
+            val result = registry.context.tools.execute(
+                name = name,
+                input = buildJsonObject { put("prompt", "find button"); if (name.endsWith("vscreen")) put("id", "screen-1") },
+                context = ToolContext(attributes = mapOf("model_profile" to selected), approval = { true }),
+            )
+            assertFalse(result.content, result.isError)
+        }
+        assertEquals(2, analyzer.calls.size)
+        analyzer.calls.forEach { call ->
+            assertEquals("subagent-secret", call.key)
+            assertEquals(selected, call.route.profile)
+            assertEquals(selected.model, call.route.model)
+            assertEquals(selected.baseUrl, call.route.baseUrl)
+        }
+    }
+
+    @Test
     fun mainScreenAnalysisRequiresApprovalBeforeCapturingPixels() = runTest {
         val device = RecordingDevice()
         val analyzer = RecordingAnalyzer()

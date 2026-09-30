@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runInterruptible
+import com.labteto.dshmobile.local.model.withCancellableModelResponse
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -30,7 +30,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 /**
  * OpenAI-compatible multimodal transport for explicit image-analysis tools.
  *
- * The route and credential always come from the currently selected model. Screenshots are sent only
+ * The route and credential come from the frozen tool-run profile or the selected model. Screenshots are sent only
  * after a model tool call, keeping image bytes out of durable conversation history.
  */
 @Singleton
@@ -68,6 +68,7 @@ class VisionClient @Inject constructor(
         prompt = prompt,
         imageDataUrl = imageDataUrl,
         usageContext = route.usageContext,
+        profile = route.profile,
     )
 
     suspend fun analyze(
@@ -77,15 +78,22 @@ class VisionClient @Inject constructor(
         prompt: String,
         imageDataUrl: String,
         usageContext: TokenUsageContext? = null,
+        profile: LocalModelProfile? = null,
     ): String = withContext(Dispatchers.IO) {
         require(apiKey.isNotBlank()) { "当前模型密钥为空" }
         require(model.isNotBlank()) { "当前模型名称为空" }
         require(prompt.isNotBlank()) { "图片分析要求不能为空" }
         validateImageDataUrl(imageDataUrl)
+        val encodedLength = (imageDataUrl.length - imageDataUrl.indexOf(',') - 1).toLong()
+        val padding = if (imageDataUrl.endsWith("==")) 2 else if (imageDataUrl.endsWith("=")) 1 else 0
+        require(encodedLength % 4 == 0L && encodedLength / 4 * 3 - padding <=
+            LocalModelPresets.maxNativeImageBytesFor(model, baseUrl)) {
+            "图片超过当前模型的上传大小限制，请压缩后重试"
+        }
 
         val gateway = runCatching { modelGateway.get() }.getOrNull()
-        val activeProfile = gateway?.activeProfile()
-        if (activeProfile?.usesResponsesTransport() == true) {
+        val selectedProfile = profile ?: gateway?.activeProfile()
+        if (gateway != null && selectedProfile != null) {
             val messages = buildPayload(model, prompt, imageDataUrl)["messages"]
                 ?.jsonArray
                 ?.map { it.jsonObject }
@@ -95,6 +103,7 @@ class VisionClient @Inject constructor(
                 baseUrl = baseUrl,
                 messages = messages,
                 tools = JsonArray(emptyList()),
+                profile = selectedProfile,
             )
             usageTracker.get().record(
                 model = model,
@@ -122,7 +131,7 @@ class VisionClient @Inject constructor(
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
         try {
-            runInterruptible { client.newCall(request).execute() }.use { response ->
+            withCancellableModelResponse(client.newCall(request)) { response ->
                 val body = response.readBounded()
                 if (!response.isSuccessful) {
                     val detail = runCatching {

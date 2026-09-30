@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalModelAuthKind
 import com.labteto.dshmobile.local.LocalModelDelta
 import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.LocalModelPresets
+import com.labteto.dshmobile.local.LocalModelToolCallingMode
 import com.labteto.dshmobile.local.LocalModelProtocol
 import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.usesResponsesTransport
@@ -48,6 +49,8 @@ class LocalModelGateway @Inject constructor(
     ): LocalModelReply {
         val resolved = credentials.resolve(model, baseUrl, profile)
         val routedTemperature = LocalModelPresets.samplingTemperatureFor(model, baseUrl, temperature)
+            .takeUnless { usesResponses(profile, resolved.authKind) &&
+                LocalModelPresets.toolCallingModeFor(model, baseUrl) == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING }
         return if (usesResponses(profile, resolved.authKind)) {
             responses.completeStreaming(
                 accessToken = resolved.bearerToken,
@@ -81,6 +84,8 @@ class LocalModelGateway @Inject constructor(
     ): LocalModelReply {
         val resolved = credentials.resolve(model, baseUrl, profile)
         val routedTemperature = LocalModelPresets.samplingTemperatureFor(model, baseUrl, temperature)
+            .takeUnless { usesResponses(profile, resolved.authKind) &&
+                LocalModelPresets.toolCallingModeFor(model, baseUrl) == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING }
         return if (usesResponses(profile, resolved.authKind)) {
             responses.completeStreaming(
                 accessToken = resolved.bearerToken,

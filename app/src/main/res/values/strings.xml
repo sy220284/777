@@ -1339,4 +1339,5 @@
     <string name="chatgpt_remove_registration_body">This revokes the authorization and removes this saved registration from the device. It does not delete your ChatGPT account.</string>
     <string name="chatgpt_remove_registration_confirm">Remove</string>
     <string name="chatgpt_cancel">Cancel</string>
+    <string name="local_model_media_not_connected">当前支持文字和图片；音视频理解暂未开放。</string>
 </resources>

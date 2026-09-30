@@ -104,12 +104,13 @@ internal class LocalSubagentRunnerFactory(
         schemas = schemasProvider,
         execute = executeTool,
         spillToolOutput = { callId, output -> toolOutputStore.store(toolOutputSessionId(), callId, output) != null },
-        prepareMessages = { messages, mode, _, _ ->
+        prepareMessages = { messages, mode, baseUrl, model ->
             prepareLocalMultimodalMessages(
                 messages = messages,
                 workspaceRoot = File(workspacePath),
                 mode = mode,
                 budget = imageRequestBudget,
+                maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(model, baseUrl),
             )
         },
         resolveImageMode = { mode, baseUrl, model -> resolveLocalImageInputMode(mode, imageCapabilities, baseUrl, model) },

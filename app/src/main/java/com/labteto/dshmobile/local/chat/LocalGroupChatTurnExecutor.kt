@@ -157,6 +157,7 @@ internal class LocalGroupChatTurnExecutor(
                 workspaceRoot = File(workspacePath),
                 mode = groupImageMode,
                 budget = imageRequestBudget,
+                maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.model, snapshot.baseUrl),
             )
             val rawReply = completeWithRetry(
                 key = key,

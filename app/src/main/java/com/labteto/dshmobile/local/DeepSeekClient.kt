@@ -5,7 +5,7 @@ import java.net.SocketTimeoutException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runInterruptible
+import com.labteto.dshmobile.local.model.withCancellableModelResponse
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -75,7 +75,7 @@ class DeepSeekClient @Inject constructor(
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
         try {
-            runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
+            withCancellableModelResponse(modelHttp.newCall(request)) { response ->
                 val body = response.readModelBodyBounded()
                 if (!response.isSuccessful) {
                     val detail = providerErrorDetail(body, json)
@@ -145,7 +145,7 @@ class DeepSeekClient @Inject constructor(
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
         try {
-            runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
+            withCancellableModelResponse(modelHttp.newCall(request)) { response ->
                 if (!response.isSuccessful) {
                     val body = response.readModelBodyBounded()
                     val detail = providerErrorDetail(body, json)
@@ -198,15 +198,27 @@ class DeepSeekClient @Inject constructor(
                         } catch (error: Exception) {
                             throw streamProtocolError("模型流式响应包含无法解析的数据帧", error)
                         }
+                        if (root["error"] != null && root["error"] !is JsonNull) {
+                            throw LocalModelException(
+                                code = "MODEL_STREAM_ERROR",
+                                message = "模型流式请求失败：${providerErrorDetail(root.toString(), json) ?: "未知错误"}",
+                                retryable = false,
+                                requestId = requestId,
+                            )
+                        }
                         (root["usage"] as? JsonObject)?.let { streamUsage = it }
                         val firstChoice = (root["choices"] as? JsonArray)
                             ?.firstOrNull() as? JsonObject
                         val finishReason = (firstChoice?.get("finish_reason") as? JsonPrimitive)
                             ?.contentOrNull
-                        if (!finishReason.isNullOrBlank()) sawTerminalFrame = true
+                        if (!finishReason.isNullOrBlank()) {
+                            requireCompleteFinishReason(finishReason)
+                            sawTerminalFrame = true
+                        }
                         val delta = firstChoice?.get("delta") as? JsonObject
                         if (delta == null) continue
-                        val textDelta = assistantText(delta["content"]).orEmpty()
+                        val textDelta = assistantText(delta["content"]).orEmpty() +
+                            (delta["refusal"] as? JsonPrimitive)?.contentOrNull.orEmpty()
                         val reasoningDelta = (delta["reasoning_content"] as? JsonPrimitive)
                             ?.contentOrNull.orEmpty()
                         if (textDelta.isNotEmpty()) content.append(textDelta)
@@ -219,6 +231,9 @@ class DeepSeekClient @Inject constructor(
                                 ?: throw streamProtocolError("模型流式工具调用数据帧格式错误")
                             val index = (item["index"] as? JsonPrimitive)?.intOrNull ?: 0
                             val acc = toolCalls.getOrPut(index) { StreamToolCall() }
+                            acc.metadata = mergeModelMetadata(acc.metadata, JsonObject(item.filterKeys {
+                                it !in setOf("index", "id", "type", "function")
+                            }))
                             (item["id"] as? JsonPrimitive)?.contentOrNull
                                 ?.takeIf(String::isNotBlank)?.let { acc.id = it }
                             val function = item["function"] as? JsonObject
@@ -237,7 +252,7 @@ class DeepSeekClient @Inject constructor(
                             retryable = true,
                         )
                     }
-                    return@withContext try {
+                    return@withCancellableModelResponse try {
                         parse(fallback.toString()).copy(
                             requestId = requestId,
                             promptBreakdown = promptBreakdown,
@@ -265,6 +280,7 @@ class DeepSeekClient @Inject constructor(
                                 add(buildJsonObject {
                                     put("id", call.id ?: throw streamProtocolError("流式工具调用缺少 id"))
                                     put("type", "function")
+                                    call.metadata.forEach { (key, value) -> put(key, value) }
                                     put("function", buildJsonObject {
                                         put("name", call.name ?: throw streamProtocolError("流式工具调用缺少 name"))
                                         put("arguments", call.arguments.toString().ifBlank { "{}" })
@@ -326,9 +342,13 @@ class DeepSeekClient @Inject constructor(
         var id: String? = null,
         var name: String? = null,
         val arguments: StringBuilder = StringBuilder(),
+        var metadata: JsonObject = JsonObject(emptyMap()),
     )
     internal fun parse(body: String): LocalModelReply {
         val root = json.parseToJsonElement(body).jsonObject
+        val choice = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+        (choice?.get("finish_reason") as? JsonPrimitive)?.contentOrNull
+            ?.takeIf(String::isNotBlank)?.let(::requireCompleteFinishReason)
         val message = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
             ?.get("message")?.jsonObject ?: error("模型响应缺少 choices[0].message")
         val rawToolCalls = message["tool_calls"]?.jsonArray.orEmpty()
@@ -355,7 +375,8 @@ class DeepSeekClient @Inject constructor(
         val usage = parseDeepSeekOpenAiUsage(root)
         return LocalModelReply(
             message = normalizedMessage,
-            content = assistantText(message["content"]),
+            content = assistantText(message["content"])
+                ?: (message["refusal"] as? JsonPrimitive)?.contentOrNull,
             reasoning = message["reasoning_content"]?.jsonPrimitive?.contentOrNull,
             toolCalls = calls,
             usage = usage,
@@ -434,6 +455,26 @@ class DeepSeekClient @Inject constructor(
         const val MODEL_CALL_TIMEOUT_SECONDS = 210L
         const val MAX_MODEL_RESPONSE_BYTES = 16 * 1024 * 1024
     }
+}
+
+internal fun mergeModelMetadata(previous: JsonObject, next: JsonObject): JsonObject =
+    JsonObject(previous.toMutableMap().apply {
+        next.forEach { (key, value) ->
+            val old = get(key)
+            if (value !is JsonNull || old == null) {
+                put(key, if (old is JsonObject && value is JsonObject) mergeModelMetadata(old, value) else value)
+            }
+        }
+    })
+
+private fun requireCompleteFinishReason(reason: String) {
+    if (reason in setOf("stop", "tool_calls", "function_call")) return
+    throw LocalModelException(
+        code = if (reason == "length") "MODEL_OUTPUT_TRUNCATED" else "MODEL_FINISH_$reason",
+        message = if (reason == "length") "模型输出达到长度上限，回复未完整生成，请缩短任务后重试。"
+            else "模型未正常完成回复（$reason），请调整请求后重试。",
+        retryable = false,
+    )
 }
 
 internal fun shouldSendToolChoice(baseUrl: String, model: String): Boolean {

@@ -95,14 +95,14 @@ internal class LocalImageCapabilityRegistry {
 }
 
 internal fun resolveLocalImageInputMode(
-    @Suppress("UNUSED_PARAMETER") requested: LocalImageInputMode,
+    requested: LocalImageInputMode,
     registry: LocalImageCapabilityRegistry,
     baseUrl: String,
     model: String,
 ): LocalImageInputMode = when (registry.state(baseUrl, model)) {
     LocalImageCapability.UNSUPPORTED -> LocalImageInputMode.TOOL
     LocalImageCapability.UNKNOWN,
-    LocalImageCapability.SUPPORTED -> LocalImageInputMode.NATIVE
+    LocalImageCapability.SUPPORTED -> if (requested == LocalImageInputMode.TOOL) LocalImageInputMode.TOOL else LocalImageInputMode.NATIVE
 }
 
 internal fun buildLocalUserModelMessage(
@@ -183,6 +183,7 @@ internal suspend fun prepareLocalMultimodalMessages(
         maxImages = 8,
         maxRawBytes = 32L * 1024L * 1024L,
     ),
+    maxImageBytes: Long = MAX_NATIVE_IMAGE_BYTES,
 ): List<JsonObject> = withContext(Dispatchers.IO) {
     val activeImageMessageIndices = activeImageMessageIndices(messages, mode)
     val root = workspaceRoot.canonicalFile
@@ -209,8 +210,8 @@ internal suspend fun prepareLocalMultimodalMessages(
                 val file = File(root, relative).canonicalFile
                 require(file.toPath().startsWith(root.toPath())) { "图片引用越过工作区边界" }
                 require(file.isFile) { "图片附件不存在：$relative" }
-                require(file.length() in 1..MAX_NATIVE_IMAGE_BYTES) {
-                    "图片附件超过 ${MAX_NATIVE_IMAGE_BYTES / 1024 / 1024} MB 直传上限：$relative"
+                require(file.length() in 1..minOf(maxImageBytes, MAX_NATIVE_IMAGE_BYTES)) {
+                    "图片附件超过 ${minOf(maxImageBytes, MAX_NATIVE_IMAGE_BYTES) / 1_000_000} MB 直传上限：$relative"
                 }
                 activeImages += 1
                 activeRawBytes += file.length()
@@ -228,7 +229,7 @@ internal suspend fun prepareLocalMultimodalMessages(
                     "图片附件内容与记录格式不一致：$relative"
                 }
                 val data = Base64.getEncoder().encodeToString(
-                    readLocalImageBytesBounded(file, MAX_NATIVE_IMAGE_BYTES),
+                    readLocalImageBytesBounded(file, minOf(maxImageBytes, MAX_NATIVE_IMAGE_BYTES)),
                 )
                 add(buildJsonObject {
                     put("type", "image_url")
