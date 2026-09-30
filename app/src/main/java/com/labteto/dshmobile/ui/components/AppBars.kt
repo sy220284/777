@@ -113,7 +113,7 @@ fun DsSegmentedTabs(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 40.dp)
+                    .heightIn(min = DsSpacing.touchTarget)
                     .clip(DsShapes.row)
                     .background(segmentColor)
                     .selectable(
