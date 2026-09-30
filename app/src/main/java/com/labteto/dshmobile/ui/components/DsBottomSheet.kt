@@ -28,6 +28,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
  * The app's sheet surface, themed to the harness tokens.
@@ -53,7 +54,7 @@ fun DsBottomSheet(
         sheetState = state,
         modifier = modifier,
         shape = DsShapes.dialog,
-        containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG, BackgroundRegion.BOTTOM),
+        containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.SHEET, BackgroundRegion.BOTTOM),
         scrimColor = colors.overlayMask,
         dragHandle = null,
         contentWindowInsets = { WindowInsets.navigationBars },
@@ -82,9 +83,9 @@ fun DsBottomSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(title, style = DsType.base16Strong, color = colors.labelPrimary)
+                        Text(title, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
                         if (subtitle != null) {
-                            Text(subtitle, style = DsType.small13, color = colors.labelTertiary)
+                            Text(subtitle, style = DsType.small13.withReadingWeight(), color = colors.labelTertiary)
                         }
                     }
                     trailing?.invoke()
