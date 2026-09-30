@@ -58,7 +58,7 @@ class TouchTargetRegressionTest {
         compose.setContent {
             DshTheme {
                 MarkdownText(
-                    text = "```text\\nhello\\n```",
+                    text = "```text\nhello\n```",
                 )
             }
         }
