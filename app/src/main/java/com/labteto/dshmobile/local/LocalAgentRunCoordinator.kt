@@ -431,8 +431,10 @@ internal class LocalAgentRunCoordinator(
         val turnStart = log.latest("turn/start") ?: return false
         val assistant = log.latest("assistant/message") ?: return false
         if (assistant.sequence <= turnStart.sequence) return false
-        val toolCalls = assistant.data["tool_calls"] as? JsonArray
-        return toolCalls == null || toolCalls.isEmpty()
+        val genericToolCalls = assistant.data[LOCAL_MODEL_TOOL_CALLS_EVENT_KEY] as? JsonArray
+        if (genericToolCalls != null) return genericToolCalls.isEmpty()
+        val legacyToolCalls = assistant.data["tool_calls"] as? JsonArray
+        return legacyToolCalls == null || legacyToolCalls.isEmpty()
     }
 
     private fun eventType(kind: LocalAgentRunKind): String = when (kind) {
