@@ -48,7 +48,6 @@ data class LocalConversationSurfaceState(
     val model: String = "deepseek-flash",
     val baseUrl: String = "https://api.deepseek.com",
     val modelProfiles: List<LocalModelProfile> = emptyList(),
-    val activeModelProfileId: String? = null,
     val planMode: Boolean = false,
     val safeAutoApprovalEnabled: Boolean = false,
     val deviceApprovalLease: Boolean = false,
@@ -59,7 +58,7 @@ data class LocalConversationSurfaceState(
     val pendingQuestion: LocalQuestion? = null,
 )
 
-internal fun LocalHarnessState.toChatSurfaceUiState(activeModelProfileId: String? = null): LocalConversationSurfaceState =
+internal fun LocalHarnessState.toChatSurfaceUiState(): LocalConversationSurfaceState =
     LocalConversationSurfaceState(
         loading = loading,
         configured = configured,
@@ -82,10 +81,9 @@ internal fun LocalHarnessState.toChatSurfaceUiState(activeModelProfileId: String
         model = model,
         baseUrl = baseUrl,
         modelProfiles = modelProfiles,
-        activeModelProfileId = activeModelProfileId,
     )
 
-internal fun LocalHarnessState.toWorkSurfaceUiState(activeModelProfileId: String? = null): LocalConversationSurfaceState =
+internal fun LocalHarnessState.toWorkSurfaceUiState(): LocalConversationSurfaceState =
     LocalConversationSurfaceState(
         loading = loading,
         configured = configured,
@@ -100,7 +98,6 @@ internal fun LocalHarnessState.toWorkSurfaceUiState(activeModelProfileId: String
         model = model,
         baseUrl = baseUrl,
         modelProfiles = modelProfiles,
-        activeModelProfileId = activeModelProfileId,
         planMode = planMode,
         safeAutoApprovalEnabled = safeAutoApprovalEnabled,
         deviceApprovalLease = deviceApprovalLease,
