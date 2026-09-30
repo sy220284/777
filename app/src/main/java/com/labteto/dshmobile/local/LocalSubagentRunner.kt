@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelRunContext
+import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.harness.agent.*
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
@@ -279,7 +281,8 @@ internal class LocalSubagentRunner(
                     modelStep += 1
                     val durableHistory = history.toList()
                     val selectedMode = resolveImageMode(snapshot.imageInputMode, snapshot.baseUrl, routeModel)
-                    if (hasLocalImageRefs(durableHistory) && selectedMode == LocalImageInputMode.TOOL) {
+                    if (hasLocalImageRefs(durableHistory) &&
+                        resolveImageMode(LocalImageInputMode.AUTO, snapshot.baseUrl, routeModel) == LocalImageInputMode.TOOL) {
                         throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
                     }
                     val preparedHistory = prepareMessages(
@@ -376,7 +379,9 @@ internal class LocalSubagentRunner(
                                 errorCode = "SUBAGENT_VIRTUAL_SCREEN_MISMATCH",
                                 recoveryHint = "使用系统上下文中提供的虚拟屏 id。",
                             )
-                        else -> execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
+                        else -> withContext(LocalModelRunContext(runProfile)) {
+                            execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
+                        }
                     }
                 },
                 eventSink = AgentEventSink { event ->

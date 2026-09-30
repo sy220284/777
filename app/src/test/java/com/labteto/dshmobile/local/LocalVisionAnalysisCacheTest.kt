@@ -18,6 +18,7 @@ class LocalVisionAnalysisCacheTest {
             cache.put(image, route, "分析按钮", "结果 A")
 
             assertEquals("结果 A", cache.get(image, route, "分析按钮"))
+            assertNull(cache.get(image, route.copy(profile = LocalModelProfile("other-source", route.model, route.baseUrl)), "分析按钮"))
             assertNull(cache.get(image, route, "分析文字"))
             assertNull(cache.get(image, LocalVisionRoute(route.baseUrl, "vision-b"), "分析按钮"))
             assertNull(cache.get(image, LocalVisionRoute("https://other.example/v1", route.model), "分析按钮"))

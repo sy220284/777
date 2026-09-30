@@ -18,7 +18,6 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -76,12 +75,12 @@ class OpenAiResponsesClient @Inject constructor(
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
         try {
-            runInterruptible { modelHttp.newCall(request).execute() }.use { response ->
+            withCancellableModelResponse(modelHttp.newCall(request)) { response ->
                 val requestId = response.header("x-request-id")
                     ?: response.header("openai-request-id")
                 val retryAfterMs = parseRetryAfterMillis(response.header("Retry-After"))
                 if (!response.isSuccessful) {
-                    val body = response.body?.string().orEmpty().take(ERROR_BODY_LIMIT)
+                    val body = response.readBoundedModelError(ERROR_BODY_LIMIT)
                     throw httpError(
                         status = response.code,
                         body = body,
@@ -162,7 +161,8 @@ class OpenAiResponsesClient @Inject constructor(
                             )
                             "response.completed" -> {
                                 completedResponse = event["response"] as? JsonObject
-                                    ?: error("Responses API completed 事件缺少 response")
+                                    ?: throw responseProtocolError("completed 事件缺少 response")
+                                break
                             }
                         }
                     }
@@ -239,7 +239,21 @@ class OpenAiResponsesClient @Inject constructor(
             val role = message["role"]?.jsonPrimitive?.contentOrNull.orEmpty()
             val raw = message[RESPONSES_OUTPUT_KEY] as? JsonArray
             if (raw != null) {
-                raw.forEach(::add)
+                val canonicalText = (message["content"] as? JsonPrimitive)?.contentOrNull
+                var replacedText = false
+                raw.forEach { item ->
+                    val obj = item as? JsonObject
+                    if (canonicalText != null && obj?.get("type")?.jsonPrimitive?.contentOrNull == "message" &&
+                        obj["role"]?.jsonPrimitive?.contentOrNull == "assistant"
+                    ) {
+                        if (!replacedText) {
+                            add(JsonObject(obj + ("content" to buildJsonArray {
+                                add(buildJsonObject { put("type", "output_text"); put("text", canonicalText) })
+                            })))
+                            replacedText = true
+                        }
+                    } else add(item)
+                }
                 val streamedFallback = (message["content"] as? JsonPrimitive)
                     ?.contentOrNull
                     ?.takeIf(String::isNotBlank)
@@ -316,9 +330,11 @@ class OpenAiResponsesClient @Inject constructor(
                     if (!url.isNullOrBlank()) add(buildJsonObject {
                         put("type", "input_image")
                         put("image_url", url)
+                        if (source is JsonObject) source["detail"]?.let { put("detail", it) }
                     })
                 }
                 "input_text", "input_image" -> add(obj)
+                else -> throw responseProtocolError("不支持的输入内容类型：${obj["type"]}")
             }
         }
     }
@@ -349,6 +365,7 @@ class OpenAiResponsesClient @Inject constructor(
             add(buildJsonObject {
                 put("type", "namespace")
                 put("name", CHATGPT_PLAN_TOOL_NAMESPACE)
+                put("description", "本机 Harness 工具，用于已授权的文件、设备和任务操作。")
                 put("tools", functions)
             })
         }
@@ -387,14 +404,17 @@ class OpenAiResponsesClient @Inject constructor(
                     }
                 }
                 "function_call" -> {
-                    val callId = obj["call_id"]?.jsonPrimitive?.contentOrNull
-                        ?: obj["id"]?.jsonPrimitive?.contentOrNull
-                        ?: UUID.randomUUID().toString()
-                    val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: return@forEach
-                    val rawArguments = obj["arguments"]?.jsonPrimitive?.contentOrNull ?: "{}"
+                    val callId = (obj["call_id"] as? JsonPrimitive)?.contentOrNull
+                        ?.takeIf(String::isNotBlank)
+                        ?: throw responseProtocolError("工具调用缺少 call_id")
+                    val name = (obj["name"] as? JsonPrimitive)?.contentOrNull
+                        ?.takeIf(String::isNotBlank)
+                        ?: throw responseProtocolError("工具调用缺少 name")
+                    val rawArguments = (obj["arguments"] as? JsonPrimitive)?.contentOrNull
+                        ?: throw responseProtocolError("工具调用缺少 arguments")
                     val arguments = runCatching {
                         json.parseToJsonElement(rawArguments) as? JsonObject
-                    }.getOrNull() ?: JsonObject(emptyMap())
+                    }.getOrNull() ?: throw responseProtocolError("工具参数不是合法 JSON 对象")
                     toolCalls += LocalToolCall(callId, name, arguments, rawArguments)
                 }
             }
@@ -704,6 +724,12 @@ class OpenAiResponsesClient @Inject constructor(
             (atMillis - nowMillis).coerceAtLeast(0L)
         }.getOrNull()
     }
+
+    private fun responseProtocolError(detail: String) = LocalModelException(
+        code = "RESPONSES_PROTOCOL_ERROR",
+        message = "Responses API 协议错误：$detail",
+        retryable = false,
+    )
 
     companion object {
         const val RESPONSES_OUTPUT_KEY = "_dsh_responses_output"

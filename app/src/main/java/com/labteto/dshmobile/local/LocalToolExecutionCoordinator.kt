@@ -7,6 +7,8 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.observability.AppLog
+import kotlinx.coroutines.currentCoroutineContext
+import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -136,7 +138,10 @@ internal class LocalToolExecutionCoordinator(
             context = ToolContext(
                 sessionId = sessionId,
                 allowMutation = allowMutation,
-                attributes = mapOf("call_id" to call.id),
+                attributes = buildMap {
+                    put("call_id", call.id)
+                    currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
+                },
                 approval = { tool ->
                     val granted = approval(call, tool, approvalSummary(call, tool))
                     if (!granted) approvalDenied = true
