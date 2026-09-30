@@ -28,10 +28,12 @@ import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
- * OpenAI-compatible multimodal transport for explicit image-analysis tools.
+ * Multimodal compatibility service for explicit image-analysis tools.
  *
- * The route and credential always come from the currently selected model. Screenshots are sent only
- * after a model tool call, keeping image bytes out of durable conversation history.
+ * Runtime requests with a captured model profile always go back through LocalModelGateway so
+ * Responses, Chat Completions and native provider protocols share the same credential/router boundary.
+ * The direct OpenAI-compatible branch remains only as a legacy/test fallback for routes without a
+ * captured profile. Screenshots are sent only after a model tool call and never enter durable history.
  */
 @Singleton
 class VisionClient @Inject constructor(
@@ -68,6 +70,7 @@ class VisionClient @Inject constructor(
         prompt = prompt,
         imageDataUrl = imageDataUrl,
         usageContext = route.usageContext,
+        routeProfile = route.profile,
     )
 
     suspend fun analyze(
@@ -77,6 +80,7 @@ class VisionClient @Inject constructor(
         prompt: String,
         imageDataUrl: String,
         usageContext: TokenUsageContext? = null,
+        routeProfile: LocalModelProfile? = null,
     ): String = withContext(Dispatchers.IO) {
         require(apiKey.isNotBlank()) { "当前模型密钥为空" }
         require(model.isNotBlank()) { "当前模型名称为空" }
@@ -84,8 +88,7 @@ class VisionClient @Inject constructor(
         validateImageDataUrl(imageDataUrl)
 
         val gateway = runCatching { modelGateway.get() }.getOrNull()
-        val activeProfile = gateway?.activeProfile()
-        if (activeProfile?.usesResponsesTransport() == true) {
+        if (gateway != null && routeProfile != null) {
             val messages = buildPayload(model, prompt, imageDataUrl)["messages"]
                 ?.jsonArray
                 ?.map { it.jsonObject }
@@ -95,6 +98,7 @@ class VisionClient @Inject constructor(
                 baseUrl = baseUrl,
                 messages = messages,
                 tools = JsonArray(emptyList()),
+                profile = routeProfile,
             )
             usageTracker.get().record(
                 model = model,
