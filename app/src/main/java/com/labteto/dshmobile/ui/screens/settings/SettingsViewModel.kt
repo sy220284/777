@@ -30,6 +30,7 @@ import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.LocalSessionStorageStatus
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
@@ -106,6 +107,7 @@ class SettingsViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = localHarness.initialState,
         )
+    val chatGptState: StateFlow<ChatGptUiState> = localHarness.chatGptState
     val deepSeekPricing: StateFlow<DeepSeekPricingState> = deepSeekPricingRepository.state
     val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = usageTracker.analyticsRevision
         .mapLatest {
@@ -147,6 +149,7 @@ class SettingsViewModel @Inject constructor(
             hostsStore.settings.collect { _state.value = it }
         }
         refreshAdvancedSettings()
+        viewModelScope.launch { localHarness.refreshChatGpt() }
     }
 
     fun set(transform: (AppSettings) -> AppSettings) {
@@ -360,6 +363,34 @@ class SettingsViewModel @Inject constructor(
         withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl) }
 
     fun selectLocalModel(id: String) = localHarness.selectModel(id)
+
+    fun connectChatGpt(existingAccountId: String? = null, onDone: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching { localHarness.connectChatGpt(existingAccountId) }
+                .onSuccess { onDone(null) }
+                .onFailure { onDone(it.message ?: "ChatGPT 登录失败") }
+        }
+    }
+
+    fun selectChatGptAccount(id: String, onDone: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching { localHarness.selectChatGptAccount(id) }
+                .onSuccess { onDone(null) }
+                .onFailure { onDone(it.message ?: "切换 ChatGPT 账户失败") }
+        }
+    }
+
+    fun disconnectChatGptAccount(id: String, onDone: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching { localHarness.disconnectChatGptAccount(id) }
+                .onSuccess { onDone(null) }
+                .onFailure { onDone(it.message ?: "断开 ChatGPT 账户失败") }
+        }
+    }
+
+    fun refreshChatGpt() {
+        viewModelScope.launch { runCatching { localHarness.refreshChatGpt() } }
+    }
 
     fun removeLocalModel(id: String) = localHarness.removeModel(id)
 
