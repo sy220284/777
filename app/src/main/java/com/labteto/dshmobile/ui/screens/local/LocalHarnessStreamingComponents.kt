@@ -24,6 +24,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.model.forSurface
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -34,7 +36,8 @@ internal fun LocalStreamingChatTurn(
     sessionId: String,
     streamingState: StateFlow<LocalHarnessStreamingState>,
 ) {
-    val stream by streamingState.collectAsStateWithLifecycle()
+    val rawStream by streamingState.collectAsStateWithLifecycle()
+    val stream = rawStream.forSurface(sessionId, LocalUsageMode.CHAT)
     Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
         if (stream.reasoning.isNotBlank()) {
             ChatThinkingRow(
@@ -84,10 +87,12 @@ internal fun LocalStreamingChatTurn(
 
 @Composable
 internal fun LocalStreamingWorkPreview(
+    sessionId: String,
     streamingState: StateFlow<LocalHarnessStreamingState>,
     surfaceColor: Color,
 ) {
-    val stream by streamingState.collectAsStateWithLifecycle()
+    val rawStream by streamingState.collectAsStateWithLifecycle()
+    val stream = rawStream.forSurface(sessionId, LocalUsageMode.WORK)
     val preview = stream.assistant.let { text ->
         if (text.length > 480) "…" + text.takeLast(480) else text
     }
