@@ -1278,4 +1278,26 @@
 <string name="local_send_rejected_queue_unavailable">The follow-up queue is temporarily unavailable. Your draft was kept.</string>
 <string name="usage_show_all">Show all %1$d</string>
 <string name="usage_show_recent">Show recent only</string>
+
+    <string name="chatgpt_account_title">ChatGPT account</string>
+    <string name="chatgpt_account_hint">Use your ChatGPT plan for eligible model requests without an OpenAI API key.</string>
+    <string name="chatgpt_privacy_hint">ChatGPT sign-in does not share your ChatGPT conversations or Memory with this app.</string>
+    <string name="chatgpt_connected">Connected</string>
+    <string name="chatgpt_connecting">Connecting</string>
+    <string name="chatgpt_not_connected">Not connected</string>
+    <string name="chatgpt_account_fallback">ChatGPT account</string>
+    <string name="chatgpt_plan_usage">ChatGPT plan</string>
+    <string name="chatgpt_model_count">%1$d models</string>
+    <string name="chatgpt_saved_accounts">Saved ChatGPT accounts</string>
+    <string name="chatgpt_current_account">Current</string>
+    <string name="chatgpt_use_account">Use</string>
+    <string name="chatgpt_reauthorize">Reconnect</string>
+    <string name="chatgpt_disconnect">Disconnect</string>
+    <string name="chatgpt_add_account">Add ChatGPT account</string>
+    <string name="chatgpt_waiting_browser">Complete authorization in your browser, then return here.</string>
+    <string name="chatgpt_exchanging">Completing ChatGPT authorization…</string>
+    <string name="chatgpt_validating">Verifying account identity…</string>
+    <string name="chatgpt_loading_models">Loading models available to this ChatGPT account…</string>
+    <string name="chatgpt_model_source">ChatGPT plan · %1$s</string>
+
 </resources>
