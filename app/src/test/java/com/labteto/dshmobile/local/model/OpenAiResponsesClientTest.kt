@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalToolCatalog
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import java.io.IOException
 import java.net.SocketException
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -13,7 +14,17 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody
+import okio.Buffer
+import okio.BufferedSource
+import okio.Source
+import okio.Timeout
+import okio.buffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -31,6 +42,65 @@ class OpenAiResponsesClientTest {
         assertEquals("MODEL_NETWORK", error.code)
         assertTrue(error.retryable)
         assertFalse(error.message.orEmpty().contains("CANCEL"))
+    }
+
+    @Test
+    fun completedEventSettlesBeforeTrailingTransportResetAndKeepsReportedUsage() = runBlocking {
+        val terminalFrame = """
+            data: {"type":"response.completed","response":{"id":"resp-terminal","output":[{"type":"message","content":[{"type":"output_text","text":"完成"}]}],"usage":{"input_tokens":7,"output_tokens":3}}}
+            
+        """.trimIndent()
+        val bytes = Buffer().writeUtf8(terminalFrame)
+        var sourceReads = 0
+        val source = object : Source {
+            override fun read(sink: Buffer, byteCount: Long): Long {
+                sourceReads += 1
+                if (bytes.size > 0L) return bytes.read(sink, byteCount)
+                throw IOException("stream was reset: CANCEL")
+            }
+
+            override fun timeout(): Timeout = Timeout.NONE
+            override fun close() = Unit
+        }.buffer()
+        val transport = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .header("Content-Type", "text/event-stream")
+                    .body(object : ResponseBody() {
+                        override fun contentType(): MediaType = "text/event-stream".toMediaType()
+                        override fun contentLength(): Long = -1L
+                        override fun source(): BufferedSource = source
+                    })
+                    .build()
+            }
+            .build()
+        val terminalClient = OpenAiResponsesClient(
+            transport,
+            Json { ignoreUnknownKeys = true },
+        )
+
+        val reply = terminalClient.completeStreaming(
+            accessToken = "test-token",
+            baseUrl = "https://api.openai.com/v1",
+            model = "gpt-test",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "测试")
+            }),
+            tools = JsonArray(emptyList()),
+            planSharing = true,
+        )
+
+        assertEquals("resp-terminal", reply.requestId)
+        assertEquals("完成", reply.content)
+        assertTrue(reply.usage.reported)
+        assertEquals(7L, reply.usage.promptTokens)
+        assertEquals(3L, reply.usage.completionTokens)
+        assertEquals(1, sourceReads)
     }
 
     @Test
