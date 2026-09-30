@@ -1,8 +1,8 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.DeepSeekClient
+import com.labteto.dshmobile.local.model.LocalModelGateway
+
 import com.labteto.dshmobile.local.DeepSeekUsageTracker
-import com.labteto.dshmobile.local.LocalApiKeyStore
 import com.labteto.dshmobile.local.LocalGroupChatMember
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
@@ -14,8 +14,7 @@ import kotlinx.serialization.json.put
 
 /** Drafts a public scene premise; the user reviews the result before it is saved. */
 class GroupAnnouncementService @Inject constructor(
-    private val apiKeys: LocalApiKeyStore,
-    private val modelClient: DeepSeekClient,
+    private val modelGateway: LocalModelGateway,
     private val usageTracker: DeepSeekUsageTracker,
 ) {
     suspend fun generate(
@@ -25,8 +24,6 @@ class GroupAnnouncementService @Inject constructor(
         direction: String,
         current: String,
     ): String {
-        val key = apiKeys.get()?.trim()?.takeIf(String::isNotBlank)
-            ?: error("请先在模型设置里配置密钥")
         val cast = members.joinToString("\n") { member ->
             val persona = member.persona
             "${member.displayName}：${persona.identity.take(100)}；${persona.personality.take(120)}；${persona.relationship.take(120)}"
@@ -41,7 +38,7 @@ class GroupAnnouncementService @Inject constructor(
                 put("content", "人物：\n$cast\n\n剧情方向：${direction.trim().ifBlank { "基于现有人物关系生成自然、可继续发展的共同事件" }.take(500)}\n\n现有公告参考：${current.take(1_000)}")
             },
         )
-        val reply = modelClient.complete(key, baseUrl, model, messages, JsonArray(emptyList()))
+        val reply = modelGateway.complete(model = model, baseUrl = baseUrl, messages = messages, tools = JsonArray(emptyList()))
         usageTracker.record(
             model = model,
             usage = reply.usage,
