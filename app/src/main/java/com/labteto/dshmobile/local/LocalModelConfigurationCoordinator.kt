@@ -125,7 +125,7 @@ internal class LocalModelConfigurationCoordinator(
 
     suspend fun deepSeekSearchApiKeyOrNull(): String? {
         val candidates = profiles.read()
-            .filter(LocalModelProfile::canBackDeepSeekSearch)
+            .filter { it.canBackDeepSeekSearch() }
             .sortedBy { if (it.model.equals(DEFAULT_MODEL, ignoreCase = true)) 0 else 1 }
         candidates.forEach { profile ->
             apiKeys.getFor(profile.id)?.let { return it }
