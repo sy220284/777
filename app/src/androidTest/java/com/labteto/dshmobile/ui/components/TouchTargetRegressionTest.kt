@@ -44,7 +44,7 @@ class TouchTargetRegressionTest {
         compose.setContent {
             DshTheme {
                 DsPill(
-                    text = "Queue",
+                    text = "Q",
                     onClick = {},
                 )
             }
