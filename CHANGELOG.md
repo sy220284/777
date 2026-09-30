@@ -7,6 +7,8 @@ All notable changes to DSH Mobile are documented here. Format based on
 
 ### Added
 
+- **应用更新可直接走 Gitee 国内镜像。** 正式构建可写入公开 Gitee Release 仓库地址；手动检查更新时先读取 Gitee 最新正式版及同版本 `update-manifest.json`，镜像异常才回退 GitHub。发布工作流会先上传并公开回读校验 APK / 增量包，最后上传更新清单，再继续 GitHub Release；未配置镜像时保持原有 GitHub 更新行为。安装前的 SHA-256、包名、签名证书和版本号校验不变。
+
 - **The app can wear a background image.** Settings → General now takes a picture from the device
   and paints it behind the whole shell. Cards, sheets and list rows keep their own opaque fills, so
   text keeps its contrast; only the surfaces that cover the window — the local home, the chat screen
