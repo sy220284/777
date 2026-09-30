@@ -43,6 +43,7 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /** Large borderless surface used for mobile setting groups and capability panels. */
 @Composable
@@ -117,7 +118,7 @@ fun DsCategoryRow(
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 title,
-                style = DsType.base16,
+                style = DsType.base16Strong.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -125,7 +126,7 @@ fun DsCategoryRow(
             subtitle?.let {
                 Text(
                     it,
-                    style = DsType.caption11,
+                    style = DsType.caption11.withReadingWeight(),
                     color = colors.labelTertiary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -136,7 +137,7 @@ fun DsCategoryRow(
             Spacer(Modifier.width(DsSpacing.small))
             Text(
                 it,
-                style = DsType.std14,
+                style = DsType.std14.withReadingWeight(),
                 color = colors.labelTertiary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -188,7 +189,7 @@ fun DsQuickActionTile(
             )
             Text(
                 label,
-                style = DsType.small13,
+                style = DsType.small13.withReadingWeight(),
                 color = if (enabled) colors.labelPrimary else colors.labelCaption,
                 maxLines = 1,
             )
