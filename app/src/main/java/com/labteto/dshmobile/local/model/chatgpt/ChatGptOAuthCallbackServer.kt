@@ -26,7 +26,7 @@ class ChatGptOAuthCallbackServer @Inject constructor() {
     ) : AutoCloseable {
         val redirectUri: String = "http://$LOOPBACK:${server.localPort}$CALLBACK_PATH"
 
-        suspend fun await(timeoutMillis: Long = CALLBACK_TIMEOUT_MILLIS): ChatGptOAuthCallback =
+        internal suspend fun await(timeoutMillis: Long = CALLBACK_TIMEOUT_MILLIS): ChatGptOAuthCallback =
             withTimeout(timeoutMillis) {
                 withContext(Dispatchers.IO) {
                     val client = runInterruptible { server.accept() }
