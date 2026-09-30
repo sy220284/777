@@ -40,7 +40,7 @@ class LocalSettingsRuntime @Inject constructor(
     suspend fun refreshChatGpt() = chatGpt.refresh()
     suspend fun connectChatGpt(existingAccountId: String? = null) = chatGpt.connect(existingAccountId)
     suspend fun selectChatGptAccount(id: String) = chatGpt.select(id)
-    suspend fun disconnectChatGptAccount(id: String) = chatGpt.disconnect(id)
+    suspend fun disconnectChatGptAccount(id: String): String? = chatGpt.disconnect(id)
     fun configureModel(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)
     suspend fun saveModel(apiKey: String, model: String, baseUrl: String) = engine.saveModelConfiguration(apiKey, model, baseUrl)
     fun selectModel(id: String) = engine.selectModel(id)
