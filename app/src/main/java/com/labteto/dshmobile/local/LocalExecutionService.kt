@@ -12,7 +12,6 @@ import com.labteto.dshmobile.MainActivity
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.notify.DshNotifications
-import com.labteto.dshmobile.notify.NotificationArtwork
 import com.labteto.dshmobile.notify.stableNotificationId
 import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.AndroidEntryPoint
@@ -150,7 +149,6 @@ class LocalExecutionService : Service() {
         )
         return NotificationCompat.Builder(this, DshNotifications.CHANNEL_LOCAL_JOBS)
             .setSmallIcon(R.drawable.ic_notification_butterfly)
-            .setLargeIcon(NotificationArtwork.largeIcon(this))
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(pending)
