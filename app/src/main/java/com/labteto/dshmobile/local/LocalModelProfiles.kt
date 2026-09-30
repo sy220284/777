@@ -2,14 +2,56 @@ package com.labteto.dshmobile.local
 
 import java.security.MessageDigest
 
-/** A saved route has its own encrypted credential; IDs never contain secrets. */
-data class LocalModelProfile(val id: String, val model: String, val baseUrl: String)
+enum class LocalModelAuthKind {
+    API_KEY,
+    CHATGPT_PLAN,
+}
+
+enum class LocalModelProtocol {
+    CHAT_COMPLETIONS,
+    RESPONSES,
+}
+
+/** A saved route references a credential without embedding any secret in its durable ID. */
+data class LocalModelProfile(
+    val id: String,
+    val model: String,
+    val baseUrl: String,
+    val provider: String = "",
+    val authKind: LocalModelAuthKind = LocalModelAuthKind.API_KEY,
+    val protocol: LocalModelProtocol = LocalModelProtocol.CHAT_COMPLETIONS,
+    val credentialRef: String? = null,
+    val displayName: String? = null,
+)
 
 internal fun modelProfileId(model: String, baseUrl: String): String {
     val route = normalizeModelBaseUrl(baseUrl) + "\u0000" + model.trim()
     return MessageDigest.getInstance("SHA-256").digest(route.toByteArray())
         .joinToString("") { "%02x".format(it) }
 }
+
+internal fun modelProfileId(
+    model: String,
+    baseUrl: String,
+    authKind: LocalModelAuthKind,
+    credentialRef: String?,
+): String {
+    if (authKind == LocalModelAuthKind.API_KEY) return modelProfileId(model, baseUrl)
+    val route = listOf(
+        authKind.name,
+        credentialRef.orEmpty(),
+        normalizeModelBaseUrl(baseUrl),
+        model.trim(),
+    ).joinToString("\u0000")
+    return MessageDigest.getInstance("SHA-256").digest(route.toByteArray())
+        .joinToString("") { "%02x".format(it) }
+}
+
+internal fun LocalModelProfile.sourceLabel(): String =
+    when (authKind) {
+        LocalModelAuthKind.API_KEY -> "API Key"
+        LocalModelAuthKind.CHATGPT_PLAN -> "ChatGPT 套餐"
+    }
 
 enum class LocalModelCapability {
     TEXT,
@@ -33,6 +75,12 @@ data class LocalModelPreset(
     val imageInputSupported: Boolean? = null,
     val modelsEndpoint: String? = null,
     val toolCallingMode: LocalModelToolCallingMode = LocalModelToolCallingMode.CHAT_COMPLETIONS,
+    val protocol: LocalModelProtocol =
+        if (toolCallingMode == LocalModelToolCallingMode.RESPONSES_ONLY) {
+            LocalModelProtocol.RESPONSES
+        } else {
+            LocalModelProtocol.CHAT_COMPLETIONS
+        },
 ) {
     val chatEndpoint: String
         get() = baseUrl.trimEnd('/') + "/chat/completions"
