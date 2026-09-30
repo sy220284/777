@@ -11,6 +11,7 @@ import kotlinx.serialization.json.Json
 internal data class LocalModelConfigurationResult(
     val configured: Boolean, val model: String, val baseUrl: String,
     val profiles: List<LocalModelProfile>,
+    val activeProfileId: String?,
 ) {
     val configuredModels: List<String>
         get() = profiles.map(LocalModelProfile::model).distinct().sorted()
@@ -46,7 +47,7 @@ internal class LocalModelConfigurationCoordinator(
             val all = profiles.read().filterNot { it.id == id } + profile
             profiles.write(all)
             activate(profile)
-            LocalModelConfigurationResult(true, name, url, all)
+            LocalModelConfigurationResult(true, name, url, all, profile.id)
         }
 
     suspend fun saveChatGptModels(
@@ -63,7 +64,7 @@ internal class LocalModelConfigurationCoordinator(
         val selected = all.firstOrNull { it.id == id } ?: return@run null
         require(gateway.hasCredential(selected)) { credentialError(selected) }
         activate(selected)
-        LocalModelConfigurationResult(true, selected.model, selected.baseUrl, all)
+        LocalModelConfigurationResult(true, selected.model, selected.baseUrl, all, selected.id)
     }
 
     suspend fun remove(
@@ -147,6 +148,7 @@ internal class LocalModelConfigurationCoordinator(
             model = next?.model ?: DEFAULT_MODEL,
             baseUrl = next?.baseUrl ?: DEFAULT_BASE_URL,
             profiles = remaining,
+            activeProfileId = next?.id,
         )
     }
 
