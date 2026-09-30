@@ -153,7 +153,7 @@ class OpenAiResponsesClient @Inject constructor(
         model: String,
         messages: List<JsonObject>,
         tools: JsonArray,
-        temperature: Double?,
+        @Suppress("UNUSED_PARAMETER") temperature: Double?,
     ): JsonObject = buildJsonObject {
         put("model", model)
         responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
@@ -164,8 +164,6 @@ class OpenAiResponsesClient @Inject constructor(
         if (tools.isNotEmpty()) put("tools", responseTools(tools))
         // ChatGPT plan sharing currently rejects temperature/top_p and other sampling controls.
         // Keep the parameter on the gateway contract for API-key transports, but never forward it here.
-        @Suppress("UNUSED_EXPRESSION")
-        temperature
     }
 
     private fun responseInstructions(messages: List<JsonObject>): String =
