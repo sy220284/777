@@ -7,6 +7,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalModelProfilesTest {
+    @Test fun transportAndSearchCapabilitiesFollowProfileContract() {
+        val chat = LocalModelProfile("chat", "model", "https://provider.example/v1")
+        val responses = chat.copy(id = "responses", protocol = LocalModelProtocol.RESPONSES)
+        val plan = chat.copy(id = "plan", baseUrl = "https://api.openai.com/v1", authKind = LocalModelAuthKind.CHATGPT_PLAN)
+        val deepSeek = chat.copy(id = "deepseek", model = "deepseek-flash", baseUrl = "https://api.deepseek.com")
+        assertFalse(chat.usesResponsesTransport())
+        assertTrue(responses.usesResponsesTransport())
+        assertTrue(plan.usesResponsesTransport())
+        assertTrue(deepSeek.canBackDeepSeekSearch())
+        assertFalse(chat.canBackDeepSeekSearch())
+        assertFalse(plan.canBackDeepSeekSearch())
+        assertEquals(LocalModelProtocol.RESPONSES, LocalModelPresets.find("gpt-6-astra", "https://api.openai.com/v1")?.protocol)
+    }
+
     @Test fun sameModelOnDifferentServicesHasDifferentCredentials() {
         val first = modelProfileId("shared-model", "https://service-a.example/v1")
         val second = modelProfileId("shared-model", "https://service-b.example/v1")

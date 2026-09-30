@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.LocalToolCall
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.estimatePromptBreakdown
+import com.labteto.dshmobile.local.normalizeModelBaseUrl
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_RESPONSES_URL
 import java.io.IOException
 import java.net.SocketException
@@ -52,6 +53,7 @@ class OpenAiResponsesClient @Inject constructor(
 
     suspend fun completeStreaming(
         accessToken: String,
+        baseUrl: String,
         model: String,
         messages: List<JsonObject>,
         tools: JsonArray,
@@ -60,9 +62,16 @@ class OpenAiResponsesClient @Inject constructor(
         onDelta: (LocalModelDelta) -> Unit = {},
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
-        val payload = buildPayload(model, messages, tools, temperature, planSharing)
+        val payload = buildPayload(
+            model = model,
+            messages = messages,
+            tools = tools,
+            temperature = temperature,
+            planSharing = planSharing,
+            includeEncryptedReasoning = shouldIncludeEncryptedReasoning(baseUrl, planSharing),
+        )
         val request = Request.Builder()
-            .url(CHATGPT_RESPONSES_URL)
+            .url(responsesEndpoint(baseUrl, planSharing))
             .header("Authorization", "Bearer $accessToken")
             .header("Content-Type", "application/json")
             .post(payload.toString().toRequestBody(JSON_MEDIA))
@@ -118,13 +127,21 @@ class OpenAiResponsesClient @Inject constructor(
                                     ?.takeIf(String::isNotEmpty)
                                     ?.let { onDelta(LocalModelDelta(content = it)) }
                             }
-                            "response.reasoning_text.delta" -> {
+                            "response.reasoning_text.delta",
+                            "response.reasoning_summary_text.delta" -> {
                                 event["delta"]?.jsonPrimitive?.contentOrNull
                                     ?.takeIf(String::isNotEmpty)
                                     ?.let { onDelta(LocalModelDelta(reasoning = it)) }
                             }
+                            "response.refusal.delta" -> {
+                                event["delta"]?.jsonPrimitive?.contentOrNull
+                                    ?.takeIf(String::isNotEmpty)
+                                    ?.let { onDelta(LocalModelDelta(content = it)) }
+                            }
+                            "error" -> throw streamError(event, planSharing, requestId, retryAfterMs)
                             "response.failed" -> throw responseFailure(
                                 event = event,
+                                planSharing = planSharing,
                                 requestId = requestId,
                                 retryAfterMs = retryAfterMs,
                             )
@@ -167,13 +184,16 @@ class OpenAiResponsesClient @Inject constructor(
         tools: JsonArray,
         temperature: Double?,
         planSharing: Boolean = true,
+        includeEncryptedReasoning: Boolean = true,
     ): JsonObject = buildJsonObject {
         put("model", model)
         responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
         put("input", responseInput(messages))
         put("store", false)
         put("stream", true)
-        put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
+        if (includeEncryptedReasoning) {
+            put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
+        }
         if (tools.isNotEmpty()) put("tools", responseTools(tools, planSharing))
         if (!planSharing) temperature?.let { put("temperature", it) }
         // ChatGPT plan sharing rejects sampling controls; API-key Responses keeps its own contract.
@@ -288,6 +308,16 @@ class OpenAiResponsesClient @Inject constructor(
         }
     }
 
+    internal fun responseMessageText(parts: JsonArray): String = buildString {
+        parts.forEach { part ->
+            val p = part as? JsonObject ?: return@forEach
+            when (p["type"]?.jsonPrimitive?.contentOrNull) {
+                "output_text" -> append(p["text"]?.jsonPrimitive?.contentOrNull.orEmpty())
+                "refusal" -> append(p["refusal"]?.jsonPrimitive?.contentOrNull.orEmpty())
+            }
+        }
+    }
+
     private fun parseCompleted(
         response: JsonObject,
         promptBreakdown: TokenPromptBreakdown,
@@ -300,12 +330,7 @@ class OpenAiResponsesClient @Inject constructor(
             val obj = item as? JsonObject ?: return@forEach
             when (obj["type"]?.jsonPrimitive?.contentOrNull) {
                 "message" -> {
-                    (obj["content"] as? JsonArray).orEmpty().forEach { part ->
-                        val p = part as? JsonObject ?: return@forEach
-                        if (p["type"]?.jsonPrimitive?.contentOrNull == "output_text") {
-                            content.append(p["text"]?.jsonPrimitive?.contentOrNull.orEmpty())
-                        }
-                    }
+                    content.append(responseMessageText((obj["content"] as? JsonArray) ?: JsonArray(emptyList())))
                 }
                 "reasoning" -> {
                     (obj["summary"] as? JsonArray).orEmpty().forEach { part ->
@@ -376,6 +401,7 @@ class OpenAiResponsesClient @Inject constructor(
 
     private fun responseFailure(
         event: JsonObject,
+        planSharing: Boolean,
         requestId: String?,
         retryAfterMs: Long?,
     ): LocalModelException {
@@ -385,14 +411,51 @@ class OpenAiResponsesClient @Inject constructor(
         val param = error?.get("param")?.jsonPrimitive?.contentOrNull
         val message = error?.get("message")?.jsonPrimitive?.contentOrNull
             ?: "Responses API 请求失败"
-        return structuredResponseError(
-            code = code,
-            param = param,
-            detail = message,
-            requestId = requestId,
-            retryAfterMs = retryAfterMs,
-        )
+        return if (planSharing) {
+            structuredResponseError(code, param, message, requestId, retryAfterMs)
+        } else {
+            standardStreamError("RESPONSES_FAILED", code, param, message, requestId, retryAfterMs)
+        }
     }
+
+    internal fun streamError(
+        event: JsonObject,
+        planSharing: Boolean,
+        requestId: String?,
+        retryAfterMs: Long?,
+    ): LocalModelException {
+        val nested = event["error"] as? JsonObject
+        val code = event["code"]?.jsonPrimitive?.contentOrNull
+            ?: nested?.get("code")?.jsonPrimitive?.contentOrNull
+            ?: "unknown_error"
+        val param = event["param"]?.jsonPrimitive?.contentOrNull
+            ?: nested?.get("param")?.jsonPrimitive?.contentOrNull
+        val detail = event["message"]?.jsonPrimitive?.contentOrNull
+            ?: nested?.get("message")?.jsonPrimitive?.contentOrNull
+            ?: "Responses API 流式请求失败"
+        return if (planSharing) {
+            structuredResponseError(code, param, detail, requestId, retryAfterMs)
+        } else {
+            standardStreamError("RESPONSES_STREAM", code, param, detail, requestId, retryAfterMs)
+        }
+    }
+
+    private fun standardStreamError(
+        prefix: String,
+        code: String,
+        param: String?,
+        detail: String,
+        requestId: String?,
+        retryAfterMs: Long?,
+    ): LocalModelException = LocalModelException(
+        code = "$prefix_$code",
+        message = detail,
+        retryable = code in setOf("server_error", "server_overloaded", "rate_limit_exceeded"),
+        providerRetryAfterMs = retryAfterMs,
+        requestId = requestId,
+        providerCode = code,
+        providerParam = param,
+    )
 
     private fun incompleteReason(event: JsonObject): String {
         val response = event["response"] as? JsonObject
@@ -540,6 +603,19 @@ class OpenAiResponsesClient @Inject constructor(
             providerCode = code,
             providerParam = param,
         )
+    }
+
+    internal fun responsesEndpoint(baseUrl: String, planSharing: Boolean): String {
+        if (planSharing) return CHATGPT_RESPONSES_URL
+        val clean = normalizeModelBaseUrl(baseUrl).trimEnd('/')
+        return if (clean.endsWith("/responses")) clean else "$clean/responses"
+    }
+
+    internal fun shouldIncludeEncryptedReasoning(baseUrl: String, planSharing: Boolean): Boolean {
+        if (planSharing) return true
+        return runCatching {
+            java.net.URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.openai.com", ignoreCase = true)
+        }.getOrDefault(false)
     }
 
     internal fun networkFailure(error: IOException): LocalModelException {

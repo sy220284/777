@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import java.net.URI
 import java.security.MessageDigest
 
 enum class LocalModelAuthKind {
@@ -23,6 +24,16 @@ data class LocalModelProfile(
     val credentialRef: String? = null,
     val displayName: String? = null,
 )
+
+internal fun LocalModelProfile.usesResponsesTransport(): Boolean =
+    authKind == LocalModelAuthKind.CHATGPT_PLAN || protocol == LocalModelProtocol.RESPONSES
+
+internal fun LocalModelProfile.canBackDeepSeekSearch(): Boolean =
+    authKind == LocalModelAuthKind.API_KEY && runCatching {
+        val uri = URI(normalizeModelBaseUrl(baseUrl))
+        uri.scheme.equals("https", ignoreCase = true) &&
+            uri.host.equals("api.deepseek.com", ignoreCase = true)
+    }.getOrDefault(false)
 
 internal fun modelProfileId(model: String, baseUrl: String): String {
     val route = normalizeModelBaseUrl(baseUrl) + "\u0000" + model.trim()

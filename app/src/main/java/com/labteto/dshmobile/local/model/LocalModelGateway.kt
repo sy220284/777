@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.LocalModelDelta
 import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.LocalModelProtocol
 import com.labteto.dshmobile.local.LocalModelReply
+import com.labteto.dshmobile.local.usesResponsesTransport
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.JsonArray
@@ -38,6 +39,7 @@ class LocalModelGateway @Inject constructor(
         return if (usesResponses(profile, resolved.authKind)) {
             responses.completeStreaming(
                 accessToken = resolved.bearerToken,
+                baseUrl = baseUrl,
                 model = model,
                 messages = messages,
                 tools = tools,
@@ -69,6 +71,7 @@ class LocalModelGateway @Inject constructor(
         return if (usesResponses(profile, resolved.authKind)) {
             responses.completeStreaming(
                 accessToken = resolved.bearerToken,
+                baseUrl = baseUrl,
                 model = model,
                 messages = messages,
                 tools = tools,
@@ -89,12 +92,41 @@ class LocalModelGateway @Inject constructor(
         }
     }
 
+    suspend fun probeApiKey(
+        apiKey: String,
+        model: String,
+        baseUrl: String,
+        protocol: LocalModelProtocol,
+    ): LocalModelReply = when (protocol) {
+        LocalModelProtocol.RESPONSES -> responses.completeStreaming(
+            accessToken = apiKey,
+            baseUrl = baseUrl,
+            model = model,
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "Reply with OK.")
+            }),
+            tools = JsonArray(emptyList()),
+            planSharing = false,
+        )
+        LocalModelProtocol.CHAT_COMPLETIONS -> chatCompletions.complete(
+            apiKey = apiKey,
+            baseUrl = baseUrl,
+            model = model,
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "Reply with OK.")
+            }),
+            tools = JsonArray(emptyList()),
+        )
+    }
+
     private fun usesResponses(
         profile: LocalModelProfile?,
         authKind: LocalModelAuthKind,
     ): Boolean =
         authKind == LocalModelAuthKind.CHATGPT_PLAN ||
-            profile?.protocol == LocalModelProtocol.RESPONSES
+            profile?.usesResponsesTransport() == true
 
     private fun sanitizeForChatCompletions(messages: List<JsonObject>): List<JsonObject> =
         messages.map { source ->

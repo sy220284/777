@@ -22,6 +22,51 @@ class OpenAiResponsesClientTest {
     )
 
     @Test
+    fun responsesEndpointKeepsPlanSharingOnOpenAiAndHonorsApiKeyBaseUrl() {
+        assertEquals("https://api.openai.com/v1/responses", client.responsesEndpoint("https://proxy.example.com/v1", true))
+        assertEquals("https://proxy.example.com/v1/responses", client.responsesEndpoint("https://proxy.example.com/v1", false))
+        assertEquals("https://proxy.example.com/v1/responses", client.responsesEndpoint("https://proxy.example.com/v1/responses", false))
+    }
+
+    @Test
+    fun encryptedReasoningIsOnlyForcedForPlanSharingOrOfficialOpenAi() {
+        assertTrue(client.shouldIncludeEncryptedReasoning("https://proxy.example.com/v1", true))
+        assertTrue(client.shouldIncludeEncryptedReasoning("https://api.openai.com/v1", false))
+        assertFalse(client.shouldIncludeEncryptedReasoning("https://proxy.example.com/v1", false))
+        val payload = client.buildPayload(
+            model = "custom-responses",
+            messages = listOf(buildJsonObject { put("role", "user"); put("content", "继续") }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = false,
+            includeEncryptedReasoning = false,
+        )
+        assertFalse("include" in payload)
+    }
+
+    @Test
+    fun refusalContentIsPreservedAsAssistantText() {
+        val text = client.responseMessageText(JsonArray(listOf(buildJsonObject {
+            put("type", "refusal")
+            put("refusal", "无法完成这个请求")
+        })))
+        assertEquals("无法完成这个请求", text)
+    }
+
+    @Test
+    fun standardResponsesStreamErrorsNeverBecomeChatGptPlanErrors() {
+        val event = buildJsonObject {
+            put("type", "error")
+            put("code", "subscription_sharing_usage_limit_exceeded")
+            put("message", "limit")
+        }
+        val standard = client.streamError(event, false, "req-standard", null)
+        val plan = client.streamError(event, true, "req-plan", null)
+        assertEquals("RESPONSES_STREAM_subscription_sharing_usage_limit_exceeded", standard.code)
+        assertEquals("CHATGPT_PLAN_LIMIT_REACHED", plan.code)
+    }
+
+    @Test
     fun chatGptPlanPayloadMovesSystemMessagesToInstructionsAndOmitsSamplingControls() {
         val payload = client.buildPayload(
             model = "gpt-test",
