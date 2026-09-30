@@ -93,7 +93,7 @@ internal class LocalModelRequestCoordinator(
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
                     is AgentRequestEvent.AttemptStarted -> {
-                        if (publishPreviewEnabled && previewGuard()) resetPreview()
+                        if (previewGuard()) resetPreview()
                     }
                     is AgentRequestEvent.AttemptFailed -> {
                         AppLog.warn(
