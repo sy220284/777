@@ -12,14 +12,13 @@ class LocalModelConnectionTester @Inject constructor(private val gateway: LocalM
         key: String,
         url: String,
         model: String,
-        protocol: LocalModelProtocol,
     ): String = try {
         withTimeout(20_000L) {
             gateway.probeApiKey(
                 apiKey = key,
                 baseUrl = url,
                 model = model,
-                protocol = protocol,
+                protocol = LocalModelPresets.protocolFor(model, url),
             )
         }
         "连接成功，模型已返回响应"
