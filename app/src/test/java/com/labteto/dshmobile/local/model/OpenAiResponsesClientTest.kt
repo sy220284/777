@@ -50,6 +50,24 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun apiKeyResponsesKeepsSamplingControlOutsidePlanSharing() {
+        val payload = client.buildPayload(
+            model = "gpt-test",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "继续")
+            }),
+            tools = JsonArray(emptyList()),
+            temperature = 0.65,
+            planSharing = false,
+        )
+
+        assertEquals(0.65, payload["temperature"]?.jsonPrimitive?.content?.toDouble())
+        assertEquals(false, payload["store"]?.jsonPrimitive?.content?.toBoolean())
+        assertEquals(true, payload["stream"]?.jsonPrimitive?.content?.toBoolean())
+    }
+
+    @Test
     fun multipleSystemMessagesPreserveOrderInInstructions() {
         val payload = client.buildPayload(
             model = "gpt-test",
