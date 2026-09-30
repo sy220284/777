@@ -1,0 +1,37 @@
+name: Gitee Repair v174
+
+'on':
+  push:
+    branches:
+      - fix/gitee-large-asset-upload
+
+permissions:
+  contents: read
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: fix/gitee-large-asset-upload
+
+      - name: Download v174 GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf .release-assets
+          mkdir -p .release-assets
+          gh release download v0.12.0-777.174 --dir .release-assets
+          ls -lh .release-assets
+
+      - name: Repair Gitee v174 mirror
+        env:
+          UPDATE_MIRROR_BASE_URL: ${{ vars.UPDATE_MIRROR_BASE_URL }}
+          GITEE_MIRROR_ACCESS_TOKEN: ${{ secrets.GITEE_MIRROR_ACCESS_TOKEN }}
+        run: |
+          python3 .github/scripts/publish-gitee-update-mirror.py \
+            --asset-dir .release-assets \
+            --version 0.12.0-777.174
