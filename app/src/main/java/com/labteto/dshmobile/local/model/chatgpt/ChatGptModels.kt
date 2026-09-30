@@ -66,6 +66,9 @@ internal class ChatGptOAuthTokenException(
     message: String,
 ) : java.io.IOException(message)
 
+internal fun shouldRetryChatGptAuthorization(oauthCode: String?, allowed: Boolean): Boolean =
+    allowed && oauthCode == "invalid_grant"
+
 internal data class ChatGptTokenResponse(
     val accessToken: String,
     val refreshToken: String?,
