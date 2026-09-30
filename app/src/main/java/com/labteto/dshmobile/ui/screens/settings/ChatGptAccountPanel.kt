@@ -49,6 +49,7 @@ internal fun ChatGptAccountPanel(
         context.getSharedPreferences("chatgpt_plan_ui", android.content.Context.MODE_PRIVATE)
     }
     var showWelcome by remember { mutableStateOf(false) }
+    val accountShortLabel = stringResource(R.string.chatgpt_account_short)
     val selected = state.selectedAccount
     LaunchedEffect(state.connected) {
         if (state.connected && !welcomePrefs.getBoolean("plan_welcome_seen_v1", false)) {
@@ -132,6 +133,11 @@ internal fun ChatGptAccountPanel(
                 selected.email?.takeIf { it != selected.displayName }?.let {
                     Text(it, style = DsType.caption11, color = colors.labelTertiary)
                 }
+                Text(
+                    "$accountShortLabel ${selected.clientId.takeLast(6)}",
+                    style = DsType.caption11,
+                    color = colors.labelTertiary,
+                )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                     verticalAlignment = Alignment.CenterVertically,
@@ -153,8 +159,18 @@ internal fun ChatGptAccountPanel(
                             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                         ) {
                             Text(
-                                account.displayName?.takeIf(String::isNotBlank)
-                                    ?: account.email.orEmpty().ifBlank { stringResource(R.string.chatgpt_account_fallback) },
+                                buildString {
+                                    append(
+                                        account.displayName?.takeIf(String::isNotBlank)
+                                            ?: account.email.orEmpty().ifBlank {
+                                                context.getString(R.string.chatgpt_account_fallback)
+                                            },
+                                    )
+                                    append(" · ")
+                                    append(accountShortLabel)
+                                    append(' ')
+                                    append(account.clientId.takeLast(6))
+                                },
                                 style = DsType.small13,
                                 color = colors.labelSecondary,
                                 modifier = Modifier.weight(1f),
