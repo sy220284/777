@@ -63,6 +63,40 @@ class LocalModelProfileStoreAndroidTest {
         assertEquals(LocalModelAuthKind.API_KEY, reloaded.read().single().authKind)
     }
 
+
+    @Test
+    fun officialClaudeLegacyProfileMigratesToNativeMessagesButCustomRoutesDoNot() {
+        val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
+        val json = Json { ignoreUnknownKeys = true }
+        val store = LocalModelProfileStore(preferences, json)
+        val legacyClaude = LocalModelProfile(
+            id = modelProfileId("claude-sonnet-5-5", "https://api.anthropic.com/v1"),
+            model = "claude-sonnet-5-5",
+            baseUrl = "https://api.anthropic.com/v1",
+            provider = "Claude（兼容接口）",
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+        )
+        val custom = LocalModelProfile(
+            id = modelProfileId("claude-sonnet-5-5", "https://proxy.example/v1"),
+            model = "claude-sonnet-5-5",
+            baseUrl = "https://proxy.example/v1",
+            provider = "自定义",
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+        )
+
+        store.write(listOf(legacyClaude, custom))
+        val reloaded = LocalModelProfileStore(preferences, json).read()
+
+        assertEquals(
+            LocalModelProtocol.ANTHROPIC_MESSAGES,
+            reloaded.first { it.id == legacyClaude.id }.protocol,
+        )
+        assertEquals(
+            LocalModelProtocol.CHAT_COMPLETIONS,
+            reloaded.first { it.id == custom.id }.protocol,
+        )
+    }
+
     private fun planProfile(accountId: String) = LocalModelProfile(
         id = modelProfileId(
             "gpt-test",
