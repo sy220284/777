@@ -10,7 +10,6 @@ import com.labteto.dshmobile.local.estimatePromptBreakdown
 import com.labteto.dshmobile.local.normalizeModelBaseUrl
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_RESPONSES_URL
 import java.io.IOException
-import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -619,12 +618,15 @@ class OpenAiResponsesClient @Inject constructor(
     }
 
     internal fun networkFailure(error: IOException): LocalModelException {
-        val interrupted = error is SocketException && listOf(
+        val detail = error.message.orEmpty().lowercase()
+        val interrupted = listOf(
             "connection abort",
             "connection reset",
             "broken pipe",
             "socket closed",
-        ).any { marker -> error.message.orEmpty().lowercase().contains(marker) }
+            "stream was reset",
+            "stream reset",
+        ).any(detail::contains)
         return LocalModelException(
             code = "MODEL_NETWORK",
             message = if (interrupted) {

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.model
 
+import java.io.IOException
 import java.net.SocketException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -171,6 +172,16 @@ class OpenAiResponsesClientTest {
         assertTrue(error.retryable)
         assertTrue(error.message.orEmpty().contains("流式连接中断"))
         assertFalse(error.message.orEmpty().contains("Software caused connection abort"))
+    }
+
+    @Test
+    fun http2StreamResetCancelIsTreatedAsRetryableStreamInterruption() {
+        val error = client.networkFailure(IOException("stream was reset: CANCEL"))
+
+        assertEquals("MODEL_NETWORK", error.code)
+        assertTrue(error.retryable)
+        assertTrue(error.message.orEmpty().contains("流式连接中断"))
+        assertFalse(error.message.orEmpty().contains("stream was reset"))
     }
 
     @Test
