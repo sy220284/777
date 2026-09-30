@@ -22,6 +22,7 @@ import java.io.File
 data class LocalVisionRoute(
     val baseUrl: String,
     val model: String,
+    val profile: LocalModelProfile? = null,
     val usageContext: TokenUsageContext? = null,
 )
 
