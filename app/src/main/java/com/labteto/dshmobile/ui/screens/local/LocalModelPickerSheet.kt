@@ -14,13 +14,13 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 @Composable
 internal fun LocalModelPickerSheet(
     profiles: List<LocalModelProfile>,
-    currentModel: String,
-    currentBaseUrl: String,
+    activeProfileId: String?,
     onSelect: (String) -> Unit,
     onConfigure: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val chatGptPlanLabel = stringResource(R.string.chatgpt_plan_usage)
+    val chatGptAccountLabel = stringResource(R.string.chatgpt_account_short)
     DsBottomSheet(title = stringResource(R.string.models_title), onDismiss = onDismiss) {
         profiles.forEach { profile ->
             DsButton(
@@ -28,8 +28,13 @@ internal fun LocalModelPickerSheet(
                     append(profile.displayName ?: profile.model)
                     append("  ·  ")
                     append(
-                        if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) chatGptPlanLabel
-                        else profile.baseUrl.substringAfter("://").substringBefore('/'),
+                        if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
+                            val account = profile.credentialRef?.takeLast(6).orEmpty()
+                            if (account.isBlank()) chatGptPlanLabel
+                            else "$chatGptPlanLabel · $chatGptAccountLabel $account"
+                        } else {
+                            profile.baseUrl.substringAfter("://").substringBefore('/')
+                        },
                     )
                 },
                 onClick = {
@@ -37,8 +42,7 @@ internal fun LocalModelPickerSheet(
                     onDismiss()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                variant = if (profile.model == currentModel && profile.baseUrl == currentBaseUrl)
-                    DsButtonVariant.Info else DsButtonVariant.Ghost,
+                variant = if (profile.id == activeProfileId) DsButtonVariant.Info else DsButtonVariant.Ghost,
             )
         }
         DsButton(
