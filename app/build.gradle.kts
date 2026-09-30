@@ -16,6 +16,31 @@ plugins {
  */
 val dshVersionName: String = System.getenv("DSH_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: rootProject.file(".github/release-version").readText().trim()
 
+val dshUpdateMirrorBaseUrl: String = System.getenv("DSH_UPDATE_MIRROR_BASE_URL")
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+    ?.trimEnd('/')
+    ?.plus("/")
+    .orEmpty()
+
+if (dshUpdateMirrorBaseUrl.isNotEmpty()) {
+    val mirrorUri = runCatching { java.net.URI(dshUpdateMirrorBaseUrl) }.getOrNull()
+    require(
+        mirrorUri != null &&
+            mirrorUri.scheme.equals("https", ignoreCase = true) &&
+            !mirrorUri.host.isNullOrBlank() &&
+            mirrorUri.rawQuery == null &&
+            mirrorUri.rawFragment == null &&
+            mirrorUri.userInfo == null
+    ) {
+        "DSH_UPDATE_MIRROR_BASE_URL 必须是无用户信息、查询参数和片段的 HTTPS 根地址"
+    }
+}
+
+val escapedUpdateMirrorBaseUrl = dshUpdateMirrorBaseUrl
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+
 val dshForkRevision: Int = dshVersionName
     .substringAfter('-', "")
     .substringAfterLast('.', "")
@@ -158,6 +183,11 @@ android {
         targetSdk = 36
         versionCode = dshVersionCode
         versionName = dshVersionName
+        buildConfigField(
+            "String",
+            "UPDATE_MIRROR_BASE_URL",
+            "\"" + escapedUpdateMirrorBaseUrl + "\"",
+        )
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters.addAll(bundledRuntimeAbis) }
         vectorDrawables { useSupportLibrary = true }
