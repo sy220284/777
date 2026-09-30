@@ -20,7 +20,7 @@ import kotlinx.serialization.json.put
  * recovery. The engine supplies only current product state and the durable compaction callback.
  */
 internal class LocalModelRequestCoordinator(
-    private val modelClient: DeepSeekClient,
+    private val modelGateway: LocalModelGateway,
     private val resourceScheduler: HarnessResourceScheduler,
     private val historyCompactor: LocalHistoryCompactor,
     private val toolSchemas: (LocalAgentRunPolicy) -> JsonArray,
@@ -162,8 +162,7 @@ internal class LocalModelRequestCoordinator(
                         .takeIf { it.isNotEmpty() }
                         ?.let(::ChatStreamFilter)
                     resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                        val reply = modelClient.completeStreaming(
-                            apiKey = key,
+                        val reply = modelGateway.completeStreaming(
                             baseUrl = snapshot.baseUrl,
                             model = snapshot.model,
                             messages = activeMessages,
