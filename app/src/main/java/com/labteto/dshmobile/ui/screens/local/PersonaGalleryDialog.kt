@@ -59,7 +59,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -465,9 +464,8 @@ internal fun PersonaGalleryScreen(
                 ) {
                     Text(
                         stringResource(R.string.persona_gallery_presets_title),
-                        style = DsType.std14.withReadingWeight(),
+                        style = DsType.std14Strong.withReadingWeight(),
                         color = DsTheme.colors.labelPrimary,
-                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f),
                     )
                     GalleryPill(visiblePresets.size.toString())
@@ -609,9 +607,8 @@ internal fun PersonaGalleryScreen(
             ) {
                 Text(
                     stringResource(R.string.persona_gallery_my_characters),
-                    style = DsType.std14.withReadingWeight(),
+                    style = DsType.std14Strong.withReadingWeight(),
                     color = DsTheme.colors.labelPrimary,
-                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
                 GalleryPill(entries.size.toString())
@@ -797,9 +794,8 @@ internal fun PersonaGalleryScreen(
 
             Text(
                 stringResource(R.string.persona_gallery_storylines_title),
-                style = DsType.std14.withReadingWeight(),
+                style = DsType.std14Strong.withReadingWeight(),
                 color = DsTheme.colors.labelPrimary,
-                fontWeight = FontWeight.SemiBold,
             )
             if (selected.stories.isEmpty()) {
                 DsCard {
