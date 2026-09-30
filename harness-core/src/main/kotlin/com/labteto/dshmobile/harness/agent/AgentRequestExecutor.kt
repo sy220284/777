@@ -50,7 +50,7 @@ class AgentRequestExecutor(
     maxAttempts: Int,
     private val retryable: (Exception) -> Boolean,
     private val eventSink: AgentRequestEventSink = AgentRequestEventSink { },
-    private val backoffMillis: (failedAttempt: Int) -> Long = { failedAttempt ->
+    private val backoffMillis: (failedAttempt: Int, error: Exception) -> Long = { failedAttempt, _ ->
         1_000L shl (failedAttempt - 1).coerceIn(0, 20)
     },
     private val sleeper: suspend (Long) -> Unit = { delay(it) },
@@ -87,7 +87,7 @@ class AgentRequestExecutor(
                     ),
                 )
                 if (!willRetry) throw error
-                val delayMillis = backoffMillis(attempt).coerceAtLeast(0L)
+                val delayMillis = backoffMillis(attempt, error).coerceAtLeast(0L)
                 eventSink.append(
                     AgentRequestEvent.RetryScheduled(
                         attempt = attempt,

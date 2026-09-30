@@ -7,11 +7,83 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalModelProfilesTest {
+    @Test fun transportAndSearchCapabilitiesFollowProfileContract() {
+        val chat = LocalModelProfile("chat", "model", "https://provider.example/v1")
+        val responses = chat.copy(id = "responses", protocol = LocalModelProtocol.RESPONSES)
+        val plan = chat.copy(id = "plan", baseUrl = "https://api.openai.com/v1", authKind = LocalModelAuthKind.CHATGPT_PLAN)
+        val deepSeek = chat.copy(id = "deepseek", model = "deepseek-flash", baseUrl = "https://api.deepseek.com")
+        assertFalse(chat.usesResponsesTransport())
+        assertTrue(responses.usesResponsesTransport())
+        assertTrue(plan.usesResponsesTransport())
+        assertTrue(deepSeek.canBackDeepSeekSearch())
+        assertFalse(chat.canBackDeepSeekSearch())
+        assertFalse(plan.canBackDeepSeekSearch())
+        assertEquals(LocalModelProtocol.RESPONSES, LocalModelPresets.find("gpt-6-astra", "https://api.openai.com/v1")?.protocol)
+    }
+
     @Test fun sameModelOnDifferentServicesHasDifferentCredentials() {
         val first = modelProfileId("shared-model", "https://service-a.example/v1")
         val second = modelProfileId("shared-model", "https://service-b.example/v1")
         assertNotEquals(first, second)
         assertEquals(first, modelProfileId(" shared-model ", "https://service-a.example/v1/"))
+    }
+
+    @Test fun representativeProvidersKeepTheirDeclaredTransportProtocols() {
+        val chatCompletionRoutes = listOf(
+            "deepseek-flash" to "https://api.deepseek.com",
+            "MiniMax-M3" to "https://api.minimaxi.com/v1",
+            "gemini-3.8-flash" to "https://generativelanguage.googleapis.com/v1beta/openai",
+            "qwen3.8-max" to "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
+        chatCompletionRoutes.forEach { (model, baseUrl) ->
+            assertEquals(
+                LocalModelProtocol.CHAT_COMPLETIONS,
+                LocalModelPresets.protocolFor(model, baseUrl),
+            )
+        }
+        assertEquals(
+            LocalModelProtocol.RESPONSES,
+            LocalModelPresets.protocolFor("gpt-6-astra", "https://api.openai.com/v1"),
+        )
+        assertEquals(
+            LocalModelProtocol.CHAT_COMPLETIONS,
+            LocalModelPresets.protocolFor("custom-model", "https://custom.example/v1"),
+        )
+    }
+
+    @Test fun samplingControlsFollowModelCapabilitiesWithoutChangingOtherProviders() {
+        assertEquals(
+            null,
+            LocalModelPresets.samplingTemperatureFor(
+                "gpt-6-astra",
+                "https://api.openai.com/v1",
+                0.85,
+            ),
+        )
+        assertEquals(
+            0.85,
+            LocalModelPresets.samplingTemperatureFor(
+                "gpt-6-sol",
+                "https://api.openai.com/v1",
+                0.85,
+            ),
+        )
+        assertEquals(
+            0.85,
+            LocalModelPresets.samplingTemperatureFor(
+                "deepseek-flash",
+                "https://api.deepseek.com",
+                0.85,
+            ),
+        )
+        assertEquals(
+            0.85,
+            LocalModelPresets.samplingTemperatureFor(
+                "gemini-3.8-flash",
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+                0.85,
+            ),
+        )
     }
 
     @Test fun providerPresetsUseDomesticRoutesWithoutRegionSuffixes() {

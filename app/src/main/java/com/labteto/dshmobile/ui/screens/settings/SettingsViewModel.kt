@@ -359,43 +359,89 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String) =
-        withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl) }
+    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null) =
+        withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol) }
 
     fun selectLocalModel(id: String) = localHarness.selectModel(id)
 
     fun connectChatGpt(existingAccountId: String? = null, onDone: (String?) -> Unit = {}) {
         viewModelScope.launch {
-            runCatching { localHarness.connectChatGpt(existingAccountId) }
-                .onSuccess { onDone(null) }
-                .onFailure { onDone(it.message ?: "ChatGPT 登录失败") }
+            try {
+                localHarness.connectChatGpt(existingAccountId)
+                onDone(null)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onDone(error.message ?: "ChatGPT 登录失败")
+            }
         }
+    }
+
+    fun restartChatGptAuthorization(existingAccountId: String? = null, onDone: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                localHarness.restartChatGptAuthorization(existingAccountId)
+                onDone(null)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onDone(error.message ?: "重新开始 ChatGPT 授权失败")
+            }
+        }
+    }
+
+    fun cancelChatGptAuthorization() {
+        viewModelScope.launch { localHarness.cancelChatGptAuthorization() }
+    }
+
+    fun testChatGptAccount(id: String, onDone: (String) -> Unit) {
+        viewModelScope.launch { onDone(localHarness.testChatGptAccount(id)) }
     }
 
     fun selectChatGptAccount(id: String, onDone: (String?) -> Unit = {}) {
         viewModelScope.launch {
-            runCatching { localHarness.selectChatGptAccount(id) }
-                .onSuccess { onDone(null) }
-                .onFailure { onDone(it.message ?: "切换 ChatGPT 账户失败") }
+            try {
+                localHarness.selectChatGptAccount(id)
+                onDone(null)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onDone(error.message ?: "切换 ChatGPT 账户失败")
+            }
         }
     }
 
     fun disconnectChatGptAccount(id: String, onDone: (String?) -> Unit = {}) {
         viewModelScope.launch {
-            runCatching { localHarness.disconnectChatGptAccount(id) }
-                .onSuccess { warning -> onDone(warning) }
-                .onFailure { onDone(it.message ?: "断开 ChatGPT 账户失败") }
+            try {
+                onDone(localHarness.disconnectChatGptAccount(id))
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onDone(error.message ?: "断开 ChatGPT 账户失败")
+            }
         }
     }
 
+    fun removeChatGptAccount(id: String, onDone: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                onDone(localHarness.removeChatGptAccount(id))
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onDone(error.message ?: "移除 ChatGPT 授权记录失败")
+            }
+        }
+    }
     fun refreshChatGpt() {
         viewModelScope.launch { runCatching { localHarness.refreshChatGpt() } }
     }
 
     fun removeLocalModel(id: String) = localHarness.removeModel(id)
 
-    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String): String =
-        localHarness.testModel(apiKey, model, baseUrl)
+    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null): String =
+        localHarness.testModel(apiKey, model, baseUrl, protocol)
 
     fun configureLocalMemory(userRules: String, autoRecall: Boolean, autoMemory: Boolean) {
         localHarness.configurePersonalization(userRules, autoRecall, autoMemory)

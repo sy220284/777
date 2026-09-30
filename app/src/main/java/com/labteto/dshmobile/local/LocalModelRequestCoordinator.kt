@@ -85,6 +85,11 @@ internal class LocalModelRequestCoordinator(
             retryable = { error ->
                 (error as? LocalModelException)?.retryable == true || error is java.io.IOException
             },
+            backoffMillis = { failedAttempt, error ->
+                (error as? LocalModelException)?.providerRetryAfterMs
+                    ?.coerceIn(0L, 60_000L)
+                    ?: (1_000L shl (failedAttempt - 1).coerceIn(0, 20))
+            },
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
                     is AgentRequestEvent.AttemptStarted -> {
@@ -162,17 +167,36 @@ internal class LocalModelRequestCoordinator(
                         .takeIf { it.isNotEmpty() }
                         ?.let(::ChatStreamFilter)
                     resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                        val reply = modelGateway.completeStreaming(
-                            baseUrl = snapshot.baseUrl,
-                            model = snapshot.model,
-                            messages = activeMessages,
-                            tools = tools,
-                            temperature = temperature,
-                            onDelta = { delta ->
-                                val visible = streamFilter?.append(delta.content)?.text ?: delta.content
-                                streamPreview.append(visible)
-                            },
-                        )
+                        val reply = try {
+                            modelGateway.completeStreaming(
+                                baseUrl = snapshot.baseUrl,
+                                model = snapshot.model,
+                                messages = activeMessages,
+                                tools = tools,
+                                temperature = temperature,
+                                onDelta = { delta ->
+                                    val visible = streamFilter?.append(delta.content)?.text ?: delta.content
+                                    streamPreview.append(visible)
+                                },
+                            )
+                        } catch (error: LocalModelException) {
+                            log.append("request/provider-error", buildJsonObject {
+                                put("step", step)
+                                put("code", error.code)
+                                error.status?.let { put("status", it) }
+                                error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
+                                error.requestId?.let { put("request_id", it) }
+                                error.providerCode?.let { put("provider_code", it) }
+                                error.providerParam?.let { put("provider_param", it) }
+                                error.cause?.let { cause ->
+                                    put("cause_type", cause::class.java.simpleName)
+                                    cause.message?.takeIf(String::isNotBlank)?.let {
+                                        put("cause_detail", it.take(800))
+                                    }
+                                }
+                            })
+                            throw error
+                        }
                         streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
                         streamPreview.flush()
                         reply

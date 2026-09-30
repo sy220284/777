@@ -57,10 +57,13 @@ class DeepSeekClient @Inject constructor(
             put("messages", JsonArray(messages))
             put("stream", false)
             temperature?.let { put("temperature", it) }
+            if (
+                toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING &&
+                (tools.isNotEmpty() || temperature != null)
+            ) {
+                put("reasoning_effort", "none")
+            }
             if (tools.isNotEmpty()) {
-                if (toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING) {
-                    put("reasoning_effort", "none")
-                }
                 put("tools", tools)
                 if (shouldSendToolChoice(baseUrl, model)) put("tool_choice", "auto")
             }
@@ -124,10 +127,13 @@ class DeepSeekClient @Inject constructor(
             put("stream", true)
             temperature?.let { put("temperature", it) }
             put("stream_options", buildJsonObject { put("include_usage", true) })
+            if (
+                toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING &&
+                (tools.isNotEmpty() || temperature != null)
+            ) {
+                put("reasoning_effort", "none")
+            }
             if (tools.isNotEmpty()) {
-                if (toolCallingMode == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING) {
-                    put("reasoning_effort", "none")
-                }
                 put("tools", tools)
                 if (shouldSendToolChoice(baseUrl, model)) put("tool_choice", "auto")
             }
@@ -471,6 +477,11 @@ class LocalModelException(
     message: String,
     val retryable: Boolean,
     cause: Throwable? = null,
+    val status: Int? = null,
+    val providerRetryAfterMs: Long? = null,
+    val requestId: String? = null,
+    val providerCode: String? = null,
+    val providerParam: String? = null,
 ) : Exception(message, cause)
 
 internal fun contextWindowExceeded(error: Throwable): Boolean {
@@ -642,7 +653,7 @@ object LocalToolCatalog {
         )))
         add(tool("subagent", "启动一个只读子代理处理独立子任务；同一工具块中的多个子代理可并行且互不级联取消", properties(
             "task" to string("交给子代理的完整任务"),
-            "model" to string("可选模型路由；留空继承父代理模型"),
+            "model" to string("可选；使用 list_subagent_models 返回的 profileId，或无歧义的模型名；留空继承父代理模型"),
             "max_steps" to integer("最大模型/工具循环步数，默认 20，可配置 1 到 128"),
             "virtual_screen" to boolean("是否为子代理分配独立虚拟屏；用于并行操作 Android 界面，默认 false"),
             "run_in_background" to boolean("是否转为后台任务，默认 false"),

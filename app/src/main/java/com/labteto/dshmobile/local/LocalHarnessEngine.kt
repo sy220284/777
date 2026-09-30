@@ -198,13 +198,18 @@ class LocalHarnessEngine @Inject constructor(
     private val toolOutputStore = LocalToolOutputStore(
         File(context.noBackupFilesDir, "local-harness/tool-output"),
     )
-    private val webTools = LocalWebTools(web, apiKeys, workspace, json)
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
     private val modelConfiguration = LocalModelConfigurationCoordinator(
         preferences = preferences,
         apiKeys = apiKeys,
         gateway = modelGateway,
         tester = modelConnectionTester,
+        json = json,
+    )
+    private val webTools = LocalWebTools(
+        web = web,
+        searchKeyProvider = LocalDeepSeekSearchCredentialResolver(modelConfiguration::readProfiles, apiKeys)::resolve,
+        workspace = workspace,
         json = json,
     )
     private val approvalPreferences = LocalApprovalPreferences(preferences)
@@ -771,9 +776,9 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String) {
+    internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null) {
         require(!isRunBusy()) { "请先结束当前任务再切换模型" }
-        val result = modelConfiguration.save(apiKey, model, baseUrl)
+        val result = modelConfiguration.save(apiKey, model, baseUrl, protocol)
         imageCapabilities.clearRoute(result.baseUrl, result.model)
         _state.update {
             it.copy(
@@ -847,8 +852,8 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    internal suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String): String =
-        modelConfiguration.test(apiKey, model, baseUrl)
+    internal suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): String =
+        modelConfiguration.test(apiKey, model, baseUrl, protocol)
 
     /** Choose how user image attachments reach the local model. */
     internal fun configureImageInputMode(mode: LocalImageInputMode) =
@@ -4023,9 +4028,8 @@ class LocalHarnessEngine @Inject constructor(
             "job_output" -> jobs.output(args.string("job_id"), boundSessionId)
             "job_kill" -> jobs.kill(args.string("job_id"), boundSessionId)
             "web_search" -> {
-                val key = apiKeys.get() ?: error("网页搜索无法读取模型密钥")
                 val queries = args["queries"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-                web.search(key, queries, tokenUsageBridge.resolve(boundSessionId, call.id, TokenUsageAction.WEB_SEARCH, queries.firstOrNull()))
+                webTools.search(queries, tokenUsageBridge.resolve(boundSessionId, call.id, TokenUsageAction.WEB_SEARCH, queries.firstOrNull()))
             }
             "web_fetch" -> {
                 val input = args.string("url")
@@ -4127,7 +4131,7 @@ class LocalHarnessEngine @Inject constructor(
                     parentCallId = call.id,
                     maxSteps = executionState.value.subagentMaxSteps,
                 )
-            "list_subagent_models" -> "${executionState.value.model}（当前父代理模型）\ndeepseek-flash\ndeepseek-v4-pro"
+            "list_subagent_models" -> modelGateway.availableProfiles().joinToString("\n") { "${it.id} | ${it.model} | ${it.provider} | ${it.authKind} | ${it.baseUrl}" }
             "list_agents" -> jobs.listAgents(boundSessionId)
             "send_message" -> jobs.send(args.string("agent_id"), args.string("message"), boundSessionId)
             "interrupt_agent" -> jobs.kill(args.string("agent_id"), boundSessionId)

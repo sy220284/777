@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import java.net.URI
 import java.security.MessageDigest
 
 enum class LocalModelAuthKind {
@@ -23,6 +24,16 @@ data class LocalModelProfile(
     val credentialRef: String? = null,
     val displayName: String? = null,
 )
+
+internal fun LocalModelProfile.usesResponsesTransport(): Boolean =
+    authKind == LocalModelAuthKind.CHATGPT_PLAN || protocol == LocalModelProtocol.RESPONSES
+
+internal fun LocalModelProfile.canBackDeepSeekSearch(): Boolean =
+    authKind == LocalModelAuthKind.API_KEY && runCatching {
+        val uri = URI(normalizeModelBaseUrl(baseUrl))
+        uri.scheme.equals("https", ignoreCase = true) &&
+            uri.host.equals("api.deepseek.com", ignoreCase = true)
+    }.getOrDefault(false)
 
 internal fun modelProfileId(model: String, baseUrl: String): String {
     val route = normalizeModelBaseUrl(baseUrl) + "\u0000" + model.trim()
@@ -81,6 +92,7 @@ data class LocalModelPreset(
         } else {
             LocalModelProtocol.CHAT_COMPLETIONS
         },
+    val temperatureSupported: Boolean = true,
 ) {
     val chatEndpoint: String
         get() = baseUrl.trimEnd('/') + "/chat/completions"
@@ -243,6 +255,7 @@ object LocalModelPresets {
             imageInputSupported = true,
             modelsEndpoint = "https://api.openai.com/v1/models",
             toolCallingMode = LocalModelToolCallingMode.RESPONSES_ONLY,
+            temperatureSupported = false,
         ),
         LocalModelPreset(
             provider = "OpenAI",
@@ -406,4 +419,10 @@ object LocalModelPresets {
 
     fun toolCallingModeFor(model: String, baseUrl: String): LocalModelToolCallingMode =
         find(model, baseUrl)?.toolCallingMode ?: LocalModelToolCallingMode.CHAT_COMPLETIONS
+
+    fun protocolFor(model: String, baseUrl: String): LocalModelProtocol =
+        find(model, baseUrl)?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS
+
+    fun samplingTemperatureFor(model: String, baseUrl: String, requested: Double?): Double? =
+        requested?.takeIf { find(model, baseUrl)?.temperatureSupported != false }
 }

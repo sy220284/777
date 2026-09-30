@@ -6,10 +6,19 @@ import kotlinx.serialization.json.Json
 
 internal class LocalWebTools(
     private val web: LocalWebProvider,
-    private val apiKeys: LocalApiKeyStore,
+    private val searchKeyProvider: suspend () -> String?,
     private val workspace: LocalWorkspace,
     private val json: Json,
 ) {
+    suspend fun search(
+        queries: List<String>,
+        usageContext: TokenUsageContext? = null,
+    ): String {
+        val key = searchKeyProvider()
+            ?: error("网页搜索需要单独配置 DeepSeek 官方 API Key")
+        return web.search(key, queries, usageContext)
+    }
+
     suspend fun fetch(
         input: String,
         maxBytes: Int,
@@ -28,9 +37,9 @@ internal class LocalWebTools(
             )
         } catch (error: LocalWebException) {
             if (error.code !in FALLBACK_WEB_ERRORS) throw error
-            val key = apiKeys.get()
+            val key = searchKeyProvider()
             if (key == null) {
-                "[web_fetch][${error.code}] ${error.message}\n搜索降级不可用：本机模型密钥不可用。可把文件通过输入栏附件放入本机工作区。"
+                "[web_fetch][${error.code}] ${error.message}\n搜索降级不可用：未配置 DeepSeek 官方搜索所需的 API Key。可把文件通过输入栏附件放入本机工作区。"
             } else {
                 runCatching {
                     val fallback = web.search(key, listOf(web.fallbackQuery(input)))

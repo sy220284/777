@@ -7,13 +7,14 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.HttpUrl.Companion.toHttpUrl
 
 @Singleton
@@ -26,7 +27,9 @@ class ChatGptAuthCoordinator @Inject constructor(
     private val verifier: ChatGptIdTokenVerifier,
 ) {
     private val random = SecureRandom()
-    private val authInProgress = AtomicBoolean(false)
+    private val authMutex = Mutex()
+    @Volatile private var activeListener: ChatGptOAuthCallbackServer.Listener? = null
+    @Volatile private var cancellationRequested = false
     private val _state = MutableStateFlow(ChatGptUiState())
     val state: StateFlow<ChatGptUiState> = _state.asStateFlow()
 
@@ -39,7 +42,7 @@ class ChatGptAuthCoordinator @Inject constructor(
             return
         }
         val selected = stored.first { it.id == selectedId }
-        if (!selected.sharingEnabled || selected.accessToken.isBlank() || selected.refreshToken.isBlank()) {
+        if (!hasUsableCredentials(selected)) {
             accounts.select(selectedId)
             _state.value = ChatGptUiState(
                 phase = ChatGptAuthPhase.DISCONNECTED,
@@ -48,27 +51,24 @@ class ChatGptAuthCoordinator @Inject constructor(
             )
             return
         }
-        runCatching {
+        try {
             accounts.select(selectedId)
             val models = sessions.listModels(selectedId)
             _state.value = ChatGptUiState(
                 phase = ChatGptAuthPhase.CONNECTED,
-                accounts = stored.map(::summary),
+                accounts = accounts.list().map(::summary),
                 selectedAccountId = selectedId,
                 models = models,
             )
-        }.onFailure { error ->
-            _state.value = ChatGptUiState(
-                phase = ChatGptAuthPhase.ERROR,
-                accounts = stored.map(::summary),
-                selectedAccountId = selectedId,
-                error = error.message ?: "ChatGPT 账户状态刷新失败",
-            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            publishLoadFailure(selectedId, error, "ChatGPT 账户状态刷新失败")
         }
     }
-
     suspend fun connect(existingAccountId: String? = null): ChatGptAccountRecord {
-        check(authInProgress.compareAndSet(false, true)) { "ChatGPT 授权正在进行，请完成当前授权" }
+        check(authMutex.tryLock()) { "ChatGPT 授权正在进行，请先取消当前授权后重试" }
+        cancellationRequested = false
         try {
             val existing = existingAccountId?.let { accounts.get(it) }
             val pendingClientId = if (existing == null) hostIdentity.pendingClientId() else null
@@ -80,8 +80,21 @@ class ChatGptAuthCoordinator @Inject constructor(
                 allowInvalidGrantRetry = true,
             )
         } finally {
-            authInProgress.set(false)
+            activeListener = null
+            authMutex.unlock()
         }
+    }
+
+    suspend fun cancelPendingAuthorization() {
+        if (!authMutex.isLocked) return
+        cancellationRequested = true
+        activeListener?.close()
+        authMutex.withLock { Unit }
+    }
+
+    suspend fun restartAuthorization(existingAccountId: String? = null): ChatGptAccountRecord {
+        cancelPendingAuthorization()
+        return connect(existingAccountId)
     }
 
     private suspend fun connectAttempt(
@@ -95,6 +108,7 @@ class ChatGptAuthCoordinator @Inject constructor(
             phase = ChatGptAuthPhase.PREPARING,
             selectedAccountId = existingAccountId ?: _state.value.selectedAccountId,
             error = null,
+            pendingAccountId = existingAccountId,
         )
         val hostId = hostIdentity.getOrCreate()
         val stateValue = randomValue(32)
@@ -104,7 +118,12 @@ class ChatGptAuthCoordinator @Inject constructor(
             MessageDigest.getInstance("SHA-256").digest(pkceVerifier.toByteArray(Charsets.US_ASCII)),
         )
         val listener = callbackServer.open()
+        activeListener = listener
         try {
+            if (cancellationRequested) {
+                listener.close()
+                throw CancellationException("ChatGPT 授权已取消")
+            }
             val builder = CHATGPT_AUTHORIZE_URL.toHttpUrl().newBuilder()
                 .addQueryParameter("client_id", requestedClientId)
                 .addQueryParameter("ext_agent_host_id", hostId)
@@ -130,6 +149,7 @@ class ChatGptAuthCoordinator @Inject constructor(
                 phase = ChatGptAuthPhase.WAITING_FOR_BROWSER,
                 selectedAccountId = existingAccountId ?: _state.value.selectedAccountId,
                 error = null,
+                pendingAccountId = existingAccountId,
             )
             context.startActivity(
                 Intent(Intent.ACTION_VIEW, Uri.parse(builder.build().toString()))
@@ -238,8 +258,13 @@ class ChatGptAuthCoordinator @Inject constructor(
             )
             return record
         } catch (cancelled: CancellationException) {
+            if (cancellationRequested) restoreAfterCancelledAuthorization()
             throw cancelled
         } catch (error: Throwable) {
+            if (cancellationRequested) {
+                restoreAfterCancelledAuthorization()
+                throw CancellationException("ChatGPT 授权已取消")
+            }
             _state.value = currentState(
                 phase = ChatGptAuthPhase.ERROR,
                 selectedAccountId = existingAccountId ?: _state.value.selectedAccountId,
@@ -247,6 +272,7 @@ class ChatGptAuthCoordinator @Inject constructor(
             )
             throw error
         } finally {
+            if (activeListener === listener) activeListener = null
             listener.close()
         }
     }
@@ -254,7 +280,7 @@ class ChatGptAuthCoordinator @Inject constructor(
     suspend fun selectAccount(id: String) {
         accounts.select(id)
         val selected = accounts.get(id) ?: error("ChatGPT 账户不存在")
-        if (!selected.sharingEnabled || selected.accessToken.isBlank() || selected.refreshToken.isBlank()) {
+        if (!hasUsableCredentials(selected)) {
             _state.value = ChatGptUiState(
                 phase = ChatGptAuthPhase.DISCONNECTED,
                 accounts = accounts.list().map(::summary),
@@ -267,26 +293,22 @@ class ChatGptAuthCoordinator @Inject constructor(
             selectedAccountId = id,
             error = null,
         )
-        runCatching { sessions.listModels(id) }
-            .onSuccess { models ->
-                _state.value = ChatGptUiState(
-                    phase = ChatGptAuthPhase.CONNECTED,
-                    accounts = accounts.list().map(::summary),
-                    selectedAccountId = id,
-                    models = models,
-                )
-            }
-            .onFailure { error ->
-                _state.value = currentState(
-                    phase = ChatGptAuthPhase.ERROR,
-                    selectedAccountId = id,
-                    error = error.message ?: "读取 ChatGPT 模型失败",
-                )
-            }
+        try {
+            val models = sessions.listModels(id)
+            _state.value = ChatGptUiState(
+                phase = ChatGptAuthPhase.CONNECTED,
+                accounts = accounts.list().map(::summary),
+                selectedAccountId = id,
+                models = models,
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            publishLoadFailure(id, error, "读取 ChatGPT 模型失败")
+        }
     }
-
     suspend fun disconnect(id: String): String? {
-        val revokeFailure = runCatching { sessions.revoke(id) }.exceptionOrNull()
+        val revokeFailure = revokeFailure(id)
         accounts.clearCredentials(id)
         val next = accounts.list().firstOrNull { account ->
             account.id != id &&
@@ -301,10 +323,71 @@ class ChatGptAuthCoordinator @Inject constructor(
         }
     }
 
+    suspend fun remove(id: String): String? {
+        val revokeFailure = revokeFailure(id)
+        accounts.remove(id)
+        val next = accounts.list().firstOrNull { account ->
+            account.sharingEnabled &&
+                account.accessToken.isNotBlank() &&
+                account.refreshToken.isNotBlank()
+        }
+        next?.let { accounts.select(it.id) }
+        refresh()
+        return revokeFailure?.let {
+            "本机授权记录已移除，但 OpenAI 端撤销状态未能确认；请在 ChatGPT 设置中检查应用连接。"
+        }
+    }
+
+    private suspend fun revokeFailure(id: String): Throwable? = try {
+        sessions.revoke(id)
+        null
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Throwable) {
+        error
+    }
+
+    private suspend fun publishLoadFailure(
+        selectedId: String,
+        error: Throwable,
+        fallback: String,
+    ) {
+        val latest = accounts.list()
+        val selected = latest.firstOrNull { it.id == selectedId }
+        _state.value = ChatGptUiState(
+            phase = if (hasUsableCredentials(selected)) ChatGptAuthPhase.ERROR else ChatGptAuthPhase.DISCONNECTED,
+            accounts = latest.map(::summary),
+            selectedAccountId = selectedId,
+            error = error.message ?: fallback,
+        )
+    }
+
+    private fun hasUsableCredentials(record: ChatGptAccountRecord?): Boolean =
+        record?.sharingEnabled == true &&
+            record.accessToken.isNotBlank() &&
+            record.refreshToken.isNotBlank()
+
+    private suspend fun restoreAfterCancelledAuthorization() {
+        val stored = accounts.list()
+        val selectedId = accounts.selectedId()?.takeIf { id -> stored.any { it.id == id } }
+            ?: stored.firstOrNull()?.id
+        val selected = selectedId?.let { id -> stored.firstOrNull { it.id == id } }
+        val connected = selected?.sharingEnabled == true &&
+            selected.accessToken.isNotBlank() &&
+            selected.refreshToken.isNotBlank()
+        _state.value = ChatGptUiState(
+            phase = if (connected) ChatGptAuthPhase.CONNECTED else ChatGptAuthPhase.DISCONNECTED,
+            accounts = stored.map(::summary),
+            selectedAccountId = selectedId,
+            models = if (selectedId == _state.value.selectedAccountId) _state.value.models else emptyList(),
+        )
+    }
+
     private suspend fun currentState(
         phase: ChatGptAuthPhase,
         selectedAccountId: String?,
         error: String?,
+        pendingAccountId: String? = null,
     ): ChatGptUiState {
         val stored = accounts.list()
         return ChatGptUiState(
@@ -313,6 +396,7 @@ class ChatGptAuthCoordinator @Inject constructor(
             selectedAccountId = selectedAccountId,
             models = if (selectedAccountId == _state.value.selectedAccountId) _state.value.models else emptyList(),
             error = error,
+            pendingAccountId = pendingAccountId,
         )
     }
 
