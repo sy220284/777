@@ -2,8 +2,8 @@
 <!-- The DeepSeek Harness can serve plain HTTP on a user-selected local network and
      user-approved MCP endpoints may also use HTTP, so the application transport layer
      keeps cleartext available. Credential-bearing model endpoints are validated
-     separately and require HTTPS unless they are literal loopback addresses. GitHub
-     release checks remain HTTPS.
+     separately and require HTTPS unless they are literal loopback addresses. Gitee/GitHub
+     release checks and update downloads remain HTTPS.
 
      User-installed CAs are trusted alongside the system set: the only way a
      harness is ever reached over HTTPS is through a reverse proxy the user

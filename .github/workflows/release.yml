@@ -258,6 +258,7 @@ jobs:
           DSH_KEYSTORE_PASSWORD: ${{ env.DSH_RELEASE_PASSWORD }}
           DSH_KEY_ALIAS: 777-release
           DSH_KEY_PASSWORD: ${{ env.DSH_RELEASE_PASSWORD }}
+          DSH_UPDATE_MIRROR_BASE_URL: ${{ vars.UPDATE_MIRROR_BASE_URL }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
       - name: Verify Android 16 APK
@@ -428,6 +429,16 @@ jobs:
             echo "current=false" >> "$GITHUB_OUTPUT"
             echo "构建期间 main 已出现影响构建的变更：$MAIN_SHA，本次旧版本不发布。"
           fi
+
+      - name: Publish Gitee mainland update mirror
+        if: steps.freshness.outputs.current == 'true'
+        env:
+          UPDATE_MIRROR_BASE_URL: ${{ vars.UPDATE_MIRROR_BASE_URL }}
+          GITEE_MIRROR_ACCESS_TOKEN: ${{ secrets.GITEE_MIRROR_ACCESS_TOKEN }}
+        run: |
+          python3 .github/scripts/publish-gitee-update-mirror.py \
+            --asset-dir .release-assets \
+            --version "$DSH_VERSION_NAME"
 
       - name: Publish GitHub Release
         if: steps.freshness.outputs.current == 'true'
