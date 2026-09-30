@@ -1053,13 +1053,13 @@ private fun AppearanceReadingPreview(settings: AppSettings) {
     ) {
         Text(
             stringResource(R.string.settings_appearance_preview_assistant),
-            style = DsType.base1.withReadingWeight()6.withReadingWeight(),
+            style = DsType.base16.withReadingWeight(),
             color = colors.labelPrimary,
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Text(
                 stringResource(R.string.settings_appearance_preview_user),
-                style = DsType.base16Stron.withReadingWeight()g.withReadingWeight(),
+                style = DsType.base16Strong.withReadingWeight(),
                 color = colors.labelPrimary,
                 modifier = Modifier
                     .background(colors.userBubble, DsShapes.bubble)
