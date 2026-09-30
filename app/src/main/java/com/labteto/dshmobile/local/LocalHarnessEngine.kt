@@ -3317,8 +3317,7 @@ class LocalHarnessEngine @Inject constructor(
                         startedToolCallIds.clear()
                         completedToolCallIds.clear()
                         val assistantEvent = runEventLog.append(
-                            "assistant/message",
-                            runTranscript.withTranscript(reply.message, transcriptMessages)
+                            "assistant/message", runTranscript.withTranscript(reply.message, transcriptMessages)
                                 .withModelToolCallEventData(reply.toolCalls),
                         )
                         if (beforeAssistant.usageMode == LocalUsageMode.CHAT && event.toolCalls.isEmpty()) {
