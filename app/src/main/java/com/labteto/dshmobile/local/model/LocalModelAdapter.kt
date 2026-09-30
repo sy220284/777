@@ -99,7 +99,7 @@ internal class OpenAiResponsesAdapter @Inject constructor(
         tools = request.tools,
         temperature = request.temperature,
         planSharing = request.route.authKind == LocalModelAuthKind.CHATGPT_PLAN,
-        onDelta = if (streaming) onDelta else {},
+        onDelta = if (streaming) onDelta else { _: LocalModelDelta -> },
     )
 }
 
@@ -120,7 +120,7 @@ internal class AnthropicMessagesAdapter @Inject constructor(
         messages = request.messages,
         tools = request.tools,
         temperature = request.temperature,
-        onDelta = if (streaming) onDelta else {},
+        onDelta = if (streaming) onDelta else { _: LocalModelDelta -> },
     )
 }
 
