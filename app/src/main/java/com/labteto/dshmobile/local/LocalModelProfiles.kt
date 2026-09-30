@@ -11,6 +11,7 @@ enum class LocalModelAuthKind {
 enum class LocalModelProtocol {
     CHAT_COMPLETIONS,
     RESPONSES,
+    ANTHROPIC_MESSAGES,
 }
 
 /** A saved route references a credential without embedding any secret in its durable ID. */
@@ -77,6 +78,19 @@ enum class LocalModelToolCallingMode {
     CHAT_COMPLETIONS_NO_REASONING,
     RESPONSES_ONLY,
 }
+
+data class LocalModelRuntimeCapabilities(
+    val streaming: Boolean = true,
+    val toolCalling: Boolean = true,
+    val parallelToolCalling: Boolean = true,
+    val reasoning: Boolean = true,
+    val structuredOutput: Boolean = false,
+    val strictSchema: Boolean = false,
+    val replay: Boolean = true,
+    val imageInput: Boolean? = null,
+    val temperature: Boolean = true,
+    val maxImageBytes: Long = 20L * 1024L * 1024L,
+)
 
 data class LocalModelPreset(
     val provider: String,
@@ -372,9 +386,10 @@ object LocalModelPresets {
             imageInputSupported = false,
         ),
         LocalModelPreset(
-            provider = "Claude（兼容接口）",
+            provider = "Claude",
             model = "claude-opus-5-5",
             baseUrl = "https://api.anthropic.com/v1",
+            protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
             capabilities = setOf(
                 LocalModelCapability.TEXT,
                 LocalModelCapability.IMAGE,
@@ -382,9 +397,10 @@ object LocalModelPresets {
             imageInputSupported = true,
         ),
         LocalModelPreset(
-            provider = "Claude（兼容接口）",
+            provider = "Claude",
             model = "claude-sonnet-5-5",
             baseUrl = "https://api.anthropic.com/v1",
+            protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
             capabilities = setOf(
                 LocalModelCapability.TEXT,
                 LocalModelCapability.IMAGE,
@@ -392,9 +408,10 @@ object LocalModelPresets {
             imageInputSupported = true,
         ),
         LocalModelPreset(
-            provider = "Claude（兼容接口）",
+            provider = "Claude",
             model = "claude-fable-5-1",
             baseUrl = "https://api.anthropic.com/v1",
+            protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
             capabilities = setOf(
                 LocalModelCapability.TEXT,
                 LocalModelCapability.IMAGE,
@@ -436,4 +453,37 @@ object LocalModelPresets {
 
     fun samplingTemperatureFor(model: String, baseUrl: String, requested: Double?): Double? =
         requested?.takeIf { find(model, baseUrl)?.temperatureSupported != false }
+
+    fun runtimeCapabilitiesFor(
+        model: String,
+        baseUrl: String,
+        protocol: LocalModelProtocol = protocolFor(model, baseUrl),
+    ): LocalModelRuntimeCapabilities {
+        val preset = find(model, baseUrl)
+        val image = preset?.imageInputSupported
+        val maxImageBytes = maxNativeImageBytesFor(model, baseUrl)
+        return when (protocol) {
+            LocalModelProtocol.CHAT_COMPLETIONS -> LocalModelRuntimeCapabilities(
+                structuredOutput = false,
+                strictSchema = false,
+                imageInput = image,
+                temperature = preset?.temperatureSupported != false,
+                maxImageBytes = maxImageBytes,
+            )
+            LocalModelProtocol.RESPONSES -> LocalModelRuntimeCapabilities(
+                structuredOutput = true,
+                strictSchema = true,
+                imageInput = image,
+                temperature = preset?.temperatureSupported != false,
+                maxImageBytes = maxImageBytes,
+            )
+            LocalModelProtocol.ANTHROPIC_MESSAGES -> LocalModelRuntimeCapabilities(
+                structuredOutput = false,
+                strictSchema = false,
+                imageInput = image,
+                temperature = preset?.temperatureSupported != false,
+                maxImageBytes = maxImageBytes,
+            )
+        }
+    }
 }
