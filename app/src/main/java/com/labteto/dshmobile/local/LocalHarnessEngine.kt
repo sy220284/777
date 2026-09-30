@@ -84,7 +84,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.model.LocalModelCredentialResolver
+import com.labteto.dshmobile.local.model.LocalModelAccountStateCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.profile.UserProfile
@@ -150,7 +150,6 @@ class LocalHarnessEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     private val apiKeys: LocalApiKeyStore,
     private val modelGateway: LocalModelGateway,
-    private val modelCredentials: LocalModelCredentialResolver,
     private val modelConnectionTester: LocalModelConnectionTester,
     private val usageTracker: DeepSeekUsageTracker,
     private val githubCredentials: LocalGitHubCredentialStore,
@@ -204,7 +203,7 @@ class LocalHarnessEngine @Inject constructor(
     private val modelConfiguration = LocalModelConfigurationCoordinator(
         preferences = preferences,
         apiKeys = apiKeys,
-        credentials = modelCredentials,
+        gateway = modelGateway,
         tester = modelConnectionTester,
         json = json,
     )
@@ -341,6 +340,15 @@ class LocalHarnessEngine @Inject constructor(
     internal val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
     internal val streamingState: StateFlow<LocalHarnessStreamingState> = _streamingState.asStateFlow()
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
+
+    private val modelAccountStateCoordinator by lazy {
+        LocalModelAccountStateCoordinator(
+            configuration = modelConfiguration,
+            gateway = modelGateway,
+            state = _state,
+            isBusy = ::isRunBusy,
+        )
+    }
 
     private val transcriptRuntime by lazy {
         LocalTranscriptRuntime(
@@ -788,44 +796,10 @@ class LocalHarnessEngine @Inject constructor(
         accountId: String,
         models: List<ChatGptModelOption>,
         selectFirst: Boolean = true,
-    ) {
-        require(!isRunBusy()) { "请先结束当前任务再切换模型账户" }
-        val profiles = modelConfiguration.saveChatGptModels(accountId, models)
-        val chatGptProfiles = profiles.filter {
-            it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
-        }
-        val selected = if (selectFirst) chatGptProfiles.firstOrNull() else null
-        val result = selected?.let { modelConfiguration.select(it.id, profiles) }
-        _state.update { current ->
-            current.copy(
-                configured = result?.configured ?: current.configured,
-                model = result?.model ?: current.model,
-                baseUrl = result?.baseUrl ?: current.baseUrl,
-                configuredModels = profiles.map(LocalModelProfile::model).distinct().sorted(),
-                modelProfiles = profiles,
-                error = if (models.isEmpty()) "当前 ChatGPT 账户没有可用于套餐共享的模型" else null,
-            )
-        }
-    }
+    ) = modelAccountStateCoordinator.syncChatGptModels(accountId, models, selectFirst)
 
-    internal suspend fun removeChatGptAccountProfiles(accountId: String) {
-        require(!isRunBusy()) { "请先结束当前任务再断开模型账户" }
-        val result = modelConfiguration.removeChatGptAccount(accountId) ?: return
-        val profiles = result.profiles
-        val active = modelConfiguration.activeProfile(result.model, result.baseUrl, profiles)
-        val configured = active != null && modelCredentials.hasCredential(active)
-        active?.takeIf { configured }?.let(modelCredentials::activate)
-        _state.update { current ->
-            current.copy(
-                configured = configured,
-                model = result.model,
-                baseUrl = result.baseUrl,
-                configuredModels = result.configuredModels,
-                modelProfiles = profiles,
-                error = null,
-            )
-        }
-    }
+    internal suspend fun removeChatGptAccountProfiles(accountId: String) =
+        modelAccountStateCoordinator.removeChatGptAccountProfiles(accountId)
 
     /** Switch the active route and its corresponding encrypted key together. */
     internal fun selectModel(id: String) {
@@ -4735,15 +4709,8 @@ class LocalHarnessEngine @Inject constructor(
         },
     )
 
-    private suspend fun modelRequestMarkerOrNull(): String? {
-        val snapshot = _state.value
-        val profile = modelConfiguration.activeProfile(
-            currentModel = snapshot.model,
-            currentBaseUrl = snapshot.baseUrl,
-            profiles = snapshot.modelProfiles,
-        ) ?: return null
-        return if (modelCredentials.hasCredential(profile)) "" else null
-    }
+    private suspend fun modelRequestMarkerOrNull(): String? =
+        modelAccountStateCoordinator.requestMarkerOrNull()
 
     private suspend fun modelRequestMarker(): String =
         modelRequestMarkerOrNull() ?: error("请先配置模型账户或 API Key")
@@ -4958,49 +4925,9 @@ class LocalHarnessEngine @Inject constructor(
     private suspend fun load() {
         val storedModel = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
         val model = modelConfiguration.normalizeModel(storedModel)
-        if (model != storedModel) {
-            preferences.edit().putString(KEY_MODEL, model).apply()
-        }
+        if (model != storedModel) preferences.edit().putString(KEY_MODEL, model).apply()
         val baseUrl = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
-
-        if (!preferences.contains(LocalModelConfigurationCoordinator.KEY_MODEL_PROFILES_V3)) {
-            if (preferences.contains(LocalModelConfigurationCoordinator.KEY_MODEL_PROFILES_V2)) {
-                modelConfiguration.migrateProfileStorageIfNeeded()
-            } else {
-                val oldModels = if (apiKeys.hasLegacyCredential()) {
-                    modelConfiguration.legacyConfiguredModelNames(model)
-                } else {
-                    emptyList()
-                }
-                val profiles = oldModels.map { name ->
-                    LocalModelProfile(
-                        id = modelProfileId(name, baseUrl),
-                        model = name,
-                        baseUrl = baseUrl,
-                        authKind = LocalModelAuthKind.API_KEY,
-                    )
-                }
-                preferences.edit()
-                    .putString(
-                        LocalModelConfigurationCoordinator.KEY_MODEL_PROFILES_V3,
-                        modelConfiguration.encodeProfiles(profiles),
-                    )
-                    .apply()
-                apiKeys.migrate(profiles.map(LocalModelProfile::id))
-            }
-        }
-
-        val profiles = modelConfiguration.readProfiles()
-        apiKeys.migrate(
-            profiles.filter { it.authKind == LocalModelAuthKind.API_KEY }
-                .map(LocalModelProfile::id),
-        )
-        val active = modelConfiguration.activeProfile(model, baseUrl, profiles)
-        if (active != null && modelCredentials.hasCredential(active)) {
-            modelCredentials.activate(active)
-        } else {
-            apiKeys.activate(modelProfileId(model, baseUrl))
-        }
+        modelConfiguration.prepareStartup(model, baseUrl)
         loadSession(currentSessionId, model, baseUrl)
     }
 
@@ -5099,8 +5026,8 @@ class LocalHarnessEngine @Inject constructor(
         val modelProfiles = modelConfiguration.readProfiles()
         val activeModelProfile = modelConfiguration.activeProfile(model, baseUrl, modelProfiles)
         val modelConfigured =
-            activeModelProfile != null && modelCredentials.hasCredential(activeModelProfile)
-        activeModelProfile?.takeIf { modelConfigured }?.let(modelCredentials::activate)
+            activeModelProfile != null && modelGateway.hasCredential(activeModelProfile)
+        activeModelProfile?.takeIf { modelConfigured }?.let(modelGateway::activate)
         _state.value = LocalHarnessState(
             loading = false,
             configured = modelConfigured,
