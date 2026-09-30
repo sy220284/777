@@ -41,6 +41,7 @@ class LocalModelGateway @Inject constructor(
                 messages = messages,
                 tools = tools,
                 temperature = temperature,
+                planSharing = resolved.authKind == LocalModelAuthKind.CHATGPT_PLAN,
             )
         } else {
             chatCompletions.complete(
@@ -71,6 +72,7 @@ class LocalModelGateway @Inject constructor(
                 messages = messages,
                 tools = tools,
                 temperature = temperature,
+                planSharing = resolved.authKind == LocalModelAuthKind.CHATGPT_PLAN,
                 onDelta = onDelta,
             )
         } else {
