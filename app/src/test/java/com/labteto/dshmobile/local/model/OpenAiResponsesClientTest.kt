@@ -214,7 +214,27 @@ class OpenAiResponsesClientTest {
         assertEquals(false, payload["store"]?.jsonPrimitive?.content?.toBoolean())
         assertEquals(true, payload["stream"]?.jsonPrimitive?.content?.toBoolean())
         assertFalse("temperature" in payload)
-        assertFalse("top_p" in payload)
+        val unsupported = listOf(
+            "background",
+            "conversation",
+            "max_output_tokens",
+            "max_tool_calls",
+            "metadata",
+            "moderation",
+            "multi_agent",
+            "prompt",
+            "prompt_cache_retention",
+            "safety_identifier",
+            "temperature",
+            "top_logprobs",
+            "top_p",
+            "truncation",
+            "user",
+            "previous_response_id",
+        )
+        unsupported.forEach { field ->
+            assertFalse("ChatGPT 套餐请求不得发送 $field", field in payload)
+        }
 
         val input = payload["input"]!!.jsonArray
         assertEquals(1, input.size)
@@ -663,6 +683,81 @@ class OpenAiResponsesClientTest {
 
         assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
         assertTrue(error?.message.orEmpty().contains("allOf"))
+    }
+
+    @Test
+    fun thirdPartyResponsesDoesNotInheritOpenAiStrictSchemaRules() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"vendor_tool",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{
+                        "required_value":{"type":"string"},
+                        "optional_value":{"type":"string"}
+                    },
+                    "required":["required_value"]
+                }
+            }}
+        ]""").jsonArray
+
+        val payload = client.buildPayload(
+            model = "vendor-responses-model",
+            messages = emptyList(),
+            tools = tools,
+            temperature = null,
+            planSharing = false,
+            includeEncryptedReasoning = false,
+            enforceOpenAiToolSchema = false,
+        )
+
+        val function = payload["tools"]!!.jsonArray.single().jsonObject
+        assertEquals("true", function["strict"]!!.jsonPrimitive.content)
+        assertEquals(
+            tools.single().jsonObject["function"]!!.jsonObject["parameters"],
+            function["parameters"],
+        )
+    }
+
+    @Test
+    fun officialOpenAiApiKeyResponsesEnforcesOpenAiStrictSchemaRules() {
+        val tools = Json.parseToJsonElement("""[
+            {"type":"function","function":{
+                "name":"openai_tool",
+                "strict":true,
+                "parameters":{
+                    "type":"object",
+                    "properties":{
+                        "required_value":{"type":"string"},
+                        "optional_value":{"type":"string"}
+                    },
+                    "required":["required_value"]
+                }
+            }}
+        ]""").jsonArray
+
+        val error = runCatching {
+            client.buildPayload(
+                model = "gpt-test",
+                messages = emptyList(),
+                tools = tools,
+                temperature = null,
+                planSharing = false,
+                includeEncryptedReasoning = true,
+                enforceOpenAiToolSchema = true,
+            )
+        }.exceptionOrNull() as? LocalModelException
+
+        assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", error?.code)
+        assertTrue(error?.message.orEmpty().contains("additionalProperties=false"))
+    }
+
+    @Test
+    fun openAiResponsesContractDetectionSeparatesOfficialAndCustomRoutes() {
+        assertTrue(client.usesOpenAiResponsesContract("https://api.openai.com/v1", false))
+        assertTrue(client.usesOpenAiResponsesContract("https://proxy.example.com/v1", true))
+        assertFalse(client.usesOpenAiResponsesContract("https://proxy.example.com/v1", false))
     }
 
     @Test
