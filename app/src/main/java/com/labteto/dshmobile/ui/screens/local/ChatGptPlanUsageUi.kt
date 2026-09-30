@@ -66,6 +66,11 @@ internal fun LocalConversationErrorCard(
     val message = sendRejectMessage ?: stateError ?: return
     val uriHandler = LocalUriHandler.current
     val usageError = sendRejectMessage == null && isChatGptPlanUsageError(stateError)
+    val modelRecovery = sendRejectMessage == null && stateError.orEmpty().let {
+        it.contains("ChatGPT 模型已不可用") ||
+            it.contains("ChatGPT 账户授权") ||
+            it.contains("模型来源与请求不一致")
+    }
     val colors = DsTheme.colors
 
     Surface(
@@ -100,6 +105,14 @@ internal fun LocalConversationErrorCard(
                         modifier = Modifier.fillMaxWidth(),
                         size = DsButtonSize.Small,
                         variant = DsButtonVariant.Ghost,
+                    )
+                }
+                modelRecovery -> {
+                    DsButton(
+                        text = stringResource(R.string.chatgpt_switch_model_source),
+                        onClick = onSwitchModelSource,
+                        modifier = Modifier.fillMaxWidth(),
+                        size = DsButtonSize.Small,
                     )
                 }
                 sendRejectMessage == null && restoreRequest != null -> {
