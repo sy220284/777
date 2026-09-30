@@ -50,6 +50,7 @@ internal fun ChatGptAccountPanel(
     }
     var showWelcome by remember { mutableStateOf(false) }
     val accountShortLabel = stringResource(R.string.chatgpt_account_short)
+    val accountFallbackLabel = stringResource(R.string.chatgpt_account_fallback)
     val selected = state.selectedAccount
     LaunchedEffect(state.connected) {
         if (state.connected && !welcomePrefs.getBoolean("plan_welcome_seen_v1", false)) {
@@ -162,9 +163,7 @@ internal fun ChatGptAccountPanel(
                                 buildString {
                                     append(
                                         account.displayName?.takeIf(String::isNotBlank)
-                                            ?: account.email.orEmpty().ifBlank {
-                                                context.getString(R.string.chatgpt_account_fallback)
-                                            },
+                                            ?: account.email.orEmpty().ifBlank { accountFallbackLabel },
                                     )
                                     append(" · ")
                                     append(accountShortLabel)
