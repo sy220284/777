@@ -153,6 +153,12 @@ internal class LocalHistoryCompactor(
                 break
             }
         }
+        // A tail can begin inside a large tool batch. Keep its assistant call and every result
+        // together; cutting only by message size would manufacture an orphan tool result.
+        if (history.getOrNull(start)?.get("role").asText() == "tool") {
+            while (start > 1 && history[start - 1]["role"].asText() == "tool") start -= 1
+            if (start > 1 && history[start - 1]["role"].asText() == "assistant") start -= 1
+        }
         if (start <= 1 || start >= history.size) return null
 
         val omitted = history.subList(1, start)

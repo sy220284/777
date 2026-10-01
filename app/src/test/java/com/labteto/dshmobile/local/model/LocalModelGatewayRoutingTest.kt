@@ -17,6 +17,20 @@ import org.junit.Test
 
 class LocalModelGatewayRoutingTest {
     @Test
+    fun oldEmptyAssistantDoesNotPoisonARequestAfterSwitchingProviders() {
+        val empty = buildJsonObject { put("role", "assistant") }
+        val user = buildJsonObject { put("role", "user"); put("content", "continue") }
+        val history = listOf(empty, user)
+        val prepared = prepareLocalModelAdapterRequest(
+            route = route(LocalModelRuntimeCapabilities()), messages = history,
+            tools = JsonArray(emptyList()), temperature = null, streaming = true,
+        )
+        assertEquals(1, prepared.request.messages.size)
+        assertEquals(LocalCanonicalRole.USER, prepared.request.messages.single().role)
+        assertEquals(listOf(empty, user), history)
+    }
+
+    @Test
     fun chatGptPlanAlwaysUsesResponsesRegardlessOfStoredProfileProtocol() {
         val accidentalAnthropic = LocalModelProfile(
             id = "plan",

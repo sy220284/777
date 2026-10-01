@@ -30,10 +30,25 @@ class ChatGptAuthCoordinator @Inject constructor(
     private val authMutex = Mutex()
     @Volatile private var activeListener: ChatGptOAuthCallbackServer.Listener? = null
     @Volatile private var cancellationRequested = false
+    @Volatile private var authorizationInProgress = false
     private val _state = MutableStateFlow(ChatGptUiState())
     val state: StateFlow<ChatGptUiState> = _state.asStateFlow()
 
     suspend fun refresh() {
+        // Returning from the OAuth browser must not overwrite the authorization in progress.
+        if (!authMutex.tryLock()) return
+        try {
+            refreshLocked()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            _state.value = _state.value.copy(error = error.message ?: "ChatGPT 账户状态读取失败")
+        } finally {
+            authMutex.unlock()
+        }
+    }
+
+    private suspend fun refreshLocked() {
         val stored = accounts.list()
         val selectedId = accounts.selectedId()?.takeIf { id -> stored.any { it.id == id } }
             ?: stored.firstOrNull()?.id
@@ -67,8 +82,9 @@ class ChatGptAuthCoordinator @Inject constructor(
         }
     }
     suspend fun connect(existingAccountId: String? = null): ChatGptAccountRecord {
-        check(authMutex.tryLock()) { "ChatGPT 授权正在进行，请先取消当前授权后重试" }
+        check(authMutex.tryLock()) { "ChatGPT 账户操作正在进行，请稍后重试" }
         cancellationRequested = false
+        authorizationInProgress = true
         try {
             val existing = existingAccountId?.let { accounts.get(it) }
             val pendingClientId = if (existing == null) hostIdentity.pendingClientId() else null
@@ -81,12 +97,13 @@ class ChatGptAuthCoordinator @Inject constructor(
             )
         } finally {
             activeListener = null
+            authorizationInProgress = false
             authMutex.unlock()
         }
     }
 
     suspend fun cancelPendingAuthorization() {
-        if (!authMutex.isLocked) return
+        if (!authorizationInProgress) return
         cancellationRequested = true
         activeListener?.close()
         authMutex.withLock { Unit }
@@ -248,7 +265,14 @@ class ChatGptAuthCoordinator @Inject constructor(
                 selectedAccountId = record.id,
                 error = null,
             )
-            val models = sessions.listModels(record.id)
+            val models = try {
+                sessions.listModels(record.id)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                publishLoadFailure(record.id, error, "授权已保存，暂时无法验证模型连接")
+                return record
+            }
             val stored = accounts.list()
             _state.value = ChatGptUiState(
                 phase = ChatGptAuthPhase.CONNECTED,
@@ -277,7 +301,7 @@ class ChatGptAuthCoordinator @Inject constructor(
         }
     }
 
-    suspend fun selectAccount(id: String) {
+    suspend fun selectAccount(id: String) = authMutex.withLock {
         accounts.select(id)
         val selected = accounts.get(id) ?: error("ChatGPT 账户不存在")
         if (!hasUsableCredentials(selected)) {
@@ -286,7 +310,7 @@ class ChatGptAuthCoordinator @Inject constructor(
                 accounts = accounts.list().map(::summary),
                 selectedAccountId = id,
             )
-            return
+            return@withLock
         }
         _state.value = currentState(
             phase = ChatGptAuthPhase.LOADING_MODELS,
@@ -307,7 +331,7 @@ class ChatGptAuthCoordinator @Inject constructor(
             publishLoadFailure(id, error, "读取 ChatGPT 模型失败")
         }
     }
-    suspend fun disconnect(id: String): String? {
+    suspend fun disconnect(id: String): String? = authMutex.withLock {
         val revokeFailure = revokeFailure(id)
         accounts.clearCredentials(id)
         val next = accounts.list().firstOrNull { account ->
@@ -317,13 +341,13 @@ class ChatGptAuthCoordinator @Inject constructor(
                 account.refreshToken.isNotBlank()
         }
         next?.let { accounts.select(it.id) }
-        refresh()
-        return revokeFailure?.let {
+        refreshLocked()
+        revokeFailure?.let {
             "已从本机断开 ChatGPT 账户，但 OpenAI 端撤销状态未能确认；请在 ChatGPT 设置中检查应用连接。"
         }
     }
 
-    suspend fun remove(id: String): String? {
+    suspend fun remove(id: String): String? = authMutex.withLock {
         val revokeFailure = revokeFailure(id)
         accounts.remove(id)
         val next = accounts.list().firstOrNull { account ->
@@ -332,8 +356,8 @@ class ChatGptAuthCoordinator @Inject constructor(
                 account.refreshToken.isNotBlank()
         }
         next?.let { accounts.select(it.id) }
-        refresh()
-        return revokeFailure?.let {
+        refreshLocked()
+        revokeFailure?.let {
             "本机授权记录已移除，但 OpenAI 端撤销状态未能确认；请在 ChatGPT 设置中检查应用连接。"
         }
     }
@@ -355,9 +379,10 @@ class ChatGptAuthCoordinator @Inject constructor(
         val latest = accounts.list()
         val selected = latest.firstOrNull { it.id == selectedId }
         _state.value = ChatGptUiState(
-            phase = if (hasUsableCredentials(selected)) ChatGptAuthPhase.ERROR else ChatGptAuthPhase.DISCONNECTED,
+            phase = if (hasUsableCredentials(selected)) ChatGptAuthPhase.UNVERIFIED else ChatGptAuthPhase.DISCONNECTED,
             accounts = latest.map(::summary),
             selectedAccountId = selectedId,
+            models = if (hasUsableCredentials(selected) && selectedId == _state.value.selectedAccountId) _state.value.models else emptyList(),
             error = error.message ?: fallback,
         )
     }
@@ -376,7 +401,7 @@ class ChatGptAuthCoordinator @Inject constructor(
             selected.accessToken.isNotBlank() &&
             selected.refreshToken.isNotBlank()
         _state.value = ChatGptUiState(
-            phase = if (connected) ChatGptAuthPhase.CONNECTED else ChatGptAuthPhase.DISCONNECTED,
+            phase = if (connected) ChatGptAuthPhase.UNVERIFIED else ChatGptAuthPhase.DISCONNECTED,
             accounts = stored.map(::summary),
             selectedAccountId = selectedId,
             models = if (selectedId == _state.value.selectedAccountId) _state.value.models else emptyList(),

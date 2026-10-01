@@ -197,7 +197,7 @@ class LocalModelGateway @Inject constructor(
             request = prepared.request,
             streaming = prepared.streaming,
             onDelta = if (prepared.streaming) onDelta else { _: LocalModelDelta -> },
-        ).copy(routeIdentity = route.identity())
+        ).also(::validateUsableModelReply).copy(routeIdentity = route.identity())
     }
 
     private fun probeMessages(): List<JsonObject> = listOf(buildJsonObject {
@@ -218,7 +218,8 @@ internal fun prepareLocalModelAdapterRequest(
     temperature: Double?,
     streaming: Boolean,
 ): LocalPreparedModelRequest {
-    val canonicalMessages = LocalCanonicalModelCodec.messages(messages)
+    val canonicalMessages = LocalCanonicalModelCodec.messages(messages).filterNot(::isEmptyCanonicalAssistant)
+    validateCanonicalModelHistory(canonicalMessages)
     val canonicalTools = LocalCanonicalModelCodec.tools(tools)
     if (canonicalTools.isNotEmpty() && !route.capabilities.toolCalling) {
         throw LocalModelException(
