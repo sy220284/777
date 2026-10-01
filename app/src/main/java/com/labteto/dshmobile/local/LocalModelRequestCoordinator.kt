@@ -109,6 +109,7 @@ internal class LocalModelRequestCoordinator(
 
         var failureContextLogged = false
         var lastProviderError: LocalModelException? = null
+        var attemptStartedNanos = System.nanoTime()
         val executor = AgentRequestExecutor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
@@ -122,6 +123,7 @@ internal class LocalModelRequestCoordinator(
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
                     is AgentRequestEvent.AttemptStarted -> {
+                        attemptStartedNanos = System.nanoTime()
                         lastProviderError = null
                         previewOwner?.takeIf { previewGuard() }?.let(streamingPreviewStore::begin)
                     }
@@ -131,11 +133,15 @@ internal class LocalModelRequestCoordinator(
                                 ?.takeIf { previewGuard() }
                                 ?.let(streamingPreviewStore::begin)
                         }
+                        val durationMs = (System.nanoTime() - attemptStartedNanos) / 1_000_000
                         val providerError = lastProviderError
                         AppLog.warn(
                             "LocalModelRequest",
                             buildString {
                                 append("模型请求失败 model=${snapshot.model} step=$step attempt=${event.attempt} ")
+                                append("duration_ms=$durationMs session_id=${snapshot.sessionId} ")
+                                providerError?.code?.let { append("code=$it ") }
+                                providerError?.cause?.let { append("cause_type=${it::class.java.simpleName} ") }
                                 append("retryable=${event.retryable} profile_id=${frozenProfile.id} ")
                                 append("auth_kind=${frozenProfile.authKind.name} protocol=${frozenProfile.protocol.name} ")
                                 credentialDiagnostic.credentialRefTail?.let { append("credential_ref_tail=$it ") }
@@ -161,6 +167,8 @@ internal class LocalModelRequestCoordinator(
                             failureContextLogged = true
                         }
                         log.append("request/error", buildJsonObject {
+                            put("duration_ms", durationMs)
+                            put("session_id", snapshot.sessionId)
                             put("step", step)
                             put("attempt", event.attempt)
                             put("retryable", event.retryable)

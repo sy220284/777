@@ -21,6 +21,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
 import okio.BufferedSource
 import okio.Source
@@ -43,6 +44,34 @@ class OpenAiResponsesClientTest {
         assertEquals("MODEL_NETWORK", error.code)
         assertTrue(error.retryable)
         assertFalse(error.message.orEmpty().contains("CANCEL"))
+    }
+
+    @Test
+    fun admittedEofAndInStreamFailuresNeverReplayThePlanRequest() = runBlocking {
+        val created = """data: {"type":"response.created","response":{"id":"resp-start"}}""" + "\n\n"
+        val bodies = listOf(
+            created,
+            created + """data: {"type":"response.output_text.delta","delta":"partial"}""" + "\n\n",
+            created + """data: {"type":"response.failed","response":{"error":{"code":"server_error","message":"failed"}}}""" + "\n\n",
+        )
+        for (body in bodies) {
+            var requests = 0
+            val transport = OkHttpClient.Builder().addInterceptor { chain ->
+                requests++
+                Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                    .message("OK").header("x-request-id", "req-start")
+                    .body(body.toResponseBody("text/event-stream".toMediaType())).build()
+            }.build()
+            val failure = try {
+                OpenAiResponsesClient(transport, Json).completeStreaming(
+                    accessToken = "test", baseUrl = "https://api.openai.com/v1", model = "gpt-test",
+                    messages = chatPostTurnModelMessages("test"), tools = JsonArray(emptyList()), planSharing = true,
+                )
+                error("expected failed stream")
+            } catch (error: LocalModelException) { error }
+            assertFalse(failure.retryable)
+            assertEquals(1, requests)
+        }
     }
 
     @Test
@@ -354,21 +383,23 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
-    fun postTurnPlannerMessagesAlwaysProduceRealResponsesInput() {
-        val payload = client.buildPayload(
-            model = "gpt-test",
-            messages = chatPostTurnModelMessages("整理这一轮隐藏状态"),
-            tools = JsonArray(emptyList()),
-            temperature = null,
-            planSharing = true,
-        )
-        client.validateRequestPayload(payload)
+    fun backgroundPlannerMessagesAlwaysProduceRealResponsesInput() {
+        for (prompt in listOf("整理这一轮隐藏状态", "根据最近对话生成回复建议，只输出 JSON")) {
+            val payload = client.buildPayload(
+                model = "gpt-test",
+                messages = chatPostTurnModelMessages(prompt),
+                tools = JsonArray(emptyList()),
+                temperature = null,
+                planSharing = true,
+            )
+            client.validateRequestPayload(payload)
 
-        assertTrue(payload["instructions"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
-        val input = payload["input"]!!.jsonArray
-        assertEquals(1, input.size)
-        assertEquals("user", input.single().jsonObject["role"]?.jsonPrimitive?.content)
-        assertEquals("整理这一轮隐藏状态", input.single().jsonObject["content"]?.jsonPrimitive?.content)
+            assertTrue(payload["instructions"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+            val input = payload["input"]!!.jsonArray
+            assertEquals(1, input.size)
+            assertEquals("user", input.single().jsonObject["role"]?.jsonPrimitive?.content)
+            assertEquals(prompt, input.single().jsonObject["content"]?.jsonPrimitive?.content)
+        }
     }
 
     @Test

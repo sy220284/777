@@ -201,6 +201,21 @@ class OpenAiResponsesClient @Inject constructor(
                 )
             }
         } catch (error: LocalModelException) {
+            // In-stream server errors can arrive after inference has started, too. Preserve their
+            // diagnostic identity but apply the same no-replay boundary as transport interruption.
+            if (planSharing && responseAdmitted && error.retryable) {
+                throw LocalModelException(
+                    code = error.code,
+                    message = "${error.message}。请求已进入 Responses 流，本轮不会自动重放，请检查状态后重试。",
+                    retryable = false,
+                    cause = error,
+                    status = error.status,
+                    providerRetryAfterMs = error.providerRetryAfterMs,
+                    requestId = error.requestId ?: admittedRequestId,
+                    providerCode = error.providerCode,
+                    providerParam = error.providerParam,
+                )
+            }
             throw error
         } catch (error: SocketTimeoutException) {
             if (planSharing && responseAdmitted) {
@@ -680,7 +695,7 @@ class OpenAiResponsesClient @Inject constructor(
             "subscription_sharing_usage_unavailable",
             "subscription_sharing_user_unavailable" -> Triple(
                 "CHATGPT_PLAN_USAGE_UNAVAILABLE",
-                "ChatGPT 暂时无法确认套餐可用量，777 会保留登录状态并按有限次数退避重试。",
+                "ChatGPT 暂时无法确认套餐可用量，777 已保留登录状态。",
                 true,
             )
             "subscription_sharing_user_not_eligible" -> Triple(
