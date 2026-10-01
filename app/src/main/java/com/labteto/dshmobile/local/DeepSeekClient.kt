@@ -6,8 +6,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import com.labteto.dshmobile.local.model.withCancellableModelResponse
+import com.labteto.dshmobile.local.model.validatedModelToolCall
+import com.labteto.dshmobile.local.model.requireUniqueModelToolCallIds
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonNull
@@ -229,20 +232,30 @@ class DeepSeekClient @Inject constructor(
                         if (textDelta.isNotEmpty() || reasoningDelta.isNotEmpty()) {
                             onDelta(LocalModelDelta(textDelta, reasoningDelta))
                         }
-                        (delta["tool_calls"] as? JsonArray).orEmpty().forEach { element ->
+                        val callDeltas = delta["tool_calls"]?.takeUnless { it == JsonNull }?.let {
+                            it as? JsonArray ?: throw streamProtocolError("tool_calls 必须是数组")
+                        }
+                        callDeltas.orEmpty().forEach { element ->
                             val item = element as? JsonObject
                                 ?: throw streamProtocolError("模型流式工具调用数据帧格式错误")
-                            val index = (item["index"] as? JsonPrimitive)?.intOrNull ?: 0
+                            val index = (item["index"] as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull
+                                ?.takeIf { it >= 0 } ?: throw streamProtocolError("工具调用 index 无效或缺失")
                             val acc = toolCalls.getOrPut(index) { StreamToolCall() }
                             acc.metadata = mergeModelMetadata(acc.metadata, JsonObject(item.filterKeys {
                                 it !in setOf("index", "id", "type", "function")
                             }))
-                            (item["id"] as? JsonPrimitive)?.contentOrNull
-                                ?.takeIf(String::isNotBlank)?.let { acc.id = it }
-                            val function = item["function"] as? JsonObject
-                            (function?.get("name") as? JsonPrimitive)?.contentOrNull
-                                ?.takeIf(String::isNotBlank)?.let { acc.name = it }
-                            (function?.get("arguments") as? JsonPrimitive)?.contentOrNull
+                            streamToolString(item["id"], "id")?.let { id ->
+                                if (acc.id != null && acc.id != id) throw streamProtocolError("同一 index 的工具调用 id 发生变化")
+                                acc.id = id
+                            }
+                            val function = item["function"]?.takeUnless { it == JsonNull }?.let {
+                                it as? JsonObject ?: throw streamProtocolError("工具调用 function 必须是对象")
+                            }
+                            streamToolString(function?.get("name"), "name")?.let { name ->
+                                if (acc.name != null && acc.name != name) throw streamProtocolError("同一 index 的工具名称发生变化")
+                                acc.name = name
+                            }
+                            streamToolString(function?.get("arguments"), "arguments", allowEmpty = true)
                                 ?.let(acc.arguments::append)
                         }
                     }
@@ -273,41 +286,36 @@ class DeepSeekClient @Inject constructor(
                         retryable = true,
                     )
                 }
+                val accumulated = toolCalls.toSortedMap().values.toList()
+                val calls = accumulated.map { call ->
+                    validatedModelToolCall(
+                        id = call.id?.let(::JsonPrimitive),
+                        name = call.name?.let(::JsonPrimitive),
+                        arguments = JsonPrimitive(call.arguments.toString()),
+                        code = "MODEL_STREAM_PROTOCOL",
+                        retryable = true,
+                    )
+                }
+                requireUniqueModelToolCallIds(calls, "MODEL_STREAM_PROTOCOL", retryable = true)
                 val message = buildJsonObject {
                     put("role", "assistant")
                     put("content", content.toString())
                     if (reasoning.isNotEmpty()) put("reasoning_content", reasoning.toString())
-                    if (toolCalls.isNotEmpty()) {
+                    if (calls.isNotEmpty()) {
                         put("tool_calls", buildJsonArray {
-                            toolCalls.toSortedMap().values.forEach { call ->
+                            calls.zip(accumulated).forEach { (call, accumulator) ->
                                 add(buildJsonObject {
-                                    put("id", call.id ?: throw streamProtocolError("流式工具调用缺少 id"))
+                                    put("id", call.id)
                                     put("type", "function")
-                                    call.metadata.forEach { (key, value) -> put(key, value) }
+                                    accumulator.metadata.forEach { (key, value) -> put(key, value) }
                                     put("function", buildJsonObject {
-                                        put("name", call.name ?: throw streamProtocolError("流式工具调用缺少 name"))
-                                        put("arguments", call.arguments.toString().ifBlank { "{}" })
+                                        put("name", call.name)
+                                        put("arguments", call.rawArguments)
                                     })
                                 })
                             }
                         })
                     }
-                }
-                val calls = toolCalls.toSortedMap().values.map { call ->
-                    val raw = call.arguments.toString().ifBlank { "{}" }
-                    LocalToolCall(
-                        id = call.id ?: throw streamProtocolError("流式工具调用缺少 id"),
-                        name = call.name ?: throw streamProtocolError("流式工具调用缺少 name"),
-                        arguments = try {
-                            json.parseToJsonElement(raw) as? JsonObject
-                                ?: throw streamProtocolError("工具参数不是合法对象")
-                        } catch (error: LocalModelException) {
-                            throw error
-                        } catch (error: Exception) {
-                            throw streamProtocolError("工具参数不是合法对象：${error.message}", error)
-                        },
-                        rawArguments = raw,
-                    )
                 }
                 val usage = streamUsage?.let { value ->
                     parseDeepSeekOpenAiUsage(buildJsonObject { put("usage", value) })
@@ -354,7 +362,9 @@ class DeepSeekClient @Inject constructor(
             ?.takeIf(String::isNotBlank)?.let(::requireCompleteFinishReason)
         val message = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
             ?.get("message")?.jsonObject ?: error("模型响应缺少 choices[0].message")
-        val rawToolCalls = message["tool_calls"]?.jsonArray.orEmpty()
+        val rawToolCalls = message["tool_calls"]?.takeUnless { it == JsonNull }?.let {
+            it as? JsonArray ?: throw LocalModelException("MODEL_RESPONSE_PROTOCOL", "tool_calls 必须是数组", false)
+        }.orEmpty()
         val normalizedMessage = if (
             rawToolCalls.isNotEmpty() && (message["content"] == null || message["content"] is JsonNull)
         ) {
@@ -363,18 +373,13 @@ class DeepSeekClient @Inject constructor(
             message
         }
         val calls = rawToolCalls.map { element ->
-            val item = element.jsonObject
-            val function = item["function"]?.jsonObject ?: error("工具调用缺少 function")
-            val raw = function["arguments"]?.jsonPrimitive?.content ?: "{}"
-            LocalToolCall(
-                id = item["id"]?.jsonPrimitive?.content ?: error("工具调用缺少 id"),
-                name = function["name"]?.jsonPrimitive?.content ?: error("工具调用缺少 name"),
-                arguments = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrElse {
-                    error("工具参数不是合法对象：${it.message}")
-                },
-                rawArguments = raw,
-            )
+            val item = element as? JsonObject
+                ?: throw LocalModelException("MODEL_RESPONSE_PROTOCOL", "工具调用必须是对象", false)
+            val function = item["function"] as? JsonObject
+                ?: throw LocalModelException("MODEL_RESPONSE_PROTOCOL", "工具调用缺少 function 对象", false)
+            validatedModelToolCall(item["id"], function["name"], function["arguments"], "MODEL_RESPONSE_PROTOCOL")
         }
+        requireUniqueModelToolCallIds(calls, "MODEL_RESPONSE_PROTOCOL")
         val usage = parseDeepSeekOpenAiUsage(root)
         return LocalModelReply(
             message = normalizedMessage,
@@ -490,6 +495,15 @@ internal fun shouldSendToolChoice(baseUrl: String, model: String): Boolean {
         "deepseek-reasoner",
     )
     return !(officialDeepSeek && thinkingModel)
+}
+
+private fun streamToolString(value: JsonElement?, field: String, allowEmpty: Boolean = false): String? {
+    if (value == null || value == JsonNull) return null
+    val primitive = value as? JsonPrimitive
+    if (primitive == null || !primitive.isString || (!allowEmpty && primitive.content.isBlank())) {
+        throw streamProtocolError("工具调用 $field 必须是字符串")
+    }
+    return primitive.content
 }
 
 private fun streamProtocolError(

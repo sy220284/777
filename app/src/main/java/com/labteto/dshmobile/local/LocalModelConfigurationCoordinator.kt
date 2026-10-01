@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import android.content.SharedPreferences
+import com.labteto.dshmobile.local.model.resolveLocalModelApiKeyDraft
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelMutationGate
 import com.labteto.dshmobile.local.model.LocalModelProfileStore
@@ -12,10 +13,7 @@ internal data class LocalModelConfigurationResult(
     val configured: Boolean, val model: String, val baseUrl: String,
     val profiles: List<LocalModelProfile>,
     val activeProfileId: String?,
-) {
-    val configuredModels: List<String>
-        get() = profiles.map(LocalModelProfile::model).distinct().sorted()
-}
+)
 
 /** Coordinates model-route mutations; storage, migration and credential resolution stay extracted. */
 internal class LocalModelConfigurationCoordinator(
@@ -27,28 +25,18 @@ internal class LocalModelConfigurationCoordinator(
 ) {
     private val profiles = LocalModelProfileStore(preferences, json)
     private val startup = LocalModelStartupMigrator(preferences, profiles, apiKeys, gateway)
-    suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): LocalModelConfigurationResult =
+    suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): LocalModelConfigurationResult =
         LocalModelMutationGate.run {
             require(model.isNotBlank()) { "模型名称不能为空" }
-            val url = normalizeModelBaseUrl(baseUrl)
-            val name = migrateOfficialClaudeModel(normalizeModel(model), url)
             val existingProfiles = profiles.read()
-            val existing = existingProfiles.apiKeyProfileForRoute(name, url)
-            val id = existing?.id ?: modelProfileId(name, url)
-            if (apiKey.isNotBlank()) apiKeys.putFor(id, apiKey)
-            else require(apiKeys.getFor(id) != null) { "请填写该模型的密钥" }
-            val preset = LocalModelPresets.find(name, url)
-            val profile = LocalModelProfile(
-                id = id,
-                model = name,
-                baseUrl = url,
-                provider = preset?.provider.orEmpty(),
-                protocol = protocol ?: existing?.protocol ?: preset?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS,
-            )
-            val all = existingProfiles.filterNot { it.id == id } + profile
+            val draft = resolveLocalModelApiKeyDraft(apiKey, normalizeModel(model), baseUrl, protocol,
+                existingProfiles, apiKeys::getFor, profileId)
+            val profile = draft.profile
+            if (apiKey.isNotBlank()) apiKeys.putFor(profile.id, draft.key)
+            val all = existingProfiles.filterNot { it.id == profile.id } + profile
             profiles.write(all)
             activate(profile)
-            LocalModelConfigurationResult(true, name, url, all, profile.id)
+            LocalModelConfigurationResult(true, profile.model, profile.baseUrl, all, profile.id)
         }
 
     suspend fun saveChatGptModels(
@@ -112,9 +100,9 @@ internal class LocalModelConfigurationCoordinator(
 
     suspend fun prepareStartup(model: String, baseUrl: String) = startup.prepare(model, baseUrl)
 
-    suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): String {
+    suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): String {
         if (model.isBlank()) return "请选择模型"
-        return tester.testStoredRoute(apiKey, normalizeModel(model), baseUrl, protocol, profiles.read(), apiKeys::getFor)
+        return tester.testStoredRoute(apiKey, normalizeModel(model), baseUrl, protocol, profiles.read(), apiKeys::getFor, profileId)
     }
 
     fun readProfiles(): List<LocalModelProfile> = profiles.read()

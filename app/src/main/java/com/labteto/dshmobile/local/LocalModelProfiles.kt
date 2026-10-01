@@ -502,11 +502,19 @@ internal fun migrateOfficialClaudeModel(model: String, baseUrl: String): String 
 internal fun List<LocalModelProfile>.apiKeyProfileForRoute(
     model: String,
     baseUrl: String,
+    profileId: String? = null,
 ): LocalModelProfile? {
     val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl).trimEnd('/')
-    return firstOrNull { profile ->
+    val matches = filter { profile ->
         profile.authKind == LocalModelAuthKind.API_KEY &&
             profile.model == model &&
             normalizeModelBaseUrl(profile.baseUrl).trimEnd('/') == normalizedBaseUrl
     }
+    if (profileId != null) {
+        return requireNotNull(matches.firstOrNull { it.id == profileId }) {
+            "所选模型配置已删除或路由已更改，请重新打开配置"
+        }
+    }
+    require(matches.size <= 1) { "同一模型地址存在多个配置，请从列表选择要编辑的配置" }
+    return matches.singleOrNull()
 }

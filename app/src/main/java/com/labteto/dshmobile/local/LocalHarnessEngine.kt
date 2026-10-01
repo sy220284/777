@@ -83,6 +83,7 @@ import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.withModelToolCallEventData
 import com.labteto.dshmobile.local.model.LocalModelAccountStateCoordinator
@@ -773,17 +774,16 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null) {
+    internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null) {
         require(!isRunBusy()) { "请先结束当前任务再切换模型" }
-        val result = modelConfiguration.save(apiKey, model, baseUrl, protocol)
+        val result = modelConfiguration.save(apiKey, model, baseUrl, protocol, profileId)
         imageCapabilities.clearRoute(result.baseUrl, result.model)
         _state.update {
             it.copy(
                 configured = result.configured,
                 model = result.model,
                 baseUrl = result.baseUrl,
-                configuredModels = result.configuredModels,
-                modelProfiles = result.profiles,
+                modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
                 error = null,
             )
         }
@@ -814,8 +814,7 @@ class LocalHarnessEngine @Inject constructor(
                                 configured = result.configured,
                                 model = result.model,
                                 baseUrl = result.baseUrl,
-                                modelProfiles = result.profiles,
-                                configuredModels = result.configuredModels,
+                                modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
                                 error = null,
                             )
                         }
@@ -838,8 +837,7 @@ class LocalHarnessEngine @Inject constructor(
                             configured = result.configured,
                             model = result.model,
                             baseUrl = result.baseUrl,
-                            modelProfiles = result.profiles,
-                            configuredModels = result.configuredModels,
+                            modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
                         )
                     }
                 }
@@ -849,8 +847,8 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    internal suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): String =
-        modelConfiguration.test(apiKey, model, baseUrl, protocol)
+    internal suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): String =
+        modelConfiguration.test(apiKey, model, baseUrl, protocol, profileId)
 
     /** Choose how user image attachments reach the local model. */
     internal fun configureImageInputMode(mode: LocalImageInputMode) =
@@ -2365,8 +2363,7 @@ class LocalHarnessEngine @Inject constructor(
                             configured = result.configured,
                             model = result.model,
                             baseUrl = result.baseUrl,
-                            modelProfiles = result.profiles,
-                            configuredModels = result.configuredModels,
+                            modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
                         )
                     }
                 } finally {
@@ -5030,8 +5027,7 @@ class LocalHarnessEngine @Inject constructor(
             configured = modelConfigured,
             model = model,
             baseUrl = baseUrl,
-            configuredModels = modelProfiles.map(LocalModelProfile::model).distinct().sorted(),
-            modelProfiles = modelProfiles,
+            modelSelection = LocalModelSelectionState(modelProfiles, activeModelProfile?.id),
             mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
             subagentMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
             modelAttempts = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),

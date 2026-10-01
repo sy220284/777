@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelSelectionState
+
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
@@ -224,8 +226,7 @@ data class LocalHarnessState(
     val configured: Boolean = false,
     val model: String = "deepseek-flash",
     val baseUrl: String = "https://api.deepseek.com",
-    val configuredModels: List<String> = emptyList(),
-    val modelProfiles: List<LocalModelProfile> = emptyList(),
+    val modelSelection: LocalModelSelectionState = LocalModelSelectionState(),
     val mainMaxSteps: Int = 16,
     val subagentMaxSteps: Int = 20,
     val modelAttempts: Int = 3,
@@ -286,7 +287,9 @@ data class LocalHarnessState(
     val pendingQuestion: LocalQuestion? = null,
     val usage: DeepSeekUsageSnapshot = DeepSeekUsageSnapshot(),
     val error: String? = null,
-)
+) {
+    val modelProfiles: List<LocalModelProfile> get() = modelSelection.profiles
+}
 
 /** One OpenAI-compatible function call emitted by the model. */
 data class LocalToolCall(

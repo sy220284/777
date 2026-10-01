@@ -359,8 +359,8 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null) =
-        withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol) }
+    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null) =
+        withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol, profileId) }
 
     fun selectLocalModel(id: String) = localHarness.selectModel(id)
 
@@ -440,8 +440,8 @@ class SettingsViewModel @Inject constructor(
 
     fun removeLocalModel(id: String) = localHarness.removeModel(id)
 
-    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null): String =
-        localHarness.testModel(apiKey, model, baseUrl, protocol)
+    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null): String =
+        localHarness.testModel(apiKey, model, baseUrl, protocol, profileId)
 
     fun configureLocalMemory(userRules: String, autoRecall: Boolean, autoMemory: Boolean) {
         localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
