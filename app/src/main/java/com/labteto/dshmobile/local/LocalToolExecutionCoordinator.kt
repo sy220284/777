@@ -171,14 +171,12 @@ internal class LocalToolExecutionCoordinator(
             timedOut -> "TOOL_TIMEOUT"
             else -> "TOOL_REPORTED_ERROR"
         }
-        val preExecutionFailure = errorCode in PRE_EXECUTION_ERROR_CODES
         val mutationMayHaveSideEffect =
-            registered.access in MUTATING_ACCESSES && !preExecutionFailure
-        // Registry admission/validation/approval failures happen before the executor runs and may
-        // safely preserve their structured retry contract. Once a mutating tool may have started,
-        // never let a provider opt it back into blind automatic retry.
+            registered.access in MUTATING_ACCESSES && result.executionStarted
+        // Registry is the authority for whether the executor actually started. Provider error codes
+        // are descriptive only and cannot downgrade a mutating call to a pre-execution failure.
         val retryable = when {
-            preExecutionFailure -> result.retryable
+            !result.executionStarted -> result.retryable
             readLike -> result.retryable || (providerCode == null && timedOut)
             else -> false
         }
@@ -222,14 +220,6 @@ internal class LocalToolExecutionCoordinator(
 
     private companion object {
         val GITHUB_CONNECTOR_TOOL_NAMES = setOf("github_status", "github_api_get", "github_api_request")
-        val PRE_EXECUTION_ERROR_CODES = setOf(
-            "TOOL_LIFECYCLE_UNAVAILABLE",
-            "UNKNOWN_TOOL",
-            "INVALID_TOOL_ARGUMENTS",
-            "MUTATION_SCOPE_BLOCKED",
-            "APPROVAL_REQUIRED",
-            "APPROVAL_DENIED",
-        )
         val MUTATING_ACCESSES = setOf(
             ToolAccess.WORKSPACE_WRITE,
             ToolAccess.SESSION_WRITE,
