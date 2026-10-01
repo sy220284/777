@@ -149,6 +149,7 @@ val prepareUpdatePatcher = tasks.register<Exec>("prepareUpdatePatcher") {
 android {
     namespace = "com.labteto.dshmobile"
     compileSdk = 37
+    ndkVersion = "30.0.16248370"
 
     defaultConfig {
         // Keep this fork installable alongside the upstream DSH Mobile app.
@@ -207,6 +208,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
 
     buildFeatures {
         compose = true
