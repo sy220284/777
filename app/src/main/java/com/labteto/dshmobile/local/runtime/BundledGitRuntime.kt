@@ -1,8 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import android.content.Context
 import android.os.Build
-import com.labteto.dshmobile.local.runtime.BundledRuntimeLibraryStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.nio.file.Files
