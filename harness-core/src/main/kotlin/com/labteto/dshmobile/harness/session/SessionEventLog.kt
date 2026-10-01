@@ -2,7 +2,6 @@ package com.labteto.dshmobile.harness.session
 
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.RandomAccessFile
 import java.nio.file.AtomicMoveNotSupportedException
@@ -91,11 +90,7 @@ class SessionEventLog(
         require(incomingBytes <= maxBytes) { "单条会话事件超过日志分段上限" }
         file.parentFile?.mkdirs()
         if (file.isFile && file.length() + incomingBytes > maxBytes) rotateActiveSegment()
-        FileOutputStream(file, true).use { output ->
-            output.write(encoded.toByteArray(Charsets.UTF_8))
-            output.flush()
-            output.fd.sync()
-        }
+        file.appendText(encoded)
         nextSequence.incrementAndGet()
         // Archive maintenance must not turn a committed append into an apparent failure.
         runCatching { compressOneLegacySegmentUnsafe() }
