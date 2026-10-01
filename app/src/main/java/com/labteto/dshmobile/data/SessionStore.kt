@@ -171,18 +171,9 @@ class SessionStore @Inject constructor(
         logger = ::log,
     )
 
-    private val _searchResults = MutableStateFlow<List<Pair<String, String>>>(emptyList())
-    val searchResults: StateFlow<List<Pair<String, String>>> = _searchResults.asStateFlow()
-
-    private val _contentSearchAvailable = MutableStateFlow(true)
-
-    /**
-     * Whether this harness will answer `session.search`.
-     *
-     * Assumed true and latched false by the first refusal — see [search]. Reset on connect, because
-     * it is a fact about the harness on the other end, not about the app.
-     */
-    val contentSearchAvailable: StateFlow<Boolean> = _contentSearchAvailable.asStateFlow()
+    private val searchRuntime = SessionSearchRuntime(apiProvider = ::apiOrNull)
+    val searchResults: StateFlow<List<Pair<String, String>>> get() = searchRuntime.results
+    val contentSearchAvailable: StateFlow<Boolean> get() = searchRuntime.available
 
     private val _currentConversation = MutableStateFlow<ConversationSnapshot?>(null)
     val currentConversation: StateFlow<ConversationSnapshot?> = _currentConversation.asStateFlow()
@@ -457,7 +448,7 @@ class SessionStore @Inject constructor(
     private suspend fun baseline() {
         // Whether content search works is a fact about the harness we just reached, so a fresh
         // connection re-earns the answer rather than inheriting the previous host's.
-        _contentSearchAvailable.value = true
+        searchRuntime.resetCapability()
         // Before the list read: the workspace and control streams each open with their own
         // complete baseline, and the list is what their increments are applied on top of.
         remoteStreams.restartHostStreams()
@@ -1419,29 +1410,7 @@ class SessionStore @Inject constructor(
      * and workspace filtering is unaffected and remains the primary way to find a session, exactly
      * as it is in the harness's web sidebar under the same configuration.
      */
-    suspend fun search(query: String) {
-        val trimmed = query.trim()
-        // The host schema is query.trim().min(1).max(500); a blank or overlong query is an
-        // invalid payload, so never send one — a blank query just clears the result set.
-        if (trimmed.isEmpty()) {
-            _searchResults.value = emptyList()
-            return
-        }
-        if (!_contentSearchAvailable.value) return
-        val api = apiOrNull() ?: run {
-            // Disconnected: stale hits would otherwise sit under a query that never ran.
-            _searchResults.value = emptyList()
-            return
-        }
-        val bounded = trimmed.take(SESSION_SEARCH_QUERY_MAX_CHARS)
-        when (val r = api.sessionSearch(bounded)) {
-            is RpcResult.Ok -> _searchResults.value = r.value.items.map { it.sessionId to it.snippet }
-            is RpcResult.Err -> {
-                _contentSearchAvailable.value = false
-                _searchResults.value = emptyList()
-            }
-        }
-    }
+    suspend fun search(query: String) = searchRuntime.search(query)
 
     suspend fun fetchAttachment(attachmentId: String, sessionId: String? = currentSessionId.value, host: String? = activeHostKey): ByteArray? =
         attachmentTransfer.fetchAttachment(
@@ -1776,9 +1745,6 @@ class SessionStore @Inject constructor(
 
         /** The event types that produce a visible message; everything else frames them. */
         val SURFACE_EVENT_TYPES = setOf("user/message", "assistant/message", "tool/result")
-
-        /** Host-side wire bound for `session.search` (SESSION_SEARCH_QUERY_MAX_CHARS). */
-        const val SESSION_SEARCH_QUERY_MAX_CHARS = 500
 
         /**
          * Floor on the gap between transcript rebuilds while a turn streams.
