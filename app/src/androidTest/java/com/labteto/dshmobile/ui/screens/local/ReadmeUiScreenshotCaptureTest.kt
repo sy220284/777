@@ -365,7 +365,10 @@ class ReadmeUiScreenshotCaptureTest {
 
     private fun save(name: String) {
         compose.waitForIdle()
-        val dir = File(context.filesDir, "readme-screenshots").apply {
+        val externalRoot = checkNotNull(context.getExternalFilesDir(null)) {
+            "无法取得 README 截图外部目录"
+        }
+        val dir = File(externalRoot, "readme-screenshots").apply {
             check(exists() || mkdirs()) { "无法创建 README 截图目录" }
         }
         FileOutputStream(File(dir, name)).use { output ->
