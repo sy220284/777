@@ -102,8 +102,7 @@ class OpenAiResponsesClient @Inject constructor(
                     detail = "Responses API 返回了空响应",
                 )
                 var completedResponse: JsonObject? = null
-                val streamedContent = StringBuilder()
-                val streamedReasoning = StringBuilder()
+                val streamed = OpenAiResponsesStreamSnapshot()
                 var totalBytes = 0
                 // Response 生命周期由 withCancellableModelResponse 统一关闭；这里不要单独 use(reader)，
                 // 否则成功终态后的 reader.close() 异常仍可能把成功请求翻成失败。
@@ -141,32 +140,8 @@ class OpenAiResponsesClient @Inject constructor(
                                     )
                                 }
                             }
+                        streamed.record(event)?.let { onDelta(it) }
                         when (event["type"]?.jsonPrimitive?.contentOrNull) {
-                            "response.output_text.delta" -> {
-                                event["delta"]?.jsonPrimitive?.contentOrNull
-                                    ?.takeIf(String::isNotEmpty)
-                                    ?.let { delta ->
-                                        streamedContent.append(delta)
-                                        onDelta(LocalModelDelta(content = delta))
-                                    }
-                            }
-                            "response.reasoning_text.delta",
-                            "response.reasoning_summary_text.delta" -> {
-                                event["delta"]?.jsonPrimitive?.contentOrNull
-                                    ?.takeIf(String::isNotEmpty)
-                                    ?.let { delta ->
-                                        streamedReasoning.append(delta)
-                                        onDelta(LocalModelDelta(reasoning = delta))
-                                    }
-                            }
-                            "response.refusal.delta" -> {
-                                event["delta"]?.jsonPrimitive?.contentOrNull
-                                    ?.takeIf(String::isNotEmpty)
-                                    ?.let { delta ->
-                                        streamedContent.append(delta)
-                                        onDelta(LocalModelDelta(content = delta))
-                                    }
-                            }
                             "error" -> throw streamError(event, planSharing, requestId, retryAfterMs)
                             "response.failed" -> throw responseFailure(
                                 event = event,
@@ -194,10 +169,10 @@ class OpenAiResponsesClient @Inject constructor(
                     detail = "Responses API 流在 response.completed 前结束",
                 )
                 parseCompleted(
-                    response = completed,
+                    response = streamed.settledResponse(completed),
                     promptBreakdown = promptBreakdown,
-                    streamedContent = streamedContent.toString(),
-                    streamedReasoning = streamedReasoning.toString(),
+                    streamedContent = streamed.content,
+                    streamedReasoning = streamed.reasoningText,
                 )
             }
         } catch (error: LocalModelException) {
@@ -519,7 +494,7 @@ class OpenAiResponsesClient @Inject constructor(
             usage = parseUsage(response["usage"] as? JsonObject),
             requestId = response["id"]?.jsonPrimitive?.contentOrNull ?: UUID.randomUUID().toString(),
             promptBreakdown = promptBreakdown,
-        )
+        ).also(::validateUsableModelReply)
     }
 
     private fun parseUsage(usage: JsonObject?): DeepSeekTokenUsage {

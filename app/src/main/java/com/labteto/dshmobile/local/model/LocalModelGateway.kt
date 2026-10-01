@@ -218,7 +218,7 @@ internal fun prepareLocalModelAdapterRequest(
     temperature: Double?,
     streaming: Boolean,
 ): LocalPreparedModelRequest {
-    val canonicalMessages = LocalCanonicalModelCodec.messages(messages)
+    val canonicalMessages = LocalCanonicalModelCodec.messages(messages).filterNot(::isEmptyCanonicalAssistant)
     validateCanonicalModelHistory(canonicalMessages)
     val canonicalTools = LocalCanonicalModelCodec.tools(tools)
     if (canonicalTools.isNotEmpty() && !route.capabilities.toolCalling) {

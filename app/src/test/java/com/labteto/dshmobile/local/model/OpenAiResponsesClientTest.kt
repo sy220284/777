@@ -75,6 +75,31 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun doneOnlyTextCompletesButUsageOnlyTerminalResponseFailsWithoutReplay() = runBlocking {
+        for (done in listOf("", """data: {"type":"response.output_text.done","text":"recovered"}""" + "\n\n")) {
+            val terminal = """data: {"type":"response.completed","response":{"id":"resp-empty-output","output":[],"usage":{"input_tokens":127941,"output_tokens":270}}}""" + "\n\n"
+            val http = OkHttpClient.Builder().addInterceptor { chain ->
+                Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                    .message("OK").body((done + terminal).toResponseBody()).build()
+            }.build()
+            val result = runCatching {
+                OpenAiResponsesClient(http, Json).completeStreaming(
+                    "test", "https://api.openai.com/v1", "gpt-test", chatPostTurnModelMessages("test"),
+                    JsonArray(emptyList()), planSharing = true,
+                )
+            }
+            if (done.isEmpty()) {
+                val error = result.exceptionOrNull() as LocalModelException
+                assertEquals("MODEL_EMPTY_RESPONSE", error.code)
+                assertFalse(error.retryable)
+            } else {
+                assertEquals("recovered", result.getOrThrow().content)
+                assertEquals(270L, result.getOrThrow().usage.completionTokens)
+            }
+        }
+    }
+
+    @Test
     fun completedEventSettlesBeforeTrailingTransportResetAndKeepsReportedUsage() = runBlocking {
         val terminalFrame =
             """data: {"type":"response.completed","response":{"id":"resp-terminal","output":[{"type":"message","content":[{"type":"output_text","text":"完成"}]}],"usage":{"input_tokens":7,"output_tokens":3}}}""" + "\n"

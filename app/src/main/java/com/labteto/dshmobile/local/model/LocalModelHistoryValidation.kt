@@ -18,14 +18,7 @@ internal fun validateCanonicalModelHistory(messages: List<LocalCanonicalMessage>
         if (pending.isNotEmpty()) invalid("上一条工具调用尚未收到全部结果")
         if (message.role == LocalCanonicalRole.ASSISTANT) {
             val calls = message.content.filterIsInstance<LocalCanonicalContent.ToolCall>()
-            val visible = message.content.any {
-                when (it) {
-                    is LocalCanonicalContent.Text -> it.text.isNotBlank()
-                    is LocalCanonicalContent.Image, is LocalCanonicalContent.Raw -> true
-                    else -> false
-                }
-            }
-            if (!visible && calls.isEmpty()) invalid("助手消息既无正文也无工具调用")
+            if (isEmptyCanonicalAssistant(message)) invalid("助手消息既无正文也无工具调用")
             calls.forEach { if (!pending.add(it.id)) invalid("工具调用包含重复身份") }
         }
     }
@@ -33,3 +26,14 @@ internal fun validateCanonicalModelHistory(messages: List<LocalCanonicalMessage>
         "MODEL_HISTORY_INVALID", "模型历史的工具调用缺少结果，不能继续发送；请新建会话或恢复到工具调用前重试。", false,
     )
 }
+
+/** Older versions could persist reasoning-only or empty successful turns. They carry no semantic
+ * answer or tool side effect and may be omitted from requests without rewriting durable history. */
+internal fun isEmptyCanonicalAssistant(message: LocalCanonicalMessage): Boolean =
+    message.role == LocalCanonicalRole.ASSISTANT && message.content.none {
+        when (it) {
+            is LocalCanonicalContent.Text -> it.text.isNotBlank()
+            is LocalCanonicalContent.ToolCall, is LocalCanonicalContent.Image, is LocalCanonicalContent.Raw -> true
+            else -> false
+        }
+    }
