@@ -171,6 +171,7 @@ internal class LocalAutomationChatCoordinator(
                 val sessionContext = session.chatContext.withLegacyFallback(session.chatState)
                 val sessionCharacterState = session.chatState.withoutLegacyConversationContext()
                 val runtime = state.value
+                val runProfile = modelGateway.profileForRun()
                 val persona = chatPersonaStore.get(session.personaId)
                 val boundEventLog = eventLogFor(session.id)
                 val recentTranscript = LocalSessionTranscriptPager(boundEventLog)
@@ -247,6 +248,8 @@ internal class LocalAutomationChatCoordinator(
                 val sessionTranscriptIndex = localTranscriptIndexForSession(session)
                 val boundState = runtime.copy(
                     sessionId = session.id,
+                    model = runProfile.model,
+                    baseUrl = runProfile.baseUrl,
                     usageMode = LocalUsageMode.CHAT,
                     personaId = session.personaId,
                     galleryId = session.galleryId,
@@ -317,11 +320,11 @@ internal class LocalAutomationChatCoordinator(
                     stableContext = chatContext.stablePrompt,
                     dynamicContext = dynamicContext,
                 )
-                val activeProfile = modelGateway.activeProfile()
-                require(activeProfile != null && modelGateway.hasCredential(activeProfile)) { "请先配置模型账户或 API Key" }
-
                 boundEventLog.append("turn/start", buildJsonObject {
                     put("model", boundState.model)
+                    put("profile_id", runProfile.id)
+                    put("auth_kind", runProfile.authKind.name)
+                    put("protocol", runProfile.protocol.name)
                     put("mode", "chat")
                     put("automation", true)
                     put("proactive", true)
@@ -330,6 +333,7 @@ internal class LocalAutomationChatCoordinator(
                 val rawReply = completeAutomationChat(
                     snapshot = boundState,
                     messages = requestMessages,
+                    profile = runProfile,
                 )
                 var reply = chatTurnCoordinator.finalize(
                     snapshot = boundState,
@@ -352,6 +356,7 @@ internal class LocalAutomationChatCoordinator(
                 if (isNearDuplicateProactive(content, recentTranscript)) {
                     val retryRawReply = completeAutomationChat(
                         snapshot = boundState,
+                        profile = runProfile,
                         messages = withEphemeralContext(
                             requestMessages,
                             """
@@ -391,6 +396,7 @@ internal class LocalAutomationChatCoordinator(
                         completeAutomationChat(
                             snapshot = boundState,
                             messages = withEphemeralContext(requestMessages, repairHint),
+                            profile = runProfile,
                         )
                     },
                     appendEvent = { type, data ->
@@ -505,6 +511,7 @@ internal class LocalAutomationChatCoordinator(
     private suspend fun completeAutomationChat(
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
+        profile: LocalModelProfile,
         allowContextOverflowRecovery: Boolean = true,
     ): LocalModelReply = modelRequestCoordinator.complete(
         snapshot = snapshot,
@@ -517,5 +524,6 @@ internal class LocalAutomationChatCoordinator(
         persistOverflowHistory = false,
         requestLog = eventLogFor(snapshot.sessionId),
         temperature = CHAT_ROLEPLAY_TEMPERATURE,
+        profile = profile,
     )
 }
