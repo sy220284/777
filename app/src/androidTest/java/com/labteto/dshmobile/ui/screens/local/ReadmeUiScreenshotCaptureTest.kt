@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import android.content.ContentValues
 import android.graphics.Bitmap
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,8 +42,6 @@ import com.labteto.dshmobile.ui.screens.settings.UsageCalculationPage
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.ThemePreference
-import java.io.File
-import java.io.FileOutputStream
 import org.junit.Rule
 import org.junit.Test
 
@@ -365,16 +366,37 @@ class ReadmeUiScreenshotCaptureTest {
 
     private fun save(name: String) {
         compose.waitForIdle()
-        val dir = File(context.filesDir, "readme-screenshots").apply {
-            check(exists() || mkdirs()) { "无法创建 README 截图目录" }
+        val resolver = context.contentResolver
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+            put(
+                MediaStore.MediaColumns.RELATIVE_PATH,
+                Environment.DIRECTORY_DOWNLOADS + "/readme-screenshots",
+            )
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
-        FileOutputStream(File(dir, name)).use { output ->
-            check(
-                compose.onRoot()
-                    .captureToImage()
-                    .asAndroidBitmap()
-                    .compress(Bitmap.CompressFormat.PNG, 100, output),
-            ) { "README 截图写入失败：$name" }
+        val uri = checkNotNull(
+            resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values),
+        ) { "无法创建 README 截图媒体项：$name" }
+
+        try {
+            checkNotNull(resolver.openOutputStream(uri, "w")).use { output ->
+                check(
+                    compose.onRoot()
+                        .captureToImage()
+                        .asAndroidBitmap()
+                        .compress(Bitmap.CompressFormat.PNG, 100, output),
+                ) { "README 截图写入失败：$name" }
+            }
+            values.clear()
+            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+            check(resolver.update(uri, values, null, null) == 1) {
+                "README 截图发布失败：$name"
+            }
+        } catch (t: Throwable) {
+            resolver.delete(uri, null, null)
+            throw t
         }
     }
 }
