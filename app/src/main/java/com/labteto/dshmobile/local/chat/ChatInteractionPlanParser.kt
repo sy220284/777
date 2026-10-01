@@ -49,7 +49,7 @@ internal class ChatInteractionPlanParser(
                 )
             }
             .filter { it.label.isNotBlank() && it.text.isNotBlank() }
-            .distinctBy { normalize(it.text) }
+            .distinctBy { normalizeChatInteractionText(it.text) }
             .take(4)
             .toList()
 
@@ -68,6 +68,5 @@ internal class ChatInteractionPlanParser(
         return trimmed.substring(start, end + 1)
     }
 
-    private fun normalize(text: String): String =
-        text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】]+"""), "")
+
 }

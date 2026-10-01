@@ -383,7 +383,7 @@ internal class ChatInteractionStateReducer {
             emptyList()
         } else {
             previous.unresolvedThreads.filter { thread ->
-                val key = normalize(thread)
+                val key = normalizeChatInteractionText(thread)
                 val next = (nextThreadAges[key] ?: 0) + 1
                 if (next > previous.behaviorTuning.transientTtl(THREAD_TTL)) {
                     nextThreadAges.remove(key)
@@ -430,7 +430,7 @@ internal class ChatInteractionStateReducer {
         reset("immediateConcern", state.immediateConcern)
 
         val threadAges = if (rawState.containsKey("unresolvedThreads")) {
-            state.unresolvedThreads.associate { normalize(it) to 0 }
+            state.unresolvedThreads.associate { normalizeChatInteractionText(it) to 0 }
         } else {
             state.unresolvedThreadAges
         }
@@ -570,7 +570,7 @@ internal class ChatInteractionStateReducer {
                 confidence = confidence,
                 source = source,
             )
-            merged[normalize(text)] = clean
+            merged[normalizeChatInteractionText(text)] = clean
         }
         return merged.values.toList().takeLast(limit)
     }
@@ -584,7 +584,7 @@ internal class ChatInteractionStateReducer {
         val merged = linkedMapOf<String, String>()
         (previous + incoming).forEach { raw ->
             val text = raw.trim().take(maxChars)
-            if (text.isNotBlank()) merged[normalize(text)] = text
+            if (text.isNotBlank()) merged[normalizeChatInteractionText(text)] = text
         }
         return merged.values.toList().takeLast(limit)
     }

@@ -2,7 +2,6 @@ package com.labteto.dshmobile.data
 
 import com.labteto.dshmobile.core.wire.DshApiClient
 import com.labteto.dshmobile.core.wire.RpcResult
-import com.labteto.dshmobile.core.wire.dto.ATTACHMENT_INVALID
 import com.labteto.dshmobile.core.wire.dto.CUSTOM_PRESET
 import com.labteto.dshmobile.core.wire.dto.CommandSubmitAttachment
 import kotlinx.serialization.json.JsonNull

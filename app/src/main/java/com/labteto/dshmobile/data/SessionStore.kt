@@ -171,16 +171,6 @@ class SessionStore @Inject constructor(
         logger = ::log,
     )
 
-    private val slashCommandRuntime = SessionSlashCommandRuntime(
-        apiForHost = ::apiForHost,
-        currentSessionId = { currentSessionId.value },
-        activeHostKey = { activeHostKey },
-        markCommandsUnavailable = catalogs::markCommandsUnavailable,
-        installPermission = interactionRuntime::installPermission,
-        clearPermission = interactionRuntime::clearPermission,
-        onConnectionError = ::setConnectionError,
-    )
-
     private val sessionLifecycleRuntime = SessionLifecycleRuntime(
         apiProvider = ::apiOrNull,
         reusableBlankSession = { workspaceId ->
@@ -356,6 +346,16 @@ class SessionStore @Inject constructor(
         emitSessions = ::emitSessionsLocked,
         logger = { message -> log(message) },
     )
+    private val slashCommandRuntime = SessionSlashCommandRuntime(
+        apiForHost = ::apiForHost,
+        currentSessionId = { currentSessionId.value },
+        activeHostKey = { activeHostKey },
+        markCommandsUnavailable = catalogs::markCommandsUnavailable,
+        installPermission = interactionRuntime::installPermission,
+        clearPermission = interactionRuntime::clearPermission,
+        onConnectionError = ::setConnectionError,
+    )
+
     val pendingApproval: StateFlow<PendingApproval?> get() = interactionRuntime.pendingApproval
     val pendingQuestions: StateFlow<PendingQuestions?> get() = interactionRuntime.pendingQuestions
     val pendingPermission: StateFlow<String?> get() = interactionRuntime.pendingPermission
