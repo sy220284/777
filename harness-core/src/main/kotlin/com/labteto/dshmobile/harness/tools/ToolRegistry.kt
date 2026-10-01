@@ -89,7 +89,7 @@ class ToolRegistry private constructor(
             errorCode = "TOOL_LIFECYCLE_UNAVAILABLE",
             retryable = true,
             recoveryHint = "等待插件生命周期切换完成后重试一次；持续失败时停用异常插件。",
-        executionStarted = false,
+            executionStarted = false,
         )
         return try {
             executeAdmitted(name, input, rawArguments, context)
@@ -106,7 +106,7 @@ class ToolRegistry private constructor(
             isError = true,
             errorCode = "UNKNOWN_TOOL",
             recoveryHint = "检查工具名称或重新发现当前可用能力。",
-        executionStarted = false,
+            executionStarted = false,
         )
         validateToolInput(tool, input)?.let { problem ->
             return ToolResult(
@@ -114,7 +114,7 @@ class ToolRegistry private constructor(
                 isError = true,
                 errorCode = "INVALID_TOOL_ARGUMENTS",
                 recoveryHint = "按工具 schema 修正参数后再调用。",
-            executionStarted = false,
+                executionStarted = false,
             )
         }
         if (!context.allowMutation && tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)) {
@@ -123,7 +123,7 @@ class ToolRegistry private constructor(
                 isError = true,
                 errorCode = "MUTATION_SCOPE_BLOCKED",
                 recoveryHint = "改用只读能力，或回到允许修改的父任务执行。",
-            executionStarted = false,
+                executionStarted = false,
             )
         }
         val needsApproval = when (tool.approvalPolicy) {
@@ -145,7 +145,7 @@ class ToolRegistry private constructor(
                 isError = true,
                 errorCode = "APPROVAL_DENIED",
                 recoveryHint = "不要重复调用；改用已授权能力或等待用户调整权限。",
-            executionStarted = false,
+                executionStarted = false,
             )
         }
         val timeoutMillis = tool.timeoutMillis
