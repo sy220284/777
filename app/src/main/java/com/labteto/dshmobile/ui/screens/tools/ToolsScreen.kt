@@ -151,6 +151,28 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+    fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
+            try {
+                localTools.connectStdio(serverId, command, workingDirectory)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    servers = localTools.servers(),
+                    localPlugins = localTools.installedPluginIds(),
+                    notice = ToolsNotice.CONNECTED,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    notice = ToolsNotice.CONNECT_FAILED,
+                )
+            }
+        }
+    }
+
     fun configureGitHub(token: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
@@ -221,6 +243,8 @@ fun ToolsScreen(
     val toast = rememberDsToast()
     var serverId by remember { mutableStateOf("") }
     var endpoint by remember { mutableStateOf("") }
+    var stdioCommand by remember { mutableStateOf("") }
+    var stdioWorkingDirectory by remember { mutableStateOf("") }
     var githubToken by remember { mutableStateOf("") }
     var showGitHubConfig by remember { mutableStateOf(false) }
     var showExternalConfig by remember { mutableStateOf(false) }
@@ -245,6 +269,8 @@ fun ToolsScreen(
             ToolsNotice.CONNECTED -> {
                 serverId = ""
                 endpoint = ""
+                stdioCommand = ""
+                stdioWorkingDirectory = ""
                 githubToken = ""
                 showGitHubConfig = false
                 showExternalConfig = false
@@ -549,6 +575,52 @@ fun ToolsScreen(
                 variant = DsButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
                 icon = Icons.Outlined.Link,
+            )
+            Text(
+                stringResource(R.string.tools_stdio_title),
+                style = DsType.std14Strong.withReadingWeight(),
+                color = colors.labelPrimary,
+            )
+            OutlinedTextField(
+                value = stdioCommand,
+                onValueChange = { stdioCommand = it.take(4000) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.tools_stdio_command)) },
+                supportingText = { Text(stringResource(R.string.tools_stdio_command_hint)) },
+                enabled = !state.loading,
+                minLines = 2,
+                maxLines = 6,
+                shape = DsShapes.row,
+            )
+            OutlinedTextField(
+                value = stdioWorkingDirectory,
+                onValueChange = { stdioWorkingDirectory = it.take(1000) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.tools_stdio_working_directory)) },
+                supportingText = { Text(stringResource(R.string.tools_stdio_working_directory_hint)) },
+                enabled = !state.loading,
+                singleLine = true,
+                shape = DsShapes.row,
+            )
+            val stdioArgs = stdioCommand.lineSequence()
+                .map(String::trim)
+                .filter(String::isNotBlank)
+                .toList()
+            DsButton(
+                text = stringResource(
+                    if (state.loading) R.string.tools_processing else R.string.tools_stdio_connect,
+                ),
+                onClick = {
+                    viewModel.connectStdio(
+                        serverId.trim(),
+                        stdioArgs,
+                        stdioWorkingDirectory.trim().takeIf(String::isNotBlank),
+                    )
+                },
+                enabled = !state.loading && serverId.isNotBlank() && stdioArgs.isNotEmpty(),
+                variant = DsButtonVariant.Outline,
+                modifier = Modifier.fillMaxWidth(),
+                icon = FeatherIcons.Terminal,
             )
         }
     }
