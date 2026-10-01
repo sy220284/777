@@ -267,9 +267,9 @@ screen_entry_boundary = re.search(
 screen_entry_end = (
     screen_entry_start + 1 + screen_entry_boundary.start()
     if screen_entry_boundary is not None
-    else -1
+    else len(screen_source)
 )
-if screen_entry_start < 0 or screen_entry_end < 0:
+if screen_entry_start < 0:
     die("unable to locate LocalHarnessScreen entry function")
 screen_entry = screen_source[screen_entry_start:screen_entry_end]
 if "viewModel.state.collectAsStateWithLifecycle()" in screen_entry:
