@@ -559,8 +559,7 @@ class LocalHarnessViewModel @Inject constructor(
         if (entries.size != ids.distinct().size) return false
         return runtime.chat.configureGroupChatMembers(entries)
     }
-    suspend fun setGroupChatAnnouncement(text: String): Result<Unit> =
-        runtime.chat.setGroupChatAnnouncement(text)
+    suspend fun setGroupChatAnnouncement(text: String): Result<Unit> = runtime.chat.setGroupChatAnnouncement(text)
 
     suspend fun generateGroupChatAnnouncement(direction: String): Result<String> = runCatching {
         val snapshot = state.value
