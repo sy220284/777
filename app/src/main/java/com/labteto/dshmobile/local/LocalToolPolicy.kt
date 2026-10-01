@@ -38,9 +38,6 @@ internal object LocalToolPolicy {
      */
     private val DESTRUCTIVE_GIT_OPERATIONS = listOf("reset --hard", "clean -fd", "clean -fdx", "filter-branch")
 
-    /** Force flags, matched anywhere in the command so argument order cannot hide them. */
-    private val FORCE_FLAGS = listOf("--force", "-f")
-
     private val aliases = mapOf(
         "read_file" to "read", "write_file" to "write", "edit_file" to "edit",
         "glob_files" to "glob", "search_text" to "grep", "run_shell" to "bash",
@@ -65,14 +62,28 @@ internal object LocalToolPolicy {
     }
 
     /**
-     * Force-push detection that does not depend on argument order.
+     * Force-push detection uses shell-token boundaries instead of substring matching.
      *
-     * A substring test for `push --force` misses `git push origin main --force`, so the push verb and
-     * a force flag are matched independently. `--force-with-lease` still matches `--force`, which is
-     * intentional: it can still overwrite a remote branch when the lease is stale.
+     * This remains a best-effort guard rather than a shell parser, but ordinary branch names such
+     * as `feature-fix` and unrelated flags no longer look like `-f`.
      */
-    private fun isForcePush(command: String): Boolean =
-        command.contains("push") && FORCE_FLAGS.any { command.contains(it) }
+    private fun isForcePush(command: String): Boolean {
+        val tokens = Regex("""[^\s;&|]+""").findAll(command)
+            .map { match -> match.value.trim('"', '\'') }
+            .toList()
+        val pushIndex = tokens.indexOfFirst { it == "push" }
+        if (pushIndex <= 0) return false
+        val gitBeforePush = tokens.take(pushIndex).any { token ->
+            token.substringAfterLast('/') == "git"
+        }
+        if (!gitBeforePush) return false
+        return tokens.drop(pushIndex + 1).any { token ->
+            token == "-f" ||
+                token == "--force" ||
+                token == "--force-with-lease" ||
+                token.startsWith("--force-with-lease=")
+        }
+    }
 
     fun access(name: String): ToolAccess = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "present" -> ToolAccess.WORKSPACE_WRITE

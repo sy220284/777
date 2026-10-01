@@ -56,6 +56,11 @@ class LocalHarnessViewModel @Inject constructor(
         appContext = appContext,
         scope = viewModelScope,
     )
+    private val chatModelAssistController = LocalChatModelAssistController(
+        runtime = runtime,
+        personaAutoFillService = personaAutoFillService,
+        groupAnnouncementService = groupAnnouncementService,
+    )
     val gallery = personaGalleryController.gallery
     val personaPresets: List<PersonaPreset> = personaGalleryController.personaPresets
     private val transcriptHistoryController = LocalTranscriptHistoryController(
@@ -146,19 +151,8 @@ class LocalHarnessViewModel @Inject constructor(
     }
     suspend fun setGroupChatAnnouncement(text: String): Result<Unit> = runtime.chat.setGroupChatAnnouncement(text)
 
-    suspend fun generateGroupChatAnnouncement(direction: String): Result<String> = runCatching {
-        val snapshot = state.value
-        check(!snapshot.loading && !snapshot.running && snapshot.groupChat.enabled) { "请在群聊空闲时生成公告" }
-        check(snapshot.configured) { "请先配置聊天模型" }
-        check(snapshot.groupChat.members.size >= 2) { "请先添加至少两位群聊人物" }
-        groupAnnouncementService.generate(
-            model = snapshot.model, baseUrl = snapshot.baseUrl,
-            profileId = snapshot.modelSelection.activeProfileId,
-            members = snapshot.groupChat.members,
-            direction = direction,
-            current = snapshot.groupChat.announcement,
-        )
-    }
+    suspend fun generateGroupChatAnnouncement(direction: String): Result<String> =
+        chatModelAssistController.generateGroupAnnouncement(direction)
     suspend fun editAndResendUserMessage(messageId: String, text: String): LocalChatUserEditResult {
         val result = withContext(Dispatchers.IO) {
             runtime.chat.editAndResendUserMessage(messageId, text)
@@ -208,33 +202,8 @@ class LocalHarnessViewModel @Inject constructor(
     fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) =
         runtime.chat.undoChatPersonaCorrection(noticeId, personaId, correction)
 
-    suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> {
-        val snapshot = state.value
-        if (
-            snapshot.loading ||
-            snapshot.running ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.groupChat.enabled
-        ) {
-            return Result.failure(IllegalStateException("persona_autofill_busy"))
-        }
-        if (!snapshot.configured) {
-            return Result.failure(IllegalStateException("persona_autofill_unconfigured"))
-        }
-        return runCatching {
-            val recentMessages = withContext(Dispatchers.IO) {
-                runtime.session.transcriptTailForUi(snapshot.sessionId, PERSONA_AUTOFILL_RECENT_MESSAGES)
-            }
-            val generated = personaAutoFillService.generate(
-                model = snapshot.model,
-                baseUrl = snapshot.baseUrl,
-                current = snapshot.chatPersona,
-                recentMessages = recentMessages,
-                description = description,
-            )
-            runtime.chat.syncDefaultChatPersona(generated)
-        }
-    }
+    suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> =
+        chatModelAssistController.autoFillCurrentPersona(description)
     fun switchSession(sessionId: String) = runtime.session.switchSession(sessionId)
     fun clearCredential() = runtime.model.clearCredential()
 }

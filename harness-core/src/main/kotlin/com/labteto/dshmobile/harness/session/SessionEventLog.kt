@@ -32,6 +32,12 @@ data class SessionEventFileSnapshot(
     override fun close() = input.close()
 }
 
+data class SessionEventLogDiagnostics(
+    val malformedRows: Long,
+    val segmentReadFailures: Long,
+    val archiveFailures: Long,
+)
+
 /**
  * Append-only source of truth for model-visible session facts.
  *
@@ -44,6 +50,7 @@ class SessionEventLog(
     private val json: Json,
     private val maxBytes: Long = DEFAULT_MAX_BYTES,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val diagnosticSink: (String, Throwable?) -> Unit = { _, _ -> },
 ) {
     init {
         require(maxBytes >= MIN_MAX_BYTES) { "事件日志分段上限至少为 $MIN_MAX_BYTES 字节" }
@@ -51,7 +58,16 @@ class SessionEventLog(
 
     // Several Android adapters can open the same session while background maintenance is running.
     private val lock = PATH_LOCKS[(file.absolutePath.hashCode() and Int.MAX_VALUE) % PATH_LOCKS.size]
+    private val malformedRows = AtomicLong()
+    private val segmentReadFailures = AtomicLong()
+    private val archiveFailures = AtomicLong()
     private val nextSequence = AtomicLong(synchronized(lock) { readNextSequence() })
+
+    fun diagnostics(): SessionEventLogDiagnostics = SessionEventLogDiagnostics(
+        malformedRows = malformedRows.get(),
+        segmentReadFailures = segmentReadFailures.get(),
+        archiveFailures = archiveFailures.get(),
+    )
 
     fun append(type: String, data: JsonObject): SessionEvent = synchronized(lock) {
         require(type.isNotBlank()) { "事件类型不能为空" }
@@ -78,6 +94,7 @@ class SessionEventLog(
         nextSequence.incrementAndGet()
         // Archive maintenance must not turn a committed append into an apparent failure.
         runCatching { compressOneLegacySegmentUnsafe() }
+            .onFailure { error -> reportArchiveFailure("legacy-segment", error) }
         event
     }
 
@@ -144,12 +161,16 @@ class SessionEventLog(
             relevant.addFirst(source)
         }
         for (source in relevant) {
-            source.eventReader().use { reader ->
-                while (result.size < wanted) {
-                    val line = reader.readLine() ?: break
-                    val event = decodeEventOrNull(line) ?: continue
-                    if (event.sequence > sequenceExclusive) result += event
+            try {
+                source.eventReader().use { reader ->
+                    while (result.size < wanted) {
+                        val line = reader.readLine() ?: break
+                        val event = decodeEventOrNull(line) ?: continue
+                        if (event.sequence > sequenceExclusive) result += event
+                    }
                 }
+            } catch (error: Exception) {
+                reportSegmentReadFailure(source, error)
             }
             if (result.size >= wanted) break
         }
@@ -430,10 +451,14 @@ class SessionEventLog(
 
     private fun readFirstValidEventUnsafe(source: File): SessionEvent? {
         if (!source.isFile || source.length() == 0L) return null
-        source.eventReader().useLines { lines ->
-            lines.forEach { line ->
-                decodeEventOrNull(line)?.let { return it }
+        try {
+            source.eventReader().useLines { lines ->
+                lines.forEach { line ->
+                    decodeEventOrNull(line)?.let { return it }
+                }
             }
+        } catch (error: Exception) {
+            reportSegmentReadFailure(source, error)
         }
         return null
     }
@@ -493,7 +518,12 @@ class SessionEventLog(
         if (!source.isFile || source.length() == 0L) return true
         if (source.name.endsWith(COMPRESSED_SUFFIX)) {
             // One decoded segment is bounded by maxBytes (8 MiB in production).
-            val lines = source.eventReader().useLines { it.toList() }
+            val lines = try {
+                source.eventReader().useLines { it.toList() }
+            } catch (error: Exception) {
+                reportSegmentReadFailure(source, error)
+                return true
+            }
             for (line in lines.asReversed()) {
                 val event = decodeEventOrNull(line) ?: continue
                 if (!visitor(event)) return false
@@ -554,26 +584,31 @@ class SessionEventLog(
         val window = mutableListOf<SessionEvent>()
         var found = false
         var afterRemaining = after
-        sources[sourceIndex].eventReader().useLines { lines ->
-            val iterator = lines.iterator()
-            while (iterator.hasNext()) {
-                val event = decodeEventOrNull(iterator.next()) ?: continue
-                if (!found) {
-                    if (event.sequence == sequence) {
-                        found = true
-                        window.addAll(localBefore)
+        val targetSource = sources[sourceIndex]
+        try {
+            targetSource.eventReader().useLines { lines ->
+                val iterator = lines.iterator()
+                while (iterator.hasNext()) {
+                    val event = decodeEventOrNull(iterator.next()) ?: continue
+                    if (!found) {
+                        if (event.sequence == sequence) {
+                            found = true
+                            window.addAll(localBefore)
+                            window += event
+                        } else if (before > 0) {
+                            if (localBefore.size >= before) localBefore.removeFirst()
+                            localBefore.addLast(event)
+                        }
+                    } else if (afterRemaining > 0) {
                         window += event
-                    } else if (before > 0) {
-                        if (localBefore.size >= before) localBefore.removeFirst()
-                        localBefore.addLast(event)
+                        afterRemaining -= 1
+                    } else {
+                        break
                     }
-                } else if (afterRemaining > 0) {
-                    window += event
-                    afterRemaining -= 1
-                } else {
-                    break
                 }
             }
+        } catch (error: Exception) {
+            reportSegmentReadFailure(targetSource, error)
         }
         if (!found) return emptyList()
 
@@ -593,13 +628,18 @@ class SessionEventLog(
 
         var right = sourceIndex + 1
         while (afterRemaining > 0 && right < sources.size) {
-            sources[right].eventReader().useLines { lines ->
-                val iterator = lines.iterator()
-                while (afterRemaining > 0 && iterator.hasNext()) {
-                    val event = decodeEventOrNull(iterator.next()) ?: continue
-                    window += event
-                    afterRemaining -= 1
+            val source = sources[right]
+            try {
+                source.eventReader().useLines { lines ->
+                    val iterator = lines.iterator()
+                    while (afterRemaining > 0 && iterator.hasNext()) {
+                        val event = decodeEventOrNull(iterator.next()) ?: continue
+                        window += event
+                        afterRemaining -= 1
+                    }
                 }
+            } catch (error: Exception) {
+                reportSegmentReadFailure(source, error)
             }
             right += 1
         }
@@ -631,15 +671,32 @@ class SessionEventLog(
     }
 
     private fun decodeEventOrNull(line: String): SessionEvent? =
-        runCatching { json.decodeFromString(SessionEvent.serializer(), line) }.getOrNull()
+        runCatching { json.decodeFromString(SessionEvent.serializer(), line) }
+            .getOrElse { error ->
+                malformedRows.incrementAndGet()
+                reportDiagnostic("malformed-row", error)
+                null
+            }
+
+    private fun reportSegmentReadFailure(source: File, error: Throwable) {
+        segmentReadFailures.incrementAndGet()
+        reportDiagnostic("segment-read-failed:${source.name}", error)
+    }
+
+    private fun reportArchiveFailure(source: String, error: Throwable) {
+        archiveFailures.incrementAndGet()
+        reportDiagnostic("archive-failed:$source", error)
+    }
+
+    private fun reportDiagnostic(kind: String, error: Throwable?) {
+        runCatching { diagnosticSink(kind, error) }
+    }
 
     private fun readEventsUnsafe(): List<SessionEvent> {
         val events = mutableListOf<SessionEvent>()
         for (source in orderedFilesUnsafe()) {
             source.forEachEventLine { line ->
-                runCatching { json.decodeFromString(SessionEvent.serializer(), line) }
-                    .getOrNull()
-                    ?.let(events::add)
+                decodeEventOrNull(line)?.let(events::add)
             }
         }
         return events
@@ -679,6 +736,7 @@ class SessionEventLog(
             Files.move(file.toPath(), target.toPath())
         }
         runCatching { compressSegmentUnsafe(target) }
+            .onFailure { error -> reportArchiveFailure(target.name, error) }
     }
 
     private fun compressOneLegacySegmentUnsafe() {
@@ -721,7 +779,11 @@ class SessionEventLog(
         else bufferedReader()
 
     private inline fun File.forEachEventLine(block: (String) -> Unit) {
-        eventReader().useLines { lines -> lines.forEach(block) }
+        try {
+            eventReader().useLines { lines -> lines.forEach(block) }
+        } catch (error: Exception) {
+            reportSegmentReadFailure(this, error)
+        }
     }
 
     private companion object {
