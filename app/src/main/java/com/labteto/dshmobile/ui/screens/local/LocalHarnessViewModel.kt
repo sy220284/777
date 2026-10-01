@@ -240,7 +240,7 @@ class LocalHarnessViewModel @Inject constructor(
             personaInspectionService.inspect(
                 model = snapshot.model,
                 baseUrl = snapshot.baseUrl,
-            profileId = snapshot.modelSelection.activeProfileId,
+                profileId = snapshot.modelSelection.activeProfileId,
                 persona = entry.persona,
                 messages = dialogue,
             )
