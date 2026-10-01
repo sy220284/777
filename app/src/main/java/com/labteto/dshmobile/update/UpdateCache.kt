@@ -38,9 +38,10 @@ internal object UpdateCache {
             nowMillis = nowMillis,
         )
         if (protectedForMillis != null) {
-            throw IOException(
-                "上一份更新仍由系统安装器处理，请先完成安装；安装包会在系统释放后自动清理",
-            )
+            // prepare() only runs after an explicit new update action. Reaching it means the user
+            // has returned to the app and deliberately superseded the previous installer handoff;
+            // do not lock them out for the remainder of the passive cleanup grace window.
+            root.deleteRecursively()
         }
         if (root.exists() && !root.deleteRecursively()) {
             throw IOException("无法清理旧更新缓存，请释放存储空间后重试")
