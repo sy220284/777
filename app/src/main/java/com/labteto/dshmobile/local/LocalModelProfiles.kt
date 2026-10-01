@@ -494,23 +494,7 @@ object LocalModelPresets {
 
 /** Fix the retired official preset without changing proxy model aliases or credential identity. */
 internal fun migrateOfficialClaudeModel(model: String, baseUrl: String): String =
-    if (model == LEGACY_CLAUDE_SONNET_MODEL && isOfficialAnthropicBaseUrl(baseUrl)) {
-        CURRENT_CLAUDE_SONNET_MODEL
+    if (model == "claude-sonnet-5" &&
+        normalizeModelBaseUrl(baseUrl).trimEnd('/') == "https://api.anthropic.com/v1") {
+        "claude-sonnet-5-5"
     } else model
-
-internal fun migratedOfficialClaudeProfileId(profile: LocalModelProfile): String? {
-    if (
-        profile.authKind != LocalModelAuthKind.API_KEY ||
-        profile.model != CURRENT_CLAUDE_SONNET_MODEL ||
-        !isOfficialAnthropicBaseUrl(profile.baseUrl)
-    ) return null
-    val legacyId = modelProfileId(LEGACY_CLAUDE_SONNET_MODEL, profile.baseUrl)
-    if (profile.id != legacyId) return null
-    return modelProfileId(CURRENT_CLAUDE_SONNET_MODEL, profile.baseUrl)
-}
-
-private fun isOfficialAnthropicBaseUrl(baseUrl: String): Boolean =
-    normalizeModelBaseUrl(baseUrl).trimEnd('/') == "https://api.anthropic.com/v1"
-
-private const val LEGACY_CLAUDE_SONNET_MODEL = "claude-sonnet-5"
-private const val CURRENT_CLAUDE_SONNET_MODEL = "claude-sonnet-5-5"
