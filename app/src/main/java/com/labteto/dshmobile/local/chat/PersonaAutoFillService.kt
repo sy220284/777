@@ -319,7 +319,8 @@ class PersonaAutoFillService @Inject constructor(
             },
         )
 
-        val reply = modelGateway.complete(
+        return modelGateway.withFrozenRoute(model, baseUrl) {
+            val reply = modelGateway.complete(
             baseUrl = baseUrl,
             model = model,
             messages = messages,
@@ -382,7 +383,7 @@ class PersonaAutoFillService @Inject constructor(
             }
         }
 
-        return current.copy(
+        current.copy(
             id = PersonaProfile.DEFAULT_PERSONA_ID,
             name = draft.name.ifBlank { current.name.ifBlank { "默认角色" } },
             identity = draft.identity.ifBlank { current.identity },
@@ -404,6 +405,7 @@ class PersonaAutoFillService @Inject constructor(
             bannedPhrases = draft.bannedPhrases.ifEmpty { current.bannedPhrases },
             signaturePhrases = draft.signaturePhrases.ifEmpty { current.signaturePhrases },
         )
+        }
     }
 
     private companion object {
