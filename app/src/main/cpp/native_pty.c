@@ -366,6 +366,32 @@ Java_com_labteto_dshmobile_runtime_NativePtyBridge_nativeIsAlive(
     return JNI_FALSE;
 }
 
+JNIEXPORT jboolean JNICALL
+Java_com_labteto_dshmobile_runtime_NativePtyBridge_nativeHasReadable(
+    JNIEnv *env,
+    jobject self,
+    jlong raw_handle
+) {
+    (void) env;
+    (void) self;
+    dsh_pty_handle *handle = (dsh_pty_handle *) (intptr_t) raw_handle;
+    if (handle == NULL || handle->master_fd < 0) return JNI_FALSE;
+    int available = 0;
+    if (ioctl(handle->master_fd, FIONREAD, &available) == 0 && available > 0) {
+        return JNI_TRUE;
+    }
+    struct pollfd descriptor = {
+        .fd = handle->master_fd,
+        .events = POLLIN,
+        .revents = 0,
+    };
+    int ready;
+    do {
+        ready = poll(&descriptor, 1, 0);
+    } while (ready < 0 && errno == EINTR);
+    return ready > 0 && (descriptor.revents & POLLIN) != 0 ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT void JNICALL
 Java_com_labteto_dshmobile_runtime_NativePtyBridge_nativeClose(
     JNIEnv *env,
