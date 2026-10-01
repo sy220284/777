@@ -7,5 +7,8 @@ data class LocalModelSelectionState(
     val profiles: List<LocalModelProfile> = emptyList(),
     val activeProfileId: String? = null,
 ) {
+    val activeProfile: LocalModelProfile?
+        get() = profiles.firstOrNull { it.id == activeProfileId }
+
     fun isActive(profile: LocalModelProfile): Boolean = profile.id == activeProfileId
 }
