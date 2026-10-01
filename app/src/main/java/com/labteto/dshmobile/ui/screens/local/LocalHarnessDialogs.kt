@@ -527,6 +527,7 @@ internal fun ChatPersonaDialog(
                     val message = when (error) {
                         "persona_autofill_busy" -> stringResource(R.string.local_persona_ai_busy)
                         "persona_autofill_unconfigured" -> stringResource(R.string.local_persona_ai_unconfigured)
+                        "persona_autofill_stale" -> stringResource(R.string.local_persona_ai_stale)
                         "persona_autofill_failed" -> stringResource(R.string.local_persona_ai_failed)
                         else -> error
                     }
