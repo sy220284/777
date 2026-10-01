@@ -44,7 +44,10 @@ class BundledNodeRuntime @Inject constructor(
         val libraryDir = File(versionRoot, "lib")
         val marker = File(versionRoot, ".ready")
         val markerValue = "$version|" + BundledRuntimeLibraryStore.LAYOUT_VERSION
-        if (marker.readTextOrNull() != markerValue) {
+        if (
+            marker.readTextOrNull() != markerValue ||
+            !BundledRuntimeLibraryStore.isMaterializedValid(context, "node", abi, libraryDir)
+        ) {
             versionRoot.deleteRecursively()
             BundledRuntimeLibraryStore.materialize(context, "node", abi, libraryDir)
             marker.parentFile?.mkdirs()
