@@ -295,8 +295,7 @@ class LocalHarnessEngine @Inject constructor(
             resourceScheduler = resourceScheduler,
             routeProvider = {
                 val current = _state.value
-                current.modelSelection.activeProfile
-                    ?.takeIf { current.configured }
+                current.modelSelection.activeProfile?.takeIf { current.configured }
                     ?.let { LocalVisionRoute(it.baseUrl, it.model, profile = it) }
             },
             imageSupportProvider = { route ->
@@ -2921,7 +2920,7 @@ class LocalHarnessEngine @Inject constructor(
                     expectedSessionId = snapshot.sessionId,
                     expectedAssistantMessageId = assistantTranscript.id,
                     expectedBaseState = _state.value.chatState,
-                    profile = snapshot.modelSelection.activeProfile ?: return,
+                    profile = snapshot.modelSelection.activeProfile,
                     sourceUserMessageId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
                 )
             }
@@ -3516,7 +3515,7 @@ class LocalHarnessEngine @Inject constructor(
                         expectedSessionId = postTurnSnapshot.sessionId,
                         expectedAssistantMessageId = assistantMessage.id,
                         expectedBaseState = postTurnSnapshot.chatState,
-                        profile = runSnapshot.modelSelection.activeProfile ?: return@withTimeout,
+                        profile = runSnapshot.modelSelection.activeProfile,
                         sourceUserMessageId = sourceMessageId ?: runSnapshot.transcriptIndex.latestUserMessageId,
                     )
                 }
@@ -4660,9 +4659,10 @@ class LocalHarnessEngine @Inject constructor(
         expectedSessionId: String,
         expectedAssistantMessageId: String,
         expectedBaseState: ChatCharacterState,
-        profile: LocalModelProfile,
+        profile: LocalModelProfile?,
         sourceUserMessageId: String? = null,
     ) {
+        if (profile == null) return
         chatContextRefreshCoordinator.schedule(
             userMessage = userMessage,
             assistantMessage = assistantMessage,
