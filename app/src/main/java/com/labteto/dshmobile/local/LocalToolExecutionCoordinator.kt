@@ -171,7 +171,9 @@ internal class LocalToolExecutionCoordinator(
             timedOut -> "TOOL_TIMEOUT"
             else -> "TOOL_REPORTED_ERROR"
         }
-        val retryable = result.retryable || (providerCode == null && timedOut && readLike)
+        // A mutating/process/device tool may already have produced a side effect. Even when a
+        // provider reports a transient failure, automatic retry is only safe for read-like tools.
+        val retryable = readLike && (result.retryable || (providerCode == null && timedOut))
         AppLog.warn(
             "LocalToolExecution",
             "工具执行失败 tool=${call.name} code=$errorCode retryable=$retryable",

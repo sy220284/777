@@ -128,7 +128,7 @@ class LocalToolExecutionCoordinatorTest {
 
         assertTrue(result.isError)
         assertEquals("WRITE_FAILED", result.errorCode)
-        assertTrue(result.retryable)
+        assertFalse(result.retryable)
         assertEquals("重新读取目标状态后再决定是否重试。", result.recoveryHint)
         assertEquals(AgentToolSideEffect.POSSIBLE, result.sideEffect)
     }
