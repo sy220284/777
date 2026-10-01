@@ -1,11 +1,14 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -26,7 +29,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -70,7 +74,7 @@ class LocalWebProvider @Inject constructor(
                     .header("User-Agent", USER_AGENT)
                     .header("Accept", "text/html,text/plain,application/json,application/xml;q=0.9,*/*;q=0.5")
                 route.hostHeader?.let { requestBuilder.header("Host", it) }
-                route.client.newCall(requestBuilder.build()).execute().use { response ->
+                val result = withCancellableHttpResponse(route.client.newCall(requestBuilder.build())) { response ->
                     if (response.isRedirect) {
                         if (redirectCount >= MAX_REDIRECTS) {
                             throw LocalWebException("HTTP_REDIRECT", "网页重定向次数过多")
@@ -78,14 +82,14 @@ class LocalWebProvider @Inject constructor(
                         val location = response.header("Location")
                             ?: throw LocalWebException("HTTP_REDIRECT", "网页重定向缺少地址")
                         current = validateTarget(current.uri.resolve(location).toString())
-                        return@repeat
+                        return@withCancellableHttpResponse null
                     }
                     if (!response.isSuccessful) {
                         val code = if (response.code in 400..499) "HTTP_4XX" else "HTTP_5XX"
                         throw LocalWebException(code, "服务器返回 HTTP ${response.code}：${current.uri}")
                     }
                     val body = response.body
-                        ?: return@withContext LocalWebFetchResult(
+                        ?: return@withCancellableHttpResponse LocalWebFetchResult(
                             url = current.uri.toString(),
                             mediaType = "",
                             content = "",
@@ -105,7 +109,7 @@ class LocalWebProvider @Inject constructor(
                     val charset = body.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
                     val rawText = bounded.bytes.toString(charset)
                     val content = if (format == "raw") rawText else normalize(rawText, mediaType)
-                    return@withContext LocalWebFetchResult(
+                    return@withCancellableHttpResponse LocalWebFetchResult(
                         url = current.uri.toString(),
                         mediaType = mediaType,
                         content = content,
@@ -114,6 +118,7 @@ class LocalWebProvider @Inject constructor(
                         truncated = bounded.truncated,
                     )
                 }
+                result?.let { return@withContext it }
             }
             throw LocalWebException("HTTP_REDIRECT", "网页重定向次数过多")
         } catch (error: LocalWebException) {
@@ -167,11 +172,11 @@ class LocalWebProvider @Inject constructor(
                 .method(verb, requestBody)
             safeHeaders.forEach { (name, value) -> builder.header(name, value) }
             route.hostHeader?.let { builder.header("Host", it) }
-            executeWithTransientRetry(
+            val result = executeWithTransientRetry(
                 client = route.client,
                 request = builder.build(),
                 attempts = if (verb in SAFE_RETRY_METHODS) SAFE_HTTP_RETRY_ATTEMPTS else 1,
-            ).use { response ->
+            ) { response ->
                 if (response.isRedirect) {
                     if (verb !in setOf("GET", "HEAD")) {
                         throw LocalWebException("HTTP_REDIRECT", "会改变远端状态的 HTTP 请求拒绝自动跟随重定向")
@@ -182,7 +187,7 @@ class LocalWebProvider @Inject constructor(
                     val location = response.header("Location")
                         ?: throw LocalWebException("HTTP_REDIRECT", "HTTP 重定向缺少地址")
                     current = validateTarget(current.uri.resolve(location).toString())
-                    return@repeat
+                    return@executeWithTransientRetry null
                 }
                 val responseBody = response.body
                 val mediaType = responseBody?.contentType()?.toString().orEmpty()
@@ -194,7 +199,7 @@ class LocalWebProvider @Inject constructor(
                 }
                 val bounded = responseBody?.byteStream()?.use { readBounded(it, byteLimit) }
                     ?: BoundedBytes(ByteArray(0), false)
-                return@withContext LocalHttpResponse(
+                return@executeWithTransientRetry LocalHttpResponse(
                     url = current.uri.toString(),
                     status = response.code,
                     mediaType = mediaType,
@@ -204,6 +209,7 @@ class LocalWebProvider @Inject constructor(
                     truncated = bounded.truncated,
                 )
             }
+            result?.let { return@withContext it }
         }
         throw LocalWebException("HTTP_REDIRECT", "HTTP 请求重定向次数过多")
     }
@@ -223,7 +229,7 @@ class LocalWebProvider @Inject constructor(
                 .header("User-Agent", USER_AGENT)
                 .get()
             route.hostHeader?.let { builder.header("Host", it) }
-            route.client.newCall(builder.build()).execute().use { response ->
+            val result = withCancellableHttpResponse(route.client.newCall(builder.build())) { response ->
                 if (response.isRedirect) {
                     if (redirectCount >= MAX_REDIRECTS) {
                         throw LocalWebException("HTTP_REDIRECT", "下载重定向次数过多")
@@ -231,7 +237,7 @@ class LocalWebProvider @Inject constructor(
                     val location = response.header("Location")
                         ?: throw LocalWebException("HTTP_REDIRECT", "下载重定向缺少地址")
                     current = validateTarget(current.uri.resolve(location).toString())
-                    return@repeat
+                    return@withCancellableHttpResponse null
                 }
                 if (!response.isSuccessful) {
                     throw LocalWebException(
@@ -245,8 +251,7 @@ class LocalWebProvider @Inject constructor(
                     throw LocalWebException("DOWNLOAD_TOO_LARGE", "下载文件超过 ${boundedMax} 字节上限")
                 }
                 destination.parentFile?.mkdirs()
-                val temporary = File(destination.parentFile, destination.name + ".part")
-                temporary.delete()
+                val temporary = File.createTempFile("web-download-", ".part", destination.absoluteFile.parentFile)
                 val digest = MessageDigest.getInstance("SHA-256")
                 var total = 0L
                 try {
@@ -254,7 +259,9 @@ class LocalWebProvider @Inject constructor(
                         temporary.outputStream().use { output ->
                             val buffer = ByteArray(32 * 1024)
                             while (true) {
+                                currentCoroutineContext().ensureActive()
                                 val read = inputStream.read(buffer)
+                                currentCoroutineContext().ensureActive()
                                 if (read < 0) break
                                 total += read
                                 if (total > boundedMax) {
@@ -269,21 +276,20 @@ class LocalWebProvider @Inject constructor(
                         }
                     }
                     require(total > 0L) { "下载文件为空" }
-                    if (!temporary.renameTo(destination)) {
-                        temporary.copyTo(destination, overwrite = true)
-                        temporary.delete()
-                    }
+                    currentCoroutineContext().ensureActive()
+                    Files.move(temporary.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
                 } catch (error: Throwable) {
                     temporary.delete()
                     throw error
                 }
-                return@withContext LocalDownloadResult(
+                return@withCancellableHttpResponse LocalDownloadResult(
                     url = current.uri.toString(),
                     bytes = total,
                     mediaType = body.contentType()?.toString().orEmpty(),
                     sha256 = digest.digest().joinToString("") { "%02x".format(it) },
                 )
             }
+            result?.let { return@withContext it }
         }
         throw LocalWebException("HTTP_REDIRECT", "下载重定向次数过多")
     }
@@ -391,8 +397,10 @@ class LocalWebProvider @Inject constructor(
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
         return try {
-            runInterruptible { http.newCall(request).execute() }.use { response ->
-                val body = response.body?.string().orEmpty()
+            withCancellableHttpResponse(http.newCall(request)) { response ->
+                val bounded = response.body?.byteStream()?.use { readBounded(it, MAX_FETCH_BYTES) }
+                require(bounded?.truncated != true) { "网页搜索响应超过大小上限" }
+                val body = bounded?.bytes?.toString(Charsets.UTF_8).orEmpty()
                 if (!response.isSuccessful) {
                     val code = if (response.code in 400..499) "HTTP_4XX" else "HTTP_5XX"
                     throw LocalWebException(code, "网页搜索失败（HTTP ${response.code}）：${body.take(500)}")
@@ -619,7 +627,7 @@ class LocalWebProvider @Inject constructor(
         error("网络探测重试循环异常结束")
     }
 
-    private fun probeConnectivityOnce(target: ValidatedTarget): ConnectivityProbe {
+    private suspend fun probeConnectivityOnce(target: ValidatedTarget): ConnectivityProbe {
         return try {
             val route = requestRoute(target, PROBE_CALL_TIMEOUT_SECONDS)
             val builder = Request.Builder()
@@ -627,7 +635,7 @@ class LocalWebProvider @Inject constructor(
                 .header("User-Agent", USER_AGENT)
                 .head()
             route.hostHeader?.let { builder.header("Host", it) }
-            route.client.newCall(builder.build()).execute().use { response ->
+            withCancellableHttpResponse(route.client.newCall(builder.build())) { response ->
                 val classification = classifyProbeStatus(response.code)
                 ConnectivityProbe(
                     reachable = classification.first,
@@ -650,25 +658,24 @@ class LocalWebProvider @Inject constructor(
         }
     }
 
-    private suspend fun executeWithTransientRetry(
+    private suspend fun <T> executeWithTransientRetry(
         client: OkHttpClient,
         request: Request,
         attempts: Int,
-    ): Response {
-        val boundedAttempts = attempts.coerceAtLeast(1)
+        read: suspend (Response) -> T,
+    ): T {
+        val boundedAttempts = attempts.coerceIn(1, SAFE_HTTP_RETRY_ATTEMPTS)
         repeat(boundedAttempts) { index ->
             try {
-                val response = client.newCall(request).execute()
-                if (index + 1 < boundedAttempts && shouldRetryProbeStatus(response.code)) {
-                    response.close()
-                    delay(NETWORK_RETRY_BACKOFF_MS * (index + 1))
-                    return@repeat
+                val result = withCancellableHttpResponse(client.newCall(request)) { response ->
+                    if (index + 1 < boundedAttempts && shouldRetryProbeStatus(response.code)) null
+                    else Result.success(read(response))
                 }
-                return response
+                if (result != null) return result.getOrThrow()
             } catch (error: java.io.IOException) {
                 if (!isRetryableTransportFailure(error) || index + 1 >= boundedAttempts) throw error
-                delay(NETWORK_RETRY_BACKOFF_MS * (index + 1))
             }
+            delay(NETWORK_RETRY_BACKOFF_MS * (index + 1))
         }
         error("HTTP 重试循环异常结束")
     }

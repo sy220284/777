@@ -1,11 +1,11 @@
 package com.labteto.dshmobile.local.model.chatgpt
 
+import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -48,7 +48,7 @@ class ChatGptSessionManager @Inject constructor(
                 refresh(latest)
             } catch (error: ChatGptOAuthTokenException) {
                 if (shouldInvalidateChatGptRefreshToken(error.oauthCode)) {
-                    accounts.clearCredentials(accountId)
+                    accounts.clearCredentials(accountId, expected = latest)
                     throw ChatGptOAuthTokenException(
                         oauthCode = error.oauthCode,
                         message = "ChatGPT 登录已过期或已被撤销，请重新授权",
@@ -56,7 +56,9 @@ class ChatGptSessionManager @Inject constructor(
                 }
                 throw error
             }
-            accounts.put(refreshed, select = accounts.selectedId() == accountId)
+            check(accounts.replaceCredentials(latest, refreshed)) {
+                "ChatGPT 账户在刷新期间已断开或变更，请重新选择账户后重试"
+            }
             refreshed.accessToken
         }
     }
@@ -86,8 +88,8 @@ class ChatGptSessionManager @Inject constructor(
                 .url(CHATGPT_OPENID_CONFIGURATION_URL)
                 .get()
                 .build()
-            runInterruptible { http.newCall(discovery).execute() }.use { response ->
-                if (!response.isSuccessful) return@withContext null
+            withCancellableHttpResponse(http.newCall(discovery)) { response ->
+                if (!response.isSuccessful) return@withCancellableHttpResponse null
                 val body = response.body?.string().orEmpty()
                 runCatching {
                     json.parseToJsonElement(body).jsonObject["revocation_endpoint"]
@@ -109,7 +111,7 @@ class ChatGptSessionManager @Inject constructor(
             var lastFailure: IOException? = null
             for (attempt in 0 until REVOKE_ATTEMPTS) {
                 val responseCode = try {
-                    runInterruptible { http.newCall(request).execute() }.use { response -> response.code }
+                    withCancellableHttpResponse(http.newCall(request)) { response -> response.code }
                 } catch (error: IOException) {
                     lastFailure = error
                     null
@@ -135,7 +137,7 @@ class ChatGptSessionManager @Inject constructor(
             .header("Authorization", "Bearer $token")
             .get()
             .build()
-        runInterruptible { http.newCall(request).execute() }.use { response ->
+        withCancellableHttpResponse(http.newCall(request)) { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 throw IOException("读取 ChatGPT 模型列表失败（HTTP ${response.code}）")
@@ -175,7 +177,7 @@ class ChatGptSessionManager @Inject constructor(
             .post(form)
             .header("Accept", "application/json")
             .build()
-        runInterruptible { http.newCall(request).execute() }.use { response ->
+        withCancellableHttpResponse(http.newCall(request)) { response ->
             val body = response.body?.string().orEmpty()
             val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
             if (!response.isSuccessful) {

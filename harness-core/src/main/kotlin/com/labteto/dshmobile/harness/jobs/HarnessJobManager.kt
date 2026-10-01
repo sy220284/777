@@ -66,6 +66,9 @@ class HarnessJobManager(
 
     private val lock = Any()
     private val records = linkedMapOf<String, Record>()
+    private val removingOwners = mutableSetOf<String>()
+
+    private fun Record.occupiesSlot(): Boolean = status == "running" || job?.isCompleted == false
 
     init {
         synchronized(lock) {
@@ -140,9 +143,10 @@ class HarnessJobManager(
         var previousOwnerId: String? = null
         val record = synchronized(lock) {
             val found = records[id] ?: return "后台任务不存在：$id"
+            if ((ownerId ?: found.ownerId) in removingOwners) return "会话正在移除，无法恢复后台任务"
             if (found.resumeKind.isNullOrBlank()) return "后台任务不可恢复：$id"
             if (found.status != "interrupted") return "后台任务无需恢复：$id [${found.status}]"
-            val running = records.values.count { it.status == "running" }
+            val running = records.values.count { it.occupiesSlot() }
             if (running >= maxConcurrentJobs) {
                 return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
             }
@@ -181,7 +185,7 @@ class HarnessJobManager(
     fun snapshots(): List<JobSnapshot> = synchronized(lock) { records.values.map(::snapshot) }
 
     fun availableSlots(): Int = synchronized(lock) {
-        (maxConcurrentJobs - records.values.count { it.status == "running" }).coerceAtLeast(0)
+        (maxConcurrentJobs - records.values.count { it.occupiesSlot() }).coerceAtLeast(0)
     }
 
     fun failInterrupted(id: String, detail: String): String {
@@ -205,8 +209,9 @@ class HarnessJobManager(
         block: suspend (String, (String) -> Unit) -> String,
     ): String {
         val record = synchronized(lock) {
+            if (ownerId in removingOwners) return "会话正在移除，无法启动后台任务"
             pruneRetainedLocked()
-            val running = records.values.count { it.status == "running" }
+            val running = records.values.count { it.occupiesSlot() }
             if (running >= maxConcurrentJobs) {
                 return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
             }
@@ -300,6 +305,7 @@ class HarnessJobManager(
                 false
             }
         }
+        launched.invokeOnCompletion { notifyChanged() }
         if (shouldStart) {
             launched.start()
         } else {
@@ -341,7 +347,7 @@ class HarnessJobManager(
         }
         job?.cancel()
         publish()
-        return "已停止后台任务：$id"
+        return "已请求停止后台任务：$id"
     }
 
     fun send(id: String, message: String, ownerId: String? = null): String {
@@ -406,31 +412,29 @@ class HarnessJobManager(
     suspend fun removeOwnedAndJoin(ownerIds: Set<String>) {
         if (ownerIds.isEmpty()) return
         val jobs = synchronized(lock) {
-            records.values
-                .filter { it.ownerId in ownerIds && it.status == "running" }
-                .onEach {
-                    it.status = "cancelled"
-                    it.output = "任务已取消"
-                    it.updatedAt = System.currentTimeMillis()
-                }
-                .mapNotNull { it.job }
+            check(ownerIds.none { it in removingOwners }) { "会话任务正在移除" }
+            removingOwners.addAll(ownerIds)
+            markRunningJobsCancelled { it.ownerId in ownerIds }
         }
-        jobs.forEach { it.cancel() }
-        jobs.joinAll()
-        synchronized(lock) {
-            val iterator = records.entries.iterator()
-            while (iterator.hasNext()) {
-                if (iterator.next().value.ownerId in ownerIds) iterator.remove()
+        try {
+            jobs.forEach { it.cancel() }
+            jobs.joinAll()
+            synchronized(lock) {
+                records.entries.removeAll { it.value.ownerId in ownerIds }
             }
+            publish()
+        } finally {
+            synchronized(lock) { removingOwners.removeAll(ownerIds) }
         }
-        publish()
     }
 
     private fun markRunningJobsCancelled(predicate: (Record) -> Boolean = { true }): List<Job> = synchronized(lock) {
-        records.values.filter { it.status == "running" && predicate(it) }.onEach {
-            it.status = "cancelled"
-            it.output = "任务已取消"
-            it.updatedAt = System.currentTimeMillis()
+        records.values.filter { it.occupiesSlot() && predicate(it) }.onEach {
+            if (it.status == "running") {
+                it.status = "cancelled"
+                it.output = "任务已取消"
+                it.updatedAt = System.currentTimeMillis()
+            }
         }.mapNotNull { it.job }
     }
 
@@ -449,7 +453,7 @@ class HarnessJobManager(
     private fun pruneRetainedLocked() {
         if (records.size < maxRetainedJobs) return
         val removable = records.values
-            .filter { it.status != "running" }
+            .filter { !it.occupiesSlot() }
             .map { it.id }
         for (id in removable) {
             if (records.size < maxRetainedJobs) break

@@ -21,6 +21,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -59,17 +60,40 @@ class McpClient(
     private val transport: McpTransport,
 ) : Closeable {
     suspend fun listTools(): List<McpToolDefinition> {
-        val result = transport.request("tools/list").requireResult()
-        return result["tools"]?.jsonArray.orEmpty().map { element ->
-            val tool = element.jsonObject
-            McpToolDefinition(
-                name = tool["name"]?.jsonPrimitive?.content ?: error("MCP 工具缺少 name"),
-                description = tool["description"]?.jsonPrimitive?.content,
-                inputSchema = tool["inputSchema"]?.jsonObject ?: JsonObject(emptyMap()),
-                raw = tool,
-            )
+        val tools = mutableListOf<McpToolDefinition>()
+        val names = mutableSetOf<String>()
+        val cursors = mutableSetOf<String>()
+        var cursor: String? = null
+        var definitionBytes = 0
+        repeat(MAX_TOOL_PAGES) {
+            val result = transport.request("tools/list", buildJsonObject {
+                cursor?.let { put("cursor", it) }
+            }).requireResult()
+            result["tools"]?.jsonArray.orEmpty().forEach { element ->
+                val tool = element.jsonObject
+                val name = tool["name"]?.jsonPrimitive?.content ?: error("MCP 工具缺少 name")
+                require(name.isNotBlank() && names.add(name)) { "MCP 工具名称为空或重复：$name" }
+                require(tools.size < MAX_TOOLS) { "MCP 工具数量超过 $MAX_TOOLS 上限" }
+                val bytes = tool.toString().toByteArray(Charsets.UTF_8).size
+                require(bytes <= MAX_DEFINITION_BYTES - definitionBytes) { "MCP 工具定义总大小超过上限" }
+                definitionBytes += bytes
+                tools += McpToolDefinition(
+                    name = name,
+                    description = tool["description"]?.jsonPrimitive?.content,
+                    inputSchema = tool["inputSchema"]?.jsonObject ?: JsonObject(emptyMap()),
+                    raw = tool,
+                )
+            }
+            val next = result["nextCursor"]?.takeUnless { it == JsonNull } ?: return tools
+            val value = next.jsonPrimitive
+            require(value.isString && value.content.length in 1..MAX_CURSOR_CHARS && cursors.add(value.content)) {
+                "MCP 分页游标无效或重复"
+            }
+            cursor = value.content
         }
+        error("MCP 工具分页超过 $MAX_TOOL_PAGES 页上限")
     }
+
 
     suspend fun callTool(name: String, arguments: JsonObject): JsonObject =
         transport.request(
@@ -84,6 +108,13 @@ class McpClient(
         transport.request("server/discover").requireResult()
 
     override fun close() = transport.close()
+
+    private companion object {
+        const val MAX_TOOLS = 128
+        const val MAX_TOOL_PAGES = 128
+        const val MAX_DEFINITION_BYTES = 8 * 1024 * 1024
+        const val MAX_CURSOR_CHARS = 4_096
+    }
 
     private fun JsonObject.requireResult(): JsonObject {
         this["error"]?.let { error -> throw IllegalStateException("MCP 返回错误：$error") }
@@ -136,16 +167,10 @@ class McpStreamableHttpTransport(
             }
 
             http.newCall(builder.build()).executeCancellable { response ->
-                val body = response.readMcpBodyBounded()
                 if (!response.isSuccessful) {
-                    throw McpHttpException(response.code, body)
+                    throw McpHttpException(response.code, response.readMcpBodyBounded())
                 }
-                val contentType = response.header("Content-Type").orEmpty()
-                if (contentType.startsWith("text/event-stream", ignoreCase = true)) {
-                    parseSseResponse(body, id, json)
-                } else {
-                    parseJsonRpcResponse(body, id, json)
-                }
+                response.readMcpRpcResponse(id, json)
             }
         }
 
@@ -363,19 +388,6 @@ internal fun parseJsonRpcResponse(body: String, id: Long, json: Json): JsonObjec
         "MCP HTTP 响应 id 与请求不匹配"
     }
     return response
-}
-
-internal fun parseSseResponse(body: String, id: Long, json: Json): JsonObject {
-    var matching: JsonObject? = null
-    body.lineSequence().forEach { line ->
-        if (!line.startsWith("data:")) return@forEach
-        val payload = line.removePrefix("data:").trim()
-        if (payload.isEmpty()) return@forEach
-        val objectValue = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull()
-            ?: return@forEach
-        if (objectValue["id"]?.jsonPrimitive?.content == id.toString()) matching = objectValue
-    }
-    return matching ?: error("MCP SSE 未返回请求 $id 的最终响应")
 }
 
 internal fun encodeHeaderValue(value: String): String =
