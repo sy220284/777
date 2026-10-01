@@ -122,6 +122,7 @@ import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.rootSurface
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -806,15 +807,16 @@ private fun LocalConversationSurface(
                 }
                 var failure: String? = if (uris.size > available) imageLimitMessage else null
                 uris.take(available).forEach { uri ->
-                    runCatching { onImportAttachment(uri) }
-                        .onSuccess { imported ->
-                            val duplicate = imported.attachmentId != null &&
-                                attachments.any { it.attachmentId == imported.attachmentId }
-                            if (!duplicate) attachments += imported
-                        }
-                        .onFailure { error ->
-                            failure = error.message ?: imageImportFailedMessage
-                        }
+                    try {
+                        val imported = onImportAttachment(uri)
+                        val duplicate = imported.attachmentId != null &&
+                            attachments.any { it.attachmentId == imported.attachmentId }
+                        if (!duplicate) attachments += imported
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        failure = error.message ?: imageImportFailedMessage
+                    }
                 }
                 attachmentError = failure
             }
@@ -823,12 +825,14 @@ private fun LocalConversationSurface(
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch {
-                runCatching { onImportAttachment(uri) }
-                    .onSuccess {
-                        attachments += it
-                        attachmentError = null
-                    }
-                    .onFailure { attachmentError = it.message ?: fileImportFailedMessage }
+                try {
+                    attachments += onImportAttachment(uri)
+                    attachmentError = null
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    attachmentError = error.message ?: fileImportFailedMessage
+                }
             }
         }
     }

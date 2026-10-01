@@ -1,0 +1,73 @@
+name: Capture README UI
+
+on:
+  push:
+    branches:
+      - docs/readme-user-flow
+    paths:
+      - '.github/workflows/capture-readme-ui.yml'
+      - 'app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/ReadmeUiScreenshotCaptureTest.kt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+      - name: Enable KVM acceleration
+        run: |
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+          else
+            echo "::error::/dev/kvm is unavailable on this runner"
+            exit 1
+          fi
+      - name: Capture current Android UI
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 36
+          arch: x86_64
+          disable-animations: true
+          script: |
+            set -eux
+            DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.ReadmeUiScreenshotCaptureTest --stacktrace
+
+            mkdir -p docs/images/current
+            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/navigation.png > docs/images/current/navigation.png
+            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/chat.png > docs/images/current/chat.png
+            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/work.png > docs/images/current/work.png
+            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/character-tuning.png > docs/images/current/character-tuning.png
+            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/usage.png > docs/images/current/usage.png
+            test -s docs/images/current/navigation.png
+            test -s docs/images/current/chat.png
+            test -s docs/images/current/work.png
+            test -s docs/images/current/character-tuning.png
+            test -s docs/images/current/usage.png
+            python3 -c 'from pathlib import Path; import struct; files=sorted(Path("docs/images/current").glob("*.png")); assert {p.name for p in files}=={"navigation.png","chat.png","work.png","character-tuning.png","usage.png"}; [(lambda d,p: (d[:8]==b"\\x89PNG\\r\\n\\x1a\\n" or (_ for _ in ()).throw(AssertionError(f"{p} invalid PNG")), struct.unpack(">II",d[16:24])[0]>=300 or (_ for _ in ()).throw(AssertionError(f"{p} width")), struct.unpack(">II",d[16:24])[1]>=500 or (_ for _ in ()).throw(AssertionError(f"{p} height"))))(p.read_bytes(),p) for p in files]'
+
+      - name: Commit captured screenshots
+        run: |
+          set -euxo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/images/current/*.png
+          if git diff --cached --quiet; then
+            echo "界面截图没有变化"
+            exit 0
+          fi
+          git commit -m "更新 README 当前界面截图"
+          git push origin HEAD:"${GITHUB_REF_NAME}"

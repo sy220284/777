@@ -31,12 +31,11 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.CloudDownload
+import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -62,7 +61,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -87,12 +85,10 @@ import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.DsSegment
 import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
-import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ToggleRow
@@ -108,6 +104,7 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -122,10 +119,11 @@ import kotlinx.coroutines.withContext
  */
 enum class SettingsDestination {
     ROOT,
-    GENERAL,
+    SESSION,
     APPEARANCE,
     CHAT,
     MODELS,
+    MODEL_USAGE,
     PRICING,
     USAGE,
     USAGE_LOG,
@@ -138,19 +136,57 @@ enum class SettingsDestination {
 
 private fun SettingsDestination.parentDestination(): SettingsDestination? = when (this) {
     SettingsDestination.ROOT -> null
-    SettingsDestination.GENERAL,
+    SettingsDestination.SESSION,
+    SettingsDestination.APPEARANCE,
     SettingsDestination.MODELS,
+    SettingsDestination.MODEL_USAGE,
     SettingsDestination.MEMORY,
     SettingsDestination.PERMISSIONS,
     SettingsDestination.NOTIFICATIONS,
     SettingsDestination.ADVANCED -> SettingsDestination.ROOT
-    SettingsDestination.APPEARANCE,
-    SettingsDestination.CHAT -> SettingsDestination.GENERAL
+    SettingsDestination.CHAT -> SettingsDestination.SESSION
     SettingsDestination.PRICING,
-    SettingsDestination.USAGE -> SettingsDestination.MODELS
+    SettingsDestination.USAGE -> SettingsDestination.MODEL_USAGE
     SettingsDestination.USAGE_LOG -> SettingsDestination.USAGE
     SettingsDestination.USAGE_DETAIL -> SettingsDestination.USAGE
 }
+
+internal fun encodeUsageDetailSelection(selection: UsageDetailSelection?): List<String> = when (selection) {
+    null -> emptyList()
+    is UsageDetailSelection.Request -> listOf("request", selection.requestId)
+    is UsageDetailSelection.Group -> listOf(
+        "group",
+        selection.kind.name,
+        selection.key,
+        selection.title,
+    )
+}
+
+internal fun decodeUsageDetailSelection(saved: List<String>): UsageDetailSelection? = when (saved.firstOrNull()) {
+    "request" -> saved.getOrNull(1)
+        ?.takeIf(String::isNotBlank)
+        ?.let(UsageDetailSelection::Request)
+    "group" -> {
+        if (saved.size < 4) null else {
+            runCatching { com.labteto.dshmobile.local.TokenUsageGroupKind.valueOf(saved[1]) }
+                .getOrNull()
+                ?.let { kind ->
+                    UsageDetailSelection.Group(
+                        kind = kind,
+                        key = saved[2],
+                        title = saved[3],
+                    )
+                }
+        }
+    }
+    else -> null
+}
+
+private val usageDetailSelectionStateSaver =
+    androidx.compose.runtime.saveable.listSaver<androidx.compose.runtime.MutableState<UsageDetailSelection?>, String>(
+        save = { state -> encodeUsageDetailSelection(state.value) },
+        restore = { saved -> mutableStateOf(decodeUsageDetailSelection(saved)) },
+    )
 
 @Composable
 fun SettingsScreen(
@@ -188,14 +224,20 @@ fun SettingsScreen(
                         stream.write(report.toByteArray(Charsets.UTF_8))
                     } ?: error("无法打开导出文件")
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 toast.second(exportFailed)
             }
         }
     }
-    var page by rememberSaveable { mutableStateOf(initialDestination) }
-    var usageDetailSelection by remember { mutableStateOf<UsageDetailSelection?>(null) }
-    var usageDetailBackSelection by remember { mutableStateOf<UsageDetailSelection?>(null) }
+    var page by rememberSaveable(initialDestination) { mutableStateOf(initialDestination) }
+    var usageDetailSelection by rememberSaveable(saver = usageDetailSelectionStateSaver) {
+        mutableStateOf<UsageDetailSelection?>(null)
+    }
+    var usageDetailBackSelection by rememberSaveable(saver = usageDetailSelectionStateSaver) {
+        mutableStateOf<UsageDetailSelection?>(null)
+    }
     var usageDetailReturnPage by rememberSaveable { mutableStateOf(SettingsDestination.USAGE) }
     var showDisconnectDialog by remember { mutableStateOf(false) }
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
@@ -213,6 +255,8 @@ fun SettingsScreen(
                 viewModel.exportLocalSessionStorage(uri)
                 localSessionStorageStatus = viewModel.localSessionStorageStatus()
                 toast.second(storageExported)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 toast.second(storageExportFailed)
             } finally {
@@ -237,9 +281,6 @@ fun SettingsScreen(
     }
 
     BackHandler { navigateBack() }
-    LaunchedEffect(initialDestination) {
-        page = initialDestination
-    }
     LaunchedEffect(connectionState.phase) {
         viewModel.refreshRemoteSettings()
     }
@@ -260,10 +301,11 @@ fun SettingsScreen(
 
     val title = when (page) {
         SettingsDestination.ROOT -> stringResource(R.string.settings_title)
-        SettingsDestination.GENERAL -> stringResource(R.string.settings_page_general)
+        SettingsDestination.SESSION -> stringResource(R.string.settings_page_session)
         SettingsDestination.APPEARANCE -> stringResource(R.string.settings_page_appearance)
         SettingsDestination.CHAT -> stringResource(R.string.settings_page_chat)
         SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
+        SettingsDestination.MODEL_USAGE -> stringResource(R.string.settings_page_model_usage)
         SettingsDestination.PRICING -> stringResource(R.string.settings_page_pricing)
         SettingsDestination.USAGE -> stringResource(R.string.usage_calculation_title)
         SettingsDestination.USAGE_LOG -> stringResource(R.string.usage_log_title)
@@ -308,7 +350,7 @@ fun SettingsScreen(
                 ) {
                 when (page) {
                     SettingsDestination.ROOT -> {
-                        Text(stringResource(R.string.settings_group_experience), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
+                        Text(stringResource(R.string.settings_group_models), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
                         DsGroupCard {
                             DsCategoryRow(
                                 icon = Icons.Outlined.Cloud,
@@ -319,6 +361,17 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.MODELS },
                             )
                             DsCategoryRow(
+                                icon = Icons.Outlined.History,
+                                title = stringResource(R.string.settings_page_model_usage),
+                                subtitle = stringResource(R.string.settings_model_usage_subtitle),
+                                iconFamily = DsIconFamily.Amber,
+                                onClick = { page = SettingsDestination.MODEL_USAGE },
+                            )
+                        }
+
+                        Text(stringResource(R.string.settings_group_experience), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
+                        DsGroupCard {
+                            DsCategoryRow(
                                 icon = Icons.Outlined.Memory,
                                 title = stringResource(R.string.settings_page_memory),
                                 subtitle = stringResource(R.string.settings_memory_subtitle),
@@ -327,12 +380,29 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.MEMORY },
                             )
                             DsCategoryRow(
-                                icon = Icons.Outlined.Language,
-                                title = stringResource(R.string.settings_page_general),
-                                subtitle = stringResource(R.string.settings_general_subtitle),
+                                icon = Icons.Outlined.Tune,
+                                title = stringResource(R.string.settings_page_appearance),
+                                subtitle = stringResource(R.string.settings_appearance_reading_subtitle),
                                 iconFamily = DsIconFamily.Cyan,
-                                value = appearanceLabel(settings.themePreference),
-                                onClick = { page = SettingsDestination.GENERAL },
+                                value = stringResource(
+                                    R.string.settings_text_scale_value,
+                                    (settings.textScale * 100).toInt(),
+                                ),
+                                onClick = { page = SettingsDestination.APPEARANCE },
+                            )
+                            DsCategoryRow(
+                                icon = Icons.Outlined.Chat,
+                                title = stringResource(R.string.settings_page_session),
+                                subtitle = stringResource(R.string.settings_session_subtitle),
+                                iconFamily = DsIconFamily.Cyan,
+                                value = stringResource(
+                                    if (sessionSort == "updated") {
+                                        R.string.chatlist_sort_updated
+                                    } else {
+                                        R.string.chatlist_sort_manual
+                                    },
+                                ),
+                                onClick = { page = SettingsDestination.SESSION },
                             )
                         }
 
@@ -386,20 +456,7 @@ fun SettingsScreen(
                         )
                     }
 
-                    SettingsDestination.GENERAL -> {
-                        SettingsCard(stringResource(R.string.settings_general), Icons.Outlined.Language) {
-                            LanguageRow(settings) { tag -> viewModel.set { it.copy(localeOverride = tag) } }
-                        }
-                        DsGroupCard {
-                            DsCategoryRow(
-                                icon = Icons.Outlined.Tune,
-                                title = stringResource(R.string.settings_page_appearance),
-                                subtitle = stringResource(R.string.settings_appearance_reading_subtitle),
-                                iconFamily = DsIconFamily.Cyan,
-                                value = stringResource(R.string.settings_text_scale_value, (settings.textScale * 100).toInt()),
-                                onClick = { page = SettingsDestination.APPEARANCE },
-                            )
-                        }
+                    SettingsDestination.SESSION -> {
                         SettingsCard(stringResource(R.string.chatlist_title), Icons.Outlined.History) {
                             ToggleRow(
                                 stringResource(R.string.chatlist_sort_updated),
@@ -586,6 +643,11 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.MODELS -> {
+                        LocalModelSettingsCard(localHarness, viewModel, toast.second)
+                        ModelServicesCard(modelServices, viewModel)
+                    }
+
+                    SettingsDestination.MODEL_USAGE -> {
                         DsGroupCard {
                             DsCategoryRow(
                                 icon = Icons.Outlined.Tune,
@@ -602,8 +664,6 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.USAGE },
                             )
                         }
-                        LocalModelSettingsCard(localHarness, viewModel, toast.second)
-                        ModelServicesCard(modelServices, viewModel)
                     }
 
                     SettingsDestination.PRICING -> {
@@ -962,63 +1022,6 @@ private fun ConnectionSection(connectionState: ConnectionUiState, onDisconnect: 
     }
 }
 
-@Composable
-private fun LanguageRow(settings: AppSettings, onSelect: (String) -> Unit) {
-    val colors = DsTheme.colors
-    // A compact dropdown keeps the language choice secondary to the settings users change often.
-    val systemLanguage = LocalConfiguration.current.locales[0].language
-    val effectiveTag = when {
-        settings.localeOverride?.startsWith("zh", ignoreCase = true) == true -> "zh-CN"
-        settings.localeOverride == "en" -> "en"
-        systemLanguage.equals("zh", ignoreCase = true) -> "zh-CN"
-        else -> "en"
-    }
-    val current = LanguageOptions.first { it.tag == effectiveTag }
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.small),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            stringResource(R.string.settings_language),
-            style = DsType.std14.withReadingWeight(),
-            color = colors.labelSecondary,
-            modifier = Modifier.weight(1f),
-        )
-        DsMenu(
-            anchor = {
-                Row(
-                    modifier = Modifier
-                        .clip(DsShapes.pillFull)
-                        .background(colors.hoverSolid)
-                        .border(1.dp, colors.borderL2, DsShapes.pillFull)
-                        .padding(horizontal = DsSpacing.compact, vertical = DsSpacing.tiny),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-                ) {
-                    Text(
-                        current.label,
-                        style = DsType.small13.withReadingWeight(),
-                        color = colors.labelPrimary,
-                        maxLines = 1,
-                    )
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = colors.labelSecondary,
-                        modifier = Modifier.size(14.dp),
-                    )
-                }
-            },
-            items = LanguageOptions.map { option ->
-                MenuItem(
-                    text = option.label,
-                    icon = Icons.Filled.Check.takeIf { option == current },
-                ) { onSelect(option.tag) }
-            },
-        )
-    }
-}
-
 private fun enabledNotificationCount(settings: AppSettings): Int = listOf(
     settings.notifyTurnComplete,
     settings.notifyGoal,
@@ -1032,14 +1035,6 @@ private fun deviceCapabilitiesState(state: DeviceCapabilitiesState): StateDotSta
     state.accessibility && state.notifications && state.virtualDisplay -> StateDotState.Done
     state.accessibility || state.notifications -> StateDotState.Warning
     else -> StateDotState.Idle
-}
-
-@Composable
-private fun appearanceLabel(preference: String): String = when (preference) {
-    "light" -> stringResource(R.string.settings_appearance_light)
-    "dark" -> stringResource(R.string.settings_appearance_dark)
-    "matte_black" -> stringResource(R.string.settings_appearance_matte_black)
-    else -> stringResource(R.string.settings_appearance_system)
 }
 
 @Composable

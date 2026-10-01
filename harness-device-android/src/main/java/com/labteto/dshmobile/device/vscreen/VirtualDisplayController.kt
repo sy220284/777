@@ -25,6 +25,18 @@ data class VirtualDisplayStatus(
     val valid: Boolean,
 )
 
+internal inline fun <T> releaseResourceOnFailure(
+    release: () -> Unit,
+    block: () -> T,
+): T {
+    try {
+        return block()
+    } catch (error: Throwable) {
+        runCatching { release() }
+        throw error
+    }
+}
+
 class VirtualDisplayController(
     private val context: Context,
 ) {
@@ -52,19 +64,22 @@ class VirtualDisplayController(
         val flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY or
             DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC or
             DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION
-        val display = manager.createVirtualDisplay(
-            "777-harness-$id",
-            width,
-            height,
-            densityDpi,
-            reader.surface,
-            flags,
-        ) ?: run {
-            reader.close()
-            error("系统拒绝创建虚拟屏")
+        return releaseResourceOnFailure(reader::close) {
+            val display = manager.createVirtualDisplay(
+                "777-harness-$id",
+                width,
+                height,
+                densityDpi,
+                reader.surface,
+                flags,
+            ) ?: error("系统拒绝创建虚拟屏")
+            releaseResourceOnFailure(display::release) {
+                val session = Session(id, width, height, densityDpi, reader, display)
+                val createdStatus = statusOf(session)
+                sessions[id] = session
+                createdStatus
+            }
         }
-        sessions[id] = Session(id, width, height, densityDpi, reader, display)
-        return status(id)
     }
 
     fun status(id: String): VirtualDisplayStatus {

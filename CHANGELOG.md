@@ -7,13 +7,18 @@ All notable changes to DSH Mobile are documented here. Format based on
 
 ### Added
 
-- **The app can wear a background image.** Settings → General now takes a picture from the device
+- **The app can wear a background image.** Settings → Appearance & Reading now takes a picture from the device
   and paints it behind the whole shell. Cards, sheets and list rows keep their own opaque fills, so
   text keeps its contrast; only the surfaces that cover the window — the local home, the chat screen
   and the workspace panel — drop their fill while an image is in use. The picked file is *copied*
   into the app's private storage instead of being referenced by URI, so the background survives a
   restart and does not vanish when a picker grant lapses. Picking another image replaces the stored
   one; removing it returns the plain theme colour.
+
+### Changed
+
+- Reorganized Settings around direct task entry points: removed the General/language selector, split Model and Experience into separate groups, promoted Appearance & Reading and Session to top-level pages, renamed Model to Model Settings, and moved API pricing plus usage into a separate Model Pricing & Usage page.
+- Retired the old per-app language stack completely: Chinese is now the single default resource surface, Android's app-language entry is removed, and legacy saved app-language state is cleared through a one-way startup migration.
 
 ### Fixed
 

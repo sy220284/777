@@ -5,7 +5,6 @@ import com.labteto.dshmobile.local.LocalHarnessResourceState
 import com.labteto.dshmobile.local.projectWorkResourceCount
 import com.labteto.dshmobile.local.LocalUsageMode
 
-/** Maps scheduler-owned resource state into the stable app/session projection. */
 internal fun HarnessResourceSnapshot.toLocalHarnessResourceState(
     usageMode: LocalUsageMode,
 ): LocalHarnessResourceState =

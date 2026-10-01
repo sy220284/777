@@ -1,9 +1,12 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.SessionEvent
+import com.labteto.dshmobile.harness.session.SessionEventFileSnapshot
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
+import java.io.OutputStream
 import java.util.zip.ZipInputStream
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
@@ -12,6 +15,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -97,8 +101,61 @@ class LocalSessionStorageManagerTest {
         assertEquals("event-a\n", entries["a.events.jsonl"])
     }
 
+    @Test
+    fun exportFailureClosesEveryOpenedEventSnapshot() {
+        val root = temporary.newFolder("sessions-export-failure")
+        File(root, "a.events.jsonl").writeText("event-a\n")
+        val first = TrackingInputStream("first\n".toByteArray())
+        val second = TrackingInputStream("second\n".toByteArray())
+        val third = TrackingInputStream("third\n".toByteArray())
+        val snapshots = listOf(
+            SessionEventFileSnapshot("a.events.jsonl.part-0", 1L, 6L, first),
+            SessionEventFileSnapshot("a.events.jsonl.part-1", 2L, 7L, second),
+            SessionEventFileSnapshot("a.events.jsonl", 3L, 6L, third),
+        )
+        val manager = LocalSessionStorageManager(
+            root = root,
+            json = json,
+            eventSnapshotOpener = { _, _ -> snapshots },
+        )
+
+        assertThrows(IOException::class.java) {
+            manager.exportAll(FailingOutputStream(failAfterBytes = 64))
+        }
+
+        assertTrue(first.closed)
+        assertTrue(second.closed)
+        assertTrue(third.closed)
+    }
+
     private fun manager(root: File) = LocalSessionStorageManager(
         root = root,
-        json = json
+        json = json,
     )
+
+    private class TrackingInputStream(bytes: ByteArray) : ByteArrayInputStream(bytes) {
+        var closed: Boolean = false
+            private set
+
+        override fun close() {
+            closed = true
+            super.close()
+        }
+    }
+
+    private class FailingOutputStream(
+        private val failAfterBytes: Int,
+    ) : OutputStream() {
+        private var written = 0
+
+        override fun write(value: Int) {
+            if (written >= failAfterBytes) throw IOException("forced export failure")
+            written++
+        }
+
+        override fun write(buffer: ByteArray, offset: Int, length: Int) {
+            if (written + length > failAfterBytes) throw IOException("forced export failure")
+            written += length
+        }
+    }
 }

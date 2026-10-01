@@ -9,8 +9,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.os.LocaleListCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import com.labteto.dshmobile.connection.HostsStore
@@ -50,22 +48,11 @@ class MainActivity : AppCompatActivity() {
         notifications.ensureChannels()
         notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
 
-        // Keep runtime appearance and app language aligned with persisted settings.
+        // Keep runtime appearance aligned with persisted settings.
         lifecycleScope.launch {
             hostsStore.settings.collect { settings ->
                 applyWindowBackground(settings.themePreference)
                 applyNightMode(settings.themePreference)
-
-                val desiredLocales = settings.localeOverride?.let { tag ->
-                    LocaleListCompat.forLanguageTags(tag)
-                } ?: LocaleListCompat.getEmptyLocaleList()
-                
-                val currentLocales = AppCompatDelegate.getApplicationLocales()
-                
-                // Only dispatch a locale update when the effective language really changed.
-                if (desiredLocales.toLanguageTags() != currentLocales.toLanguageTags()) {
-                    AppCompatDelegate.setApplicationLocales(desiredLocales)
-                }
             }
         }
 

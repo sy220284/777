@@ -43,7 +43,8 @@ class HostsStore @Inject constructor(
         val NOTIFY_LOCAL_JOBS = booleanPreferencesKey("notify_local_jobs")
         val THEME = stringPreferencesKey("theme")
         val ACCENT_THEME = stringPreferencesKey("accent_theme")
-        val LOCALE = stringPreferencesKey("locale")
+        // Migration-only key from builds that exposed per-app language selection.
+        val RETIRED_LOCALE = stringPreferencesKey("locale")
         val LAST_SESSIONS = stringPreferencesKey("last_sessions_json")
         val SESSION_SORT = stringPreferencesKey("session_sort")
         val DESIRED_HOST_ID = stringPreferencesKey("desired_host_id")
@@ -57,6 +58,17 @@ class HostsStore @Inject constructor(
     val settings: Flow<AppSettings> = dataStore.data.map(::decodeSettings)
 
     suspend fun settingsOnce(): AppSettings = settings.first()
+
+    /**
+     * One-way migration cleanup for builds that persisted a per-app language choice.
+     *
+     * The setting no longer participates in runtime behavior. Remove this compatibility boundary
+     * once the supported upgrade path can no longer originate from a build that wrote "locale".
+     */
+    suspend fun clearRetiredLocalePreference() {
+        if (dataStore.data.first()[Keys.RETIRED_LOCALE] == null) return
+        dataStore.edit { it.remove(Keys.RETIRED_LOCALE) }
+    }
 
     suspend fun setDesiredHost(id: String?) {
         dataStore.edit { prefs ->
@@ -227,11 +239,6 @@ class HostsStore @Inject constructor(
             textWeightAdjustment = (prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] ?: 0).coerceIn(0, 2),
             wallpaperSurfaceTransparency =
                 (prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] ?: 0.5f).coerceIn(0f, 1f),
-            localeOverride = when (val tag = prefs[Keys.LOCALE]) {
-                "en" -> "en"
-                "zh", "zh-CN", "zh_CN" -> "zh-CN"
-                else -> null
-            },
         )
 
     private fun decodeHosts(prefs: Preferences): List<HostConfig> {
@@ -271,7 +278,6 @@ class HostsStore @Inject constructor(
             prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] = next.textWeightAdjustment.coerceIn(0, 2)
             prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] =
                 next.wallpaperSurfaceTransparency.coerceIn(0f, 1f)
-            next.localeOverride?.let { prefs[Keys.LOCALE] = it } ?: prefs.remove(Keys.LOCALE)
             committed = next
         }
         // Mirrored out to SharedPreferences as well: the scheme has to be readable before any
