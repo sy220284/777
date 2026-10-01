@@ -35,27 +35,41 @@ class LocalModelGateway @Inject constructor(
     suspend fun availableProfiles(): List<LocalModelProfile> =
         routes.profiles().filter { credentials.hasCredential(it) }
 
-    suspend fun profileForRun(selection: String? = null): LocalModelProfile =
-        selectRunModelProfile(availableProfiles(), credentials.active(), selection).also {
+    suspend fun profileForRun(selection: String? = null): LocalModelProfile {
+        val inherited = currentCoroutineContext()[LocalModelRunContext]?.profile
+        val selected = if (selection?.trim().isNullOrEmpty() && inherited != null) {
+            inherited
+        } else {
+            selectRunModelProfile(availableProfiles(), credentials.active(), selection)
+        }
+        require(credentials.hasCredential(selected)) { "所选模型凭据不可用" }
+        return selected
+    }
+
+    suspend fun profileForRoute(
+        profileId: String?,
+        model: String,
+        baseUrl: String,
+    ): LocalModelProfile =
+        selectModelRouteProfile(availableProfiles(), profileId, model, baseUrl).also {
             require(credentials.hasCredential(it)) { "所选模型凭据不可用" }
         }
+
+    suspend fun <T> withFrozenRoute(
+        profileId: String?,
+        model: String,
+        baseUrl: String,
+        block: suspend () -> T,
+    ): T {
+        val profile = profileForRoute(profileId, model, baseUrl)
+        return withContext(LocalModelRunContext(profile)) { block() }
+    }
 
     suspend fun <T> withFrozenRoute(
         model: String,
         baseUrl: String,
         block: suspend () -> T,
-    ): T {
-        val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl)
-        val active = credentials.active()?.takeIf {
-            it.model == model && normalizeModelBaseUrl(it.baseUrl) == normalizedBaseUrl
-        }
-        val profile = active
-            ?: availableProfiles().singleOrNull {
-                it.model == model && normalizeModelBaseUrl(it.baseUrl) == normalizedBaseUrl
-            }
-            ?: profileForRun(model)
-        return withContext(LocalModelRunContext(profile)) { block() }
-    }
+    ): T = withFrozenRoute(null, model, baseUrl, block)
 
     suspend fun complete(
         model: String,
@@ -135,7 +149,7 @@ class LocalModelGateway @Inject constructor(
     ): LocalResolvedModelRoute {
         val effectiveProfile = profile
             ?: currentCoroutineContext()[LocalModelRunContext]?.profile
-            ?: credentials.active()
+            ?: profileForRoute(null, model, baseUrl)
         val resolved = credentials.resolve(model, baseUrl, effectiveProfile)
         val preset = LocalModelPresets.find(model, baseUrl)
         val protocol = resolveLocalModelProtocol(
