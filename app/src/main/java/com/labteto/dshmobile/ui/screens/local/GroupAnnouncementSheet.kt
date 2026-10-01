@@ -102,7 +102,10 @@ internal fun GroupAnnouncementSheet(
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    DsBottomSheet(title = stringResource(R.string.local_group_announcement_title), onDismiss = onDismiss) {
+    DsBottomSheet(
+        title = stringResource(R.string.local_group_announcement_title),
+        onDismiss = { if (!saving) onDismiss() },
+    ) {
         Text(stringResource(R.string.local_group_announcement_hint),
             style = DsType.small13.withReadingWeight(), color = DsTheme.colors.labelSecondary)
         OutlinedTextField(
