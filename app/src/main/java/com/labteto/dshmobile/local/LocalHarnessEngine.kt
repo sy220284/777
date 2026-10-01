@@ -295,7 +295,7 @@ class LocalHarnessEngine @Inject constructor(
             resourceScheduler = resourceScheduler,
             routeProvider = {
                 val current = _state.value
-                current.modelSelection.profiles.firstOrNull { it.id == current.modelSelection.activeProfileId }
+                current.modelSelection.activeProfile
                     ?.takeIf { current.configured }
                     ?.let { LocalVisionRoute(it.baseUrl, it.model, profile = it) }
             },
@@ -1230,7 +1230,7 @@ class LocalHarnessEngine @Inject constructor(
         val expectedSessionId = snapshot.sessionId
         val expectedAssistantMessageId = assistantMessage.id
         val boundEventLog = eventLogFor(expectedSessionId)
-        val key = modelRequestMarkerOrNull() ?: return false; val profile = modelGateway.activeProfile() ?: return false
+        val key = modelRequestMarkerOrNull() ?: return false
         val prompt = chatTurnCoordinator.replySuggestionsPrompt(
             persona = snapshot.chatPersona,
             state = snapshot.chatState,
@@ -1250,7 +1250,7 @@ class LocalHarnessEngine @Inject constructor(
                 step = CHAT_POST_TURN_MODEL_STEP + 1,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
-                requestLog = boundEventLog, profile = profile,
+                requestLog = boundEventLog,
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -2921,8 +2921,8 @@ class LocalHarnessEngine @Inject constructor(
                     expectedSessionId = snapshot.sessionId,
                     expectedAssistantMessageId = assistantTranscript.id,
                     expectedBaseState = _state.value.chatState,
-                    sourceUserMessageId = sourceMessageId
-                        ?: snapshot.transcriptIndex.latestUserMessageId,
+                    profile = snapshot.modelSelection.activeProfile ?: return,
+                    sourceUserMessageId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
                 )
             }
         } catch (cancelled: CancellationException) {
@@ -3516,8 +3516,8 @@ class LocalHarnessEngine @Inject constructor(
                         expectedSessionId = postTurnSnapshot.sessionId,
                         expectedAssistantMessageId = assistantMessage.id,
                         expectedBaseState = postTurnSnapshot.chatState,
-                        sourceUserMessageId = sourceMessageId
-                            ?: runSnapshot.transcriptIndex.latestUserMessageId,
+                        profile = runSnapshot.modelSelection.activeProfile ?: return@withTimeout,
+                        sourceUserMessageId = sourceMessageId ?: runSnapshot.transcriptIndex.latestUserMessageId,
                     )
                 }
             }
@@ -4660,9 +4660,9 @@ class LocalHarnessEngine @Inject constructor(
         expectedSessionId: String,
         expectedAssistantMessageId: String,
         expectedBaseState: ChatCharacterState,
+        profile: LocalModelProfile,
         sourceUserMessageId: String? = null,
     ) {
-        val profile = modelGateway.activeProfile() ?: return
         chatContextRefreshCoordinator.schedule(
             userMessage = userMessage,
             assistantMessage = assistantMessage,
