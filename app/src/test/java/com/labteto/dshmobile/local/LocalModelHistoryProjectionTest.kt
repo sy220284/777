@@ -272,6 +272,23 @@ class LocalModelHistoryProjectionTest {
     }
 
     @Test
+    fun malformedCheckpointToolCallsTypeIsDiscarded() {
+        val malformed = buildJsonObject {
+            put("role", "assistant")
+            put("tool_calls", "broken")
+        }
+
+        val restored = restoreLocalModelHistory(
+            listOf(event(0L, ModelHistoryCheckpointCodec.EVENT_TYPE, codec.encode(listOf(malformed), "malformed-type"))),
+            emptyList(),
+            codec,
+        )
+
+        assertTrue(restored.messages.isEmpty())
+        assertTrue(restored.checkpointRecommended)
+    }
+
+    @Test
     fun malformedCheckpointToolCallWithoutIdIsDiscarded() {
         val malformed = buildJsonObject {
             put("role", "assistant")
