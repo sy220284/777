@@ -27,46 +27,17 @@ internal class LocalModelStartupMigrator(
             }
         }
 
-        var all = profiles.read()
-        val activeBeforeIdentityMigration = profiles.active(model, baseUrl, all)
-        val migratedIds = linkedMapOf<String, String>()
-        val normalized = all.map { profile ->
-            val nextId = com.labteto.dshmobile.local.migratedOfficialClaudeProfileId(profile)
-                ?: return@map profile
-            migratedIds[profile.id] = nextId
-            profile.copy(id = nextId)
-        }
-        if (migratedIds.isNotEmpty()) {
-            for ((oldId, newId) in migratedIds) {
-                val oldKey = apiKeys.getFor(oldId)
-                if (oldKey != null && apiKeys.getFor(newId) == null) {
-                    apiKeys.putFor(newId, oldKey)
-                }
-            }
-            profiles.write(normalized)
-            activeBeforeIdentityMigration?.let { previous ->
-                migratedIds[previous.id]?.let { newId ->
-                    normalized.firstOrNull { it.id == newId }?.let(profiles::setActive)
-                }
-            }
-            for ((oldId, newId) in migratedIds) {
-                if (oldId != newId && apiKeys.getFor(newId) != null) apiKeys.clearFor(oldId)
-            }
-            all = normalized
-        }
-
+        val all = profiles.read()
         apiKeys.migrate(
             all.filter { it.authKind == LocalModelAuthKind.API_KEY }
                 .map(LocalModelProfile::id),
         )
-        val currentModel = com.labteto.dshmobile.local.migrateOfficialClaudeModel(model, baseUrl)
-        val active = profiles.active(currentModel, baseUrl, all)
+        val active = profiles.active(model, baseUrl, all)
         if (active != null && gateway.hasCredential(active)) {
-            profiles.setActive(active)
             gateway.activate(active)
         } else {
             gateway.clearActive()
-            apiKeys.activate(modelProfileId(currentModel, baseUrl))
+            apiKeys.activate(modelProfileId(model, baseUrl))
         }
     }
 
