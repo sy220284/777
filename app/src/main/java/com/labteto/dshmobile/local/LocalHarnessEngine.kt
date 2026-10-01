@@ -2793,7 +2793,7 @@ class LocalHarnessEngine @Inject constructor(
                 },
             )
 
-            if (replacingMessageId != null && reply.content.isNullOrBlank()) {
+            if (reply.content.isNullOrBlank()) {
                 error("模型没有返回可用回复")
             }
 
