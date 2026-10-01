@@ -17,7 +17,8 @@ All notable changes to DSH Mobile are documented here. Format based on
 
 ### Changed
 
-- Reorganized Settings around direct task entry points: removed the General/language selector, promoted Appearance & Reading and Session to top-level pages, renamed Model to Model Settings, and moved API pricing plus usage into a separate Model Pricing & Usage page.
+- Reorganized Settings around direct task entry points: removed the General/language selector, split Model and Experience into separate groups, promoted Appearance & Reading and Session to top-level pages, renamed Model to Model Settings, and moved API pricing plus usage into a separate Model Pricing & Usage page.
+- Retired the old per-app language stack completely: Chinese is now the single default resource surface, Android's app-language entry is removed, and legacy saved app-language state is cleared through a one-way startup migration.
 
 ### Fixed
 
