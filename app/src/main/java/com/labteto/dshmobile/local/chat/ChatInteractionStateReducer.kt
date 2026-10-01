@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local.chat
 
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-
 /** Owns deterministic hidden-state evolution after model output has been parsed. */
 internal class ChatInteractionStateReducer {
     fun reduce(
