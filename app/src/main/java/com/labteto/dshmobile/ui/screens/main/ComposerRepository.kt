@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.ui.screens.main
 
 import androidx.compose.runtime.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
 
 internal data class ComposerKey(val host: String, val sessionId: String)
 
@@ -20,13 +20,12 @@ internal class ComposerDraft(val key: ComposerKey) {
 }
 
 internal class ComposerRepository(
+    val scope: CoroutineScope,
     private val maxCachedDrafts: Int = MAX_CACHED_DRAFTS,
 ) {
     init {
         require(maxCachedDrafts > 0) { "草稿缓存上限必须大于 0" }
     }
-
-    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     /**
      * Drafts survive normal session switches, but they must not live for the lifetime of
