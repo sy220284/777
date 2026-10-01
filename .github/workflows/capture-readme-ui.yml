@@ -6,6 +6,7 @@ on:
       - docs/readme-screenshot-capture
     paths:
       - '.github/workflows/capture-readme-ui.yml'
+      - '.github/scripts/capture-readme-ui.sh'
       - 'app/src/debug/**'
       - 'README.md'
   workflow_dispatch:
@@ -43,67 +44,7 @@ jobs:
           api-level: 36
           arch: x86_64
           disable-animations: true
-          script: |
-            bash <<'BASH'
-            set -euo pipefail
-            DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:assembleDebug --stacktrace
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
-
-            mkdir -p docs/images/current
-
-            capture_screen() {
-              local screen="$1"
-              local output="$2"
-              local ready=0
-
-              adb logcat -c
-              adb shell am force-stop com.sy220284.dshmobile.debug
-              adb shell am start -W \
-                -n com.sy220284.dshmobile.debug/com.labteto.dshmobile.ui.screens.local.ReadmeScreenshotActivity \
-                --es readme_screen "$screen"
-
-              for attempt in $(seq 1 80); do
-                if adb logcat -d -s ReadmeScreenshot:I '*:S' | grep -Fq "READY:$screen"; then
-                  ready=1
-                  break
-                fi
-                sleep 0.25
-              done
-              test "$ready" -eq 1
-
-              adb exec-out screencap -p > "$output"
-              test -s "$output"
-            }
-
-            capture_screen navigation docs/images/current/navigation.png
-            capture_screen chat docs/images/current/chat.png
-            capture_screen work docs/images/current/work.png
-            capture_screen character-tuning docs/images/current/character-tuning.png
-            capture_screen usage docs/images/current/usage.png
-
-            python3 - <<'PY'
-            from pathlib import Path
-            import struct
-
-            expected = {
-                "navigation.png",
-                "chat.png",
-                "work.png",
-                "character-tuning.png",
-                "usage.png",
-            }
-            files = sorted(Path("docs/images/current").glob("*.png"))
-            assert {p.name for p in files} == expected
-
-            for path in files:
-                data = path.read_bytes()
-                assert data[:8] == bytes.fromhex("89504e470d0a1a0a"), f"{path} invalid PNG"
-                width, height = struct.unpack(">II", data[16:24])
-                assert width >= 300, f"{path} width={width}"
-                assert height >= 500, f"{path} height={height}"
-                assert len(data) > 10_000, f"{path} bytes={len(data)}"
-            PY
-            BASH
+          script: bash .github/scripts/capture-readme-ui.sh
 
       - name: Upload captured screenshots
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
