@@ -33,6 +33,33 @@ class LocalModelProfilesTest {
         assertEquals(LocalModelProtocol.RESPONSES, LocalModelPresets.find("gpt-6-astra", "https://api.openai.com/v1")?.protocol)
     }
 
+
+    @Test fun migratedOfficialClaudeRouteReusesStableApiCredentialProfileId() {
+        val officialBase = "https://api.anthropic.com/v1"
+        val legacy = LocalModelProfile(
+            id = modelProfileId("claude-sonnet-5", officialBase),
+            model = "claude-sonnet-5-5",
+            baseUrl = officialBase,
+            provider = "Claude",
+            protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
+        )
+        val custom = LocalModelProfile(
+            id = modelProfileId("claude-sonnet-5", "https://proxy.example/v1"),
+            model = "claude-sonnet-5",
+            baseUrl = "https://proxy.example/v1",
+            provider = "自定义",
+        )
+
+        assertEquals(
+            legacy.id,
+            listOf(legacy, custom).apiKeyProfileForRoute("claude-sonnet-5-5", officialBase)?.id,
+        )
+        assertEquals(
+            custom.id,
+            listOf(legacy, custom).apiKeyProfileForRoute("claude-sonnet-5", "https://proxy.example/v1")?.id,
+        )
+    }
+
     @Test fun sameModelOnDifferentServicesHasDifferentCredentials() {
         val first = modelProfileId("shared-model", "https://service-a.example/v1")
         val second = modelProfileId("shared-model", "https://service-b.example/v1")
