@@ -131,7 +131,7 @@ internal class LocalToolExecutionCoordinator(
         }
 
         var approvalDenied = false
-        val result = registry.execute(
+        val invocation = registry.executeTracked(
             name = call.name,
             input = call.arguments,
             rawArguments = call.rawArguments,
@@ -149,6 +149,7 @@ internal class LocalToolExecutionCoordinator(
                 },
             ),
         )
+        val result = invocation.result
 
         if (!result.isError) {
             return AgentToolResult(
@@ -172,11 +173,11 @@ internal class LocalToolExecutionCoordinator(
             else -> "TOOL_REPORTED_ERROR"
         }
         val mutationMayHaveSideEffect =
-            registered.access in MUTATING_ACCESSES && result.executionStarted
+            registered.access in MUTATING_ACCESSES && invocation.executionStarted
         // Registry is the authority for whether the executor actually started. Provider error codes
         // are descriptive only and cannot downgrade a mutating call to a pre-execution failure.
         val retryable = when {
-            !result.executionStarted -> result.retryable
+            !invocation.executionStarted -> result.retryable
             readLike -> result.retryable || (providerCode == null && timedOut)
             else -> false
         }
