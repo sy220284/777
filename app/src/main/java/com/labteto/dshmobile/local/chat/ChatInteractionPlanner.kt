@@ -11,6 +11,7 @@ class ChatInteractionPlanner @Inject constructor(
     private val json: Json,
 ) {
     private val promptBuilder = ChatInteractionPromptBuilder()
+    private val parser = ChatInteractionPlanParser(json)
 
     fun prompt(
         persona: PersonaProfile,
@@ -33,28 +34,8 @@ class ChatInteractionPlanner @Inject constructor(
         recentDialogue = recentDialogue,
     )
 
-    fun parseSuggestions(text: String): List<ChatReplySuggestion>? {
-        val body = extractJsonObject(text) ?: return null
-        val decoded = runCatching {
-            json.decodeFromString(ChatReplySuggestionPlan.serializer(), body)
-        }.getOrNull() ?: return null
-        return decoded.suggestions.asSequence()
-            .map { suggestion ->
-                val style = suggestion.style.trim().take(12)
-                ChatReplySuggestion(
-                    label = suggestion.label.trim().take(12),
-                    text = suggestion.text.trim().take(320),
-                    style = style,
-                    bold = suggestion.bold || style == "放飞",
-                    direction = suggestion.direction.trim().take(200),
-                    impact = suggestion.impact.trim().take(120),
-                )
-            }
-            .filter { it.label.isNotBlank() && it.text.isNotBlank() }
-            .distinctBy { normalize(it.text) }
-            .take(4)
-            .toList()
-    }
+    fun parseSuggestions(text: String): List<ChatReplySuggestion>? =
+        parser.parseSuggestions(text)
 
     fun parse(
         text: String,
@@ -62,14 +43,9 @@ class ChatInteractionPlanner @Inject constructor(
         userMessage: String = "",
         assistantMessage: String = "",
     ): ChatPostTurnPlan? {
-        val body = extractJsonObject(text) ?: return null
-        val root = runCatching {
-            json.parseToJsonElement(body).jsonObject
-        }.getOrNull() ?: return null
-        val decoded = runCatching {
-            json.decodeFromString(ChatPostTurnPlan.serializer(), body)
-        }.getOrNull() ?: return null
-        val rawState = root["state"]?.let { runCatching { it.jsonObject }.getOrNull() }
+        val parsed = parser.parsePlan(text) ?: return null
+        val decoded = parsed.plan
+        val rawState = parsed.rawState
         val significance = normalizeSignificance(decoded.turnSignificance)
 
         val agedPrevious = ageTransientState(previous, userMessage)
@@ -95,7 +71,9 @@ class ChatInteractionPlanner @Inject constructor(
             userMessage = userMessage,
             assistantMessage = assistantMessage,
         )
-        val evolvedState = continuityState.copy(evolution = evolveCharacterEvolution(agedPrevious, continuityState, significance))
+        val evolvedState = continuityState.copy(
+            evolution = evolveCharacterEvolution(agedPrevious, continuityState, significance),
+        )
         return decoded.copy(
             state = applyInteractionPerformance(
                 state = applyInteractionIntent(
@@ -107,25 +85,10 @@ class ChatInteractionPlanner @Inject constructor(
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
             ),
-            suggestions = decoded.suggestions.asSequence()
-                .map { suggestion ->
-                    val style = suggestion.style.trim().take(12)
-                    ChatReplySuggestion(
-                        label = suggestion.label.trim().take(12),
-                        text = suggestion.text.trim().take(320),
-                        style = style,
-                        bold = suggestion.bold || style == "放飞",
-                        direction = suggestion.direction.trim().take(200),
-                        impact = suggestion.impact.trim().take(120),
-                    )
-                }
-                .filter { it.label.isNotBlank() && it.text.isNotBlank() }
-                .distinctBy { normalize(it.text) }
-                .take(4)
-                .toList(),
             turnSignificance = significance,
         )
     }
+
     private fun applyExplicitTransientClears(
         value: ChatCharacterState,
         previous: ChatCharacterState,
@@ -683,24 +646,6 @@ class ChatInteractionPlanner @Inject constructor(
         "REPAIRING" -> "修复中"
         else -> "熟悉中"
     }
-
-    private fun extractJsonObject(text: String): String? {
-        val trimmed = text.trim()
-            .removePrefix("~~~json")
-            .removePrefix("~~~")
-            .removeSuffix("~~~")
-            .removePrefix("```json")
-            .removePrefix("```")
-            .removeSuffix("```")
-            .trim()
-        val start = trimmed.indexOf('{')
-        val end = trimmed.lastIndexOf('}')
-        if (start < 0 || end <= start) return null
-        return trimmed.substring(start, end + 1)
-    }
-
-    private fun normalize(text: String): String =
-        text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】]+"""), "")
 
     private companion object {
         const val ACTION_COOLDOWN_TURNS = 3
