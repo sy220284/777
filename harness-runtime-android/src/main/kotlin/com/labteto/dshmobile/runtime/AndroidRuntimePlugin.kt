@@ -166,6 +166,35 @@ class AndroidRuntimePlugin(
 
         context.tools.register(
             HarnessTool(
+                name = "terminal_resize",
+                schema = terminalResizeSchema(),
+                access = ToolAccess.PROCESS,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                timeoutMillis = 5_000L,
+                executor = HarnessToolExecutor { _, input, _ ->
+                    val sessionId = input.requiredString("session_id")
+                    val columns = input["columns"]?.jsonPrimitive?.intOrNull
+                        ?.coerceIn(MIN_TERMINAL_DIMENSION, MAX_TERMINAL_DIMENSION)
+                        ?: error("缺少参数：columns")
+                    val rows = input["rows"]?.jsonPrimitive?.intOrNull
+                        ?.coerceIn(MIN_TERMINAL_DIMENSION, MAX_TERMINAL_DIMENSION)
+                        ?: error("缺少参数：rows")
+                    val resized = terminalProvider.resize(sessionId, columns, rows)
+                    ToolResult(
+                        buildJsonObject {
+                            put("session_id", sessionId)
+                            put("resized", resized)
+                            put("columns", columns)
+                            put("rows", rows)
+                            put("native_pty", terminalProvider.nativePtyAvailable())
+                        }.toString(),
+                    )
+                },
+            ),
+        )
+
+        context.tools.register(
+            HarnessTool(
                 name = "terminal_read",
                 schema = terminalSessionSchema("terminal_read", "读取持久终端当前可用输出"),
                 access = ToolAccess.READ_ONLY,
@@ -347,7 +376,7 @@ class AndroidRuntimePlugin(
 
     private fun terminalOpenSchema(): JsonObject = functionSchema(
         "terminal_open",
-        "打开一个跨多次工具调用保持存活的交互进程；当前为管道终端，不伪装完整 PTY",
+        "打开一个跨多次工具调用保持存活的交互终端；Android 原生 PTY 可用时提供 TTY/job-control/curses 语义，否则明确回退到管道终端",
         buildJsonObject {
             put(
                 "command",
@@ -369,6 +398,25 @@ class AndroidRuntimePlugin(
             put("input", buildJsonObject { put("type", "string") })
         },
         required = setOf("session_id", "input"),
+    )
+
+    private fun terminalResizeSchema(): JsonObject = functionSchema(
+        "terminal_resize",
+        "调整原生 PTY 的终端行列；管道 fallback 返回 resized=false",
+        buildJsonObject {
+            put("session_id", buildJsonObject { put("type", "string") })
+            put("columns", buildJsonObject {
+                put("type", "integer")
+                put("minimum", MIN_TERMINAL_DIMENSION)
+                put("maximum", MAX_TERMINAL_DIMENSION)
+            })
+            put("rows", buildJsonObject {
+                put("type", "integer")
+                put("minimum", MIN_TERMINAL_DIMENSION)
+                put("maximum", MAX_TERMINAL_DIMENSION)
+            })
+        },
+        required = setOf("session_id", "columns", "rows"),
     )
 
     private fun terminalSessionSchema(name: String, description: String): JsonObject = functionSchema(
@@ -415,12 +463,15 @@ class AndroidRuntimePlugin(
         const val DEFAULT_PROCESS_TIMEOUT_MILLIS = 30_000L
         const val MAX_PROCESS_TIMEOUT_MILLIS = 120_000L
         const val PROCESS_TOOL_TIMEOUT_MILLIS = 125_000L
+        const val MIN_TERMINAL_DIMENSION = 1
+        const val MAX_TERMINAL_DIMENSION = 10_000
         const val MAX_TOOL_OUTPUT_CHARS = 120_000
         val TOOL_NAMES = listOf(
             "runtime_command_status",
             "process_exec",
             "terminal_open",
             "terminal_write",
+            "terminal_resize",
             "terminal_read",
             "terminal_status",
             "terminal_close",
