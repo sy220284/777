@@ -237,7 +237,7 @@ class LocalCanonicalModelCodecTest {
             """[{"type":"function","function":{"name":"read","description":123}}]""",
         ).forEach { raw ->
             val error = runCatching { LocalCanonicalModelCodec.tools(Json.parseToJsonElement(raw).jsonArray) }.exceptionOrNull()
-            assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", (error as? com.labteto.dshmobile.local.LocalModelException)?.code)
+            assertEquals("MODEL_TOOL_SCHEMA_INVALID", (error as? com.labteto.dshmobile.local.LocalModelException)?.code)
         }
     }
 
