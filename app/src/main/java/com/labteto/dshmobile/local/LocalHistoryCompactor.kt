@@ -1,20 +1,87 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 internal data class LocalHistoryCompaction(
     val messages: List<JsonObject>,
     val omittedMessages: Int,
     val summary: String,
+    val workCheckpoint: LocalWorkCheckpoint? = null,
     val estimatedTokensBefore: Int = 0,
     val estimatedTokensAfter: Int = 0,
 )
+
+internal data class LocalWorkCheckpoint(
+    val goals: List<String>,
+    val constraints: List<String>,
+    val decisions: List<String>,
+    val failures: List<String>,
+    val unfinished: List<String>,
+    val progress: List<String>,
+    val artifacts: List<String>,
+    val tools: List<String>,
+) {
+    fun toJsonObject(): JsonObject = buildJsonObject {
+        put("version", 1)
+        put("goals", JsonArray(goals.map(::JsonPrimitive)))
+        put("constraints", JsonArray(constraints.map(::JsonPrimitive)))
+        put("decisions", JsonArray(decisions.map(::JsonPrimitive)))
+        put("failures", JsonArray(failures.map(::JsonPrimitive)))
+        put("unfinished", JsonArray(unfinished.map(::JsonPrimitive)))
+        put("progress", JsonArray(progress.map(::JsonPrimitive)))
+        put("artifacts", JsonArray(artifacts.map(::JsonPrimitive)))
+        put("tools", JsonArray(tools.map(::JsonPrimitive)))
+    }
+
+    fun toModelBlock(): String = buildString {
+        append("<work-checkpoint>\n")
+        append(toJsonObject().toString())
+        append("\n</work-checkpoint>")
+    }
+
+    companion object {
+        private val json = Json { ignoreUnknownKeys = true }
+
+        fun latestFrom(messages: List<JsonObject>): LocalWorkCheckpoint? =
+            messages.asReversed().firstNotNullOfOrNull { message ->
+                val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return@firstNotNullOfOrNull null
+                val start = content.lastIndexOf("<work-checkpoint>")
+                val end = content.lastIndexOf("</work-checkpoint>")
+                if (start < 0 || end <= start) return@firstNotNullOfOrNull null
+                val payload = content
+                    .substring(start + "<work-checkpoint>".length, end)
+                    .trim()
+                runCatching {
+                    fromJsonObject(json.parseToJsonElement(payload) as JsonObject)
+                }.getOrNull()
+            }
+
+        private fun fromJsonObject(value: JsonObject): LocalWorkCheckpoint {
+            fun list(key: String): List<String> =
+                (value[key] as? JsonArray).orEmpty()
+                    .mapNotNull { element -> (element as? JsonPrimitive)?.contentOrNull }
+                    .filter(String::isNotBlank)
+            return LocalWorkCheckpoint(
+                goals = list("goals"),
+                constraints = list("constraints"),
+                decisions = list("decisions"),
+                failures = list("failures"),
+                unfinished = list("unfinished"),
+                progress = list("progress"),
+                artifacts = list("artifacts"),
+                tools = list("tools"),
+            )
+        }
+    }
+}
 
 internal enum class LocalHistorySummaryMode {
     WORK,
@@ -89,12 +156,29 @@ internal class LocalHistoryCompactor(
         if (start <= 1 || start >= history.size) return null
 
         val omitted = history.subList(1, start)
-        val summary = buildSummary(omitted, effectiveSummaryChars, summaryMode)
+        val workCheckpoint = if (summaryMode == LocalHistorySummaryMode.WORK) {
+            buildWorkCheckpoint(omitted, effectiveSummaryChars)
+        } else {
+            null
+        }
+        val summary = buildSummary(omitted, effectiveSummaryChars, summaryMode, workCheckpoint)
         val compacted = buildList {
             add(history.first())
             add(buildJsonObject {
                 put("role", "user")
-                put("content", "<compacted-summary>\n$summary\n</compacted-summary>")
+                put(
+                    "content",
+                    if (workCheckpoint != null) {
+                        buildString {
+                            append("<compacted-summary>\n")
+                            append("较早工作历史已压缩为结构化检查点；字段均直接提取自原会话，当前工作区状态优先。")
+                            append("\n</compacted-summary>\n")
+                            append(workCheckpoint.toModelBlock())
+                        }
+                    } else {
+                        "<compacted-summary>\n$summary\n</compacted-summary>"
+                    },
+                )
             })
             addAll(history.drop(start))
         }
@@ -107,6 +191,7 @@ internal class LocalHistoryCompactor(
             messages = compacted,
             omittedMessages = omitted.size,
             summary = summary,
+            workCheckpoint = workCheckpoint,
             estimatedTokensBefore = estimatedTokensBefore,
             estimatedTokensAfter = estimatedTokensAfter,
         )
@@ -190,15 +275,16 @@ internal class LocalHistoryCompactor(
         messages: List<JsonObject>,
         summaryLimit: Int,
         summaryMode: LocalHistorySummaryMode,
+        workCheckpoint: LocalWorkCheckpoint?,
     ): String {
         val user = recentText(messages, "user", maxItems = 8, maxPerItem = 1_200)
-        val assistant = recentText(messages, "assistant", maxItems = 6, maxPerItem = 1_200)
-        val tools = recentTools(messages, maxItems = 12)
 
         val text = buildString {
             when (summaryMode) {
                 LocalHistorySummaryMode.WORK -> {
-                    val sections = structuredWorkSummary(messages, summaryLimit)
+                    val sections = requireNotNull(workCheckpoint) {
+                        "WORK 摘要必须携带结构化检查点"
+                    }
                     append("较早工作检查点，共折叠 ")
                     append(messages.size)
                     append(" 条模型消息；内容均提取自原会话，实时目标、计划、任务和工作区状态优先。")
@@ -208,9 +294,13 @@ internal class LocalHistoryCompactor(
                     appendSummarySection("失败尝试与风险", sections.failures)
                     appendSummarySection("未完成事项", sections.unfinished)
                     appendSummarySection("其他阶段进展", sections.progress)
-                    if (tools.isNotEmpty()) {
+                    if (sections.artifacts.isNotEmpty()) {
+                        append("\n\n重要产物：")
+                        sections.artifacts.forEach { append("\n- ").append(it) }
+                    }
+                    if (sections.tools.isNotEmpty()) {
                         append("\n\n已涉及工具：")
-                        append(tools.joinToString("、"))
+                        append(sections.tools.joinToString("、"))
                     }
                 }
                 LocalHistorySummaryMode.CHAT -> {
@@ -228,27 +318,18 @@ internal class LocalHistoryCompactor(
         return truncateWithoutSplittingSurrogatePair(text, summaryLimit)
     }
 
-    private data class WorkSummarySections(
-        val goals: List<String>,
-        val constraints: List<String>,
-        val decisions: List<String>,
-        val failures: List<String>,
-        val unfinished: List<String>,
-        val progress: List<String>,
-    )
-
     private fun StringBuilder.appendSummarySection(title: String, values: List<String>) {
         if (values.isEmpty()) return
         append("\n\n").append(title).append("：")
         values.forEach { append("\n- ").append(it) }
     }
 
-    private fun structuredWorkSummary(
+    private fun buildWorkCheckpoint(
         messages: List<JsonObject>,
         summaryLimit: Int,
-    ): WorkSummarySections {
+    ): LocalWorkCheckpoint {
         val used = linkedSetOf<String>()
-        val maxPerItem = (summaryLimit / 18).coerceIn(200, 800)
+        val maxPerItem = (summaryLimit / 48).coerceIn(100, 360)
 
         fun select(
             role: String? = null,
@@ -269,20 +350,37 @@ internal class LocalHistoryCompactor(
 
         // Prioritize the facts most likely to change future execution. Every row remains a direct
         // extract from model-visible history; classification only decides which heading owns it.
-        val constraints = select(cues = WORK_CONSTRAINT_CUES, maxItems = 4)
-        val failures = select(cues = WORK_FAILURE_CUES, maxItems = 4)
-        val unfinished = select(cues = WORK_UNFINISHED_CUES, maxItems = 5)
-        val decisions = select(role = "assistant", cues = WORK_DECISION_CUES, maxItems = 5)
-        val goals = select(role = "user", maxItems = 6)
-        val progress = select(role = "assistant", maxItems = 4)
+        val constraints = select(cues = WORK_CONSTRAINT_CUES, maxItems = 3)
+        val failures = select(cues = WORK_FAILURE_CUES, maxItems = 3)
+        val unfinished = select(cues = WORK_UNFINISHED_CUES, maxItems = 4)
+        val decisions = select(role = "assistant", cues = WORK_DECISION_CUES, maxItems = 3)
+        val goals = select(role = "user", maxItems = 4)
+        val progress = select(role = "assistant", maxItems = 3)
+        val artifacts = messages.asReversed()
+            .asSequence()
+            .mapNotNull(::messageText)
+            .flatMap { text -> WORK_ARTIFACT_PATTERN.findAll(text).map { match ->
+                    truncateWithoutSplittingSurrogatePair(
+                        match.value.trimEnd('.', ',', ';', ':'),
+                        500,
+                    )
+                } }
+            .filter(String::isNotBlank)
+            .distinct()
+            .take(6)
+            .toList()
+            .asReversed()
+        val tools = recentTools(messages, maxItems = 8)
 
-        return WorkSummarySections(
+        return LocalWorkCheckpoint(
             goals = goals,
             constraints = constraints,
             decisions = decisions,
             failures = failures,
             unfinished = unfinished,
             progress = progress,
+            artifacts = artifacts,
+            tools = tools,
         )
     }
 
@@ -358,6 +456,9 @@ internal class LocalHistoryCompactor(
         val WORK_DECISION_CUES = setOf(
             "决定", "确认", "采用", "改为", "保留", "结论", "方案", "选择", "完成",
             "decide", "confirmed", "adopt", "keep", "conclusion", "completed",
+        )
+        val WORK_ARTIFACT_PATTERN = Regex(
+            """(?:(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+\.[A-Za-z0-9]{1,10}|https?://[^\s)\]}>"']+)""",
         )
 
         const val DEFAULT_MAX_HISTORY_CHARS = 500_000
