@@ -1,14 +1,12 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.LocalHarnessMessage
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.session.LocalSessionRuntime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -16,7 +14,8 @@ import kotlinx.coroutines.withContext
 /** Owns transcript-history paging state for the local conversation UI. */
 internal class LocalTranscriptHistoryController(
     private val session: LocalSessionRuntime,
-    private val harnessState: StateFlow<LocalHarnessState>,
+    private val currentSessionId: () -> String,
+    private val liveMessages: () -> List<LocalHarnessMessage>,
     private val scope: CoroutineScope,
 ) {
     private val _history = MutableStateFlow(LocalTranscriptHistoryState())
@@ -37,10 +36,8 @@ internal class LocalTranscriptHistoryController(
         initializedSessionId = null
         _history.value = LocalTranscriptHistoryState(sessionId = sessionId, loading = true)
         try {
-            val liveMessagesAtBootstrap = harnessState.value
-                .takeIf { snapshot -> snapshot.sessionId == sessionId }
-                ?.messages
-                .orEmpty()
+            val liveMessagesAtBootstrap =
+                if (currentSessionId() == sessionId) liveMessages() else emptyList()
             val firstPage = withContext(Dispatchers.IO) {
                 session.transcriptPageForUi(
                     sessionId = sessionId,
@@ -51,10 +48,10 @@ internal class LocalTranscriptHistoryController(
                     ),
                 )
             }
-            if (harnessState.value.sessionId != sessionId) return
+            if (currentSessionId() != sessionId) return
             val pageExtras = transcriptHistoryPageExtras(
                 pageMessages = firstPage.messages,
-                liveMessages = harnessState.value.messages,
+                liveMessages = liveMessages(),
             )
             cursor = firstPage.nextCursor
             initializedSessionId = sessionId
@@ -66,7 +63,7 @@ internal class LocalTranscriptHistoryController(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            if (harnessState.value.sessionId != sessionId) return
+            if (currentSessionId() != sessionId) return
             cursor = null
             initializedSessionId = null
             _history.value = LocalTranscriptHistoryState(
@@ -84,8 +81,8 @@ internal class LocalTranscriptHistoryController(
         if (
             cursor == null &&
             _history.value.olderMessages.isEmpty() &&
-            harnessState.value.sessionId == sessionId &&
-            harnessState.value.messages.size > LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES
+            currentSessionId() == sessionId &&
+            liveMessages().size > LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES
         ) {
             prepare(sessionId, force = true)
         }
@@ -103,11 +100,11 @@ internal class LocalTranscriptHistoryController(
                     limit = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
                 )
             }
-            if (harnessState.value.sessionId != sessionId) return Result.success(0)
+            if (currentSessionId() != sessionId) return Result.success(0)
             val latest = _history.value
             if (latest.sessionId != sessionId) return Result.success(0)
             val existingIds = latest.olderMessages.mapTo(hashSetOf(), LocalHarnessMessage::id)
-            harnessState.value.messages.mapTo(existingIds, LocalHarnessMessage::id)
+            liveMessages().mapTo(existingIds, LocalHarnessMessage::id)
             val newlyLoaded = page.messages.filterNot { message -> message.id in existingIds }
             cursor = page.nextCursor
             _history.value = latest.copy(
@@ -131,7 +128,7 @@ internal class LocalTranscriptHistoryController(
     }
 
     fun refreshAfterTimelineRewrite() {
-        val sessionId = harnessState.value.sessionId
+        val sessionId = currentSessionId()
         cursor = null
         initializedSessionId = null
         _history.value = LocalTranscriptHistoryState(sessionId = sessionId)

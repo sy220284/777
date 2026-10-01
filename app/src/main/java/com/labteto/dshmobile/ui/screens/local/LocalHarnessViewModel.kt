@@ -60,7 +60,8 @@ class LocalHarnessViewModel @Inject constructor(
     val personaPresets: List<PersonaPreset> = personaGalleryController.personaPresets
     private val transcriptHistoryController = LocalTranscriptHistoryController(
         session = runtime.session,
-        harnessState = state,
+        currentSessionId = { state.value.sessionId },
+        liveMessages = { state.value.messages },
         scope = viewModelScope,
     )
     internal val transcriptHistory = transcriptHistoryController.history
