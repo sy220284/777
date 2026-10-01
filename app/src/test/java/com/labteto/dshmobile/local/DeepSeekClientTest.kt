@@ -286,7 +286,7 @@ class DeepSeekClientTest {
 
 
     @Test
-    fun truncatedSseIsRetryableInsteadOfReturningPartialAnswer() = runBlocking {
+    fun truncatedSseAfterAdmissionIsNotBlindlyReplayed() = runBlocking {
         val body = "data: {\"choices\":[{\"delta\":{\"content\":\"半截\"}}]}"
         val http = OkHttpClient.Builder().addInterceptor { chain ->
             Response.Builder()
@@ -308,12 +308,12 @@ class DeepSeekClientTest {
             )
         }.exceptionOrNull() as? LocalModelException
 
-        assertEquals("MODEL_STREAM_INCOMPLETE", error?.code)
-        assertTrue(error?.retryable == true)
+        assertEquals("MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION", error?.code)
+        assertFalse(error?.retryable ?: true)
     }
 
     @Test
-    fun malformedSseFrameIsRetryableProtocolFailure() = runBlocking {
+    fun malformedSseFrameAfterAdmissionIsNotBlindlyReplayed() = runBlocking {
         val body = "data: {not-json"
         val http = OkHttpClient.Builder().addInterceptor { chain ->
             Response.Builder()
@@ -336,7 +336,7 @@ class DeepSeekClientTest {
         }.exceptionOrNull() as? LocalModelException
 
         assertEquals("MODEL_STREAM_PROTOCOL", error?.code)
-        assertTrue(error?.retryable == true)
+        assertFalse(error?.retryable ?: true)
     }
 
     @Test
@@ -368,7 +368,7 @@ class DeepSeekClientTest {
 
 
     @Test
-    fun emptySuccessfulResponseIsRetryableIncompleteStream() = runBlocking {
+    fun emptySuccessfulResponseAfterAdmissionIsNotBlindlyReplayed() = runBlocking {
         val http = OkHttpClient.Builder().addInterceptor { chain ->
             Response.Builder()
                 .request(chain.request())
@@ -389,12 +389,12 @@ class DeepSeekClientTest {
             )
         }.exceptionOrNull() as? LocalModelException
 
-        assertEquals("MODEL_STREAM_INCOMPLETE", error?.code)
-        assertTrue(error?.retryable == true)
+        assertEquals("MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION", error?.code)
+        assertFalse(error?.retryable ?: true)
     }
 
     @Test
-    fun malformedNonSseFallbackIsRetryableProtocolFailure() = runBlocking {
+    fun malformedNonSseFallbackAfterAdmissionIsNotBlindlyReplayed() = runBlocking {
         val http = OkHttpClient.Builder().addInterceptor { chain ->
             Response.Builder()
                 .request(chain.request())
@@ -416,7 +416,7 @@ class DeepSeekClientTest {
         }.exceptionOrNull() as? LocalModelException
 
         assertEquals("MODEL_STREAM_PROTOCOL", error?.code)
-        assertTrue(error?.retryable == true)
+        assertFalse(error?.retryable ?: true)
     }
 
 }
