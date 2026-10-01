@@ -47,14 +47,11 @@ import com.labteto.dshmobile.core.wire.dto.RemoteEventRejection
 import com.labteto.dshmobile.core.wire.dto.SessionAddress
 import com.labteto.dshmobile.core.wire.dto.SessionAttachmentRequest
 import com.labteto.dshmobile.core.wire.dto.SessionControlFrame
-import com.labteto.dshmobile.core.wire.dto.SessionCreateRequest
 import com.labteto.dshmobile.core.wire.dto.SessionEvent
 import com.labteto.dshmobile.core.wire.dto.SessionFollowFrame
-import com.labteto.dshmobile.core.wire.dto.SessionForkRequest
 import com.labteto.dshmobile.core.wire.dto.SessionHistoryRecord
 import com.labteto.dshmobile.core.wire.dto.SessionModelsValue
 import com.labteto.dshmobile.core.wire.dto.SessionPageRequest
-import com.labteto.dshmobile.core.wire.dto.SessionRenameRequest
 import com.labteto.dshmobile.core.wire.dto.SessionSelectModelRequest
 import com.labteto.dshmobile.core.wire.dto.SessionStatsView
 import com.labteto.dshmobile.core.wire.dto.SessionSummary
@@ -181,6 +178,17 @@ class SessionStore @Inject constructor(
         markCommandsUnavailable = catalogs::markCommandsUnavailable,
         installPermission = interactionRuntime::installPermission,
         clearPermission = interactionRuntime::clearPermission,
+        onConnectionError = ::setConnectionError,
+    )
+
+    private val sessionLifecycleRuntime = SessionLifecycleRuntime(
+        apiProvider = ::apiOrNull,
+        reusableBlankSession = { workspaceId ->
+            synchronized(lock) { indexState.reusableBlankSession(workspaceId) }
+        },
+        refreshSessions = ::refreshSessions,
+        openSession = ::openSession,
+        onTitleChanged = ::setTitle,
         onConnectionError = ::setConnectionError,
     )
 
@@ -1006,43 +1014,14 @@ class SessionStore @Inject constructor(
         }
     }
 
-    suspend fun createSession(cwd: String? = null, workspaceId: String? = null) {
-        // Reuse the workspace's existing blank session instead of leaving another empty one behind
-        // — the harness's own New Session does this, and it is why its list stays clean.
-        if (workspaceId != null) {
-            val reusable = synchronized(lock) {
-                indexState.reusableBlankSession(workspaceId)
-            }
-            if (reusable != null) {
-                openSession(reusable)
-                return
-            }
-        }
-        val api = apiOrNull() ?: return
-        when (val r = api.sessionCreate(SessionCreateRequest(workspaceId = workspaceId, cwd = cwd))) {
-            is RpcResult.Ok -> {
-                refreshSessions()
-                openSession(r.value.sessionId)
-            }
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun createSession(cwd: String? = null, workspaceId: String? = null) =
+        sessionLifecycleRuntime.create(cwd, workspaceId)
 
-    suspend fun renameSession(sessionId: String, title: String) {
-        val api = apiOrNull() ?: return
-        when (val r = api.sessionRename(SessionRenameRequest(sessionId, title))) {
-            is RpcResult.Ok -> setTitle(sessionId, r.value.title)
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun renameSession(sessionId: String, title: String) =
+        sessionLifecycleRuntime.rename(sessionId, title)
 
-    suspend fun forkSession(sessionId: String, atSeq: Long? = null) {
-        val api = apiOrNull() ?: return
-        when (val r = api.sessionFork(SessionForkRequest(sessionId, atSeq?.toInt()))) {
-            is RpcResult.Ok -> refreshSessions()
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun forkSession(sessionId: String, atSeq: Long? = null) =
+        sessionLifecycleRuntime.fork(sessionId, atSeq)
 
     suspend fun archiveSession(sessionId: String) = workspaceRuntime.archiveSession(sessionId)
 
