@@ -5,7 +5,6 @@ import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.LocalModelProtocol
 import com.labteto.dshmobile.local.apiKeyProfileForRoute
 import com.labteto.dshmobile.local.migrateOfficialClaudeModel
-import com.labteto.dshmobile.local.modelProfileId
 import com.labteto.dshmobile.local.normalizeModelBaseUrl
 import java.util.UUID
 
