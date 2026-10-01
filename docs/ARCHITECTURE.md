@@ -174,7 +174,7 @@ Relationship memory uses a stable subject key; Gallery identity wins over copied
 
 `TokenUsageAnalyticsStore` migrates the legacy JSONL ledger transactionally into SQLite. Request insertion, deduplication and lifetime totals commit together; a failed write can be retried with the same request id. Request details retain at most 90 days and 10,000 records (shrinking to 9,000 after overflow), with a 4 KiB per-record bound. Lifetime totals are retained independently. The bounded projection updates incrementally; reopening, retention cleanup and time-zone changes rebuild it from the retained window. Averages, action splits and groups describe that window, while headline aggregates remain lifetime totals. Deduplication covers retained request identities; callers must use a new id for a new request and avoid replaying expired requests. API-reported input/output usage is the total; prompt sections are diagnostic attribution only and are not added again.
 
-`LocalTokenUsageContextBridge` maps internal model-consuming actions such as Web and Vision back to their parent run.
+`LocalTokenUsageContextBridge` maps internal model-consuming actions such as Web and Vision back to their parent run. 每个成功模型回复同时携带不含密钥的实际 route identity（profile/provider/model/baseUrl/auth/protocol/fingerprint）；Token 账本用它区分同名模型、多账户和代理地址。官方价格只在供应商与官方地址同时匹配时估算，未知或第三方路由保留实际 API usage 并记为未定价。
 
 ```text
 requestId
