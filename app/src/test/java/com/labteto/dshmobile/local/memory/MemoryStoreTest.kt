@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.memory
 
+import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.*
