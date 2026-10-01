@@ -76,6 +76,7 @@ import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
 import com.labteto.dshmobile.local.chat.nextQuietHoursEndMillis
 import com.labteto.dshmobile.local.chat.proactiveConversationFocus
 import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
+import com.labteto.dshmobile.local.chat.saveGroupChatAnnouncement
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -1155,83 +1156,15 @@ class LocalHarnessEngine @Inject constructor(
         return true
     }
 
-    internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> {
-        val snapshot = _state.value
-        if (
-            snapshot.loading ||
-            snapshot.running ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            !snapshot.groupChat.enabled
-        ) {
-            return Result.failure(IllegalStateException("当前状态暂时无法保存群公告"))
-        }
-        val announcement = text.trim().take(2_000)
-        if (announcement == snapshot.groupChat.announcement) return Result.success(Unit)
-
-        _state.update { current ->
-            if (current.sessionId == snapshot.sessionId && current.groupChat.enabled) {
-                current.copy(groupChat = current.groupChat.copy(announcement = announcement))
-            } else {
-                current
-            }
-        }
-        if (
-            _state.value.sessionId != snapshot.sessionId ||
-            _state.value.groupChat.announcement != announcement
-        ) {
-            return Result.failure(IllegalStateException("会话状态已变化，请重新保存群公告"))
-        }
-
-        return try {
-            persistNow()
-            runCatching {
-                eventLog.append("group/announcement", buildJsonObject {
-                    put("status", "saved")
-                    put("active", announcement.isNotBlank())
-                    put("chars", announcement.length)
-                })
-            }
-            Result.success(Unit)
-        } catch (cancelled: CancellationException) {
-            _state.update { current ->
-                if (
-                    current.sessionId == snapshot.sessionId &&
-                    current.groupChat.announcement == announcement
-                ) {
-                    current.copy(
-                        groupChat = current.groupChat.copy(
-                            announcement = snapshot.groupChat.announcement,
-                        ),
-                    )
-                } else {
-                    current
-                }
-            }
-            throw cancelled
-        } catch (error: Throwable) {
-            _state.update { current ->
-                if (
-                    current.sessionId == snapshot.sessionId &&
-                    current.groupChat.announcement == announcement
-                ) {
-                    current.copy(
-                        groupChat = current.groupChat.copy(
-                            announcement = snapshot.groupChat.announcement,
-                        ),
-                    )
-                } else {
-                    current
-                }
-            }
-            runCatching {
-                eventLog.append("group/announcement", buildJsonObject {
-                    put("status", "failed")
-                    put("detail", error.message.orEmpty().take(500))
-                })
-            }
-            Result.failure(error)
-        }
-    }
+    internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> =
+        saveGroupChatAnnouncement(
+            state = _state,
+            text = text,
+            sessionId = currentSessionId,
+            transcriptProjectedThroughSequence = transcriptProjectionCursor,
+            sessionCoordinator = sessionCoordinator,
+            eventLog = eventLog,
+        )
 
     internal fun removeGroupChatMemberByGalleryId(galleryId: String) {
         val snapshot = _state.value
@@ -5278,21 +5211,6 @@ class LocalHarnessEngine @Inject constructor(
         sessionCoordinator.enqueue(snapshot)
     }
 
-    private suspend fun persistNow(binding: LocalWorkRunBinding? = null) {
-        val sessionId = binding?.sessionId ?: currentSessionId
-        val log = binding?.eventLog ?: eventLog
-        val controlProjectedThroughSequence = log.latestSequence()
-        val transcriptProjectedThroughSequence =
-            binding?.transcriptProjectionCursor ?: transcriptProjectionCursor
-        val state = binding?.state?.value ?: _state.value
-        val snapshot = sessionCoordinator.snapshot(
-            sessionId = sessionId,
-            state = state,
-            controlProjectedThroughSequence = controlProjectedThroughSequence,
-            transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
-        )
-        sessionCoordinator.writeNow(snapshot)
-    }
 
     private fun sessionFileFor(id: String) = File(sessionsRoot, "$id.json")
 
