@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 typedef struct {
@@ -418,7 +419,11 @@ Java_com_labteto_dshmobile_runtime_NativePtyBridge_nativeClose(
                 handle->reaped = true;
                 break;
             }
-            usleep(10000);
+            const struct timespec delay = {
+                .tv_sec = 0,
+                .tv_nsec = 10L * 1000L * 1000L,
+            };
+            (void) nanosleep(&delay, NULL);
         }
         if (!handle->reaped) {
             (void) kill(-handle->pid, SIGKILL);
