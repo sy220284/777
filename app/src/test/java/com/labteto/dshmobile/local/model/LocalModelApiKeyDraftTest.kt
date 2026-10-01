@@ -47,11 +47,35 @@ class LocalModelApiKeyDraftTest {
         }
     }
 
-    @Test fun ambiguousRouteCannotSilentlyOverwriteTheFirstAccountEvenWithAnExplicitKey() = runBlocking {
+    @Test fun explicitKeyWithoutProfileIdCreatesAnotherAccountInsteadOfOverwritingEitherExistingRoute() = runBlocking {
+        var reads = 0
+        val draft = resolveLocalModelApiKeyDraft(
+            " replacement ",
+            legacy.model,
+            url,
+            null,
+            listOf(current, legacy),
+            { reads++; "should-not-read" },
+            newProfileId = { "api-third" },
+        )
+        assertEquals("api-third", draft.profile.id)
+        assertEquals("replacement", draft.key)
+        assertNotEquals(current.id, draft.profile.id)
+        assertNotEquals(legacy.id, draft.profile.id)
+        assertEquals(0, reads)
+    }
+
+    @Test fun blankKeyWithoutProfileIdStillRefusesToGuessBetweenSameRouteAccounts() = runBlocking {
         var reads = 0
         val failure = runCatching {
-            resolveLocalModelApiKeyDraft("replacement", legacy.model, url, null, listOf(current, legacy),
-                { reads++; "key" })
+            resolveLocalModelApiKeyDraft(
+                "",
+                legacy.model,
+                url,
+                null,
+                listOf(current, legacy),
+                { reads++; "key" },
+            )
         }.exceptionOrNull()
         assertTrue(failure is IllegalArgumentException)
         assertEquals(0, reads)
@@ -76,6 +100,28 @@ class LocalModelApiKeyDraftTest {
         assertNotEquals(plan.id, newRoute.profile.id)
     }
 
+    @Test fun generatedIdentityRetriesCollisionsBeforeSaving() = runBlocking {
+        var attempts = 0
+        val draft = resolveLocalModelApiKeyDraft(
+            "new-key",
+            legacy.model,
+            url,
+            null,
+            listOf(current, legacy),
+            { error("Explicit key needs no stored credential") },
+            newProfileId = {
+                attempts++
+                when (attempts) {
+                    1 -> current.id
+                    2 -> legacy.id
+                    else -> "api-unique"
+                }
+            },
+        )
+        assertEquals("api-unique", draft.profile.id)
+        assertEquals(3, attempts)
+    }
+
     @Test fun cancelledCredentialReadPropagatesInsteadOfCreatingAFallbackRoute() = runBlocking {
         val cancelled = CancellationException("cancelled")
         val failure = runCatching {
@@ -87,9 +133,17 @@ class LocalModelApiKeyDraftTest {
         val retained = resolveLocalModelApiKeyDraft("", legacy.model, url, null, listOf(legacy),
             { id -> if (id == legacy.id) "legacy-key" else error("Wrong identity") })
         assertEquals(legacy.id, retained.profile.id)
-        val created = resolveLocalModelApiKeyDraft("new-key", "custom", "https://proxy.example/v1/",
-            LocalModelProtocol.RESPONSES, emptyList(), { error("Explicit key needs no stored credential") })
-        assertEquals(modelProfileId("custom", "https://proxy.example/v1"), created.profile.id)
+        val created = resolveLocalModelApiKeyDraft(
+            "new-key",
+            "custom",
+            "https://proxy.example/v1/",
+            LocalModelProtocol.RESPONSES,
+            emptyList(),
+            { error("Explicit key needs no stored credential") },
+            newProfileId = { "api-custom" },
+        )
+        assertEquals("api-custom", created.profile.id)
+        assertNotEquals(modelProfileId("custom", "https://proxy.example/v1"), created.profile.id)
         assertEquals(LocalModelProtocol.RESPONSES, created.profile.protocol)
     }
 
