@@ -197,10 +197,10 @@ internal class LocalSessionRepository(
 
     fun readWithLegacyApproval(id: String): LocalSessionRead? = synchronized(storageLock) {
         val persistedPayload = store.read(id)?.document?.payload
-        val latest = synchronized(lock) {
-            if (id in deletedIds) null else latestSnapshots[id]
+        val (deleted, latest) = synchronized(lock) {
+            (id in deletedIds) to latestSnapshots[id]
         }
-        if (id in synchronized(lock) { deletedIds.toSet() }) return@synchronized null
+        if (deleted) return@synchronized null
         if (latest != null) {
             return@synchronized LocalSessionRead(
                 session = latest,
