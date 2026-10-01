@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.session.SessionEventFileSnapshot
 import com.labteto.dshmobile.harness.session.SessionEventLog
 import java.io.File
 import java.io.InputStream
@@ -36,7 +37,10 @@ data class LocalSessionStorageStatus(
  */
 internal class LocalSessionStorageManager(
     private val root: File,
-    private val json: Json
+    private val json: Json,
+    private val eventSnapshotOpener: (File, Json) -> List<SessionEventFileSnapshot> = { activeFile, codec ->
+        SessionEventLog(activeFile, codec).openDurableFileSnapshot()
+    },
 ) {
     fun status(): LocalSessionStorageStatus {
         val files = durableFiles()
@@ -88,10 +92,9 @@ internal class LocalSessionStorageManager(
                 .distinct()
                 .sorted()
                 .forEach { id ->
-                    val snapshot = SessionEventLog(File(root, "$id.events.jsonl"), json)
-                        .openDurableFileSnapshot()
-                    snapshot.forEach { source ->
-                        try {
+                    val snapshot = eventSnapshotOpener(File(root, "$id.events.jsonl"), json)
+                    try {
+                        snapshot.forEach { source ->
                             exportedBytes += copyZipEntry(
                                 name = source.name,
                                 lastModified = source.lastModified,
@@ -99,8 +102,10 @@ internal class LocalSessionStorageManager(
                                 input = source.input,
                                 zip = zip,
                             )
-                        } finally {
-                            source.close()
+                        }
+                    } finally {
+                        snapshot.forEach { source ->
+                            runCatching { source.close() }
                         }
                     }
                 }

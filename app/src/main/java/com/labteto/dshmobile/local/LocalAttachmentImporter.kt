@@ -5,15 +5,21 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
 import java.security.MessageDigest
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.runInterruptible
 
 internal class LocalAttachmentImporter(
     private val context: Context,
     private val workspace: LocalWorkspace,
     private val maxAttachmentBytes: Long = 20L * 1024L * 1024L,
 ) {
-    fun import(uri: Uri): LocalImportedAttachment {
+    suspend fun import(uri: Uri): LocalImportedAttachment {
         val resolver = context.contentResolver
         var displayName: String? = null
         var declaredSize: Long? = null
@@ -47,22 +53,18 @@ internal class LocalAttachmentImporter(
 
         val input = resolver.openInputStream(uri) ?: error("无法读取所选附件")
         try {
+            currentCoroutineContext().ensureActive()
             input.use { source ->
                 incoming.outputStream().use { output ->
-                    val buffer = ByteArray(32 * 1024)
-                    var total = 0L
-                    while (true) {
-                        val read = source.read(buffer)
-                        if (read < 0) break
-                        total += read
-                        if (total > maxAttachmentBytes) {
-                            error("附件超过 ${maxAttachmentBytes / 1024 / 1024} MB 上限")
-                        }
-                        digest.update(buffer, 0, read)
-                        output.write(buffer, 0, read)
-                    }
+                    copyAttachmentCancellably(
+                        source = source,
+                        output = output,
+                        maxAttachmentBytes = maxAttachmentBytes,
+                        digest = digest,
+                    )
                 }
             }
+            currentCoroutineContext().ensureActive()
         } catch (error: Throwable) {
             incoming.delete()
             throw error
@@ -95,6 +97,12 @@ internal class LocalAttachmentImporter(
                 .lowercase()
                 .takeIf { it.matches(Regex("[a-z0-9]{1,10}")) }
         }
+        try {
+            currentCoroutineContext().ensureActive()
+        } catch (error: Throwable) {
+            incoming.delete()
+            throw error
+        }
         val target = File(dir, attachmentId + extension?.let { ".$it" }.orEmpty())
         if (target.exists()) {
             incoming.delete()
@@ -125,4 +133,27 @@ internal class LocalAttachmentImporter(
         if (width <= 0 || height <= 0) return null
         return LocalImageMetadata(mediaType = mediaType, width = width, height = height)
     }
+}
+
+
+internal suspend fun copyAttachmentCancellably(
+    source: InputStream,
+    output: OutputStream,
+    maxAttachmentBytes: Long,
+    digest: MessageDigest,
+): Long = runInterruptible(Dispatchers.IO) {
+    val buffer = ByteArray(32 * 1024)
+    var total = 0L
+    while (true) {
+        if (Thread.currentThread().isInterrupted) throw InterruptedException("附件导入已取消")
+        val read = source.read(buffer)
+        if (read < 0) break
+        total += read
+        if (total > maxAttachmentBytes) {
+            error("附件超过 ${maxAttachmentBytes / 1024 / 1024} MB 上限")
+        }
+        digest.update(buffer, 0, read)
+        output.write(buffer, 0, read)
+    }
+    total
 }

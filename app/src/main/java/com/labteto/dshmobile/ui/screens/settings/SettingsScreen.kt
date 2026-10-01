@@ -104,6 +104,7 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -150,6 +151,43 @@ private fun SettingsDestination.parentDestination(): SettingsDestination? = when
     SettingsDestination.USAGE_DETAIL -> SettingsDestination.USAGE
 }
 
+internal fun encodeUsageDetailSelection(selection: UsageDetailSelection?): List<String> = when (selection) {
+    null -> emptyList()
+    is UsageDetailSelection.Request -> listOf("request", selection.requestId)
+    is UsageDetailSelection.Group -> listOf(
+        "group",
+        selection.kind.name,
+        selection.key,
+        selection.title,
+    )
+}
+
+internal fun decodeUsageDetailSelection(saved: List<String>): UsageDetailSelection? = when (saved.firstOrNull()) {
+    "request" -> saved.getOrNull(1)
+        ?.takeIf(String::isNotBlank)
+        ?.let(UsageDetailSelection::Request)
+    "group" -> {
+        if (saved.size < 4) null else {
+            runCatching { com.labteto.dshmobile.local.TokenUsageGroupKind.valueOf(saved[1]) }
+                .getOrNull()
+                ?.let { kind ->
+                    UsageDetailSelection.Group(
+                        kind = kind,
+                        key = saved[2],
+                        title = saved[3],
+                    )
+                }
+        }
+    }
+    else -> null
+}
+
+private val usageDetailSelectionStateSaver =
+    androidx.compose.runtime.saveable.listSaver<androidx.compose.runtime.MutableState<UsageDetailSelection?>, String>(
+        save = { state -> encodeUsageDetailSelection(state.value) },
+        restore = { saved -> mutableStateOf(decodeUsageDetailSelection(saved)) },
+    )
+
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
@@ -186,14 +224,20 @@ fun SettingsScreen(
                         stream.write(report.toByteArray(Charsets.UTF_8))
                     } ?: error("无法打开导出文件")
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 toast.second(exportFailed)
             }
         }
     }
-    var page by rememberSaveable { mutableStateOf(initialDestination) }
-    var usageDetailSelection by remember { mutableStateOf<UsageDetailSelection?>(null) }
-    var usageDetailBackSelection by remember { mutableStateOf<UsageDetailSelection?>(null) }
+    var page by rememberSaveable(initialDestination) { mutableStateOf(initialDestination) }
+    var usageDetailSelection by rememberSaveable(saver = usageDetailSelectionStateSaver) {
+        mutableStateOf<UsageDetailSelection?>(null)
+    }
+    var usageDetailBackSelection by rememberSaveable(saver = usageDetailSelectionStateSaver) {
+        mutableStateOf<UsageDetailSelection?>(null)
+    }
     var usageDetailReturnPage by rememberSaveable { mutableStateOf(SettingsDestination.USAGE) }
     var showDisconnectDialog by remember { mutableStateOf(false) }
     var showDiagnostic by rememberSaveable { mutableStateOf(false) }
@@ -211,6 +255,8 @@ fun SettingsScreen(
                 viewModel.exportLocalSessionStorage(uri)
                 localSessionStorageStatus = viewModel.localSessionStorageStatus()
                 toast.second(storageExported)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 toast.second(storageExportFailed)
             } finally {
@@ -235,9 +281,6 @@ fun SettingsScreen(
     }
 
     BackHandler { navigateBack() }
-    LaunchedEffect(initialDestination) {
-        page = initialDestination
-    }
     LaunchedEffect(connectionState.phase) {
         viewModel.refreshRemoteSettings()
     }
