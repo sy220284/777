@@ -209,12 +209,6 @@ class SessionStore @Inject constructor(
     private val _loadOlderFailed = MutableStateFlow(false)
     val loadOlderFailed: StateFlow<Boolean> = _loadOlderFailed.asStateFlow()
 
-    private val _pendingApproval = MutableStateFlow<PendingApproval?>(null)
-    val pendingApproval: StateFlow<PendingApproval?> = _pendingApproval.asStateFlow()
-
-    private val _pendingQuestions = MutableStateFlow<PendingQuestions?>(null)
-    val pendingQuestions: StateFlow<PendingQuestions?> = _pendingQuestions.asStateFlow()
-
     val commands: StateFlow<List<CommandDescriptor>> = catalogs.commands
 
     /** False once the harness has told us it has no command registry; the menu degrades, not errors. */
@@ -224,10 +218,6 @@ class SessionStore @Inject constructor(
 
     /** The host's plugin inventory, or null when this deployment does not expose one. */
     val plugins: StateFlow<PluginInventorySnapshot?> = catalogs.plugins
-
-    /** The preset a switch is in flight for, cleared when the projection reports it as effective. */
-    private val _pendingPermission = MutableStateFlow<String?>(null)
-    val pendingPermission: StateFlow<String?> = _pendingPermission.asStateFlow()
 
     // ------------------------------------------------------------------ projection views
     // These are folds of `currentConversation.projections`, not separate fetches: the harness
@@ -288,11 +278,6 @@ class SessionStore @Inject constructor(
     // ------------------------------------------------------------------ internal state (guarded by `lock`)
     private val indexState = SessionIndexState()
 
-    // Pending Remote Event waterfalls this store can answer. Keyed by the frame's `eventId`,
-    // which is both what an answer names and what a `cancel` frame withdraws — 0.1.2 mints no
-    // separate approval id.
-    private val pendingInteractions = PendingSessionInteractionStore()
-
     // Open-session fold state.
     private var currentId: String? = null
     private val openSessionState = OpenSessionFoldState()
@@ -332,6 +317,20 @@ class SessionStore @Inject constructor(
         onConnectionError = ::setConnectionError,
         logger = ::log,
     )
+    private val interactionRuntime = SessionInteractionRuntime(
+        lock = lock,
+        apiProvider = ::apiOrNull,
+        clientIdProvider = { connectionManager.generation?.clientId },
+        currentSessionId = { currentId },
+        addPending = ::addPendingLocked,
+        removePending = ::removePendingLocked,
+        emitSessions = ::emitSessionsLocked,
+        logger = { message -> log(message) },
+    )
+    val pendingApproval: StateFlow<PendingApproval?> get() = interactionRuntime.pendingApproval
+    val pendingQuestions: StateFlow<PendingQuestions?> get() = interactionRuntime.pendingQuestions
+    val pendingPermission: StateFlow<String?> get() = interactionRuntime.pendingPermission
+
     val subagents: StateFlow<List<SubagentListEntry>> get() = subagentRuntime.subagents
     val subagentConversation: StateFlow<ConversationSnapshot?> get() = subagentRuntime.conversation
     val subagentMode: StateFlow<String?> get() = subagentRuntime.mode
@@ -350,14 +349,7 @@ class SessionStore @Inject constructor(
     private fun observePermissionSettlement() {
         scope.launch {
             permissions.collect { select ->
-                synchronized(lock) {
-                    val sessionId = currentId ?: return@synchronized
-                    val pending = pendingInteractions.permissionForSession(sessionId) ?: return@synchronized
-                    if (select?.currentValue == pending) {
-                        pendingInteractions.forgetPermission(sessionId, pending)
-                        syncCurrentInteractionCardsLocked()
-                    }
-                }
+                interactionRuntime.settlePermission(select?.currentValue)
             }
         }
     }
@@ -398,29 +390,11 @@ class SessionStore @Inject constructor(
                 val retiredGeneration =
                     prev.phase == ConnectionPhase.CONNECTED &&
                         state.phase != ConnectionPhase.CONNECTED
-                if (retiredGeneration) clearRetiredGenerationInteractions()
+                if (retiredGeneration) interactionRuntime.clearRetiredGeneration()
                 prev = state
                 if (initialConnect || reconnect) triggerBaseline()
             }
         }
-    }
-
-    private fun clearRetiredGenerationInteractions() {
-        synchronized(lock) {
-            pendingInteractions.clear().forEach { sessionId ->
-                removePendingLocked(sessionId, "approval")
-                removePendingLocked(sessionId, "question")
-                removePendingLocked(sessionId, "plan-review")
-            }
-            emitSessionsLocked()
-            syncCurrentInteractionCardsLocked()
-        }
-    }
-
-    private fun syncCurrentInteractionCardsLocked() {
-        _pendingApproval.value = pendingInteractions.approvalForSession(currentId)
-        _pendingQuestions.value = pendingInteractions.questionsForSession(currentId)
-        _pendingPermission.value = pendingInteractions.permissionForSession(currentId)
     }
 
     private fun observeEvents() {
@@ -558,13 +532,13 @@ class SessionStore @Inject constructor(
                 val request = runCatching {
                     decodeFromJsonElement(ApprovalRequestEvent.serializer(), frame.request)
                 }.getOrNull() ?: return
-                handleApprovalRequested(frame.eventId, frame.agentId, request)
+                interactionRuntime.installApproval(frame.eventId, frame.agentId, request)
             }
             USER_QUESTIONS_REQUEST_EVENT -> {
                 val request = runCatching {
                     decodeFromJsonElement(AskUserQuestionRequestEvent.serializer(), frame.request)
                 }.getOrNull() ?: return
-                handleQuestionRequested(frame.eventId, frame.agentId, request.questions)
+                interactionRuntime.installQuestions(frame.eventId, frame.agentId, request.questions)
             }
             else -> log("unhandled waterfall ${frame.event}")
         }
@@ -581,23 +555,7 @@ class SessionStore @Inject constructor(
      * before it cancels the rest, so this frame reaches every client except the one that acted.
      * That client settles its own card in [answerOutcome].
      */
-    private fun handleWaterfallCancelled(eventId: String) = forgetRequest(eventId)
-
-    /**
-     * Drop one request this client is holding, whoever settled it.
-     *
-     * Idempotent by construction — every step is a remove or a null-if-matching — because the two
-     * callers can both fire for one request: this client answers, forgets it here, and a `cancel`
-     * for the same `eventId` may still arrive if the host had a second delivery open.
-     */
-    private fun forgetRequest(eventId: String) {
-        synchronized(lock) {
-            val removed = pendingInteractions.forgetEvent(eventId) ?: return
-            removed.pendingKinds.forEach { removePendingLocked(removed.sessionId, it) }
-            emitSessionsLocked()
-            syncCurrentInteractionCardsLocked()
-        }
-    }
+    private fun handleWaterfallCancelled(eventId: String) = interactionRuntime.forgetEvent(eventId)
 
     // ------------------------------------------------------------------ control stream
     /**
@@ -731,30 +689,6 @@ class SessionStore @Inject constructor(
     @Volatile
     var notificationSink: ((String, SessionEventEnvelope) -> Unit)? = null
 
-    private fun handleApprovalRequested(eventId: String, sessionId: String, request: ApprovalRequestEvent) {
-        synchronized(lock) {
-            pendingInteractions.installApproval(eventId, sessionId, request)
-            addPendingLocked(sessionId, "approval")
-            emitSessionsLocked()
-            syncCurrentInteractionCardsLocked()
-        }
-    }
-
-    private fun handleQuestionRequested(
-        eventId: String,
-        sessionId: String,
-        questions: List<AskUserQuestionItem>,
-    ) {
-        synchronized(lock) {
-            val kind = pendingInteractions.installQuestions(eventId, sessionId, questions)
-            removePendingLocked(sessionId, "question")
-            removePendingLocked(sessionId, "plan-review")
-            addPendingLocked(sessionId, kind)
-            emitSessionsLocked()
-            syncCurrentInteractionCardsLocked()
-        }
-    }
-
     // ------------------------------------------------------------------ session list state updates
     /**
      * One session became visible to list consumers.
@@ -779,9 +713,8 @@ class SessionStore @Inject constructor(
     private fun onSessionRemoved(sessionId: String) {
         synchronized(lock) {
             indexState.removeSession(sessionId)
-            pendingInteractions.discardSession(sessionId)
+            interactionRuntime.discardSession(sessionId)
             emitSessionsLocked()
-            syncCurrentInteractionCardsLocked()
         }
     }
 
@@ -914,7 +847,7 @@ class SessionStore @Inject constructor(
             val same = currentId == sessionId
             currentId = sessionId
             _currentSessionId.value = sessionId
-            syncCurrentInteractionCardsLocked()
+            interactionRuntime.syncVisible()
             openSessionState.reset(indexState.session(sessionId)?.blank ?: true)
             if (!same) {
                 _currentConversation.value = null
@@ -1175,171 +1108,19 @@ class SessionStore @Inject constructor(
         sessionId: String? = currentSessionId.value,
     ): Boolean = turnCommandRuntime.updateQueue(itemId, action, contentText, sessionId)
 
-    /**
-     * Allows or refuses one pending approval.
-     *
-     * Reports its verdict in the same vocabulary a question answer does, and for the same reason:
-     * an approval that the host would not take leaves the tool call behind it blocked, and a panel
-     * that swallowed the refusal would sit there looking like a button that does nothing. A taken
-     * one takes the panel with it — see [answerOutcome] for why no frame does that here.
-     */
-    suspend fun respondApproval(sessionId: String, approvalId: String, allow: Boolean): QuestionOutcome {
-        val api = apiOrNull() ?: return QuestionOutcome.Unsent
-        val request = synchronized(lock) { pendingInteractions.approvalForEvent(approvalId) }
-        if (request == null) {
-            log("no pending approval for id $approvalId")
-            // Nothing to answer with, so nothing can arrive to take the panel away either.
-            if (_pendingApproval.value?.approvalId == approvalId) _pendingApproval.value = null
-            return QuestionOutcome.Refused(NOT_PENDING)
-        }
-        if (!approvalResponseMatchesSession(request.sessionId, sessionId)) {
-            log("refusing approval $approvalId for session $sessionId; owner=${request.sessionId}")
-            return QuestionOutcome.Refused(NOT_PENDING)
-        }
-        val clientId = connectionManager.generation?.clientId
-        if (clientId == null) {
-            log("cannot answer approval $approvalId: no connection generation")
-            return QuestionOutcome.Unsent
-        }
-        val outcome = if (allow) ApprovalOutcome.ALLOWED_ONCE else ApprovalOutcome.REJECTED
-        // The waterfall's own return value *is* the outcome string, so this claims the request
-        // with a bare value rather than the object 0.1.1 posted to /api/respond.
-        val result = api.answerEvent(
-            clientId = clientId,
-            eventId = request.rpcId,
-            outcome = RemoteEventOutcome.Result(value = JsonPrimitive(outcome)),
-        )
-        return answerOutcome(result, "approval response", sessionId) { forgetRequest(request.rpcId) }
-    }
-
-    /**
-     * Answers a pending question batch.
-     *
-     * The payload is serialized from a typed DTO rather than assembled by hand, and that is the
-     * whole point of the type: `custom` belongs to the answer *item*, and the host's schema strips
-     * keys it does not recognise instead of objecting to them. A `custom` written one level out
-     * therefore reached the wire, was accepted, and simply never reached the model — the user's
-     * typed answer deleted in transit with nothing to show for it.
-     */
-    suspend fun answerQuestions(sessionId: String, answer: AskUserQuestionAnswer): QuestionOutcome {
-        val api = apiOrNull() ?: return QuestionOutcome.Unsent
-        val eventId = pendingQuestionEvent(sessionId) ?: return abandonQuestions(sessionId)
-        val clientId = connectionManager.generation?.clientId ?: return QuestionOutcome.Unsent
-        // The waterfall returns the answer object itself; there is no envelope around it now.
-        return answerOutcome(
-            api.answerEvent(
-                clientId = clientId,
-                eventId = eventId,
-                outcome = RemoteEventOutcome.Result(
-                    value = encodeToJsonElement(AskUserQuestionAnswer.serializer(), answer),
-                ),
-            ),
-            "question response",
-            sessionId,
-        ) { forgetRequest(eventId) }
-    }
-
-    /**
-     * Dismisses a pending question batch instead of answering it.
-     *
-     * Answering every item with an empty selection is a perfectly valid *answer*, and the model
-     * reads it as "no preference". A dismissal fails the wait instead, and the host then settles
-     * the tool call as cancelled. The code has to be exactly `cancelled`; the proxy refuses an
-     * `ok:false` carrying any other.
-     */
-    suspend fun dismissQuestions(sessionId: String): QuestionOutcome {
-        val api = apiOrNull() ?: return QuestionOutcome.Unsent
-        val eventId = pendingQuestionEvent(sessionId) ?: return abandonQuestions(sessionId)
-        val clientId = connectionManager.generation?.clientId ?: return QuestionOutcome.Unsent
-        // A rejection, not an empty answer, and not `next`: `next` would delegate to the host's
-        // own later listeners, which is a different thing from the user closing the prompt.
-        return answerOutcome(
-            api.answerEvent(
-                clientId = clientId,
-                eventId = eventId,
-                outcome = RemoteEventOutcome.Rejected(
-                    error = RemoteEventRejection(
-                        name = "UserQuestionError",
-                        message = QUESTION_CANCELLED.message,
-                        code = QUESTION_CANCELLED.code,
-                    ),
-                ),
-            ),
-            "question dismissal",
-            sessionId,
-        ) { forgetRequest(eventId) }
-    }
-
-    private fun pendingQuestionEvent(sessionId: String): String? {
-        val eventId = synchronized(lock) { pendingInteractions.questionEventForSession(sessionId) }
-        if (eventId == null) log("no pending question for session $sessionId")
-        return eventId
-    }
-
-    /**
-     * There is a card on screen for [sessionId] but no event left to address it to.
-     *
-     * A card in that state can never be answered — every path through here needs the `eventId` the
-     * waterfall arrived with — so it is a corpse, and leaving it up would be the same dead end by a
-     * shorter route. Reported as [NOT_PENDING] all the same: the wait, wherever it went, is not
-     * this client's to settle any more.
-     */
-    private fun abandonQuestions(sessionId: String): QuestionOutcome {
-        synchronized(lock) {
-            if (pendingInteractions.forgetQuestions(sessionId, null)) {
-                removePendingLocked(sessionId, "question"); removePendingLocked(sessionId, "plan-review")
-                emitSessionsLocked(); syncCurrentInteractionCardsLocked()
-            }
-        }
-        return QuestionOutcome.Refused(NOT_PENDING)
-    }
-
-    /**
-     * Map one `$events/result` answer onto the store's outcome vocabulary, and run [forget] when
-     * that answer ended the request behind it.
-     *
-     * [forget] is the card's only exit on this client, and it is a caller's lambda rather than an
-     * `eventId` because the two kinds are held differently — an approval by its event alone, a
-     * question by its session *and* its event, so that an answer cannot take away the card of the
-     * request that replaced the one it answered. The web client has no equivalent because it never needs
-     * one: its `PendingQuestion.answer()` resolves the waiting promise in the same process, so the
-     * card's life ends with the call. Here the answer is a POST, and the host settles it by
-     * *removing this client's delivery first* and then pushing `cancel` to the deliveries that
-     * remain — so the client that acted is the only one the resolution is never announced to.
-     * Waiting for a frame that cannot arrive is what left an answered card frozen on "Submitting…"
-     * with no way out but a force-stop.
-     *
-     * A failure here is not retried: upstream fails the whole connection generation on it and
-     * replays the pending request on the next one, so a retry would answer the same question
-     * twice. Nor is a failing card taken away — see [settlesRequest].
-     */
-    private fun answerOutcome(
-        result: RpcResult<JsonElement>,
-        what: String,
+    suspend fun respondApproval(
         sessionId: String,
-        forget: () -> Unit,
-    ): QuestionOutcome {
-        val outcome = when (result) {
-            is RpcResult.Ok -> QuestionOutcome.Accepted
-            is RpcResult.Err -> {
-                log("$what failed for $sessionId: ${result.error.code}: ${result.error.message}")
-                // The split is "did the host answer at all", not a list of codes. A carrier failure
-                // carries a [TransportFailure] marker and nothing is known about the wait; anything
-                // else reached the host and came back `ok:false`, so the refusal is reported with
-                // the host's own code. Folding those into [QuestionOutcome.Unsent] is what made a
-                // malformed envelope read as "could not reach the harness" and sent reporters to
-                // debug their network for a protocol fault.
-                if (TransportFailures.of(result.error) != null) {
-                    QuestionOutcome.Unsent
-                } else {
-                    QuestionOutcome.Refused(result.error.code)
-                }
-            }
-        }
-        if (settlesRequest(outcome)) forget()
-        return outcome
-    }
+        approvalId: String,
+        allow: Boolean,
+    ): QuestionOutcome = interactionRuntime.respondApproval(sessionId, approvalId, allow)
 
+    suspend fun answerQuestions(
+        sessionId: String,
+        answer: AskUserQuestionAnswer,
+    ): QuestionOutcome = interactionRuntime.answerQuestions(sessionId, answer)
+
+    suspend fun dismissQuestions(sessionId: String): QuestionOutcome =
+        interactionRuntime.dismissQuestions(sessionId)
 
     suspend fun selectModel(provider: String, model: String, reasoningEffort: String? = null) {
         val sid = currentSessionId.value ?: return
@@ -1535,16 +1316,10 @@ class SessionStore @Inject constructor(
         }
         val sessionId = currentSessionId.value ?: return CommandOutcome.Failed("no open session")
         val host = activeHostKey
-        synchronized(lock) {
-            pendingInteractions.installPermission(sessionId, value)
-            syncCurrentInteractionCardsLocked()
-        }
+        interactionRuntime.installPermission(sessionId, value)
         val outcome = runCommand("/permission $value", targetSessionId = sessionId, targetHost = host)
         if (outcome !is CommandOutcome.Ok) {
-            synchronized(lock) {
-                pendingInteractions.forgetPermission(sessionId, value)
-                syncCurrentInteractionCardsLocked()
-            }
+            interactionRuntime.clearPermission(sessionId, value)
         }
         return outcome
     }
