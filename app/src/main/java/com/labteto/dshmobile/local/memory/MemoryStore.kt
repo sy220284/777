@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.memory
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -619,7 +620,12 @@ class MemoryStore internal constructor(
         cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
 
         val document = decodeDocument(file) ?: if (!file.isFile) {
-            decodeDocument(backup) ?: MemoryDocument()
+            val recovered = decodeDocument(backup)
+            if (backup.isFile && recovered == null) {
+                AppLog.error(TAG, "memory primary missing and backup is corrupt")
+                error("长期记忆主文件缺失且备份已损坏，已停止写入以避免覆盖可恢复数据")
+            }
+            recovered ?: MemoryDocument()
         } else {
             val corrupt = File(root, "memories.corrupt-${System.currentTimeMillis()}.json")
             val moved = runCatching { file.renameTo(corrupt) }.getOrDefault(false)
@@ -630,7 +636,8 @@ class MemoryStore internal constructor(
                 runCatching { backup.copyTo(file, overwrite = true) }
                 recovered
             } else {
-                MemoryDocument()
+                AppLog.error(TAG, "memory primary and backup are both corrupt")
+                error("长期记忆主文件与备份均已损坏，损坏文件已保留；请先恢复或导出后再继续")
             }
         }
         cachedDocument = document
@@ -676,6 +683,10 @@ class MemoryStore internal constructor(
         backupModified = backup.takeIf(File::isFile)?.lastModified() ?: -1L,
         backupLength = backup.takeIf(File::isFile)?.length() ?: -1L,
     )
+
+    private companion object {
+        const val TAG = "MemoryStore"
+    }
 
     private data class DocumentStamp(
         val primaryModified: Long,
