@@ -69,7 +69,6 @@ import com.labteto.dshmobile.local.chat.boundDurablePending
 import com.labteto.dshmobile.local.chat.rebaseGeneration
 import com.labteto.dshmobile.local.chat.restoreBranchContext
 import com.labteto.dshmobile.local.chat.withContextForPlanner
-import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
 import com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger
@@ -5013,8 +5012,8 @@ class LocalHarnessEngine @Inject constructor(
             galleryStoryId = stored.galleryStoryId,
             gallerySaveSuppressedThrough = stored.gallerySaveSuppressedThrough,
             chatPersona = chatPersonaStore.get(stored.personaId),
-            chatState = stored.chatState.withoutLegacyConversationContext(),
-            chatContext = stored.chatContext.withLegacyFallback(stored.chatState).boundDurablePending(eventLog),
+            chatState = stored.chatState,
+            chatContext = stored.chatContext.boundDurablePending(eventLog),
             replySuggestions = stored.replySuggestions,
             chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !stored.groupChat.enabled) {
                 restoreMaterializedChatBranchState(
@@ -5027,7 +5026,7 @@ class LocalHarnessEngine @Inject constructor(
                 LocalChatBranchState()
             },
             groupChat = if (stored.usageMode == LocalUsageMode.CHAT) {
-                stored.groupChat.migrateLegacyConversationContext().let { it.copy(context = it.context.boundDurablePending(eventLog, "group")) }
+                stored.groupChat.copy(context = stored.groupChat.context.boundDurablePending(eventLog, "group"))
             } else {
                 LocalGroupChatState()
             },

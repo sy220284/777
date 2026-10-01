@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatSceneState
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -38,6 +40,29 @@ class LocalSessionCoordinatorTest {
         assertEquals(listOf("m3", "m4"), restored.messages.map { it.id })
         assertEquals(5L, restored.index.totalMessageCount)
         assertTrue(restored.needsPersist)
+    }
+
+    @Test
+    fun readCanonicalizesLegacyChatContextAtPersistenceBoundary() = runTest {
+        val json = Json { ignoreUnknownKeys = true }
+        val sessions = temporary.newFolder("legacy-chat-context")
+        val repository = LocalSessionRepository(sessions, json, backgroundScope, {}, {})
+        val coordinator = LocalSessionCoordinator(
+            repository = repository,
+            eventLogFor = { id -> LocalSessionEventLog(File(sessions, "$id.events.jsonl"), json) },
+            runtimeWindowMessages = 2,
+        )
+        repository.writeNow(
+            LocalHarnessSession(
+                id = "legacy-chat",
+                chatState = ChatCharacterState(scene = ChatSceneState(location = "庭院")),
+            ),
+        )
+
+        val restored = requireNotNull(coordinator.read("legacy-chat"))
+
+        assertEquals("庭院", restored.chatContext.scene.location)
+        assertTrue(restored.chatState.scene.location.isBlank())
     }
 
     @Test

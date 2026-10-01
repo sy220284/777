@@ -8,7 +8,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 
 LINE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 5174,
+    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 5173,
     "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 1885,
     "app/src/main/java/com/labteto/dshmobile/data/SessionAttachmentTransfer.kt": 100,
     "app/src/main/java/com/labteto/dshmobile/data/SessionCatalogRuntime.kt": 151,
@@ -35,7 +35,7 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt": 128,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRunnerFactory.kt": 135,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt": 323,
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt": 525,
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt": 523,
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessRuntimePolicy.kt": 98,
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt": 76,
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessResourceProjection.kt": 23,

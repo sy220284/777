@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.withLegacyFallback
+import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -21,10 +23,13 @@ internal class LocalSessionCoordinator(
     private val eventLogFor: (String) -> LocalSessionEventLog,
     private val runtimeWindowMessages: Int,
 ) {
-    fun read(id: String): LocalHarnessSession? = repository.read(id)
+    fun read(id: String): LocalHarnessSession? =
+        repository.read(id)?.canonicalizeLegacyChatState()
 
     fun readWithLegacyApproval(id: String): LocalSessionRead? =
-        repository.readWithLegacyApproval(id)
+        repository.readWithLegacyApproval(id)?.let { loaded ->
+            loaded.copy(session = loaded.session.canonicalizeLegacyChatState())
+        }
 
     fun enqueue(snapshot: LocalHarnessSession) = repository.enqueue(snapshot)
 
@@ -143,6 +148,13 @@ internal class LocalSessionCoordinator(
         controlProjectedThroughSequence = controlProjectedThroughSequence,
         transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
     )
+
+    private fun LocalHarnessSession.canonicalizeLegacyChatState(): LocalHarnessSession =
+        copy(
+            chatState = chatState.withoutLegacyConversationContext(),
+            chatContext = chatContext.withLegacyFallback(chatState),
+            groupChat = groupChat.migrateLegacyConversationContext(),
+        )
 
     private companion object {
         const val LEGACY_TRANSCRIPT_PROJECTION_BASELINE_EVENT =
