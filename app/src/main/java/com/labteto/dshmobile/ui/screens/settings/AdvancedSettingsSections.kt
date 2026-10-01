@@ -457,8 +457,9 @@ internal fun LocalModelSettingsCard(
         it.authKind == LocalModelAuthKind.API_KEY &&
             it.model == model.trim() && it.baseUrl == baseUrl.trim().trimEnd('/')
     }
-    val savedProfile = if (editingProfileId != null) matchingRoutes.firstOrNull { it.id == editingProfileId }
-        else matchingRoutes.singleOrNull()
+    val savedProfile = editingProfileId?.let { id ->
+        matchingRoutes.firstOrNull { it.id == id }
+    }
     val savedRoute = savedProfile != null
     val selectedPreset = LocalModelPresets.find(model, baseUrl)
     val editRoute: (String, String, String?) -> Unit = { name, url, id ->
@@ -466,9 +467,12 @@ internal fun LocalModelSettingsCard(
         editingProfileId = id
         model = name
         baseUrl = url
-        protocol = local.modelProfiles.filter { it.authKind == LocalModelAuthKind.API_KEY && it.model == name && it.baseUrl == url }
-            .let { routes -> if (id != null) routes.firstOrNull { it.id == id } else routes.singleOrNull() }
-            ?.protocol ?: LocalModelPresets.protocolFor(name, url)
+        protocol = id?.let { profileId ->
+            local.modelProfiles.firstOrNull {
+                it.authKind == LocalModelAuthKind.API_KEY && it.id == profileId &&
+                    it.model == name && it.baseUrl == url
+            }?.protocol
+        } ?: LocalModelPresets.protocolFor(name, url)
         apiKey = ""
         testStatus = null
     }
