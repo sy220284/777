@@ -5,7 +5,6 @@ import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.connection.ConnectionManager
 import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.HostsStore
-import com.labteto.dshmobile.core.session.AssistantLiveState
 import com.labteto.dshmobile.core.session.ChunkRows
 import com.labteto.dshmobile.core.session.ConversationSnapshot
 import com.labteto.dshmobile.core.session.EventFold
@@ -22,10 +21,7 @@ import com.labteto.dshmobile.core.wire.dto.AskUserQuestionAnswer
 import com.labteto.dshmobile.core.wire.dto.AskUserQuestionIntent
 import com.labteto.dshmobile.core.wire.dto.AskUserQuestionItem
 import com.labteto.dshmobile.core.wire.dto.AskUserQuestionRequestEvent
-import com.labteto.dshmobile.core.wire.dto.CUSTOM_PRESET
 import com.labteto.dshmobile.core.wire.dto.CommandDescriptor
-import com.labteto.dshmobile.core.wire.dto.CommandSubmitAttachment
-import com.labteto.dshmobile.core.wire.dto.ContentBlock
 import com.labteto.dshmobile.core.wire.dto.ContextBreakdownView
 import com.labteto.dshmobile.core.wire.dto.ContextPressureView
 import com.labteto.dshmobile.core.wire.dto.EncodedFileUploadRequest
@@ -40,9 +36,7 @@ import com.labteto.dshmobile.core.wire.dto.JobView
 import com.labteto.dshmobile.core.wire.dto.PermissionSelect
 import com.labteto.dshmobile.core.wire.dto.PlanStateView
 import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
-import com.labteto.dshmobile.core.wire.dto.PromptContentPart
 import com.labteto.dshmobile.core.wire.dto.QUESTION_CANCELLED
-import com.labteto.dshmobile.core.wire.dto.QueueAction
 import com.labteto.dshmobile.core.wire.dto.ModelSelectionProjection
 import kotlinx.coroutines.flow.combine
 import com.labteto.dshmobile.core.wire.dto.ModelCatalog
@@ -52,40 +46,25 @@ import com.labteto.dshmobile.core.wire.dto.RemoteEventOutcome
 import com.labteto.dshmobile.core.wire.dto.RemoteEventRejection
 import com.labteto.dshmobile.core.wire.dto.SessionAddress
 import com.labteto.dshmobile.core.wire.dto.SessionAttachmentRequest
-import com.labteto.dshmobile.core.wire.dto.SessionCancelRequest
 import com.labteto.dshmobile.core.wire.dto.SessionControlFrame
-import com.labteto.dshmobile.core.wire.dto.SessionCreateRequest
 import com.labteto.dshmobile.core.wire.dto.SessionEvent
 import com.labteto.dshmobile.core.wire.dto.SessionFollowFrame
-import com.labteto.dshmobile.core.wire.dto.SessionForkRequest
 import com.labteto.dshmobile.core.wire.dto.SessionHistoryRecord
 import com.labteto.dshmobile.core.wire.dto.SessionModelsValue
 import com.labteto.dshmobile.core.wire.dto.SessionPageRequest
-import com.labteto.dshmobile.core.wire.dto.SessionPromptRequest
-import com.labteto.dshmobile.core.wire.dto.SessionRenameRequest
 import com.labteto.dshmobile.core.wire.dto.SessionSelectModelRequest
 import com.labteto.dshmobile.core.wire.dto.SessionStatsView
 import com.labteto.dshmobile.core.wire.dto.SessionSummary
-import com.labteto.dshmobile.core.wire.dto.SessionUpdateQueueRequest
 import com.labteto.dshmobile.core.wire.dto.SkillEntry
 import com.labteto.dshmobile.core.wire.dto.SkillListRequest
 import com.labteto.dshmobile.core.wire.dto.SubagentListEntry
-import com.labteto.dshmobile.core.wire.dto.SubagentPromptRequest
 import com.labteto.dshmobile.core.wire.dto.TokenUsageView
 import com.labteto.dshmobile.core.wire.dto.USER_QUESTIONS_REQUEST_EVENT
-import com.labteto.dshmobile.core.wire.dto.UnknownSubagentListEntry
-import com.labteto.dshmobile.core.wire.dto.WorkspaceArchiveSessionRequest
-import com.labteto.dshmobile.core.wire.dto.WorkspaceCreateRequest
-import com.labteto.dshmobile.core.wire.dto.WorkspaceDeleteRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceFollowFrame
-import com.labteto.dshmobile.core.wire.dto.WorkspaceRenameRequest
-import com.labteto.dshmobile.core.wire.dto.WorkspaceValue
 import com.labteto.dshmobile.core.wire.dto.WorkspaceView
-import com.labteto.dshmobile.core.wire.dto.imageRejectionOf
 import com.labteto.dshmobile.core.wire.RpcError
 import com.labteto.dshmobile.core.wire.TransportFailures
 import com.labteto.dshmobile.core.wire.encodeToJsonElement
-import com.labteto.dshmobile.core.wire.newPromptRequestId
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.TimeZone
@@ -108,7 +87,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -174,18 +152,47 @@ class SessionStore @Inject constructor(
         logger = ::log,
     )
 
-    private val _searchResults = MutableStateFlow<List<Pair<String, String>>>(emptyList())
-    val searchResults: StateFlow<List<Pair<String, String>>> = _searchResults.asStateFlow()
+    private val workspaceRuntime = SessionWorkspaceRuntime(
+        apiProvider = ::apiOrNull,
+        apiForHost = ::apiForHost,
+        activeHostKey = { activeHostKey },
+        onWorkspaceUpsert = ::upsertWorkspace,
+        onWorkspaceRemove = ::removeWorkspace,
+        onArchivedChanged = ::setArchived,
+        refreshSessions = ::refreshSessions,
+        onConnectionError = ::setConnectionError,
+    )
 
-    private val _contentSearchAvailable = MutableStateFlow(true)
+    private val goalRuntime = SessionGoalRuntime(
+        apiProvider = ::apiOrNull,
+        currentSessionId = { currentSessionId.value },
+        currentGoalRef = { synchronized(lock) { goalRefFromProjectionLocked() } },
+        onConnectionError = ::setConnectionError,
+        logger = ::log,
+    )
 
-    /**
-     * Whether this harness will answer `session.search`.
-     *
-     * Assumed true and latched false by the first refusal — see [search]. Reset on connect, because
-     * it is a fact about the harness on the other end, not about the app.
-     */
-    val contentSearchAvailable: StateFlow<Boolean> = _contentSearchAvailable.asStateFlow()
+    private val sessionLifecycleRuntime = SessionLifecycleRuntime(
+        apiProvider = ::apiOrNull,
+        reusableBlankSession = { workspaceId ->
+            synchronized(lock) { indexState.reusableBlankSession(workspaceId) }
+        },
+        refreshSessions = ::refreshSessions,
+        openSession = ::openSession,
+        onTitleChanged = ::setTitle,
+        onConnectionError = ::setConnectionError,
+    )
+
+    private val searchRuntime = SessionSearchRuntime(apiProvider = ::apiOrNull)
+    val searchResults: StateFlow<List<Pair<String, String>>> get() = searchRuntime.results
+    val contentSearchAvailable: StateFlow<Boolean> get() = searchRuntime.available
+
+    private val turnCommandRuntime = SessionTurnCommandRuntime(
+        apiForHost = ::apiForHost,
+        apiProvider = ::apiOrNull,
+        currentSessionId = { _currentSessionId.value },
+        activeHostKey = { activeHostKey },
+        onConnectionError = ::setConnectionError,
+    )
 
     private val _currentConversation = MutableStateFlow<ConversationSnapshot?>(null)
     val currentConversation: StateFlow<ConversationSnapshot?> = _currentConversation.asStateFlow()
@@ -221,21 +228,6 @@ class SessionStore @Inject constructor(
     private val _loadOlderFailed = MutableStateFlow(false)
     val loadOlderFailed: StateFlow<Boolean> = _loadOlderFailed.asStateFlow()
 
-    private val _subagents = MutableStateFlow<List<SubagentListEntry>>(emptyList())
-    val subagents: StateFlow<List<SubagentListEntry>> = _subagents.asStateFlow()
-
-    private val _subagentConversation = MutableStateFlow<ConversationSnapshot?>(null)
-    val subagentConversation: StateFlow<ConversationSnapshot?> = _subagentConversation.asStateFlow()
-
-    private val _subagentMode = MutableStateFlow<String?>(null)
-    val subagentMode: StateFlow<String?> = _subagentMode.asStateFlow()
-
-    private val _pendingApproval = MutableStateFlow<PendingApproval?>(null)
-    val pendingApproval: StateFlow<PendingApproval?> = _pendingApproval.asStateFlow()
-
-    private val _pendingQuestions = MutableStateFlow<PendingQuestions?>(null)
-    val pendingQuestions: StateFlow<PendingQuestions?> = _pendingQuestions.asStateFlow()
-
     val commands: StateFlow<List<CommandDescriptor>> = catalogs.commands
 
     /** False once the harness has told us it has no command registry; the menu degrades, not errors. */
@@ -245,10 +237,6 @@ class SessionStore @Inject constructor(
 
     /** The host's plugin inventory, or null when this deployment does not expose one. */
     val plugins: StateFlow<PluginInventorySnapshot?> = catalogs.plugins
-
-    /** The preset a switch is in flight for, cleared when the projection reports it as effective. */
-    private val _pendingPermission = MutableStateFlow<String?>(null)
-    val pendingPermission: StateFlow<String?> = _pendingPermission.asStateFlow()
 
     // ------------------------------------------------------------------ projection views
     // These are folds of `currentConversation.projections`, not separate fetches: the harness
@@ -309,11 +297,6 @@ class SessionStore @Inject constructor(
     // ------------------------------------------------------------------ internal state (guarded by `lock`)
     private val indexState = SessionIndexState()
 
-    // Pending Remote Event waterfalls this store can answer. Keyed by the frame's `eventId`,
-    // which is both what an answer names and what a `cancel` frame withdraws — 0.1.2 mints no
-    // separate approval id.
-    private val pendingInteractions = PendingSessionInteractionStore()
-
     // Open-session fold state.
     private var currentId: String? = null
     private val openSessionState = OpenSessionFoldState()
@@ -345,6 +328,42 @@ class SessionStore @Inject constructor(
         },
     )
 
+    private val subagentRuntime = SessionSubagentRuntime(
+        apiProvider = ::apiOrNull,
+        currentSessionId = { _currentSessionId.value },
+        activeHostKey = { activeHostKey },
+        remoteStreams = remoteStreams,
+        onConnectionError = ::setConnectionError,
+        logger = ::log,
+    )
+    private val interactionRuntime = SessionInteractionRuntime(
+        lock = lock,
+        apiProvider = ::apiOrNull,
+        clientIdProvider = { connectionManager.generation?.clientId },
+        currentSessionId = { currentId },
+        addPending = ::addPendingLocked,
+        removePending = ::removePendingLocked,
+        emitSessions = ::emitSessionsLocked,
+        logger = { message -> log(message) },
+    )
+    private val slashCommandRuntime = SessionSlashCommandRuntime(
+        apiForHost = ::apiForHost,
+        currentSessionId = { currentSessionId.value },
+        activeHostKey = { activeHostKey },
+        markCommandsUnavailable = catalogs::markCommandsUnavailable,
+        installPermission = interactionRuntime::installPermission,
+        clearPermission = interactionRuntime::clearPermission,
+        onConnectionError = ::setConnectionError,
+    )
+
+    val pendingApproval: StateFlow<PendingApproval?> get() = interactionRuntime.pendingApproval
+    val pendingQuestions: StateFlow<PendingQuestions?> get() = interactionRuntime.pendingQuestions
+    val pendingPermission: StateFlow<String?> get() = interactionRuntime.pendingPermission
+
+    val subagents: StateFlow<List<SubagentListEntry>> get() = subagentRuntime.subagents
+    val subagentConversation: StateFlow<ConversationSnapshot?> get() = subagentRuntime.conversation
+    val subagentMode: StateFlow<String?> get() = subagentRuntime.mode
+
     init {
         observeConnection()
         observeEvents()
@@ -359,14 +378,7 @@ class SessionStore @Inject constructor(
     private fun observePermissionSettlement() {
         scope.launch {
             permissions.collect { select ->
-                synchronized(lock) {
-                    val sessionId = currentId ?: return@synchronized
-                    val pending = pendingInteractions.permissionForSession(sessionId) ?: return@synchronized
-                    if (select?.currentValue == pending) {
-                        pendingInteractions.forgetPermission(sessionId, pending)
-                        syncCurrentInteractionCardsLocked()
-                    }
-                }
+                interactionRuntime.settlePermission(select?.currentValue)
             }
         }
     }
@@ -407,29 +419,11 @@ class SessionStore @Inject constructor(
                 val retiredGeneration =
                     prev.phase == ConnectionPhase.CONNECTED &&
                         state.phase != ConnectionPhase.CONNECTED
-                if (retiredGeneration) clearRetiredGenerationInteractions()
+                if (retiredGeneration) interactionRuntime.clearRetiredGeneration()
                 prev = state
                 if (initialConnect || reconnect) triggerBaseline()
             }
         }
-    }
-
-    private fun clearRetiredGenerationInteractions() {
-        synchronized(lock) {
-            pendingInteractions.clear().forEach { sessionId ->
-                removePendingLocked(sessionId, "approval")
-                removePendingLocked(sessionId, "question")
-                removePendingLocked(sessionId, "plan-review")
-            }
-            emitSessionsLocked()
-            syncCurrentInteractionCardsLocked()
-        }
-    }
-
-    private fun syncCurrentInteractionCardsLocked() {
-        _pendingApproval.value = pendingInteractions.approvalForSession(currentId)
-        _pendingQuestions.value = pendingInteractions.questionsForSession(currentId)
-        _pendingPermission.value = pendingInteractions.permissionForSession(currentId)
     }
 
     private fun observeEvents() {
@@ -457,7 +451,7 @@ class SessionStore @Inject constructor(
     private suspend fun baseline() {
         // Whether content search works is a fact about the harness we just reached, so a fresh
         // connection re-earns the answer rather than inheriting the previous host's.
-        _contentSearchAvailable.value = true
+        searchRuntime.resetCapability()
         // Before the list read: the workspace and control streams each open with their own
         // complete baseline, and the list is what their increments are applied on top of.
         remoteStreams.restartHostStreams()
@@ -567,13 +561,13 @@ class SessionStore @Inject constructor(
                 val request = runCatching {
                     decodeFromJsonElement(ApprovalRequestEvent.serializer(), frame.request)
                 }.getOrNull() ?: return
-                handleApprovalRequested(frame.eventId, frame.agentId, request)
+                interactionRuntime.installApproval(frame.eventId, frame.agentId, request)
             }
             USER_QUESTIONS_REQUEST_EVENT -> {
                 val request = runCatching {
                     decodeFromJsonElement(AskUserQuestionRequestEvent.serializer(), frame.request)
                 }.getOrNull() ?: return
-                handleQuestionRequested(frame.eventId, frame.agentId, request.questions)
+                interactionRuntime.installQuestions(frame.eventId, frame.agentId, request.questions)
             }
             else -> log("unhandled waterfall ${frame.event}")
         }
@@ -590,23 +584,7 @@ class SessionStore @Inject constructor(
      * before it cancels the rest, so this frame reaches every client except the one that acted.
      * That client settles its own card in [answerOutcome].
      */
-    private fun handleWaterfallCancelled(eventId: String) = forgetRequest(eventId)
-
-    /**
-     * Drop one request this client is holding, whoever settled it.
-     *
-     * Idempotent by construction — every step is a remove or a null-if-matching — because the two
-     * callers can both fire for one request: this client answers, forgets it here, and a `cancel`
-     * for the same `eventId` may still arrive if the host had a second delivery open.
-     */
-    private fun forgetRequest(eventId: String) {
-        synchronized(lock) {
-            val removed = pendingInteractions.forgetEvent(eventId) ?: return
-            removed.pendingKinds.forEach { removePendingLocked(removed.sessionId, it) }
-            emitSessionsLocked()
-            syncCurrentInteractionCardsLocked()
-        }
-    }
+    private fun handleWaterfallCancelled(eventId: String) = interactionRuntime.forgetEvent(eventId)
 
     // ------------------------------------------------------------------ control stream
     /**
@@ -740,30 +718,6 @@ class SessionStore @Inject constructor(
     @Volatile
     var notificationSink: ((String, SessionEventEnvelope) -> Unit)? = null
 
-    private fun handleApprovalRequested(eventId: String, sessionId: String, request: ApprovalRequestEvent) {
-        synchronized(lock) {
-            pendingInteractions.installApproval(eventId, sessionId, request)
-            addPendingLocked(sessionId, "approval")
-            emitSessionsLocked()
-            syncCurrentInteractionCardsLocked()
-        }
-    }
-
-    private fun handleQuestionRequested(
-        eventId: String,
-        sessionId: String,
-        questions: List<AskUserQuestionItem>,
-    ) {
-        synchronized(lock) {
-            val kind = pendingInteractions.installQuestions(eventId, sessionId, questions)
-            removePendingLocked(sessionId, "question")
-            removePendingLocked(sessionId, "plan-review")
-            addPendingLocked(sessionId, kind)
-            emitSessionsLocked()
-            syncCurrentInteractionCardsLocked()
-        }
-    }
-
     // ------------------------------------------------------------------ session list state updates
     /**
      * One session became visible to list consumers.
@@ -788,9 +742,8 @@ class SessionStore @Inject constructor(
     private fun onSessionRemoved(sessionId: String) {
         synchronized(lock) {
             indexState.removeSession(sessionId)
-            pendingInteractions.discardSession(sessionId)
+            interactionRuntime.discardSession(sessionId)
             emitSessionsLocked()
-            syncCurrentInteractionCardsLocked()
         }
     }
 
@@ -904,18 +857,6 @@ class SessionStore @Inject constructor(
         }
     }
 
-    /**
-     * Apply one workspace mutation's own answer immediately.
-     *
-     * `workspace.list` no longer exists; the registry is a stream, and a mutation answers with the
-     * value it produced. Applying it here keeps the UI responsive without waiting for the stream
-     * to commit, and the stream's next frame — which is authoritative — corrects anything this
-     * guessed. Deleting is the one case that must not be optimistic in reverse: a delayed upsert
-     * could otherwise resurrect a row, which is why removal goes through the same path as the
-     * stream's own.
-     */
-    private fun applyWorkspaceValue(value: WorkspaceValue) = upsertWorkspace(value.workspace)
-
     suspend fun openSession(sessionId: String) = withContext(Dispatchers.Default) {
         val api = apiOrNull() ?: return@withContext
         _loadOlderFailed.value = false
@@ -923,15 +864,13 @@ class SessionStore @Inject constructor(
             val same = currentId == sessionId
             currentId = sessionId
             _currentSessionId.value = sessionId
-            syncCurrentInteractionCardsLocked()
+            interactionRuntime.syncVisible()
             openSessionState.reset(indexState.session(sessionId)?.blank ?: true)
             if (!same) {
                 _currentConversation.value = null
                 _jobs.value = emptyList()
                 catalogs.resetSession()
-                _subagents.value = emptyList()
-                _subagentConversation.value = null
-                _subagentMode.value = null
+                subagentRuntime.resetSession()
             }
         }
         startFollow(sessionId)
@@ -1075,69 +1014,24 @@ class SessionStore @Inject constructor(
         }
     }
 
-    suspend fun createSession(cwd: String? = null, workspaceId: String? = null) {
-        // Reuse the workspace's existing blank session instead of leaving another empty one behind
-        // — the harness's own New Session does this, and it is why its list stays clean.
-        if (workspaceId != null) {
-            val reusable = synchronized(lock) {
-                indexState.reusableBlankSession(workspaceId)
-            }
-            if (reusable != null) {
-                openSession(reusable)
-                return
-            }
-        }
-        val api = apiOrNull() ?: return
-        when (val r = api.sessionCreate(SessionCreateRequest(workspaceId = workspaceId, cwd = cwd))) {
-            is RpcResult.Ok -> {
-                refreshSessions()
-                openSession(r.value.sessionId)
-            }
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun createSession(cwd: String? = null, workspaceId: String? = null) =
+        sessionLifecycleRuntime.create(cwd, workspaceId)
 
-    suspend fun renameSession(sessionId: String, title: String) {
-        val api = apiOrNull() ?: return
-        when (val r = api.sessionRename(SessionRenameRequest(sessionId, title))) {
-            is RpcResult.Ok -> setTitle(sessionId, r.value.title)
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun renameSession(sessionId: String, title: String) =
+        sessionLifecycleRuntime.rename(sessionId, title)
 
-    suspend fun forkSession(sessionId: String, atSeq: Long? = null) {
-        val api = apiOrNull() ?: return
-        when (val r = api.sessionFork(SessionForkRequest(sessionId, atSeq?.toInt()))) {
-            is RpcResult.Ok -> refreshSessions()
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun forkSession(sessionId: String, atSeq: Long? = null) =
+        sessionLifecycleRuntime.fork(sessionId, atSeq)
 
-    suspend fun archiveSession(sessionId: String) {
-        val api = apiOrNull() ?: return
-        when (val r = api.workspaceArchiveSession(WorkspaceArchiveSessionRequest(sessionId))) {
-            is RpcResult.Ok -> {
-                setArchived(r.value.archivedSessionIds)
-                refreshSessions()
-            }
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun archiveSession(sessionId: String) = workspaceRuntime.archiveSession(sessionId)
 
-    suspend fun prompt(text: String, mode: String, targetSessionId: String? = currentSessionId.value, targetHost: String? = activeHostKey) =
-        promptContent(mode, listOf(PromptContentPart.Text(text)), targetSessionId, targetHost)
+    suspend fun prompt(
+        text: String,
+        mode: String,
+        targetSessionId: String? = currentSessionId.value,
+        targetHost: String? = activeHostKey,
+    ) = turnCommandRuntime.prompt(text, mode, targetSessionId, targetHost)
 
-    /**
-     * Prompt with attachments: raster images (bytes submitted base64, as the browser wire does)
-     * and files already staged through [uploadFile], cited by receipt.
-     *
-     * All of them ride *one* call. `session/prompt` takes a list of content parts and the host
-     * admits that list as a single batch, which is where its per-message image count and
-     * aggregate-size limits live — sending one image per call, as this client used to, split one
-     * message into several and meant those two limits could never fire at all. A file's bytes
-     * never ride the prompt: the receipt names an upload the host already holds, and the host
-     * refuses one it did not mint for this session.
-     */
     suspend fun promptWithAttachments(
         text: String,
         mode: String,
@@ -1145,13 +1039,14 @@ class SessionStore @Inject constructor(
         fileReceipts: List<String> = emptyList(),
         targetSessionId: String? = currentSessionId.value,
         targetHost: String? = activeHostKey,
-    ): PromptOutcome {
-        val parts = mutableListOf<PromptContentPart>()
-        if (text.isNotBlank()) parts.add(PromptContentPart.Text(text))
-        images.mapTo(parts) { PromptContentPart.Image(it.mediaType, it.data, it.name) }
-        fileReceipts.mapTo(parts) { PromptContentPart.File(it) }
-        return promptContent(mode, parts, targetSessionId, targetHost)
-    }
+    ): PromptOutcome = turnCommandRuntime.promptWithAttachments(
+        text = text,
+        mode = mode,
+        images = images,
+        fileReceipts = fileReceipts,
+        targetSessionId = targetSessionId,
+        targetHost = targetHost,
+    )
 
     /**
      * Stage one file for the open session and answer with its receipt.
@@ -1183,222 +1078,28 @@ class SessionStore @Inject constructor(
             targetHost = targetHost,
         )
 
-    private suspend fun promptContent(mode: String, content: List<PromptContentPart>, targetSessionId: String?, targetHost: String?): PromptOutcome {
-        val sid = targetSessionId ?: return PromptOutcome.Failed("no open session")
-        val api = apiForHost(targetHost) ?: return PromptOutcome.Failed("not connected")
-        val safeMode = if (mode == "steer") "steer" else "queue"
-        val zone = TimeZone.getDefault().id
-        val request = SessionPromptRequest(
-            requestId = newPromptRequestId(),
-            sessionId = sid,
-            mode = safeMode,
-            content = content,
-            clientTimeZone = zone,
-        )
-        return when (val r = api.sessionPrompt(request)) {
-            is RpcResult.Ok -> PromptOutcome.Ok
-            is RpcResult.Err -> if (r.error.code == ATTACHMENT_INVALID) {
-                // The host declined the attachments, not the connection. Report it where they are
-                // so the composer can keep them and say which bound they crossed.
-                val reason = (r.error.details as? JsonObject)
-                    ?.get("reason")?.jsonPrimitive?.contentOrNull
-                PromptOutcome.Rejected(imageRejectionOf(reason.orEmpty()), reason)
-            } else {
-                setConnectionError(r.error.message)
-                PromptOutcome.Failed(r.error.message)
-            }
-        }
-    }
+    suspend fun cancelTurn() = turnCommandRuntime.cancelTurn()
 
-    suspend fun cancelTurn() {
-        val sid = currentSessionId.value ?: return
-        val api = apiOrNull() ?: return
-        when (val r = api.sessionCancel(SessionCancelRequest(sid))) {
-            is RpcResult.Ok -> Unit
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun updateQueue(
+        itemId: String,
+        action: String,
+        contentText: String? = null,
+        sessionId: String? = currentSessionId.value,
+    ): Boolean = turnCommandRuntime.updateQueue(itemId, action, contentText, sessionId)
 
-    suspend fun updateQueue(itemId: String, action: String, contentText: String? = null, sessionId: String? = currentSessionId.value): Boolean {
-        if (action == "edit" && contentText.isNullOrBlank()) return false
-        val sid = sessionId ?: return false
-        val api = apiOrNull() ?: return false
-        val queueAction: QueueAction = when (action) {
-            "remove" -> QueueAction.Remove()
-            "steer" -> QueueAction.Steer()
-            else -> QueueAction.Edit(listOf(ContentBlock.Text(contentText.orEmpty())))
-        }
-        return when (val r = api.sessionUpdateQueue(SessionUpdateQueueRequest(sid, itemId, queueAction))) {
-            is RpcResult.Ok -> true
-            is RpcResult.Err -> { setConnectionError(r.error.message); false }
-        }
-    }
-
-    /**
-     * Allows or refuses one pending approval.
-     *
-     * Reports its verdict in the same vocabulary a question answer does, and for the same reason:
-     * an approval that the host would not take leaves the tool call behind it blocked, and a panel
-     * that swallowed the refusal would sit there looking like a button that does nothing. A taken
-     * one takes the panel with it — see [answerOutcome] for why no frame does that here.
-     */
-    suspend fun respondApproval(sessionId: String, approvalId: String, allow: Boolean): QuestionOutcome {
-        val api = apiOrNull() ?: return QuestionOutcome.Unsent
-        val request = synchronized(lock) { pendingInteractions.approvalForEvent(approvalId) }
-        if (request == null) {
-            log("no pending approval for id $approvalId")
-            // Nothing to answer with, so nothing can arrive to take the panel away either.
-            if (_pendingApproval.value?.approvalId == approvalId) _pendingApproval.value = null
-            return QuestionOutcome.Refused(NOT_PENDING)
-        }
-        if (!approvalResponseMatchesSession(request.sessionId, sessionId)) {
-            log("refusing approval $approvalId for session $sessionId; owner=${request.sessionId}")
-            return QuestionOutcome.Refused(NOT_PENDING)
-        }
-        val clientId = connectionManager.generation?.clientId
-        if (clientId == null) {
-            log("cannot answer approval $approvalId: no connection generation")
-            return QuestionOutcome.Unsent
-        }
-        val outcome = if (allow) ApprovalOutcome.ALLOWED_ONCE else ApprovalOutcome.REJECTED
-        // The waterfall's own return value *is* the outcome string, so this claims the request
-        // with a bare value rather than the object 0.1.1 posted to /api/respond.
-        val result = api.answerEvent(
-            clientId = clientId,
-            eventId = request.rpcId,
-            outcome = RemoteEventOutcome.Result(value = JsonPrimitive(outcome)),
-        )
-        return answerOutcome(result, "approval response", sessionId) { forgetRequest(request.rpcId) }
-    }
-
-    /**
-     * Answers a pending question batch.
-     *
-     * The payload is serialized from a typed DTO rather than assembled by hand, and that is the
-     * whole point of the type: `custom` belongs to the answer *item*, and the host's schema strips
-     * keys it does not recognise instead of objecting to them. A `custom` written one level out
-     * therefore reached the wire, was accepted, and simply never reached the model — the user's
-     * typed answer deleted in transit with nothing to show for it.
-     */
-    suspend fun answerQuestions(sessionId: String, answer: AskUserQuestionAnswer): QuestionOutcome {
-        val api = apiOrNull() ?: return QuestionOutcome.Unsent
-        val eventId = pendingQuestionEvent(sessionId) ?: return abandonQuestions(sessionId)
-        val clientId = connectionManager.generation?.clientId ?: return QuestionOutcome.Unsent
-        // The waterfall returns the answer object itself; there is no envelope around it now.
-        return answerOutcome(
-            api.answerEvent(
-                clientId = clientId,
-                eventId = eventId,
-                outcome = RemoteEventOutcome.Result(
-                    value = encodeToJsonElement(AskUserQuestionAnswer.serializer(), answer),
-                ),
-            ),
-            "question response",
-            sessionId,
-        ) { forgetRequest(eventId) }
-    }
-
-    /**
-     * Dismisses a pending question batch instead of answering it.
-     *
-     * Answering every item with an empty selection is a perfectly valid *answer*, and the model
-     * reads it as "no preference". A dismissal fails the wait instead, and the host then settles
-     * the tool call as cancelled. The code has to be exactly `cancelled`; the proxy refuses an
-     * `ok:false` carrying any other.
-     */
-    suspend fun dismissQuestions(sessionId: String): QuestionOutcome {
-        val api = apiOrNull() ?: return QuestionOutcome.Unsent
-        val eventId = pendingQuestionEvent(sessionId) ?: return abandonQuestions(sessionId)
-        val clientId = connectionManager.generation?.clientId ?: return QuestionOutcome.Unsent
-        // A rejection, not an empty answer, and not `next`: `next` would delegate to the host's
-        // own later listeners, which is a different thing from the user closing the prompt.
-        return answerOutcome(
-            api.answerEvent(
-                clientId = clientId,
-                eventId = eventId,
-                outcome = RemoteEventOutcome.Rejected(
-                    error = RemoteEventRejection(
-                        name = "UserQuestionError",
-                        message = QUESTION_CANCELLED.message,
-                        code = QUESTION_CANCELLED.code,
-                    ),
-                ),
-            ),
-            "question dismissal",
-            sessionId,
-        ) { forgetRequest(eventId) }
-    }
-
-    private fun pendingQuestionEvent(sessionId: String): String? {
-        val eventId = synchronized(lock) { pendingInteractions.questionEventForSession(sessionId) }
-        if (eventId == null) log("no pending question for session $sessionId")
-        return eventId
-    }
-
-    /**
-     * There is a card on screen for [sessionId] but no event left to address it to.
-     *
-     * A card in that state can never be answered — every path through here needs the `eventId` the
-     * waterfall arrived with — so it is a corpse, and leaving it up would be the same dead end by a
-     * shorter route. Reported as [NOT_PENDING] all the same: the wait, wherever it went, is not
-     * this client's to settle any more.
-     */
-    private fun abandonQuestions(sessionId: String): QuestionOutcome {
-        synchronized(lock) {
-            if (pendingInteractions.forgetQuestions(sessionId, null)) {
-                removePendingLocked(sessionId, "question"); removePendingLocked(sessionId, "plan-review")
-                emitSessionsLocked(); syncCurrentInteractionCardsLocked()
-            }
-        }
-        return QuestionOutcome.Refused(NOT_PENDING)
-    }
-
-    /**
-     * Map one `$events/result` answer onto the store's outcome vocabulary, and run [forget] when
-     * that answer ended the request behind it.
-     *
-     * [forget] is the card's only exit on this client, and it is a caller's lambda rather than an
-     * `eventId` because the two kinds are held differently — an approval by its event alone, a
-     * question by its session *and* its event, so that an answer cannot take away the card of the
-     * request that replaced the one it answered. The web client has no equivalent because it never needs
-     * one: its `PendingQuestion.answer()` resolves the waiting promise in the same process, so the
-     * card's life ends with the call. Here the answer is a POST, and the host settles it by
-     * *removing this client's delivery first* and then pushing `cancel` to the deliveries that
-     * remain — so the client that acted is the only one the resolution is never announced to.
-     * Waiting for a frame that cannot arrive is what left an answered card frozen on "Submitting…"
-     * with no way out but a force-stop.
-     *
-     * A failure here is not retried: upstream fails the whole connection generation on it and
-     * replays the pending request on the next one, so a retry would answer the same question
-     * twice. Nor is a failing card taken away — see [settlesRequest].
-     */
-    private fun answerOutcome(
-        result: RpcResult<JsonElement>,
-        what: String,
+    suspend fun respondApproval(
         sessionId: String,
-        forget: () -> Unit,
-    ): QuestionOutcome {
-        val outcome = when (result) {
-            is RpcResult.Ok -> QuestionOutcome.Accepted
-            is RpcResult.Err -> {
-                log("$what failed for $sessionId: ${result.error.code}: ${result.error.message}")
-                // The split is "did the host answer at all", not a list of codes. A carrier failure
-                // carries a [TransportFailure] marker and nothing is known about the wait; anything
-                // else reached the host and came back `ok:false`, so the refusal is reported with
-                // the host's own code. Folding those into [QuestionOutcome.Unsent] is what made a
-                // malformed envelope read as "could not reach the harness" and sent reporters to
-                // debug their network for a protocol fault.
-                if (TransportFailures.of(result.error) != null) {
-                    QuestionOutcome.Unsent
-                } else {
-                    QuestionOutcome.Refused(result.error.code)
-                }
-            }
-        }
-        if (settlesRequest(outcome)) forget()
-        return outcome
-    }
+        approvalId: String,
+        allow: Boolean,
+    ): QuestionOutcome = interactionRuntime.respondApproval(sessionId, approvalId, allow)
 
+    suspend fun answerQuestions(
+        sessionId: String,
+        answer: AskUserQuestionAnswer,
+    ): QuestionOutcome = interactionRuntime.answerQuestions(sessionId, answer)
+
+    suspend fun dismissQuestions(sessionId: String): QuestionOutcome =
+        interactionRuntime.dismissQuestions(sessionId)
 
     suspend fun selectModel(provider: String, model: String, reasoningEffort: String? = null) {
         val sid = currentSessionId.value ?: return
@@ -1421,29 +1122,7 @@ class SessionStore @Inject constructor(
      * and workspace filtering is unaffected and remains the primary way to find a session, exactly
      * as it is in the harness's web sidebar under the same configuration.
      */
-    suspend fun search(query: String) {
-        val trimmed = query.trim()
-        // The host schema is query.trim().min(1).max(500); a blank or overlong query is an
-        // invalid payload, so never send one — a blank query just clears the result set.
-        if (trimmed.isEmpty()) {
-            _searchResults.value = emptyList()
-            return
-        }
-        if (!_contentSearchAvailable.value) return
-        val api = apiOrNull() ?: run {
-            // Disconnected: stale hits would otherwise sit under a query that never ran.
-            _searchResults.value = emptyList()
-            return
-        }
-        val bounded = trimmed.take(SESSION_SEARCH_QUERY_MAX_CHARS)
-        when (val r = api.sessionSearch(bounded)) {
-            is RpcResult.Ok -> _searchResults.value = r.value.items.map { it.sessionId to it.snippet }
-            is RpcResult.Err -> {
-                _contentSearchAvailable.value = false
-                _searchResults.value = emptyList()
-            }
-        }
-    }
+    suspend fun search(query: String) = searchRuntime.search(query)
 
     suspend fun fetchAttachment(attachmentId: String, sessionId: String? = currentSessionId.value, host: String? = activeHostKey): ByteArray? =
         attachmentTransfer.fetchAttachment(
@@ -1457,170 +1136,30 @@ class SessionStore @Inject constructor(
         loadSkills(sid)
     }
 
-    suspend fun refreshSubagents() {
-        val sid = currentSessionId.value ?: return
-        val api = apiOrNull() ?: return
-        when (val r = api.subagentList(sid)) {
-            is RpcResult.Ok -> synchronized(lock) {
-                if (currentId == sid) _subagents.value = r.value.entries
-            }
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun refreshSubagents() = subagentRuntime.refresh()
 
-    suspend fun interruptSubagent(childSessionId: String) {
-        val sid = currentSessionId.value ?: return
-        val api = apiOrNull() ?: return
-        when (val r = api.subagentInterrupt(childSessionId = childSessionId, parentSessionId = sid)) {
-            is RpcResult.Ok -> Unit
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun interruptSubagent(childSessionId: String) =
+        subagentRuntime.interrupt(childSessionId)
 
-    suspend fun promptSubagent(childSessionId: String, text: String, delivery: String = "queue"): Boolean {
-        val sid = currentSessionId.value ?: return false
-        val api = apiOrNull() ?: return false
-        val zone = TimeZone.getDefault().id
-        val request = SubagentPromptRequest(
-            requestId = newPromptRequestId(),
-            parentSessionId = sid,
-            childSessionId = childSessionId,
-            mode = "continuable",
-            delivery = delivery,
-            content = listOf(PromptContentPart.Text(text)),
-            clientTimeZone = zone,
-        )
-        return when (val r = api.subagentPrompt(request)) {
-            is RpcResult.Ok -> true
-            is RpcResult.Err -> { setConnectionError(r.error.message); false }
-        }
-    }
+    suspend fun promptSubagent(
+        childSessionId: String,
+        text: String,
+        delivery: String = "queue",
+    ): Boolean = subagentRuntime.prompt(childSessionId, text, delivery)
 
-    suspend fun openSubagentTranscript(childSessionId: String) {
-        val sid = currentSessionId.value ?: return
-        apiOrNull() ?: return
-        val entry = _subagents.value.firstOrNull { subagentEntryId(it) == childSessionId }
-        val mode = when (entry) {
-            is SubagentListEntry.ChildOneShot -> "one-shot"
-            is SubagentListEntry.ChildContinuable -> "continuable"
-            else -> null
-        }
-        _subagentMode.value = mode
-        if (mode == null) {
-            _subagentConversation.value = null
-            log("subagent $childSessionId has no readable transcript mode")
-            return
-        }
-        remoteStreams.cancelSubagentFollow()
-        _subagentConversation.value = null
-        val host = activeHostKey ?: return
-        val events = mutableListOf<SessionEventEnvelope>()
-        val live = AssistantLiveState()
-        var hasMore = false
-        val opened = remoteStreams.followSubagent(
-            parentSessionId = sid,
-            childSessionId = childSessionId,
-            mode = mode,
-            maxMessages = HISTORY_PAGE_SIZE,
-        ) { frame ->
-            if (activeHostKey == host && currentSessionId.value == sid) {
-                when (frame) {
-                    is SessionFollowFrame.Snapshot -> {
-                        events.clear()
-                        events.addAll(expandRecords(frame.records))
-                        live.seed(frame.assistantStream)
-                        hasMore = frame.hasMore
-                    }
-                    is SessionFollowFrame.Entry -> expandRecords(listOf(frame.record)).forEach { event ->
-                        if (events.none { it.seq == event.seq }) events.add(event)
-                        val data = event.data as? JsonObject
-                        live.acceptDurable(
-                            event.type,
-                            data?.get("turn")?.jsonPrimitive?.intOrNull,
-                            data?.get("step")?.jsonPrimitive?.intOrNull,
-                            event.seq,
-                            event.surfaceOp,
-                        )
-                    }
-                    is SessionFollowFrame.AssistantStream -> live.accept(frame.frame)
-                }
-                _subagentConversation.value = EventFold(childSessionId)
-                    .fold(events.sortedBy { it.seq }, live.transientEnvelopes())
-                    .copy(hasMore = hasMore)
-            }
-        }
-        if (!opened) {
-            log("cannot follow subagent $childSessionId: no connection generation")
-        }
-    }
+    suspend fun openSubagentTranscript(childSessionId: String) =
+        subagentRuntime.openTranscript(childSessionId)
 
-    fun closeSubagentTranscript() {
-        remoteStreams.cancelSubagentFollow()
-    }
+    fun closeSubagentTranscript() = subagentRuntime.closeTranscript()
 
-    suspend fun createWorkspace(path: String) {
-        val api = apiOrNull() ?: return
-        when (val r = api.workspaceCreate(WorkspaceCreateRequest(path))) {
-            is RpcResult.Ok -> upsertWorkspace(r.value.workspace)
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun createWorkspace(path: String) = workspaceRuntime.create(path)
 
-    suspend fun renameWorkspace(id: String, title: String) {
-        val api = apiOrNull() ?: return
-        when (val r = api.workspaceRename(WorkspaceRenameRequest(id, title))) {
-            is RpcResult.Ok -> applyWorkspaceValue(r.value)
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun renameWorkspace(id: String, title: String) = workspaceRuntime.rename(id, title)
 
-    suspend fun deleteWorkspace(id: String) {
-        val api = apiOrNull() ?: return
-        when (val r = api.workspaceDelete(WorkspaceDeleteRequest(id))) {
-            is RpcResult.Ok -> removeWorkspace(id)
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun deleteWorkspace(id: String) = workspaceRuntime.delete(id)
 
-    suspend fun goalAction(action: String, objective: String? = null) {
-        val sid = currentSessionId.value ?: return
-        val api = apiOrNull() ?: return
-        when (action) {
-            "create" -> {
-                val obj = objective
-                if (obj.isNullOrBlank()) {
-                    log("goal create requires an objective")
-                    return
-                }
-                handleResult(
-                    api.goalCreate(sid, buildJsonObject { put("objective", JsonPrimitive(obj)) }),
-                )
-            }
-            "edit", "pause", "resume", "complete", "clear" -> {
-                val ref = synchronized(lock) { goalRefFromProjectionLocked() }
-                if (ref == null) {
-                    log("goal $action requires a current goal (no goal projection)")
-                    return
-                }
-                when (action) {
-                    "edit" -> handleResult(
-                        api.goalEdit(
-                            sid,
-                            ref,
-                            buildJsonObject {
-                                if (objective != null) put("objective", JsonPrimitive(objective))
-                            },
-                        ),
-                    )
-                    "pause" -> handleResult(api.goalPause(sid, ref))
-                    "resume" -> handleResult(api.goalResume(sid, ref))
-                    "complete" -> handleResult(api.goalComplete(sid, ref))
-                    "clear" -> handleResult(api.goalClear(sid, ref))
-                }
-            }
-            else -> log("unknown goal action $action")
-        }
-    }
+    suspend fun goalAction(action: String, objective: String? = null) =
+        goalRuntime.act(action, objective)
 
     /**
      * Reload the session's slash-command catalog.
@@ -1651,69 +1190,13 @@ class SessionStore @Inject constructor(
      */
     suspend fun runCommand(
         line: String,
-        attachments: List<CommandSubmitAttachment> = emptyList(),
+        attachments: List<com.labteto.dshmobile.core.wire.dto.CommandSubmitAttachment> = emptyList(),
         targetSessionId: String? = currentSessionId.value,
         targetHost: String? = activeHostKey,
-    ): CommandOutcome {
-        val sid = targetSessionId ?: return CommandOutcome.Failed("no open session")
-        val api = apiForHost(targetHost) ?: return CommandOutcome.Failed("not connected")
-        return when (val r = api.commandsExecute(sid, line, attachments)) {
-            is RpcResult.Ok -> {
-                val execution = r.value as? JsonObject
-                val commandId = execution?.get("commandId")
-                if (commandId == null || commandId is JsonNull) {
-                    CommandOutcome.Unknown(line)
-                } else {
-                    val result = execution["result"] as? JsonObject
-                    val text = (result?.get("text") as? JsonPrimitive)?.contentOrNull
-                    if ((result?.get("kind") as? JsonPrimitive)?.contentOrNull == "error") {
-                        CommandOutcome.Failed(text ?: "command failed")
-                    } else {
-                        CommandOutcome.Ok(text)
-                    }
-                }
-            }
-            is RpcResult.Err -> when (r.error.code) {
-                // The attachments were refused, by the host or by the client's own guard. A
-                // composer problem, so it must not raise the connection banner.
-                ATTACHMENT_INVALID -> CommandOutcome.Failed(r.error.message)
-                // No command gateway in this build (404) or the trust fence refused it (403).
-                // Neither is a connection fault, so the menu retires rather than the session.
-                "capability-unavailable", "forbidden" -> {
-                    catalogs.markCommandsUnavailable(r.error.code, r.error.message)
-                    CommandOutcome.Failed(r.error.message)
-                }
-                else -> {
-                    setConnectionError(r.error.message)
-                    CommandOutcome.Failed(r.error.message)
-                }
-            }
-        }
-    }
+    ): CommandOutcome = slashCommandRuntime.run(line, attachments, targetSessionId, targetHost)
 
-    /**
-     * Switch the session's permission preset. The read side is the `permissions` projection, so
-     * there is nothing to refresh — the harness pushes the new value back on a projection frame.
-     */
-    suspend fun setPermissionPreset(value: String): CommandOutcome {
-        if (value == CUSTOM_PRESET) {
-            return CommandOutcome.Failed("`$CUSTOM_PRESET` is a derived state, not a preset")
-        }
-        val sessionId = currentSessionId.value ?: return CommandOutcome.Failed("no open session")
-        val host = activeHostKey
-        synchronized(lock) {
-            pendingInteractions.installPermission(sessionId, value)
-            syncCurrentInteractionCardsLocked()
-        }
-        val outcome = runCommand("/permission $value", targetSessionId = sessionId, targetHost = host)
-        if (outcome !is CommandOutcome.Ok) {
-            synchronized(lock) {
-                pendingInteractions.forgetPermission(sessionId, value)
-                syncCurrentInteractionCardsLocked()
-            }
-        }
-        return outcome
-    }
+    suspend fun setPermissionPreset(value: String): CommandOutcome =
+        slashCommandRuntime.setPermissionPreset(value)
 
     /**
      * Reload the host's plugin inventory.
@@ -1814,13 +1297,6 @@ class SessionStore @Inject constructor(
         return entries.subList(index.coerceAtLeast(0), entries.size)
     }
 
-    private fun subagentEntryId(entry: SubagentListEntry): String? = when (entry) {
-        is SubagentListEntry.ChildOneShot -> entry.id
-        is SubagentListEntry.ChildContinuable -> entry.id
-        is SubagentListEntry.Diagnostic -> entry.id
-        is UnknownSubagentListEntry -> null
-    }
-
     /**
      * Whether this connection's harness carries attachments on a slash command.
      *
@@ -1833,27 +1309,13 @@ class SessionStore @Inject constructor(
 
     suspend fun refreshPermissionCatalog() = catalogs.refreshPermissionCatalog()
 
-    suspend fun unarchiveSession(sessionId: String): Boolean {
-        val key = activeHostKey
-        val result = apiForHost(key)?.workspaceUnarchiveSession(sessionId) ?: return false
-        if (key != activeHostKey) return false
-        return when (result) {
-            is RpcResult.Ok -> { setArchived(result.value.archivedSessionIds); refreshSessions(); true }
-            is RpcResult.Err -> { setConnectionError(result.error.message); false }
-        }
-    }
+    suspend fun unarchiveSession(sessionId: String): Boolean =
+        workspaceRuntime.unarchiveSession(sessionId)
 
     private fun apiOrNull(): DshApiClient? {
         val api = connectionManager.connectedApi
         if (api == null) log("not connected — ignoring request")
         return api
-    }
-
-    private fun <T> handleResult(result: RpcResult<T>) {
-        when (result) {
-            is RpcResult.Ok -> Unit
-            is RpcResult.Err -> setConnectionError(result.error.message)
-        }
     }
 
     private fun log(message: String, throwable: Throwable? = null) {
@@ -1870,9 +1332,6 @@ class SessionStore @Inject constructor(
 
         /** The event types that produce a visible message; everything else frames them. */
         val SURFACE_EVENT_TYPES = setOf("user/message", "assistant/message", "tool/result")
-
-        /** Host-side wire bound for `session.search` (SESSION_SEARCH_QUERY_MAX_CHARS). */
-        const val SESSION_SEARCH_QUERY_MAX_CHARS = 500
 
         /**
          * Floor on the gap between transcript rebuilds while a turn streams.
