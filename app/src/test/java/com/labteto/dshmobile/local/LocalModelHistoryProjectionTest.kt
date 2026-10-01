@@ -44,7 +44,7 @@ class LocalModelHistoryProjectionTest {
         val events = listOf(
             event(0L, "system/prompt", buildJsonObject { put("content", "系统") }),
             event(1L, "user/message", buildJsonObject { put("content", "问题") }),
-            event(2L, "assistant/message", message("assistant", "回答")),
+            event(2L, "assistant/message", toolAssistant("call-1")),
             event(3L, "tool/result", buildJsonObject {
                 put("id", "call-1")
                 put("content", "结果")
@@ -170,7 +170,8 @@ class LocalModelHistoryProjectionTest {
     @Test
     fun toolReplayPrefersExactModelVisibleContentOverAuditContent() {
         val events = listOf(
-            event(0L, "tool/result", buildJsonObject {
+            event(0L, "assistant/message", toolAssistant("call-exact")),
+            event(1L, "tool/result", buildJsonObject {
                 put("id", "call-exact")
                 put("content", "审计保留的原始截断内容")
                 put("model_content", "模型实际看到的压缩内容")
@@ -179,16 +180,17 @@ class LocalModelHistoryProjectionTest {
 
         val restored = restoreLocalModelHistory(events, emptyList(), codec)
 
-        assertEquals(1, restored.messages.size)
+        assertEquals(2, restored.messages.size)
         assertEquals(
             "模型实际看到的压缩内容",
-            restored.messages.single()["content"].toString().trim('"'),
+            restored.messages.last()["content"].toString().trim('"'),
         )
     }
 
     @Test
     fun duplicateToolResultIsNotReapplied() {
         val checkpoint = listOf(
+            toolAssistant("call-1"),
             buildJsonObject {
                 put("role", "tool")
                 put("tool_call_id", "call-1")
@@ -205,8 +207,63 @@ class LocalModelHistoryProjectionTest {
 
         val restored = restoreLocalModelHistory(events, emptyList(), codec)
 
-        assertEquals(1, restored.messages.size)
+        assertEquals(2, restored.messages.size)
         assertFalse(restored.replayedTail)
+    }
+
+    @Test
+    fun orphanToolResultIsDroppedDuringRestore() {
+        val events = listOf(
+            event(0L, "system/prompt", buildJsonObject { put("content", "系统") }),
+            event(1L, "tool/result", buildJsonObject {
+                put("id", "orphan-call")
+                put("content", "孤立结果")
+            }),
+            event(2L, "user/message", buildJsonObject { put("content", "继续") }),
+        )
+
+        val restored = restoreLocalModelHistory(events, emptyList(), codec)
+
+        assertEquals(listOf("system", "user"), restored.messages.map {
+            it["role"].toString().trim('"')
+        })
+        assertTrue(restored.checkpointRecommended)
+    }
+
+    @Test
+    fun incompleteToolBatchIsDiscardedBeforeFollowingUserMessage() {
+        val events = listOf(
+            event(0L, "system/prompt", buildJsonObject { put("content", "系统") }),
+            event(1L, "assistant/message", toolAssistant("call-a", "call-b")),
+            event(2L, "tool/result", buildJsonObject {
+                put("id", "call-a")
+                put("content", "只恢复了一半")
+            }),
+            event(3L, "user/message", buildJsonObject { put("content", "新的问题") }),
+        )
+
+        val restored = restoreLocalModelHistory(events, emptyList(), codec)
+
+        assertEquals(listOf("system", "user"), restored.messages.map {
+            it["role"].toString().trim('"')
+        })
+        assertEquals("新的问题", restored.messages.last()["content"].toString().trim('"'))
+        assertTrue(restored.checkpointRecommended)
+    }
+
+    private fun toolAssistant(vararg callIds: String): JsonObject = buildJsonObject {
+        put("role", "assistant")
+        put("content", "")
+        put("tool_calls", JsonArray(callIds.map { callId ->
+            buildJsonObject {
+                put("id", callId)
+                put("type", "function")
+                put("function", buildJsonObject {
+                    put("name", "read")
+                    put("arguments", "{}")
+                })
+            }
+        }))
     }
 
     private fun message(role: String, content: String): JsonObject = buildJsonObject {
