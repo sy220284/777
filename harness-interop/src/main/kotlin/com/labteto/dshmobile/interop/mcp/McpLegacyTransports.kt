@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.interop.mcp
 
-import java.io.BufferedReader
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -122,23 +121,15 @@ class McpLegacyStreamableHttpTransport(
         sessionId?.let { builder.header("Mcp-Session-Id", it) }
 
         http.newCall(builder.build()).executeCancellable { response ->
-            val bodyText = response.readMcpBodyBounded()
-            if (!response.isSuccessful) throw McpHttpException(response.code, bodyText)
-            if (notification || response.code == 202 || bodyText.isBlank()) {
+            if (!response.isSuccessful) throw McpHttpException(response.code, response.readMcpBodyBounded())
+            if (notification || response.code == 202) {
                 return@executeCancellable LegacyHttpResponse(
                     JsonObject(emptyMap()),
                     response.header("Mcp-Session-Id"),
                 )
             }
             val id = payload["id"]?.jsonPrimitive?.content?.toLongOrNull()
-            val body = if (
-                response.header("Content-Type").orEmpty()
-                    .startsWith("text/event-stream", ignoreCase = true)
-            ) {
-                parseSseResponse(bodyText, requireNotNull(id), json)
-            } else {
-                json.parseToJsonElement(bodyText).jsonObject
-            }
+            val body = response.readMcpRpcResponse(requireNotNull(id), json)
             LegacyHttpResponse(body, response.header("Mcp-Session-Id"))
         }
     }
@@ -225,7 +216,7 @@ class McpLegacyHttpSseTransport(
         sseResponse = response
         scope.launch {
             try {
-                readSse(response.body?.charStream() ?: error("MCP SSE 响应为空"))
+                readSse(response.body?.byteStream() ?: error("MCP SSE 响应为空"))
             } catch (error: Exception) {
                 if (!endpoint.isCompleted) endpoint.completeExceptionally(error)
                 pending.values.forEach { it.completeExceptionally(error) }
@@ -299,29 +290,12 @@ class McpLegacyHttpSseTransport(
         }
     }
 
-    private fun readSse(reader: java.io.Reader) {
-        BufferedReader(reader).use { input ->
-            var event: String? = null
-            val data = StringBuilder()
-            while (true) {
-                val line = input.readLine() ?: break
-                if (line.isEmpty()) {
-                    dispatchSse(event, data.toString())
-                    event = null
-                    data.setLength(0)
-                    continue
-                }
-                if (line.startsWith(":")) continue
-                when {
-                    line.startsWith("event:") -> event = line.removePrefix("event:").trim()
-                    line.startsWith("data:") -> {
-                        if (data.isNotEmpty()) data.append('\n')
-                        data.append(line.removePrefix("data:").trimStart())
-                    }
-                }
-            }
-            if (data.isNotEmpty()) dispatchSse(event, data.toString())
+    private fun readSse(input: java.io.InputStream) {
+        readMcpSseEvents(input) { event, data ->
+            dispatchSse(event, data)
+            false
         }
+        error("MCP SSE 连接已结束")
     }
 
     private fun dispatchSse(event: String?, data: String) {
@@ -354,6 +328,10 @@ class McpLegacyHttpSseTransport(
     }
 }
 
+// Authentication, permission, timeout and rate-limit errors do not indicate an older protocol.
+private fun McpHttpException.isProtocolNegotiationFailure(): Boolean =
+    statusCode in setOf(400, 404, 405, 406, 415, 422)
+
 /** Current HTTP first, then 2025 lifecycle, then deprecated 2024 HTTP+SSE. */
 class McpNegotiatingHttpTransport(
     endpoint: String,
@@ -373,11 +351,11 @@ class McpNegotiatingHttpTransport(
             try {
                 modern.request(method, params).also { selected = modern }
             } catch (modernError: McpHttpException) {
-                if (modernError.statusCode !in 400..499) throw modernError
+                if (!modernError.isProtocolNegotiationFailure()) throw modernError
                 try {
                     legacy.request(method, params).also { selected = legacy }
                 } catch (legacyError: McpHttpException) {
-                    if (legacyError.statusCode !in 400..499) throw legacyError
+                    if (!legacyError.isProtocolNegotiationFailure()) throw legacyError
                     legacySse.request(method, params).also { selected = legacySse }
                 }
             }

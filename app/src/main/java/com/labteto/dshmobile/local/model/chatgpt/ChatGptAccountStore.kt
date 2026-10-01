@@ -58,13 +58,23 @@ class ChatGptAccountStore @Inject constructor(
         }
     }
 
+    /** Refresh may update an existing credential snapshot, never recreate a removed/replaced login. */
+    suspend fun replaceCredentials(expected: ChatGptAccountRecord, replacement: ChatGptAccountRecord): Boolean =
+        mutex.withLock {
+            require(replacement.id == expected.id) { "刷新凭据账户身份不匹配" }
+            if (get(expected.id) != expected) return@withLock false
+            secret(expected.id).put(json.encodeToString(replacement))
+            true
+        }
+
     suspend fun select(id: String) = mutex.withLock {
         require(get(id) != null) { "ChatGPT 账户不存在或凭据已失效" }
         dataStore.edit { it[selectedKey] = id }
     }
 
-    suspend fun clearCredentials(id: String) = mutex.withLock {
+    suspend fun clearCredentials(id: String, expected: ChatGptAccountRecord? = null) = mutex.withLock {
         val current = get(id) ?: return@withLock
+        if (expected != null && current != expected) return@withLock
         val disconnected = current.copy(
             idToken = "",
             accessToken = "",

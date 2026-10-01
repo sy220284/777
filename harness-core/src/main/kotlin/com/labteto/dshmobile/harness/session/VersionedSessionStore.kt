@@ -65,6 +65,7 @@ class SessionMigrationRegistry(
     }
 }
 
+/** Reads may restore backups; serialize the entire recovery/write transaction on this store. */
 class VersionedSessionStore(
     private val root: File,
     private val json: Json,
@@ -75,6 +76,7 @@ class VersionedSessionStore(
         root.mkdirs()
     }
 
+    @Synchronized
     fun read(id: String): SessionLoadResult? {
         val file = fileFor(id)
         if (!file.isFile) return null
@@ -98,8 +100,10 @@ class VersionedSessionStore(
         }
     }
 
+    @Synchronized
     fun repair(id: String): SessionLoadResult? = read(id)
 
+    @Synchronized
     fun write(id: String, payload: JsonObject, updatedAt: Long = clock()): SessionDocument {
         validateId(id)
         val source = fileFor(id)
@@ -125,6 +129,7 @@ class VersionedSessionStore(
         return document
     }
 
+    @Synchronized
     fun delete(id: String): Boolean {
         validateId(id)
         var changed = fileFor(id).delete()
@@ -138,9 +143,11 @@ class VersionedSessionStore(
         return changed
     }
 
+    @Synchronized
     fun ids(): List<String> = sessionFiles()
         .map { file -> file.name.removeSuffix(SESSION_SUFFIX) }
 
+    @Synchronized
     fun list(): List<SessionLoadResult> = ids()
         .mapNotNull { id ->
             try {
@@ -153,11 +160,13 @@ class VersionedSessionStore(
         }
         .sortedByDescending { it.document.updatedAt }
 
+    @Synchronized
     fun export(id: String): String {
         val loaded = read(id) ?: error("会话不存在：$id")
         return json.encodeToString(SessionDocument.serializer(), loaded.document)
     }
 
+    @Synchronized
     fun import(serialized: String, overwrite: Boolean = false): SessionDocument {
         val document = json.decodeFromString(SessionDocument.serializer(), serialized)
         if (document.formatVersion > migrations.currentVersion) {
@@ -169,6 +178,7 @@ class VersionedSessionStore(
         return write(document.id, payload, document.updatedAt)
     }
 
+    @Synchronized
     fun checkpoint(id: String, version: Int = migrations.currentVersion): File {
         val source = fileFor(id)
         require(source.isFile) { "会话不存在：$id" }
