@@ -343,9 +343,20 @@ class AndroidDeviceProvider(
         val service = HarnessNotificationListenerService.active()
             ?: error("通知读取服务未授权或未连接")
         return service.snapshots().joinToString("\n") { item ->
-            "${item.packageName}\t${item.title.orEmpty()}\t${item.text.orEmpty()}\t${item.postedAt}"
+            val title = sanitizeNotificationText(item.title.orEmpty(), MAX_NOTIFICATION_TITLE_CHARS)
+            val text = sanitizeNotificationText(item.text.orEmpty(), MAX_NOTIFICATION_TEXT_CHARS)
+            "${item.packageName}\t$title\t$text\t${item.postedAt}"
         }
     }
+
+    private fun sanitizeNotificationText(value: String, maxChars: Int): String =
+        value.take(maxChars)
+            .replace(
+                Regex(
+                    """(?i)(验证码|校验码|动态码|verification\\s*code|security\\s*code|one[- ]time\\s*password|otp)\\s*[:：-]?\\s*[A-Z0-9]{4,12}""",
+                ),
+                "$1：<已脱敏>",
+            )
 
     private fun clipboardGet(): String {
         val manager = context.getSystemService(ClipboardManager::class.java)
@@ -372,6 +383,8 @@ class AndroidDeviceProvider(
         this[key]?.takeIf(String::isNotBlank) ?: error("缺少参数：$key")
 
     private companion object {
+        const val MAX_NOTIFICATION_TITLE_CHARS = 160
+        const val MAX_NOTIFICATION_TEXT_CHARS = 600
         val SAFE_VIEW_SCHEMES = setOf("http", "https", "market", "geo", "mailto", "tel")
     }
 }
