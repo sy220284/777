@@ -50,6 +50,7 @@ class PersonaInspectionService @Inject constructor(
     suspend fun inspect(
         model: String,
         baseUrl: String,
+        profileId: String? = null,
         persona: PersonaProfile,
         messages: List<LocalHarnessMessage>,
     ): PersonaInspectionResult {
@@ -90,7 +91,7 @@ class PersonaInspectionService @Inject constructor(
             append(dialogue)
         }
 
-        return modelGateway.withFrozenRoute(model, baseUrl) {
+        return modelGateway.withFrozenRoute(profileId, model, baseUrl) {
             val reply = modelGateway.complete(
                 baseUrl = baseUrl,
                 model = model,

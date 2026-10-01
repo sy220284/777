@@ -202,6 +202,7 @@ class LocalHarnessViewModel @Inject constructor(
         personaAutoFillService.generate(
             model = snapshot.model,
             baseUrl = snapshot.baseUrl,
+            profileId = snapshot.modelSelection.activeProfileId,
             current = PersonaProfile(name = ""),
             recentMessages = emptyList(),
             description = description,
@@ -239,6 +240,7 @@ class LocalHarnessViewModel @Inject constructor(
             personaInspectionService.inspect(
                 model = snapshot.model,
                 baseUrl = snapshot.baseUrl,
+            profileId = snapshot.modelSelection.activeProfileId,
                 persona = entry.persona,
                 messages = dialogue,
             )
@@ -569,6 +571,7 @@ class LocalHarnessViewModel @Inject constructor(
         groupAnnouncementService.generate(
             model = snapshot.model,
             baseUrl = snapshot.baseUrl,
+            profileId = snapshot.modelSelection.activeProfileId,
             members = snapshot.groupChat.members,
             direction = direction,
             current = snapshot.groupChat.announcement,

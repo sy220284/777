@@ -242,6 +242,7 @@ class PersonaAutoFillService @Inject constructor(
     suspend fun generate(
         model: String,
         baseUrl: String,
+        profileId: String? = null,
         current: PersonaProfile,
         recentMessages: List<LocalHarnessMessage>,
         description: String,
@@ -319,7 +320,7 @@ class PersonaAutoFillService @Inject constructor(
             },
         )
 
-        return modelGateway.withFrozenRoute(model, baseUrl) {
+        return modelGateway.withFrozenRoute(profileId, model, baseUrl) {
             val reply = modelGateway.complete(
                 baseUrl = baseUrl,
                 model = model,

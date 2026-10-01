@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.chat.loadPendingBatch
 import com.labteto.dshmobile.local.chat.groundContinuityEvidence
 import com.labteto.dshmobile.local.chat.withContextForPlanner
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -123,6 +124,13 @@ internal fun findChatContinuitySourceUserMessageId(
         before = oldestSequence
     }
 }
+
+internal fun shouldRetryChatPostTurnRequest(error: Throwable): Boolean =
+    when (error) {
+        is LocalModelException -> error.retryable
+        is IOException -> true
+        else -> false
+    }
 
 internal class LocalChatContextRefreshCoordinator(
     private val state: MutableStateFlow<LocalHarnessState>,
@@ -359,14 +367,18 @@ internal class LocalChatContextRefreshCoordinator(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
+            val retryable = shouldRetryChatPostTurnRequest(error)
             boundEventLog.append("chat/post-turn", buildJsonObject {
                 put("status", "failed")
                 put("detail", error.message.orEmpty().take(1_000))
                 put("pending_count", pending.size)
+                put("retryable", retryable)
             })
-            scheduleRetry(
-                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "request-failed",
-            )
+            if (retryable) {
+                scheduleRetry(
+                    persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "request-failed",
+                )
+            }
             return
         }
         if (plannerReply == null) {

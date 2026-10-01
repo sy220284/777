@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.*
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -92,6 +93,17 @@ class LocalChatContextRefreshRaceTest {
             fixture.log, fixture.profile,
         )
         assertEquals(listOf("profile-a"), fixture.observedProfiles)
+    }
+
+    @Test fun terminalProviderFailureDoesNotEnterDetachedPostTurnRetryLoop() {
+        assertFalse(shouldRetryChatPostTurnRequest(
+            LocalModelException("CHATGPT_PLAN_LIMIT_REACHED", "limit", false),
+        ))
+        assertTrue(shouldRetryChatPostTurnRequest(
+            LocalModelException("MODEL_NETWORK", "network", true),
+        ))
+        assertTrue(shouldRetryChatPostTurnRequest(IOException("socket reset")))
+        assertFalse(shouldRetryChatPostTurnRequest(IllegalStateException("bad state")))
     }
 
     @Test fun enqueueRetryAfterSessionSwitchReturnsNoGenerationAndDoesNotPersistNewSession() = runTest {

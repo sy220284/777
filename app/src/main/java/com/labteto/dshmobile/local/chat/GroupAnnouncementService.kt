@@ -21,6 +21,7 @@ class GroupAnnouncementService @Inject constructor(
     suspend fun generate(
         model: String,
         baseUrl: String,
+        profileId: String? = null,
         members: List<LocalGroupChatMember>,
         direction: String,
         current: String,
@@ -39,7 +40,7 @@ class GroupAnnouncementService @Inject constructor(
                 put("content", "人物：\n$cast\n\n剧情方向：${direction.trim().ifBlank { "基于现有人物关系生成自然、可继续发展的共同事件" }.take(500)}\n\n现有公告参考：${current.take(1_000)}")
             },
         )
-        return modelGateway.withFrozenRoute(model, baseUrl) {
+        return modelGateway.withFrozenRoute(profileId, model, baseUrl) {
             val reply = modelGateway.complete(
                 model = model,
                 baseUrl = baseUrl,

@@ -301,8 +301,9 @@ for helper_path in (
     "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaInspectionService.kt",
     "app/src/main/java/com/labteto/dshmobile/local/chat/GroupAnnouncementService.kt",
 ):
-    if "modelGateway.withFrozenRoute(" not in strip_comments(read(helper_path)):
-        die(f"{helper_path} must freeze model identity across the helper operation")
+    helper_source = strip_comments(read(helper_path))
+    if "modelGateway.withFrozenRoute(profileId, model, baseUrl)" not in helper_source:
+        die(f"{helper_path} must freeze the explicit selected profile across the helper operation")
 
 chat_refresh = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt")
@@ -311,6 +312,10 @@ if "profile: LocalModelProfile" not in chat_refresh or "requestPlanner(before, p
     die("Chat post-turn refresh and retries must retain the originating model profile")
 if "profile = profile" not in engine[engine.find("requestPlanner ="):engine.find("private val chatReplyCoordinator")]:
     die("Chat post-turn planner must pass its frozen profile into model requests")
+if "profileId = runSnapshot.modelSelection.activeProfileId" not in engine:
+    die("Foreground runs must freeze the exact selected model profile id")
+if "modelRequestMarkerOrNull()?.let" in engine[engine.find("requestPlanner ="):engine.find("private val chatReplyCoordinator")]:
+    die("Chat post-turn planner must not re-read mutable active model identity")
 
 unexpected_consumers = sorted(engine_consumers - ENGINE_CONSUMER_ALLOWLIST)
 if unexpected_consumers:

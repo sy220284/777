@@ -363,23 +363,21 @@ class LocalHarnessEngine @Inject constructor(
             scope = scope,
             chatTurnCoordinator = chatTurnCoordinator,
             requestPlanner = { snapshot, prompt, requestLog, profile ->
-                modelRequestMarkerOrNull()?.let { key ->
-                    completeWithRetry(
-                        key = key,
-                        snapshot = snapshot,
-                        messages = listOf(
-                            buildJsonObject {
-                                put("role", "system")
-                                put("content", prompt)
-                            },
-                        ),
-                        step = CHAT_POST_TURN_MODEL_STEP,
-                        toolsOverride = JsonArray(emptyList()),
-                        publishPreview = false,
-                        requestLog = requestLog,
-                        profile = profile,
-                    )
-                }
+                completeWithRetry(
+                    key = profile.id,
+                    snapshot = snapshot,
+                    messages = listOf(
+                        buildJsonObject {
+                            put("role", "system")
+                            put("content", prompt)
+                        },
+                    ),
+                    step = CHAT_POST_TURN_MODEL_STEP,
+                    toolsOverride = JsonArray(emptyList()),
+                    publishPreview = false,
+                    requestLog = requestLog,
+                    profile = profile,
+                )
             },
             recordUsage = { snapshot, reply -> usageTracker.recordForeground(snapshot, reply, TokenUsageAction.CHAT_STATE_REFRESH) },
             persistBranchState = ::persistChatBranchState,
@@ -3503,7 +3501,11 @@ class LocalHarnessEngine @Inject constructor(
 
         try {
             withTimeout(FOREGROUND_TURN_TIMEOUT_MILLIS) {
-                modelGateway.withFrozenRoute(runSnapshot.model, runSnapshot.baseUrl) { loop.run(input) }
+                modelGateway.withFrozenRoute(
+                    profileId = runSnapshot.modelSelection.activeProfileId,
+                    model = runSnapshot.model,
+                    baseUrl = runSnapshot.baseUrl,
+                ) { loop.run(input) }
             }
             if (runState.value.usageMode == LocalUsageMode.CHAT) {
                 val postTurnSnapshot = runState.value
