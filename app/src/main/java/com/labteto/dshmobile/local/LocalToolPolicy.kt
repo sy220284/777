@@ -38,8 +38,8 @@ internal object LocalToolPolicy {
      */
     private val DESTRUCTIVE_GIT_OPERATIONS = listOf("reset --hard", "clean -fd", "clean -fdx", "filter-branch")
 
-    /** Force flags, matched anywhere in the command so argument order cannot hide them. */
-    private val FORCE_FLAGS = listOf("--force", "-f")
+    /** Force flags are matched as shell tokens so ordinary arguments containing "-f" are unaffected. */
+    private val FORCE_FLAGS = setOf("--force", "--force-with-lease", "-f")
 
     private val aliases = mapOf(
         "read_file" to "read", "write_file" to "write", "edit_file" to "edit",
@@ -71,8 +71,15 @@ internal object LocalToolPolicy {
      * a force flag are matched independently. `--force-with-lease` still matches `--force`, which is
      * intentional: it can still overwrite a remote branch when the lease is stale.
      */
-    private fun isForcePush(command: String): Boolean =
-        command.contains("push") && FORCE_FLAGS.any { command.contains(it) }
+    private fun isForcePush(command: String): Boolean {
+        val tokens = command.split(Regex("\\s+"))
+            .map { it.trim('"', '\'', ';', '&', '|', '(', ')') }
+            .filter(String::isNotBlank)
+        val pushIndex = tokens.indexOfFirst { it == "push" }
+        return pushIndex >= 0 && tokens.drop(pushIndex + 1).any { token ->
+            token in FORCE_FLAGS || token.startsWith("--force=") || token.startsWith("--force-with-lease=")
+        }
+    }
 
     fun access(name: String): ToolAccess = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "present" -> ToolAccess.WORKSPACE_WRITE
