@@ -200,18 +200,18 @@ internal class LocalSessionRepository(
         val (deleted, latest) = synchronized(lock) {
             (id in deletedIds) to latestSnapshots[id]
         }
-        if (deleted) return@synchronized null
-        if (latest != null) {
-            return@synchronized LocalSessionRead(
+        when {
+            deleted -> null
+            latest != null -> LocalSessionRead(
                 session = latest,
                 legacySafeAutoApproval = persistedPayload?.let(::legacySafeAutoApproval) == true,
             )
-        }
-        persistedPayload?.let { payload ->
-            LocalSessionRead(
-                session = json.decodeFromJsonElement(LocalHarnessSession.serializer(), payload),
-                legacySafeAutoApproval = legacySafeAutoApproval(payload),
-            )
+            else -> persistedPayload?.let { payload ->
+                LocalSessionRead(
+                    session = json.decodeFromJsonElement(LocalHarnessSession.serializer(), payload),
+                    legacySafeAutoApproval = legacySafeAutoApproval(payload),
+                )
+            }
         }
     }
 
