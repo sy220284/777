@@ -207,6 +207,9 @@ class AgentLoop(
                 eventSink.append(AgentEvent.StepStarted(turnId, step))
                 val reply = model.complete(messages.toList())
                 requireUniqueCallIds(reply.toolCalls)
+                require(reply.toolCalls.isNotEmpty() || reply.content.isNotBlank()) {
+                    "模型未返回正文或工具调用，本轮不能判定为完成"
+                }
                 messages += AgentMessage(
                     role = "assistant",
                     content = reply.content,
