@@ -8,22 +8,28 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Android replacement for a desktop PTY when no native pseudo-terminal bridge is installed.
+ * Persistent Android terminal with a real PTY when the JNI bridge is packaged.
  *
- * It preserves one interactive process and stdin/stdout across calls. Terminal features that require
- * a controlling TTY (window size, job control, full-screen curses applications) are intentionally
- * reported as unsupported rather than faked.
+ * JVM tests and environments without the native bridge keep the original pipe backend. The
+ * fallback is explicit: [nativePtyAvailable] remains false and resize returns false instead of
+ * pretending that a pipe process has terminal semantics.
  */
 class PersistentPipeTerminalProvider(
     private val defaultWorkingDirectory: File? = null,
     private val extraSearchPaths: () -> List<File> = { emptyList() },
     private val baseEnvironment: () -> Map<String, String> = { emptyMap() },
 ) : HarnessTerminalProvider {
-    private data class Session(
+    private sealed interface Session
+
+    private data class PipeSession(
         val managed: ManagedProcess,
         val input: java.io.OutputStream,
         val output: java.io.InputStream,
-    )
+    ) : Session
+
+    private data class PtySession(
+        val handle: Long,
+    ) : Session
 
     private val sessions = ConcurrentHashMap<String, Session>()
 
@@ -33,33 +39,112 @@ class PersistentPipeTerminalProvider(
             val directory = workingDirectory?.let(::File) ?: defaultWorkingDirectory
             if (directory != null) require(directory.isDirectory) { "工作目录不存在：${directory.path}" }
             val resolved = resolveCommand(command)
-            val managed = ManagedProcess.start(
-                ProcessBuilder(resolved)
-                    .directory(directory)
-                    .redirectErrorStream(true)
-                    .apply {
-                        environment()["PATH"] = searchPaths().joinToString(File.pathSeparator) { it.path }
-                        environment().putAll(baseEnvironment())
-                    },
-            )
-            val process = managed.process
+            val environment = terminalEnvironment()
+
+            val session: Session = if (NativePtyBridge.available) {
+                PtySession(
+                    NativePtyBridge.open(
+                        command = resolved,
+                        workingDirectory = directory?.absolutePath,
+                        environment = environment,
+                    ),
+                )
+            } else {
+                val managed = ManagedProcess.start(
+                    ProcessBuilder(resolved)
+                        .directory(directory)
+                        .redirectErrorStream(true)
+                        .apply {
+                            environment().clear()
+                            environment().putAll(environment)
+                        },
+                )
+                val process = managed.process
+                PipeSession(managed, process.outputStream, process.inputStream)
+            }
+
             val id = "term-" + UUID.randomUUID().toString().replace("-", "").take(16)
-            sessions[id] = Session(managed, process.outputStream, process.inputStream)
+            sessions[id] = session
             id
         }
 
     override suspend fun write(sessionId: String, input: String) = withContext(Dispatchers.IO) {
-        val session = requireLiveSession(sessionId)
-        session.input.write(input.toByteArray())
-        session.input.flush()
+        when (val session = requireLiveSession(sessionId)) {
+            is PipeSession -> {
+                session.input.write(input.toByteArray())
+                session.input.flush()
+            }
+            is PtySession -> synchronized(session) {
+                NativePtyBridge.write(session.handle, input.toByteArray())
+            }
+        }
     }
 
     override suspend fun read(sessionId: String): String = withContext(Dispatchers.IO) {
         val session = requireKnownSession(sessionId)
+        when (session) {
+            is PipeSession -> readPipe(sessionId, session)
+            is PtySession -> {
+                val bytes = synchronized(session) {
+                    NativePtyBridge.read(session.handle, MAX_READ_BYTES)
+                }
+                if (
+                    bytes.isEmpty() &&
+                    !NativePtyBridge.isAlive(session.handle) &&
+                    !NativePtyBridge.hasReadable(session.handle)
+                ) {
+                    releaseIfCurrent(sessionId, session)
+                }
+                bytes.decodeToString()
+            }
+        }
+    }
+
+    override suspend fun resize(sessionId: String, columns: Int, rows: Int): Boolean =
+        withContext(Dispatchers.IO) {
+            require(columns in 1..MAX_TERMINAL_DIMENSION) { "终端列数无效：$columns" }
+            require(rows in 1..MAX_TERMINAL_DIMENSION) { "终端行数无效：$rows" }
+            when (val session = requireKnownSession(sessionId)) {
+                is PipeSession -> false
+                is PtySession -> synchronized(session) {
+                    NativePtyBridge.resize(session.handle, columns, rows)
+                }
+            }
+        }
+
+    override suspend fun close(sessionId: String) = withContext(Dispatchers.IO) {
+        val session = sessions.remove(sessionId) ?: return@withContext
+        release(session)
+        Unit
+    }
+
+    fun isAlive(sessionId: String): Boolean {
+        val session = sessions[sessionId] ?: return false
+        val alive = when (session) {
+            is PipeSession -> session.managed.process.isAlive
+            is PtySession -> synchronized(session) {
+                NativePtyBridge.isAlive(session.handle)
+            }
+        }
+        if (alive) return true
+
+        val hasFinalOutput = when (session) {
+            is PipeSession -> runCatching { session.output.available() }.getOrDefault(0) > 0
+            is PtySession -> synchronized(session) {
+                NativePtyBridge.hasReadable(session.handle)
+            }
+        }
+        if (!hasFinalOutput) releaseIfCurrent(sessionId, session)
+        return false
+    }
+
+    override fun nativePtyAvailable(): Boolean = NativePtyBridge.available
+
+    private fun readPipe(id: String, session: PipeSession): String {
         val available = runCatching { session.output.available() }.getOrDefault(0)
         if (available <= 0) {
-            if (!session.managed.process.isAlive) releaseIfCurrent(sessionId, session)
-            return@withContext ""
+            if (!session.managed.process.isAlive) releaseIfCurrent(id, session)
+            return ""
         }
 
         val bytes = ByteArray(minOf(available, MAX_READ_BYTES))
@@ -70,30 +155,10 @@ class PersistentPipeTerminalProvider(
             !session.managed.process.isAlive &&
             runCatching { session.output.available() }.getOrDefault(0) <= 0
         ) {
-            releaseIfCurrent(sessionId, session)
+            releaseIfCurrent(id, session)
         }
-        text
+        return text
     }
-
-    override suspend fun close(sessionId: String) = withContext(Dispatchers.IO) {
-        val session = sessions.remove(sessionId) ?: return@withContext
-        release(session)
-        Unit
-    }
-
-    fun isAlive(sessionId: String): Boolean {
-        val session = sessions[sessionId] ?: return false
-        if (session.managed.process.isAlive) return true
-
-        // Preserve a finished process just long enough for terminal_read to drain its final output.
-        // Empty finished sessions can be released immediately instead of accumulating forever.
-        if (runCatching { session.output.available() }.getOrDefault(0) <= 0) {
-            releaseIfCurrent(sessionId, session)
-        }
-        return false
-    }
-
-    fun nativePtyAvailable(): Boolean = false
 
     private fun resolveCommand(command: List<String>): List<String> {
         val executable = command.first()
@@ -104,6 +169,14 @@ class PersistentPipeTerminalProvider(
             .firstOrNull(File::canExecute)
             ?: return command
         return listOf(resolved.absolutePath) + command.drop(1)
+    }
+
+    private fun terminalEnvironment(): Map<String, String> = buildMap {
+        putAll(System.getenv())
+        put("PATH", searchPaths().joinToString(File.pathSeparator) { it.path })
+        putAll(baseEnvironment())
+        putIfAbsent("TERM", "xterm-256color")
+        putIfAbsent("COLORTERM", "truecolor")
     }
 
     private fun searchPaths(): List<File> {
@@ -125,9 +198,19 @@ class PersistentPipeTerminalProvider(
 
     private fun requireLiveSession(id: String): Session {
         val session = requireKnownSession(id)
-        if (session.managed.process.isAlive) return session
-        releaseIfCurrent(id, session)
+        if (isSessionAlive(session)) return session
+        if (!hasReadableOutput(session)) releaseIfCurrent(id, session)
         error("终端会话已结束：$id")
+    }
+
+    private fun isSessionAlive(session: Session): Boolean = when (session) {
+        is PipeSession -> session.managed.process.isAlive
+        is PtySession -> synchronized(session) { NativePtyBridge.isAlive(session.handle) }
+    }
+
+    private fun hasReadableOutput(session: Session): Boolean = when (session) {
+        is PipeSession -> runCatching { session.output.available() }.getOrDefault(0) > 0
+        is PtySession -> synchronized(session) { NativePtyBridge.hasReadable(session.handle) }
     }
 
     private fun releaseIfCurrent(id: String, session: Session) {
@@ -135,12 +218,20 @@ class PersistentPipeTerminalProvider(
     }
 
     private fun release(session: Session) {
-        session.managed.terminate()
-        runCatching { session.input.close() }
-        runCatching { session.output.close() }
+        when (session) {
+            is PipeSession -> {
+                session.managed.terminate()
+                runCatching { session.input.close() }
+                runCatching { session.output.close() }
+            }
+            is PtySession -> synchronized(session) {
+                NativePtyBridge.close(session.handle)
+            }
+        }
     }
 
     private companion object {
         const val MAX_READ_BYTES = 64 * 1024
+        const val MAX_TERMINAL_DIMENSION = 10_000
     }
 }
