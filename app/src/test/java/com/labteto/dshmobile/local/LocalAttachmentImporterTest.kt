@@ -6,6 +6,7 @@ import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -34,7 +35,7 @@ class LocalAttachmentImporterTest {
 
             override fun read(buffer: ByteArray, offset: Int, length: Int): Int = blockingRead()
         }
-        val job = launch {
+        val job = launch(Dispatchers.Default) {
             copyAttachmentCancellably(
                 source = source,
                 output = ByteArrayOutputStream(),
