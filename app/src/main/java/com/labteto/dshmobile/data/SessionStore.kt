@@ -120,13 +120,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
-internal fun InputStream.readBytesAtMost(maxBytes: Int): ByteArray {
-    require(maxBytes >= 0) { "maxBytes 必须大于等于 0" }
-    val bytes = readNBytes(maxBytes + 1)
-    check(bytes.size <= maxBytes) { "附件实际大小超过 $maxBytes 字节回退上传上限" }
-    return bytes
-}
-
 /**
  * Single source of truth for the connected harness's live state. All public surface is
  * [StateFlow]; every RPC error becomes [connectionError] and never throws. The store survives
@@ -147,6 +140,11 @@ class SessionStore @Inject constructor(
     fun apiForHost(key: String?): DshApiClient? = if (key != null && key == activeHostKey) connectionManager.connectedApi else null
     fun muxForHost(key: String?) = if (key != null && key == activeHostKey) connectionManager.generation?.mux else null
     fun retryConnection() = connectionManager.reconnectIfNeeded()
+    private val attachmentTransfer = SessionAttachmentTransfer(
+        apiForHost = ::apiForHost,
+        onConnectionError = ::setConnectionError,
+        logger = ::log,
+    )
     private val permissionCatalog = MutableStateFlow<PermissionCatalog?>(null)
     private var permissionCatalogEpoch = 0L
     private val queuesBySession = MutableStateFlow<Map<String, List<QueueItem>>>(emptyMap())
@@ -1182,29 +1180,15 @@ class SessionStore @Inject constructor(
         onProgress: (sent: Long) -> Unit = {},
         targetSessionId: String? = currentSessionId.value,
         targetHost: String? = activeHostKey,
-    ): RpcResult<FileUploadValue> = withContext(Dispatchers.IO) {
-        val sid = targetSessionId
-            ?: return@withContext RpcResult.Err(RpcError("internal", "no open session"))
-        val api = apiForHost(targetHost)
-            ?: return@withContext RpcResult.Err(RpcError("internal", "not connected"))
-        val stream = open()
-            ?: return@withContext RpcResult.Err(RpcError("internal", "could not read the file"))
-        val streamed = stream.use { api.uploadFileBinary(sid, name, size, it, onProgress) }
-        if (streamed !is RpcResult.Err || streamed.error.code != "capability-unavailable") return@withContext streamed
-        if (size !in 0..MAX_ENCODED_UPLOAD_BYTES) return@withContext streamed
-        log("upload route unavailable; falling back to fileUploads/upload for ${size}B")
-        val bytes = try {
-            open()?.use { it.readBytesAtMost(MAX_ENCODED_UPLOAD_BYTES.toInt()) }
-        } catch (tooLarge: IllegalStateException) {
-            return@withContext RpcResult.Err(
-                RpcError(ATTACHMENT_INVALID, tooLarge.message ?: "attachment exceeds fallback upload limit"),
-            )
-        } ?: return@withContext RpcResult.Err(RpcError("internal", "could not read the file"))
-        api.fileUploadEncoded(
-            sid,
-            EncodedFileUploadRequest(data = Base64.encodeToString(bytes, Base64.NO_WRAP), name = name),
-        ).also { onProgress(bytes.size.toLong()) }
-    }
+    ): RpcResult<FileUploadValue> =
+        attachmentTransfer.uploadFile(
+            name = name,
+            size = size,
+            open = open,
+            onProgress = onProgress,
+            targetSessionId = targetSessionId,
+            targetHost = targetHost,
+        )
 
     private suspend fun promptContent(mode: String, content: List<PromptContentPart>, targetSessionId: String?, targetHost: String?): PromptOutcome {
         val sid = targetSessionId ?: return PromptOutcome.Failed("no open session")
@@ -1468,17 +1452,12 @@ class SessionStore @Inject constructor(
         }
     }
 
-    suspend fun fetchAttachment(attachmentId: String, sessionId: String? = currentSessionId.value, host: String? = activeHostKey): ByteArray? {
-        val sid = sessionId ?: return null
-        val api = host?.let(::apiForHost) ?: return null
-        return when (val r = api.sessionAttachment(SessionAttachmentRequest(sid, attachmentId))) {
-            is RpcResult.Ok -> runCatching { Base64.decode(r.value.data, Base64.DEFAULT) }.getOrNull()
-            is RpcResult.Err -> {
-                setConnectionError(r.error.message)
-                null
-            }
-        }
-    }
+    suspend fun fetchAttachment(attachmentId: String, sessionId: String? = currentSessionId.value, host: String? = activeHostKey): ByteArray? =
+        attachmentTransfer.fetchAttachment(
+            attachmentId = attachmentId,
+            sessionId = sessionId,
+            host = host,
+        )
 
     suspend fun listSkills() {
         val sid = currentSessionId.value ?: return
@@ -1977,14 +1956,6 @@ class SessionStore @Inject constructor(
     private companion object {
         const val TAG = "SessionStore"
 
-        /**
-         * The host's refusal of a prompt's or command's attachments (harness 0.1.3; it was
-         * `attachment-error` through 0.1.2). Every business code is namespaced now.
-         */
-        const val ATTACHMENT_INVALID = "session/attachment-invalid"
-
-        /** Largest file the base64 Remote fallback will carry; anything bigger needs the route. */
-        const val MAX_ENCODED_UPLOAD_BYTES = 20L * 1024 * 1024
         const val HISTORY_PAGE_SIZE = 60
 
         /** Ceiling on events folded per page, whatever the host sends. */
