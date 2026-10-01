@@ -30,13 +30,14 @@ internal fun GroupAnnouncementSheet(
     sessionId: String,
     announcement: String,
     enabled: Boolean,
-    onSave: (String) -> Boolean,
+    onSave: suspend (String) -> Result<Unit>,
     onGenerate: suspend (String) -> Result<String>,
     onDismiss: () -> Unit,
 ) {
     var draft by rememberSaveable(sessionId) { mutableStateOf(announcement) }
     var direction by rememberSaveable(sessionId) { mutableStateOf("") }
     var generating by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -50,7 +51,7 @@ internal fun GroupAnnouncementSheet(
             label = { Text(stringResource(R.string.local_group_announcement_content)) },
             minLines = 4,
             maxLines = 9,
-            enabled = enabled && !generating,
+            enabled = enabled && !generating && !saving,
         )
         OutlinedTextField(
             value = direction,
@@ -58,19 +59,19 @@ internal fun GroupAnnouncementSheet(
             modifier = Modifier.fillMaxWidth(),
             label = { Text(stringResource(R.string.local_group_announcement_direction)) },
             placeholder = { Text(stringResource(R.string.local_group_announcement_direction_hint)) },
-            enabled = enabled && !generating,
+            enabled = enabled && !generating && !saving,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
             DsButton(
                 text = stringResource(R.string.local_group_announcement_drama),
                 onClick = { direction = "修罗场：几人因为同一件事产生互相矛盾的期待，秘密即将被揭开" },
-                enabled = enabled && !generating,
+                enabled = enabled && !generating && !saving,
                 variant = DsButtonVariant.Outline,
             )
             DsButton(
                 text = stringResource(R.string.local_group_announcement_mystery),
                 onClick = { direction = "悬疑对峙：有人隐瞒关键线索，众人必须当场作出选择" },
-                enabled = enabled && !generating,
+                enabled = enabled && !generating && !saving,
                 variant = DsButtonVariant.Outline,
             )
         }
@@ -85,18 +86,30 @@ internal fun GroupAnnouncementSheet(
                     generating = false
                 }
             },
-            enabled = enabled && !generating,
+            enabled = enabled && !generating && !saving,
             modifier = Modifier.fillMaxWidth(),
             variant = DsButtonVariant.Outline,
         )
         error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
         DsButton(
-            text = stringResource(R.string.local_group_announcement_save),
+            text = stringResource(
+                if (saving) R.string.local_group_announcement_saving
+                else R.string.local_group_announcement_save,
+            ),
             onClick = {
-                if (onSave(draft)) onDismiss()
-                else error = "当前无法保存群公告，请稍后重试"
+                saving = true
+                error = null
+                scope.launch {
+                    onSave(draft)
+                        .onSuccess { onDismiss() }
+                        .onFailure { failure ->
+                            error = failure.message?.takeIf(String::isNotBlank)
+                                ?: "群公告保存失败，请重试"
+                        }
+                    saving = false
+                }
             },
-            enabled = enabled && !generating && draft != announcement,
+            enabled = enabled && !generating && !saving && draft != announcement,
             modifier = Modifier.fillMaxWidth(),
         )
     }
