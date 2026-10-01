@@ -8,7 +8,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 
 LINE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 5232,
+    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 5183,
     "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 1885,
     "app/src/main/java/com/labteto/dshmobile/data/SessionAttachmentTransfer.kt": 100,
     "app/src/main/java/com/labteto/dshmobile/data/SessionCatalogRuntime.kt": 151,
@@ -37,6 +37,7 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt": 525,
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessRuntimePolicy.kt": 98,
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt": 76,
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessResourceProjection.kt": 23,
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalBundledRuntimeEnvironment.kt": 41,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt": 67,
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupExecutionModels.kt": 22,
@@ -55,7 +56,7 @@ LINE_BUDGETS = {
 
 ENGINE_MAX_PUBLIC_METHODS = 0
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 21
-AGGREGATE_STATE_MAX_FIELDS = 66
+AGGREGATE_STATE_MAX_FIELDS = 55
 LOCAL_ROOT_MAX_KOTLIN_FILES = 90
 PROJECTION_FIELD_BUDGETS = {
     "LocalHarnessSettingsState": 17,
