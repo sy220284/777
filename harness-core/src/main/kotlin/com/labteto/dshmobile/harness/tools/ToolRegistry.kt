@@ -43,8 +43,12 @@ data class ToolResult(
     val errorCode: String? = null,
     val retryable: Boolean = false,
     val recoveryHint: String? = null,
+)
+
+data class ToolInvocationResult internal constructor(
+    val result: ToolResult,
     /** False only when ToolRegistry proves the executor was never entered. */
-    val executionStarted: Boolean = true,
+    val executionStarted: Boolean,
 )
 
 fun interface HarnessToolExecutor {
@@ -82,47 +86,70 @@ class ToolRegistry private constructor(
         input: JsonObject,
         rawArguments: String = input.toString(),
         context: ToolContext = ToolContext(),
-    ): ToolResult {
-        if (!admission.beginCall()) return ToolResult(
-            content = "插件生命周期切换中或资源状态异常，请稍后重试或停用异常插件：$name",
-            isError = true,
-            errorCode = "TOOL_LIFECYCLE_UNAVAILABLE",
-            retryable = true,
-            recoveryHint = "等待插件生命周期切换完成后重试一次；持续失败时停用异常插件。",
+    ): ToolResult = executeTracked(name, input, rawArguments, context).result
+
+    /**
+     * Same execution contract as [execute], with registry-owned provenance indicating whether the
+     * tool executor was actually entered. Callers may use this to guard retry/side-effect recovery;
+     * providers cannot forge the provenance because [ToolInvocationResult] is registry-constructed.
+     */
+    suspend fun executeTracked(
+        name: String,
+        input: JsonObject,
+        rawArguments: String = input.toString(),
+        context: ToolContext = ToolContext(),
+    ): ToolInvocationResult {
+        if (!admission.beginCall()) return ToolInvocationResult(
+            result = ToolResult(
+                content = "插件生命周期切换中或资源状态异常，请稍后重试或停用异常插件：$name",
+                isError = true,
+                errorCode = "TOOL_LIFECYCLE_UNAVAILABLE",
+                retryable = true,
+                recoveryHint = "等待插件生命周期切换完成后重试一次；持续失败时停用异常插件。",
+            ),
             executionStarted = false,
         )
         return try {
-            executeAdmitted(name, input, rawArguments, context)
+            executeAdmittedTracked(name, input, rawArguments, context)
         } finally {
             admission.endCall()
         }
     }
 
-    private suspend fun executeAdmitted(
-        name: String, input: JsonObject, rawArguments: String, context: ToolContext,
-    ): ToolResult {
-        val tool = tools.get(name) ?: return ToolResult(
-            content = "未知工具：$name",
-            isError = true,
-            errorCode = "UNKNOWN_TOOL",
-            recoveryHint = "检查工具名称或重新发现当前可用能力。",
+    private suspend fun executeAdmittedTracked(
+        name: String,
+        input: JsonObject,
+        rawArguments: String,
+        context: ToolContext,
+    ): ToolInvocationResult {
+        val tool = tools.get(name) ?: return ToolInvocationResult(
+            result = ToolResult(
+                content = "未知工具：$name",
+                isError = true,
+                errorCode = "UNKNOWN_TOOL",
+                recoveryHint = "检查工具名称或重新发现当前可用能力。",
+            ),
             executionStarted = false,
         )
         validateToolInput(tool, input)?.let { problem ->
-            return ToolResult(
-                content = "工具参数无效：$name：$problem",
-                isError = true,
-                errorCode = "INVALID_TOOL_ARGUMENTS",
-                recoveryHint = "按工具 schema 修正参数后再调用。",
+            return ToolInvocationResult(
+                result = ToolResult(
+                    content = "工具参数无效：$name：$problem",
+                    isError = true,
+                    errorCode = "INVALID_TOOL_ARGUMENTS",
+                    recoveryHint = "按工具 schema 修正参数后再调用。",
+                ),
                 executionStarted = false,
             )
         }
         if (!context.allowMutation && tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)) {
-            return ToolResult(
-                content = "当前作用域禁止执行会改变状态的工具：$name",
-                isError = true,
-                errorCode = "MUTATION_SCOPE_BLOCKED",
-                recoveryHint = "改用只读能力，或回到允许修改的父任务执行。",
+            return ToolInvocationResult(
+                result = ToolResult(
+                    content = "当前作用域禁止执行会改变状态的工具：$name",
+                    isError = true,
+                    errorCode = "MUTATION_SCOPE_BLOCKED",
+                    recoveryHint = "改用只读能力，或回到允许修改的父任务执行。",
+                ),
                 executionStarted = false,
             )
         }
@@ -133,36 +160,50 @@ class ToolRegistry private constructor(
         }
         if (needsApproval) {
             val approval = context.approval
-                ?: return ToolResult(
-                    content = "工具需要人工审批：$name",
-                    isError = true,
-                    errorCode = "APPROVAL_REQUIRED",
-                    recoveryHint = "等待用户审批后再执行。",
-                executionStarted = false,
+                ?: return ToolInvocationResult(
+                    result = ToolResult(
+                        content = "工具需要人工审批：$name",
+                        isError = true,
+                        errorCode = "APPROVAL_REQUIRED",
+                        recoveryHint = "等待用户审批后再执行。",
+                    ),
+                    executionStarted = false,
                 )
-            if (!approval(tool)) return ToolResult(
-                content = "用户拒绝执行工具：$name",
-                isError = true,
-                errorCode = "APPROVAL_DENIED",
-                recoveryHint = "不要重复调用；改用已授权能力或等待用户调整权限。",
+            if (!approval(tool)) return ToolInvocationResult(
+                result = ToolResult(
+                    content = "用户拒绝执行工具：$name",
+                    isError = true,
+                    errorCode = "APPROVAL_DENIED",
+                    recoveryHint = "不要重复调用；改用已授权能力或等待用户调整权限。",
+                ),
                 executionStarted = false,
             )
         }
+
         val timeoutMillis = tool.timeoutMillis
-        if (timeoutMillis == null) return tool.executor.execute(context, input, rawArguments)
+        if (timeoutMillis == null) {
+            return ToolInvocationResult(
+                result = tool.executor.execute(context, input, rawArguments),
+                executionStarted = true,
+            )
+        }
         require(timeoutMillis > 0L) { "工具超时必须大于 0：$name" }
-        return withTimeoutOrNull(timeoutMillis) {
+        val result = withTimeoutOrNull(timeoutMillis) {
             tool.executor.execute(context, input, rawArguments)
-        } ?: ToolResult(
-            content = "工具执行超时：$name（${timeoutMillis} ms）",
-            isError = true,
-            errorCode = "TOOL_TIMEOUT",
-            retryable = tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK),
-            recoveryHint = if (tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)) {
-                "只读工具超时，可缩小范围后重试一次。"
-            } else {
-                "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
-            },
+        }
+        return ToolInvocationResult(
+            result = result ?: ToolResult(
+                content = "工具执行超时：$name（${timeoutMillis} ms）",
+                isError = true,
+                errorCode = "TOOL_TIMEOUT",
+                retryable = tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK),
+                recoveryHint = if (tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)) {
+                    "只读工具超时，可缩小范围后重试一次。"
+                } else {
+                    "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
+                },
+            ),
+            executionStarted = true,
         )
     }
 
