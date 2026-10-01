@@ -31,15 +31,15 @@ internal class KeystorePreferenceSecretStore(
 
     suspend fun get(): String? {
         val blob = dataStore.data.first()[key] ?: return null
-        val value = withContext(Dispatchers.Default) {
-            runCatching { decrypt(blob) }.getOrNull()
-        }
-        if (value == null) {
-            dataStore.edit { preferences ->
-                if (preferences[key] == blob) preferences.remove(key)
+        return withContext(Dispatchers.Default) {
+            try {
+                decrypt(blob)
+            } catch (error: Exception) {
+                // Keystore may be temporarily unavailable. A failed read must never erase the
+                // only durable copy or silently replace the encryption key.
+                throw java.io.IOException("本机凭据读取失败，请稍后重试；已保留原授权数据", error)
             }
         }
-        return value
     }
 
     suspend fun put(value: String) {
@@ -54,7 +54,7 @@ internal class KeystorePreferenceSecretStore(
 
     private fun encrypt(plain: String): String {
         val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey())
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey(create = true))
         val encoder = Base64.getEncoder()
         return encoder.encodeToString(cipher.iv) + SEPARATOR +
             encoder.encodeToString(cipher.doFinal(plain.toByteArray(Charsets.UTF_8)))
@@ -67,16 +67,16 @@ internal class KeystorePreferenceSecretStore(
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(
             Cipher.DECRYPT_MODE,
-            secretKey(),
+            secretKey(create = false),
             GCMParameterSpec(TAG_BITS, decoder.decode(parts[0])),
         )
         return String(cipher.doFinal(decoder.decode(parts[1])), Charsets.UTF_8)
     }
 
-    @Synchronized
-    private fun secretKey(): SecretKey {
+    private fun secretKey(create: Boolean): SecretKey = synchronized(KEY_LOCK) {
         val keyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
-        (keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
+        (keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry)?.let { return@synchronized it.secretKey }
+        if (!create) throw GeneralSecurityException("local credential key unavailable")
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER)
         generator.init(
             KeyGenParameterSpec.Builder(
@@ -88,10 +88,11 @@ internal class KeystorePreferenceSecretStore(
                 .setUserAuthenticationRequired(false)
                 .build(),
         )
-        return generator.generateKey()
+        generator.generateKey()
     }
 
     private companion object {
+        val KEY_LOCK = Any()
         const val PROVIDER = "AndroidKeyStore"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val TAG_BITS = 128

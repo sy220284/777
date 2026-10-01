@@ -193,7 +193,7 @@ internal object LocalCanonicalModelCodec {
         source: List<LocalCanonicalMessage>,
         adapterId: String,
         routeFingerprint: String,
-    ): List<JsonObject> = source.map { toLegacyMessage(it, adapterId, routeFingerprint) }
+    ): List<JsonObject> = source.filterNot(::isEmptyCanonicalAssistant).map { toLegacyMessage(it, adapterId, routeFingerprint) }
 
     fun toHistoryMessage(message: LocalCanonicalMessage): JsonObject =
         toLegacyMessage(message, adapterId = "", routeFingerprint = "")
@@ -227,6 +227,12 @@ internal object LocalCanonicalModelCodec {
         routeFingerprint: String,
     ): LocalModelReply {
         val parsed = message(reply.message)
+        if (isEmptyCanonicalAssistant(parsed)) {
+            throw LocalModelException(
+                "MODEL_EMPTY_RESPONSE", "模型没有返回正文或工具调用，本轮未写入会话历史；请稍后重试。", false,
+                requestId = reply.requestId,
+            )
+        }
         val replay = parsed.replay?.let {
             it.copy(
                 adapterId = adapterId,

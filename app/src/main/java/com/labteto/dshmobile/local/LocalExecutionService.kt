@@ -77,7 +77,7 @@ class LocalExecutionService : Service() {
                     ?.takeIf(String::isNotBlank)
                     ?: released?.sessionId
                 val outcome = intent.getStringExtra(EXTRA_OUTCOME).orEmpty()
-                if (sessionId != null) postCompletion(sessionId, outcome)
+                if (released != null && sessionId != null) postCompletion(sessionId, outcome)
             }
             ACTION_SYNC_JOBS -> {
                 val ids = intent.getStringArrayListExtra(EXTRA_JOB_IDS).orEmpty()
@@ -208,26 +208,47 @@ class LocalExecutionService : Service() {
 
         @Volatile private var dispatchedActive = false
 
-        fun holdTurn(context: Context, sessionId: String, step: Int = 0) {
+        /** Share the same service lifetime for edit, regeneration and group-chat entry points. */
+        suspend fun withTurn(
+            context: Context,
+            sessionId: String,
+            error: () -> String?,
+            block: suspend () -> Unit,
+        ) {
+            val key = "turn:$sessionId:${java.util.UUID.randomUUID()}"
+            holdTurn(context, sessionId, key = key)
+            var outcome = OUTCOME_FAILED
+            try {
+                block()
+                outcome = if (error() == null) OUTCOME_COMPLETED else OUTCOME_FAILED
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                outcome = OUTCOME_CANCELLED
+                throw cancelled
+            } finally {
+                releaseTurn(context, sessionId, outcome, key)
+            }
+        }
+
+        fun holdTurn(context: Context, sessionId: String, step: Int = 0, key: String = "turn:$sessionId") {
             dispatchedActive = true
             dispatch(
                 context,
                 Intent(context, LocalExecutionService::class.java)
                     .setAction(ACTION_TURN)
-                    .putExtra(EXTRA_KEY, "turn:$sessionId")
+                    .putExtra(EXTRA_KEY, key)
                     .putExtra(EXTRA_SESSION_ID, sessionId)
                     .putExtra(EXTRA_LABEL, context.getString(R.string.local_execution_notification_body))
                     .putExtra(EXTRA_STEP, step),
             )
         }
 
-        fun releaseTurn(context: Context, sessionId: String, outcome: String) {
+        fun releaseTurn(context: Context, sessionId: String, outcome: String, key: String = "turn:$sessionId") {
             if (!dispatchedActive) return
             dispatch(
                 context,
                 Intent(context, LocalExecutionService::class.java)
                     .setAction(ACTION_RELEASE_TURN)
-                    .putExtra(EXTRA_KEY, "turn:$sessionId")
+                    .putExtra(EXTRA_KEY, key)
                     .putExtra(EXTRA_SESSION_ID, sessionId)
                     .putExtra(EXTRA_OUTCOME, outcome),
             )

@@ -16,9 +16,28 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
+import com.labteto.dshmobile.local.LocalModelException
 import org.junit.Test
 
 class LocalCanonicalModelCodecTest {
+    @Test
+    fun legacyEmptyAssistantIsOmittedFromEveryProtocolWithoutMutatingDurableHistory() {
+        val empty = Json.parseToJsonElement("""{"role":"assistant","_dsh_model_replay":{"adapter_id":"openai-responses","route_fingerprint":"old","payload":{"output":[]}},"model_tool_calls":[]}""").jsonObject
+        val user = Json.parseToJsonElement("""{"role":"user","content":"continue"}""").jsonObject
+        val source = listOf(empty, user)
+        val canonical = LocalCanonicalModelCodec.messages(source)
+        listOf(LocalModelAdapterIds.OPENAI_CHAT, LocalModelAdapterIds.OPENAI_RESPONSES, LocalModelAdapterIds.ANTHROPIC_MESSAGES).forEach { adapter ->
+            val projected = LocalCanonicalModelCodec.toLegacyMessages(canonical, adapter, "different-account")
+            assertEquals(listOf(user), projected)
+        }
+        assertEquals(2, source.size)
+        assertThrows(LocalModelException::class.java) {
+            LocalCanonicalModelCodec.canonicalizeReply(LocalModelReply(empty, null, null, emptyList()),
+                LocalModelAdapterIds.OPENAI_RESPONSES, "old")
+        }
+    }
+
     @Test
     fun legacyResponsesReplayMigratesToGenericHistoryAndOnlyReturnsToResponses() {
         val legacyOutput = buildJsonArray {

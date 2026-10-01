@@ -10,6 +10,7 @@ enum class ChatGptAuthPhase {
     VALIDATING_IDENTITY,
     LOADING_MODELS,
     CONNECTED,
+    UNVERIFIED,
     ERROR,
 }
 

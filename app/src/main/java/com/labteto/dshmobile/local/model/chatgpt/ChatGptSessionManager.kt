@@ -5,6 +5,7 @@ import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -55,9 +56,6 @@ class ChatGptSessionManager @Inject constructor(
                     )
                 }
                 throw error
-            }
-            check(accounts.replaceCredentials(latest, refreshed)) {
-                "ChatGPT 账户在刷新期间已断开或变更，请重新选择账户后重试"
             }
             refreshed.accessToken
         }
@@ -154,24 +152,38 @@ class ChatGptSessionManager @Inject constructor(
             .add("refresh_token", current.refreshToken)
             .add("resource", CHATGPT_RESOURCE)
             .build()
-        val token = requestToken(form)
-        val now = System.currentTimeMillis() / 1_000L
-        val grantedScopes = if (token.scopes.isEmpty()) current.scopes else token.scopes
-        require(CHATGPT_PLAN_SCOPE in grantedScopes) {
-            "ChatGPT 套餐授权已失效，请重新连接账户"
+        var refreshed: ChatGptAccountRecord? = null
+        requestToken(form) { token ->
+            val now = System.currentTimeMillis() / 1_000L
+            val grantedScopes = if (token.scopes.isEmpty()) current.scopes else token.scopes
+            require(CHATGPT_PLAN_SCOPE in grantedScopes) {
+                "ChatGPT 套餐授权已失效，请重新连接账户"
+            }
+            val replacement = current.copy(
+                accessToken = token.accessToken,
+                refreshToken = token.refreshToken ?: current.refreshToken,
+                idToken = current.idToken,
+                tokenType = token.tokenType,
+                scopes = grantedScopes,
+                accessTokenExpiresAtEpochSeconds = now + token.expiresInSeconds,
+                savedAtEpochSeconds = now,
+            )
+            // Once a rotated token has been received, finish this local CAS even if the caller
+            // cancels. The HTTP read remains cancellable; cancellation still reaches the caller.
+            withContext(NonCancellable) {
+                check(accounts.replaceCredentials(current, replacement)) {
+                    "ChatGPT 账户在刷新期间已断开或变更，请重新选择账户后重试"
+                }
+            }
+            refreshed = replacement
         }
-        return current.copy(
-            accessToken = token.accessToken,
-            refreshToken = token.refreshToken ?: current.refreshToken,
-            idToken = current.idToken,
-            tokenType = token.tokenType,
-            scopes = grantedScopes,
-            accessTokenExpiresAtEpochSeconds = now + token.expiresInSeconds,
-            savedAtEpochSeconds = now,
-        )
+        return checkNotNull(refreshed)
     }
 
-    private suspend fun requestToken(form: FormBody): ChatGptTokenResponse = withContext(Dispatchers.IO) {
+    private suspend fun requestToken(
+        form: FormBody,
+        onToken: suspend (ChatGptTokenResponse) -> Unit = {},
+    ): ChatGptTokenResponse = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(CHATGPT_TOKEN_URL)
             .post(form)
@@ -196,7 +208,7 @@ class ChatGptSessionManager @Inject constructor(
                 ?.takeIf(String::isNotBlank)
                 ?: error("ChatGPT OAuth 响应缺少 access_token")
             val expires = root["expires_in"]?.jsonPrimitive?.longOrNull ?: 3_600L
-            ChatGptTokenResponse(
+            val token = ChatGptTokenResponse(
                 accessToken = access,
                 refreshToken = root["refresh_token"]?.jsonPrimitive?.contentOrNull,
                 idToken = root["id_token"]?.jsonPrimitive?.contentOrNull,
@@ -209,6 +221,8 @@ class ChatGptSessionManager @Inject constructor(
                     .filter(String::isNotBlank)
                     .toSet(),
             )
+            onToken(token)
+            token
         }
     }
 

@@ -303,6 +303,27 @@ class LocalHistoryCompactorTest {
         })
     }
 
+    @Test
+    fun overflowCompactionKeepsTheWholeParallelToolBatchAtTheTailBoundary() {
+        val calls = kotlinx.serialization.json.Json.parseToJsonElement(
+            """{"role":"assistant","tool_calls":[{"id":"a","function":{"name":"read","arguments":"{}"}},{"id":"b","function":{"name":"read","arguments":"{}"}}]}""",
+        ) as JsonObject
+        val results = listOf("b", "a").map { id -> buildJsonObject {
+            put("role", "tool")
+            put("tool_call_id", id)
+            put("content", "result".repeat(3_000))
+        } }
+        val history = listOf(message("system", "rules"), message("user", "old".repeat(8_000)),
+            message("assistant", "done"), calls) + results
+        val compacted = LocalHistoryCompactor().compactForOverflow(history)
+            ?: error("expected overflow compaction")
+        assertEquals(listOf(calls) + results, compacted.messages.takeLast(3))
+        com.labteto.dshmobile.local.model.validateCanonicalModelHistory(
+            compacted.messages.map(com.labteto.dshmobile.local.model.LocalCanonicalModelCodec::message),
+        )
+        assertTrue(compacted.estimatedTokensAfter < compacted.estimatedTokensBefore)
+    }
+
     private fun String.anyIndexed(predicate: (Int, Char) -> Boolean): Boolean {
         for (index in indices) if (predicate(index, this[index])) return true
         return false

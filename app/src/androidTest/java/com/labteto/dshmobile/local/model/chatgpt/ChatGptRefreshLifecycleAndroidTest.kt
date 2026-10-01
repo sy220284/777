@@ -11,6 +11,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -18,6 +20,12 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
+import okhttp3.ResponseBody
+import okio.Buffer
+import okio.BufferedSource
+import okio.Source
+import okio.Timeout
+import okio.buffer
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -87,6 +95,41 @@ class ChatGptRefreshLifecycleAndroidTest {
             assertNotNull(accounts.get(original.id))
             assertEquals(other.id, accounts.selectedId())
             assertEquals("refreshed", accounts.get(original.id)!!.accessToken)
+        }
+    }
+
+    @Test
+    fun cancellationAfterReceivingRotatedTokenStillPersistsItWithoutReturningSuccess() = runBlocking {
+        withAccounts { accounts ->
+            val original = record()
+            accounts.put(original)
+            lateinit var refresh: Deferred<String>
+            val bytes = Buffer().writeUtf8("""{"access_token":"new-access","refresh_token":"rotated","expires_in":3600}""")
+            val source = object : Source {
+                override fun read(sink: Buffer, byteCount: Long): Long {
+                    if (bytes.size > 0) return bytes.read(sink, byteCount)
+                    refresh.cancel()
+                    return -1
+                }
+                override fun timeout(): Timeout = Timeout.NONE
+                override fun close() = Unit
+            }.buffer()
+            val http = OkHttpClient.Builder().addInterceptor { chain ->
+                Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                    .message("OK").body(object : ResponseBody() {
+                        override fun contentType(): okhttp3.MediaType? = null
+                        override fun contentLength(): Long = -1
+                        override fun source(): BufferedSource = source
+                    }).build()
+            }.build()
+            val sessions = ChatGptSessionManager(accounts, http, Json)
+            refresh = async(Dispatchers.Default, start = CoroutineStart.LAZY) { sessions.accessToken(original.id) }
+            refresh.start()
+            refresh.join()
+            assertTrue(refresh.isCancelled)
+            assertEquals("rotated", accounts.get(original.id)!!.refreshToken)
+            assertEquals("new-access", accounts.get(original.id)!!.accessToken)
+            assertEquals(original.id, accounts.selectedId())
         }
     }
 
