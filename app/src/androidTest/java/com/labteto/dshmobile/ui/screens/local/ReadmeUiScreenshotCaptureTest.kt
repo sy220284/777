@@ -45,11 +45,11 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Temporary documentation capture harness.
+ * README documentation screenshot contract.
  *
- * Every screenshot below is composed from the same production components used by the app. The
- * capture workflow removes this test after the PNGs are committed, so README assets never depend
- * on a parallel mock UI.
+ * Every screenshot below is composed from the same production components used by the app. This
+ * test intentionally remains in the repository so future UI changes can regenerate the README
+ * assets from the same maintained production components instead of a parallel mock UI.
  */
 class ReadmeUiScreenshotCaptureTest {
     @get:Rule val compose = createComposeRule()

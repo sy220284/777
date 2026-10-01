@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/capture-readme-ui.yml'
       - 'app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/ReadmeUiScreenshotCaptureTest.kt'
+      - 'README.md'
   workflow_dispatch:
 
 permissions:
@@ -64,7 +65,8 @@ jobs:
           set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/images/current/*.png
+          rm -f docs/images/home.png docs/images/chat.png docs/images/trajectory.png docs/images/session-info.png docs/images/subagent.png
+          git add -A docs/images
           if git diff --cached --quiet; then
             echo "界面截图没有变化"
             exit 0
