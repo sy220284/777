@@ -4713,7 +4713,6 @@ class LocalHarnessEngine @Inject constructor(
 
     private suspend fun modelRequestMarker(): String =
         modelRequestMarkerOrNull() ?: error("请先配置模型账户或 API Key")
-
     private suspend fun completeWithRetry(
         key: String,
         snapshot: LocalHarnessState,
