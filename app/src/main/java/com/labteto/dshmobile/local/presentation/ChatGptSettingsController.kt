@@ -21,12 +21,12 @@ internal class ChatGptSettingsController(
 
     suspend fun connect(existingAccountId: String? = null) {
         val account = auth.connect(existingAccountId)
-        syncModels(account.id, auth.state.value.models, true)
+        if (auth.state.value.connected) syncModels(account.id, auth.state.value.models, true)
     }
 
     suspend fun restart(existingAccountId: String? = null) {
         val account = auth.restartAuthorization(existingAccountId)
-        syncModels(account.id, auth.state.value.models, true)
+        if (auth.state.value.connected) syncModels(account.id, auth.state.value.models, true)
     }
 
     suspend fun cancelAuthorization() = auth.cancelPendingAuthorization()

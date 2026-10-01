@@ -410,7 +410,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runGroupChatTurn(input: String, sourceMessageId: String? = null) =
-        groupChatTurnExecutor.run(input, sourceMessageId)
+        LocalExecutionService.withTurn(context, currentSessionId, { _state.value.error }) { groupChatTurnExecutor.run(input, sourceMessageId) }
 
     // SupervisorJob keeps one failed child from cancelling unrelated engine work. The handler is the
     // final visibility boundary; operation-specific busy/loading state is still owned by each launch.
@@ -1200,12 +1200,7 @@ class LocalHarnessEngine @Inject constructor(
             completeWithRetry(
                 key = key,
                 snapshot = snapshot,
-                messages = listOf(
-                    buildJsonObject {
-                        put("role", "system")
-                        put("content", prompt)
-                    },
-                ),
+                messages = chatPostTurnModelMessages(prompt),
                 step = CHAT_POST_TURN_MODEL_STEP + 1,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
@@ -1485,7 +1480,9 @@ class LocalHarnessEngine @Inject constructor(
             } else {
                 captureChatPersonaCorrection(requestedText)
                 hydrateNewChatStateFromRelationshipMemory()
-                runChatTurn(content, sourceMessageId = edited.id)
+                LocalExecutionService.withTurn(context, state.sessionId, { _state.value.error }) {
+                    runChatTurn(content, sourceMessageId = edited.id)
+                }
             }
         }.also { activeJob = it; it.start() }
         LocalChatUserEditResult.SENT
@@ -1598,8 +1595,10 @@ class LocalHarnessEngine @Inject constructor(
             }
         }
         scope.launch(start = CoroutineStart.LAZY) {
-            if (state.usageMode == LocalUsageMode.CHAT) runChatTurn(prompt, replacingMessageId = messageId)
-            else regenerateWorkReply(messageId)
+            LocalExecutionService.withTurn(context, state.sessionId, { _state.value.error }) {
+                if (state.usageMode == LocalUsageMode.CHAT) runChatTurn(prompt, replacingMessageId = messageId)
+                else regenerateWorkReply(messageId)
+            }
         }
             .also { activeJob = it; it.start() }
         true

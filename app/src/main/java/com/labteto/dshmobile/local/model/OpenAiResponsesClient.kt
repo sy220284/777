@@ -102,8 +102,7 @@ class OpenAiResponsesClient @Inject constructor(
                     detail = "Responses API 返回了空响应",
                 )
                 var completedResponse: JsonObject? = null
-                val streamedContent = StringBuilder()
-                val streamedReasoning = StringBuilder()
+                val streamed = OpenAiResponsesStreamSnapshot()
                 var totalBytes = 0
                 // Response 生命周期由 withCancellableModelResponse 统一关闭；这里不要单独 use(reader)，
                 // 否则成功终态后的 reader.close() 异常仍可能把成功请求翻成失败。
@@ -141,32 +140,8 @@ class OpenAiResponsesClient @Inject constructor(
                                     )
                                 }
                             }
+                        streamed.record(event)?.let { onDelta(it) }
                         when (event["type"]?.jsonPrimitive?.contentOrNull) {
-                            "response.output_text.delta" -> {
-                                event["delta"]?.jsonPrimitive?.contentOrNull
-                                    ?.takeIf(String::isNotEmpty)
-                                    ?.let { delta ->
-                                        streamedContent.append(delta)
-                                        onDelta(LocalModelDelta(content = delta))
-                                    }
-                            }
-                            "response.reasoning_text.delta",
-                            "response.reasoning_summary_text.delta" -> {
-                                event["delta"]?.jsonPrimitive?.contentOrNull
-                                    ?.takeIf(String::isNotEmpty)
-                                    ?.let { delta ->
-                                        streamedReasoning.append(delta)
-                                        onDelta(LocalModelDelta(reasoning = delta))
-                                    }
-                            }
-                            "response.refusal.delta" -> {
-                                event["delta"]?.jsonPrimitive?.contentOrNull
-                                    ?.takeIf(String::isNotEmpty)
-                                    ?.let { delta ->
-                                        streamedContent.append(delta)
-                                        onDelta(LocalModelDelta(content = delta))
-                                    }
-                            }
                             "error" -> throw streamError(event, planSharing, requestId, retryAfterMs)
                             "response.failed" -> throw responseFailure(
                                 event = event,
@@ -194,13 +169,28 @@ class OpenAiResponsesClient @Inject constructor(
                     detail = "Responses API 流在 response.completed 前结束",
                 )
                 parseCompleted(
-                    response = completed,
+                    response = streamed.settledResponse(completed),
                     promptBreakdown = promptBreakdown,
-                    streamedContent = streamedContent.toString(),
-                    streamedReasoning = streamedReasoning.toString(),
+                    streamedContent = streamed.content,
+                    streamedReasoning = streamed.reasoningText,
                 )
             }
         } catch (error: LocalModelException) {
+            // In-stream server errors can arrive after inference has started, too. Preserve their
+            // diagnostic identity but apply the same no-replay boundary as transport interruption.
+            if (planSharing && responseAdmitted && error.retryable) {
+                throw LocalModelException(
+                    code = error.code,
+                    message = "${error.message}。请求已进入 Responses 流，本轮不会自动重放，请检查状态后重试。",
+                    retryable = false,
+                    cause = error,
+                    status = error.status,
+                    providerRetryAfterMs = error.providerRetryAfterMs,
+                    requestId = error.requestId ?: admittedRequestId,
+                    providerCode = error.providerCode,
+                    providerParam = error.providerParam,
+                )
+            }
             throw error
         } catch (error: SocketTimeoutException) {
             if (planSharing && responseAdmitted) {
@@ -504,7 +494,7 @@ class OpenAiResponsesClient @Inject constructor(
             usage = parseUsage(response["usage"] as? JsonObject),
             requestId = response["id"]?.jsonPrimitive?.contentOrNull ?: UUID.randomUUID().toString(),
             promptBreakdown = promptBreakdown,
-        )
+        ).also(::validateUsableModelReply)
     }
 
     private fun parseUsage(usage: JsonObject?): DeepSeekTokenUsage {
@@ -680,7 +670,7 @@ class OpenAiResponsesClient @Inject constructor(
             "subscription_sharing_usage_unavailable",
             "subscription_sharing_user_unavailable" -> Triple(
                 "CHATGPT_PLAN_USAGE_UNAVAILABLE",
-                "ChatGPT 暂时无法确认套餐可用量，777 会保留登录状态并按有限次数退避重试。",
+                "ChatGPT 暂时无法确认套餐可用量，777 已保留登录状态。",
                 true,
             )
             "subscription_sharing_user_not_eligible" -> Triple(

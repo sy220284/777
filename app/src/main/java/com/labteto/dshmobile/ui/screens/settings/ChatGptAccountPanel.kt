@@ -123,6 +123,7 @@ internal fun ChatGptAccountPanel(
                     label = when {
                         selected?.sharingEnabled == true && state.phase == ChatGptAuthPhase.CONNECTED ->
                             stringResource(R.string.chatgpt_connected)
+                        state.phase == ChatGptAuthPhase.UNVERIFIED -> stringResource(R.string.chatgpt_authorized_unverified)
                         busy -> stringResource(R.string.chatgpt_connecting)
                         else -> stringResource(R.string.chatgpt_not_connected)
                     },
