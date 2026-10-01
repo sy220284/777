@@ -22,14 +22,15 @@ class LocalPromptContextTest {
             baseUrl = "https://api.openai.com/v1",
             provider = "OpenAI",
             authKind = LocalModelAuthKind.CHATGPT_PLAN,
-            protocol = LocalModelProtocol.RESPONSES,
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS,
             credentialRef = "account-private-reference",
         )
 
         val context = withWorkRuntimeContext(
             context = "用户规则：完成后复查。",
             workspacePath = "/workspace",
-            model = "fallback-model",
+            model = "gpt-5.6-luna",
+            baseUrl = "https://api.openai.com/v1",
             profile = profile,
         )
 
