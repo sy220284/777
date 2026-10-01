@@ -244,9 +244,8 @@ android {
     }
 
     lint {
-        // English is the base resource set and Simplified Chinese is the maintained translation.
-        // MissingTranslation stays fatal so the two language surfaces cannot silently drift.
-        error += listOf("MissingTranslation", "ImpliedQuantity")
+        // Chinese is the single user-facing base resource set; there is no locale translation surface.
+        error += listOf("ImpliedQuantity")
         // `HardcodedText` is deliberately absent: it only inspects XML layouts, and this app has
         // none. Compose string literals have to be caught in review.
     }

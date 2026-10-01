@@ -30,8 +30,8 @@ for count, path in sorted(counts, reverse=True)[:12]:
 
 if total > MAX_HARDCODED_CJK_LITERALS:
     print(
-        "Hard-coded UI text increased. Move new user-visible text into strings.xml and "
-        "values-zh-rCN/strings.xml, or migrate existing literals so the total does not grow.",
+        "Hard-coded UI text increased. Move new user-visible text into the Chinese base "
+        "strings.xml, or migrate existing literals so the total does not grow.",
         file=sys.stderr,
     )
     sys.exit(1)
