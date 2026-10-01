@@ -231,6 +231,33 @@ class LocalModelHistoryProjectionTest {
     }
 
     @Test
+    fun malformedToolCallWithoutIdIsDroppedDuringRestore() {
+        val malformedAssistant = buildJsonObject {
+            put("role", "assistant")
+            put("content", "")
+            put("tool_calls", JsonArray(listOf(buildJsonObject {
+                put("type", "function")
+                put("function", buildJsonObject {
+                    put("name", "read")
+                    put("arguments", "{}")
+                })
+            })))
+        }
+        val events = listOf(
+            event(0L, "system/prompt", buildJsonObject { put("content", "系统") }),
+            event(1L, "assistant/message", malformedAssistant),
+            event(2L, "user/message", buildJsonObject { put("content", "继续") }),
+        )
+
+        val restored = restoreLocalModelHistory(events, emptyList(), codec)
+
+        assertEquals(listOf("system", "user"), restored.messages.map {
+            it["role"].toString().trim('"')
+        })
+        assertTrue(restored.checkpointRecommended)
+    }
+
+    @Test
     fun incompleteToolBatchIsDiscardedBeforeFollowingUserMessage() {
         val events = listOf(
             event(0L, "system/prompt", buildJsonObject { put("content", "系统") }),
