@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.model
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.LocalToolCatalog
 import com.labteto.dshmobile.local.TokenPromptBreakdown
+import com.labteto.dshmobile.local.chat.chatPostTurnModelMessages
 import java.io.IOException
 import java.net.SocketException
 import kotlinx.coroutines.runBlocking
@@ -312,6 +313,56 @@ class OpenAiResponsesClientTest {
         val input = payload["input"]!!.jsonArray
         assertEquals(1, input.size)
         assertEquals("user", input.single().jsonObject["role"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun postTurnPlannerMessagesAlwaysProduceRealResponsesInput() {
+        val payload = client.buildPayload(
+            model = "gpt-test",
+            messages = chatPostTurnModelMessages("整理这一轮隐藏状态"),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = true,
+        )
+        client.validateRequestPayload(payload)
+
+        assertTrue(payload["instructions"]?.jsonPrimitive?.content.orEmpty().isNotBlank())
+        val input = payload["input"]!!.jsonArray
+        assertEquals(1, input.size)
+        assertEquals("user", input.single().jsonObject["role"]?.jsonPrimitive?.content)
+        assertEquals("整理这一轮隐藏状态", input.single().jsonObject["content"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun systemOnlyResponsesPayloadIsRejectedBeforeNetwork() {
+        val payload = client.buildPayload(
+            model = "gpt-test",
+            messages = listOf(buildJsonObject {
+                put("role", "system")
+                put("content", "只有 instructions")
+            }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = true,
+        )
+        val error = runCatching { client.validateRequestPayload(payload) }.exceptionOrNull()
+            as? LocalModelException
+        assertEquals("RESPONSES_INPUT_REQUIRED", error?.code)
+        assertFalse(error?.retryable ?: true)
+    }
+
+    @Test
+    fun admittedPlanStreamInterruptionIsNeverBlindlyReplayed() {
+        val error = client.streamInterruptedAfterAdmission(
+            planSharing = true,
+            requestId = "req-stream-1",
+            detail = "流断开",
+            cause = IOException("stream was reset: CANCEL"),
+        )
+        assertEquals("CHATGPT_PLAN_STREAM_INTERRUPTED", error.code)
+        assertFalse(error.retryable)
+        assertEquals("req-stream-1", error.requestId)
+        assertEquals("stream_interrupted_after_admission", error.providerCode)
     }
 
     @Test

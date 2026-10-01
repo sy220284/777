@@ -29,6 +29,12 @@ class LocalModelGateway @Inject constructor(
     fun clearActive() = credentials.clearActive()
     fun activeProfile(): LocalModelProfile? = credentials.active()
 
+    suspend fun synchronizeCredentialSelection(profile: LocalModelProfile) =
+        credentials.synchronizeSelection(profile)
+
+    suspend fun credentialDiagnostic(profile: LocalModelProfile): LocalCredentialDiagnostic =
+        credentials.diagnostic(profile)
+
     suspend fun hasCredential(profile: LocalModelProfile): Boolean =
         credentials.hasCredential(profile)
 

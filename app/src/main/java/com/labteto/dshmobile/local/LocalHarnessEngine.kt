@@ -57,6 +57,7 @@ import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
+import com.labteto.dshmobile.local.chat.chatPostTurnModelMessages
 import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.applySceneTurn
@@ -366,12 +367,7 @@ class LocalHarnessEngine @Inject constructor(
                 completeWithRetry(
                     key = profile.id,
                     snapshot = snapshot,
-                    messages = listOf(
-                        buildJsonObject {
-                            put("role", "system")
-                            put("content", prompt)
-                        },
-                    ),
+                    messages = chatPostTurnModelMessages(prompt),
                     step = CHAT_POST_TURN_MODEL_STEP,
                     toolsOverride = JsonArray(emptyList()),
                     publishPreview = false,

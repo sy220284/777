@@ -34,6 +34,7 @@ internal class LocalModelStartupMigrator(
         )
         val active = profiles.active(model, baseUrl, all)
         if (active != null && gateway.hasCredential(active)) {
+            gateway.synchronizeCredentialSelection(active)
             gateway.activate(active)
         } else {
             gateway.clearActive()

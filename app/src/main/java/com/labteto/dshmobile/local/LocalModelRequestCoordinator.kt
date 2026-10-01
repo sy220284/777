@@ -55,6 +55,7 @@ internal class LocalModelRequestCoordinator(
             snapshot.model,
             snapshot.baseUrl,
         )
+        val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
         val previewOwner = if (publishPreviewEnabled) {
             streamingPreviewStore.newOwner(
                 sessionId = snapshot.sessionId,
@@ -83,6 +84,12 @@ internal class LocalModelRequestCoordinator(
             put("auth_kind", frozenProfile.authKind.name)
             put("protocol", frozenProfile.protocol.name)
             frozenProfile.credentialRef?.takeLast(8)?.let { put("credential_ref_tail", it) }
+            credentialDiagnostic.clientIdTail?.let { put("client_id_tail", it) }
+            credentialDiagnostic.selectedAccountTail?.let { put("selected_account_tail", it) }
+            credentialDiagnostic.matchesSelectedAccount?.let { put("matches_selected_account", it) }
+            put("credential_binding_valid", credentialDiagnostic.bindingValid)
+            credentialDiagnostic.planScopeGranted?.let { put("plan_scope_granted", it) }
+            credentialDiagnostic.resourceInvokeGranted?.let { put("resource_invoke_granted", it) }
             put("step", step)
             put("message_count", logMessages.size)
             put("context_chars", contextChars)
@@ -101,6 +108,7 @@ internal class LocalModelRequestCoordinator(
         })
 
         var failureContextLogged = false
+        var lastProviderError: LocalModelException? = null
         val executor = AgentRequestExecutor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
@@ -114,6 +122,7 @@ internal class LocalModelRequestCoordinator(
             eventSink = AgentRequestEventSink { event ->
                 when (event) {
                     is AgentRequestEvent.AttemptStarted -> {
+                        lastProviderError = null
                         previewOwner?.takeIf { previewGuard() }?.let(streamingPreviewStore::begin)
                     }
                     is AgentRequestEvent.AttemptFailed -> {
@@ -122,10 +131,23 @@ internal class LocalModelRequestCoordinator(
                                 ?.takeIf { previewGuard() }
                                 ?.let(streamingPreviewStore::begin)
                         }
+                        val providerError = lastProviderError
                         AppLog.warn(
                             "LocalModelRequest",
-                            "主智能体模型请求失败 model=${snapshot.model} step=$step attempt=${event.attempt} " +
-                                "retryable=${event.retryable} detail=${event.reason.take(800)}",
+                            buildString {
+                                append("模型请求失败 model=${snapshot.model} step=$step attempt=${event.attempt} ")
+                                append("retryable=${event.retryable} profile_id=${frozenProfile.id} ")
+                                append("auth_kind=${frozenProfile.authKind.name} protocol=${frozenProfile.protocol.name} ")
+                                credentialDiagnostic.credentialRefTail?.let { append("credential_ref_tail=$it ") }
+                                credentialDiagnostic.clientIdTail?.let { append("client_id_tail=$it ") }
+                                credentialDiagnostic.selectedAccountTail?.let { append("selected_account_tail=$it ") }
+                                credentialDiagnostic.matchesSelectedAccount?.let { append("selected_match=$it ") }
+                                append("binding_valid=${credentialDiagnostic.bindingValid} ")
+                                providerError?.status?.let { append("status=$it ") }
+                                providerError?.requestId?.let { append("request_id=$it ") }
+                                providerError?.providerCode?.let { append("provider_code=$it ") }
+                                append("detail=${event.reason.take(800)}")
+                            },
                         )
                         if (!failureContextLogged) {
                             runCatching {
@@ -211,6 +233,7 @@ internal class LocalModelRequestCoordinator(
                                     },
                                 )
                             } catch (error: LocalModelException) {
+                                lastProviderError = error
                                 log.append("request/provider-error", buildJsonObject {
                                     put("step", step)
                                     put("code", error.code)
