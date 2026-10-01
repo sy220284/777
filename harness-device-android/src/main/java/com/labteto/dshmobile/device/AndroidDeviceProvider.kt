@@ -26,7 +26,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 internal fun sanitizeNotificationField(value: String?, maxChars: Int): String {
     if (value.isNullOrBlank()) return ""
-    val normalized = value.replace(Regex("""[\\t\\r\\n]+"""), " ").trim()
+    val normalized = value.replace(Regex("""[\t\r\n]+"""), " ").trim()
     val redacted = NOTIFICATION_SECRET_PATTERN.replace(normalized) { match ->
         "${match.groupValues[1]}：[已脱敏]"
     }
@@ -35,7 +35,7 @@ internal fun sanitizeNotificationField(value: String?, maxChars: Int): String {
 }
 
 private val NOTIFICATION_SECRET_PATTERN = Regex(
-    """(?i)(验证码|校验码|动态码|一次性密码|otp|verification\\s*code|password|密码)\\s*[:：]?\\s*[A-Za-z0-9_-]{4,32}""",
+    """(?i)(验证码|校验码|动态码|一次性密码|otp|verification\s*code|password|密码)\s*[:：]?\s*[A-Za-z0-9_-]{4,32}""",
 )
 
 class AndroidDeviceProvider(
