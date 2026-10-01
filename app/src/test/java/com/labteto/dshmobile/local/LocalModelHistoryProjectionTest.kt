@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
