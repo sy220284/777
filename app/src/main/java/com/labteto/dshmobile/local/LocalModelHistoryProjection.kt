@@ -87,7 +87,9 @@ private fun sanitizeRestoredModelHistory(source: List<JsonObject>): Pair<List<Js
             "assistant" -> {
                 if (pendingCallIds.isNotEmpty()) discardPendingBatch()
                 val callIds = modelToolCallIds(message)
-                if (callIds.isEmpty()) {
+                if (callIds == null) {
+                    changed = true
+                } else if (callIds.isEmpty()) {
                     restored += message
                 } else if (callIds.size != callIds.toSet().size) {
                     changed = true
@@ -118,12 +120,13 @@ private fun sanitizeRestoredModelHistory(source: List<JsonObject>): Pair<List<Js
     return restored to (changed || restored.size != source.size)
 }
 
-private fun modelToolCallIds(message: JsonObject): List<String> {
+private fun modelToolCallIds(message: JsonObject): List<String>? {
     val calls = (message["tool_calls"] as? JsonArray)
         ?: (message["model_tool_calls"] as? JsonArray)
         ?: return emptyList()
-    return calls.mapNotNull { raw ->
+    return calls.map { raw ->
         (raw as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+            ?: return null
     }
 }
 
