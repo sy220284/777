@@ -307,7 +307,7 @@ fun SettingsScreen(
                 ) {
                 when (page) {
                     SettingsDestination.ROOT -> {
-                        Text(stringResource(R.string.settings_group_experience), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
+                        Text(stringResource(R.string.settings_group_models), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
                         DsGroupCard {
                             DsCategoryRow(
                                 icon = Icons.Outlined.Cloud,
@@ -324,6 +324,10 @@ fun SettingsScreen(
                                 iconFamily = DsIconFamily.Amber,
                                 onClick = { page = SettingsDestination.MODEL_USAGE },
                             )
+                        }
+
+                        Text(stringResource(R.string.settings_group_experience), style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
+                        DsGroupCard {
                             DsCategoryRow(
                                 icon = Icons.Outlined.Memory,
                                 title = stringResource(R.string.settings_page_memory),
