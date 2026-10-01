@@ -9,13 +9,14 @@ import androidx.core.content.FileProvider
 import com.github.sisong.HPatch
 import com.labteto.dshmobile.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.EOFException
 import java.io.File
-import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,7 +25,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
-import okhttp3.Request
 
 data class UpdateInstallResult(
     val launchedInstaller: Boolean,
@@ -45,15 +45,18 @@ class UpdateInstaller @Inject constructor(
         .retryOnConnectionFailure(true)
         .protocols(listOf(Protocol.HTTP_1_1))
         .build()
+    private val payloadTransfer = UpdatePayloadTransfer(downloadClient)
     private val maintenanceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     suspend fun downloadVerifyAndLaunch(update: AvailableUpdate): UpdateInstallResult =
         withContext(Dispatchers.IO) {
+            currentCoroutineContext().ensureActive()
             if (!context.packageManager.canRequestPackageInstalls()) {
                 val settingsIntent = Intent(
                     Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                     Uri.parse("package:${context.packageName}"),
                 ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                currentCoroutineContext().ensureActive()
                 context.startActivity(settingsIntent)
                 return@withContext UpdateInstallResult(
                     launchedInstaller = false,
@@ -65,7 +68,7 @@ class UpdateInstaller @Inject constructor(
             val apkName = update.apkName ?: "777-${update.version}.apk"
             val expected = update.expectedSha256
                 ?: update.checksumUrl
-                    ?.let { fetchText(it, MAX_CHECKSUM_BYTES) }
+                    ?.let { payloadTransfer.fetchText(it, MAX_CHECKSUM_BYTES) }
                     ?.let { parseUpdateChecksum(it, apkName) }
                 ?: error("发行版缺少 ${apkName} 的 SHA-256 校验信息")
 
@@ -87,7 +90,7 @@ class UpdateInstaller @Inject constructor(
                 val usedDelta = tryDeltaUpdate(update, target, expected)
                 if (!usedDelta) {
                     target.delete()
-                    downloadFile(
+                    payloadTransfer.downloadFile(
                         url = apkUrl,
                         target = target,
                         maxBytes = MAX_APK_BYTES,
@@ -102,7 +105,9 @@ class UpdateInstaller @Inject constructor(
                     }
                 }
 
+                currentCoroutineContext().ensureActive()
                 val targetVersionCode = verifyPackageAndSigner(target)
+                currentCoroutineContext().ensureActive()
 
                 val uri = FileProvider.getUriForFile(
                     context,
@@ -116,12 +121,14 @@ class UpdateInstaller @Inject constructor(
                 // Protect exactly this verified APK across a possible process restart while Android
                 // reads it. The marker is removed with the APK as soon as the target build is seen,
                 // or after the bounded handoff window if installation was cancelled.
+                currentCoroutineContext().ensureActive()
                 UpdateCache.markInstallerHandoff(
                     root = root,
                     apk = target,
                     targetVersionCode = targetVersionCode,
                     handedAtMillis = System.currentTimeMillis(),
                 )
+                currentCoroutineContext().ensureActive()
                 context.startActivity(intent)
                 installerOwnsTarget = true
 
@@ -151,7 +158,7 @@ class UpdateInstaller @Inject constructor(
             }
         }
 
-    private fun tryDeltaUpdate(
+    private suspend fun tryDeltaUpdate(
         update: AvailableUpdate,
         target: File,
         expectedTargetSha256: String,
@@ -177,7 +184,7 @@ class UpdateInstaller @Inject constructor(
                     sha256(patchFile).equals(step.expectedSha256, ignoreCase = true)
                 if (!canReusePatch) {
                     patchFile.delete()
-                    downloadFile(
+                    payloadTransfer.downloadFile(
                         url = step.url,
                         target = patchFile,
                         maxBytes = MAX_PATCH_BYTES,
@@ -206,6 +213,7 @@ class UpdateInstaller @Inject constructor(
                 }
                 output.delete()
 
+                currentCoroutineContext().ensureActive()
                 val patchResult = try {
                     HPatch.patch(
                         source.absolutePath,
@@ -220,6 +228,7 @@ class UpdateInstaller @Inject constructor(
                     // beside the reconstructed APK while the system installer is open.
                     patchFile.delete()
                 }
+                currentCoroutineContext().ensureActive()
                 if (patchResult != 0 || !output.isFile) {
                     output.delete()
                     cleanupIntermediates(intermediates, target)
@@ -246,6 +255,9 @@ class UpdateInstaller @Inject constructor(
             if (!valid) target.delete()
             cleanupIntermediates(intermediates, if (valid) null else target)
             return valid
+        } catch (cancelled: CancellationException) {
+            cleanupIntermediates(intermediates, target)
+            throw cancelled
         } catch (_: LinkageError) {
             cleanupIntermediates(intermediates, target)
             return false
@@ -260,102 +272,12 @@ class UpdateInstaller @Inject constructor(
         target?.delete()
     }
 
-    private fun downloadFile(
-        url: String,
-        target: File,
-        maxBytes: Long,
-        expectedBytes: Long?,
-        kind: String,
-        accept: String,
-    ) {
-        validateUpdateExpectedSize(expectedBytes, maxBytes, kind)
-        val temp = File(target.parentFile, target.name + ".part")
-        var lastError: IOException? = null
-
-        repeat(MAX_DOWNLOAD_ATTEMPTS) { attempt ->
-            temp.delete()
-            try {
-                val request = Request.Builder()
-                    .url(url)
-                    .header("Accept", accept)
-                    .header("Cache-Control", "no-cache")
-                    .get()
-                    .build()
-                downloadClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        throw IOException("下载 $kind 失败：HTTP ${response.code}")
-                    }
-                    val body = response.body ?: throw IOException("下载 $kind 返回空响应")
-                    val declared = body.contentLength()
-                    validateUpdateDeclaredSize(declared, expectedBytes, maxBytes, kind)
-
-                    var total = 0L
-                    temp.outputStream().use { output ->
-                        body.byteStream().use { input ->
-                            val buffer = ByteArray(64 * 1024)
-                            while (true) {
-                                val read = input.read(buffer)
-                                if (read < 0) break
-                                total += read
-                                if (total > maxBytes ||
-                                    (expectedBytes != null && total > expectedBytes)
-                                ) {
-                                    throw IOException("$kind 下载超过预期大小")
-                                }
-                                output.write(buffer, 0, read)
-                            }
-                        }
-                    }
-                    if (declared >= 0L && total != declared) {
-                        throw EOFException("$kind 下载流提前结束：$total/$declared 字节")
-                    }
-                    if (expectedBytes != null && total != expectedBytes) {
-                        throw EOFException("$kind 下载不完整：$total/$expectedBytes 字节")
-                    }
-                }
-
-                if (target.exists()) target.delete()
-                if (!temp.renameTo(target)) {
-                    temp.copyTo(target, overwrite = true)
-                    temp.delete()
-                }
-                return
-            } catch (error: IOException) {
-                lastError = error
-                temp.delete()
-                if (attempt + 1 < MAX_DOWNLOAD_ATTEMPTS) {
-                    Thread.sleep(RETRY_BACKOFF_MS * (attempt + 1L))
-                }
-            }
-        }
-
-        throw IOException(
-            "$kind 下载连接中断，已自动重试 $MAX_DOWNLOAD_ATTEMPTS 次：" +
-                (lastError?.message ?: "未知网络错误"),
-            lastError,
-        )
-    }
-
-    private fun fetchText(url: String, maxBytes: Long): String {
-        val request = Request.Builder()
-            .url(url)
-            .header("Accept", "text/plain, application/octet-stream")
-            .get()
-            .build()
-        return downloadClient.newCall(request).execute().use { response ->
-            require(response.isSuccessful) { "下载校验文件失败：HTTP ${response.code}" }
-            val body = response.body ?: error("校验文件为空")
-            require(body.contentLength() <= maxBytes) { "校验文件异常过大" }
-            val bytes = body.byteStream().use { readChecksumBytes(it, maxBytes) }
-            bytes.toString(Charsets.UTF_8)
-        }
-    }
-
-    private fun sha256(file: File): String {
+    private suspend fun sha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
         file.inputStream().use { input ->
             val buffer = ByteArray(64 * 1024)
             while (true) {
+                currentCoroutineContext().ensureActive()
                 val read = input.read(buffer)
                 if (read < 0) break
                 digest.update(buffer, 0, read)
@@ -405,8 +327,6 @@ class UpdateInstaller @Inject constructor(
         const val MAX_APK_BYTES = 200L * 1024L * 1024L
         const val MAX_PATCH_BYTES = 128L * 1024L * 1024L
         const val MAX_CHECKSUM_BYTES = 256L * 1024L
-        const val MAX_DOWNLOAD_ATTEMPTS = 4
-        const val RETRY_BACKOFF_MS = 500L
         const val PATCH_CACHE_BYTES = 8L * 1024L * 1024L
         const val PATCH_THREADS = 2
     }

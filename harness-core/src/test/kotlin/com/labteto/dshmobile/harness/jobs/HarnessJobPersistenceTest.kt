@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.harness.jobs
 
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -11,6 +15,53 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HarnessJobPersistenceTest {
+    @Test
+    fun cancelledJobKeepsItsSlotAndRemainsOwnedUntilCleanupCompletes() = runTest {
+        val cleaning = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val manager = HarnessJobManager(this, {}, maxConcurrentJobs = 1, maxRetainedJobs = 1)
+        val first = manager.start("first", ownerId = "session") { _, _ ->
+            try { awaitCancellation() } finally {
+                withContext(NonCancellable) { cleaning.complete(Unit); release.await() }
+            }
+        }.substringAfterLast('：')
+        runCurrent()
+        manager.kill(first)
+        runCurrent()
+        assertTrue(cleaning.isCompleted)
+        assertTrue(manager.availableSlots() == 0)
+        assertTrue(manager.start("second") { _, _ -> "done" }.contains("并发已满"))
+        assertTrue(manager.snapshots().any { it.id == first })
+        val stopping = launch { manager.stopAllAndJoin() }
+        runCurrent()
+        assertFalse(stopping.isCompleted)
+        release.complete(Unit)
+        stopping.join()
+        assertTrue(manager.availableSlots() == 1)
+        manager.start("second") { _, _ -> "done" }
+        runCurrent()
+        assertTrue(manager.snapshots().none { it.id == first })
+    }
+
+    @Test
+    fun removingAnOwnerWaitsForAlreadyCancelledJobsAndRejectsNewOwnedWork() = runTest {
+        val release = CompletableDeferred<Unit>()
+        val manager = HarnessJobManager(this, {}, maxConcurrentJobs = 2)
+        val first = manager.start("first", ownerId = "session") { _, _ ->
+            try { awaitCancellation() } finally { withContext(NonCancellable) { release.await() } }
+        }.substringAfterLast('：')
+        runCurrent()
+        manager.kill(first)
+        val removal = launch { manager.removeOwnedAndJoin(setOf("session")) }
+        runCurrent()
+        assertFalse(removal.isCompleted)
+        assertTrue(manager.start("late", ownerId = "session") { _, _ -> "done" }.contains("正在移除"))
+        release.complete(Unit)
+        removal.join()
+        assertTrue(manager.snapshots().isEmpty())
+        assertTrue(manager.availableSlots() == 2)
+    }
+
     @Test
     fun restartedShellJobReportsInterruptionWithoutSuggestingRecovery() = runTest {
         val manager = HarnessJobManager(

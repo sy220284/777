@@ -75,7 +75,7 @@
 - 工作模式区分主代理 / 子代理消耗。
 - 单次模型调用带 `requestId / sessionId / turnId / runId / parentRunId / agentId / action`。
 - Token 日志可追到回复、状态刷新、回复建议、子代理、Automation、Web、Vision 等动作。
-- API usage 是真实计费口径；系统提示词、人物状态、记忆、历史与工具定义只作为输入构成诊断，避免重复统计。
+- 本地 Token 总量以成功模型响应实际返回的 API usage 为准；失败、取消、断流或供应商未返回 usage 的请求只记录诊断，不推断供应商最终计费。系统提示词、人物状态、记忆、历史与工具定义只作为输入构成诊断，避免重复统计。
 - 旧版本只有累计值的数据继续保留，但不会伪造历史日期、会话或任务归属。
 
 ### 通用体验
@@ -222,9 +222,9 @@ harness-core / Android runtime / MCP / device
 - Hilt 2.59.2
 - Java 17
 
-当前仓库版本基线：`0.12.0-777.22`。
+当前正式版本以 GitHub Releases 的最新标签为准。
 
-发布版本号来自 git 标签：发布工作流导出 `DSH_VERSION_NAME`，`versionCode` 由版本名推导；本地构建回退到 `.github/release-version`。
+发布版本号来自 git 标签：发布工作流导出 `DSH_VERSION_NAME`，`versionCode` 由版本名推导；本地构建回退到 `.github/release-version`。该 fallback 随主线准备的下一正式版推进，避免本地升级测试使用陈旧 versionCode。
 
 开发与合并规则见 [AGENTS.md](AGENTS.md)，贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 

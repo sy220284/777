@@ -88,7 +88,7 @@ app 内采用 capability runtime + projection + coordinator 的模块化单体�
 - 不依赖猜测的 Harness 版本分支行为。
 - 本机 Session Event Log 是主要事实源。
 - 运行恢复不能盲目重放结果未知的副作用。
-- API usage 是 Token 总量；prompt breakdown 只做诊断，不重复计数。
+- 本地 Token 总量只采用成功响应实际返回的 API usage；失败或未返回 usage 的请求只做诊断，不估算供应商最终计费；prompt breakdown 不重复计数。
 
 ## 验证
 
