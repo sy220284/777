@@ -418,6 +418,13 @@ class LocalWebProvider @Inject constructor(
                         action = TokenUsageAction.WEB_SEARCH,
                         taskLabel = query.take(120),
                     ),
+                    route = LocalModelRouteIdentity(
+                        provider = "DeepSeek",
+                        model = SEARCH_MODEL,
+                        baseUrl = "https://api.deepseek.com",
+                        authKind = LocalModelAuthKind.API_KEY.name,
+                        protocol = LocalModelProtocol.ANTHROPIC_MESSAGES.name,
+                    ),
                 )
                 formatSearch(query, root)
             }
