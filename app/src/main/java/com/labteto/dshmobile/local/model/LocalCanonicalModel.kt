@@ -166,8 +166,8 @@ internal object LocalCanonicalModelCodec {
     }
 
     private fun invalidTool(index: Int, detail: String) = LocalModelException(
-        code = "RESPONSES_TOOL_SCHEMA_INVALID",
-        message = "工具定义第 ${index + 1} 项无效：$detail",
+        code = "MODEL_TOOL_SCHEMA_INVALID",
+        message = "模型工具定义第 ${index + 1} 项无效：$detail",
         retryable = false,
     )
 
