@@ -32,7 +32,9 @@ interface HarnessTerminalProvider {
     suspend fun open(command: List<String>, workingDirectory: String? = null): String
     suspend fun write(sessionId: String, input: String)
     suspend fun read(sessionId: String): String
+    suspend fun resize(sessionId: String, columns: Int, rows: Int): Boolean = false
     suspend fun close(sessionId: String)
+    fun nativePtyAvailable(): Boolean = false
 }
 
 interface HarnessNetworkProvider {
