@@ -248,6 +248,7 @@ internal class LocalAutomationChatCoordinator(
                 val sessionTranscriptIndex = localTranscriptIndexForSession(session)
                 val boundState = runtime.copy(
                     sessionId = session.id,
+                    model = runProfile.model, baseUrl = runProfile.baseUrl,
                     usageMode = LocalUsageMode.CHAT,
                     personaId = session.personaId,
                     galleryId = session.galleryId,
