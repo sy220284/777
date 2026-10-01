@@ -169,6 +169,14 @@ class SessionStore @Inject constructor(
         onConnectionError = ::setConnectionError,
     )
 
+    private val goalRuntime = SessionGoalRuntime(
+        apiProvider = ::apiOrNull,
+        currentSessionId = { currentSessionId.value },
+        currentGoalRef = { synchronized(lock) { goalRefFromProjectionLocked() } },
+        onConnectionError = ::setConnectionError,
+        logger = ::log,
+    )
+
     private val searchRuntime = SessionSearchRuntime(apiProvider = ::apiOrNull)
     val searchResults: StateFlow<List<Pair<String, String>>> get() = searchRuntime.results
     val contentSearchAvailable: StateFlow<Boolean> get() = searchRuntime.available
@@ -1164,45 +1172,8 @@ class SessionStore @Inject constructor(
 
     suspend fun deleteWorkspace(id: String) = workspaceRuntime.delete(id)
 
-    suspend fun goalAction(action: String, objective: String? = null) {
-        val sid = currentSessionId.value ?: return
-        val api = apiOrNull() ?: return
-        when (action) {
-            "create" -> {
-                val obj = objective
-                if (obj.isNullOrBlank()) {
-                    log("goal create requires an objective")
-                    return
-                }
-                handleResult(
-                    api.goalCreate(sid, buildJsonObject { put("objective", JsonPrimitive(obj)) }),
-                )
-            }
-            "edit", "pause", "resume", "complete", "clear" -> {
-                val ref = synchronized(lock) { goalRefFromProjectionLocked() }
-                if (ref == null) {
-                    log("goal $action requires a current goal (no goal projection)")
-                    return
-                }
-                when (action) {
-                    "edit" -> handleResult(
-                        api.goalEdit(
-                            sid,
-                            ref,
-                            buildJsonObject {
-                                if (objective != null) put("objective", JsonPrimitive(objective))
-                            },
-                        ),
-                    )
-                    "pause" -> handleResult(api.goalPause(sid, ref))
-                    "resume" -> handleResult(api.goalResume(sid, ref))
-                    "complete" -> handleResult(api.goalComplete(sid, ref))
-                    "clear" -> handleResult(api.goalClear(sid, ref))
-                }
-            }
-            else -> log("unknown goal action $action")
-        }
-    }
+    suspend fun goalAction(action: String, objective: String? = null) =
+        goalRuntime.act(action, objective)
 
     /**
      * Reload the session's slash-command catalog.
@@ -1409,13 +1380,6 @@ class SessionStore @Inject constructor(
         val api = connectionManager.connectedApi
         if (api == null) log("not connected — ignoring request")
         return api
-    }
-
-    private fun <T> handleResult(result: RpcResult<T>) {
-        when (result) {
-            is RpcResult.Ok -> Unit
-            is RpcResult.Err -> setConnectionError(result.error.message)
-        }
     }
 
     private fun log(message: String, throwable: Throwable? = null) {
