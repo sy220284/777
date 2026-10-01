@@ -44,15 +44,17 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
-            set -eu
+            bash <<'BASH'
+            set -euo pipefail
             DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:assembleDebug --stacktrace
             adb install -r app/build/outputs/apk/debug/app-debug.apk
 
             mkdir -p docs/images/current
 
             capture_screen() {
-              screen="$1"
-              output="$2"
+              local screen="$1"
+              local output="$2"
+              local ready=0
 
               adb logcat -c
               adb shell am force-stop com.sy220284.dshmobile.debug
@@ -60,7 +62,6 @@ jobs:
                 -n com.sy220284.dshmobile.debug/com.labteto.dshmobile.ui.screens.local.ReadmeScreenshotActivity \
                 --es readme_screen "$screen"
 
-              ready=0
               for attempt in $(seq 1 80); do
                 if adb logcat -d -s ReadmeScreenshot:I '*:S' | grep -Fq "READY:$screen"; then
                   ready=1
@@ -102,6 +103,7 @@ jobs:
                 assert height >= 500, f"{path} height={height}"
                 assert len(data) > 10_000, f"{path} bytes={len(data)}"
             PY
+            BASH
 
       - name: Upload captured screenshots
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
