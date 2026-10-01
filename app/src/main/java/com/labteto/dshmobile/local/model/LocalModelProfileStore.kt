@@ -90,7 +90,7 @@ internal class LocalModelProfileStore(
         profiles: List<LocalModelProfile> = read(),
     ): LocalModelProfile? {
         preferences.getString(KEY_ACTIVE_PROFILE_ID, null)?.let { id ->
-            return profiles.firstOrNull { it.id == id }
+            profiles.firstOrNull { it.id == id }?.let { return it }
         }
         return profiles.firstOrNull {
             it.model == currentModel && it.baseUrl.trimEnd('/') == currentBaseUrl.trimEnd('/')
