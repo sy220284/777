@@ -248,8 +248,6 @@ internal class LocalAutomationChatCoordinator(
                 val sessionTranscriptIndex = localTranscriptIndexForSession(session)
                 val boundState = runtime.copy(
                     sessionId = session.id,
-                    model = runProfile.model,
-                    baseUrl = runProfile.baseUrl,
                     usageMode = LocalUsageMode.CHAT,
                     personaId = session.personaId,
                     galleryId = session.galleryId,
@@ -322,9 +320,6 @@ internal class LocalAutomationChatCoordinator(
                 )
                 boundEventLog.append("turn/start", buildJsonObject {
                     put("model", boundState.model)
-                    put("profile_id", runProfile.id)
-                    put("auth_kind", runProfile.authKind.name)
-                    put("protocol", runProfile.protocol.name)
                     put("mode", "chat")
                     put("automation", true)
                     put("proactive", true)
