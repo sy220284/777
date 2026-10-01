@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/capture-readme-ui.yml'
       - 'app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/ReadmeUiScreenshotCaptureTest.kt'
+      - 'README.md'
   workflow_dispatch:
 
 permissions:
@@ -47,24 +48,31 @@ jobs:
             DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.ReadmeUiScreenshotCaptureTest --stacktrace
 
             mkdir -p docs/images/current
-            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/navigation.png > docs/images/current/navigation.png
-            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/chat.png > docs/images/current/chat.png
-            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/work.png > docs/images/current/work.png
-            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/character-tuning.png > docs/images/current/character-tuning.png
-            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/usage.png > docs/images/current/usage.png
+            adb shell "run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/navigation.png > /data/local/tmp/readme-navigation.png"
+            adb pull /data/local/tmp/readme-navigation.png docs/images/current/navigation.png
+            adb shell "run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/chat.png > /data/local/tmp/readme-chat.png"
+            adb pull /data/local/tmp/readme-chat.png docs/images/current/chat.png
+            adb shell "run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/work.png > /data/local/tmp/readme-work.png"
+            adb pull /data/local/tmp/readme-work.png docs/images/current/work.png
+            adb shell "run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/character-tuning.png > /data/local/tmp/readme-character-tuning.png"
+            adb pull /data/local/tmp/readme-character-tuning.png docs/images/current/character-tuning.png
+            adb shell "run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/usage.png > /data/local/tmp/readme-usage.png"
+            adb pull /data/local/tmp/readme-usage.png docs/images/current/usage.png
             test -s docs/images/current/navigation.png
             test -s docs/images/current/chat.png
             test -s docs/images/current/work.png
             test -s docs/images/current/character-tuning.png
             test -s docs/images/current/usage.png
-            python3 -c 'from pathlib import Path; import struct; files=sorted(Path("docs/images/current").glob("*.png")); assert {p.name for p in files}=={"navigation.png","chat.png","work.png","character-tuning.png","usage.png"}; [(lambda d,p: (d[:8]==b"\\x89PNG\\r\\n\\x1a\\n" or (_ for _ in ()).throw(AssertionError(f"{p} invalid PNG")), struct.unpack(">II",d[16:24])[0]>=300 or (_ for _ in ()).throw(AssertionError(f"{p} width")), struct.unpack(">II",d[16:24])[1]>=500 or (_ for _ in ()).throw(AssertionError(f"{p} height"))))(p.read_bytes(),p) for p in files]'
+            adb shell rm -f /data/local/tmp/readme-navigation.png /data/local/tmp/readme-chat.png /data/local/tmp/readme-work.png /data/local/tmp/readme-character-tuning.png /data/local/tmp/readme-usage.png
+            python3 -c 'from pathlib import Path; import struct; files=sorted(Path("docs/images/current").glob("*.png")); assert {p.name for p in files}=={"navigation.png","chat.png","work.png","character-tuning.png","usage.png"}; [(lambda d,p: (d[:8]==bytes.fromhex("89504e470d0a1a0a") or (_ for _ in ()).throw(AssertionError(f"{p} invalid PNG")), struct.unpack(">II",d[16:24])[0]>=300 or (_ for _ in ()).throw(AssertionError(f"{p} width")), struct.unpack(">II",d[16:24])[1]>=500 or (_ for _ in ()).throw(AssertionError(f"{p} height"))))(p.read_bytes(),p) for p in files]'
 
       - name: Commit captured screenshots
         run: |
           set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/images/current/*.png
+          rm -f docs/images/home.png docs/images/chat.png docs/images/trajectory.png docs/images/session-info.png docs/images/subagent.png
+          git add -A docs/images
           if git diff --cached --quiet; then
             echo "界面截图没有变化"
             exit 0
