@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
+import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.harness.session.RecoveredToolResult
 import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
@@ -41,6 +42,60 @@ class LocalAgentRunCoordinatorTest {
             assertTrue(decision.queuedInput?.content.orEmpty().contains("继续执行"))
             assertNull(decision.blockedReason)
             assertTrue(log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT) != null)
+        }
+    }
+
+    @Test
+    fun safeRecoveryIncludesLatestTypedWorkCheckpoint() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false,
+                maxSteps = 16,
+                input = "继续项目",
+                memoryInput = "继续项目",
+            )
+            coordinator.recordEvent(context, AgentEvent.StepStarted(context.runId, 1))
+            val checkpoint = LocalWorkCheckpoint(
+                goals = listOf("完成恢复链"),
+                constraints = listOf("禁止盲目重放副作用"),
+                decisions = listOf("Session Event 是事实源"),
+                failures = listOf("旧方案重复写入"),
+                unfinished = listOf("补 Android 17 回归"),
+                progress = listOf("基础恢复已完成"),
+                artifacts = listOf("docs/PROTOCOL.md"),
+                tools = listOf("write_file"),
+            )
+            log.append(
+                ModelHistoryCheckpointCodec.EVENT_TYPE,
+                ModelHistoryCheckpointCodec().encode(
+                    messages = listOf(
+                        buildJsonObject {
+                            put("role", "system")
+                            put("content", "系统")
+                        },
+                        buildJsonObject {
+                            put("role", "user")
+                            put("content", checkpoint.toModelBlock())
+                        },
+                    ),
+                    reason = "test",
+                ),
+            )
+
+            val decision = requireNotNull(
+                coordinator.recoveryDecision("s1", SessionRepairResult()),
+            )
+
+            val content = decision.queuedInput?.content.orEmpty()
+            assertTrue(content.contains("<work-checkpoint>"))
+            assertTrue(content.contains("补 Android 17 回归"))
+            assertTrue(content.contains("不要重做已完成步骤"))
         }
     }
 

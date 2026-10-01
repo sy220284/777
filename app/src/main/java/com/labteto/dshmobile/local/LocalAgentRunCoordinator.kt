@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.model.LOCAL_MODEL_TOOL_CALLS_EVENT_KEY
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import java.util.UUID
@@ -19,6 +20,7 @@ internal const val LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT = "agent/subagent-run-che
 internal const val LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT = "agent/automation-run-checkpoint"
 private const val LOCAL_AGENT_RUN_CHECKPOINT_VERSION = 1
 private const val MAX_RECOVERY_INPUT_CHARS = 8_000
+private const val MAX_RECOVERY_CONTINUATION_CHARS = 12_000
 
 internal enum class LocalAgentRunKind {
     FOREGROUND,
@@ -241,12 +243,13 @@ internal class LocalAgentRunCoordinator(
             )
         }
         if (status == LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase()) {
+            val continuation = recoveryContinuationPrompt(log, data)
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 queuedInput = QueuedAgentInput(
                     id = "run-recovery:$runId",
-                    content = RECOVERY_CONTINUATION_PROMPT,
-                    memoryInput = RECOVERY_CONTINUATION_PROMPT,
+                    content = continuation,
+                    memoryInput = continuation,
                 ),
             )
         }
@@ -270,14 +273,15 @@ internal class LocalAgentRunCoordinator(
                     blockedReason = "上次后台执行已经进入可能产生副作用的工具阶段。为避免系统重跑造成重复操作，已停止自动续跑，请先检查外部状态。",
                 )
             }
+            val continuation = recoveryContinuationPrompt(log, data)
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 queuedInput = QueuedAgentInput(
                     id = "run-recovery:$runId",
-                    content = RECOVERY_CONTINUATION_PROMPT,
+                    content = continuation,
                     memoryInput = data["memory_input"]?.jsonPrimitive?.contentOrNull
                         ?: data["input"]?.jsonPrimitive?.contentOrNull
-                        ?: RECOVERY_CONTINUATION_PROMPT,
+                        ?: continuation,
                 ),
             )
         }
@@ -311,12 +315,30 @@ internal class LocalAgentRunCoordinator(
         val originalInput = data["memory_input"]?.jsonPrimitive?.contentOrNull
             ?: data["input"]?.jsonPrimitive?.contentOrNull
             ?: ""
+        val continuationPrompt = recoveryContinuationPrompt(log, data)
         val continuation = QueuedAgentInput(
             id = "run-recovery:$runId",
-            content = RECOVERY_CONTINUATION_PROMPT,
-            memoryInput = originalInput.ifBlank { RECOVERY_CONTINUATION_PROMPT },
+            content = continuationPrompt,
+            memoryInput = originalInput.ifBlank { continuationPrompt },
         )
         return LocalAgentRunRecoveryDecision(runId = runId, queuedInput = continuation)
+    }
+
+    private fun recoveryContinuationPrompt(
+        log: LocalSessionEventLog,
+        runCheckpoint: JsonObject,
+    ): String {
+        if (runCheckpoint["mode"]?.jsonPrimitive?.contentOrNull != LocalUsageMode.WORK.name.lowercase()) {
+            return RECOVERY_CONTINUATION_PROMPT
+        }
+        val historyEvent = log.latest(ModelHistoryCheckpointCodec.EVENT_TYPE) ?: return RECOVERY_CONTINUATION_PROMPT
+        val messages = ModelHistoryCheckpointCodec().decode(historyEvent.data) ?: return RECOVERY_CONTINUATION_PROMPT
+        val checkpoint = LocalWorkCheckpoint.latestFrom(messages) ?: return RECOVERY_CONTINUATION_PROMPT
+        return buildString {
+            append(RECOVERY_CONTINUATION_PROMPT)
+            append("\n\n最近持久工作检查点如下。先核对当前工作区和外部状态，再继续未完成事项；不要重做已完成步骤。\n")
+            append(checkpoint.toModelBlock())
+        }.take(MAX_RECOVERY_CONTINUATION_CHARS)
     }
 
     fun markRecoveryQueued(
