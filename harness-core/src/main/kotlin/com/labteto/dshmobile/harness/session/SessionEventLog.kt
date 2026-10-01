@@ -518,7 +518,12 @@ class SessionEventLog(
         if (!source.isFile || source.length() == 0L) return true
         if (source.name.endsWith(COMPRESSED_SUFFIX)) {
             // One decoded segment is bounded by maxBytes (8 MiB in production).
-            val lines = source.eventReader().useLines { it.toList() }
+            val lines = try {
+                source.eventReader().useLines { it.toList() }
+            } catch (error: Exception) {
+                reportSegmentReadFailure(source, error)
+                return true
+            }
             for (line in lines.asReversed()) {
                 val event = decodeEventOrNull(line) ?: continue
                 if (!visitor(event)) return false
