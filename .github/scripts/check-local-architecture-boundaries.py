@@ -281,6 +281,41 @@ if "pluginManager.installAll(pluginCatalog.ids())" not in plugin_composition:
     die("startup plugin installation must be resolved through PluginManager/PluginCatalog")
 if re.search(r"\bstartupPlugins\b", plugin_composition):
     die("startup plugins must not be maintained as a raw hard-coded lifecycle list")
+if "apiKeys.get()" in plugin_composition:
+    die("Vision/plugin composition must not read the mutable global active API key")
+if "route.copy(profile = modelGateway.activeProfile())" in plugin_composition:
+    die("Vision route identity must not be overwritten from mutable activeProfile")
+if "routeProvider = routeProvider" not in plugin_composition or "apiKeys.getFor(profile.id)" not in plugin_composition:
+    die("Vision composition must preserve the exact route profile and resolve credentials by profile id")
+
+automation_chat = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt")
+)
+if "val runProfile = modelGateway.profileForRun()" not in automation_chat:
+    die("Automation Chat must freeze one model profile for the whole detached run")
+if "profile = runProfile" not in automation_chat:
+    die("Automation Chat model retries/repairs must reuse the frozen profile")
+
+for helper_path in (
+    "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaAutoFillService.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaInspectionService.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/GroupAnnouncementService.kt",
+):
+    helper_source = strip_comments(read(helper_path))
+    if "modelGateway.withFrozenRoute(profileId, model, baseUrl)" not in helper_source:
+        die(f"{helper_path} must freeze the explicit selected profile across the helper operation")
+
+chat_refresh = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt")
+)
+if "profile: LocalModelProfile" not in chat_refresh or "requestPlanner(before, prompt, boundEventLog, profile)" not in chat_refresh:
+    die("Chat post-turn refresh and retries must retain the originating model profile")
+if "profile = profile" not in engine[engine.find("requestPlanner ="):engine.find("private val chatReplyCoordinator")]:
+    die("Chat post-turn planner must pass its frozen profile into model requests")
+if "profileId = runSnapshot.modelSelection.activeProfileId" not in engine:
+    die("Foreground runs must freeze the exact selected model profile id")
+if "modelRequestMarkerOrNull()?.let" in engine[engine.find("requestPlanner ="):engine.find("private val chatReplyCoordinator")]:
+    die("Chat post-turn planner must not re-read mutable active model identity")
 
 unexpected_consumers = sorted(engine_consumers - ENGINE_CONSUMER_ALLOWLIST)
 if unexpected_consumers:

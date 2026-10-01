@@ -27,6 +27,18 @@ class LocalModelRouteCatalogTest {
         assertSame(parent, selectRunModelProfile(listOf(parent, api, plan), parent, null))
     }
 
+    @Test fun explicitProfileIdDisambiguatesSameModelAndEndpoint() {
+        val secondPlan = plan.copy(id = "openai-plan-two", credentialRef = "account-two")
+        assertSame(
+            plan,
+            selectModelRouteProfile(listOf(plan, secondPlan), plan.id, plan.model, plan.baseUrl),
+        )
+        val error = runCatching {
+            selectModelRouteProfile(listOf(plan, secondPlan), null, plan.model, plan.baseUrl)
+        }.exceptionOrNull()
+        assertEquals("MODEL_PROFILE_ID_REQUIRED", (error as LocalModelException).code)
+    }
+
     @Test fun uniqueLegacyModelNameStillWorksAcrossProviders() {
         assertSame(api, selectRunModelProfile(listOf(parent, api), parent, " gpt-test "))
     }

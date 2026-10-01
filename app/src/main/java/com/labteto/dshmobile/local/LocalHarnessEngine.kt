@@ -4,7 +4,6 @@ import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.send.coordinateLocalSend
 import com.labteto.dshmobile.local.send.prepareLocalSend
-
 import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
@@ -296,8 +295,8 @@ class LocalHarnessEngine @Inject constructor(
             resourceScheduler = resourceScheduler,
             routeProvider = {
                 val current = _state.value
-                if (!current.configured) null
-                else LocalVisionRoute(baseUrl = current.baseUrl, model = current.model)
+                current.modelSelection.activeProfile?.takeIf { current.configured }
+                    ?.let { LocalVisionRoute(it.baseUrl, it.model, profile = it) }
             },
             imageSupportProvider = { route ->
                 when (imageCapabilities.state(route.baseUrl, route.model)) {
@@ -363,23 +362,22 @@ class LocalHarnessEngine @Inject constructor(
             state = _state,
             scope = scope,
             chatTurnCoordinator = chatTurnCoordinator,
-            requestPlanner = { snapshot, prompt, requestLog ->
-                modelRequestMarkerOrNull()?.let { key ->
-                    completeWithRetry(
-                        key = key,
-                        snapshot = snapshot,
-                        messages = listOf(
-                            buildJsonObject {
-                                put("role", "system")
-                                put("content", prompt)
-                            },
-                        ),
-                        step = CHAT_POST_TURN_MODEL_STEP,
-                        toolsOverride = JsonArray(emptyList()),
-                        publishPreview = false,
-                        requestLog = requestLog,
-                    )
-                }
+            requestPlanner = { snapshot, prompt, requestLog, profile ->
+                completeWithRetry(
+                    key = profile.id,
+                    snapshot = snapshot,
+                    messages = listOf(
+                        buildJsonObject {
+                            put("role", "system")
+                            put("content", prompt)
+                        },
+                    ),
+                    step = CHAT_POST_TURN_MODEL_STEP,
+                    toolsOverride = JsonArray(emptyList()),
+                    publishPreview = false,
+                    requestLog = requestLog,
+                    profile = profile,
+                )
             },
             recordUsage = { snapshot, reply -> usageTracker.recordForeground(snapshot, reply, TokenUsageAction.CHAT_STATE_REFRESH) },
             persistBranchState = ::persistChatBranchState,
@@ -2920,8 +2918,8 @@ class LocalHarnessEngine @Inject constructor(
                     expectedSessionId = snapshot.sessionId,
                     expectedAssistantMessageId = assistantTranscript.id,
                     expectedBaseState = _state.value.chatState,
-                    sourceUserMessageId = sourceMessageId
-                        ?: snapshot.transcriptIndex.latestUserMessageId,
+                    profile = snapshot.modelSelection.activeProfile,
+                    sourceUserMessageId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
                 )
             }
         } catch (cancelled: CancellationException) {
@@ -3503,7 +3501,11 @@ class LocalHarnessEngine @Inject constructor(
 
         try {
             withTimeout(FOREGROUND_TURN_TIMEOUT_MILLIS) {
-                modelGateway.withFrozenRoute(runSnapshot.model, runSnapshot.baseUrl) { loop.run(input) }
+                modelGateway.withFrozenRoute(
+                    profileId = runSnapshot.modelSelection.activeProfileId,
+                    model = runSnapshot.model,
+                    baseUrl = runSnapshot.baseUrl,
+                ) { loop.run(input) }
             }
             if (runState.value.usageMode == LocalUsageMode.CHAT) {
                 val postTurnSnapshot = runState.value
@@ -3515,8 +3517,8 @@ class LocalHarnessEngine @Inject constructor(
                         expectedSessionId = postTurnSnapshot.sessionId,
                         expectedAssistantMessageId = assistantMessage.id,
                         expectedBaseState = postTurnSnapshot.chatState,
-                        sourceUserMessageId = sourceMessageId
-                            ?: runSnapshot.transcriptIndex.latestUserMessageId,
+                        profile = runSnapshot.modelSelection.activeProfile,
+                        sourceUserMessageId = sourceMessageId ?: runSnapshot.transcriptIndex.latestUserMessageId,
                     )
                 }
             }
@@ -4659,8 +4661,10 @@ class LocalHarnessEngine @Inject constructor(
         expectedSessionId: String,
         expectedAssistantMessageId: String,
         expectedBaseState: ChatCharacterState,
+        profile: LocalModelProfile?,
         sourceUserMessageId: String? = null,
     ) {
+        if (profile == null) return
         chatContextRefreshCoordinator.schedule(
             userMessage = userMessage,
             assistantMessage = assistantMessage,
@@ -4669,6 +4673,7 @@ class LocalHarnessEngine @Inject constructor(
             expectedAssistantMessageId = expectedAssistantMessageId,
             expectedBaseState = expectedBaseState,
             boundEventLog = eventLogFor(expectedSessionId),
+            profile = profile,
             sourceUserMessageId = sourceUserMessageId,
         )
     }
@@ -4708,7 +4713,6 @@ class LocalHarnessEngine @Inject constructor(
 
     private suspend fun modelRequestMarker(): String =
         modelRequestMarkerOrNull() ?: error("请先配置模型账户或 API Key")
-
     private suspend fun completeWithRetry(
         key: String,
         snapshot: LocalHarnessState,
@@ -4721,7 +4725,7 @@ class LocalHarnessEngine @Inject constructor(
         persistOverflowHistory: Boolean = false,
         streamFilterPhrases: List<String> = emptyList(),
         requestLog: LocalSessionEventLog? = null,
-        temperature: Double? = null,
+        temperature: Double? = null, profile: LocalModelProfile? = null,
         binding: LocalWorkRunBinding? = null,
     ): LocalModelReply = modelRequestCoordinator.complete(
         snapshot = snapshot,
@@ -4735,6 +4739,7 @@ class LocalHarnessEngine @Inject constructor(
         streamFilterPhrases = streamFilterPhrases,
         requestLog = requestLog ?: binding?.eventLog,
         temperature = temperature,
+        profile = profile,
         previewGuard = {
             currentSessionId == snapshot.sessionId &&
                 _state.value.sessionId == snapshot.sessionId

@@ -80,11 +80,11 @@ internal class LocalModelAccountStateCoordinator(
 
     suspend fun requestMarkerOrNull(): String? {
         val snapshot = state.value
-        val profile = configuration.activeProfile(
-            snapshot.model,
-            snapshot.baseUrl,
-            snapshot.modelProfiles,
-        ) ?: return null
-        return if (gateway.hasCredential(profile)) "" else null
+        val profileId = snapshot.modelSelection.activeProfileId ?: return null
+        return gateway.profileForRoute(
+            profileId = profileId,
+            model = snapshot.model,
+            baseUrl = snapshot.baseUrl,
+        ).id
     }
 }

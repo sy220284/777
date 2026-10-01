@@ -92,9 +92,9 @@ internal class LocalModelProfileStore(
         preferences.getString(KEY_ACTIVE_PROFILE_ID, null)?.let { id ->
             return profiles.firstOrNull { it.id == id }
         }
-        return profiles.firstOrNull {
+        return profiles.filter {
             it.model == currentModel && it.baseUrl.trimEnd('/') == currentBaseUrl.trimEnd('/')
-        }
+        }.singleOrNull()
     }
 
     fun setActive(profile: LocalModelProfile) {

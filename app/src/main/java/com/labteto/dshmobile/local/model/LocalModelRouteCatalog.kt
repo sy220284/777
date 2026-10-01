@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.model
 import android.content.Context
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.LocalModelProfile
+import com.labteto.dshmobile.local.normalizeModelBaseUrl
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,6 +20,51 @@ class LocalModelRouteCatalog @Inject constructor(
     )
 
     fun profiles(): List<LocalModelProfile> = store.read()
+}
+
+internal fun selectModelRouteProfile(
+    profiles: List<LocalModelProfile>,
+    profileId: String?,
+    model: String,
+    baseUrl: String,
+): LocalModelProfile {
+    val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl)
+    val requestedId = profileId?.trim()?.takeIf(String::isNotBlank)
+    if (requestedId != null) {
+        val selected = profiles.firstOrNull { it.id == requestedId } ?: throw LocalModelException(
+            "MODEL_PROFILE_UNAVAILABLE",
+            "当前模型配置已不存在，请重新选择模型来源",
+            false,
+        )
+        if (
+            selected.model != model ||
+            normalizeModelBaseUrl(selected.baseUrl) != normalizedBaseUrl
+        ) {
+            throw LocalModelException(
+                "MODEL_PROFILE_ROUTE_MISMATCH",
+                "模型配置身份与本次请求路由不一致，请重新选择模型来源",
+                false,
+            )
+        }
+        return selected
+    }
+
+    val matches = profiles.filter {
+        it.model == model && normalizeModelBaseUrl(it.baseUrl) == normalizedBaseUrl
+    }
+    return when (matches.size) {
+        1 -> matches.single()
+        0 -> throw LocalModelException(
+            "MODEL_PROFILE_UNAVAILABLE",
+            "当前请求没有可用的模型配置，请重新选择模型来源",
+            false,
+        )
+        else -> throw LocalModelException(
+            "MODEL_PROFILE_ID_REQUIRED",
+            "同一模型和地址存在多个凭据来源，必须使用明确的模型配置身份",
+            false,
+        )
+    }
 }
 
 internal fun selectRunModelProfile(
