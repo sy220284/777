@@ -4,7 +4,6 @@ import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.send.coordinateLocalSend
 import com.labteto.dshmobile.local.send.prepareLocalSend
-
 import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
