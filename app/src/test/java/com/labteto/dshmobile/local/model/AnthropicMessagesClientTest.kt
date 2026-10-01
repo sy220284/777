@@ -23,6 +23,13 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.ForwardingSource
+import okio.buffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -238,5 +245,85 @@ class AnthropicMessagesClientTest {
             server.stop(0)
             executor.shutdownNow()
         }
+    }
+
+    private fun fixture(events: List<String>, failClose: Boolean = false): AnthropicMessagesClient {
+        val text = events.joinToString("\n\n") { "data: $it" } + "\n\n"
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            val delegate = text.toResponseBody("text/event-stream".toMediaType())
+            val body = if (!failClose) delegate else object : ResponseBody() {
+                private val stream = object : ForwardingSource(delegate.source()) {
+                    override fun close() { super.close(); throw java.io.IOException("late close reset") }
+                }.buffer()
+                override fun contentType() = delegate.contentType()
+                override fun contentLength() = delegate.contentLength()
+                override fun source() = stream
+            }
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK").body(body).build()
+        }.build()
+        return AnthropicMessagesClient(http, json)
+    }
+
+    @Test
+    fun terminalSuccessSurvivesCloseResetAndMissingTerminalNeverSucceeds() = runBlocking {
+        val start = """{"type":"message_start","message":{"id":"msg","usage":{"input_tokens":2,"output_tokens":0}}}"""
+        val delta = """{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":3}}"""
+        val stop = """{"type":"message_stop"}"""
+        val reply = fixture(listOf(start, delta, stop), failClose = true).complete(route(), emptyList(), emptyList(), null, true)
+        assertEquals(3L, reply.usage.completionTokens)
+        listOf(
+            listOf(start, delta) to "ANTHROPIC_STREAM_INCOMPLETE",
+            listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}""", """{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}""") to "ANTHROPIC_PROTOCOL_ERROR",
+            listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"private"}}""", """{"type":"content_block_stop","index":0}""", delta, stop) to "ANTHROPIC_PROTOCOL_ERROR",
+            listOf(start, stop) to "MODEL_FINISH_null",
+            listOf(start, """{"type":"message_delta","delta":{"stop_reason":"max_tokens"}}""", stop) to "MODEL_OUTPUT_TRUNCATED",
+            listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t","name":"read","input":[]}}""", """{"type":"content_block_stop","index":0}""", """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""", stop) to "ANTHROPIC_PROTOCOL_ERROR",
+        ).forEach { (frames, code) ->
+            val error = runCatching { fixture(frames).complete(route(), emptyList(), emptyList(), null, true) }.exceptionOrNull()
+            assertEquals(code, (error as? com.labteto.dshmobile.local.LocalModelException)?.code)
+        }
+    }
+
+    @Test
+    fun canonicalTextWinsWhileThinkingSignatureAndParallelResultsSurvive() {
+        val currentRoute = route()
+        val assistant = LocalCanonicalMessage(LocalCanonicalRole.ASSISTANT,
+            listOf(LocalCanonicalContent.Text("filtered")),
+            LocalModelReplayEnvelope(LocalModelAdapterIds.ANTHROPIC_MESSAGES, currentRoute.fingerprint,
+                Json.parseToJsonElement("""{"content":[{"type":"thinking","thinking":"private","signature":"sig"},{"type":"text","text":"original"}]}""").jsonObject))
+        val results = listOf("a", "b").map { LocalCanonicalMessage(LocalCanonicalRole.TOOL, listOf(LocalCanonicalContent.ToolResult(it, "done"))) }
+        val turns = client.buildPayload(currentRoute, listOf(assistant) + results, emptyList(), null)["messages"]!!.jsonArray
+        assertEquals(2, turns.size)
+        assertEquals(2, turns[1].jsonObject["content"]!!.jsonArray.size)
+        assertEquals("sig", turns[0].jsonObject["content"]!!.jsonArray[0].jsonObject["signature"]!!.jsonPrimitive.content)
+        assertTrue(turns.toString().contains("filtered"))
+        assertFalse(turns.toString().contains("original"))
+        val audio = LocalCanonicalMessage(LocalCanonicalRole.USER, listOf(LocalCanonicalContent.Raw(Json.parseToJsonElement("""{"type":"input_audio"}""").jsonObject)))
+        assertTrue(runCatching { client.buildPayload(currentRoute, listOf(audio), emptyList(), null) }.isFailure)
+    }
+
+    @Test
+    fun outOfOrderParallelToolBlocksKeepIdentityAndRejectDuplicateIndexes() = runBlocking {
+        val start = """{"type":"message_start","message":{"id":"msg","usage":{"input_tokens":1}}}"""
+        val first = """{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"b","name":"read","input":{}}}"""
+        val second = """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"a","name":"read","input":{}}}"""
+        val end = listOf("""{"type":"content_block_stop","index":0}""", """{"type":"content_block_stop","index":1}""", """{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":2}}""", """{"type":"message_stop"}""")
+        val reply = fixture(listOf(start, first, second) + end).complete(route(), emptyList(), emptyList(), null, true)
+        assertEquals(listOf("a", "b"), reply.toolCalls.map { it.id })
+        val duplicate = runCatching { fixture(listOf(start, first, first) + end).complete(route(), emptyList(), emptyList(), null, true) }.exceptionOrNull()
+        assertEquals("ANTHROPIC_PROTOCOL_ERROR", (duplicate as? com.labteto.dshmobile.local.LocalModelException)?.code)
+    }
+
+    @Test
+    fun officialImageAndWholeRequestLimitsFailBeforeNetwork() = runBlocking {
+        val exact = "data:image/png;base64," + "A".repeat(10_000_000)
+        val image = LocalCanonicalMessage(LocalCanonicalRole.USER, listOf(LocalCanonicalContent.Image(exact)))
+        assertEquals(7_500_000L, com.labteto.dshmobile.local.LocalModelPresets.maxNativeImageBytesFor("claude-sonnet-5-5", "https://api.anthropic.com/v1"))
+        assertTrue(client.buildPayload(route(), listOf(image), emptyList(), null).isNotEmpty())
+        val tooLargeImage = image.copy(content = listOf(LocalCanonicalContent.Image(exact + "AAAA")))
+        assertTrue(runCatching { client.buildPayload(route(), listOf(tooLargeImage), emptyList(), null) }.isFailure)
+        val totalError = runCatching { fixture(emptyList()).complete(route(), listOf(image, image, image, image), emptyList(), null, true) }.exceptionOrNull()
+        assertEquals("MODEL_REQUEST_TOO_LARGE", (totalError as? com.labteto.dshmobile.local.LocalModelException)?.code)
     }
 }

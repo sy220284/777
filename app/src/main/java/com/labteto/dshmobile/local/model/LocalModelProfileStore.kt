@@ -26,9 +26,10 @@ internal class LocalModelProfileStore(
             ?: "[]"
         json.parseToJsonElement(raw).jsonArray.mapNotNull { item ->
             val obj = item.jsonObject
-            val model = obj["model"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+            val storedModel = obj["model"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
                 ?: return@mapNotNull null
             val baseUrl = obj["baseUrl"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val model = com.labteto.dshmobile.local.migrateOfficialClaudeModel(storedModel, baseUrl)
             val auth = obj["authKind"]?.jsonPrimitive?.contentOrNull
                 ?.let { runCatching { LocalModelAuthKind.valueOf(it) }.getOrNull() }
                 ?: LocalModelAuthKind.API_KEY

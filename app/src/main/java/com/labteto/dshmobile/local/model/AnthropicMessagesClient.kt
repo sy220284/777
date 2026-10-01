@@ -72,13 +72,17 @@ internal class AnthropicMessagesClient @Inject constructor(
             tools = tools,
             temperature = temperature,
         )
+        val wirePayload = payload.toString().toByteArray(Charsets.UTF_8)
+        if (wirePayload.size > 32_000_000) {
+            throw LocalModelException("MODEL_REQUEST_TOO_LARGE", "Anthropic 请求超过 32 MB，请减少图片或历史内容", false)
+        }
         val request = Request.Builder()
             .url(endpoint(route.baseUrl))
             .header("x-api-key", route.bearerToken)
             .header("anthropic-version", ANTHROPIC_VERSION)
             .header("accept", "text/event-stream")
             .header("content-type", "application/json")
-            .post(payload.toString().toRequestBody(JSON_MEDIA))
+            .post(wirePayload.toRequestBody(JSON_MEDIA))
             .build()
         try {
             withCancellableModelResponse(client.newCall(request)) { response ->
@@ -86,7 +90,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                     ?: response.header("anthropic-request-id")
                 val retryAfterMs = parseRetryAfterMillis(response.header("Retry-After"))
                 if (!response.isSuccessful) {
-                    val body = response.body?.readBounded(ERROR_BODY_LIMIT).orEmpty()
+                    val body = response.readBoundedModelError(ERROR_BODY_LIMIT)
                     throw httpFailure(response.code, body, requestId, retryAfterMs)
                 }
                 val body = response.body ?: throw LocalModelException(
@@ -139,7 +143,7 @@ internal class AnthropicMessagesClient @Inject constructor(
             put("max_tokens", DEFAULT_MAX_TOKENS)
             put("stream", true)
             if (system.isNotBlank()) put("system", system)
-            put("messages", buildJsonArray {
+            put("messages", mergeAdjacentTurns(buildJsonArray {
                 messages.forEach { message ->
                     if (message.role == LocalCanonicalRole.SYSTEM || message.role == LocalCanonicalRole.DEVELOPER) {
                         return@forEach
@@ -158,9 +162,12 @@ internal class AnthropicMessagesClient @Inject constructor(
                         put("content", converted)
                     })
                 }
-            })
+            }))
             if (tools.isNotEmpty()) put("tools", buildJsonArray {
                 tools.forEach { tool ->
+                    if (tool.parameters["type"]?.jsonPrimitive?.contentOrNull != "object") {
+                        throw protocolError("工具 input_schema 根节点必须是 object", null)
+                    }
                     add(buildJsonObject {
                         put("name", tool.name)
                         put("description", tool.description)
@@ -181,7 +188,17 @@ internal class AnthropicMessagesClient @Inject constructor(
             LocalModelAdapterIds.ANTHROPIC_MESSAGES,
             route.fingerprint,
         )?.payload?.get("content")?.let { replay ->
-            if (replay is JsonArray) return replay
+            if (replay is JsonArray) {
+                val canonical = assistantContent(message.copy(replay = null), route)
+                // Only signed reasoning is immutable; visible text and calls follow current history.
+                return buildJsonArray {
+                    replay.forEach { raw ->
+                        val type = (raw as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull
+                        if (type in setOf("thinking", "redacted_thinking")) add(raw)
+                    }
+                    canonical.forEach(::add)
+                }
+            }
         }
         return buildJsonArray {
             message.content.forEach { block ->
@@ -216,18 +233,23 @@ internal class AnthropicMessagesClient @Inject constructor(
                     })
                 }
                 is LocalCanonicalContent.Image -> {
-                    parseDataImage(block.dataUrl)?.let { image ->
+                    parseDataImage(block.dataUrl).let { image ->
                         add(buildJsonObject {
                             put("type", "image")
                             put("source", buildJsonObject {
-                                put("type", "base64")
-                                put("media_type", image.first)
-                                put("data", image.second)
+                                if (image.first == "url") {
+                                    put("type", "url")
+                                    put("url", image.second)
+                                } else {
+                                    put("type", "base64")
+                                    put("media_type", image.first)
+                                    put("data", image.second)
+                                }
                             })
                         })
                     }
                 }
-                else -> Unit
+                else -> throw protocolError("Anthropic 不支持此输入块", null)
             }
         }
     }
@@ -259,9 +281,12 @@ internal class AnthropicMessagesClient @Inject constructor(
         var outputTokens = 0L
         var stopReason: String? = null
         var sawMessageStop = false
+        var sawMessageStart = false
+        val closedBlocks = mutableSetOf<Int>()
         var totalBytes = 0
 
-        body.charStream().buffered().use { reader ->
+        val reader = body.charStream().buffered()
+        run {
             while (true) {
                 val line = reader.readLine() ?: break
                 totalBytes += line.toByteArray(Charsets.UTF_8).size + 1
@@ -282,6 +307,8 @@ internal class AnthropicMessagesClient @Inject constructor(
                     }
                 when (event["type"]?.jsonPrimitive?.contentOrNull) {
                     "message_start" -> {
+                        if (sawMessageStart) throw protocolError("重复 message_start", requestId)
+                        sawMessageStart = true
                         val message = event["message"] as? JsonObject
                             ?: throw protocolError("message_start 缺少 message", requestId)
                         messageId = message["id"]?.jsonPrimitive?.contentOrNull ?: messageId
@@ -297,16 +324,28 @@ internal class AnthropicMessagesClient @Inject constructor(
                             ?: throw protocolError("content_block_start 缺少 index", requestId)
                         val block = event["content_block"] as? JsonObject
                             ?: throw protocolError("content_block_start 缺少 content_block", requestId)
+                        if (index < 0 || index in blocks) throw protocolError("content block index 无效或重复", requestId)
                         blocks[index] = StreamBlock.from(block)
                     }
                     "content_block_delta" -> {
                         val index = event["index"]?.jsonPrimitive?.intOrNull
                             ?: throw protocolError("content_block_delta 缺少 index", requestId)
+                        if (index in closedBlocks) throw protocolError("delta 引用了已结束 block", requestId)
                         val accumulator = blocks[index]
                             ?: throw protocolError("content_block_delta 引用了未知 block", requestId)
                         val delta = event["delta"] as? JsonObject
                             ?: throw protocolError("content_block_delta 缺少 delta", requestId)
-                        when (delta["type"]?.jsonPrimitive?.contentOrNull) {
+                        val deltaType = delta["type"]?.jsonPrimitive?.contentOrNull
+                        val expectedBlock = when (deltaType) {
+                            "text_delta", "citations_delta" -> "text"
+                            "thinking_delta", "signature_delta" -> "thinking"
+                            "input_json_delta" -> "tool_use"
+                            else -> null
+                        }
+                        if (expectedBlock != null && accumulator.type != expectedBlock) {
+                            throw protocolError("delta 类型与内容块不一致", requestId)
+                        }
+                        when (deltaType) {
                             "text_delta" -> delta["text"]?.jsonPrimitive?.contentOrNull
                                 ?.takeIf(String::isNotEmpty)
                                 ?.let {
@@ -341,7 +380,12 @@ internal class AnthropicMessagesClient @Inject constructor(
                         break
                     }
                     "error" -> throw streamError(event, requestId, retryAfterMs)
-                    "ping", "content_block_stop" -> Unit
+                    "content_block_stop" -> {
+                        val index = event["index"]?.jsonPrimitive?.intOrNull
+                            ?: throw protocolError("content_block_stop 缺少 index", requestId)
+                        if (index !in blocks || !closedBlocks.add(index)) throw protocolError("block stop 无效或重复", requestId)
+                    }
+                    "ping" -> Unit
                 }
             }
         }
@@ -353,6 +397,9 @@ internal class AnthropicMessagesClient @Inject constructor(
                 retryable = true,
                 requestId = requestId ?: messageId,
             )
+        }
+        if (!sawMessageStart || messageId.isNullOrBlank() || closedBlocks.size != blocks.size) {
+            throw protocolError("message 起始身份或 block 终态不完整", requestId)
         }
         requireCompleteStopReason(stopReason, requestId ?: messageId)
 
@@ -370,9 +417,9 @@ internal class AnthropicMessagesClient @Inject constructor(
                     canonicalBlocks += LocalCanonicalContent.Reasoning(it)
                 }
                 "tool_use" -> {
-                    val id = block["id"]?.jsonPrimitive?.contentOrNull
+                    val id = block["id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
                         ?: throw protocolError("tool_use 缺少 id", requestId)
-                    val name = block["name"]?.jsonPrimitive?.contentOrNull
+                    val name = block["name"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
                         ?: throw protocolError("tool_use 缺少 name", requestId)
                     val input = block["input"] as? JsonObject
                         ?: throw protocolError("tool_use input 不是对象", requestId)
@@ -385,6 +432,9 @@ internal class AnthropicMessagesClient @Inject constructor(
                 }
             }
         }
+        val ids = canonicalBlocks.filterIsInstance<LocalCanonicalContent.ToolCall>().map { it.id }
+        if (ids.distinct().size != ids.size) throw protocolError("工具调用 id 重复", requestId)
+        if ((stopReason == "tool_use") != ids.isNotEmpty()) throw protocolError("stop_reason 与工具调用不一致", requestId)
         val replay = LocalModelReplayEnvelope(
             adapterId = LocalModelAdapterIds.ANTHROPIC_MESSAGES,
             routeFingerprint = route.fingerprint,
@@ -411,9 +461,9 @@ internal class AnthropicMessagesClient @Inject constructor(
             toolCalls = toolCalls,
             usage = DeepSeekTokenUsage(
                 promptTokens = promptTokens,
-                cacheHitTokens = cacheReadTokens,
+                cacheHitTokens = cacheReadTokens.coerceAtLeast(0L),
                 cacheMissTokens = safeAdd(inputTokens, cacheCreationTokens),
-                completionTokens = outputTokens,
+                completionTokens = outputTokens.coerceAtLeast(0L),
                 reported = true,
             ),
             requestId = requestId ?: messageId.orEmpty(),
@@ -442,6 +492,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                 if (citations.isNotEmpty()) put("citations", JsonArray(citations))
             }
             "thinking" -> buildJsonObject {
+                if (signature.isEmpty()) throw protocolErrorStatic("thinking 缺少 signature", requestId)
                 rawStart.forEach { (key, value) ->
                     if (key !in setOf("thinking", "signature")) put(key, value)
                 }
@@ -456,7 +507,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                             throw protocolErrorStatic("tool_use 参数不是合法 JSON 对象", requestId, cause)
                         }
                 } else {
-                    initialInput ?: JsonObject(emptyMap())
+                    initialInput ?: throw protocolErrorStatic("tool_use input 缺失或不是对象", requestId)
                 }
                 buildJsonObject {
                     rawStart.forEach { (key, value) ->
@@ -474,6 +525,9 @@ internal class AnthropicMessagesClient @Inject constructor(
         companion object {
             fun from(block: JsonObject): StreamBlock {
                 val type = block["type"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                if (type !in setOf("text", "thinking", "redacted_thinking", "tool_use")) {
+                    throw protocolErrorStatic("不支持的 Anthropic 内容块：$type", null)
+                }
                 return StreamBlock(
                     type = type,
                     id = block["id"]?.jsonPrimitive?.contentOrNull,
@@ -488,14 +542,32 @@ internal class AnthropicMessagesClient @Inject constructor(
         }
     }
 
-    private fun parseDataImage(value: String): Pair<String, String>? {
-        if (!value.startsWith("data:image/")) return null
-        val marker = ";base64,"
-        val split = value.indexOf(marker)
-        if (split <= 5) return null
+    private fun parseDataImage(value: String): Pair<String, String> {
+        if (value.startsWith("https://")) return "url" to value
+        val split = value.indexOf(";base64,")
+        if (!value.startsWith("data:image/") || split <= 5) throw protocolError("图片必须为 data URL 或 HTTPS URL", null)
         val mediaType = value.substring(5, split)
-        val data = value.substring(split + marker.length)
-        return mediaType.takeIf { it in SUPPORTED_IMAGE_MEDIA_TYPES && data.isNotBlank() }?.let { it to data }
+        val data = value.substring(split + 8)
+        if (mediaType !in SUPPORTED_IMAGE_MEDIA_TYPES || data.isEmpty() || data.length % 4 != 0 ||
+            data.length > 10_000_000) {
+            throw protocolError("图片格式无效或超过 Anthropic 10 MB base64 限制", null)
+        }
+        return mediaType to data
+    }
+
+    private fun mergeAdjacentTurns(messages: JsonArray): JsonArray {
+        val merged = mutableListOf<JsonObject>()
+        messages.forEach { raw ->
+            val message = raw.jsonObject
+            val previous = merged.lastOrNull()
+            if (previous != null && previous["role"] == message["role"]) {
+                merged[merged.lastIndex] = buildJsonObject {
+                    put("role", message.getValue("role"))
+                    put("content", JsonArray((previous.getValue("content") as JsonArray) + (message.getValue("content") as JsonArray)))
+                }
+            } else merged.add(message)
+        }
+        return JsonArray(merged)
     }
 
     private fun endpoint(baseUrl: String): String {
@@ -545,7 +617,7 @@ internal class AnthropicMessagesClient @Inject constructor(
 
     private fun requireCompleteStopReason(reason: String?, requestId: String?) {
         when (reason) {
-            null, "end_turn", "stop_sequence", "tool_use" -> return
+            "end_turn", "stop_sequence", "tool_use", "refusal" -> return
             "max_tokens" -> throw LocalModelException(
                 code = "MODEL_OUTPUT_TRUNCATED",
                 message = "模型输出达到长度上限，回复未完整生成，请缩短任务后重试。",
@@ -572,43 +644,12 @@ internal class AnthropicMessagesClient @Inject constructor(
         nowMillis: Long = System.currentTimeMillis(),
     ): Long? {
         val raw = value?.trim()?.takeIf(String::isNotEmpty) ?: return null
-        raw.toLongOrNull()?.let { return it.coerceAtLeast(0L) * 1_000L }
+        raw.toLongOrNull()?.let { return it.coerceIn(0L, Long.MAX_VALUE / 1_000L) * 1_000L }
         return runCatching {
             val atMillis = ZonedDateTime.parse(raw, DateTimeFormatter.RFC_1123_DATE_TIME)
                 .toInstant().toEpochMilli()
             (atMillis - nowMillis).coerceAtLeast(0L)
         }.getOrNull()
-    }
-
-    private fun ResponseBody.readBounded(maxBytes: Int): String {
-        val declared = contentLength()
-        if (declared > maxBytes) {
-            throw LocalModelException(
-                code = "MODEL_RESPONSE_TOO_LARGE",
-                message = "Anthropic 错误响应超过本机安全上限",
-                retryable = false,
-            )
-        }
-        val bytes = byteStream().use { input ->
-            val output = java.io.ByteArrayOutputStream(minOf(maxBytes, 64 * 1024))
-            val buffer = ByteArray(16 * 1024)
-            var total = 0
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                total += read
-                if (total > maxBytes) {
-                    throw LocalModelException(
-                        code = "MODEL_RESPONSE_TOO_LARGE",
-                        message = "Anthropic 错误响应超过本机安全上限",
-                        retryable = false,
-                    )
-                }
-                output.write(buffer, 0, read)
-            }
-            output.toByteArray()
-        }
-        return bytes.toString(Charsets.UTF_8)
     }
 
     private fun safeAdd(left: Long, right: Long): Long =

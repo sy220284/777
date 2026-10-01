@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.model
 
+import kotlinx.serialization.json.Json
 import com.labteto.dshmobile.local.LocalModelReply
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -225,5 +226,28 @@ class LocalCanonicalModelCodecTest {
         assertEquals("read", projected.single().jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content)
         assertFalse(projected.toString().contains(LOCAL_MODEL_REPLAY_KEY))
         assertTrue(projected.single().jsonObject["function"]!!.jsonObject.containsKey("parameters"))
+    }
+
+    @Test
+    fun invalidToolDefinitionsCannotBeNormalizedPastAdapterValidation() {
+        listOf(
+            """[{"type":"function","function":{"name":"read","strict":"true"}}]""",
+            """[{"type":"function","function":{"name":"read","parameters":[]}}]""",
+            """[{"type":"function","function":{"name":123}}]""",
+            """[{"type":"function","function":{"name":"read","description":123}}]""",
+        ).forEach { raw ->
+            val error = runCatching { LocalCanonicalModelCodec.tools(Json.parseToJsonElement(raw).jsonArray) }.exceptionOrNull()
+            assertEquals("RESPONSES_TOOL_SCHEMA_INVALID", (error as? com.labteto.dshmobile.local.LocalModelException)?.code)
+        }
+    }
+
+    @Test
+    fun interleavedTextAndImagesPreserveOrderAndStrictEmptyToolsRemainValid() {
+        val source = Json.parseToJsonElement("""{"role":"user","content":[{"type":"text","text":"first"},{"type":"image_url","image_url":{"url":"data:image/png;base64,AAAA","detail":"high"}},{"type":"text","text":"second"}]}""").jsonObject
+        val message = LocalCanonicalModelCodec.toLegacyMessages(LocalCanonicalModelCodec.messages(listOf(source)), LocalModelAdapterIds.OPENAI_CHAT, "route").single()
+        assertEquals(source["content"], message["content"])
+        val tools = LocalCanonicalModelCodec.tools(Json.parseToJsonElement("""[{"type":"function","function":{"name":"read","strict":true}}]""").jsonArray)
+        val adapted = OpenAiResponsesToolAdapter.adapt(LocalCanonicalModelCodec.toLegacyTools(tools), false, true)
+        assertEquals("false", adapted.single().jsonObject["parameters"]!!.jsonObject["additionalProperties"]!!.jsonPrimitive.content)
     }
 }

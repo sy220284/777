@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.LocalToolCall
 import kotlinx.serialization.json.Json
@@ -99,7 +100,7 @@ internal object LocalCanonicalModelCodec {
                     val name = function["name"]?.jsonPrimitive?.contentOrNull ?: return@forEach
                     val rawArguments = function["arguments"]?.jsonPrimitive?.contentOrNull ?: "{}"
                     val arguments = runCatching { Json.parseToJsonElement(rawArguments).jsonObject }
-                        .getOrElse { JsonObject(emptyMap()) }
+                        .getOrElse { throw LocalModelException("MODEL_HISTORY_INVALID", "历史工具参数不是合法 JSON 对象", false, it) }
                     val metadata = buildJsonObject {
                         call.forEach { (key, value) ->
                             if (key !in setOf("id", "type", "function")) put(key, value)
@@ -125,59 +126,50 @@ internal object LocalCanonicalModelCodec {
     }
 
     fun tools(source: JsonArray): List<LocalCanonicalToolDefinition> = source.mapIndexed { index, raw ->
-        val objectValue = raw as? JsonObject
-            ?: error("工具定义第 ${index + 1} 项必须是对象")
-        val declaredType = objectValue["type"]
-        if (declaredType != null) {
-            val type = (declaredType as? JsonPrimitive)
-                ?.takeIf(JsonPrimitive::isString)
-                ?.contentOrNull
-                ?: error("工具定义第 ${index + 1} 项的 type 必须是字符串")
-            require(type == "function") {
-                "工具定义第 ${index + 1} 项暂不支持 type=$type"
+        val objectValue = raw as? JsonObject ?: throw invalidTool(index, "工具定义必须是对象")
+        objectValue["type"]?.let { declared ->
+            val type = declared as? JsonPrimitive
+            if (type == null || !type.isString || type.content != "function") {
+                throw invalidTool(index, "type 必须是 function")
             }
         }
-        val functionElement = objectValue["function"]
-        val function = when (functionElement) {
+        val function = when (val value = objectValue["function"]) {
             null -> objectValue
-            is JsonObject -> functionElement
-            else -> error("工具定义第 ${index + 1} 项的 function 必须是对象")
+            is JsonObject -> value
+            else -> throw invalidTool(index, "function 必须是对象")
         }
-        val nameElement = function["name"]
-            ?: error("工具定义第 ${index + 1} 项缺少 name")
-        val name = (nameElement as? JsonPrimitive)
-            ?.takeIf(JsonPrimitive::isString)
-            ?.contentOrNull
-            ?.trim()
-            .orEmpty()
-        require(name.isNotEmpty()) { "工具定义第 ${index + 1} 项的 name 必须是非空字符串" }
-
-        val description = when (val value = function["description"]) {
-            null -> "调用 $name 工具。"
-            is JsonPrimitive -> value.takeIf(JsonPrimitive::isString)
-                ?.contentOrNull
-                ?.trim()
-                ?.takeIf(String::isNotEmpty)
-                ?: if (value.isString) "调用 $name 工具。"
-                else error("工具 $name 的 description 必须是字符串")
-            else -> error("工具 $name 的 description 必须是字符串")
+        fun string(field: String): String? {
+            val value = function[field] ?: return null
+            if (value == JsonNull) return null
+            val primitive = value as? JsonPrimitive
+            if (primitive == null || !primitive.isString) throw invalidTool(index, "$field 必须是字符串")
+            return primitive.content
         }
+        val name = string("name")?.trim()?.takeIf(String::isNotEmpty)
+            ?: throw invalidTool(index, "name 必须是非空字符串")
+        val description = string("description")?.trim()?.takeIf(String::isNotEmpty) ?: "调用 $name 工具。"
         val parameters = when (val value = function["parameters"]) {
-            null -> buildJsonObject {
-                put("type", "object")
-                put("properties", buildJsonObject {})
+            null, JsonNull -> buildJsonObject {
+                put("type", "object"); put("properties", buildJsonObject {})
+                put("required", buildJsonArray {}); put("additionalProperties", false)
             }
             is JsonObject -> value
-            else -> error("工具 $name 的 parameters 必须是 JSON 对象")
+            else -> throw invalidTool(index, "parameters 必须是对象")
         }
         val strict = when (val value = function["strict"]) {
-            null -> null
-            is JsonPrimitive -> value.booleanOrNull
-                ?: error("工具 $name 的 strict 必须是布尔值")
-            else -> error("工具 $name 的 strict 必须是布尔值")
+            null, JsonNull -> null
+            is JsonPrimitive -> value.takeUnless { it.isString }?.booleanOrNull
+                ?: throw invalidTool(index, "strict 必须是 JSON 布尔值")
+            else -> throw invalidTool(index, "strict 必须是 JSON 布尔值")
         }
         LocalCanonicalToolDefinition(name, description, parameters, strict)
     }
+
+    private fun invalidTool(index: Int, detail: String) = LocalModelException(
+        code = "RESPONSES_TOOL_SCHEMA_INVALID",
+        message = "工具定义第 ${index + 1} 项无效：$detail",
+        retryable = false,
+    )
 
     fun toLegacyTools(source: List<LocalCanonicalToolDefinition>): JsonArray = buildJsonArray {
         source.forEach { tool ->
@@ -286,22 +278,22 @@ internal object LocalCanonicalModelCodec {
             if (joined.isNotEmpty() || message.role != LocalCanonicalRole.ASSISTANT) put("content", joined)
         } else {
             put("content", buildJsonArray {
-                textBlocks.forEach { block ->
-                    add(buildJsonObject {
-                        put("type", "text")
-                        put("text", block.text)
-                    })
-                }
-                imageBlocks.forEach { block ->
-                    add(buildJsonObject {
-                        put("type", "image_url")
-                        put("image_url", buildJsonObject {
-                            put("url", block.dataUrl)
-                            block.detail?.let { put("detail", it) }
+                message.content.forEach { block ->
+                    when (block) {
+                        is LocalCanonicalContent.Text -> add(buildJsonObject {
+                            put("type", "text"); put("text", block.text)
                         })
-                    })
+                        is LocalCanonicalContent.Image -> add(buildJsonObject {
+                            put("type", "image_url")
+                            put("image_url", buildJsonObject {
+                                put("url", block.dataUrl)
+                                block.detail?.let { put("detail", it) }
+                            })
+                        })
+                        is LocalCanonicalContent.Raw -> add(block.value)
+                        else -> Unit
+                    }
                 }
-                rawBlocks.forEach { add(it.value) }
             })
         }
         val compatibleReplay = message.replay?.takeIf {

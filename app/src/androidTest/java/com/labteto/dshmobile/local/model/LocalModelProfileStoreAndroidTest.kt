@@ -70,15 +70,15 @@ class LocalModelProfileStoreAndroidTest {
         val json = Json { ignoreUnknownKeys = true }
         val store = LocalModelProfileStore(preferences, json)
         val legacyClaude = LocalModelProfile(
-            id = modelProfileId("claude-sonnet-5-5", "https://api.anthropic.com/v1"),
-            model = "claude-sonnet-5-5",
+            id = modelProfileId("claude-sonnet-5", "https://api.anthropic.com/v1"),
+            model = "claude-sonnet-5",
             baseUrl = "https://api.anthropic.com/v1",
             provider = "Claude（兼容接口）",
             protocol = LocalModelProtocol.CHAT_COMPLETIONS,
         )
         val custom = LocalModelProfile(
-            id = modelProfileId("claude-sonnet-5-5", "https://proxy.example/v1"),
-            model = "claude-sonnet-5-5",
+            id = modelProfileId("claude-sonnet-5", "https://proxy.example/v1"),
+            model = "claude-sonnet-5",
             baseUrl = "https://proxy.example/v1",
             provider = "自定义",
             protocol = LocalModelProtocol.CHAT_COMPLETIONS,
@@ -87,6 +87,8 @@ class LocalModelProfileStoreAndroidTest {
         store.write(listOf(legacyClaude, custom))
         val reloaded = LocalModelProfileStore(preferences, json).read()
 
+        assertEquals("claude-sonnet-5-5", reloaded.first { it.id == legacyClaude.id }.model)
+        assertEquals("claude-sonnet-5", reloaded.first { it.id == custom.id }.model)
         assertEquals(
             LocalModelProtocol.ANTHROPIC_MESSAGES,
             reloaded.first { it.id == legacyClaude.id }.protocol,

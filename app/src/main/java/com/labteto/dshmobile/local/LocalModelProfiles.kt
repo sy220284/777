@@ -440,7 +440,11 @@ object LocalModelPresets {
         }
 
     fun maxNativeImageBytesFor(model: String, baseUrl: String): Long =
-        if (find(model, baseUrl)?.provider == "MiniMax") 10_000_000L else 20L * 1024L * 1024L
+        when (find(model, baseUrl)?.provider) {
+            "MiniMax" -> 10_000_000L
+            "Claude" -> 7_500_000L
+            else -> 20L * 1024L * 1024L
+        }
 
     fun documentedImageInputSupport(model: String, baseUrl: String): Boolean? =
         find(model, baseUrl)?.imageInputSupported
@@ -487,3 +491,10 @@ object LocalModelPresets {
         }
     }
 }
+
+/** Fix the retired official preset without changing proxy model aliases or credential identity. */
+internal fun migrateOfficialClaudeModel(model: String, baseUrl: String): String =
+    if (model == "claude-sonnet-5" &&
+        normalizeModelBaseUrl(baseUrl).trimEnd('/') == "https://api.anthropic.com/v1") {
+        "claude-sonnet-5-5"
+    } else model
