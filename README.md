@@ -395,13 +395,15 @@ harness-core / Android runtime / MCP / device
 
 ## 截图
 
-| 连接 | 聊天 | 轨迹 |
-|:--:|:--:|:--:|
-| <img src="docs/images/home.png" width="240" alt="连接界面：本机 Harness 入口、已配对中继与实时可达性"> | <img src="docs/images/chat.png" width="240" alt="聊天：流式输出、人物对话与输入区"> | <img src="docs/images/trajectory.png" width="240" alt="轨迹：按回合排列的执行账本"> |
+以下截图由当前生产组件自动生成，随界面变更重新采集，避免 README 长期展示过期界面。
 
-| 会话详情 | 子代理 |
+| 导航与会话 | 角色聊天 | 工作执行 |
+|:--:|:--:|:--:|
+| <img src="docs/images/current/navigation.png" width="240" alt="当前导航与会话界面"> | <img src="docs/images/current/chat.png" width="240" alt="当前角色聊天界面"> | <img src="docs/images/current/work.png" width="240" alt="当前工作模式执行界面"> |
+
+| 人物调节 | 模型消耗 |
 |:--:|:--:|
-| <img src="docs/images/session-info.png" width="240" alt="详情面板：上下文、目标、任务、主机信息"> | <img src="docs/images/subagent.png" width="240" alt="子代理目录与子代理对话"> |
+| <img src="docs/images/current/character-tuning.png" width="240" alt="当前人物行为调节界面"> | <img src="docs/images/current/usage.png" width="240" alt="当前模型价格与消耗界面"> |
 
 ## 许可证
 
