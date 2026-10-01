@@ -23,7 +23,6 @@ import com.labteto.dshmobile.local.LocalSessionStorageStatus
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
-import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_DIR
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_FILE
@@ -58,6 +57,7 @@ class SettingsViewModel @Inject constructor(
     private val appContext = context.applicationContext
     private val remoteSettingsController = RemoteSettingsController(connectionManager, viewModelScope)
     private val deviceCapabilitiesController = DeviceCapabilitiesController(appContext)
+    private val memorySettingsController = MemorySettingsController(localHarness, memoryStore, memoryManager)
 
     private val _state = MutableStateFlow(AppSettings())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
@@ -80,9 +80,7 @@ class SettingsViewModel @Inject constructor(
             initialValue = TokenUsageAnalyticsSnapshot(),
         )
 
-    private val _memories = MutableStateFlow<List<MemoryRecord>>(emptyList())
-    val memories: StateFlow<List<MemoryRecord>> = _memories.asStateFlow()
-
+    val memories: StateFlow<List<MemoryRecord>> = memorySettingsController.memories
 
     val projectSettings: StateFlow<RemoteProjectSettingsState> =
         remoteSettingsController.projectSettings
@@ -287,56 +285,17 @@ class SettingsViewModel @Inject constructor(
         localHarness.configurePersonalization(userRules, autoRecall, autoMemory)
     }
 
-    fun refreshMemories() {
-        val local = localHarness.memoryContext()
-        val scopes = when (local.conversationMode) {
-            com.labteto.dshmobile.local.LocalConversationMode.INDEPENDENT -> setOf(MemoryScope.GLOBAL)
-            com.labteto.dshmobile.local.LocalConversationMode.PROJECT -> setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT)
-            com.labteto.dshmobile.local.LocalConversationMode.CONTINUATION ->
-                setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT, MemoryScope.LINEAGE)
-        }
-        _memories.value = memoryStore.listActive(
-            allowedScopes = scopes,
-            projectId = local.projectId,
-            lineageId = local.lineageId,
-            limit = 100,
-        )
-    }
+    fun refreshMemories() = memorySettingsController.refresh()
 
     fun updateMemory(
         id: String,
         content: String,
         pinned: Boolean,
         onDone: (String?) -> Unit = {},
-    ) {
-        val current = _memories.value.firstOrNull { it.id == id }
-        if (current == null) {
-            onDone("记忆已经不存在")
-            refreshMemories()
-            return
-        }
-        runCatching {
-            memoryManager.update(
-                existing = current,
-                content = content,
-                pinned = pinned,
-            )
-        }.onSuccess {
-            refreshMemories()
-            onDone(null)
-        }.onFailure { error ->
-            onDone(error.message ?: "更新记忆失败")
-        }
-    }
+    ) = memorySettingsController.update(id, content, pinned, onDone)
 
-    fun forgetMemory(id: String, onDone: (String?) -> Unit = {}) {
-        runCatching { memoryStore.forget(id) }
-            .onSuccess {
-                refreshMemories()
-                onDone(null)
-            }
-            .onFailure { error -> onDone(error.message ?: "停用记忆失败") }
-    }
+    fun forgetMemory(id: String, onDone: (String?) -> Unit = {}) =
+        memorySettingsController.forget(id, onDone)
 
     fun configureLocalAgent(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
         localHarness.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
