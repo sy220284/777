@@ -791,6 +791,9 @@
     <string name="local_group_announcement_mystery">悬疑对峙</string>
     <string name="local_group_announcement_generate">生成剧情草稿</string>
     <string name="local_group_announcement_save">保存公告</string>
+    <string name="local_group_announcement_saving">正在保存…</string>
+    <string name="local_group_announcement_active_short">已启用</string>
+    <string name="local_group_announcement_active_hint">后续发言的群成员都会读取这段剧情背景。</string>
     <string name="local_group_chat_title">群聊</string>
     <string name="local_group_chat_leave">退出群聊</string>
     <string name="local_group_new_session_title">新建对话</string>
