@@ -3387,6 +3387,7 @@ class LocalHarnessEngine @Inject constructor(
                 agentRunCoordinator.recordEvent(runContext, event)
             },
             maxSteps = mainStepLimit,
+            rejectEmptyFinalReply = true,
             stepLimitExtender = localForegroundStepLimitExtender(runPolicy.allowToolExecution, mainMaxSteps, input, { runState.value }, { resourceScheduler.snapshot().pressure }, { runEventLog.append("turn/budget-extended", it) }),
             idFactory = { runContext.runId },
         )
