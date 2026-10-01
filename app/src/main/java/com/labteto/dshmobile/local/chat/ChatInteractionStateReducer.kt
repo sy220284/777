@@ -347,7 +347,7 @@ internal class ChatInteractionStateReducer {
         .map(String::trim)
         .filter(String::isNotBlank)
         .map { it.take(maxChars) }
-        .distinctBy(::normalize)
+        .distinctBy(::normalizeChatInteractionText)
         .toList()
         .takeLast(limit)
 
