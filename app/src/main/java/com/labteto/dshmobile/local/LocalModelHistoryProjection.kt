@@ -122,9 +122,8 @@ private fun sanitizeRestoredModelHistory(source: List<JsonObject>): Pair<List<Js
 }
 
 private fun modelToolCallIds(message: JsonObject): List<String>? {
-    val calls = (message["tool_calls"] as? JsonArray)
-        ?: (message["model_tool_calls"] as? JsonArray)
-        ?: return emptyList()
+    val rawCalls = message["tool_calls"] ?: message["model_tool_calls"] ?: return emptyList()
+    val calls = rawCalls as? JsonArray ?: return null
     return calls.map { raw ->
         (raw as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
             ?: return null
