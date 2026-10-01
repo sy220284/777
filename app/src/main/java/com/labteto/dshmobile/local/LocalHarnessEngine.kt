@@ -247,8 +247,8 @@ class LocalHarnessEngine @Inject constructor(
     }
     private val runtimeProcess = AndroidProcessRuntime(
         defaultWorkingDirectory = File(workspace.path),
-        dynamicSearchPaths = runtimeEnvironment::searchPaths,
-        baseEnvironment = runtimeEnvironment::environment,
+        dynamicSearchPaths = bundledRuntimeManager::searchPaths,
+        baseEnvironment = bundledRuntimeManager::environment,
     )
     private val automaticLanguageServerResolver = AutomaticLanguageServerResolver(
         root = File(workspace.path),
@@ -261,8 +261,8 @@ class LocalHarnessEngine @Inject constructor(
     )
     private val runtimeTerminal = PersistentPipeTerminalProvider(
         defaultWorkingDirectory = File(workspace.path),
-        extraSearchPaths = runtimeEnvironment::searchPaths,
-        baseEnvironment = runtimeEnvironment::environment,
+        extraSearchPaths = bundledRuntimeManager::searchPaths,
+        baseEnvironment = bundledRuntimeManager::environment,
     )
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
@@ -4879,7 +4879,7 @@ class LocalHarnessEngine @Inject constructor(
             pendingInputs = pendingInputs.size(),
             pendingInputLimit = MAX_PENDING_INPUTS,
             commands = commands,
-            runtimeStatuses = listOf(bundledNodeRuntime.status(), bundledPythonRuntime.status(), bundledGitRuntime.status()),
+            runtimeStatuses = bundledRuntimeManager.statuses(),
             recentDiagnostics = AppLog.snapshot(),
         ) + "\n" + LocalSessionArchiveMaintenance.storageStatus(sessionsRoot) +
             "\n" + LocalProcessExitStatus.read(context)
