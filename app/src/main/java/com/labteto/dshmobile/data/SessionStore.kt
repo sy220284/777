@@ -21,9 +21,7 @@ import com.labteto.dshmobile.core.wire.dto.AskUserQuestionAnswer
 import com.labteto.dshmobile.core.wire.dto.AskUserQuestionIntent
 import com.labteto.dshmobile.core.wire.dto.AskUserQuestionItem
 import com.labteto.dshmobile.core.wire.dto.AskUserQuestionRequestEvent
-import com.labteto.dshmobile.core.wire.dto.CUSTOM_PRESET
 import com.labteto.dshmobile.core.wire.dto.CommandDescriptor
-import com.labteto.dshmobile.core.wire.dto.CommandSubmitAttachment
 import com.labteto.dshmobile.core.wire.dto.ContextBreakdownView
 import com.labteto.dshmobile.core.wire.dto.ContextPressureView
 import com.labteto.dshmobile.core.wire.dto.EncodedFileUploadRequest
@@ -92,7 +90,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -175,6 +172,16 @@ class SessionStore @Inject constructor(
         currentGoalRef = { synchronized(lock) { goalRefFromProjectionLocked() } },
         onConnectionError = ::setConnectionError,
         logger = ::log,
+    )
+
+    private val slashCommandRuntime = SessionSlashCommandRuntime(
+        apiForHost = ::apiForHost,
+        currentSessionId = { currentSessionId.value },
+        activeHostKey = { activeHostKey },
+        markCommandsUnavailable = catalogs::markCommandsUnavailable,
+        installPermission = interactionRuntime::installPermission,
+        clearPermission = interactionRuntime::clearPermission,
+        onConnectionError = ::setConnectionError,
     )
 
     private val searchRuntime = SessionSearchRuntime(apiProvider = ::apiOrNull)
@@ -1204,63 +1211,13 @@ class SessionStore @Inject constructor(
      */
     suspend fun runCommand(
         line: String,
-        attachments: List<CommandSubmitAttachment> = emptyList(),
+        attachments: List<com.labteto.dshmobile.core.wire.dto.CommandSubmitAttachment> = emptyList(),
         targetSessionId: String? = currentSessionId.value,
         targetHost: String? = activeHostKey,
-    ): CommandOutcome {
-        val sid = targetSessionId ?: return CommandOutcome.Failed("no open session")
-        val api = apiForHost(targetHost) ?: return CommandOutcome.Failed("not connected")
-        return when (val r = api.commandsExecute(sid, line, attachments)) {
-            is RpcResult.Ok -> {
-                val execution = r.value as? JsonObject
-                val commandId = execution?.get("commandId")
-                if (commandId == null || commandId is JsonNull) {
-                    CommandOutcome.Unknown(line)
-                } else {
-                    val result = execution["result"] as? JsonObject
-                    val text = (result?.get("text") as? JsonPrimitive)?.contentOrNull
-                    if ((result?.get("kind") as? JsonPrimitive)?.contentOrNull == "error") {
-                        CommandOutcome.Failed(text ?: "command failed")
-                    } else {
-                        CommandOutcome.Ok(text)
-                    }
-                }
-            }
-            is RpcResult.Err -> when (r.error.code) {
-                // The attachments were refused, by the host or by the client's own guard. A
-                // composer problem, so it must not raise the connection banner.
-                ATTACHMENT_INVALID -> CommandOutcome.Failed(r.error.message)
-                // No command gateway in this build (404) or the trust fence refused it (403).
-                // Neither is a connection fault, so the menu retires rather than the session.
-                "capability-unavailable", "forbidden" -> {
-                    catalogs.markCommandsUnavailable(r.error.code, r.error.message)
-                    CommandOutcome.Failed(r.error.message)
-                }
-                else -> {
-                    setConnectionError(r.error.message)
-                    CommandOutcome.Failed(r.error.message)
-                }
-            }
-        }
-    }
+    ): CommandOutcome = slashCommandRuntime.run(line, attachments, targetSessionId, targetHost)
 
-    /**
-     * Switch the session's permission preset. The read side is the `permissions` projection, so
-     * there is nothing to refresh — the harness pushes the new value back on a projection frame.
-     */
-    suspend fun setPermissionPreset(value: String): CommandOutcome {
-        if (value == CUSTOM_PRESET) {
-            return CommandOutcome.Failed("`$CUSTOM_PRESET` is a derived state, not a preset")
-        }
-        val sessionId = currentSessionId.value ?: return CommandOutcome.Failed("no open session")
-        val host = activeHostKey
-        interactionRuntime.installPermission(sessionId, value)
-        val outcome = runCommand("/permission $value", targetSessionId = sessionId, targetHost = host)
-        if (outcome !is CommandOutcome.Ok) {
-            interactionRuntime.clearPermission(sessionId, value)
-        }
-        return outcome
-    }
+    suspend fun setPermissionPreset(value: String): CommandOutcome =
+        slashCommandRuntime.setPermissionPreset(value)
 
     /**
      * Reload the host's plugin inventory.
