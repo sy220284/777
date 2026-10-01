@@ -158,9 +158,7 @@ class LocalHarnessEngine @Inject constructor(
     private val modelConnectionTester: LocalModelConnectionTester,
     private val usageTracker: DeepSeekUsageTracker,
     private val githubCredentials: LocalGitHubCredentialStore,
-    private val bundledNodeRuntime: BundledNodeRuntime,
-    private val bundledPythonRuntime: BundledPythonRuntime,
-    private val bundledGitRuntime: BundledGitRuntime,
+    private val bundledRuntimeManager: LocalBundledRuntimeManager,
     private val web: LocalWebProvider,
     private val json: Json,
     private val automationScheduler: HarnessAutomationScheduler,
@@ -180,15 +178,10 @@ class LocalHarnessEngine @Inject constructor(
         file = File(root, "jobs.json"),
         json = json,
     )
-    private val runtimeEnvironment = LocalBundledRuntimeEnvironment(
-        node = bundledNodeRuntime,
-        python = bundledPythonRuntime,
-        git = bundledGitRuntime,
-    )
     private val workspace = LocalWorkspace(
         root = File(root, "workspace"),
-        extraSearchPaths = runtimeEnvironment::searchPaths,
-        environmentProvider = runtimeEnvironment::environment,
+        extraSearchPaths = bundledRuntimeManager::searchPaths,
+        environmentProvider = bundledRuntimeManager::environment,
         boundary = LocalSandboxBoundary(
             workspaceRoot = File(root, "workspace"),
             userRoots = localSharedStorageRoots(),
@@ -706,9 +699,7 @@ class LocalHarnessEngine @Inject constructor(
                 // Migration may have copied an event log after the field was first constructed.
                 // Reopen it before any session load or tool can append to the migrated log.
                 eventLog = eventLogFor(currentSessionId)
-                bundledNodeRuntime.prepare()
-                bundledPythonRuntime.prepare()
-                bundledGitRuntime.prepare()
+                bundledRuntimeManager.prepare()
                 pluginComposition.installStartup()
                 load()
                 startNextQueuedTurnIfIdle()?.start()
