@@ -60,6 +60,9 @@ internal object NativePtyBridge {
     fun isAlive(handle: Long): Boolean =
         handle != 0L && nativeIsAlive(handle)
 
+    fun hasReadable(handle: Long): Boolean =
+        handle != 0L && nativeHasReadable(handle)
+
     fun close(handle: Long) {
         if (handle != 0L) nativeClose(handle)
     }
@@ -78,6 +81,7 @@ internal object NativePtyBridge {
     private external fun nativeWrite(handle: Long, bytes: ByteArray)
     private external fun nativeResize(handle: Long, columns: Int, rows: Int): Boolean
     private external fun nativeIsAlive(handle: Long): Boolean
+    private external fun nativeHasReadable(handle: Long): Boolean
     private external fun nativeClose(handle: Long)
 
     private const val DEFAULT_ROWS = 24
