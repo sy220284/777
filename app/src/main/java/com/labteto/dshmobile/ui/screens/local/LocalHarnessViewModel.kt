@@ -8,8 +8,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import com.labteto.dshmobile.local.LocalConversationMode
-import com.labteto.dshmobile.local.LocalHarnessMessage
-import com.labteto.dshmobile.local.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.LocalChatUserEditResult
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.send.LocalSendResult
@@ -62,13 +60,15 @@ class LocalHarnessViewModel @Inject constructor(
     val workState = state.projectWorkState(viewModelScope)
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     val gallery = _gallery.asStateFlow()
-    private val _transcriptHistory = MutableStateFlow(LocalTranscriptHistoryState())
-    internal val transcriptHistory = _transcriptHistory.asStateFlow()
+    private val transcriptHistoryController = LocalTranscriptHistoryController(
+        session = runtime.session,
+        harnessState = state,
+        scope = viewModelScope,
+    )
+    internal val transcriptHistory = transcriptHistoryController.history
     private val conversationUiState = LocalConversationUiStateStore(appContext)
     val pinnedSessionIds = conversationUiState.pinnedSessionIds
     val sessionTitleOverrides = conversationUiState.sessionTitleOverrides
-    private var transcriptHistoryCursor: LocalTranscriptPageCursor? = null
-    private var transcriptHistoryInitializedSessionId: String? = null
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -426,124 +426,10 @@ class LocalHarnessViewModel @Inject constructor(
     internal suspend fun prepareTranscriptHistory(
         sessionId: String,
         force: Boolean = false,
-    ) {
-        if (sessionId.isBlank()) {
-            transcriptHistoryCursor = null
-            transcriptHistoryInitializedSessionId = null
-            _transcriptHistory.value = LocalTranscriptHistoryState()
-            return
-        }
-        val current = _transcriptHistory.value
-        if (
-            !force &&
-            current.sessionId == sessionId &&
-            transcriptHistoryInitializedSessionId == sessionId
-        ) {
-            return
-        }
+    ) = transcriptHistoryController.prepare(sessionId, force)
 
-        transcriptHistoryCursor = null
-        transcriptHistoryInitializedSessionId = null
-        _transcriptHistory.value = LocalTranscriptHistoryState(
-            sessionId = sessionId,
-            loading = true,
-        )
-        try {
-            val liveMessagesAtBootstrap = state.value
-                .takeIf { snapshot -> snapshot.sessionId == sessionId }
-                ?.messages
-                .orEmpty()
-            val firstPage = withContext(Dispatchers.IO) {
-                runtime.session.transcriptPageForUi(
-                    sessionId = sessionId,
-                    cursor = null,
-                    limit = transcriptHistoryBootstrapLimit(
-                        liveMessageCount = liveMessagesAtBootstrap.size,
-                        maxPageSize = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
-                    ),
-                )
-            }
-            if (state.value.sessionId != sessionId) return
-            val pageExtras = transcriptHistoryPageExtras(
-                pageMessages = firstPage.messages,
-                liveMessages = state.value.messages,
-            )
-            transcriptHistoryCursor = firstPage.nextCursor
-            transcriptHistoryInitializedSessionId = sessionId
-            _transcriptHistory.value = LocalTranscriptHistoryState(
-                sessionId = sessionId,
-                olderMessages = pageExtras,
-                hasMore = firstPage.nextCursor != null,
-            )
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            if (state.value.sessionId != sessionId) return
-            transcriptHistoryCursor = null
-            transcriptHistoryInitializedSessionId = null
-            _transcriptHistory.value = LocalTranscriptHistoryState(
-                sessionId = sessionId,
-                error = error.message ?: error::class.java.simpleName,
-            )
-        }
-    }
-
-    internal suspend fun loadOlderTranscript(sessionId: String): Result<Int> {
-        if (sessionId.isBlank()) return Result.success(0)
-        if (
-            transcriptHistoryInitializedSessionId != sessionId ||
-            _transcriptHistory.value.sessionId != sessionId
-        ) {
-            prepareTranscriptHistory(sessionId)
-        }
-        if (
-            transcriptHistoryCursor == null &&
-            _transcriptHistory.value.olderMessages.isEmpty() &&
-            state.value.sessionId == sessionId &&
-            state.value.messages.size > LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES
-        ) {
-            prepareTranscriptHistory(sessionId, force = true)
-        }
-
-        val cursor = transcriptHistoryCursor ?: return Result.success(0)
-        val current = _transcriptHistory.value
-        if (current.loading) return Result.success(0)
-        _transcriptHistory.value = current.copy(loading = true, error = null)
-
-        return try {
-            val page = withContext(Dispatchers.IO) {
-                runtime.session.transcriptPageForUi(
-                    sessionId = sessionId,
-                    cursor = cursor,
-                    limit = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
-                )
-            }
-            if (state.value.sessionId != sessionId) return Result.success(0)
-            val latest = _transcriptHistory.value
-            if (latest.sessionId != sessionId) return Result.success(0)
-            val existingIds = latest.olderMessages.mapTo(hashSetOf(), LocalHarnessMessage::id)
-            state.value.messages.mapTo(existingIds, LocalHarnessMessage::id)
-            val newlyLoaded = page.messages.filterNot { message -> message.id in existingIds }
-            transcriptHistoryCursor = page.nextCursor
-            _transcriptHistory.value = latest.copy(
-                olderMessages = newlyLoaded + latest.olderMessages,
-                hasMore = page.nextCursor != null,
-                loading = false,
-                error = null,
-            )
-            Result.success(newlyLoaded.size)
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            if (_transcriptHistory.value.sessionId == sessionId) {
-                _transcriptHistory.value = _transcriptHistory.value.copy(
-                    loading = false,
-                    error = error.message ?: error::class.java.simpleName,
-                )
-            }
-            Result.failure(error)
-        }
-    }
+    internal suspend fun loadOlderTranscript(sessionId: String): Result<Int> =
+        transcriptHistoryController.loadOlder(sessionId)
 
     fun configure(apiKey: String, model: String, baseUrl: String) = runtime.model.configure(apiKey, model, baseUrl)
     fun selectModel(model: String) = runtime.model.selectModel(model)
@@ -592,15 +478,8 @@ class LocalHarnessViewModel @Inject constructor(
         return selected
     }
 
-    private fun refreshTranscriptHistoryAfterTimelineRewrite() {
-        val sessionId = state.value.sessionId
-        transcriptHistoryCursor = null
-        transcriptHistoryInitializedSessionId = null
-        _transcriptHistory.value = LocalTranscriptHistoryState(sessionId = sessionId)
-        viewModelScope.launch {
-            prepareTranscriptHistory(sessionId, force = true)
-        }
-    }
+    private fun refreshTranscriptHistoryAfterTimelineRewrite() =
+        transcriptHistoryController.refreshAfterTimelineRewrite()
     fun regenerateReply(messageId: String): Boolean = runtime.chat.regenerateReply(messageId)
     fun toggleSessionPinned(sessionId: String) = conversationUiState.toggleSessionPinned(sessionId)
     fun renameSession(sessionId: String, title: String): Boolean = conversationUiState.renameSession(sessionId, title)
