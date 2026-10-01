@@ -90,7 +90,8 @@ class PersonaInspectionService @Inject constructor(
             append(dialogue)
         }
 
-        val reply = modelGateway.complete(
+        return modelGateway.withFrozenRoute(model, baseUrl) {
+            val reply = modelGateway.complete(
             baseUrl = baseUrl,
             model = model,
             messages = listOf(
@@ -122,7 +123,8 @@ class PersonaInspectionService @Inject constructor(
         }.getOrElse { cause ->
             throw IllegalStateException("人物检查结果格式无法解析，请再试一次", cause)
         }
-        return sanitize(decoded)
+        sanitize(decoded)
+        }
     }
 
     private fun sanitize(result: PersonaInspectionResult): PersonaInspectionResult {
