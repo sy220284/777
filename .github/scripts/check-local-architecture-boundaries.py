@@ -281,6 +281,28 @@ if "pluginManager.installAll(pluginCatalog.ids())" not in plugin_composition:
     die("startup plugin installation must be resolved through PluginManager/PluginCatalog")
 if re.search(r"\bstartupPlugins\b", plugin_composition):
     die("startup plugins must not be maintained as a raw hard-coded lifecycle list")
+if "apiKeys.get()" in plugin_composition:
+    die("Vision/plugin composition must not read the mutable global active API key")
+if "route.copy(profile = modelGateway.activeProfile())" in plugin_composition:
+    die("Vision route identity must not be overwritten from mutable activeProfile")
+if "routeProvider = routeProvider" not in plugin_composition or "apiKeys.getFor(profile.id)" not in plugin_composition:
+    die("Vision composition must preserve the exact route profile and resolve credentials by profile id")
+
+automation_chat = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt")
+)
+if "val runProfile = modelGateway.profileForRun()" not in automation_chat:
+    die("Automation Chat must freeze one model profile for the whole detached run")
+if "profile = runProfile" not in automation_chat:
+    die("Automation Chat model retries/repairs must reuse the frozen profile")
+
+for helper_path in (
+    "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaAutoFillService.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaInspectionService.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/GroupAnnouncementService.kt",
+):
+    if "modelGateway.withFrozenRoute(" not in strip_comments(read(helper_path)):
+        die(f"{helper_path} must freeze model identity across the helper operation")
 
 unexpected_consumers = sorted(engine_consumers - ENGINE_CONSUMER_ALLOWLIST)
 if unexpected_consumers:
