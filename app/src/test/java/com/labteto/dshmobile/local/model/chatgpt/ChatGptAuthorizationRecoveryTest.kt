@@ -62,4 +62,26 @@ class ChatGptAuthorizationRecoveryTest {
         assertEquals(first, ChatGptAccountStore.accountId("oaiapp_first", "subject"))
         assertNotEquals(first, ChatGptAccountStore.accountId("oaiapp_second", "subject"))
     }
+
+    @Test
+    fun planBindingRequiresExactRegistrationAndInferenceScopes() {
+        val id = ChatGptAccountStore.accountId("oaiapp_first", "subject")
+        val valid = ChatGptAccountRecord(
+            id = id,
+            clientId = "oaiapp_first",
+            issuer = CHATGPT_ISSUER,
+            subject = "subject",
+            hostId = "urn:uuid:test",
+            idToken = "id-token",
+            accessToken = "access-token",
+            refreshToken = "refresh-token",
+            scopes = setOf(CHATGPT_PLAN_SCOPE, CHATGPT_RESOURCE_INVOKE_SCOPE),
+            accessTokenExpiresAtEpochSeconds = Long.MAX_VALUE,
+            savedAtEpochSeconds = 1L,
+        )
+        assertTrue(isUsableChatGptPlanBinding(id, valid))
+        assertFalse(isUsableChatGptPlanBinding(id, valid.copy(clientId = CHATGPT_DYNAMIC_CLIENT_ID)))
+        assertFalse(isUsableChatGptPlanBinding(id, valid.copy(scopes = setOf(CHATGPT_PLAN_SCOPE))))
+        assertFalse(isUsableChatGptPlanBinding("other-account", valid))
+    }
 }

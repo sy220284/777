@@ -167,8 +167,7 @@ android-17-instrumented
 - 前台 Run、子代理与工具链冻结模型 profile；运行中切换 UI active profile 不得改变已经启动的模型请求、Vision 或工具子调用。
 - Vision 生产请求必须携带冻结 profile 并重新进入统一 Gateway；不得退回自行拼接 `/chat/completions` 的可变活动模型旁路。
 - Retry 只在同一路由执行；不得因网络、429 或 5xx 自动切换供应商/API Key，避免重复工具副作用和隐式计费。
-- 模型能力由 route capability snapshot 描述并由统一 Gateway 实际执行：已知不支持的工具/图片在网络请求前拒绝，replay/streaming/temperature 服从本次冻结快照；图片上限、采样字段和协议能力必须保留 #345 已验证的供应商差异。
-- 成功模型回复与 Token 明细必须记录不含密钥的实际 route identity；同名模型、多账户和代理地址可区分。DeepSeek 官方价格只允许用于 DeepSeek 官方 host，未知或第三方路由只累计真实 API usage 并标记未定价。
+- 模型能力由 route capability snapshot 描述并由统一 Gateway 实际执行：已知不支持的工具/图片在网络请求前拒绝，replay/streaming/temperature 服从本次冻结快照；图片上限、采样字段和协议能力必须保留 #345 已验证的供应商差异。\n- 成功模型回复与 Token 明细必须记录不含密钥的实际 route identity；同名模型、多账户和代理地址可区分。DeepSeek 官方价格只允许用于 DeepSeek 官方 host，未知或第三方路由只累计真实 API usage 并标记未定价。
 
 ### ChatGPT 套餐模型
 
@@ -178,6 +177,10 @@ android-17-instrumented
 - OAuth callback 编码、state/nonce/PKCE 与 ID Token 验证路径。
 - access token 过期时 single-flight refresh，refresh token 轮换后原子替换。
 - Responses 请求固定 `store=false`、`stream=true`；不发送套餐共享暂不支持的采样字段。
+- ChatGPT 套餐 HTTP Responses 每次必须有非空 `input`；system 内容只进入 `instructions`，后台状态整理不得产生 system-only 请求。
+- ChatGPT 套餐请求收到成功 HTTP 响应后若 SSE 在 `response.completed` 前断开，视为“执行结果未知”，禁止自动整轮重放；仅明确的服务端可重试错误按官方恢复语义退避。
+- 运行诊断必须记录脱敏的 profile/account/client_id 绑定、OpenAI request ID、provider code 与 HTTP status，禁止记录 access/refresh token。
+- ChatGPT 模型档案必须绑定保存的 issued client_id 对应账户；切换模型档案时同步账户选择，禁止用可变“当前账户”替代档案 credentialRef。
 - ChatGPT 套餐共享的 function/custom tools 必须按 SIWC 预览契约放入 namespace；标准 API Key Responses 继续使用普通顶层 function tools，不相互污染协议。
 - 协议选择以模型档案的认证类型与协议为边界：ChatGPT 套餐固定走受限 Responses 契约；API Key 的 Responses / Chat Completions 保持各自原有行为。
 - OpenAI GPT-6 系列按模型能力发送采样字段：Astra 不发送 `temperature`；Sol/Luna 在 Chat Completions 需要采样或工具调用时显式使用 `reasoning_effort=none`；其他供应商不继承该限制。

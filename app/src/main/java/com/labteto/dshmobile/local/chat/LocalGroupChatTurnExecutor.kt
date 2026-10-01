@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.ChatSceneState
+import com.labteto.dshmobile.local.chat.chatPostTurnModelMessages
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.enqueuePendingDurably
@@ -268,12 +269,7 @@ internal class LocalGroupChatTurnExecutor(
             val plannerReply = completeWithRetry(
                 key = key,
                 snapshot = snapshot,
-                messages = listOf(
-                    buildJsonObject {
-                        put("role", "system")
-                        put("content", prompt)
-                    },
-                ),
+                messages = chatPostTurnModelMessages(prompt),
                 step = step,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
@@ -364,12 +360,7 @@ internal class LocalGroupChatTurnExecutor(
             val plannerReply = completeWithRetry(
                 key = key,
                 snapshot = snapshot,
-                messages = listOf(
-                    buildJsonObject {
-                        put("role", "system")
-                        put("content", prompt)
-                    },
-                ),
+                messages = chatPostTurnModelMessages(prompt),
                 step = CHAT_POST_TURN_MODEL_STEP + 100,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
