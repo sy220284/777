@@ -1,9 +1,18 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelAuthKind
+import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.LocalModelProtocol
+import com.labteto.dshmobile.local.LocalModelRuntimeCapabilities
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class LocalModelGatewayRoutingTest {
@@ -95,4 +104,176 @@ class LocalModelGatewayRoutingTest {
             ),
         )
     }
+
+    @Test
+    fun capabilitySnapshotRejectsUnsupportedToolsAndImagesBeforeAdapter() {
+        val noTools = route(LocalModelRuntimeCapabilities(toolCalling = false))
+        val tool = buildJsonArray {
+            add(buildJsonObject {
+                put("type", "function")
+                put("function", buildJsonObject {
+                    put("name", "read")
+                    put("description", "读取")
+                    put("parameters", buildJsonObject {
+                        put("type", "object")
+                        put("properties", buildJsonObject {})
+                    })
+                })
+            })
+        }
+        assertEquals(
+            "MODEL_TOOL_CALLING_UNSUPPORTED",
+            assertThrows(LocalModelException::class.java) {
+                prepareLocalModelAdapterRequest(
+                    noTools,
+                    listOf(buildJsonObject { put("role", "user"); put("content", "test") }),
+                    tool,
+                    null,
+                    true,
+                )
+            }.code,
+        )
+
+        val noImages = route(LocalModelRuntimeCapabilities(imageInput = false))
+        val imageMessage = buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "image_url")
+                    put("image_url", buildJsonObject {
+                        put("url", "data:image/png;base64,AA==")
+                    })
+                })
+            })
+        }
+        assertEquals(
+            "MODEL_IMAGE_UNSUPPORTED",
+            assertThrows(LocalModelException::class.java) {
+                prepareLocalModelAdapterRequest(
+                    noImages,
+                    listOf(imageMessage),
+                    JsonArray(emptyList()),
+                    null,
+                    true,
+                )
+            }.code,
+        )
+    }
+
+    @Test
+    fun capabilitySnapshotControlsReplayStreamingAndTemperature() {
+        val replay = LocalModelReplayEnvelope(
+            adapterId = LocalModelAdapterIds.OPENAI_CHAT,
+            routeFingerprint = "old-route",
+            payload = buildJsonObject { put("reasoning_content", "private") },
+        )
+        val history = LocalCanonicalModelCodec.toHistoryMessage(
+            LocalCanonicalMessage(
+                role = LocalCanonicalRole.ASSISTANT,
+                content = listOf(LocalCanonicalContent.Text("done")),
+                replay = replay,
+            ),
+        )
+        val prepared = prepareLocalModelAdapterRequest(
+            route = route(
+                LocalModelRuntimeCapabilities(
+                    streaming = false,
+                    replay = false,
+                    temperature = false,
+                ),
+            ),
+            messages = listOf(history),
+            tools = JsonArray(emptyList()),
+            temperature = 0.8,
+            streaming = true,
+        )
+
+        assertFalse(prepared.streaming)
+        assertNull(prepared.request.temperature)
+        assertNull(prepared.request.messages.single().replay)
+    }
+
+    @Test
+    fun everyRegisteredProtocolReceivesTheSameCanonicalSemanticContract() {
+        val message = buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject { put("type", "text"); put("text", "查看图片") })
+                add(buildJsonObject {
+                    put("type", "image_url")
+                    put("image_url", buildJsonObject {
+                        put("url", "data:image/png;base64,AA==")
+                    })
+                })
+            })
+        }
+        val tools = buildJsonArray {
+            add(buildJsonObject {
+                put("type", "function")
+                put("function", buildJsonObject {
+                    put("name", "read")
+                    put("description", "读取文件")
+                    put("parameters", buildJsonObject {
+                        put("type", "object")
+                        put("properties", buildJsonObject {})
+                    })
+                })
+            })
+        }
+
+        LocalModelProtocol.entries.forEach { protocol ->
+            val prepared = prepareLocalModelAdapterRequest(
+                route = route(
+                    LocalModelRuntimeCapabilities(imageInput = true),
+                    protocol = protocol,
+                ),
+                messages = listOf(message),
+                tools = tools,
+                temperature = 0.4,
+                streaming = true,
+            )
+            val canonical = prepared.request.messages.single()
+            assertEquals(LocalCanonicalRole.USER, canonical.role)
+            assertEquals(1, canonical.content.filterIsInstance<LocalCanonicalContent.Text>().size)
+            assertEquals(1, canonical.content.filterIsInstance<LocalCanonicalContent.Image>().size)
+            assertEquals("read", prepared.request.tools.single().name)
+        }
+    }
+
+    @Test
+    fun routeIdentityKeepsAccountAndProtocolBoundaryWithoutSecrets() {
+        val route = LocalResolvedModelRoute(
+            profileId = "account-profile",
+            provider = "ChatGPT",
+            model = "gpt-test",
+            baseUrl = "https://api.openai.com/v1/",
+            authKind = LocalModelAuthKind.CHATGPT_PLAN,
+            protocol = LocalModelProtocol.RESPONSES,
+            bearerToken = "must-not-leak",
+            capabilities = LocalModelRuntimeCapabilities(),
+        )
+
+        val identity = route.identity()
+
+        assertEquals("account-profile", identity.profileId)
+        assertEquals("ChatGPT", identity.provider)
+        assertEquals("https://api.openai.com/v1", identity.baseUrl)
+        assertEquals("CHATGPT_PLAN", identity.authKind)
+        assertEquals("RESPONSES", identity.protocol)
+        assertFalse(identity.toString().contains("must-not-leak"))
+    }
+
+    private fun route(
+        capabilities: LocalModelRuntimeCapabilities,
+        protocol: LocalModelProtocol = LocalModelProtocol.CHAT_COMPLETIONS,
+    ) = LocalResolvedModelRoute(
+        profileId = "profile",
+        provider = "test",
+        model = "test-model",
+        baseUrl = "https://example.test/v1",
+        authKind = LocalModelAuthKind.API_KEY,
+        protocol = protocol,
+        bearerToken = "secret",
+        capabilities = capabilities,
+    )
 }

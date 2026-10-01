@@ -129,6 +129,45 @@ class DeepSeekBillingTest {
     }
 
     @Test
+    fun nonOfficialRouteCountsTokensWithoutApplyingDeepSeekOfficialPrice() {
+        val next = accumulateDeepSeekUsage(
+            current = DeepSeekUsageSnapshot(),
+            model = "deepseek-flash",
+            usage = DeepSeekTokenUsage(
+                promptTokens = 100,
+                cacheMissTokens = 100,
+                completionTokens = 20,
+                reported = true,
+            ),
+            pricing = DeepSeekPricingState(),
+            epochMillis = 5_678L,
+            pricingEligible = false,
+        )
+
+        assertEquals(120L, next.totalTokens)
+        assertEquals(120L, next.unpricedTokens)
+        assertEquals(0.0, next.estimatedCostCny, 0.0)
+    }
+
+    @Test
+    fun officialPricingRequiresBothDeepSeekProviderAndOfficialHost() {
+        val official = LocalModelRouteIdentity(
+            provider = "DeepSeek",
+            model = "deepseek-flash",
+            baseUrl = "https://api.deepseek.com",
+            authKind = LocalModelAuthKind.API_KEY.name,
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS.name,
+        )
+        val proxy = official.copy(baseUrl = "https://proxy.example/v1")
+        val renamedProvider = official.copy(provider = "自定义")
+
+        assertEquals(true, official.allowsOfficialDeepSeekPricing())
+        assertEquals(false, proxy.allowsOfficialDeepSeekPricing())
+        assertEquals(false, renamedProvider.allowsOfficialDeepSeekPricing())
+        assertEquals(false, (null as LocalModelRouteIdentity?).allowsOfficialDeepSeekPricing())
+    }
+
+    @Test
     fun weekendsUseOffPeakPricing() {
         val zone = ZoneId.of("Asia/Shanghai")
         val saturdayNoon = ZonedDateTime.of(2026, 9, 26, 10, 0, 0, 0, zone).toInstant().toEpochMilli()
