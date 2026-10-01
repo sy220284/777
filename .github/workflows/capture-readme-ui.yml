@@ -44,9 +44,7 @@ jobs:
           disable-animations: true
           script: |
             set -eux
-            DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest \
-              -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.ReadmeUiScreenshotCaptureTest \
-              --stacktrace
+            DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.ReadmeUiScreenshotCaptureTest --stacktrace
 
             mkdir -p docs/images/current
             for file in navigation.png chat.png work.png character-tuning.png usage.png; do
