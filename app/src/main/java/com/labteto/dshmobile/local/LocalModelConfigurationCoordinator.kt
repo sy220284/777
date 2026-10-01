@@ -32,7 +32,9 @@ internal class LocalModelConfigurationCoordinator(
             require(model.isNotBlank()) { "模型名称不能为空" }
             val name = normalizeModel(model)
             val url = normalizeModelBaseUrl(baseUrl)
-            val id = modelProfileId(name, url)
+            val existingProfiles = profiles.read()
+            val existing = existingProfiles.apiKeyProfileForRoute(name, url)
+            val id = existing?.id ?: modelProfileId(name, url)
             if (apiKey.isNotBlank()) apiKeys.putFor(id, apiKey)
             else require(apiKeys.getFor(id) != null) { "请填写该模型的密钥" }
             val preset = LocalModelPresets.find(name, url)
@@ -41,9 +43,9 @@ internal class LocalModelConfigurationCoordinator(
                 model = name,
                 baseUrl = url,
                 provider = preset?.provider.orEmpty(),
-                protocol = protocol ?: profiles.read().firstOrNull { it.id == id }?.protocol ?: preset?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS,
+                protocol = protocol ?: existing?.protocol ?: preset?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS,
             )
-            val all = profiles.read().filterNot { it.id == id } + profile
+            val all = existingProfiles.filterNot { it.id == id } + profile
             profiles.write(all)
             activate(profile)
             LocalModelConfigurationResult(true, name, url, all, profile.id)
@@ -115,10 +117,17 @@ internal class LocalModelConfigurationCoordinator(
         val name = normalizeModel(model)
         val url = runCatching { normalizeModelBaseUrl(baseUrl) }
             .getOrElse { return it.message ?: "地址无效" }
+        val existing = profiles.read().apiKeyProfileForRoute(name, url)
         val key = apiKey.trim().takeIf(String::isNotEmpty)
+            ?: existing?.let { apiKeys.getFor(it.id) }
             ?: apiKeys.getFor(modelProfileId(name, url))
             ?: return "请先填写该模型的密钥"
-        return tester.test(key, url, name, protocol ?: profiles.read().firstOrNull { it.id == modelProfileId(name, url) }?.protocol ?: LocalModelPresets.protocolFor(name, url))
+        return tester.test(
+            key,
+            url,
+            name,
+            protocol ?: existing?.protocol ?: LocalModelPresets.protocolFor(name, url),
+        )
     }
 
     fun readProfiles(): List<LocalModelProfile> = profiles.read()
@@ -168,5 +177,18 @@ internal class LocalModelConfigurationCoordinator(
     companion object {
         const val DEFAULT_MODEL = "deepseek-flash"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
+    }
+}
+
+
+internal fun List<LocalModelProfile>.apiKeyProfileForRoute(
+    model: String,
+    baseUrl: String,
+): LocalModelProfile? {
+    val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl).trimEnd('/')
+    return firstOrNull { profile ->
+        profile.authKind == LocalModelAuthKind.API_KEY &&
+            profile.model == model &&
+            normalizeModelBaseUrl(profile.baseUrl).trimEnd('/') == normalizedBaseUrl
     }
 }
