@@ -195,20 +195,19 @@ internal class LocalSessionRepository(
 
     fun read(id: String): LocalHarnessSession? = readWithLegacyApproval(id)?.session
 
-    fun readWithLegacyApproval(id: String): LocalSessionRead? {
+    fun readWithLegacyApproval(id: String): LocalSessionRead? = synchronized(storageLock) {
+        val persistedPayload = store.read(id)?.document?.payload
         val latest = synchronized(lock) {
             if (id in deletedIds) null else latestSnapshots[id]
         }
-        val persistedPayload = synchronized(storageLock) {
-            store.read(id)?.document?.payload
-        }
+        if (id in synchronized(lock) { deletedIds.toSet() }) return@synchronized null
         if (latest != null) {
-            return LocalSessionRead(
+            return@synchronized LocalSessionRead(
                 session = latest,
                 legacySafeAutoApproval = persistedPayload?.let(::legacySafeAutoApproval) == true,
             )
         }
-        return persistedPayload?.let { payload ->
+        persistedPayload?.let { payload ->
             LocalSessionRead(
                 session = json.decodeFromJsonElement(LocalHarnessSession.serializer(), payload),
                 legacySafeAutoApproval = legacySafeAutoApproval(payload),
