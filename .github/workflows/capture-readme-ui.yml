@@ -47,36 +47,17 @@ jobs:
             DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.ReadmeUiScreenshotCaptureTest --stacktrace
 
             mkdir -p docs/images/current
-            for file in navigation.png chat.png work.png character-tuning.png usage.png; do
-              adb exec-out run-as com.sy220284.dshmobile.debug \
-                cat "files/readme-screenshots/${file}" > "docs/images/current/${file}"
-              test -s "docs/images/current/${file}"
-            done
-
-            python3 - <<'PY'
-            from pathlib import Path
-            import struct
-
-            expected = {
-                "navigation.png",
-                "chat.png",
-                "work.png",
-                "character-tuning.png",
-                "usage.png",
-            }
-            root = Path("docs/images/current")
-            found = {p.name for p in root.glob("*.png")}
-            if found != expected:
-                raise SystemExit(f"截图集合不匹配: expected={sorted(expected)} found={sorted(found)}")
-            for path in sorted(root.glob("*.png")):
-                data = path.read_bytes()
-                if data[:8] != b"\x89PNG\r\n\x1a\n":
-                    raise SystemExit(f"{path} 不是有效 PNG")
-                width, height = struct.unpack(">II", data[16:24])
-                if width < 300 or height < 500:
-                    raise SystemExit(f"{path} 尺寸异常: {width}x{height}")
-                print(f"{path}: {width}x{height}, {len(data)} bytes")
-            PY
+            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/navigation.png > docs/images/current/navigation.png
+            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/chat.png > docs/images/current/chat.png
+            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/work.png > docs/images/current/work.png
+            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/character-tuning.png > docs/images/current/character-tuning.png
+            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/usage.png > docs/images/current/usage.png
+            test -s docs/images/current/navigation.png
+            test -s docs/images/current/chat.png
+            test -s docs/images/current/work.png
+            test -s docs/images/current/character-tuning.png
+            test -s docs/images/current/usage.png
+            python3 -c 'from pathlib import Path; import struct; files=sorted(Path("docs/images/current").glob("*.png")); assert {p.name for p in files}=={"navigation.png","chat.png","work.png","character-tuning.png","usage.png"}; [(lambda d,p: (d[:8]==b"\\x89PNG\\r\\n\\x1a\\n" or (_ for _ in ()).throw(AssertionError(f"{p} invalid PNG")), struct.unpack(">II",d[16:24])[0]>=300 or (_ for _ in ()).throw(AssertionError(f"{p} width")), struct.unpack(">II",d[16:24])[1]>=500 or (_ for _ in ()).throw(AssertionError(f"{p} height"))))(p.read_bytes(),p) for p in files]'
 
       - name: Commit captured screenshots
         run: |
