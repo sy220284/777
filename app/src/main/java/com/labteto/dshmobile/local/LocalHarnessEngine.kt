@@ -364,7 +364,7 @@ class LocalHarnessEngine @Inject constructor(
             state = _state,
             scope = scope,
             chatTurnCoordinator = chatTurnCoordinator,
-            requestPlanner = { snapshot, prompt, requestLog ->
+            requestPlanner = { snapshot, prompt, requestLog, profile ->
                 modelRequestMarkerOrNull()?.let { key ->
                     completeWithRetry(
                         key = key,
@@ -379,6 +379,7 @@ class LocalHarnessEngine @Inject constructor(
                         toolsOverride = JsonArray(emptyList()),
                         publishPreview = false,
                         requestLog = requestLog,
+                        profile = profile,
                     )
                 }
             },
@@ -4662,6 +4663,7 @@ class LocalHarnessEngine @Inject constructor(
         expectedBaseState: ChatCharacterState,
         sourceUserMessageId: String? = null,
     ) {
+        val profile = modelGateway.activeProfile() ?: return
         chatContextRefreshCoordinator.schedule(
             userMessage = userMessage,
             assistantMessage = assistantMessage,
@@ -4670,6 +4672,7 @@ class LocalHarnessEngine @Inject constructor(
             expectedAssistantMessageId = expectedAssistantMessageId,
             expectedBaseState = expectedBaseState,
             boundEventLog = eventLogFor(expectedSessionId),
+            profile = profile,
             sourceUserMessageId = sourceUserMessageId,
         )
     }
@@ -4722,7 +4725,7 @@ class LocalHarnessEngine @Inject constructor(
         persistOverflowHistory: Boolean = false,
         streamFilterPhrases: List<String> = emptyList(),
         requestLog: LocalSessionEventLog? = null,
-        temperature: Double? = null,
+        temperature: Double? = null, profile: LocalModelProfile? = null,
         binding: LocalWorkRunBinding? = null,
     ): LocalModelReply = modelRequestCoordinator.complete(
         snapshot = snapshot,
@@ -4736,6 +4739,7 @@ class LocalHarnessEngine @Inject constructor(
         streamFilterPhrases = streamFilterPhrases,
         requestLog = requestLog ?: binding?.eventLog,
         temperature = temperature,
+        profile = profile,
         previewGuard = {
             currentSessionId == snapshot.sessionId &&
                 _state.value.sessionId == snapshot.sessionId
