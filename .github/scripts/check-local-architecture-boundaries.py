@@ -22,6 +22,8 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/data/SessionCatalogRuntime.kt": 151,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt": 1636,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessConfigurationComponents.kt": 163,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt": 830,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskEditorComponents.kt": 706,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt": 240,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt": 340,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt": 1041,
