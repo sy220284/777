@@ -1,7 +1,11 @@
 package com.labteto.dshmobile.local
 
 import java.io.File
+import java.io.FileOutputStream
 import java.io.RandomAccessFile
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 /**
@@ -36,9 +40,23 @@ internal class LocalToolOutputStore(
         val previousBytes = target.takeIf(File::isFile)?.length() ?: 0L
         val cachedBefore = knownGlobalBytes
         val temp = File(dir, "." + target.name + ".tmp")
-        temp.writeBytes(bytes)
-        if (!temp.renameTo(target)) {
-            target.writeBytes(bytes)
+        try {
+            FileOutputStream(temp).use { output ->
+                output.write(bytes)
+                output.flush()
+                output.fd.sync()
+            }
+            try {
+                Files.move(
+                    temp.toPath(),
+                    target.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
             temp.delete()
         }
         target.setLastModified(System.currentTimeMillis())
