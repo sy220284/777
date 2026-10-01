@@ -251,6 +251,7 @@ private fun SubagentRow(entry: SubagentListEntry, selected: Boolean, onClick: ()
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = DsSpacing.touchTarget)
             .clickable(onClick = onClick)
             .padding(vertical = DsSpacing.xsmall),
         verticalAlignment = Alignment.CenterVertically,

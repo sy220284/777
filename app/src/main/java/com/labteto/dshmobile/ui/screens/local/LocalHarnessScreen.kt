@@ -612,6 +612,7 @@ private fun LocalConfiguration(
 private fun ModelChoice(id: String, label: String, selected: String, onSelect: (String) -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)
+            .heightIn(min = DsSpacing.touchTarget)
             .selectable(selected = selected == id, onClick = { onSelect(id) })
             .padding(vertical = DsSpacing.tiny),
         verticalAlignment = Alignment.CenterVertically,

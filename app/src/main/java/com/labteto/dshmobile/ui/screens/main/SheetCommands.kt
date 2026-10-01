@@ -291,6 +291,7 @@ internal fun SheetRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.row)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = DsSpacing.small),

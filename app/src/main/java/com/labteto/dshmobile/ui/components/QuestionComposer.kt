@@ -53,6 +53,7 @@ import com.labteto.dshmobile.core.wire.dto.AskUserQuestionItem
 import com.labteto.dshmobile.core.wire.dto.AskUserQuestionOption
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -271,6 +272,7 @@ private fun QuestionHeader(
         Row(
             modifier = Modifier
                 .weight(1f)
+                .heightIn(min = DsSpacing.touchTarget)
                 .clickable(enabled = !busy, onClickLabel = toggleLabel, onClick = onToggle),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -370,6 +372,7 @@ private fun OptionRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = DsSpacing.touchTarget)
             .clickable(enabled = enabled, onClick = onClick),
         shape = DsShapes.menu,
         color = if (selected) colors.accentTertiary else colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),

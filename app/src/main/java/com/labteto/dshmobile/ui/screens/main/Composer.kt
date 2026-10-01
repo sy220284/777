@@ -414,21 +414,27 @@ private fun AttachmentStrip(
                 Box(
                     Modifier
                         .align(Alignment.TopEnd)
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(colors.toastBg)
+                        .size(DsSpacing.touchTarget)
                         .clickable { onRemove(index) },
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = Alignment.TopEnd,
                 ) {
-                    Icon(
-                        Icons.Filled.Close,
-                        contentDescription = stringResource(
-                            if (attachment is PendingAttachment.File) R.string.chat_composer_remove_file
-                            else R.string.chat_composer_remove_image,
-                        ),
-                        tint = Color.White,
-                        modifier = Modifier.size(12.dp),
-                    )
+                    Box(
+                        Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(colors.toastBg),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = stringResource(
+                                if (attachment is PendingAttachment.File) R.string.chat_composer_remove_file
+                                else R.string.chat_composer_remove_image,
+                            ),
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp),
+                        )
+                    }
                 }
             }
         }

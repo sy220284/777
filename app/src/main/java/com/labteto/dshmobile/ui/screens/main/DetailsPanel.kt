@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -632,6 +633,7 @@ private fun SubagentsCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = DsSpacing.touchTarget)
                     .clickable(enabled = id != null) { id?.let(onOpen) },
                 verticalAlignment = Alignment.CenterVertically,
             ) {

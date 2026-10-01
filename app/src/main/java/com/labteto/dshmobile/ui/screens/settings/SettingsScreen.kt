@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -95,6 +96,7 @@ import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ToggleRow
+import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -425,7 +427,7 @@ fun SettingsScreen(
 
                     SettingsDestination.APPEARANCE -> {
                         SettingsCard(stringResource(R.string.settings_appearance_preview), Icons.Outlined.Tune) {
-                            AppearanceReadingPreview(settings)
+                            AppearanceReadingPreview()
                         }
                         SettingsCard(stringResource(R.string.settings_appearance), Icons.Outlined.Tune) {
                             AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
@@ -1041,7 +1043,7 @@ private fun appearanceLabel(preference: String): String = when (preference) {
 }
 
 @Composable
-private fun AppearanceReadingPreview(settings: AppSettings) {
+private fun AppearanceReadingPreview() {
     val colors = DsTheme.colors
     Column(
         modifier = Modifier
@@ -1053,20 +1055,10 @@ private fun AppearanceReadingPreview(settings: AppSettings) {
     ) {
         Text(
             stringResource(R.string.settings_appearance_preview_assistant),
-            style = DsType.base16.withReadingWeight(),
+            style = DsType.chatBody.withReadingWeight(),
             color = colors.labelPrimary,
         )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Text(
-                stringResource(R.string.settings_appearance_preview_user),
-                style = DsType.base16Strong.withReadingWeight(),
-                color = colors.labelPrimary,
-                modifier = Modifier
-                    .background(colors.userBubble, DsShapes.bubble)
-                    .border(1.dp, colors.borderL3, DsShapes.bubble)
-                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-            )
-        }
+        UserBubble(stringResource(R.string.settings_appearance_preview_user))
         Text(
             stringResource(R.string.settings_appearance_preview_hint),
             style = DsType.small13.withReadingWeight(),
@@ -1340,6 +1332,7 @@ private fun AppearanceChip(label: String, selected: Boolean, onClick: () -> Unit
     val colors = DsTheme.colors
     Box(
         modifier = Modifier
+            .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.cube)
             .background(if (selected) colors.accentTertiary else colors.bgModulePlatform)
             .clickable(onClick = onClick)
