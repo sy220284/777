@@ -335,6 +335,7 @@ class PersonaAutoFillService @Inject constructor(
                 requestId = reply.requestId,
                 context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.PERSONA_AUTOFILL),
                 promptBreakdown = reply.promptBreakdown,
+                route = reply.routeIdentity,
             )
         }
 
@@ -370,6 +371,7 @@ class PersonaAutoFillService @Inject constructor(
                     requestId = repairedReply.requestId,
                     context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.PERSONA_AUTOFILL),
                     promptBreakdown = repairedReply.promptBreakdown,
+                    route = repairedReply.routeIdentity,
                 )
             }
 
