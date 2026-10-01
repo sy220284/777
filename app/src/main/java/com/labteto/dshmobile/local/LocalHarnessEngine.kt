@@ -296,8 +296,17 @@ class LocalHarnessEngine @Inject constructor(
             resourceScheduler = resourceScheduler,
             routeProvider = {
                 val current = _state.value
-                if (!current.configured) null
-                else LocalVisionRoute(baseUrl = current.baseUrl, model = current.model)
+                val activeProfile = current.modelSelection.profiles
+                    .firstOrNull { it.id == current.modelSelection.activeProfileId }
+                if (!current.configured || activeProfile == null) {
+                    null
+                } else {
+                    LocalVisionRoute(
+                        baseUrl = activeProfile.baseUrl,
+                        model = activeProfile.model,
+                        profile = activeProfile,
+                    )
+                }
             },
             imageSupportProvider = { route ->
                 when (imageCapabilities.state(route.baseUrl, route.model)) {
