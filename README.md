@@ -39,6 +39,18 @@
 
 本机模式不要求电脑在线。APK 自带 Node / Python / Git 等执行环境；模型是否联网取决于你配置的模型服务。
 
+## 当前界面
+
+以下图片直接由当前生产界面组件生成，展示现在实际使用的主要页面。
+
+| 导航与会话 | 角色聊天 | 工作执行 |
+|:--:|:--:|:--:|
+| <img src="docs/images/current/navigation.png" width="240" alt="当前导航与会话界面"> | <img src="docs/images/current/chat.png" width="240" alt="当前角色聊天界面"> | <img src="docs/images/current/work.png" width="240" alt="当前工作模式执行界面"> |
+
+| 人物调节 | 模型价格与消耗 |
+|:--:|:--:|
+| <img src="docs/images/current/character-tuning.png" width="240" alt="当前人物行为调节界面"> | <img src="docs/images/current/usage.png" width="240" alt="当前模型价格与消耗界面"> |
+
 ## 它是怎么工作的
 
 一次消息进入应用后，大致会经过这条链路：
@@ -124,6 +136,8 @@ Agent 开始思考
 ```
 
 当前运行链支持 OpenAI-compatible Chat Completions、OpenAI Responses 和 Anthropic Messages 等协议。
+
+模型既可以使用 API Key，也可以通过 OpenAI 的 **Continue with ChatGPT** 授权连接 ChatGPT 账户并使用符合条件的套餐模型。两种认证身份分别保存和路由，不会互相覆盖。
 
 一次任务开始后，模型档案会固定下来。即使你随后在界面切换到其他模型或账户，已经启动的任务、子代理、Vision 和后续处理仍沿用原来的运行身份，避免串账户、串 API Key 或串上下文。
 
@@ -348,7 +362,7 @@ harness-core / Android runtime / MCP / device
 ## 快速开始
 
 1. 从 [Releases](https://github.com/sy220284/777/releases/latest) 安装 APK。
-2. **本机模式**：直接进入本机 Harness，配置模型 API 密钥即可开始。密钥使用 Android Keystore 加密存储。
+2. **本机模式**：进入模型设置后，可配置 API Key，或通过 **Continue with ChatGPT** 连接 ChatGPT 账户并使用符合条件的套餐模型；选择模型后即可开始。API Key 使用 Android Keystore 加密存储。
 3. **远程模式**：在电脑上安装 [`dsh-relay`](https://github.com/sorsama/deepseek-harness-relay)：
 
    ```sh
@@ -394,18 +408,6 @@ harness-core / Android runtime / MCP / device
 - [架构](docs/ARCHITECTURE.md) · [协议](docs/PROTOCOL.md) · [兼容性](docs/COMPATIBILITY.md) · [安全](docs/SECURITY.md)
 - [Android 原生 Harness 当前状态](docs/ANDROID-HARNESS-STATUS.zh-CN.md) · [后续路线](docs/ANDROID-HARNESS-ROADMAP.zh-CN.md)
 - [验证体系](docs/VALIDATION.md) · [UI / UX](docs/UI-UX.zh-CN.md) · [效果图](docs/UI-ARTIFACTS.md)
-
-## 截图
-
-以下截图直接由当前生产界面组件生成，展示现在实际使用的主要页面。
-
-| 导航与会话 | 角色聊天 | 工作执行 |
-|:--:|:--:|:--:|
-| <img src="docs/images/current/navigation.png" width="240" alt="当前导航与会话界面"> | <img src="docs/images/current/chat.png" width="240" alt="当前角色聊天界面"> | <img src="docs/images/current/work.png" width="240" alt="当前工作模式执行界面"> |
-
-| 人物调节 | 模型消耗 |
-|:--:|:--:|
-| <img src="docs/images/current/character-tuning.png" width="240" alt="当前人物行为调节界面"> | <img src="docs/images/current/usage.png" width="240" alt="当前模型价格与消耗界面"> |
 
 ## 许可证
 
