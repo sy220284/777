@@ -24,7 +24,6 @@ import com.labteto.dshmobile.core.wire.dto.AskUserQuestionRequestEvent
 import com.labteto.dshmobile.core.wire.dto.CUSTOM_PRESET
 import com.labteto.dshmobile.core.wire.dto.CommandDescriptor
 import com.labteto.dshmobile.core.wire.dto.CommandSubmitAttachment
-import com.labteto.dshmobile.core.wire.dto.ContentBlock
 import com.labteto.dshmobile.core.wire.dto.ContextBreakdownView
 import com.labteto.dshmobile.core.wire.dto.ContextPressureView
 import com.labteto.dshmobile.core.wire.dto.EncodedFileUploadRequest
@@ -39,9 +38,7 @@ import com.labteto.dshmobile.core.wire.dto.JobView
 import com.labteto.dshmobile.core.wire.dto.PermissionSelect
 import com.labteto.dshmobile.core.wire.dto.PlanStateView
 import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
-import com.labteto.dshmobile.core.wire.dto.PromptContentPart
 import com.labteto.dshmobile.core.wire.dto.QUESTION_CANCELLED
-import com.labteto.dshmobile.core.wire.dto.QueueAction
 import com.labteto.dshmobile.core.wire.dto.ModelSelectionProjection
 import kotlinx.coroutines.flow.combine
 import com.labteto.dshmobile.core.wire.dto.ModelCatalog
@@ -51,7 +48,6 @@ import com.labteto.dshmobile.core.wire.dto.RemoteEventOutcome
 import com.labteto.dshmobile.core.wire.dto.RemoteEventRejection
 import com.labteto.dshmobile.core.wire.dto.SessionAddress
 import com.labteto.dshmobile.core.wire.dto.SessionAttachmentRequest
-import com.labteto.dshmobile.core.wire.dto.SessionCancelRequest
 import com.labteto.dshmobile.core.wire.dto.SessionControlFrame
 import com.labteto.dshmobile.core.wire.dto.SessionCreateRequest
 import com.labteto.dshmobile.core.wire.dto.SessionEvent
@@ -60,12 +56,10 @@ import com.labteto.dshmobile.core.wire.dto.SessionForkRequest
 import com.labteto.dshmobile.core.wire.dto.SessionHistoryRecord
 import com.labteto.dshmobile.core.wire.dto.SessionModelsValue
 import com.labteto.dshmobile.core.wire.dto.SessionPageRequest
-import com.labteto.dshmobile.core.wire.dto.SessionPromptRequest
 import com.labteto.dshmobile.core.wire.dto.SessionRenameRequest
 import com.labteto.dshmobile.core.wire.dto.SessionSelectModelRequest
 import com.labteto.dshmobile.core.wire.dto.SessionStatsView
 import com.labteto.dshmobile.core.wire.dto.SessionSummary
-import com.labteto.dshmobile.core.wire.dto.SessionUpdateQueueRequest
 import com.labteto.dshmobile.core.wire.dto.SkillEntry
 import com.labteto.dshmobile.core.wire.dto.SkillListRequest
 import com.labteto.dshmobile.core.wire.dto.SubagentListEntry
@@ -78,11 +72,9 @@ import com.labteto.dshmobile.core.wire.dto.WorkspaceFollowFrame
 import com.labteto.dshmobile.core.wire.dto.WorkspaceRenameRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceValue
 import com.labteto.dshmobile.core.wire.dto.WorkspaceView
-import com.labteto.dshmobile.core.wire.dto.imageRejectionOf
 import com.labteto.dshmobile.core.wire.RpcError
 import com.labteto.dshmobile.core.wire.TransportFailures
 import com.labteto.dshmobile.core.wire.encodeToJsonElement
-import com.labteto.dshmobile.core.wire.newPromptRequestId
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.TimeZone
@@ -174,6 +166,14 @@ class SessionStore @Inject constructor(
     private val searchRuntime = SessionSearchRuntime(apiProvider = ::apiOrNull)
     val searchResults: StateFlow<List<Pair<String, String>>> get() = searchRuntime.results
     val contentSearchAvailable: StateFlow<Boolean> get() = searchRuntime.available
+
+    private val turnCommandRuntime = SessionTurnCommandRuntime(
+        apiForHost = ::apiForHost,
+        apiProvider = ::apiOrNull,
+        currentSessionId = { _currentSessionId.value },
+        activeHostKey = { activeHostKey },
+        onConnectionError = ::setConnectionError,
+    )
 
     private val _currentConversation = MutableStateFlow<ConversationSnapshot?>(null)
     val currentConversation: StateFlow<ConversationSnapshot?> = _currentConversation.asStateFlow()
@@ -1113,20 +1113,13 @@ class SessionStore @Inject constructor(
         }
     }
 
-    suspend fun prompt(text: String, mode: String, targetSessionId: String? = currentSessionId.value, targetHost: String? = activeHostKey) =
-        promptContent(mode, listOf(PromptContentPart.Text(text)), targetSessionId, targetHost)
+    suspend fun prompt(
+        text: String,
+        mode: String,
+        targetSessionId: String? = currentSessionId.value,
+        targetHost: String? = activeHostKey,
+    ) = turnCommandRuntime.prompt(text, mode, targetSessionId, targetHost)
 
-    /**
-     * Prompt with attachments: raster images (bytes submitted base64, as the browser wire does)
-     * and files already staged through [uploadFile], cited by receipt.
-     *
-     * All of them ride *one* call. `session/prompt` takes a list of content parts and the host
-     * admits that list as a single batch, which is where its per-message image count and
-     * aggregate-size limits live — sending one image per call, as this client used to, split one
-     * message into several and meant those two limits could never fire at all. A file's bytes
-     * never ride the prompt: the receipt names an upload the host already holds, and the host
-     * refuses one it did not mint for this session.
-     */
     suspend fun promptWithAttachments(
         text: String,
         mode: String,
@@ -1134,13 +1127,14 @@ class SessionStore @Inject constructor(
         fileReceipts: List<String> = emptyList(),
         targetSessionId: String? = currentSessionId.value,
         targetHost: String? = activeHostKey,
-    ): PromptOutcome {
-        val parts = mutableListOf<PromptContentPart>()
-        if (text.isNotBlank()) parts.add(PromptContentPart.Text(text))
-        images.mapTo(parts) { PromptContentPart.Image(it.mediaType, it.data, it.name) }
-        fileReceipts.mapTo(parts) { PromptContentPart.File(it) }
-        return promptContent(mode, parts, targetSessionId, targetHost)
-    }
+    ): PromptOutcome = turnCommandRuntime.promptWithAttachments(
+        text = text,
+        mode = mode,
+        images = images,
+        fileReceipts = fileReceipts,
+        targetSessionId = targetSessionId,
+        targetHost = targetHost,
+    )
 
     /**
      * Stage one file for the open session and answer with its receipt.
@@ -1172,56 +1166,14 @@ class SessionStore @Inject constructor(
             targetHost = targetHost,
         )
 
-    private suspend fun promptContent(mode: String, content: List<PromptContentPart>, targetSessionId: String?, targetHost: String?): PromptOutcome {
-        val sid = targetSessionId ?: return PromptOutcome.Failed("no open session")
-        val api = apiForHost(targetHost) ?: return PromptOutcome.Failed("not connected")
-        val safeMode = if (mode == "steer") "steer" else "queue"
-        val zone = TimeZone.getDefault().id
-        val request = SessionPromptRequest(
-            requestId = newPromptRequestId(),
-            sessionId = sid,
-            mode = safeMode,
-            content = content,
-            clientTimeZone = zone,
-        )
-        return when (val r = api.sessionPrompt(request)) {
-            is RpcResult.Ok -> PromptOutcome.Ok
-            is RpcResult.Err -> if (r.error.code == ATTACHMENT_INVALID) {
-                // The host declined the attachments, not the connection. Report it where they are
-                // so the composer can keep them and say which bound they crossed.
-                val reason = (r.error.details as? JsonObject)
-                    ?.get("reason")?.jsonPrimitive?.contentOrNull
-                PromptOutcome.Rejected(imageRejectionOf(reason.orEmpty()), reason)
-            } else {
-                setConnectionError(r.error.message)
-                PromptOutcome.Failed(r.error.message)
-            }
-        }
-    }
+    suspend fun cancelTurn() = turnCommandRuntime.cancelTurn()
 
-    suspend fun cancelTurn() {
-        val sid = currentSessionId.value ?: return
-        val api = apiOrNull() ?: return
-        when (val r = api.sessionCancel(SessionCancelRequest(sid))) {
-            is RpcResult.Ok -> Unit
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
-
-    suspend fun updateQueue(itemId: String, action: String, contentText: String? = null, sessionId: String? = currentSessionId.value): Boolean {
-        if (action == "edit" && contentText.isNullOrBlank()) return false
-        val sid = sessionId ?: return false
-        val api = apiOrNull() ?: return false
-        val queueAction: QueueAction = when (action) {
-            "remove" -> QueueAction.Remove()
-            "steer" -> QueueAction.Steer()
-            else -> QueueAction.Edit(listOf(ContentBlock.Text(contentText.orEmpty())))
-        }
-        return when (val r = api.sessionUpdateQueue(SessionUpdateQueueRequest(sid, itemId, queueAction))) {
-            is RpcResult.Ok -> true
-            is RpcResult.Err -> { setConnectionError(r.error.message); false }
-        }
-    }
+    suspend fun updateQueue(
+        itemId: String,
+        action: String,
+        contentText: String? = null,
+        sessionId: String? = currentSessionId.value,
+    ): Boolean = turnCommandRuntime.updateQueue(itemId, action, contentText, sessionId)
 
     /**
      * Allows or refuses one pending approval.
