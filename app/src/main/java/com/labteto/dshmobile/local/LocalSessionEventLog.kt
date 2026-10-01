@@ -34,6 +34,8 @@ class LocalSessionEventLog(
 
     fun latestSequence(): Long = delegate.latestSequence()
 
+    fun corruptionStats() = delegate.corruptionStats()
+
     fun snapshotAfter(sequenceExclusive: Long): List<Event> = delegate.snapshotAfter(sequenceExclusive).map { event ->
         event.toLocalEvent()
     }
