@@ -2,7 +2,6 @@ package com.labteto.dshmobile.data
 
 import com.labteto.dshmobile.core.wire.DshApiClient
 import com.labteto.dshmobile.core.wire.RpcResult
-import com.labteto.dshmobile.core.wire.dto.ATTACHMENT_INVALID
 import com.labteto.dshmobile.core.wire.dto.ContentBlock
 import com.labteto.dshmobile.core.wire.dto.EncodedImageAttachment
 import com.labteto.dshmobile.core.wire.dto.PromptContentPart
