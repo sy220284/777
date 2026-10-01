@@ -78,7 +78,7 @@ internal class LocalSubagentRunner(
     private val runSessionId: () -> String = { state.value.sessionId },
     private val runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
 ) {
-    private val historyPolicy = LocalSubagentHistoryPolicy(
+    private val historyPolicy = com.labteto.dshmobile.local.agent.LocalSubagentHistoryPolicy(
         spillToolOutput = spillToolOutput,
         historyCompactor = historyCompactor,
         eventLog = eventLog,

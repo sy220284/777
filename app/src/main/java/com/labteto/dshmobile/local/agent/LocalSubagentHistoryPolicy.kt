@@ -1,5 +1,5 @@
-package com.labteto.dshmobile.local
-
+package com.labteto.dshmobile.local.agent
+import com.labteto.dshmobile.local.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
