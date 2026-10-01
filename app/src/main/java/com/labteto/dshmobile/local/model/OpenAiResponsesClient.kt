@@ -70,12 +70,15 @@ class OpenAiResponsesClient @Inject constructor(
             includeEncryptedReasoning = openAiContract,
             enforceOpenAiToolSchema = openAiContract,
         )
+        validateRequestPayload(payload)
         val request = Request.Builder()
             .url(responsesEndpoint(baseUrl, planSharing))
             .header("Authorization", "Bearer $accessToken")
             .header("Content-Type", "application/json")
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
+        var admittedRequestId: String? = null
+        var responseAdmitted = false
         try {
             withCancellableModelResponse(modelHttp.newCall(request)) { response ->
                 val requestId = response.header("x-request-id")
@@ -91,10 +94,12 @@ class OpenAiResponsesClient @Inject constructor(
                         retryAfterMs = retryAfterMs,
                     )
                 }
-                val responseBody = response.body ?: throw LocalModelException(
-                    code = "RESPONSES_STREAM_INCOMPLETE",
-                    message = "Responses API 返回了空响应",
-                    retryable = true,
+                responseAdmitted = true
+                admittedRequestId = requestId
+                val responseBody = response.body ?: throw streamInterruptedAfterAdmission(
+                    planSharing = planSharing,
+                    requestId = requestId,
+                    detail = "Responses API 返回了空响应",
                 )
                 var completedResponse: JsonObject? = null
                 val streamedContent = StringBuilder()
@@ -119,12 +124,22 @@ class OpenAiResponsesClient @Inject constructor(
                         if (data.isBlank() || data == "[DONE]") continue
                         val event = runCatching { json.parseToJsonElement(data).jsonObject }
                             .getOrElse { cause ->
-                                throw LocalModelException(
-                                    code = "RESPONSES_PROTOCOL_ERROR",
-                                    message = "Responses API 返回了无法解析的数据帧",
-                                    retryable = true,
-                                    cause = cause,
-                                )
+                                throw if (planSharing) {
+                                    streamInterruptedAfterAdmission(
+                                        planSharing = true,
+                                        requestId = requestId,
+                                        detail = "Responses API 返回了无法解析的数据帧",
+                                        cause = cause,
+                                    )
+                                } else {
+                                    LocalModelException(
+                                        code = "RESPONSES_PROTOCOL_ERROR",
+                                        message = "Responses API 返回了无法解析的数据帧",
+                                        retryable = true,
+                                        cause = cause,
+                                        requestId = requestId,
+                                    )
+                                }
                             }
                         when (event["type"]?.jsonPrimitive?.contentOrNull) {
                             "response.output_text.delta" -> {
@@ -173,10 +188,10 @@ class OpenAiResponsesClient @Inject constructor(
                         }
                     }
                 }
-                val completed = completedResponse ?: throw LocalModelException(
-                    code = "RESPONSES_STREAM_INCOMPLETE",
-                    message = "Responses API 流在 response.completed 前结束",
-                    retryable = true,
+                val completed = completedResponse ?: throw streamInterruptedAfterAdmission(
+                    planSharing = planSharing,
+                    requestId = requestId,
+                    detail = "Responses API 流在 response.completed 前结束",
                 )
                 parseCompleted(
                     response = completed,
@@ -188,6 +203,14 @@ class OpenAiResponsesClient @Inject constructor(
         } catch (error: LocalModelException) {
             throw error
         } catch (error: SocketTimeoutException) {
+            if (planSharing && responseAdmitted) {
+                throw streamInterruptedAfterAdmission(
+                    planSharing = true,
+                    requestId = admittedRequestId,
+                    detail = "Responses API 流式响应超时",
+                    cause = error,
+                )
+            }
             throw LocalModelException(
                 code = "MODEL_TIMEOUT",
                 message = "Responses API 推理超时",
@@ -195,9 +218,53 @@ class OpenAiResponsesClient @Inject constructor(
                 cause = error,
             )
         } catch (error: IOException) {
+            if (planSharing && responseAdmitted) {
+                throw streamInterruptedAfterAdmission(
+                    planSharing = true,
+                    requestId = admittedRequestId,
+                    detail = "Responses API 流式连接中断",
+                    cause = error,
+                )
+            }
             throw networkFailure(error)
         }
     }
+
+    internal fun validateRequestPayload(payload: JsonObject) {
+        val input = payload["input"] as? JsonArray
+        if (input.isNullOrEmpty()) {
+            throw LocalModelException(
+                code = "RESPONSES_INPUT_REQUIRED",
+                message = "Responses API 请求缺少 input；后台任务必须提供至少一条实际输入，不能只发送 instructions。",
+                retryable = false,
+            )
+        }
+    }
+
+    internal fun streamInterruptedAfterAdmission(
+        planSharing: Boolean,
+        requestId: String?,
+        detail: String,
+        cause: Throwable? = null,
+    ): LocalModelException =
+        if (planSharing) {
+            LocalModelException(
+                code = "CHATGPT_PLAN_STREAM_INTERRUPTED",
+                message = "$detail。请求已经进入 Responses 流，为避免重复推理和重复套餐消耗，777 不会自动重放本轮。",
+                retryable = false,
+                cause = cause,
+                requestId = requestId,
+                providerCode = "stream_interrupted_after_admission",
+            )
+        } else {
+            LocalModelException(
+                code = "RESPONSES_STREAM_INCOMPLETE",
+                message = detail,
+                retryable = true,
+                cause = cause,
+                requestId = requestId,
+            )
+        }
 
     internal fun buildPayload(
         model: String,
