@@ -221,6 +221,10 @@ data class LocalHarnessStreamingState(
 )
 
 /** State rendered by the standalone, on-device Harness screen. */
+data class LocalHarnessResourceState(
+    val resources: LocalHarnessResourceState = LocalHarnessResourceState(),
+)
+
 data class LocalHarnessState(
     val loading: Boolean = true,
     val configured: Boolean = false,
