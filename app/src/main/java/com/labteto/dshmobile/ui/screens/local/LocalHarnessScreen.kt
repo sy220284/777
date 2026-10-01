@@ -934,51 +934,10 @@ private fun LocalConversationSurface(
         }
 
         if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {
-            Surface(
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny)
-                    .clickable { showGroupAnnouncement = true },
-            ) {
-                Column(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            stringResource(R.string.local_group_announcement_title),
-                            style = DsType.small13Strong.withReadingWeight(),
-                            color = colors.labelPrimary,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (state.groupChat.announcement.isNotBlank()) {
-                            Text(
-                                stringResource(R.string.local_group_announcement_active_short),
-                                style = DsType.caption11.withReadingWeight(),
-                                color = colors.accent,
-                            )
-                        }
-                    }
-                    Text(
-                        state.groupChat.announcement.ifBlank {
-                            stringResource(R.string.local_group_announcement_empty)
-                        },
-                        style = DsType.small13.withReadingWeight(),
-                        color = colors.labelSecondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (state.groupChat.announcement.isNotBlank()) {
-                        Text(
-                            stringResource(R.string.local_group_announcement_active_hint),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelTertiary,
-                        )
-                    }
-                }
-            }
+            GroupAnnouncementCard(
+                announcement = state.groupChat.announcement,
+                onClick = { showGroupAnnouncement = true },
+            )
         }
 
         state.personaCorrectionNotice?.takeIf {
