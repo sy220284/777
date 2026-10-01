@@ -68,7 +68,7 @@ internal object LocalToolPolicy {
      * as `feature-fix` and unrelated flags no longer look like `-f`.
      */
     private fun isForcePush(command: String): Boolean {
-        val tokens = Regex("""[^\\s;&|]+""").findAll(command)
+        val tokens = Regex("""[^\s;&|]+""").findAll(command)
             .map { match -> match.value.trim('"', '\'') }
             .toList()
         val pushIndex = tokens.indexOfFirst { it == "push" }
