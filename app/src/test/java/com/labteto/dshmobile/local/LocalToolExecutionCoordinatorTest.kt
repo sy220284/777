@@ -101,7 +101,7 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
-    fun registryErrorsPreservePossibleSideEffect() = runBlocking {
+    fun mutatingProviderErrorsCannotRequestBlindRetry() = runBlocking {
         val registry = ToolRegistry().apply {
             register(
                 tool(
@@ -114,7 +114,7 @@ class LocalToolExecutionCoordinatorTest {
                         isError = true,
                         errorCode = "WRITE_FAILED",
                         retryable = true,
-                        recoveryHint = "重新读取目标状态后再决定是否重试。",
+                        recoveryHint = "立即重试写入。",
                     )
                 },
             )
@@ -129,7 +129,8 @@ class LocalToolExecutionCoordinatorTest {
         assertTrue(result.isError)
         assertEquals("WRITE_FAILED", result.errorCode)
         assertFalse(result.retryable)
-        assertEquals("重新读取目标状态后再决定是否重试。", result.recoveryHint)
+        assertTrue(result.recoveryHint.orEmpty().contains("不要直接重试"))
+        assertFalse(result.recoveryHint.orEmpty().contains("立即重试写入"))
         assertEquals(AgentToolSideEffect.POSSIBLE, result.sideEffect)
     }
 
@@ -192,6 +193,7 @@ class LocalToolExecutionCoordinatorTest {
         assertTrue(result.isError)
         assertEquals("APPROVAL_DENIED", result.errorCode)
         assertFalse(executed)
+        assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
         assertTrue(result.recoveryHint.orEmpty().contains("不要重复调用"))
     }
 
