@@ -40,8 +40,13 @@ class GroupAnnouncementService @Inject constructor(
             },
         )
         return modelGateway.withFrozenRoute(model, baseUrl) {
-            val reply = modelGateway.complete(model = model, baseUrl = baseUrl, messages = messages, tools = JsonArray(emptyList()))
-        withContext(Dispatchers.IO) {
+            val reply = modelGateway.complete(
+                model = model,
+                baseUrl = baseUrl,
+                messages = messages,
+                tools = JsonArray(emptyList()),
+            )
+            withContext(Dispatchers.IO) {
             usageTracker.record(
                 model = model,
                 usage = reply.usage,
@@ -50,8 +55,8 @@ class GroupAnnouncementService @Inject constructor(
                 promptBreakdown = reply.promptBreakdown,
             )
         }
-        reply.content?.trim()?.take(2_000)?.takeIf(String::isNotBlank)
-            ?: error("模型没有生成可用的群公告")
+            reply.content?.trim()?.take(2_000)?.takeIf(String::isNotBlank)
+                ?: error("模型没有生成可用的群公告")
         }
     }
 }
