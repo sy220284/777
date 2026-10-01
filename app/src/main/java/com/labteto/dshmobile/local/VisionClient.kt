@@ -92,7 +92,10 @@ class VisionClient @Inject constructor(
         }
 
         val gateway = runCatching { modelGateway.get() }.getOrNull()
-        val selectedProfile = profile ?: gateway?.activeProfile()
+        if (gateway != null && profile == null) {
+            error("视觉模型请求缺少冻结模型档案，拒绝回退到可变 active profile")
+        }
+        val selectedProfile = profile
         if (gateway != null && selectedProfile != null) {
             val messages = buildPayload(model, prompt, imageDataUrl)["messages"]
                 ?.jsonArray

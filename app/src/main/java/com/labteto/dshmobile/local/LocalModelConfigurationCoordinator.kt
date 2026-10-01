@@ -30,9 +30,11 @@ internal class LocalModelConfigurationCoordinator(
     suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): LocalModelConfigurationResult =
         LocalModelMutationGate.run {
             require(model.isNotBlank()) { "模型名称不能为空" }
-            val name = normalizeModel(model)
             val url = normalizeModelBaseUrl(baseUrl)
-            val id = modelProfileId(name, url)
+            val name = migrateOfficialClaudeModel(normalizeModel(model), url)
+            val existingProfiles = profiles.read()
+            val existing = existingProfiles.apiKeyProfileForRoute(name, url)
+            val id = existing?.id ?: modelProfileId(name, url)
             if (apiKey.isNotBlank()) apiKeys.putFor(id, apiKey)
             else require(apiKeys.getFor(id) != null) { "请填写该模型的密钥" }
             val preset = LocalModelPresets.find(name, url)
@@ -41,9 +43,9 @@ internal class LocalModelConfigurationCoordinator(
                 model = name,
                 baseUrl = url,
                 provider = preset?.provider.orEmpty(),
-                protocol = protocol ?: profiles.read().firstOrNull { it.id == id }?.protocol ?: preset?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS,
+                protocol = protocol ?: existing?.protocol ?: preset?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS,
             )
-            val all = profiles.read().filterNot { it.id == id } + profile
+            val all = existingProfiles.filterNot { it.id == id } + profile
             profiles.write(all)
             activate(profile)
             LocalModelConfigurationResult(true, name, url, all, profile.id)
@@ -112,13 +114,7 @@ internal class LocalModelConfigurationCoordinator(
 
     suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): String {
         if (model.isBlank()) return "请选择模型"
-        val name = normalizeModel(model)
-        val url = runCatching { normalizeModelBaseUrl(baseUrl) }
-            .getOrElse { return it.message ?: "地址无效" }
-        val key = apiKey.trim().takeIf(String::isNotEmpty)
-            ?: apiKeys.getFor(modelProfileId(name, url))
-            ?: return "请先填写该模型的密钥"
-        return tester.test(key, url, name, protocol ?: profiles.read().firstOrNull { it.id == modelProfileId(name, url) }?.protocol ?: LocalModelPresets.protocolFor(name, url))
+        return tester.testStoredRoute(apiKey, normalizeModel(model), baseUrl, protocol, profiles.read(), apiKeys::getFor)
     }
 
     fun readProfiles(): List<LocalModelProfile> = profiles.read()

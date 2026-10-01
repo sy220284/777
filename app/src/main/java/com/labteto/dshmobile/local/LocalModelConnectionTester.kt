@@ -22,6 +22,26 @@ class LocalModelConnectionTester @Inject constructor(private val gateway: LocalM
         )
     }
 
+    internal suspend fun testStoredRoute(
+        apiKey: String,
+        model: String,
+        baseUrl: String,
+        protocol: LocalModelProtocol?,
+        profiles: List<LocalModelProfile>,
+        readKey: suspend (String) -> String?,
+    ): String {
+        if (model.isBlank()) return "请选择模型"
+        val url = runCatching { normalizeModelBaseUrl(baseUrl) }
+            .getOrElse { return it.message ?: "地址无效" }
+        val name = migrateOfficialClaudeModel(model, url)
+        val existing = profiles.apiKeyProfileForRoute(name, url)
+        val key = apiKey.trim().takeIf(String::isNotEmpty)
+            ?: existing?.let { readKey(it.id) }
+            ?: readKey(modelProfileId(name, url))
+            ?: return "请先填写该模型的密钥"
+        return test(key, url, name, protocol ?: existing?.protocol ?: LocalModelPresets.protocolFor(name, url))
+    }
+
     suspend fun testProfile(profile: LocalModelProfile): String = runProbe {
         gateway.probeProfile(profile)
     }

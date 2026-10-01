@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LOCAL_MODEL_TOOL_CALLS_EVENT_KEY
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -41,7 +42,9 @@ private fun encodeTranscriptMessage(message: LocalHarnessMessage): JsonObject =
     )
 
 internal fun assistantModelMessageFromEvent(data: JsonObject): JsonObject =
-    (data["message"] as? JsonObject) ?: JsonObject(data - "transcript" - "replaces")
+    (data["message"] as? JsonObject) ?: JsonObject(
+        data - "transcript" - "replaces" - LOCAL_MODEL_TOOL_CALLS_EVENT_KEY,
+    )
 
 internal fun projectSessionTranscriptTail(
     snapshotMessages: List<LocalHarnessMessage>,

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -311,12 +312,7 @@ internal class LocalHistoryCompactor(
         messages.asReversed()
             .asSequence()
             .flatMap { message ->
-                val calls = message["tool_calls"] as? JsonArray ?: return@flatMap emptySequence()
-                calls.asSequence().mapNotNull { raw ->
-                    val call = raw as? JsonObject ?: return@mapNotNull null
-                    val function = call["function"] as? JsonObject ?: return@mapNotNull null
-                    function["name"].asText()?.takeIf(String::isNotBlank)
-                }
+                LocalCanonicalModelCodec.diagnosticToolNames(message).asSequence()
             }
             .distinct()
             .take(maxItems)

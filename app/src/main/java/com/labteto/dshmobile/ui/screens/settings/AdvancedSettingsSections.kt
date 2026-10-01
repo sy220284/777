@@ -582,7 +582,14 @@ internal fun LocalModelSettingsCard(
                     Text(baseUrl, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                     selectedPreset?.let { preset ->
                         Text(
-                            stringResource(R.string.local_model_request_endpoint, if (protocol == LocalModelProtocol.RESPONSES) "${preset.baseUrl.trimEnd('/')}/responses" else preset.chatEndpoint),
+                            stringResource(
+                                R.string.local_model_request_endpoint,
+                                when (protocol) {
+                                    LocalModelProtocol.RESPONSES -> "${preset.baseUrl.trimEnd('/')}/responses"
+                                    LocalModelProtocol.ANTHROPIC_MESSAGES -> "${preset.baseUrl.trimEnd('/')}/messages"
+                                    LocalModelProtocol.CHAT_COMPLETIONS -> preset.chatEndpoint
+                                },
+                            ),
                             style = DsType.caption11.withReadingWeight(),
                             color = colors.labelTertiary,
                         )

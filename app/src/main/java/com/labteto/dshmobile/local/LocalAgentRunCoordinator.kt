@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LOCAL_MODEL_TOOL_CALLS_EVENT_KEY
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.session.SessionRepairResult
@@ -431,8 +432,10 @@ internal class LocalAgentRunCoordinator(
         val turnStart = log.latest("turn/start") ?: return false
         val assistant = log.latest("assistant/message") ?: return false
         if (assistant.sequence <= turnStart.sequence) return false
-        val toolCalls = assistant.data["tool_calls"] as? JsonArray
-        return toolCalls == null || toolCalls.isEmpty()
+        val genericToolCalls = assistant.data[LOCAL_MODEL_TOOL_CALLS_EVENT_KEY] as? JsonArray
+        if (genericToolCalls != null) return genericToolCalls.isEmpty()
+        val legacyToolCalls = assistant.data["tool_calls"] as? JsonArray
+        return legacyToolCalls == null || legacyToolCalls.isEmpty()
     }
 
     private fun eventType(kind: LocalAgentRunKind): String = when (kind) {

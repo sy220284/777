@@ -33,6 +33,7 @@ data class SessionRepairResult(
  * never reached tool/call becomes TOOL_NOT_STARTED.
  */
 object SessionRecovery {
+    private const val MODEL_TOOL_CALLS_EVENT_KEY = "model_tool_calls"
     const val TOOL_NOT_STARTED = "TOOL_NOT_STARTED"
     const val TOOL_OUTCOME_UNKNOWN = "TOOL_OUTCOME_UNKNOWN"
 
@@ -105,13 +106,25 @@ object SessionRecovery {
             log.forEachAfter(openStepEvent.sequence) { event ->
                 when (event.type) {
                     "assistant/message" -> {
-                        val calls = event.data["tool_calls"] as? JsonArray ?: return@forEachAfter
-                        for (element in calls) {
-                            val call = element as? JsonObject ?: continue
-                            val id = call["id"]?.jsonPrimitive?.contentOrNull ?: continue
-                            val function = call["function"] as? JsonObject
-                            val name = function?.get("name")?.jsonPrimitive?.contentOrNull
-                            pending[id] = PendingCall(id, name, openStep, started = false)
+                        val genericCalls = event.data[MODEL_TOOL_CALLS_EVENT_KEY] as? JsonArray
+                        if (genericCalls != null) {
+                            for (element in genericCalls) {
+                                val call = element as? JsonObject ?: continue
+                                val id = call["id"]?.jsonPrimitive?.contentOrNull ?: continue
+                                val name = call["name"]?.jsonPrimitive?.contentOrNull
+                                pending[id] = PendingCall(id, name, openStep, started = false)
+                            }
+                        } else {
+                            // Backward compatibility for sessions written before provider-neutral
+                            // model metadata was added.
+                            val legacyCalls = event.data["tool_calls"] as? JsonArray ?: return@forEachAfter
+                            for (element in legacyCalls) {
+                                val call = element as? JsonObject ?: continue
+                                val id = call["id"]?.jsonPrimitive?.contentOrNull ?: continue
+                                val function = call["function"] as? JsonObject
+                                val name = function?.get("name")?.jsonPrimitive?.contentOrNull
+                                pending[id] = PendingCall(id, name, openStep, started = false)
+                            }
                         }
                     }
                     "tool/call" -> {

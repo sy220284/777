@@ -84,6 +84,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.withModelToolCallEventData
 import com.labteto.dshmobile.local.model.LocalModelAccountStateCoordinator
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
@@ -3316,8 +3317,8 @@ class LocalHarnessEngine @Inject constructor(
                         startedToolCallIds.clear()
                         completedToolCallIds.clear()
                         val assistantEvent = runEventLog.append(
-                            "assistant/message",
-                            runTranscript.withTranscript(reply.message, transcriptMessages),
+                            "assistant/message", runTranscript.withTranscript(reply.message, transcriptMessages)
+                                .withModelToolCallEventData(reply.toolCalls),
                         )
                         if (beforeAssistant.usageMode == LocalUsageMode.CHAT && event.toolCalls.isEmpty()) {
                             finalChatAssistant = transcriptMessages.lastOrNull { message ->
@@ -3504,7 +3505,9 @@ class LocalHarnessEngine @Inject constructor(
         )
 
         try {
-            withTimeout(FOREGROUND_TURN_TIMEOUT_MILLIS) { loop.run(input) }
+            withTimeout(FOREGROUND_TURN_TIMEOUT_MILLIS) {
+                modelGateway.withFrozenRoute(runSnapshot.model, runSnapshot.baseUrl) { loop.run(input) }
+            }
             if (runState.value.usageMode == LocalUsageMode.CHAT) {
                 val postTurnSnapshot = runState.value
                 finalChatAssistant?.let { assistantMessage ->
@@ -4919,9 +4922,9 @@ class LocalHarnessEngine @Inject constructor(
 
     private suspend fun load() {
         val storedModel = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
-        val model = modelConfiguration.normalizeModel(storedModel)
-        if (model != storedModel) preferences.edit().putString(KEY_MODEL, model).apply()
         val baseUrl = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
+        val model = migrateOfficialClaudeModel(modelConfiguration.normalizeModel(storedModel), baseUrl)
+        if (model != storedModel) preferences.edit().putString(KEY_MODEL, model).apply()
         modelConfiguration.prepareStartup(model, baseUrl)
         loadSession(currentSessionId, model, baseUrl)
     }

@@ -26,9 +26,10 @@ internal class LocalModelProfileStore(
             ?: "[]"
         json.parseToJsonElement(raw).jsonArray.mapNotNull { item ->
             val obj = item.jsonObject
-            val model = obj["model"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+            val storedModel = obj["model"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
                 ?: return@mapNotNull null
             val baseUrl = obj["baseUrl"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val model = com.labteto.dshmobile.local.migrateOfficialClaudeModel(storedModel, baseUrl)
             val auth = obj["authKind"]?.jsonPrimitive?.contentOrNull
                 ?.let { runCatching { LocalModelAuthKind.valueOf(it) }.getOrNull() }
                 ?: LocalModelAuthKind.API_KEY
@@ -41,8 +42,9 @@ internal class LocalModelProfileStore(
                 baseUrl = baseUrl,
                 provider = obj["provider"]?.jsonPrimitive?.contentOrNull ?: preset?.provider.orEmpty(),
                 authKind = auth,
-                protocol = obj["protocol"]?.jsonPrimitive?.contentOrNull
-                    ?.let { runCatching { LocalModelProtocol.valueOf(it) }.getOrNull() }
+                protocol = preset?.protocol?.takeIf { it == LocalModelProtocol.ANTHROPIC_MESSAGES }
+                    ?: obj["protocol"]?.jsonPrimitive?.contentOrNull
+                        ?.let { runCatching { LocalModelProtocol.valueOf(it) }.getOrNull() }
                     ?: preset?.protocol
                     ?: LocalModelProtocol.CHAT_COMPLETIONS,
                 credentialRef = credentialRef,
