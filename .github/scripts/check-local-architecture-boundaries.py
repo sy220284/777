@@ -23,6 +23,8 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt": 1802,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt": 240,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt": 340,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt": 1041,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppearanceSettingsComponents.kt": 450,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/RemoteSettingsController.kt": 190,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt": 47,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt": 72,
