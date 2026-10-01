@@ -46,6 +46,8 @@ internal suspend fun saveGroupChatAnnouncement(
             current
         }
     }
+    // Match the common persistence boundary: capture the durable cursor before mutable state.
+    val controlProjectedThroughSequence = eventLog.latestSequence()
     val updated = state.value
     if (updated.sessionId != sessionId || updated.groupChat.announcement != announcement) {
         return Result.failure(IllegalStateException("会话状态已变化，请重新保存群公告"))
@@ -56,7 +58,7 @@ internal suspend fun saveGroupChatAnnouncement(
             sessionCoordinator.snapshot(
                 sessionId = sessionId,
                 state = updated,
-                controlProjectedThroughSequence = eventLog.latestSequence(),
+                controlProjectedThroughSequence = controlProjectedThroughSequence,
                 transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
             ),
         )
