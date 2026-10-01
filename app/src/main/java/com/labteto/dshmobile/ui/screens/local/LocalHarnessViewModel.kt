@@ -75,7 +75,6 @@ class LocalHarnessViewModel @Inject constructor(
         forceNewStory: Boolean = false,
     ): Result<PersonaGalleryEntry> =
         personaGalleryController.saveCurrentToGallery(notes, existingId, existingStoryId, forceNewStory)
-
     fun hasUnsavedCurrentPersona(): Boolean = personaGalleryController.hasUnsavedCurrentPersona()
     fun currentGalleryNeedsUpdate(): Boolean = personaGalleryController.currentGalleryNeedsUpdate()
     fun currentGalleryHasUnsavedChanges(): Boolean = personaGalleryController.currentGalleryHasUnsavedChanges()

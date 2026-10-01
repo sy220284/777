@@ -6,7 +6,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 UI_ROOT = ROOT / "app/src/main/java/com/labteto/dshmobile/ui"
-MAX_HARDCODED_CJK_LITERALS = 90
+MAX_HARDCODED_CJK_LITERALS = 82
 
 
 def contains_cjk(value: str) -> bool:
