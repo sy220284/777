@@ -304,6 +304,18 @@ data class LocalModelDelta(
     val reasoning: String = "",
 )
 
+/** Provider/account identity of the exact route that produced one model reply. */
+@Serializable
+data class LocalModelRouteIdentity(
+    val profileId: String? = null,
+    val provider: String = "",
+    val model: String = "",
+    val baseUrl: String = "",
+    val authKind: String = "",
+    val protocol: String = "",
+    val fingerprint: String = "",
+)
+
 /** Parsed model response retained verbatim for the next request. */
 data class LocalModelReply(
     val message: JsonObject,
@@ -314,4 +326,5 @@ data class LocalModelReply(
     val requestId: String = "",
     val promptBreakdown: TokenPromptBreakdown = TokenPromptBreakdown(),
     val canonicalMessage: LocalCanonicalMessage? = null,
+    val routeIdentity: LocalModelRouteIdentity? = null,
 )
