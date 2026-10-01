@@ -152,7 +152,7 @@ class OpenAiResponsesClientTest {
         val response = Json.parseToJsonElement("""{
             "id":"resp-namespaced-tool",
             "output":[
-                {"type":"function_call","namespace":"local","call_id":"call-read","name":"read","arguments":"{\\"path\\":\\"AGENTS.md\\"}"}
+                {"type":"function_call","namespace":"local","call_id":"call-read","name":"read","arguments":"{\"path\":\"AGENTS.md\"}"}
             ]
         }""").jsonObject
         val reply = client.parseCompleted(
