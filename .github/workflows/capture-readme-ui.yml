@@ -43,7 +43,7 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
-            set -euxo pipefail
+            set -eux
             DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest \
               -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.ReadmeUiScreenshotCaptureTest \
               --stacktrace
