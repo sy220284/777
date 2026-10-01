@@ -154,7 +154,7 @@ internal fun WorkspaceMenu(
  * "Subagents" heading per workspace, which said nothing about which run produced which — with a
  * dozen of them from three sessions it was a wall of near-identical rows.
  */
-private fun LazyListScope.sessionTreeItem(
+internal fun LazyListScope.sessionTreeItem(
     session: SessionRow,
     currentSessionId: String?,
     tree: Map<String, List<SessionRow>>,
@@ -200,7 +200,7 @@ private fun LazyListScope.sessionTreeItem(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SessionRowItem(
+internal fun SessionRowItem(
     session: SessionRow,
     isCurrent: Boolean,
     store: SessionStore,

@@ -138,7 +138,7 @@ internal fun localHarnessShowsBlockingLoading(
 ): Boolean = loading && !hasRenderedSurface
 
 @Composable
-private fun localSendRejectMessage(reason: LocalSendRejectReason, limit: Int?): String = when (reason) {
+internal fun localSendRejectMessage(reason: LocalSendRejectReason, limit: Int?): String = when (reason) {
     LocalSendRejectReason.EMPTY -> stringResource(R.string.local_send_rejected_empty)
     LocalSendRejectReason.LOADING -> stringResource(R.string.local_send_rejected_loading)
     LocalSendRejectReason.UNCONFIGURED -> stringResource(R.string.local_send_rejected_unconfigured)
