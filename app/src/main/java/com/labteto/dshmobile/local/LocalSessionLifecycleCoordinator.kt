@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.HandoffGoal
@@ -262,22 +263,7 @@ internal class LocalSessionLifecycleCoordinator(
                             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
                             deviceApprovalLease = false,
                             jobs = projectExecutionJobs(usageMode, nextSessionId, jobs.snapshotInfos()),
-                            activeAgents = projectWorkResourceCount(
-                                usageMode,
-                                resourceScheduler.snapshot().activeAgents,
-                            ),
-                            activeTerminals = projectWorkResourceCount(
-                                usageMode,
-                                resourceScheduler.snapshot().activeTerminals,
-                            ),
-                            activeVirtualDisplays = projectWorkResourceCount(
-                                usageMode,
-                                resourceScheduler.snapshot().activeVirtualDisplays,
-                            ),
-                            activeLanguageServers = projectWorkResourceCount(
-                                usageMode,
-                                resourceScheduler.snapshot().activeLanguageServers,
-                            ),
+                            resources = resourceScheduler.snapshot().toLocalHarnessResourceState(usageMode),
                             error = null,
                         )
                     }

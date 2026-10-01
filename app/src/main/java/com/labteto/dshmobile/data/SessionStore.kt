@@ -120,13 +120,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
-internal fun InputStream.readBytesAtMost(maxBytes: Int): ByteArray {
-    require(maxBytes >= 0) { "maxBytes 必须大于等于 0" }
-    val bytes = readNBytes(maxBytes + 1)
-    check(bytes.size <= maxBytes) { "附件实际大小超过 $maxBytes 字节回退上传上限" }
-    return bytes
-}
-
 /**
  * Single source of truth for the connected harness's live state. All public surface is
  * [StateFlow]; every RPC error becomes [connectionError] and never throws. The store survives
@@ -147,8 +140,11 @@ class SessionStore @Inject constructor(
     fun apiForHost(key: String?): DshApiClient? = if (key != null && key == activeHostKey) connectionManager.connectedApi else null
     fun muxForHost(key: String?) = if (key != null && key == activeHostKey) connectionManager.generation?.mux else null
     fun retryConnection() = connectionManager.reconnectIfNeeded()
-    private val permissionCatalog = MutableStateFlow<PermissionCatalog?>(null)
-    private var permissionCatalogEpoch = 0L
+    private val attachmentTransfer = SessionAttachmentTransfer(
+        apiForHost = ::apiForHost,
+        onConnectionError = ::setConnectionError,
+        logger = ::log,
+    )
     private val queuesBySession = MutableStateFlow<Map<String, List<QueueItem>>>(emptyMap())
     val sessionQueues: StateFlow<Map<String, List<QueueItem>>> = queuesBySession.asStateFlow()
 
@@ -169,6 +165,15 @@ class SessionStore @Inject constructor(
     private val _currentSessionId = MutableStateFlow<String?>(null)
     val currentSessionId: StateFlow<String?> = _currentSessionId.asStateFlow()
 
+    private val catalogs = SessionCatalogRuntime(
+        apiProvider = ::apiOrNull,
+        apiForHost = ::apiForHost,
+        activeHostKey = { activeHostKey },
+        currentSessionId = { _currentSessionId.value },
+        onConnectionError = ::setConnectionError,
+        logger = ::log,
+    )
+
     private val _searchResults = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val searchResults: StateFlow<List<Pair<String, String>>> = _searchResults.asStateFlow()
 
@@ -188,17 +193,12 @@ class SessionStore @Inject constructor(
     private val _jobs = MutableStateFlow<List<JobView>>(emptyList())
     val jobs: StateFlow<List<JobView>> = _jobs.asStateFlow()
 
-    private val _skills = MutableStateFlow<List<SkillEntry>>(emptyList())
-    val skills: StateFlow<List<SkillEntry>> = _skills.asStateFlow()
-    private val _skillsLoading = MutableStateFlow(false)
-    val skillsLoading: StateFlow<Boolean> = _skillsLoading.asStateFlow()
-
-    private val _models = MutableStateFlow<ModelCatalog?>(null)
-    private val _modelsLoading = MutableStateFlow(false)
-    val modelsLoading: StateFlow<Boolean> = _modelsLoading.asStateFlow()
+    val skills: StateFlow<List<SkillEntry>> = catalogs.skills
+    val skillsLoading: StateFlow<Boolean> = catalogs.skillsLoading
+    val modelsLoading: StateFlow<Boolean> = catalogs.modelsLoading
 
     /** The host generation's routable model catalog, before the session's own selection is joined in. */
-    val modelCatalog: StateFlow<ModelCatalog?> = _models.asStateFlow()
+    val modelCatalog: StateFlow<ModelCatalog?> = catalogs.modelCatalog
 
     private val _hostInfo = MutableStateFlow<HostDescription?>(null)
     val hostInfo: StateFlow<HostDescription?> = _hostInfo.asStateFlow()
@@ -236,20 +236,15 @@ class SessionStore @Inject constructor(
     private val _pendingQuestions = MutableStateFlow<PendingQuestions?>(null)
     val pendingQuestions: StateFlow<PendingQuestions?> = _pendingQuestions.asStateFlow()
 
-    private val _commands = MutableStateFlow<List<CommandDescriptor>>(emptyList())
-    val commands: StateFlow<List<CommandDescriptor>> = _commands.asStateFlow()
+    val commands: StateFlow<List<CommandDescriptor>> = catalogs.commands
 
     /** False once the harness has told us it has no command registry; the menu degrades, not errors. */
-    private val _commandsAvailable = MutableStateFlow(true)
-    val commandsAvailable: StateFlow<Boolean> = _commandsAvailable.asStateFlow()
+    val commandsAvailable: StateFlow<Boolean> = catalogs.commandsAvailable
 
-    private val _agentPresets = MutableStateFlow<AgentPresetListValue?>(null)
-    val agentPresets: StateFlow<AgentPresetListValue?> = _agentPresets.asStateFlow()
-
-    private val _plugins = MutableStateFlow<PluginInventorySnapshot?>(null)
+    val agentPresets: StateFlow<AgentPresetListValue?> = catalogs.agentPresets
 
     /** The host's plugin inventory, or null when this deployment does not expose one. */
-    val plugins: StateFlow<PluginInventorySnapshot?> = _plugins.asStateFlow()
+    val plugins: StateFlow<PluginInventorySnapshot?> = catalogs.plugins
 
     /** The preset a switch is in flight for, cleared when the projection reports it as effective. */
     private val _pendingPermission = MutableStateFlow<String?>(null)
@@ -262,7 +257,7 @@ class SessionStore @Inject constructor(
     // means the key is absent — the harness composes no such service — and callers hide the UI.
 
     val permissions: StateFlow<PermissionSelect?> = combine(
-        projectionOf(PermissionSelect.serializer(), "permissions"), permissionCatalog,
+        projectionOf(PermissionSelect.serializer(), "permissions"), catalogs.permissionCatalog,
     ) { selection, catalog -> selection?.copy(options = catalog?.options ?: emptyList()) }
         .stateIn(scope, SharingStarted.Eagerly, null)
     val sessionStats: StateFlow<SessionStatsView?> = projectionOf(SessionStatsView.serializer(), "sessionStats")
@@ -288,7 +283,7 @@ class SessionStore @Inject constructor(
      * stands in before a session has either.
      */
     val models: StateFlow<SessionModelsValue?> =
-        combine(_models, modelSelection) { catalog, selection ->
+        combine(catalogs.modelCatalog, modelSelection) { catalog, selection ->
             if (catalog == null) return@combine null
             val current = selection?.next ?: selection?.lastUsed ?: catalog.default
             SessionModelsValue(
@@ -933,14 +928,10 @@ class SessionStore @Inject constructor(
             if (!same) {
                 _currentConversation.value = null
                 _jobs.value = emptyList()
-                _skills.value = emptyList()
-                _skillsLoading.value = true
-                _models.value = null
-                _modelsLoading.value = true
+                catalogs.resetSession()
                 _subagents.value = emptyList()
                 _subagentConversation.value = null
                 _subagentMode.value = null
-                _commands.value = emptyList()
             }
         }
         startFollow(sessionId)
@@ -1182,29 +1173,15 @@ class SessionStore @Inject constructor(
         onProgress: (sent: Long) -> Unit = {},
         targetSessionId: String? = currentSessionId.value,
         targetHost: String? = activeHostKey,
-    ): RpcResult<FileUploadValue> = withContext(Dispatchers.IO) {
-        val sid = targetSessionId
-            ?: return@withContext RpcResult.Err(RpcError("internal", "no open session"))
-        val api = apiForHost(targetHost)
-            ?: return@withContext RpcResult.Err(RpcError("internal", "not connected"))
-        val stream = open()
-            ?: return@withContext RpcResult.Err(RpcError("internal", "could not read the file"))
-        val streamed = stream.use { api.uploadFileBinary(sid, name, size, it, onProgress) }
-        if (streamed !is RpcResult.Err || streamed.error.code != "capability-unavailable") return@withContext streamed
-        if (size !in 0..MAX_ENCODED_UPLOAD_BYTES) return@withContext streamed
-        log("upload route unavailable; falling back to fileUploads/upload for ${size}B")
-        val bytes = try {
-            open()?.use { it.readBytesAtMost(MAX_ENCODED_UPLOAD_BYTES.toInt()) }
-        } catch (tooLarge: IllegalStateException) {
-            return@withContext RpcResult.Err(
-                RpcError(ATTACHMENT_INVALID, tooLarge.message ?: "attachment exceeds fallback upload limit"),
-            )
-        } ?: return@withContext RpcResult.Err(RpcError("internal", "could not read the file"))
-        api.fileUploadEncoded(
-            sid,
-            EncodedFileUploadRequest(data = Base64.encodeToString(bytes, Base64.NO_WRAP), name = name),
-        ).also { onProgress(bytes.size.toLong()) }
-    }
+    ): RpcResult<FileUploadValue> =
+        attachmentTransfer.uploadFile(
+            name = name,
+            size = size,
+            open = open,
+            onProgress = onProgress,
+            targetSessionId = targetSessionId,
+            targetHost = targetHost,
+        )
 
     private suspend fun promptContent(mode: String, content: List<PromptContentPart>, targetSessionId: String?, targetHost: String?): PromptOutcome {
         val sid = targetSessionId ?: return PromptOutcome.Failed("no open session")
@@ -1468,17 +1445,12 @@ class SessionStore @Inject constructor(
         }
     }
 
-    suspend fun fetchAttachment(attachmentId: String, sessionId: String? = currentSessionId.value, host: String? = activeHostKey): ByteArray? {
-        val sid = sessionId ?: return null
-        val api = host?.let(::apiForHost) ?: return null
-        return when (val r = api.sessionAttachment(SessionAttachmentRequest(sid, attachmentId))) {
-            is RpcResult.Ok -> runCatching { Base64.decode(r.value.data, Base64.DEFAULT) }.getOrNull()
-            is RpcResult.Err -> {
-                setConnectionError(r.error.message)
-                null
-            }
-        }
-    }
+    suspend fun fetchAttachment(attachmentId: String, sessionId: String? = currentSessionId.value, host: String? = activeHostKey): ByteArray? =
+        attachmentTransfer.fetchAttachment(
+            attachmentId = attachmentId,
+            sessionId = sessionId,
+            host = host,
+        )
 
     suspend fun listSkills() {
         val sid = currentSessionId.value ?: return
@@ -1657,23 +1629,8 @@ class SessionStore @Inject constructor(
      * is a connection fault, so this degrades the menu to its static fallback rather than raising a
      * failure banner on an otherwise healthy session.
      */
-    suspend fun refreshCommands() {
-        val sid = currentSessionId.value ?: return
-        val api = apiOrNull() ?: return
-        when (val r = api.commandsList(sid)) {
-            is RpcResult.Ok -> synchronized(lock) {
-                if (currentId == sid) {
-                    _commands.value = r.value
-                    _commandsAvailable.value = true
-                }
-            }
-            is RpcResult.Err -> {
-                _commandsAvailable.value = false
-                _commands.value = emptyList()
-                log("commands/list unavailable (${r.error.code}): ${r.error.message}")
-            }
-        }
-    }
+    suspend fun refreshCommands() =
+        catalogs.refreshCommands(currentSessionId.value)
 
     /**
      * Run one complete slash-command line, optionally carrying the composer's images.
@@ -1723,9 +1680,7 @@ class SessionStore @Inject constructor(
                 // No command gateway in this build (404) or the trust fence refused it (403).
                 // Neither is a connection fault, so the menu retires rather than the session.
                 "capability-unavailable", "forbidden" -> {
-                    _commandsAvailable.value = false
-                    _commands.value = emptyList()
-                    log("commands/execute unavailable (${r.error.code}): ${r.error.message}")
+                    catalogs.markCommandsUnavailable(r.error.code, r.error.message)
                     CommandOutcome.Failed(r.error.message)
                 }
                 else -> {
@@ -1768,25 +1723,10 @@ class SessionStore @Inject constructor(
      * flow null and takes the settings section off the screen: absence of the capability, not a
      * failure to report.
      */
-    suspend fun refreshPlugins() {
-        val api = apiOrNull() ?: return
-        when (val r = api.pluginInventoryList()) {
-            is RpcResult.Ok -> _plugins.value = r.value
-            is RpcResult.Err -> {
-                _plugins.value = null
-                log("pluginInventory/list unavailable (${r.error.code}): ${r.error.message}")
-            }
-        }
-    }
+    suspend fun refreshPlugins() = catalogs.refreshPlugins()
 
     /** Reload the agent-preset roster (host-scoped, so it survives session switches). */
-    suspend fun refreshAgentPresets() {
-        val api = apiOrNull() ?: return
-        when (val r = api.agentPresetList()) {
-            is RpcResult.Ok -> _agentPresets.value = r.value
-            is RpcResult.Err -> log("agentPreset.list unavailable (${r.error.code}): ${r.error.message}")
-        }
-    }
+    suspend fun refreshAgentPresets() = catalogs.refreshAgentPresets()
 
     /**
      * Pin an agent preset onto the open session. The harness only allows this while the session is
@@ -1844,51 +1784,9 @@ class SessionStore @Inject constructor(
         }
     }
 
-    private suspend fun loadSkills(sessionId: String) {
-        val api = apiOrNull()
-        if (api == null) {
-            synchronized(lock) {
-                if (currentId == sessionId) _skillsLoading.value = false
-            }
-            return
-        }
-        try {
-            when (val r = api.skillList(SkillListRequest(sessionId))) {
-                is RpcResult.Ok -> synchronized(lock) {
-                    if (currentId == sessionId) _skills.value = r.value.skills
-                }
-                is RpcResult.Err -> setConnectionError(r.error.message)
-            }
-        } finally {
-            synchronized(lock) {
-                if (currentId == sessionId) _skillsLoading.value = false
-            }
-        }
-    }
+    private suspend fun loadSkills(sessionId: String) = catalogs.loadSkills(sessionId)
 
-    private suspend fun loadModels(sessionId: String) {
-        val api = apiOrNull()
-        if (api == null) {
-            synchronized(lock) {
-                if (currentId == sessionId) _modelsLoading.value = false
-            }
-            return
-        }
-        // Host-scoped now, not session-scoped: `session/modelCatalog` describes the generation's
-        // routable models, and the session's own current selection comes from its projections.
-        try {
-            when (val r = api.sessionModelCatalog()) {
-                is RpcResult.Ok -> synchronized(lock) {
-                    if (currentId == sessionId) _models.value = r.value
-                }
-                is RpcResult.Err -> setConnectionError(r.error.message)
-            }
-        } finally {
-            synchronized(lock) {
-                if (currentId == sessionId) _modelsLoading.value = false
-            }
-        }
-    }
+    private suspend fun loadModels(sessionId: String) = catalogs.loadModels(sessionId)
 
     /**
      * The tail slice of a history page the host over-delivered.
@@ -1933,19 +1831,7 @@ class SessionStore @Inject constructor(
      */
     val commandAttachmentsSupported: Boolean get() = connectionManager.connectedApi != null
 
-    suspend fun refreshPermissionCatalog() {
-        val epoch = ++permissionCatalogEpoch
-        val key = activeHostKey
-        val api = apiForHost(key) ?: return
-        // Not cleared before the read. Blanking first made the permission chip lose its options for
-        // the length of a round trip on every baseline, which reads as the chip breaking rather
-        // than as a refresh. The epoch and host guards below already stop a slow answer from
-        // overwriting a newer host's catalog, which is what the clear was standing in for.
-        val result = api.permissionCatalog()
-        if (epoch == permissionCatalogEpoch && key == activeHostKey) {
-            permissionCatalog.value = (result as? RpcResult.Ok)?.value
-        }
-    }
+    suspend fun refreshPermissionCatalog() = catalogs.refreshPermissionCatalog()
 
     suspend fun unarchiveSession(sessionId: String): Boolean {
         val key = activeHostKey
@@ -1977,14 +1863,6 @@ class SessionStore @Inject constructor(
     private companion object {
         const val TAG = "SessionStore"
 
-        /**
-         * The host's refusal of a prompt's or command's attachments (harness 0.1.3; it was
-         * `attachment-error` through 0.1.2). Every business code is namespaced now.
-         */
-        const val ATTACHMENT_INVALID = "session/attachment-invalid"
-
-        /** Largest file the base64 Remote fallback will carry; anything bigger needs the route. */
-        const val MAX_ENCODED_UPLOAD_BYTES = 20L * 1024 * 1024
         const val HISTORY_PAGE_SIZE = 60
 
         /** Ceiling on events folded per page, whatever the host sends. */

@@ -211,11 +211,11 @@ internal class LocalSubagentRunner(
             kind = runKind,
             allowMutation = allowMutation,
             resourceBudget = LocalAgentRunResourceBudget(
-                maxModelRequests = snapshot.maxModelRequests,
-                maxAgents = snapshot.maxAgents,
-                maxTerminals = snapshot.maxTerminals,
-                maxVirtualDisplays = snapshot.maxVirtualDisplays,
-                maxLanguageServers = snapshot.maxLanguageServers,
+                maxModelRequests = snapshot.resources.maxModelRequests,
+                maxAgents = snapshot.resources.maxAgents,
+                maxTerminals = snapshot.resources.maxTerminals,
+                maxVirtualDisplays = snapshot.resources.maxVirtualDisplays,
+                maxLanguageServers = snapshot.resources.maxLanguageServers,
             ),
             toolNames = schemas(
                 allowMutation,
