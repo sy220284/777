@@ -1,25 +1,15 @@
 package com.labteto.dshmobile.ui.screens.settings
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
-import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.connection.ConnectionManager
-import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.connection.HostsStore
-import com.labteto.dshmobile.core.wire.RpcResult
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
-import com.labteto.dshmobile.core.wire.dto.LlmDiscoveredModel
-import com.labteto.dshmobile.core.wire.dto.LlmModelDiscoveryRequest
-import com.labteto.dshmobile.core.wire.dto.SettingsDescribeValue
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
-import com.labteto.dshmobile.core.wire.dto.SettingsPathOpView
-import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
-import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
 import com.labteto.dshmobile.local.DeepSeekPricingRepository
 import com.labteto.dshmobile.local.DeepSeekPricingState
 import com.labteto.dshmobile.local.DeepSeekUsageTracker
@@ -53,29 +43,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 
-data class RemoteProjectSettingsState(
-    val loading: Boolean = false,
-    val available: Boolean = false,
-    val writable: Boolean = false,
-    val namespaces: List<SettingsNamespaceView> = emptyList(),
-    val error: String? = null,
-)
-
-data class ModelServicesState(
-    val loading: Boolean = false,
-    val providers: List<LlmConfigurableProvider> = emptyList(),
-    val discovered: Map<String, List<LlmDiscoveredModel>> = emptyMap(),
-    val error: String? = null,
-)
-
-data class DeviceCapabilitiesState(
-    val loading: Boolean = false,
-    val accessibility: Boolean = false,
-    val notifications: Boolean = false,
-    val virtualDisplay: Boolean = true,
-    val error: String? = null,
-)
-
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val hostsStore: HostsStore,
@@ -89,6 +56,8 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val appContext = context.applicationContext
+    private val remoteSettingsController = RemoteSettingsController(connectionManager, viewModelScope)
+    private val deviceCapabilitiesController = DeviceCapabilitiesController(appContext)
 
     private val _state = MutableStateFlow(AppSettings())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
@@ -115,14 +84,12 @@ class SettingsViewModel @Inject constructor(
     val memories: StateFlow<List<MemoryRecord>> = _memories.asStateFlow()
 
 
-    private val _projectSettings = MutableStateFlow(RemoteProjectSettingsState())
-    val projectSettings: StateFlow<RemoteProjectSettingsState> = _projectSettings.asStateFlow()
-
-    private val _modelServices = MutableStateFlow(ModelServicesState())
-    val modelServices: StateFlow<ModelServicesState> = _modelServices.asStateFlow()
-
-    private val _deviceCapabilities = MutableStateFlow(DeviceCapabilitiesState())
-    val deviceCapabilities: StateFlow<DeviceCapabilitiesState> = _deviceCapabilities.asStateFlow()
+    val projectSettings: StateFlow<RemoteProjectSettingsState> =
+        remoteSettingsController.projectSettings
+    val modelServices: StateFlow<ModelServicesState> =
+        remoteSettingsController.modelServices
+    val deviceCapabilities: StateFlow<DeviceCapabilitiesState> =
+        deviceCapabilitiesController.state
 
     val connectionState: StateFlow<ConnectionUiState> = connectionManager.state.stateIn(
         viewModelScope,
@@ -214,142 +181,23 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { deepSeekPricingRepository.refreshFromOfficial() }
     }
 
-    fun refreshRemoteSettings() {
-        viewModelScope.launch {
-            val api = connectionManager.connectedApi
-            if (api == null || connectionManager.state.value.phase != ConnectionPhase.CONNECTED) {
-                _projectSettings.value = RemoteProjectSettingsState()
-                _modelServices.value = ModelServicesState()
-                return@launch
-            }
-
-            _projectSettings.value = _projectSettings.value.copy(loading = true, error = null)
-            when (val result = api.settingsDescribe()) {
-                is RpcResult.Ok -> {
-                    val value: SettingsDescribeValue = result.value
-                    _projectSettings.value = RemoteProjectSettingsState(
-                        loading = false,
-                        available = true,
-                        writable = value.writable,
-                        namespaces = value.namespaces,
-                    )
-                }
-                is RpcResult.Err -> {
-                    _projectSettings.value = RemoteProjectSettingsState(
-                        loading = false,
-                        error = result.error.message,
-                    )
-                }
-            }
-
-            _modelServices.value = _modelServices.value.copy(loading = true, error = null)
-            when (val result = api.llmListConfigurableProviders()) {
-                is RpcResult.Ok -> {
-                    _modelServices.value = _modelServices.value.copy(
-                        loading = false,
-                        providers = result.value,
-                        error = null,
-                    )
-                }
-                is RpcResult.Err -> {
-                    _modelServices.value = ModelServicesState(
-                        loading = false,
-                        error = result.error.message,
-                    )
-                }
-            }
-        }
-    }
+    fun refreshRemoteSettings() = remoteSettingsController.refresh()
 
     fun setRemoteSetting(
         namespace: SettingsNamespaceView,
         path: List<String>,
         value: JsonElement,
         onDone: (String?) -> Unit = {},
-    ) {
-        viewModelScope.launch {
-            val api = connectionManager.connectedApi
-            if (api == null) {
-                onDone("当前没有已连接的 Harness")
-                return@launch
-            }
-            val revision = namespace.revision.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
-            when (
-                val result = api.settingsMutate(
-                    ns = namespace.ns,
-                    ops = listOf(SettingsPathOpView.Set(path = path, value = value)),
-                    expectedRevision = revision,
-                )
-            ) {
-                is RpcResult.Ok -> {
-                    replaceNamespace(result.value)
-                    onDone(null)
-                }
-                is RpcResult.Err -> {
-                    onDone(result.error.message)
-                    refreshRemoteSettings()
-                }
-            }
-        }
-    }
+    ) = remoteSettingsController.set(namespace, path, value, onDone)
 
     fun unsetRemoteSetting(
         namespace: SettingsNamespaceView,
         path: List<String>,
         onDone: (String?) -> Unit = {},
-    ) {
-        viewModelScope.launch {
-            val api = connectionManager.connectedApi
-            if (api == null) {
-                onDone("当前没有已连接的 Harness")
-                return@launch
-            }
-            val revision = namespace.revision.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
-            when (
-                val result = api.settingsMutate(
-                    ns = namespace.ns,
-                    ops = listOf(SettingsPathOpView.Unset(path = path)),
-                    expectedRevision = revision,
-                )
-            ) {
-                is RpcResult.Ok -> {
-                    replaceNamespace(result.value)
-                    onDone(null)
-                }
-                is RpcResult.Err -> {
-                    onDone(result.error.message)
-                    refreshRemoteSettings()
-                }
-            }
-        }
-    }
+    ) = remoteSettingsController.unset(namespace, path, onDone)
 
-    fun discoverModels(provider: LlmConfigurableProvider) {
-        viewModelScope.launch {
-            val api = connectionManager.connectedApi ?: return@launch
-            _modelServices.value = _modelServices.value.copy(loading = true, error = null)
-            when (
-                val result = api.llmDiscoverModels(
-                    settingsNs = provider.settingsNs,
-                    request = LlmModelDiscoveryRequest(provider = provider.provider),
-                )
-            ) {
-                is RpcResult.Ok -> {
-                    _modelServices.value = _modelServices.value.copy(
-                        loading = false,
-                        discovered = _modelServices.value.discovered + (provider.provider to result.value),
-                        error = null,
-                    )
-                }
-                is RpcResult.Err -> {
-                    _modelServices.value = _modelServices.value.copy(
-                        loading = false,
-                        error = result.error.message,
-                    )
-                }
-            }
-        }
-    }
+    fun discoverModels(provider: LlmConfigurableProvider) =
+        remoteSettingsController.discoverModels(provider)
 
     suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null) =
         withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol, profileId) }
@@ -523,33 +371,11 @@ class SettingsViewModel @Inject constructor(
         usageTracker.analyticsRecord(requestId)
     }
 
-    fun refreshDeviceCapabilities() {
-        _deviceCapabilities.value = DeviceCapabilitiesState(
-            loading = false,
-            accessibility = HarnessAccessibilityService.active() != null,
-            notifications = HarnessNotificationListenerService.active() != null,
-            virtualDisplay = true,
-        )
-    }
+    fun refreshDeviceCapabilities() = deviceCapabilitiesController.refresh()
 
-    fun openAccessibilitySettings() {
-        appContext.startActivity(
-            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-    }
+    fun openAccessibilitySettings() = deviceCapabilitiesController.openAccessibilitySettings()
 
-    fun openNotificationAccessSettings() {
-        appContext.startActivity(
-            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-    }
-
-    private fun replaceNamespace(updated: SettingsNamespaceView) {
-        _projectSettings.value = _projectSettings.value.copy(
-            namespaces = _projectSettings.value.namespaces.map {
-                if (it.ns == updated.ns) updated else it
-            },
-        )
-    }
+    fun openNotificationAccessSettings() =
+        deviceCapabilitiesController.openNotificationAccessSettings()
 
 }
