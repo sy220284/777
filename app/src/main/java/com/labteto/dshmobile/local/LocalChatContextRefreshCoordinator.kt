@@ -484,7 +484,7 @@ internal class LocalChatContextRefreshCoordinator(
                     pending.generation == expectedGeneration
             }) {
             scheduleRetry(
-                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, 0, "remaining-pending",
+                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "remaining-pending",
             )
         }
     }

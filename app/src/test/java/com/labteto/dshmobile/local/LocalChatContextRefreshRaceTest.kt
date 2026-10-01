@@ -5,6 +5,7 @@ import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -93,6 +94,41 @@ class LocalChatContextRefreshRaceTest {
             fixture.log, fixture.profile,
         )
         assertEquals(listOf("profile-a"), fixture.observedProfiles)
+    }
+
+    @Test fun remainingPendingContinuationCannotResetTheRetryBudgetForever() = runTest {
+        val fixture = fixture(backgroundScope)
+        val before = fixture.state.value
+        var context = before.chatContext
+        repeat(39) { index ->
+            val id = "extra-$index"
+            val message = LocalHarnessMessage(id, "assistant", "reply-$index", createdAt = index + 2L)
+            val event = fixture.log.append("assistant/message", buildJsonObject {
+                put("transcript", encodeTranscriptMessages(listOf(message)))
+            })
+            context = context.enqueuePendingDurably(
+                ChatPendingTurn(
+                    event.sequence,
+                    assistantMessageId = id,
+                    branchHeadId = id,
+                    assistantMessage = "reply-$index",
+                ),
+                fixture.log,
+            )
+        }
+        fixture.state.delegate.value = before.copy(chatContext = context)
+
+        fixture.coordinator.refresh(
+            PersonaProfile(), "s", before.chatState, context.generation, fixture.log, fixture.profile,
+        )
+        advanceUntilIdle()
+
+        val continuationRetries = fixture.log.snapshot().count { event ->
+            event.type == "chat/post-turn" &&
+                event.data["status"]?.jsonPrimitive?.content == "retrying" &&
+                event.data["reason"]?.jsonPrimitive?.content == "remaining-pending"
+        }
+        assertTrue("连续重排必须受同一预算约束", continuationRetries <= 3)
     }
 
     @Test fun terminalProviderFailureDoesNotEnterDetachedPostTurnRetryLoop() {

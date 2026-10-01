@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
+import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -241,7 +242,13 @@ internal class LocalSessionRepository(
                 store.read(id)
             } catch (future: FutureSessionVersionException) {
                 throw future
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                AppLog.warn(
+                    "LocalSessionRepository",
+                    "session/corrupt-skipped id=$id stage=read",
+                    error,
+                )
+                onError(IllegalStateException("会话 $id 已损坏，已从列表跳过；诊断信息已记录", error))
                 null
             } ?: return@mapNotNull null
 
@@ -287,7 +294,15 @@ internal class LocalSessionRepository(
                         ?.takeIf { it.isNotBlank() }
                         ?.let { if (it.length > 72) it.take(72) + "…" else it },
                 )
-            }.getOrNull()
+            }.getOrElse { error ->
+                AppLog.warn(
+                    "LocalSessionRepository",
+                    "session/corrupt-skipped id=$id stage=summary",
+                    error,
+                )
+                onError(IllegalStateException("会话 $id 摘要损坏，已从列表跳过；诊断信息已记录", error))
+                null
+            }
         }
 
     private fun LocalHarnessSession.toSummary(): LocalSessionSummary = LocalSessionSummary(

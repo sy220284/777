@@ -190,6 +190,39 @@ class SessionEventLogTest {
     }
 
     @Test
+    fun malformedRowsAndUnreadableSegmentsAreCountedAndReported() {
+        val directory = Files.createTempDirectory("harness-event-diagnostics").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val reports = mutableListOf<String>()
+            val log = SessionEventLog(
+                file = file,
+                json = json,
+                maxBytes = 700,
+                diagnosticSink = { kind, _ -> reports += kind },
+            )
+            repeat(12) { index ->
+                log.append("test/event", buildJsonObject {
+                    put("value", "row-$index-" + "x".repeat(48))
+                })
+            }
+            file.appendText("{broken-row\n")
+            log.snapshot()
+            assertTrue(log.diagnostics().malformedRows > 0)
+            assertTrue(reports.any { it == "malformed-row" })
+
+            val archive = directory.listFiles().orEmpty().firstOrNull { it.name.endsWith(".gz") }
+                ?: error("expected rotated archive")
+            archive.writeText("not-a-gzip")
+            log.snapshot()
+            assertTrue(log.diagnostics().segmentReadFailures > 0)
+            assertTrue(reports.any { it.startsWith("segment-read-failed:") })
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun tailAndPointReadRemainCorrectAcrossRotatedSegments() {
         val directory = Files.createTempDirectory("harness-event-window").toFile()
         val file = directory.resolve("session.events.jsonl")
