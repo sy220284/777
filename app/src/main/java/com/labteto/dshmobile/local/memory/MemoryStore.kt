@@ -631,23 +631,29 @@ class MemoryStore internal constructor(
         cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
 
         val document = decodeDocument(file) ?: if (!file.isFile) {
-            val recovered = decodeDocument(backup)
-            if (backup.isFile && recovered == null) {
-                AppLog.error("MemoryStore", "memory primary missing and backup is corrupt")
-                error("长期记忆主文件缺失且备份已损坏，已停止写入以避免覆盖可恢复数据")
+            decodeDocument(backup) ?: MemoryDocument().also {
+                if (backup.isFile) {
+                    AppLog.error(
+                        "MemoryStore",
+                        "长期记忆主文件缺失且备份无法解析；本次以空文档启动，损坏备份保留在原位置",
+                    )
+                }
             }
-            recovered ?: MemoryDocument()
         } else {
             val corrupt = File(root, "memories.corrupt-${System.currentTimeMillis()}.json")
-            runCatching { file.copyTo(corrupt, overwrite = false) }
+            val moved = runCatching { file.renameTo(corrupt) }.getOrDefault(false)
+            if (!moved) runCatching { file.copyTo(corrupt, overwrite = false) }
 
             val recovered = decodeDocument(backup)
             if (recovered != null) {
                 runCatching { backup.copyTo(file, overwrite = true) }
                 recovered
             } else {
-                AppLog.error("MemoryStore", "memory primary and backup are both corrupt")
-                error("长期记忆主文件与备份均已损坏，损坏文件已保留；请先恢复或导出后再继续")
+                AppLog.error(
+                    "MemoryStore",
+                    "长期记忆主文件损坏且备份不可用；已隔离主文件，本次以空文档启动",
+                )
+                MemoryDocument()
             }
         }
         cachedDocument = document
