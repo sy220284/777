@@ -13,13 +13,16 @@ import com.labteto.dshmobile.core.notify.CompletionEvent
 import com.labteto.dshmobile.core.session.SessionEventEnvelope
 import com.labteto.dshmobile.core.wire.dto.RemoteEventFrame
 import com.labteto.dshmobile.data.SessionStore
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -72,11 +75,38 @@ class NotificationObserver @Inject constructor(
         started = true
         notifications.ensureChannels()
         trackAppForeground()
+        store.notificationSink = ::onSessionEvent
         scope.launch {
-            hostsStore.settings.collect { settings = it }
+            collectResiliently("settings") {
+                hostsStore.settings.collect { settings = it }
+            }
         }
         scope.launch {
-            connectionManager.eventFrames.collect { handleEventFrame(it) }
+            collectResiliently("event-frames") {
+                connectionManager.eventFrames.collect { frame ->
+                    try {
+                        handleEventFrame(frame)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        AppLog.error(TAG, "notification frame handling failed", error)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun collectResiliently(name: String, collect: suspend () -> Unit) {
+        while (true) {
+            try {
+                collect()
+                return
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                AppLog.error(TAG, "notification collector failed: $name", error)
+                delay(COLLECTOR_RETRY_DELAY_MS)
+            }
         }
     }
 
@@ -200,6 +230,11 @@ class NotificationObserver @Inject constructor(
         val text = context.getString(R.string.notif_open)
         val id = notificationId(event.sessionId, spec.channel)
         notifications.postSession(spec.channel, id, spec.title, text, event.sessionId, spec.actionLabel)
+    }
+
+    private companion object {
+        const val TAG = "NotificationObserver"
+        const val COLLECTOR_RETRY_DELAY_MS = 1_000L
     }
 
     private data class Spec(
