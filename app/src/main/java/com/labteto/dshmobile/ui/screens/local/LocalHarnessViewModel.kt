@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
     private val runtime: LocalUiRuntime,
-    personaAutoFillService: PersonaAutoFillService,
+    private val personaAutoFillService: PersonaAutoFillService,
     private val groupAnnouncementService: GroupAnnouncementService,
     personaInspectionService: PersonaInspectionService,
     galleryStore: ChatPersonaGalleryStore,
