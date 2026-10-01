@@ -48,11 +48,11 @@ jobs:
             DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.ReadmeUiScreenshotCaptureTest --stacktrace
 
             mkdir -p docs/images/current
-            adb pull /sdcard/Android/data/com.sy220284.dshmobile.debug/files/readme-screenshots/navigation.png docs/images/current/navigation.png
-            adb pull /sdcard/Android/data/com.sy220284.dshmobile.debug/files/readme-screenshots/chat.png docs/images/current/chat.png
-            adb pull /sdcard/Android/data/com.sy220284.dshmobile.debug/files/readme-screenshots/work.png docs/images/current/work.png
-            adb pull /sdcard/Android/data/com.sy220284.dshmobile.debug/files/readme-screenshots/character-tuning.png docs/images/current/character-tuning.png
-            adb pull /sdcard/Android/data/com.sy220284.dshmobile.debug/files/readme-screenshots/usage.png docs/images/current/usage.png
+            adb pull /sdcard/Download/readme-screenshots/navigation.png docs/images/current/navigation.png
+            adb pull /sdcard/Download/readme-screenshots/chat.png docs/images/current/chat.png
+            adb pull /sdcard/Download/readme-screenshots/work.png docs/images/current/work.png
+            adb pull /sdcard/Download/readme-screenshots/character-tuning.png docs/images/current/character-tuning.png
+            adb pull /sdcard/Download/readme-screenshots/usage.png docs/images/current/usage.png
             test -s docs/images/current/navigation.png
             test -s docs/images/current/chat.png
             test -s docs/images/current/work.png
