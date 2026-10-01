@@ -104,6 +104,9 @@ class LocalToolPolicyTest {
         // Other uses of a force flag that are not a push must not be caught by the push heuristic.
         assertTrue("非推送的 -f 不应拦截", LocalToolPolicy.canAutoApproveCommand("ls -f"))
         assertTrue("普通推送不应拦截", LocalToolPolicy.canAutoApproveCommand("git push origin main"))
+        assertTrue("分支名中的 -f 不应拦截", LocalToolPolicy.canAutoApproveCommand("git push origin feature-fix"))
+        assertTrue("普通长选项不应被 -f 子串误伤", LocalToolPolicy.canAutoApproveCommand("git push --follow-tags origin main"))
+        assertTrue("非 git 命令里的 push/-f 文本不应拦截", LocalToolPolicy.canAutoApproveCommand("echo push -f"))
     }
 
     /**
