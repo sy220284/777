@@ -4,8 +4,6 @@ import android.os.Environment
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 @Singleton
 class LocalBundledRuntimeManager @Inject internal constructor(
@@ -13,9 +11,7 @@ class LocalBundledRuntimeManager @Inject internal constructor(
     private val python: BundledPythonRuntime,
     private val git: BundledGitRuntime,
 ) {
-    private val prepareMutex = Mutex()
-
-    suspend fun prepare() = prepareMutex.withLock {
+    suspend fun prepare() {
         node.prepare()
         python.prepare()
         git.prepare()

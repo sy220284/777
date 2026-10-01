@@ -89,8 +89,8 @@ if session_store_lines > 2_050:
 event_log = EVENT_LOG.read_text(encoding="utf-8")
 repository = REPOSITORY.read_text(encoding="utf-8")
 deepseek = DEEPSEEK.read_text(encoding="utf-8")
-if "MODEL_STREAM_INCOMPLETE" not in deepseek or "sawTerminalFrame" not in deepseek:
-    violations.append("Model streaming must reject truncated SSE responses instead of accepting partial output")
+if "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION" not in deepseek or "sawTerminalFrame" not in deepseek:
+    violations.append("Model streaming must reject truncated SSE responses after admission without blind whole-request replay")
 web_provider = WEB_PROVIDER.read_text(encoding="utf-8")
 context_budget = CONTEXT_BUDGET.read_text(encoding="utf-8")
 coordinator = COORDINATOR.read_text(encoding="utf-8")

@@ -123,22 +123,12 @@ class OpenAiResponsesClient @Inject constructor(
                         if (data.isBlank() || data == "[DONE]") continue
                         val event = runCatching { json.parseToJsonElement(data).jsonObject }
                             .getOrElse { cause ->
-                                throw if (planSharing) {
-                                    streamInterruptedAfterAdmission(
-                                        planSharing = true,
-                                        requestId = requestId,
-                                        detail = "Responses API 返回了无法解析的数据帧",
-                                        cause = cause,
-                                    )
-                                } else {
-                                    LocalModelException(
-                                        code = "RESPONSES_PROTOCOL_ERROR",
-                                        message = "Responses API 返回了无法解析的数据帧",
-                                        retryable = true,
-                                        cause = cause,
-                                        requestId = requestId,
-                                    )
-                                }
+                                throw streamInterruptedAfterAdmission(
+                                    planSharing = planSharing,
+                                    requestId = requestId,
+                                    detail = "Responses API 返回了无法解析的数据帧",
+                                    cause = cause,
+                                )
                             }
                         streamed.record(event)?.let { onDelta(it) }
                         when (event["type"]?.jsonPrimitive?.contentOrNull) {
@@ -176,26 +166,16 @@ class OpenAiResponsesClient @Inject constructor(
                 )
             }
         } catch (error: LocalModelException) {
-            // In-stream server errors can arrive after inference has started, too. Preserve their
-            // diagnostic identity but apply the same no-replay boundary as transport interruption.
-            if (planSharing && responseAdmitted && error.retryable) {
-                throw LocalModelException(
-                    code = error.code,
-                    message = "${error.message}。请求已进入 Responses 流，本轮不会自动重放，请检查状态后重试。",
-                    retryable = false,
-                    cause = error,
-                    status = error.status,
-                    providerRetryAfterMs = error.providerRetryAfterMs,
-                    requestId = error.requestId ?: admittedRequestId,
-                    providerCode = error.providerCode,
-                    providerParam = error.providerParam,
-                )
+            // In-stream failures can arrive after real inference has started on any Responses route.
+            // Preserve diagnostics but never blindly replay the whole accepted request.
+            if (responseAdmitted && error.retryable) {
+                throw error.withoutReplayAfterAdmission()
             }
             throw error
         } catch (error: SocketTimeoutException) {
-            if (planSharing && responseAdmitted) {
+            if (responseAdmitted) {
                 throw streamInterruptedAfterAdmission(
-                    planSharing = true,
+                    planSharing = planSharing,
                     requestId = admittedRequestId,
                     detail = "Responses API 流式响应超时",
                     cause = error,
@@ -208,9 +188,9 @@ class OpenAiResponsesClient @Inject constructor(
                 cause = error,
             )
         } catch (error: IOException) {
-            if (planSharing && responseAdmitted) {
+            if (responseAdmitted) {
                 throw streamInterruptedAfterAdmission(
-                    planSharing = true,
+                    planSharing = planSharing,
                     requestId = admittedRequestId,
                     detail = "Responses API 流式连接中断",
                     cause = error,
@@ -247,12 +227,11 @@ class OpenAiResponsesClient @Inject constructor(
                 providerCode = "stream_interrupted_after_admission",
             )
         } else {
-            LocalModelException(
-                code = "RESPONSES_STREAM_INCOMPLETE",
-                message = detail,
-                retryable = true,
-                cause = cause,
+            modelPostAdmissionFailure(
+                code = "RESPONSES_STREAM_INTERRUPTED_AFTER_ADMISSION",
+                detail = detail,
                 requestId = requestId,
+                cause = cause,
             )
         }
 

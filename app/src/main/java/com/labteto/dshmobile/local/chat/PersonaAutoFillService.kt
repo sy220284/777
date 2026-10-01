@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageContext
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Singleton
@@ -353,7 +354,7 @@ class PersonaAutoFillService @Inject constructor(
                     put("content", raw.take(MAX_REPAIR_CHARS))
                 },
             )
-            val repairedReply = runCatching {
+            val repairedReply = try {
                 modelGateway.complete(
                     baseUrl = baseUrl,
                     model = model,
@@ -361,8 +362,13 @@ class PersonaAutoFillService @Inject constructor(
                     tools = JsonArray(emptyList()),
                     temperature = 0.0,
                 )
-            }.getOrElse {
-                throw IllegalStateException("AI 返回的人设格式无法解析，请再试一次", firstCause)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (repairError: Throwable) {
+                throw IllegalStateException(
+                    "AI 返回的人设格式无法解析，请再试一次",
+                    repairError,
+                ).also { it.addSuppressed(firstCause) }
             }
             withContext(Dispatchers.IO) {
                 usageTracker.record(

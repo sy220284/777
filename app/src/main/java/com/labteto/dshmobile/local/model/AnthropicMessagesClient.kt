@@ -84,6 +84,8 @@ internal class AnthropicMessagesClient @Inject constructor(
             .header("content-type", "application/json")
             .post(wirePayload.toRequestBody(JSON_MEDIA))
             .build()
+        var responseAdmitted = false
+        var admittedRequestId: String? = null
         try {
             withCancellableModelResponse(client.newCall(request)) { response ->
                 val requestId = response.header("request-id")
@@ -93,10 +95,11 @@ internal class AnthropicMessagesClient @Inject constructor(
                     val body = response.readBoundedModelError(ERROR_BODY_LIMIT)
                     throw httpFailure(response.code, body, requestId, retryAfterMs)
                 }
-                val body = response.body ?: throw LocalModelException(
-                    code = "ANTHROPIC_STREAM_INCOMPLETE",
-                    message = "Anthropic Messages 返回了空响应",
-                    retryable = true,
+                responseAdmitted = true
+                admittedRequestId = requestId
+                val body = response.body ?: throw modelPostAdmissionFailure(
+                    code = "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
+                    detail = "Anthropic Messages 返回了空响应",
                     requestId = requestId,
                 )
                 parseStream(
@@ -111,6 +114,14 @@ internal class AnthropicMessagesClient @Inject constructor(
         } catch (error: LocalModelException) {
             throw error
         } catch (error: SocketTimeoutException) {
+            if (responseAdmitted) {
+                throw modelPostAdmissionFailure(
+                    code = "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
+                    detail = "Anthropic 模型流式响应超时",
+                    requestId = admittedRequestId,
+                    cause = error,
+                )
+            }
             throw LocalModelException(
                 code = "MODEL_TIMEOUT",
                 message = "Anthropic 模型请求超时：${error.message ?: "请求未在时限内完成"}",
@@ -118,6 +129,14 @@ internal class AnthropicMessagesClient @Inject constructor(
                 cause = error,
             )
         } catch (error: IOException) {
+            if (responseAdmitted) {
+                throw modelPostAdmissionFailure(
+                    code = "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
+                    detail = "Anthropic 模型流式连接中断",
+                    requestId = admittedRequestId,
+                    cause = error,
+                )
+            }
             throw LocalModelException(
                 code = "MODEL_NETWORK",
                 message = "Anthropic 模型网络请求失败：${error.message ?: "网络异常"}",
@@ -391,10 +410,9 @@ internal class AnthropicMessagesClient @Inject constructor(
         }
 
         if (!sawMessageStop) {
-            throw LocalModelException(
-                code = "ANTHROPIC_STREAM_INCOMPLETE",
-                message = "Anthropic Messages 流在 message_stop 前结束",
-                retryable = true,
+            throw modelPostAdmissionFailure(
+                code = "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
+                detail = "Anthropic Messages 流在 message_stop 前结束",
                 requestId = requestId ?: messageId,
             )
         }
@@ -608,10 +626,10 @@ internal class AnthropicMessagesClient @Inject constructor(
         return LocalModelException(
             code = "ANTHROPIC_STREAM_ERROR",
             message = detail,
-            retryable = type in setOf("overloaded_error", "rate_limit_error", "api_error"),
+            retryable = false,
             providerRetryAfterMs = retryAfterMs,
             requestId = requestId,
-            providerCode = type,
+            providerCode = type ?: "stream_error_after_admission",
         )
     }
 

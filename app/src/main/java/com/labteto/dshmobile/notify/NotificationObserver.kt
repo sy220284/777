@@ -71,41 +71,41 @@ class NotificationObserver @Inject constructor(
     private var appInForeground = false
 
     fun start() {
+        // SessionStore owns the per-session follow streams; wire its completion hook before the
+        // idempotent start guard so a repeated start can also repair an accidentally cleared hook.
+        store.notificationSink = ::onSessionEvent
         if (started) return
         started = true
         notifications.ensureChannels()
         trackAppForeground()
-        store.notificationSink = ::onSessionEvent
-        scope.launch {
-            collectResiliently("settings") {
-                hostsStore.settings.collect { settings = it }
-            }
+        launchResilientCollector("settings") {
+            hostsStore.settings.collect { settings = it }
         }
-        scope.launch {
-            collectResiliently("event-frames") {
-                connectionManager.eventFrames.collect { frame ->
-                    try {
-                        handleEventFrame(frame)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        AppLog.error(TAG, "notification frame handling failed", error)
-                    }
-                }
-            }
+        launchResilientCollector("event-frames") {
+            connectionManager.eventFrames.collect { handleEventFrame(it) }
         }
     }
 
-    private suspend fun collectResiliently(name: String, collect: suspend () -> Unit) {
-        while (true) {
-            try {
-                collect()
-                return
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                AppLog.error(TAG, "notification collector failed: $name", error)
-                delay(COLLECTOR_RETRY_DELAY_MS)
+    private fun launchResilientCollector(name: String, collect: suspend () -> Unit) {
+        scope.launch {
+            var failures = 0
+            while (true) {
+                try {
+                    collect()
+                    return@launch
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    failures += 1
+                    AppLog.error(
+                        "NotificationObserver",
+                        "$name collector failed; restarting (failure=$failures)",
+                        error,
+                    )
+                    val backoff = (250L * (1L shl (failures - 1).coerceIn(0, 4)))
+                        .coerceAtMost(4_000L)
+                    delay(backoff)
+                }
             }
         }
     }
@@ -230,11 +230,6 @@ class NotificationObserver @Inject constructor(
         val text = context.getString(R.string.notif_open)
         val id = notificationId(event.sessionId, spec.channel)
         notifications.postSession(spec.channel, id, spec.title, text, event.sessionId, spec.actionLabel)
-    }
-
-    private companion object {
-        const val TAG = "NotificationObserver"
-        const val COLLECTOR_RETRY_DELAY_MS = 1_000L
     }
 
     private data class Spec(

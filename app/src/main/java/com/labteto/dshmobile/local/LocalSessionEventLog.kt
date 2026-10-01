@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.session.SessionEventLog
 import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
+import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import java.util.zip.GZIPInputStream
 import kotlinx.serialization.Serializable
@@ -23,7 +24,18 @@ class LocalSessionEventLog(
         val data: JsonObject,
     )
 
-    private val delegate = SessionEventLog(file, json, maxBytes)
+    private val delegate = SessionEventLog(
+        file = file,
+        json = json,
+        maxBytes = maxBytes,
+        diagnosticSink = { kind, error ->
+            AppLog.warn(
+                "SessionEventLog",
+                "session/event-log-diagnostic kind=$kind file=${file.name}",
+                error,
+            )
+        },
+    )
 
     fun append(type: String, data: JsonObject): Event =
         delegate.append(type, data).toLocalEvent()
@@ -33,8 +45,6 @@ class LocalSessionEventLog(
     }
 
     fun latestSequence(): Long = delegate.latestSequence()
-
-    fun corruptionStats() = delegate.corruptionStats()
 
     fun snapshotAfter(sequenceExclusive: Long): List<Event> = delegate.snapshotAfter(sequenceExclusive).map { event ->
         event.toLocalEvent()

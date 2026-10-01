@@ -81,12 +81,12 @@ import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
+import com.labteto.dshmobile.local.chat.LocalReplySuggestionCoordinator
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.model.withoutLastCompletedAssistantReply
 import com.labteto.dshmobile.local.model.withModelToolCallEventData
 import com.labteto.dshmobile.local.model.LocalModelAccountStateCoordinator
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
@@ -371,6 +371,38 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             recordUsage = { snapshot, reply -> usageTracker.recordForeground(snapshot, reply, TokenUsageAction.CHAT_STATE_REFRESH) },
+            persistBranchState = ::persistChatBranchState,
+            persist = ::persist,
+        )
+    }
+
+    private val replySuggestionCoordinator by lazy {
+        LocalReplySuggestionCoordinator(
+            state = _state,
+            chatTurnCoordinator = chatTurnCoordinator,
+            modelGateway = modelGateway,
+            requestModel = { snapshot, messages, requestLog, profile ->
+                completeWithRetry(
+                    key = profile.id,
+                    snapshot = snapshot,
+                    messages = messages,
+                    step = CHAT_POST_TURN_MODEL_STEP + 1,
+                    toolsOverride = JsonArray(emptyList()),
+                    publishPreview = false,
+                    requestLog = requestLog,
+                    profile = profile,
+                )
+            },
+            recordUsage = { snapshot, reply ->
+                usageTracker.recordForeground(
+                    snapshot,
+                    reply,
+                    TokenUsageAction.REPLY_SUGGESTIONS,
+                    turnId = snapshot.transcriptIndex.latestUserMessageId,
+                    step = CHAT_POST_TURN_MODEL_STEP + 1,
+                )
+            },
+            eventLogFor = ::eventLogFor,
             persistBranchState = ::persistChatBranchState,
             persist = ::persist,
         )
@@ -1166,112 +1198,9 @@ class LocalHarnessEngine @Inject constructor(
         persist()
     }
 
-    /**
-     * Generate reply suggestions only when the user explicitly asks for them.
-     *
-     * Normal chat turns never call this path, so keeping the affordance visible has zero model
-     * cost until it is tapped.
-     */
-    internal suspend fun generateReplySuggestions(): Boolean {
-        val snapshot = _state.value
-        if (
-            snapshot.loading ||
-            !snapshot.configured ||
-            snapshot.running ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.groupChat.enabled
-        ) return false
-
-        val assistantIndex = snapshot.messages.indexOfLast { message ->
-            message.role == "assistant" && message.content.isNotBlank()
-        }
-        if (assistantIndex < 0) return false
-        val assistantMessage = snapshot.messages[assistantIndex]
-        val expectedSessionId = snapshot.sessionId
-        val expectedAssistantMessageId = assistantMessage.id
-        val boundEventLog = eventLogFor(expectedSessionId)
-        val key = modelRequestMarkerOrNull() ?: return false
-        val prompt = chatTurnCoordinator.replySuggestionsPrompt(
-            persona = snapshot.chatPersona,
-            state = snapshot.chatState,
-            messages = snapshot.messages,
-            latestAssistantMessageId = assistantMessage.id,
-        )
-        val reply = try {
-            completeWithRetry(
-                key = key,
-                snapshot = snapshot,
-                messages = chatPostTurnModelMessages(prompt),
-                step = CHAT_POST_TURN_MODEL_STEP + 1,
-                toolsOverride = JsonArray(emptyList()),
-                publishPreview = false,
-                requestLog = boundEventLog,
-            )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Throwable) {
-            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-                put("status", "failed")
-                put("detail", error.message.orEmpty().take(1_000))
-            })
-            return false
-        }
-        usageTracker.recordForeground(snapshot, reply, TokenUsageAction.REPLY_SUGGESTIONS, turnId = snapshot.transcriptIndex.latestUserMessageId, step = CHAT_POST_TURN_MODEL_STEP + 1)
-        val suggestions = chatTurnCoordinator.parseReplySuggestions(reply.content.orEmpty())
-        if (suggestions.isNullOrEmpty()) {
-            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-                put("status", "parse-failed")
-                put("content", reply.content.orEmpty().take(2_000))
-            })
-            return false
-        }
-
-        var applied = false
-        _state.update { current ->
-            if (
-                current.sessionId != expectedSessionId ||
-                current.usageMode != LocalUsageMode.CHAT ||
-                current.groupChat.enabled ||
-                current.transcriptIndex.latestDialogueMessageId != expectedAssistantMessageId
-            ) {
-                current
-            } else {
-                applied = true
-                current.copy(
-                    replySuggestions = suggestions,
-                    chatBranches = if (current.transcriptIndex.branchingEligible) {
-                        updateChatBranchNodeSnapshot(
-                            state = current.chatBranches,
-                            messageId = expectedAssistantMessageId,
-                            chatState = current.chatState,
-                            chatContext = current.chatContext,
-                            replySuggestions = suggestions,
-                        )
-                    } else {
-                        current.chatBranches
-                    },
-                )
-            }
-        }
-        if (!applied) {
-            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-                put("status", "stale-discarded")
-                put("assistant_message_id", expectedAssistantMessageId)
-            })
-            return false
-        }
-
-        boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-            put("status", "updated")
-            put("assistant_message_id", expectedAssistantMessageId)
-            put("suggestion_count", suggestions.size)
-        })
-        if (hasChatBranchAlternatives(_state.value.chatBranches)) {
-            persistChatBranchState("chat/reply-suggestions-updated")
-        }
-        persist()
-        return true
-    }
+    /** Generate reply suggestions only on explicit user request. */
+    internal suspend fun generateReplySuggestions(): Boolean =
+        replySuggestionCoordinator.generate()
 
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult {
@@ -1634,7 +1563,7 @@ class LocalHarnessEngine @Inject constructor(
             val snapshot = _state.value
             val key = modelRequestMarker()
             val messages = withEphemeralContext(
-                modelHistory.snapshot().withoutLastCompletedAssistantReply(),
+                modelHistory.dropLast(1),
                 "基于本轮已有结果重写最终回复；不要调用工具或声称重新执行。",
             )
             val reply = completeWithRetry(
@@ -1653,7 +1582,7 @@ class LocalHarnessEngine @Inject constructor(
             val event = eventLog.append("assistant/message", JsonObject(
                 data + ("replaces" to JsonPrimitive(messageId)),
             ))
-            modelHistory.reset(modelHistory.snapshot().withoutLastCompletedAssistantReply())
+            modelHistory.reset(modelHistory.dropLast(1))
             modelHistory.append(reply.message)
             updateContextMetrics()
             _state.update {
@@ -2739,7 +2668,7 @@ class LocalHarnessEngine @Inject constructor(
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = withChatTurnContext(
                     history = boundedChatRequestHistory(
-                        if (replacingMessageId == null) modelHistory.snapshot() else modelHistory.snapshot().withoutLastCompletedAssistantReply(),
+                        if (replacingMessageId == null) modelHistory.snapshot() else modelHistory.dropLast(1),
                         recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
                         currentFacts = snapshot.chatContext
                             .canonicalFactLines(),
@@ -2794,7 +2723,7 @@ class LocalHarnessEngine @Inject constructor(
                 },
             )
 
-            if (reply.content.isNullOrBlank()) {
+            if (replacingMessageId != null && reply.content.isNullOrBlank()) {
                 error("模型没有返回可用回复")
             }
 
@@ -2811,7 +2740,7 @@ class LocalHarnessEngine @Inject constructor(
                 ),
             )
             if (replacingMessageId != null) {
-                modelHistory.reset(modelHistory.snapshot().withoutLastCompletedAssistantReply())
+                modelHistory.reset(modelHistory.dropLast(1))
                 _state.update { state ->
                     val retained = state.messages.filterNot { it.id == replacingMessageId }
                     state.copy(

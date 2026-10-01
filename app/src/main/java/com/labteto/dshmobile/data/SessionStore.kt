@@ -114,7 +114,7 @@ class SessionStore @Inject constructor(
     val connectionState = connectionManager.state
     val activeHostKey: String? get() = connectionManager.state.value.host?.let { "${it.baseUrl}|${it.id}" }
     internal val panels = com.labteto.dshmobile.ui.screens.main.PanelRepository()
-    internal val composers = com.labteto.dshmobile.ui.screens.main.ComposerRepository(CoroutineScope(scope.coroutineContext + Dispatchers.Main.immediate))
+    internal val composers = com.labteto.dshmobile.ui.screens.main.ComposerRepository()
     fun apiForHost(key: String?): DshApiClient? = if (key != null && key == activeHostKey) connectionManager.connectedApi else null
     fun muxForHost(key: String?) = if (key != null && key == activeHostKey) connectionManager.generation?.mux else null
     fun retryConnection() = connectionManager.reconnectIfNeeded()

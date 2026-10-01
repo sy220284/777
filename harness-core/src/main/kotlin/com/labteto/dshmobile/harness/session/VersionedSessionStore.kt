@@ -71,7 +71,7 @@ class VersionedSessionStore(
     private val json: Json,
     private val migrations: SessionMigrationRegistry = SessionMigrationRegistry(),
     private val clock: () -> Long = System::currentTimeMillis,
-    private val onReadFailure: (String, Throwable) -> Unit = { _, _ -> },
+    private val onCorruptSkipped: (String, Exception) -> Unit = { _, _ -> },
 ) {
     init {
         root.mkdirs()
@@ -156,7 +156,7 @@ class VersionedSessionStore(
             } catch (future: FutureSessionVersionException) {
                 throw future
             } catch (error: Exception) {
-                onReadFailure(id, error)
+                onCorruptSkipped(id, error)
                 null
             }
         }

@@ -14,9 +14,7 @@ internal class AutomaticLanguageServerResolver(
     private val root: File,
     private val commandAvailable: (String) -> Boolean,
     private val legacyCommand: () -> List<String> = { emptyList() },
-    private val clockNanos: () -> Long = System::nanoTime,
 ) {
-    private var workspaceFamilyCache: WorkspaceFamilyCache? = null
     fun resolve(relativePath: String? = null): List<String> {
         val family = familyFor(relativePath) ?: detectWorkspaceFamily()
         family?.let(::commandFor)?.takeIf { it.isNotEmpty() }?.let { return it }
@@ -101,12 +99,7 @@ internal class AutomaticLanguageServerResolver(
         return listOf("node", script.absolutePath, "--stdio")
     }
 
-    @Synchronized
     private fun detectWorkspaceFamily(): Family? {
-        val now = clockNanos()
-        workspaceFamilyCache?.takeIf { now - it.detectedAtNanos < WORKSPACE_CACHE_TTL_NANOS }
-            ?.let { return it.family }
-
         val scores = linkedMapOf<Family, Int>()
         fun score(family: Family, value: Int) {
             scores[family] = (scores[family] ?: 0) + value
@@ -138,15 +131,8 @@ internal class AutomaticLanguageServerResolver(
                 familyFor(file.name)?.let { score(it, 1) }
             }
 
-        return scores.maxByOrNull { it.value }?.key.also { family ->
-            workspaceFamilyCache = WorkspaceFamilyCache(family, now)
-        }
+        return scores.maxByOrNull { it.value }?.key
     }
-
-    private data class WorkspaceFamilyCache(
-        val family: Family?,
-        val detectedAtNanos: Long,
-    )
 
     internal enum class Family {
         KOTLIN,
@@ -161,7 +147,6 @@ internal class AutomaticLanguageServerResolver(
     private companion object {
         const val MAX_SCAN_DEPTH = 4
         const val MAX_SCAN_FILES = 2_000
-        const val WORKSPACE_CACHE_TTL_NANOS = 10_000_000_000L
         val IGNORED_DIRECTORIES = setOf(
             ".git", ".gradle", ".idea", ".dsh", "build", "dist", "out", "target", "node_modules",
         )

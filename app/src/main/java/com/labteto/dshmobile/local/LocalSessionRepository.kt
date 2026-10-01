@@ -36,13 +36,7 @@ internal class LocalSessionRepository(
     private val onWritten: () -> Unit,
     private val onError: (Throwable) -> Unit,
 ) {
-    private val store = VersionedSessionStore(
-        root = root,
-        json = json,
-        onReadFailure = { id, error ->
-            AppLog.error(TAG, "session/corrupt-skipped id=$id", error)
-        },
-    )
+    private val store = VersionedSessionStore(root, json)
     private val lock = Any()
     private val storageLock = Any()
     private val deletedIds = mutableSetOf<String>()
@@ -249,7 +243,12 @@ internal class LocalSessionRepository(
             } catch (future: FutureSessionVersionException) {
                 throw future
             } catch (error: Exception) {
-                AppLog.error(TAG, "session/corrupt-skipped id=$id", error)
+                AppLog.warn(
+                    "LocalSessionRepository",
+                    "session/corrupt-skipped id=$id stage=read",
+                    error,
+                )
+                onError(IllegalStateException("会话 $id 已损坏，已从列表跳过；诊断信息已记录", error))
                 null
             } ?: return@mapNotNull null
 
@@ -295,7 +294,15 @@ internal class LocalSessionRepository(
                         ?.takeIf { it.isNotBlank() }
                         ?.let { if (it.length > 72) it.take(72) + "…" else it },
                 )
-            }.getOrNull()
+            }.getOrElse { error ->
+                AppLog.warn(
+                    "LocalSessionRepository",
+                    "session/corrupt-skipped id=$id stage=summary",
+                    error,
+                )
+                onError(IllegalStateException("会话 $id 摘要损坏，已从列表跳过；诊断信息已记录", error))
+                null
+            }
         }
 
     private fun LocalHarnessSession.toSummary(): LocalSessionSummary = LocalSessionSummary(
@@ -315,5 +322,4 @@ internal class LocalSessionRepository(
             ?.takeIf { it.isNotBlank() }
             ?.let { if (it.length > 72) it.take(72) + "…" else it },
     )
-    private companion object { const val TAG = "LocalSessionRepository" }
 }

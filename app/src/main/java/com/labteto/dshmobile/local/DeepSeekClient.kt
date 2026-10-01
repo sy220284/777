@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import com.labteto.dshmobile.local.model.withCancellableModelResponse
 import com.labteto.dshmobile.local.model.validatedModelToolCall
 import com.labteto.dshmobile.local.model.requireUniqueModelToolCallIds
+import com.labteto.dshmobile.local.model.modelPostAdmissionFailure
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -77,10 +78,11 @@ class DeepSeekClient @Inject constructor(
             .header("Content-Type", "application/json")
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
+        var responseAdmitted = false
         try {
             withCancellableModelResponse(modelHttp.newCall(request)) { response ->
-                val body = response.readModelBodyBounded()
                 if (!response.isSuccessful) {
+                    val body = response.readModelBodyBounded()
                     val detail = providerErrorDetail(body, json)
                     throw LocalModelException(
                         code = "MODEL_HTTP_${response.code}",
@@ -88,6 +90,8 @@ class DeepSeekClient @Inject constructor(
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
                     )
                 }
+                responseAdmitted = true
+                val body = response.readModelBodyBounded()
                 parse(body).copy(
                     requestId = requestId,
                     promptBreakdown = promptBreakdown,
@@ -96,6 +100,14 @@ class DeepSeekClient @Inject constructor(
         } catch (error: LocalModelException) {
             throw error
         } catch (error: SocketTimeoutException) {
+            if (responseAdmitted) {
+                throw modelPostAdmissionFailure(
+                    code = "MODEL_RESPONSE_INTERRUPTED_AFTER_ADMISSION",
+                    detail = "模型响应读取超时",
+                    requestId = requestId,
+                    cause = error,
+                )
+            }
             throw LocalModelException(
                 code = "MODEL_TIMEOUT",
                 message = "模型推理超时：${error.message ?: "请求未在时限内完成"}",
@@ -103,6 +115,14 @@ class DeepSeekClient @Inject constructor(
                 cause = error,
             )
         } catch (error: java.io.IOException) {
+            if (responseAdmitted) {
+                throw modelPostAdmissionFailure(
+                    code = "MODEL_RESPONSE_INTERRUPTED_AFTER_ADMISSION",
+                    detail = "模型响应连接中断",
+                    requestId = requestId,
+                    cause = error,
+                )
+            }
             throw LocalModelException(
                 code = "MODEL_NETWORK",
                 message = "模型网络请求失败：${error.message ?: "网络异常"}",
@@ -147,6 +167,7 @@ class DeepSeekClient @Inject constructor(
             .header("Content-Type", "application/json")
             .post(payload.toString().toRequestBody(JSON_MEDIA))
             .build()
+        var responseAdmitted = false
         try {
             withCancellableModelResponse(modelHttp.newCall(request)) { response ->
                 if (!response.isSuccessful) {
@@ -158,10 +179,11 @@ class DeepSeekClient @Inject constructor(
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
                     )
                 }
-                val responseBody = response.body ?: throw LocalModelException(
-                    code = "MODEL_STREAM_INCOMPLETE",
-                    message = "模型流式响应为空",
-                    retryable = true,
+                responseAdmitted = true
+                val responseBody = response.body ?: throw modelPostAdmissionFailure(
+                    code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
+                    detail = "模型流式响应为空",
+                    requestId = requestId,
                 )
                 val content = StringBuilder()
                 val reasoning = StringBuilder()
@@ -262,10 +284,10 @@ class DeepSeekClient @Inject constructor(
                 }
                 if (!sawStreamData) {
                     if (fallback.isBlank()) {
-                        throw LocalModelException(
-                            code = "MODEL_STREAM_INCOMPLETE",
-                            message = "模型流式响应为空",
-                            retryable = true,
+                        throw modelPostAdmissionFailure(
+                            code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
+                            detail = "模型流式响应为空",
+                            requestId = requestId,
                         )
                     }
                     return@withCancellableModelResponse try {
@@ -280,10 +302,10 @@ class DeepSeekClient @Inject constructor(
                     }
                 }
                 if (!sawTerminalFrame) {
-                    throw LocalModelException(
-                        code = "MODEL_STREAM_INCOMPLETE",
-                        message = "模型流式响应提前结束，未收到完成标记",
-                        retryable = true,
+                    throw modelPostAdmissionFailure(
+                        code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
+                        detail = "模型流式响应提前结束，未收到完成标记",
+                        requestId = requestId,
                     )
                 }
                 val accumulated = toolCalls.toSortedMap().values.toList()
@@ -293,10 +315,10 @@ class DeepSeekClient @Inject constructor(
                         name = call.name?.let(::JsonPrimitive),
                         arguments = JsonPrimitive(call.arguments.toString()),
                         code = "MODEL_STREAM_PROTOCOL",
-                        retryable = true,
+                        retryable = false,
                     )
                 }
-                requireUniqueModelToolCallIds(calls, "MODEL_STREAM_PROTOCOL", retryable = true)
+                requireUniqueModelToolCallIds(calls, "MODEL_STREAM_PROTOCOL", retryable = false)
                 val message = buildJsonObject {
                     put("role", "assistant")
                     put("content", content.toString())
@@ -333,6 +355,14 @@ class DeepSeekClient @Inject constructor(
         } catch (error: LocalModelException) {
             throw error
         } catch (error: SocketTimeoutException) {
+            if (responseAdmitted) {
+                throw modelPostAdmissionFailure(
+                    code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
+                    detail = "模型流式响应超时",
+                    requestId = requestId,
+                    cause = error,
+                )
+            }
             throw LocalModelException(
                 code = "MODEL_TIMEOUT",
                 message = "模型推理超时：${error.message ?: "请求未在时限内完成"}",
@@ -340,6 +370,14 @@ class DeepSeekClient @Inject constructor(
                 cause = error,
             )
         } catch (error: java.io.IOException) {
+            if (responseAdmitted) {
+                throw modelPostAdmissionFailure(
+                    code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
+                    detail = "模型流式连接中断",
+                    requestId = requestId,
+                    cause = error,
+                )
+            }
             throw LocalModelException(
                 code = "MODEL_NETWORK",
                 message = "模型网络请求失败：${error.message ?: "网络异常"}",
@@ -512,8 +550,9 @@ private fun streamProtocolError(
 ): LocalModelException = LocalModelException(
     code = "MODEL_STREAM_PROTOCOL",
     message = detail,
-    retryable = true,
+    retryable = false,
     cause = cause,
+    providerCode = "protocol_error_after_admission",
 )
 
 internal fun providerErrorDetail(body: String, json: Json): String? = runCatching {

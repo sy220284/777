@@ -79,8 +79,9 @@ class UpdateVersionTest {
     }
 
     @Test
-    fun `a release is still offered when the running version is unparseable`() {
-        assertTrue(isNewerVersion("0.2.1", "unknown"))
+    fun `an unparseable running version remains unknown instead of inventing an update`() {
+        assertFalse(isNewerVersion("0.2.1", "unknown"))
+        assertFalse(isNewerVersion("0.2.1", ""))
     }
 
     @Test

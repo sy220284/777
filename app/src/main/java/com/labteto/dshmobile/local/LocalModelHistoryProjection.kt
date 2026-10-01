@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -61,73 +62,12 @@ internal fun restoreLocalModelHistory(
     }
 
     val invalidCheckpointAfterRestore = latestCheckpointIndex > checkpointIndex
-    val (sanitizedHistory, repairedStructure) = sanitizeRestoredModelHistory(history)
     return LocalModelHistoryRestore(
-        messages = sanitizedHistory,
+        messages = history,
         replayedTail = replayed,
         usedLegacyFallback = usedLegacyFallback,
-        checkpointRecommended = usedLegacyFallback || replayed || invalidCheckpointAfterRestore || repairedStructure,
+        checkpointRecommended = usedLegacyFallback || replayed || invalidCheckpointAfterRestore,
     )
-}
-
-private fun sanitizeRestoredModelHistory(source: List<JsonObject>): Pair<List<JsonObject>, Boolean> {
-    val restored = mutableListOf<JsonObject>()
-    var pendingBatch = mutableListOf<JsonObject>()
-    var pendingCallIds = linkedSetOf<String>()
-    var changed = false
-
-    fun discardPendingBatch() {
-        if (pendingBatch.isNotEmpty()) changed = true
-        pendingBatch = mutableListOf()
-        pendingCallIds = linkedSetOf()
-    }
-
-    source.forEach { message ->
-        when (message["role"]?.jsonPrimitive?.contentOrNull) {
-            "assistant" -> {
-                if (pendingCallIds.isNotEmpty()) discardPendingBatch()
-                val callIds = modelToolCallIds(message)
-                if (callIds == null) {
-                    changed = true
-                } else if (callIds.isEmpty()) {
-                    restored += message
-                } else if (callIds.size != callIds.toSet().size) {
-                    changed = true
-                } else {
-                    pendingBatch += message
-                    pendingCallIds += callIds
-                }
-            }
-            "tool" -> {
-                val callId = message["tool_call_id"]?.jsonPrimitive?.contentOrNull
-                if (callId != null && pendingCallIds.remove(callId)) {
-                    pendingBatch += message
-                    if (pendingCallIds.isEmpty()) {
-                        restored += pendingBatch
-                        pendingBatch = mutableListOf()
-                    }
-                } else {
-                    changed = true
-                }
-            }
-            else -> {
-                if (pendingCallIds.isNotEmpty()) discardPendingBatch()
-                restored += message
-            }
-        }
-    }
-    if (pendingCallIds.isNotEmpty()) discardPendingBatch()
-    return restored to (changed || restored.size != source.size)
-}
-
-private fun modelToolCallIds(message: JsonObject): List<String>? {
-    val calls = (message["tool_calls"] as? JsonArray)
-        ?: (message["model_tool_calls"] as? JsonArray)
-        ?: return emptyList()
-    return calls.map { raw ->
-        (raw as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
-            ?: return null
-    }
 }
 
 private fun applyModelHistoryEvent(
@@ -199,11 +139,26 @@ private fun applyModelHistoryEvent(
             val callId = nested?.get("tool_call_id")?.jsonPrimitive?.contentOrNull
                 ?: event.data["id"]?.jsonPrimitive?.contentOrNull
                 ?: return false
-            val alreadyPresent = history.any { message ->
-                message["role"]?.jsonPrimitive?.contentOrNull == "tool" &&
-                    message["tool_call_id"]?.jsonPrimitive?.contentOrNull == callId
+
+            // A tool result is valid only inside the currently open assistant tool batch. Recovery
+            // must never manufacture an orphan result when an assistant event was lost/corrupted.
+            var ownerIndex = history.lastIndex
+            val currentBatchResults = linkedSetOf<String>()
+            while (ownerIndex >= 0 &&
+                history[ownerIndex]["role"]?.jsonPrimitive?.contentOrNull == "tool"
+            ) {
+                history[ownerIndex]["tool_call_id"]?.jsonPrimitive?.contentOrNull
+                    ?.let(currentBatchResults::add)
+                ownerIndex -= 1
             }
-            if (alreadyPresent) return false
+            val owner = history.getOrNull(ownerIndex)
+                ?.takeIf { it["role"]?.jsonPrimitive?.contentOrNull == "assistant" }
+                ?: return false
+            val ownerCalls = runCatching {
+                LocalCanonicalModelCodec.canonicalToolCalls(owner).mapTo(linkedSetOf()) { it.id }
+            }.getOrNull() ?: return false
+            if (callId !in ownerCalls || callId in currentBatchResults) return false
+
             val message = if (nested?.get("role")?.jsonPrimitive?.contentOrNull == "tool") {
                 nested
             } else {

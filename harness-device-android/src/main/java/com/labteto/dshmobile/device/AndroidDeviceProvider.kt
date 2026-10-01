@@ -24,6 +24,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
+internal fun sanitizeNotificationField(value: String?, maxChars: Int): String {
+    if (value.isNullOrBlank()) return ""
+    val normalized = value.replace(Regex("""[\t\r\n]+"""), " ").trim()
+    val redacted = NOTIFICATION_SECRET_PATTERN.replace(normalized) { match ->
+        "${match.groupValues[1]}：[已脱敏]"
+    }
+    return if (redacted.length <= maxChars) redacted
+    else redacted.take(maxChars).trimEnd() + "…"
+}
+
+private val NOTIFICATION_SECRET_PATTERN = Regex(
+    """(?i)(验证码|校验码|动态码|一次性密码|otp|verification\s*code|password|密码)\s*[:：]?\s*[A-Za-z0-9_-]{4,32}""",
+)
+
 class AndroidDeviceProvider(
     private val context: Context,
     private val virtualDisplays: VirtualDisplayController = VirtualDisplayController(context),
@@ -342,21 +356,19 @@ class AndroidDeviceProvider(
     private fun notificationList(): String {
         val service = HarnessNotificationListenerService.active()
             ?: error("通知读取服务未授权或未连接")
-        return service.snapshots().joinToString("\n") { item ->
-            val title = sanitizeNotificationText(item.title.orEmpty(), MAX_NOTIFICATION_TITLE_CHARS)
-            val text = sanitizeNotificationText(item.text.orEmpty(), MAX_NOTIFICATION_TEXT_CHARS)
-            "${item.packageName}\t$title\t$text\t${item.postedAt}"
-        }
+        val rows = service.snapshots()
+            .sortedByDescending { it.postedAt }
+            .take(MAX_NOTIFICATION_ROWS)
+            .joinToString("\n") { item ->
+                val title = sanitizeNotificationField(item.title, MAX_NOTIFICATION_TITLE_CHARS)
+                val text = sanitizeNotificationField(item.text, MAX_NOTIFICATION_TEXT_CHARS)
+                "${item.packageName}\t$title\t$text\t${item.postedAt}"
+            }
+        return buildString {
+            appendLine("隐私提示：通知标题/正文已限长，并对常见验证码与密码模式脱敏；该工具结果会进入当前会话历史。")
+            append(rows)
+        }.trimEnd()
     }
-
-    private fun sanitizeNotificationText(value: String, maxChars: Int): String =
-        value.take(maxChars)
-            .replace(
-                Regex(
-                    """(?i)(验证码|校验码|动态码|verification\s*code|security\s*code|one[- ]time\s*password|otp)\s*[:：-]?\s*[A-Z0-9]{4,12}""",
-                ),
-                "\$1：<已脱敏>",
-            )
 
     private fun clipboardGet(): String {
         val manager = context.getSystemService(ClipboardManager::class.java)
@@ -383,8 +395,9 @@ class AndroidDeviceProvider(
         this[key]?.takeIf(String::isNotBlank) ?: error("缺少参数：$key")
 
     private companion object {
-        const val MAX_NOTIFICATION_TITLE_CHARS = 160
-        const val MAX_NOTIFICATION_TEXT_CHARS = 600
+        const val MAX_NOTIFICATION_ROWS = 50
+        const val MAX_NOTIFICATION_TITLE_CHARS = 120
+        const val MAX_NOTIFICATION_TEXT_CHARS = 320
         val SAFE_VIEW_SCHEMES = setOf("http", "https", "market", "geo", "mailto", "tel")
     }
 }

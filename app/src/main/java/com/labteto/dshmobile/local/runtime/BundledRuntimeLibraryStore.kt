@@ -74,18 +74,6 @@ internal object BundledRuntimeLibraryStore {
     private val runtimeNames = listOf("node", "python", "git")
 
     @Synchronized
-    fun isMaterializedValid(
-        context: Context,
-        runtime: String,
-        abi: String,
-        targetDir: File,
-    ): Boolean {
-        if (runtime !in runtimeNames || !targetDir.isDirectory) return false
-        val entries = runCatching { readManifest(context, runtime, abi) }.getOrNull() ?: return false
-        return entries.all { entry -> runtimeBlobMatches(File(targetDir, entry.name), entry) }
-    }
-
-    @Synchronized
     fun materialize(
         context: Context,
         runtime: String,

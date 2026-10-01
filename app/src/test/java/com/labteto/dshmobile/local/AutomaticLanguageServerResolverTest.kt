@@ -87,25 +87,6 @@ class AutomaticLanguageServerResolverTest {
         )
     }
 
-    @Test fun workspaceDetectionCacheExpiresAndSeesNewProjectMarkers() {
-        var now = 1L
-        val resolver = AutomaticLanguageServerResolver(
-            temporary.root,
-            commandAvailable = { it == "pyright-langserver" },
-            clockNanos = { now },
-        )
-
-        assertTrue(resolver.resolve().isEmpty())
-        temporary.newFile("pyproject.toml")
-        assertTrue(resolver.resolve().isEmpty())
-
-        now += 10_000_000_001L
-        assertEquals(
-            listOf("pyright-langserver", "--stdio"),
-            resolver.resolve(),
-        )
-    }
-
     @Test fun returnsEmptyWhenNoCompatibleServerExists() {
         File(temporary.root, "src").mkdirs()
         File(temporary.root, "src/main.rs").writeText("fn main() {}")

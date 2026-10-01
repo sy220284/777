@@ -49,10 +49,7 @@ class BundledGitRuntime @Inject constructor(
         val helperDir = File(versionRoot, "libexec/git-core")
         val marker = File(versionRoot, ".ready")
         val markerValue = "$version|" + BundledRuntimeLibraryStore.LAYOUT_VERSION
-        if (
-            marker.readTextOrNull() != markerValue ||
-            !BundledRuntimeLibraryStore.isMaterializedValid(context, "git", abi, libraryDir)
-        ) {
+        if (marker.readTextOrNull() != markerValue) {
             versionRoot.deleteRecursively()
             homeDir.mkdirs()
             helperDir.mkdirs()

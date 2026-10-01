@@ -73,7 +73,7 @@ class UpdateCacheTest {
     }
 
     @Test
-    fun `explicit new prepare supersedes a previous installer handoff`() {
+    fun `explicit new attempt supersedes an active installer handoff`() {
         val cacheDir = temporary.newFolder("cache")
         val handedAt = 1_000_000L
         val root = prepare(cacheDir, currentVersionCode = 100L, nowMillis = handedAt)
@@ -86,15 +86,15 @@ class UpdateCacheTest {
             handedAtMillis = handedAt,
         )
 
-        val next = prepare(
+        val replacement = prepare(
             cacheDir = cacheDir,
             currentVersionCode = 100L,
             nowMillis = handedAt + 1_000L,
         )
 
-        assertTrue(next.isDirectory)
         assertFalse(apk.exists())
-        assertTrue(next.listFiles().isNullOrEmpty())
+        assertTrue(replacement.isDirectory)
+        assertTrue(replacement.listFiles().isNullOrEmpty())
     }
 
     @Test

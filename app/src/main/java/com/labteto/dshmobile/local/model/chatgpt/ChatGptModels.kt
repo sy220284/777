@@ -33,12 +33,6 @@ data class ChatGptAccountRecord(
 ) {
     val sharingEnabled: Boolean
         get() = CHATGPT_PLAN_SCOPE in scopes
-
-    override fun toString(): String =
-        "ChatGptAccountRecord(id=$id, clientId=$clientId, issuer=$issuer, subject=$subject, " +
-            "email=$email, displayName=$displayName, hostId=$hostId, tokenType=$tokenType, " +
-            "scopes=$scopes, accessTokenExpiresAtEpochSeconds=$accessTokenExpiresAtEpochSeconds, " +
-            "savedAtEpochSeconds=$savedAtEpochSeconds, credentials=<redacted>)"
 }
 
 data class ChatGptAccountSummary(

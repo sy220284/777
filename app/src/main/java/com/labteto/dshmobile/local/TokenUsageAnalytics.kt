@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
-import com.labteto.dshmobile.local.usage.PromptTokenEstimateCache
 import com.labteto.dshmobile.local.usage.TokenUsageDatabase
 import com.labteto.dshmobile.local.usage.UsageLifetimeTotals
 import com.labteto.dshmobile.local.usage.boundedForStorage
@@ -389,18 +388,16 @@ internal fun estimatePromptBreakdown(
 
     messages.forEachIndexed { index, message ->
         val role = message["role"]?.jsonPrimitive?.contentOrNull.orEmpty()
-        val estimate = PromptTokenEstimateCache.message(
-            value = message,
-            memoryClassifier = ::containsMemoryMarkers,
-            personaClassifier = ::containsPersonaMarkers,
-        )
+        val encoded = message.toString()
+        val tokens = estimateModelTokens(encoded)
+        val content = message["content"]?.toString().orEmpty()
         when {
-            role == "user" && index == latestUser -> currentUser += estimate.tokens
-            role != "system" -> history += estimate.tokens
-            estimate.memory -> memoryRule += estimate.tokens
-            estimate.persona -> personaState += estimate.tokens
-            index == 0 -> systemBase += estimate.tokens
-            else -> otherSystem += estimate.tokens
+            role == "user" && index == latestUser -> currentUser += tokens
+            role != "system" -> history += tokens
+            containsMemoryMarkers(content) -> memoryRule += tokens
+            containsPersonaMarkers(content) -> personaState += tokens
+            index == 0 -> systemBase += tokens
+            else -> otherSystem += tokens
         }
     }
     return TokenPromptBreakdown(
@@ -409,7 +406,7 @@ internal fun estimatePromptBreakdown(
         memoryRuleTokens = memoryRule,
         historyTokens = history,
         currentUserTokens = currentUser,
-        toolDefinitionTokens = PromptTokenEstimateCache.tools(tools),
+        toolDefinitionTokens = if (tools.isEmpty()) 0 else estimateModelTokens(tools.toString()),
         otherSystemTokens = otherSystem,
     )
 }

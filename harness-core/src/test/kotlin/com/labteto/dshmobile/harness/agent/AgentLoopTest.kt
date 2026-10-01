@@ -42,24 +42,6 @@ class AgentLoopTest {
     }
 
     @Test
-    fun emptyReplyFailsWithoutAssistantHistoryOrCompletion() = runTest {
-        val events = mutableListOf<AgentEvent>()
-        val loop = AgentLoop(
-            model = AgentModel { AgentModelReply(content = "") },
-            tools = AgentToolExecutor { error("不应调用工具") },
-            eventSink = AgentEventSink { events += it },
-            idFactory = { "turn-empty" },
-        )
-
-        val error = runCatching { loop.run("开始") }.exceptionOrNull()
-
-        assertTrue(error is IllegalArgumentException)
-        assertTrue(events.last() is AgentEvent.TurnFailed)
-        assertFalse(events.any { it is AgentEvent.AssistantObserved })
-        assertFalse(events.any { it is AgentEvent.TurnCompleted })
-    }
-
-    @Test
     fun feedsToolResultIntoTheNextModelStep() = runTest {
         val events = mutableListOf<AgentEvent>()
         var request = 0

@@ -1,28 +1,23 @@
 package com.labteto.dshmobile.local.agent
 
-import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
+import com.labteto.dshmobile.harness.agent.*
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
-import com.labteto.dshmobile.local.LocalHistoryCompactor
-import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.LocalModelReply
-import com.labteto.dshmobile.local.LocalSessionEventLog
+import com.labteto.dshmobile.local.*
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import java.io.IOException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
-/** Owns one subagent model-step request, retry and bounded recovery policy. */
+/** Owns one subagent model-step request, retry and context-overflow recovery policy. */
 internal class LocalSubagentModelStepExecutor(
     private val modelGateway: LocalModelGateway,
     private val modelAttempts: () -> Int,
     private val resourceScheduler: HarnessResourceScheduler,
     private val eventLog: () -> LocalSessionEventLog,
-    historyCompactor: LocalHistoryCompactor,
+    private val historyCompactor: LocalHistoryCompactor,
 ) {
-    private val support = LocalSubagentModelStepSupport(eventLog, historyCompactor)
-
     suspend fun complete(
         profile: LocalModelProfile,
         baseUrl: String,
@@ -37,18 +32,56 @@ internal class LocalSubagentModelStepExecutor(
         val executor = AgentRequestExecutor(
             maxAttempts = modelAttempts().coerceIn(1, 5),
             retryable = { error ->
-                (error as? LocalModelException)?.retryable == true || error is IOException
+                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
             },
             backoffMillis = { failedAttempt, error ->
-                (error as? LocalModelException)?.providerRetryAfterMs
-                    ?.coerceIn(0L, 60_000L)
+                (error as? LocalModelException)?.providerRetryAfterMs?.coerceIn(0L, 60_000L)
                     ?: (1_000L shl (failedAttempt - 1).coerceIn(0, 20))
             },
-            eventSink = support.requestEvents(subagentId, step),
+            eventSink = AgentRequestEventSink { event ->
+                when (event) {
+                    is AgentRequestEvent.AttemptStarted -> {
+                        eventLog().append("subagent/request", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            put("max_attempts", event.maxAttempts)
+                        })
+                    }
+                    is AgentRequestEvent.AttemptFailed -> {
+                        eventLog().append("subagent/request-error", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            put("retryable", event.retryable)
+                            put("will_retry", event.willRetry)
+                            put("detail", event.reason.take(2_000))
+                        })
+                    }
+                    is AgentRequestEvent.RetryScheduled -> {
+                        eventLog().append("subagent/retry", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            put("next_attempt", event.nextAttempt)
+                            put("delay_ms", event.delayMillis)
+                        })
+                    }
+                    is AgentRequestEvent.AttemptCancelled -> {
+                        eventLog().append("subagent/request-cancelled", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("step", step)
+                            put("attempt", event.attempt)
+                            event.reason?.let { put("detail", it.take(2_000)) }
+                        })
+                    }
+                    is AgentRequestEvent.AttemptSucceeded -> Unit
+                }
+            },
         )
         var activeHistory = history
         var overflowRound = 0
-        var structureRecoveryUsed = false
+        var structureRecoveryAttempted = false
         while (true) {
             try {
                 return executor.execute {
@@ -62,39 +95,58 @@ internal class LocalSubagentModelStepExecutor(
                                 tools = tools,
                             )
                         } catch (error: LocalModelException) {
-                            support.providerError(subagentId, step, error)
+                            logSubagentProviderError(eventLog(), subagentId, step, error)
                             throw error
                         }
                     }
                 }
             } catch (error: Throwable) {
-                support.recoverStructure(
-                    history = activeHistory,
-                    subagentId = subagentId,
-                    step = step,
-                    error = error,
-                    alreadyUsed = structureRecoveryUsed,
-                )?.let { recovered ->
-                    structureRecoveryUsed = true
-                    activeHistory = recovered
-                    continue
+                if (!structureRecoveryAttempted) {
+                    LocalSubagentStructureRecovery.recover(
+                        error, activeHistory, subagentId, step, eventLog(),
+                    )?.let { recovered ->
+                        structureRecoveryAttempted = true
+                        activeHistory = recovered
+                        continue
+                    }
                 }
+                if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
+                val compacted = historyCompactor.compactForOverflow(
+                    activeHistory,
+                    LocalHistorySummaryMode.WORK,
+                ) ?: throw error
+                val madeProgress = compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
+                    compacted.messages != activeHistory
+                if (!madeProgress) throw error
 
                 overflowRound += 1
-                support.recoverOverflow(
-                    history = activeHistory,
-                    durableHistory = durableHistory,
-                    subagentId = subagentId,
-                    step = step,
-                    model = model,
-                    round = overflowRound,
-                    error = error,
-                    allowed = allowContextOverflowRecovery,
-                )?.let { recovered ->
-                    activeHistory = recovered
-                    continue
+                durableHistory?.let { durable ->
+                    applyOverflowCompaction(
+                        history = durable,
+                        compactor = historyCompactor,
+                        summaryMode = LocalHistorySummaryMode.WORK,
+                    )?.let { durableCompaction ->
+                        eventLog().append("subagent/compaction", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("trigger", "context-overflow")
+                            put("round", overflowRound)
+                            put("omitted_messages", durableCompaction.omittedMessages)
+                            put("summary", durableCompaction.summary)
+                            put("estimated_tokens_before", durableCompaction.estimatedTokensBefore)
+                            put("estimated_tokens_after", durableCompaction.estimatedTokensAfter)
+                        })
+                    }
                 }
-                throw error
+                eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
+                    put("agent_id", subagentId)
+                    put("step", step)
+                    put("round", overflowRound)
+                    put("model", model)
+                    put("estimated_tokens_before", compacted.estimatedTokensBefore)
+                    put("estimated_tokens_after", compacted.estimatedTokensAfter)
+                    put("omitted_messages", compacted.omittedMessages)
+                })
+                activeHistory = compacted.messages
             }
         }
     }
