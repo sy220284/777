@@ -7,8 +7,21 @@ import com.labteto.dshmobile.local.apiKeyProfileForRoute
 import com.labteto.dshmobile.local.migrateOfficialClaudeModel
 import com.labteto.dshmobile.local.modelProfileId
 import com.labteto.dshmobile.local.normalizeModelBaseUrl
+import java.util.UUID
 
 internal data class LocalModelApiKeyDraft(val profile: LocalModelProfile, val key: String)
+
+private fun allocateApiKeyProfileId(
+    profiles: List<LocalModelProfile>,
+    factory: () -> String,
+): String {
+    repeat(4) {
+        val candidate = factory().trim()
+        require(candidate.isNotBlank()) { "模型配置身份不能为空" }
+        if (profiles.none { it.id == candidate }) return candidate
+    }
+    error("无法创建唯一模型配置身份，请重试")
+}
 
 /** Save and probe share identity resolution, including fail-closed handling of stale editors. */
 internal suspend fun resolveLocalModelApiKeyDraft(
@@ -19,13 +32,19 @@ internal suspend fun resolveLocalModelApiKeyDraft(
     profiles: List<LocalModelProfile>,
     readKey: suspend (String) -> String?,
     profileId: String? = null,
+    newProfileId: () -> String = { "api-${UUID.randomUUID()}" },
 ): LocalModelApiKeyDraft {
     require(model.isNotBlank()) { "请选择模型" }
     val url = normalizeModelBaseUrl(baseUrl)
     val name = migrateOfficialClaudeModel(model.trim(), url)
-    val existing = profiles.apiKeyProfileForRoute(name, url, profileId)
-    val id = existing?.id ?: modelProfileId(name, url)
-    val key = apiKey.trim().takeIf(String::isNotEmpty) ?: readKey(id)
+    val explicitKey = apiKey.trim().takeIf(String::isNotEmpty)
+    val existing = when {
+        profileId != null -> profiles.apiKeyProfileForRoute(name, url, profileId)
+        explicitKey == null -> profiles.apiKeyProfileForRoute(name, url)
+        else -> null
+    }
+    val id = existing?.id ?: allocateApiKeyProfileId(profiles, newProfileId)
+    val key = explicitKey ?: readKey(id)
     require(!key.isNullOrBlank()) { "请填写该模型的密钥" }
     val preset = LocalModelPresets.find(name, url)
     val profile = (existing ?: LocalModelProfile(id, name, url)).copy(
