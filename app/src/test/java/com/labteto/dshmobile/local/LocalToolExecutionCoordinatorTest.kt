@@ -108,7 +108,15 @@ class LocalToolExecutionCoordinatorTest {
                     name = "write",
                     access = ToolAccess.WORKSPACE_WRITE,
                     approval = ToolApprovalPolicy.MUTATION,
-                ) { ToolResult("写入失败", isError = true) },
+                ) {
+                    ToolResult(
+                        content = "写入失败",
+                        isError = true,
+                        errorCode = "WRITE_FAILED",
+                        retryable = true,
+                        recoveryHint = "重新读取目标状态后再决定是否重试。",
+                    )
+                },
             )
         }
         val coordinator = coordinator(registry)
@@ -119,7 +127,9 @@ class LocalToolExecutionCoordinatorTest {
         )
 
         assertTrue(result.isError)
-        assertEquals("TOOL_REPORTED_ERROR", result.errorCode)
+        assertEquals("WRITE_FAILED", result.errorCode)
+        assertTrue(result.retryable)
+        assertEquals("重新读取目标状态后再决定是否重试。", result.recoveryHint)
         assertEquals(AgentToolSideEffect.POSSIBLE, result.sideEffect)
     }
 

@@ -5,7 +5,7 @@
 ## 基线
 
 ```text
-777: 0.12.0-777.22
+777: 正式版本随 GitHub Release 标签自动推进；本地构建 fallback 见 .github/release-version
 Android: 16+
 minSdk: 36
 targetSdk: 36
@@ -316,7 +316,7 @@ REJECTED
 - action 明细。
 - 请求日志。
 
-API usage 是总量。
+本地 Token 总量只采用成功模型响应实际返回的 API usage。失败、取消、断流或未返回 usage 的请求只保留诊断信息，不由客户端推断供应商最终计费。
 
 提示词、人物状态、记忆、历史、工具定义只做输入构成分析，不重复加入总 Token。
 

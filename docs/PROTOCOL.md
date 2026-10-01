@@ -217,7 +217,7 @@ sessionId
 
 ## Token usage
 
-模型 usage 以提供方实际返回的 input / output 为总量。
+本地 Token 总量以成功模型响应中提供方实际返回的 input / output usage 为准；失败、取消、断流或未返回 usage 的请求不由客户端估算。
 
 ```text
 API usage = 实际总量

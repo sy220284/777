@@ -253,10 +253,12 @@ agentId
 
 ## 9. Token 与模型调用
 
-API usage 是真实计费依据。
+本地 Token 总量只采用成功模型响应实际返回的 API usage。
+
+失败、取消、断流或供应商未返回 usage 的请求不得由客户端估算为已计费 Token；这类请求只记录诊断，供应商最终计费以其服务端账单为准。
 
 ```text
-总 Token = API 返回的 input + output
+本地总 Token = 成功响应 API 返回的 input + output
 ```
 
 系统提示词、人物状态、记忆、历史、工具定义等只能作为输入 Token 的诊断拆分，不能再次加入总量。

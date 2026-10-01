@@ -82,6 +82,12 @@ class LocalSessionEventLog(
     fun read(sequence: Long, before: Int = 0, after: Int = 0, offsetChars: Int = 0): String =
         delegate.read(sequence, before, after, offsetChars)
 
+    fun latestMatching(
+        types: Set<String>,
+        beforeSequenceExclusive: Long = Long.MAX_VALUE,
+        predicate: (JsonObject) -> Boolean,
+    ): Event? = delegate.latestMatching(types, beforeSequenceExclusive, predicate)?.toLocalEvent()
+
     fun latest(
         type: String,
         beforeSequenceExclusive: Long = Long.MAX_VALUE,

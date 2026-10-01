@@ -5,6 +5,7 @@ import java.nio.file.Files
 import java.util.zip.GZIPInputStream
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -334,6 +335,36 @@ class SessionEventLogTest {
             val latest = requireNotNull(log.latestOf(setOf("user/message", "tool/call", "tool/result")))
             assertEquals(11L, latest.sequence)
             assertEquals("user/message", latest.type)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+
+    @Test
+    fun latestMatchingReturnsNewestPredicateMatchAcrossSegments() {
+        val directory = Files.createTempDirectory("harness-event-latest-matching").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(file, json, maxBytes = 700, clock = { 1L })
+            repeat(24) { index ->
+                log.append(
+                    if (index % 3 == 0) "agent/run-checkpoint" else "noise",
+                    buildJsonObject {
+                        put("call_id", if (index == 6 || index == 18) "target" else "call-$index")
+                        put("value", index)
+                    },
+                )
+            }
+
+            val latest = requireNotNull(
+                log.latestMatching(setOf("agent/run-checkpoint")) { data ->
+                    data["call_id"]?.jsonPrimitive?.content == "target"
+                },
+            )
+
+            assertEquals(18L, latest.sequence)
+            assertEquals(18, latest.data["value"]?.jsonPrimitive?.content?.toInt())
         } finally {
             directory.deleteRecursively()
         }

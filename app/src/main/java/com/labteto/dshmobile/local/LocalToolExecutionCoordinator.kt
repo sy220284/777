@@ -161,28 +161,32 @@ internal class LocalToolExecutionCoordinator(
             )
         }
 
-        val timedOut = result.content.startsWith("工具执行超时：")
+        val providerCode = result.errorCode?.takeIf(String::isNotBlank)
+        val timedOut = providerCode == "TOOL_TIMEOUT" ||
+            (providerCode == null && result.content.startsWith("工具执行超时："))
+        val readLike = registered.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
         val errorCode = when {
             approvalDenied -> "APPROVAL_DENIED"
+            providerCode != null -> providerCode
             timedOut -> "TOOL_TIMEOUT"
             else -> "TOOL_REPORTED_ERROR"
         }
-        val readLike = registered.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+        val retryable = result.retryable || (providerCode == null && timedOut && readLike)
         AppLog.warn(
             "LocalToolExecution",
-            "工具执行失败 tool=${call.name} code=$errorCode retryable=${timedOut && readLike}",
+            "工具执行失败 tool=${call.name} code=$errorCode retryable=$retryable",
         )
         return AgentToolResult(
             content = result.content,
             isError = true,
             errorCode = errorCode,
-            retryable = timedOut && readLike,
+            retryable = retryable,
             sideEffect = if (registered.access in MUTATING_ACCESSES) {
                 AgentToolSideEffect.POSSIBLE
             } else {
                 AgentToolSideEffect.NONE
             },
-            recoveryHint = when {
+            recoveryHint = result.recoveryHint ?: when {
                 approvalDenied -> "该工具没有获得批准；不要重复调用，改用已授权能力或等待用户调整权限。"
                 timedOut && readLike -> "只读工具超时，可缩小范围后重试一次。"
                 timedOut -> "工具可能已经产生副作用；先检查当前状态，不要直接重试。"

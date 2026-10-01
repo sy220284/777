@@ -34,6 +34,7 @@ CHAT_EDIT_SUPPORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalC
 CHAT_CONTEXT_REFRESH = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt"
 GROUP_CHAT_EXECUTOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt"
 SUBAGENT_RUNNER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt"
+TOKEN_USAGE_ANALYTICS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
 CLEANUP_WORKFLOW = ROOT / ".github/workflows/cleanup-old-releases.yml"
 
 violations: list[str] = []
@@ -108,6 +109,7 @@ chat_edit_support = CHAT_EDIT_SUPPORT.read_text(encoding="utf-8")
 chat_context_refresh = CHAT_CONTEXT_REFRESH.read_text(encoding="utf-8")
 group_chat_executor = GROUP_CHAT_EXECUTOR.read_text(encoding="utf-8")
 subagent_runner = SUBAGENT_RUNNER.read_text(encoding="utf-8")
+token_usage_analytics = TOKEN_USAGE_ANALYTICS.read_text(encoding="utf-8")
 lifecycle_coordinator = LIFECYCLE_COORDINATOR.read_text(encoding="utf-8")
 cleanup_workflow = CLEANUP_WORKFLOW.read_text(encoding="utf-8")
 
@@ -206,6 +208,18 @@ for pattern in historical_chat_full_scan_patterns:
         violations.append(
             "Historical Chat timeline rewrites must page event history instead of materializing the full archive"
         )
+
+for name, source, forbidden in (
+    ("LocalSubagentRunner.kt", subagent_runner, "eventLog().events()"),
+    ("TokenUsageAnalytics.kt", token_usage_analytics, "eventLog.events()"),
+):
+    if forbidden in source:
+        violations.append(
+            f"{name} must resolve recent run attribution with newest-first SessionEventLog lookup, not full-history events()"
+        )
+
+if "fun latestMatching(" not in event_log:
+    violations.append("SessionEventLog must keep newest-first predicate lookup for hot run attribution")
 
 for token, expected in expected_buffer_counts.items():
     actual = model_history_buffer.count(token)

@@ -321,45 +321,47 @@ class SessionEventLog(
         return page.substring(0, bodyLength) + footer + nextOffset + suffix
     }
 
-    fun latest(
-        type: String,
+    /**
+     * Return the newest event matching [types] and [predicate].
+     *
+     * This is intentionally newest-first and stops at the first match. Hot attribution paths can
+     * therefore resolve a recent call/run without replaying the complete append-only archive.
+     */
+    fun latestMatching(
+        types: Set<String>,
         beforeSequenceExclusive: Long = Long.MAX_VALUE,
+        predicate: (JsonObject) -> Boolean,
     ): SessionEvent? = synchronized(lock) {
-        require(type.isNotBlank()) { "事件类型不能为空" }
+        require(types.isNotEmpty()) { "事件类型集合不能为空" }
         for (source in orderedFilesUnsafe().asReversed()) {
             var found: SessionEvent? = null
-            source.forEachEventLine { line ->
-                val event = decodeEventOrNull(line) ?: return@forEachEventLine
+            val completed = forEachEventReverseUnsafe(source) { event ->
                 if (
                     event.sequence < beforeSequenceExclusive &&
-                    event.type == type &&
-                    (found == null || event.sequence > requireNotNull(found).sequence)
+                    event.type in types &&
+                    predicate(event.data)
                 ) {
                     found = event
+                    false
+                } else {
+                    true
                 }
             }
-            found?.let { return@synchronized it }
+            if (!completed) return@synchronized found
         }
         null
     }
 
-    fun latestOf(types: Set<String>): SessionEvent? = synchronized(lock) {
-        require(types.isNotEmpty()) { "事件类型集合不能为空" }
-        for (source in orderedFilesUnsafe().asReversed()) {
-            var found: SessionEvent? = null
-            source.forEachEventLine { line ->
-                val event = decodeEventOrNull(line) ?: return@forEachEventLine
-                if (
-                    event.type in types &&
-                    (found == null || event.sequence > requireNotNull(found).sequence)
-                ) {
-                    found = event
-                }
-            }
-            found?.let { return@synchronized it }
-        }
-        null
+    fun latest(
+        type: String,
+        beforeSequenceExclusive: Long = Long.MAX_VALUE,
+    ): SessionEvent? {
+        require(type.isNotBlank()) { "事件类型不能为空" }
+        return latestMatching(setOf(type), beforeSequenceExclusive) { true }
     }
+
+    fun latestOf(types: Set<String>): SessionEvent? =
+        latestMatching(types) { true }
 
     fun clear() {
         synchronized(lock) {
