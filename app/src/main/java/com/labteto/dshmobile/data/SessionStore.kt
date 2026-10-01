@@ -65,12 +65,7 @@ import com.labteto.dshmobile.core.wire.dto.SkillListRequest
 import com.labteto.dshmobile.core.wire.dto.SubagentListEntry
 import com.labteto.dshmobile.core.wire.dto.TokenUsageView
 import com.labteto.dshmobile.core.wire.dto.USER_QUESTIONS_REQUEST_EVENT
-import com.labteto.dshmobile.core.wire.dto.WorkspaceArchiveSessionRequest
-import com.labteto.dshmobile.core.wire.dto.WorkspaceCreateRequest
-import com.labteto.dshmobile.core.wire.dto.WorkspaceDeleteRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceFollowFrame
-import com.labteto.dshmobile.core.wire.dto.WorkspaceRenameRequest
-import com.labteto.dshmobile.core.wire.dto.WorkspaceValue
 import com.labteto.dshmobile.core.wire.dto.WorkspaceView
 import com.labteto.dshmobile.core.wire.RpcError
 import com.labteto.dshmobile.core.wire.TransportFailures
@@ -161,6 +156,17 @@ class SessionStore @Inject constructor(
         currentSessionId = { _currentSessionId.value },
         onConnectionError = ::setConnectionError,
         logger = ::log,
+    )
+
+    private val workspaceRuntime = SessionWorkspaceRuntime(
+        apiProvider = ::apiOrNull,
+        apiForHost = ::apiForHost,
+        activeHostKey = { activeHostKey },
+        onWorkspaceUpsert = ::upsertWorkspace,
+        onWorkspaceRemove = ::removeWorkspace,
+        onArchivedChanged = ::setArchived,
+        refreshSessions = ::refreshSessions,
+        onConnectionError = ::setConnectionError,
     )
 
     private val searchRuntime = SessionSearchRuntime(apiProvider = ::apiOrNull)
@@ -828,18 +834,6 @@ class SessionStore @Inject constructor(
         }
     }
 
-    /**
-     * Apply one workspace mutation's own answer immediately.
-     *
-     * `workspace.list` no longer exists; the registry is a stream, and a mutation answers with the
-     * value it produced. Applying it here keeps the UI responsive without waiting for the stream
-     * to commit, and the stream's next frame — which is authoritative — corrects anything this
-     * guessed. Deleting is the one case that must not be optimistic in reverse: a delayed upsert
-     * could otherwise resurrect a row, which is why removal goes through the same path as the
-     * stream's own.
-     */
-    private fun applyWorkspaceValue(value: WorkspaceValue) = upsertWorkspace(value.workspace)
-
     suspend fun openSession(sessionId: String) = withContext(Dispatchers.Default) {
         val api = apiOrNull() ?: return@withContext
         _loadOlderFailed.value = false
@@ -1035,16 +1029,7 @@ class SessionStore @Inject constructor(
         }
     }
 
-    suspend fun archiveSession(sessionId: String) {
-        val api = apiOrNull() ?: return
-        when (val r = api.workspaceArchiveSession(WorkspaceArchiveSessionRequest(sessionId))) {
-            is RpcResult.Ok -> {
-                setArchived(r.value.archivedSessionIds)
-                refreshSessions()
-            }
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun archiveSession(sessionId: String) = workspaceRuntime.archiveSession(sessionId)
 
     suspend fun prompt(
         text: String,
@@ -1173,29 +1158,11 @@ class SessionStore @Inject constructor(
 
     fun closeSubagentTranscript() = subagentRuntime.closeTranscript()
 
-    suspend fun createWorkspace(path: String) {
-        val api = apiOrNull() ?: return
-        when (val r = api.workspaceCreate(WorkspaceCreateRequest(path))) {
-            is RpcResult.Ok -> upsertWorkspace(r.value.workspace)
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun createWorkspace(path: String) = workspaceRuntime.create(path)
 
-    suspend fun renameWorkspace(id: String, title: String) {
-        val api = apiOrNull() ?: return
-        when (val r = api.workspaceRename(WorkspaceRenameRequest(id, title))) {
-            is RpcResult.Ok -> applyWorkspaceValue(r.value)
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun renameWorkspace(id: String, title: String) = workspaceRuntime.rename(id, title)
 
-    suspend fun deleteWorkspace(id: String) {
-        val api = apiOrNull() ?: return
-        when (val r = api.workspaceDelete(WorkspaceDeleteRequest(id))) {
-            is RpcResult.Ok -> removeWorkspace(id)
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun deleteWorkspace(id: String) = workspaceRuntime.delete(id)
 
     suspend fun goalAction(action: String, objective: String? = null) {
         val sid = currentSessionId.value ?: return
@@ -1435,15 +1402,8 @@ class SessionStore @Inject constructor(
 
     suspend fun refreshPermissionCatalog() = catalogs.refreshPermissionCatalog()
 
-    suspend fun unarchiveSession(sessionId: String): Boolean {
-        val key = activeHostKey
-        val result = apiForHost(key)?.workspaceUnarchiveSession(sessionId) ?: return false
-        if (key != activeHostKey) return false
-        return when (result) {
-            is RpcResult.Ok -> { setArchived(result.value.archivedSessionIds); refreshSessions(); true }
-            is RpcResult.Err -> { setConnectionError(result.error.message); false }
-        }
-    }
+    suspend fun unarchiveSession(sessionId: String): Boolean =
+        workspaceRuntime.unarchiveSession(sessionId)
 
     private fun apiOrNull(): DshApiClient? {
         val api = connectionManager.connectedApi
