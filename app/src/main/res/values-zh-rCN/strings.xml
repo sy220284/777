@@ -211,10 +211,8 @@
     <string name="presets_system">内置</string>
     <string name="presets_user">自定义</string>
     <string name="settings_title">设置</string>
-    <string name="settings_general">通用</string>
     <string name="settings_plugins">插件</string>
     <string name="settings_plugins_inventory">插件清单</string>
-    <string name="settings_language">语言</string>
     <string name="settings_appearance">外观</string>
     <string name="settings_page_appearance">外观与阅读</string>
     <string name="settings_appearance_reading_subtitle">字号、字重、背景与组件通透度</string>
@@ -527,8 +525,9 @@
     <string name="local_files_truncated_hint">文件较大，以下为前 512 KB 预览。</string>
 
     <string name="pair_fail_local">配对未能完成：本机保存凭据或准备连接时发生错误。请重试；若持续出现，请重启应用并检查 Android 存储与安全服务。</string>
-    <string name="settings_page_general">外观与会话</string>
-    <string name="settings_page_models">模型</string>
+    <string name="settings_page_models">模型设置</string>
+    <string name="settings_page_model_usage">模型价格与消耗</string>
+    <string name="settings_page_session">会话</string>
     <string name="settings_page_memory">个性化与记忆</string>
     <string name="settings_page_permissions">连接与权限</string>
     <string name="settings_page_notifications">通知</string>
@@ -536,9 +535,10 @@
     <string name="settings_group_experience">体验</string>
     <string name="settings_group_system">系统</string>
     <string name="settings_group_maintenance">维护</string>
-    <string name="settings_models_subtitle">模型、连通性测试、价格与用量</string>
+    <string name="settings_models_subtitle">模型配置、账户与连通性测试</string>
+    <string name="settings_model_usage_subtitle">API 价格、Token 消耗与费用估算</string>
     <string name="settings_memory_subtitle">长期规则、自动记忆与召回</string>
-    <string name="settings_general_subtitle">外观、会话与聊天风格</string>
+    <string name="settings_session_subtitle">会话排序与聊天流式过滤</string>
     <string name="settings_permissions_subtitle">远程连接、后台连接与设备授权</string>
     <string name="settings_notifications_subtitle">完成、目标与需要处理的提醒</string>
     <string name="settings_advanced_subtitle">智能体执行、项目配置与诊断</string>
