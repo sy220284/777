@@ -171,9 +171,27 @@ internal class LocalToolExecutionCoordinator(
             timedOut -> "TOOL_TIMEOUT"
             else -> "TOOL_REPORTED_ERROR"
         }
-        // A mutating/process/device tool may already have produced a side effect. Even when a
-        // provider reports a transient failure, automatic retry is only safe for read-like tools.
-        val retryable = readLike && (result.retryable || (providerCode == null && timedOut))
+        val preExecutionFailure = errorCode in PRE_EXECUTION_ERROR_CODES
+        val mutationMayHaveSideEffect =
+            registered.access in MUTATING_ACCESSES && !preExecutionFailure
+        // Registry admission/validation/approval failures happen before the executor runs and may
+        // safely preserve their structured retry contract. Once a mutating tool may have started,
+        // never let a provider opt it back into blind automatic retry.
+        val retryable = when {
+            preExecutionFailure -> result.retryable
+            readLike -> result.retryable || (providerCode == null && timedOut)
+            else -> false
+        }
+        val recoveryHint = when {
+            mutationMayHaveSideEffect ->
+                "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
+            else -> result.recoveryHint ?: when {
+                approvalDenied -> "该工具没有获得批准；不要重复调用，改用已授权能力或等待用户调整权限。"
+                timedOut && readLike -> "只读工具超时，可缩小范围后重试一次。"
+                timedOut -> "工具执行超时；先检查当前状态，再决定是否重试。"
+                else -> "根据工具返回内容检查前置条件；确认状态后再决定下一步。"
+            }
+        }
         AppLog.warn(
             "LocalToolExecution",
             "工具执行失败 tool=${call.name} code=$errorCode retryable=$retryable",
@@ -183,17 +201,12 @@ internal class LocalToolExecutionCoordinator(
             isError = true,
             errorCode = errorCode,
             retryable = retryable,
-            sideEffect = if (registered.access in MUTATING_ACCESSES) {
+            sideEffect = if (mutationMayHaveSideEffect) {
                 AgentToolSideEffect.POSSIBLE
             } else {
                 AgentToolSideEffect.NONE
             },
-            recoveryHint = result.recoveryHint ?: when {
-                approvalDenied -> "该工具没有获得批准；不要重复调用，改用已授权能力或等待用户调整权限。"
-                timedOut && readLike -> "只读工具超时，可缩小范围后重试一次。"
-                timedOut -> "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
-                else -> "根据工具返回内容检查前置条件；若可能有副作用，先核对当前状态。"
-            },
+            recoveryHint = recoveryHint,
         )
     }
 
@@ -209,6 +222,14 @@ internal class LocalToolExecutionCoordinator(
 
     private companion object {
         val GITHUB_CONNECTOR_TOOL_NAMES = setOf("github_status", "github_api_get", "github_api_request")
+        val PRE_EXECUTION_ERROR_CODES = setOf(
+            "TOOL_LIFECYCLE_UNAVAILABLE",
+            "UNKNOWN_TOOL",
+            "INVALID_TOOL_ARGUMENTS",
+            "MUTATION_SCOPE_BLOCKED",
+            "APPROVAL_REQUIRED",
+            "APPROVAL_DENIED",
+        )
         val MUTATING_ACCESSES = setOf(
             ToolAccess.WORKSPACE_WRITE,
             ToolAccess.SESSION_WRITE,
