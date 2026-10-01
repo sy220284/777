@@ -45,6 +45,7 @@ internal class LocalModelRequestCoordinator(
         streamFilterPhrases: List<String> = emptyList(),
         requestLog: LocalSessionEventLog? = null,
         temperature: Double? = null,
+        profile: LocalModelProfile? = null,
         previewGuard: () -> Boolean = { true },
         overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
     ): LocalModelReply {
@@ -192,6 +193,7 @@ internal class LocalModelRequestCoordinator(
                                     messages = activeMessages,
                                     tools = tools,
                                     temperature = temperature,
+                                    profile = profile,
                                     onDelta = { delta ->
                                         val visible =
                                             streamFilter?.append(delta.content)?.text ?: delta.content
