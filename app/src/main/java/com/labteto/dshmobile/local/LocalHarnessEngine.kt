@@ -3075,7 +3075,7 @@ class LocalHarnessEngine @Inject constructor(
                                 lineageId = snapshot.lineageId,
                                 handoffSummary = snapshot.handoffSummary,
                             ),
-                        )
+                        ).let { withWorkRuntimeContext(it, workspace.path, runSnapshot.model, runSnapshot.modelSelection.activeProfile) }
                         captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                     }
                     requestPrepared = true
