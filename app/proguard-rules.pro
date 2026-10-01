@@ -26,3 +26,10 @@
 -keep class com.github.sisong.HPatch {
     *;
 }
+
+
+# Native PTY JNI exports Java_com_labteto_dshmobile_runtime_NativePtyBridge_*.
+# Keep the class and native method names stable in optimized/release builds.
+-keep class com.labteto.dshmobile.runtime.NativePtyBridge {
+    *;
+}
