@@ -45,7 +45,7 @@ class LocalWebProvider @Inject constructor(
     private val json: Json,
     private val usageTracker: DeepSeekUsageTracker,
 ) {
-    private val targetResolver = LocalWebTargetResolver(context, http)
+    private val targetResolver = com.labteto.dshmobile.local.web.LocalWebTargetResolver(context, http)
 
     suspend fun fetch(
         input: String,
@@ -481,13 +481,13 @@ class LocalWebProvider @Inject constructor(
         }
     }
 
-    private fun validateTarget(input: String): ValidatedTarget = targetResolver.validateTarget(input)
+    private fun validateTarget(input: String): com.labteto.dshmobile.local.web.ValidatedTarget = targetResolver.validateTarget(input)
     private fun parseUri(input: String): URI = targetResolver.parseUri(input)
     private fun normalizeInput(input: String): String = targetResolver.normalizeInput(input)
     private fun resolve(host: String): List<InetAddress> = targetResolver.resolve(host)
-    private fun requestRoute(target: ValidatedTarget, timeoutSeconds: Long): RequestRoute =
+    private fun requestRoute(target: com.labteto.dshmobile.local.web.ValidatedTarget, timeoutSeconds: Long): com.labteto.dshmobile.local.web.RequestRoute =
         targetResolver.requestRoute(target, timeoutSeconds)
-    private suspend fun probeConnectivity(target: ValidatedTarget): ConnectivityProbe {
+    private suspend fun probeConnectivity(target: com.labteto.dshmobile.local.web.ValidatedTarget): ConnectivityProbe {
         val failures = mutableListOf<String>()
         repeat(PROBE_ATTEMPTS) { index ->
             val attempt = probeConnectivityOnce(target)
@@ -513,7 +513,7 @@ class LocalWebProvider @Inject constructor(
         error("网络探测重试循环异常结束")
     }
 
-    private suspend fun probeConnectivityOnce(target: ValidatedTarget): ConnectivityProbe {
+    private suspend fun probeConnectivityOnce(target: com.labteto.dshmobile.local.web.ValidatedTarget): ConnectivityProbe {
         return try {
             val route = requestRoute(target, PROBE_CALL_TIMEOUT_SECONDS)
             val builder = Request.Builder()
@@ -574,14 +574,14 @@ class LocalWebProvider @Inject constructor(
             response.header(name)?.let { value -> put(name, value) }
         }
     }
-    private fun systemHttpProxy(): ProxyEndpoint? = targetResolver.systemHttpProxy()
+    private fun systemHttpProxy(): com.labteto.dshmobile.local.web.ProxyEndpoint? = targetResolver.systemHttpProxy()
     private fun isVpnActive(): Boolean = targetResolver.isVpnActive()
     private fun activeTunnelInterfaces(): List<String> = targetResolver.activeTunnelInterfaces()
     private fun isAllowedVpnFakeAddress(host: String, address: InetAddress, vpn: Boolean): Boolean =
         targetResolver.isAllowedVpnFakeAddress(host, address, vpn)
     private fun blockedHint(host: String, blocked: List<InetAddress>, vpn: Boolean): String =
         targetResolver.blockedHint(host, blocked, vpn)
-    private fun networkHint(target: ValidatedTarget): String = targetResolver.networkHint(target)
+    private fun networkHint(target: com.labteto.dshmobile.local.web.ValidatedTarget): String = targetResolver.networkHint(target)
     private fun isPublicAddress(address: InetAddress): Boolean = targetResolver.isPublicAddress(address)
     private fun readBounded(input: java.io.InputStream, maxBytes: Int): BoundedBytes {
         val output = ByteArrayOutputStream(minOf(maxBytes, 64 * 1024))
