@@ -315,4 +315,36 @@ class TokenUsageAnalyticsTest {
         assertEquals(Int.MAX_VALUE.toLong() * 7L, breakdown.estimatedInputTokens)
     }
 
+    @Test
+    fun routeIdentityIsBackwardCompatibleAndRoundTripsInUsageRecords() {
+        val json = kotlinx.serialization.json.Json
+        val legacy = json.decodeFromString(
+            TokenUsageRecord.serializer(),
+            """{"requestId":"legacy","timestamp":1,"model":"model"}""",
+        )
+        assertEquals(null, legacy.route)
+
+        val route = LocalModelRouteIdentity(
+            profileId = "profile-a",
+            provider = "DeepSeek",
+            model = "deepseek-flash",
+            baseUrl = "https://api.deepseek.com",
+            authKind = LocalModelAuthKind.API_KEY.name,
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS.name,
+            fingerprint = "route-fingerprint",
+        )
+        val source = TokenUsageRecord(
+            requestId = "routed",
+            timestamp = 2L,
+            model = route.model,
+            route = route,
+            reported = true,
+        )
+        val decoded = json.decodeFromString(
+            TokenUsageRecord.serializer(),
+            json.encodeToString(TokenUsageRecord.serializer(), source),
+        )
+        assertEquals(route, decoded.route)
+    }
+
 }
