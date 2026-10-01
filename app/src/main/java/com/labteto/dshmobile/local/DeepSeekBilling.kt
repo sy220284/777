@@ -179,6 +179,7 @@ internal fun accumulateDeepSeekUsage(
     usage: DeepSeekTokenUsage,
     pricing: DeepSeekPricingState,
     epochMillis: Long,
+    pricingEligible: Boolean = true,
 ): DeepSeekUsageSnapshot {
     if (!usage.reported) {
         return current.copy(
@@ -188,12 +189,16 @@ internal fun accumulateDeepSeekUsage(
     }
     val normalized = usage.normalizedForAccounting()
     val miss = normalized.cacheMissTokens
-    val cost = DeepSeekCostCalculator.estimateCny(
-        model = model,
-        usage = normalized,
-        pricing = pricing,
-        epochMillis = epochMillis,
-    )
+    val cost = if (pricingEligible) {
+        DeepSeekCostCalculator.estimateCny(
+            model = model,
+            usage = normalized,
+            pricing = pricing,
+            epochMillis = epochMillis,
+        )
+    } else {
+        null
+    }
     return current.copy(
         inputTokens = saturatingUsageAdd(current.inputTokens, normalized.promptTokens),
         cacheHitTokens = saturatingUsageAdd(current.cacheHitTokens, normalized.cacheHitTokens),
@@ -307,6 +312,14 @@ class DeepSeekPricingRepository @Inject constructor(
     }
 }
 
+internal fun LocalModelRouteIdentity?.allowsOfficialDeepSeekPricing(): Boolean {
+    if (this == null) return false
+    if (!provider.equals("DeepSeek", ignoreCase = true)) return false
+    return runCatching {
+        java.net.URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.deepseek.com", ignoreCase = true)
+    }.getOrDefault(false)
+}
+
 @Singleton
 class DeepSeekUsageTracker @Inject constructor(
     @ApplicationContext context: Context,
@@ -326,10 +339,12 @@ class DeepSeekUsageTracker @Inject constructor(
         requestId: String = "",
         context: TokenUsageContext = TokenUsageContext(),
         promptBreakdown: TokenPromptBreakdown = TokenPromptBreakdown(),
+        route: LocalModelRouteIdentity? = null,
     ) {
         val normalized = usage.normalizedForAccounting()
         val miss = normalized.cacheMissTokens
-        val cost = if (usage.reported) {
+        val pricingEligible = route.allowsOfficialDeepSeekPricing()
+        val cost = if (usage.reported && pricingEligible) {
             DeepSeekCostCalculator.estimateCny(
                 model = model,
                 usage = normalized,
@@ -345,6 +360,7 @@ class DeepSeekUsageTracker @Inject constructor(
                     requestId = requestId,
                     timestamp = epochMillis,
                     model = model,
+                    route = route,
                     context = context,
                     inputTokens = if (usage.reported) normalized.promptTokens else 0L,
                     cacheHitTokens = if (usage.reported) normalized.cacheHitTokens else 0L,
@@ -362,6 +378,7 @@ class DeepSeekUsageTracker @Inject constructor(
                 usage = normalized,
                 pricing = pricingRepository.state.value,
                 epochMillis = epochMillis,
+                pricingEligible = pricingEligible,
             )
             persist(next)
             _state.value = next

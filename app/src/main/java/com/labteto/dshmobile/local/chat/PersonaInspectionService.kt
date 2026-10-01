@@ -114,6 +114,7 @@ class PersonaInspectionService @Inject constructor(
                 requestId = reply.requestId,
                 context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.PERSONA_INSPECTION),
                 promptBreakdown = reply.promptBreakdown,
+                route = reply.routeIdentity,
             )
         }
         val raw = reply.content?.trim().orEmpty()

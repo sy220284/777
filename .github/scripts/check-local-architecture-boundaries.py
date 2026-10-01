@@ -305,6 +305,15 @@ for helper_path in (
     if "modelGateway.withFrozenRoute(profileId, model, baseUrl)" not in helper_source:
         die(f"{helper_path} must freeze the explicit selected profile across the helper operation")
 
+responses_client = strip_comments(read("app/src/main/java/com/labteto/dshmobile/local/model/OpenAiResponsesClient.kt"))
+for required in ("validateRequestPayload(payload)", "CHATGPT_PLAN_STREAM_INTERRUPTED", "stream_interrupted_after_admission"):
+    if required not in responses_client:
+        die(f"Responses retry/input safety contract is missing: {required}")
+
+model_configuration = strip_comments(read("app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt"))
+if "synchronizeCredentialSelection(profile)" not in model_configuration:
+    die("Model profile selection must synchronize the bound ChatGPT account registration")
+
 chat_refresh = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt")
 )
@@ -314,6 +323,8 @@ if "profile = profile" not in engine[engine.find("requestPlanner ="):engine.find
     die("Chat post-turn planner must pass its frozen profile into model requests")
 if "profileId = runSnapshot.modelSelection.activeProfileId" not in engine:
     die("Foreground runs must freeze the exact selected model profile id")
+if "messages = chatPostTurnModelMessages(prompt)" not in engine:
+    die("Chat post-turn requests must include a real model input, not system-only instructions")
 if "modelRequestMarkerOrNull()?.let" in engine[engine.find("requestPlanner ="):engine.find("private val chatReplyCoordinator")]:
     die("Chat post-turn planner must not re-read mutable active model identity")
 

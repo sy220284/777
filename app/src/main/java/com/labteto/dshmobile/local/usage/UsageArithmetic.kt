@@ -70,4 +70,13 @@ internal fun TokenUsageRecord.boundedForStorage(): TokenUsageRecord = normalized
         taskLabel = context.taskLabel?.take(256),
         runKind = context.runKind?.take(64),
     ),
+    route = route?.copy(
+        profileId = route.profileId?.take(128),
+        provider = route.provider.take(80),
+        model = route.model.take(128),
+        baseUrl = route.baseUrl.take(512),
+        authKind = route.authKind.take(64),
+        protocol = route.protocol.take(64),
+        fingerprint = route.fingerprint.take(128),
+    ),
 )

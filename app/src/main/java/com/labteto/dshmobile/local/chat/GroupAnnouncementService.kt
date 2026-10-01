@@ -54,6 +54,7 @@ class GroupAnnouncementService @Inject constructor(
                 requestId = reply.requestId,
                 context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.GROUP_ANNOUNCEMENT),
                 promptBreakdown = reply.promptBreakdown,
+                route = reply.routeIdentity,
             )
         }
             reply.content?.trim()?.take(2_000)?.takeIf(String::isNotBlank)

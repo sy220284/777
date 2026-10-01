@@ -28,6 +28,8 @@ internal class LocalSessionCoordinator(
 
     fun enqueue(snapshot: LocalHarnessSession) = repository.enqueue(snapshot)
 
+    suspend fun writeNow(snapshot: LocalHarnessSession) = repository.writeNow(snapshot)
+
     fun delete(id: String): Boolean = repository.delete(id)
 
     fun summaries(): List<LocalSessionSummary> = repository.summaries()
