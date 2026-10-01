@@ -498,3 +498,15 @@ internal fun migrateOfficialClaudeModel(model: String, baseUrl: String): String 
         normalizeModelBaseUrl(baseUrl).trimEnd('/') == "https://api.anthropic.com/v1") {
         "claude-sonnet-5-5"
     } else model
+
+internal fun List<LocalModelProfile>.apiKeyProfileForRoute(
+    model: String,
+    baseUrl: String,
+): LocalModelProfile? {
+    val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl).trimEnd('/')
+    return firstOrNull { profile ->
+        profile.authKind == LocalModelAuthKind.API_KEY &&
+            profile.model == model &&
+            normalizeModelBaseUrl(profile.baseUrl).trimEnd('/') == normalizedBaseUrl
+    }
+}

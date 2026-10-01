@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -351,7 +352,7 @@ internal fun CompactMessageAction(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.size(32.dp),
+        modifier = Modifier.size(DsSpacing.touchTarget),
         shape = RoundedCornerShape(8.dp),
         color = androidx.compose.ui.graphics.Color.Transparent,
     ) {
@@ -467,6 +468,7 @@ internal fun WorkProcessRow(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = DsSpacing.touchTarget)
                     .clickable(role = Role.Button) { expanded = !expanded }
                     .semantics { stateDescription = disclosureState }
                     .padding(vertical = DsSpacing.xsmall),

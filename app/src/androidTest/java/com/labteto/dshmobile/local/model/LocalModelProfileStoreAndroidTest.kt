@@ -99,6 +99,22 @@ class LocalModelProfileStoreAndroidTest {
         )
     }
 
+    @Test
+    fun migratedAliasKeepsActiveCredentialIdentityWhenCurrentPresetAlsoExists() {
+        val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
+        val store = LocalModelProfileStore(preferences, Json { ignoreUnknownKeys = true })
+        val legacy = LocalModelProfile(modelProfileId("claude-sonnet-5", "https://api.anthropic.com/v1"),
+            "claude-sonnet-5", "https://api.anthropic.com/v1")
+        val current = legacy.copy(id = modelProfileId("claude-sonnet-5-5", legacy.baseUrl), model = "claude-sonnet-5-5")
+        store.write(listOf(current, legacy))
+        store.setActive(legacy)
+        val reloaded = store.read()
+        assertEquals(2, reloaded.size)
+        assertEquals(setOf(current.id, legacy.id), reloaded.map { it.id }.toSet())
+        assertEquals(legacy.id, store.active("claude-sonnet-5-5", legacy.baseUrl, reloaded)?.id)
+        assertEquals("claude-sonnet-5-5", reloaded.first { it.id == legacy.id }.model)
+    }
+
     private fun planProfile(accountId: String) = LocalModelProfile(
         id = modelProfileId(
             "gpt-test",

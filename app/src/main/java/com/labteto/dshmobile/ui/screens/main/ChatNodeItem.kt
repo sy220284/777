@@ -69,6 +69,7 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.UserBubble
 import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -355,9 +356,9 @@ private fun ActionIcon(
         contentDescription = label,
         tint = DsTheme.colors.labelTertiary,
         modifier = Modifier
-            .size(44.dp)
+            .size(DsSpacing.touchTarget)
             .clickable(onClick = onClick)
-            .padding(12.dp),
+            .padding(14.dp),
     )
 }
 

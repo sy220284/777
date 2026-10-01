@@ -4922,9 +4922,9 @@ class LocalHarnessEngine @Inject constructor(
 
     private suspend fun load() {
         val storedModel = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
-        val model = modelConfiguration.normalizeModel(storedModel)
-        if (model != storedModel) preferences.edit().putString(KEY_MODEL, model).apply()
         val baseUrl = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
+        val model = migrateOfficialClaudeModel(modelConfiguration.normalizeModel(storedModel), baseUrl)
+        if (model != storedModel) preferences.edit().putString(KEY_MODEL, model).apply()
         modelConfiguration.prepareStartup(model, baseUrl)
         loadSession(currentSessionId, model, baseUrl)
     }

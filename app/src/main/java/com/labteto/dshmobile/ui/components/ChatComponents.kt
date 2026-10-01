@@ -40,6 +40,7 @@ import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -89,7 +90,7 @@ fun UserBubble(text: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** 24dp disclosure row for collapsible thinking blocks; muted, never italic. */
+/** Compact disclosure row with a 48dp touch target; muted, never italic. */
 @Composable
 fun ThinkingRow(
     summary: String?,
@@ -104,7 +105,7 @@ fun ThinkingRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 24.dp)
+            .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.row)
             .clickable(role = Role.Button, onClick = onToggle)
             .semantics { stateDescription = disclosureState }

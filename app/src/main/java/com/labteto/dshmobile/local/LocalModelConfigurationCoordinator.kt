@@ -30,8 +30,8 @@ internal class LocalModelConfigurationCoordinator(
     suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): LocalModelConfigurationResult =
         LocalModelMutationGate.run {
             require(model.isNotBlank()) { "模型名称不能为空" }
-            val name = normalizeModel(model)
             val url = normalizeModelBaseUrl(baseUrl)
+            val name = migrateOfficialClaudeModel(normalizeModel(model), url)
             val existingProfiles = profiles.read()
             val existing = existingProfiles.apiKeyProfileForRoute(name, url)
             val id = existing?.id ?: modelProfileId(name, url)
@@ -114,20 +114,7 @@ internal class LocalModelConfigurationCoordinator(
 
     suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null): String {
         if (model.isBlank()) return "请选择模型"
-        val name = normalizeModel(model)
-        val url = runCatching { normalizeModelBaseUrl(baseUrl) }
-            .getOrElse { return it.message ?: "地址无效" }
-        val existing = profiles.read().apiKeyProfileForRoute(name, url)
-        val key = apiKey.trim().takeIf(String::isNotEmpty)
-            ?: existing?.let { apiKeys.getFor(it.id) }
-            ?: apiKeys.getFor(modelProfileId(name, url))
-            ?: return "请先填写该模型的密钥"
-        return tester.test(
-            key,
-            url,
-            name,
-            protocol ?: existing?.protocol ?: LocalModelPresets.protocolFor(name, url),
-        )
+        return tester.testStoredRoute(apiKey, normalizeModel(model), baseUrl, protocol, profiles.read(), apiKeys::getFor)
     }
 
     fun readProfiles(): List<LocalModelProfile> = profiles.read()
@@ -177,18 +164,5 @@ internal class LocalModelConfigurationCoordinator(
     companion object {
         const val DEFAULT_MODEL = "deepseek-flash"
         const val DEFAULT_BASE_URL = "https://api.deepseek.com"
-    }
-}
-
-
-internal fun List<LocalModelProfile>.apiKeyProfileForRoute(
-    model: String,
-    baseUrl: String,
-): LocalModelProfile? {
-    val normalizedBaseUrl = normalizeModelBaseUrl(baseUrl).trimEnd('/')
-    return firstOrNull { profile ->
-        profile.authKind == LocalModelAuthKind.API_KEY &&
-            profile.model == model &&
-            normalizeModelBaseUrl(profile.baseUrl).trimEnd('/') == normalizedBaseUrl
     }
 }

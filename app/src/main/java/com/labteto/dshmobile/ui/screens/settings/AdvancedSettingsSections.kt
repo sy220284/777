@@ -142,6 +142,7 @@ internal fun ProjectSettingsCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = DsSpacing.touchTarget)
                         .clip(DsShapes.row)
                         .clickable { namespacesExpanded = !namespacesExpanded }
                         .padding(vertical = DsSpacing.small),

@@ -75,6 +75,7 @@ internal fun PresetsSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = DsSpacing.touchTarget)
                         .clickable(enabled = selectable) {
                             scope.launch {
                                 if (store.selectAgentPreset(entry.id)) onDismiss()
