@@ -2,6 +2,7 @@ package com.labteto.dshmobile.harness.session
 
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.RandomAccessFile
 import java.nio.file.AtomicMoveNotSupportedException
@@ -21,6 +22,11 @@ data class SessionEvent(
     val type: String,
     val createdAt: Long,
     val data: JsonObject,
+)
+
+data class SessionEventCorruptionStats(
+    val malformedRows: Long,
+    val segmentReadFailures: Long,
 )
 
 data class SessionEventFileSnapshot(
@@ -52,6 +58,13 @@ class SessionEventLog(
     // Several Android adapters can open the same session while background maintenance is running.
     private val lock = PATH_LOCKS[(file.absolutePath.hashCode() and Int.MAX_VALUE) % PATH_LOCKS.size]
     private val nextSequence = AtomicLong(synchronized(lock) { readNextSequence() })
+    private val malformedRows = AtomicLong(0L)
+    private val segmentReadFailures = AtomicLong(0L)
+
+    fun corruptionStats(): SessionEventCorruptionStats = SessionEventCorruptionStats(
+        malformedRows = malformedRows.get(),
+        segmentReadFailures = segmentReadFailures.get(),
+    )
 
     fun append(type: String, data: JsonObject): SessionEvent = synchronized(lock) {
         require(type.isNotBlank()) { "事件类型不能为空" }
@@ -74,7 +87,11 @@ class SessionEventLog(
         require(incomingBytes <= maxBytes) { "单条会话事件超过日志分段上限" }
         file.parentFile?.mkdirs()
         if (file.isFile && file.length() + incomingBytes > maxBytes) rotateActiveSegment()
-        file.appendText(encoded)
+        FileOutputStream(file, true).use { output ->
+            output.write(encoded.toByteArray(Charsets.UTF_8))
+            output.flush()
+            output.fd.sync()
+        }
         nextSequence.incrementAndGet()
         // Archive maintenance must not turn a committed append into an apparent failure.
         runCatching { compressOneLegacySegmentUnsafe() }
@@ -630,16 +647,20 @@ class SessionEventLog(
         }
     }
 
-    private fun decodeEventOrNull(line: String): SessionEvent? =
-        runCatching { json.decodeFromString(SessionEvent.serializer(), line) }.getOrNull()
+    private fun decodeEventOrNull(line: String): SessionEvent? {
+        if (line.isBlank()) return null
+        return runCatching { json.decodeFromString(SessionEvent.serializer(), line) }
+            .getOrElse {
+                malformedRows.incrementAndGet()
+                null
+            }
+    }
 
     private fun readEventsUnsafe(): List<SessionEvent> {
         val events = mutableListOf<SessionEvent>()
         for (source in orderedFilesUnsafe()) {
             source.forEachEventLine { line ->
-                runCatching { json.decodeFromString(SessionEvent.serializer(), line) }
-                    .getOrNull()
-                    ?.let(events::add)
+                decodeEventOrNull(line)?.let(events::add)
             }
         }
         return events
@@ -721,7 +742,12 @@ class SessionEventLog(
         else bufferedReader()
 
     private inline fun File.forEachEventLine(block: (String) -> Unit) {
-        eventReader().useLines { lines -> lines.forEach(block) }
+        try {
+            eventReader().useLines { lines -> lines.forEach(block) }
+        } catch (error: Exception) {
+            segmentReadFailures.incrementAndGet()
+            throw error
+        }
     }
 
     private companion object {
