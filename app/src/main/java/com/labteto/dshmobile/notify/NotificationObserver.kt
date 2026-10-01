@@ -13,13 +13,16 @@ import com.labteto.dshmobile.core.notify.CompletionEvent
 import com.labteto.dshmobile.core.session.SessionEventEnvelope
 import com.labteto.dshmobile.core.wire.dto.RemoteEventFrame
 import com.labteto.dshmobile.data.SessionStore
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -68,15 +71,42 @@ class NotificationObserver @Inject constructor(
     private var appInForeground = false
 
     fun start() {
+        // SessionStore owns the per-session follow streams; wire its completion hook before the
+        // idempotent start guard so a repeated start can also repair an accidentally cleared hook.
+        store.notificationSink = ::onSessionEvent
         if (started) return
         started = true
         notifications.ensureChannels()
         trackAppForeground()
-        scope.launch {
+        launchResilientCollector("settings") {
             hostsStore.settings.collect { settings = it }
         }
-        scope.launch {
+        launchResilientCollector("event-frames") {
             connectionManager.eventFrames.collect { handleEventFrame(it) }
+        }
+    }
+
+    private fun launchResilientCollector(name: String, collect: suspend () -> Unit) {
+        scope.launch {
+            var failures = 0
+            while (true) {
+                try {
+                    collect()
+                    return@launch
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    failures += 1
+                    AppLog.error(
+                        "NotificationObserver",
+                        "$name collector failed; restarting (failure=$failures)",
+                        error,
+                    )
+                    val backoff = (250L * (1L shl (failures - 1).coerceIn(0, 4)))
+                        .coerceAtMost(4_000L)
+                    delay(backoff)
+                }
+            }
         }
     }
 

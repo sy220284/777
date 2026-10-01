@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.memory
 
 import android.content.Context
+import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.nio.file.Files
@@ -619,7 +620,14 @@ class MemoryStore internal constructor(
         cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
 
         val document = decodeDocument(file) ?: if (!file.isFile) {
-            decodeDocument(backup) ?: MemoryDocument()
+            decodeDocument(backup) ?: MemoryDocument().also {
+                if (backup.isFile) {
+                    AppLog.error(
+                        "MemoryStore",
+                        "长期记忆主文件缺失且备份无法解析；本次以空文档启动，损坏备份保留在原位置",
+                    )
+                }
+            }
         } else {
             val corrupt = File(root, "memories.corrupt-${System.currentTimeMillis()}.json")
             val moved = runCatching { file.renameTo(corrupt) }.getOrDefault(false)
@@ -630,6 +638,10 @@ class MemoryStore internal constructor(
                 runCatching { backup.copyTo(file, overwrite = true) }
                 recovered
             } else {
+                AppLog.error(
+                    "MemoryStore",
+                    "长期记忆主文件损坏且备份不可用；已隔离主文件，本次以空文档启动",
+                )
                 MemoryDocument()
             }
         }

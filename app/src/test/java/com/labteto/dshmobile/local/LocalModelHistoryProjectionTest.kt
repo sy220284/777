@@ -44,7 +44,7 @@ class LocalModelHistoryProjectionTest {
         val events = listOf(
             event(0L, "system/prompt", buildJsonObject { put("content", "系统") }),
             event(1L, "user/message", buildJsonObject { put("content", "问题") }),
-            event(2L, "assistant/message", message("assistant", "回答")),
+            event(2L, "assistant/message", assistantCall("call-1")),
             event(3L, "tool/result", buildJsonObject {
                 put("id", "call-1")
                 put("content", "结果")
@@ -170,7 +170,8 @@ class LocalModelHistoryProjectionTest {
     @Test
     fun toolReplayPrefersExactModelVisibleContentOverAuditContent() {
         val events = listOf(
-            event(0L, "tool/result", buildJsonObject {
+            event(0L, "assistant/message", assistantCall("call-exact")),
+            event(1L, "tool/result", buildJsonObject {
                 put("id", "call-exact")
                 put("content", "审计保留的原始截断内容")
                 put("model_content", "模型实际看到的压缩内容")
@@ -179,11 +180,43 @@ class LocalModelHistoryProjectionTest {
 
         val restored = restoreLocalModelHistory(events, emptyList(), codec)
 
-        assertEquals(1, restored.messages.size)
+        assertEquals(2, restored.messages.size)
         assertEquals(
             "模型实际看到的压缩内容",
-            restored.messages.single()["content"].toString().trim('"'),
+            restored.messages.last()["content"].toString().trim('"'),
         )
+    }
+
+    @Test
+    fun orphanToolResultIsIgnoredWhenAssistantOwnerWasLost() {
+        val restored = restoreLocalModelHistory(
+            listOf(event(0L, "tool/result", buildJsonObject {
+                put("id", "orphan")
+                put("content", "不应进入历史")
+            })),
+            emptyList(),
+            codec,
+        )
+
+        assertTrue(restored.messages.isEmpty())
+        assertFalse(restored.replayedTail)
+    }
+
+    @Test
+    fun reusedCallIdInALaterAssistantBatchIsAllowed() {
+        val events = listOf(
+            event(0L, "assistant/message", assistantCall("same")),
+            event(1L, "tool/result", buildJsonObject { put("id", "same"); put("content", "first") }),
+            event(2L, "assistant/message", assistantCall("same")),
+            event(3L, "tool/result", buildJsonObject { put("id", "same"); put("content", "second") }),
+        )
+
+        val restored = restoreLocalModelHistory(events, emptyList(), codec)
+
+        assertEquals(listOf("assistant", "tool", "assistant", "tool"), restored.messages.map {
+            it["role"].toString().trim('"')
+        })
+        assertEquals("second", restored.messages.last()["content"].toString().trim('"'))
     }
 
     @Test
@@ -212,6 +245,18 @@ class LocalModelHistoryProjectionTest {
     private fun message(role: String, content: String): JsonObject = buildJsonObject {
         put("role", role)
         put("content", content)
+    }
+
+    private fun assistantCall(callId: String): JsonObject = buildJsonObject {
+        put("role", "assistant")
+        put("tool_calls", JsonArray(listOf(buildJsonObject {
+            put("id", callId)
+            put("type", "function")
+            put("function", buildJsonObject {
+                put("name", "read")
+                put("arguments", "{}")
+            })
+        })))
     }
 
     private fun event(sequence: Long, type: String, data: JsonObject) = LocalSessionEventLog.Event(

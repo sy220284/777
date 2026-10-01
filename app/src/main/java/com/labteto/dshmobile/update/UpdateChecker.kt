@@ -156,7 +156,7 @@ internal fun isNewerVersion(candidate: String, current: String): Boolean {
     }
 
     val candidateVersion = parse(candidate) ?: return false
-    val currentVersion = parse(current) ?: return true
+    val currentVersion = parse(current) ?: return false
 
     val coreComparison = compareParts(candidateVersion.core, currentVersion.core)
     if (coreComparison != 0) return coreComparison > 0
