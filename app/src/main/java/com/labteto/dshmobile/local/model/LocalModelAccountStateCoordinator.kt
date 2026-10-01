@@ -46,8 +46,7 @@ internal class LocalModelAccountStateCoordinator(
                 configured = configured,
                 model = result?.model ?: active?.model ?: current.model,
                 baseUrl = result?.baseUrl ?: active?.baseUrl ?: current.baseUrl,
-                configuredModels = profiles.map(LocalModelProfile::model).distinct().sorted(),
-                modelProfiles = profiles,
+                modelSelection = LocalModelSelectionState(profiles, active?.id),
                 error = when {
                     models.isEmpty() -> "当前 ChatGPT 账户没有可用于套餐共享的模型"
                     removedActiveChatGptModel -> "当前 ChatGPT 模型已不可用，请重新选择模型"
@@ -73,8 +72,7 @@ internal class LocalModelAccountStateCoordinator(
                 configured = configured,
                 model = result.model,
                 baseUrl = result.baseUrl,
-                configuredModels = result.configuredModels,
-                modelProfiles = result.profiles,
+                modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
                 error = null,
             )
         }

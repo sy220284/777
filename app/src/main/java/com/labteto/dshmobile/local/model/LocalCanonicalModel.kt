@@ -93,14 +93,17 @@ internal object LocalCanonicalModelCodec {
                 source["reasoning_content"]?.jsonPrimitive?.contentOrNull
                     ?.takeIf(String::isNotBlank)
                     ?.let { blocks += LocalCanonicalContent.Reasoning(it) }
-                (source["tool_calls"] as? JsonArray).orEmpty().forEach { raw ->
-                    val call = raw as? JsonObject ?: return@forEach
-                    val function = call["function"] as? JsonObject ?: return@forEach
-                    val id = call["id"]?.jsonPrimitive?.contentOrNull ?: return@forEach
-                    val name = function["name"]?.jsonPrimitive?.contentOrNull ?: return@forEach
-                    val rawArguments = function["arguments"]?.jsonPrimitive?.contentOrNull ?: "{}"
-                    val arguments = runCatching { Json.parseToJsonElement(rawArguments).jsonObject }
-                        .getOrElse { throw LocalModelException("MODEL_HISTORY_INVALID", "历史工具参数不是合法 JSON 对象", false, it) }
+                val historyCalls = mutableListOf<LocalToolCall>()
+                val calls = source["tool_calls"]?.takeUnless { it == JsonNull }?.let {
+                    it as? JsonArray ?: throw LocalModelException("MODEL_HISTORY_INVALID", "历史 tool_calls 必须是数组", false)
+                }
+                calls.orEmpty().forEach { raw ->
+                    val call = raw as? JsonObject
+                        ?: throw LocalModelException("MODEL_HISTORY_INVALID", "历史工具调用必须是对象", false)
+                    val function = call["function"] as? JsonObject
+                        ?: throw LocalModelException("MODEL_HISTORY_INVALID", "历史工具调用缺少 function 对象", false)
+                    val validated = validatedModelToolCall(call["id"], function["name"], function["arguments"], "MODEL_HISTORY_INVALID")
+                    historyCalls += validated
                     val metadata = buildJsonObject {
                         call.forEach { (key, value) ->
                             if (key !in setOf("id", "type", "function")) put(key, value)
@@ -113,13 +116,14 @@ internal object LocalCanonicalModelCodec {
                         if (functionMetadata.isNotEmpty()) put("function_metadata", functionMetadata)
                     }
                     blocks += LocalCanonicalContent.ToolCall(
-                        id = id,
-                        name = name,
-                        arguments = arguments,
-                        rawArguments = rawArguments,
+                        id = validated.id,
+                        name = validated.name,
+                        arguments = validated.arguments,
+                        rawArguments = validated.rawArguments,
                         providerMetadata = metadata,
                     )
                 }
+                requireUniqueModelToolCallIds(historyCalls, "MODEL_HISTORY_INVALID")
             }
         }
         return LocalCanonicalMessage(role, blocks, replay(source))

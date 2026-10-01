@@ -255,7 +255,7 @@ class LocalCanonicalModelCodecTest {
     fun summaryNamesRemainAvailableWithoutMakingDamagedHistoryExecutable() {
         val partial = Json.parseToJsonElement("""{"role":"assistant","tool_calls":[{"function":{"name":"read"}}]}""").jsonObject
         assertEquals(listOf("read"), LocalCanonicalModelCodec.diagnosticToolNames(partial))
-        assertTrue(LocalCanonicalModelCodec.canonicalToolCalls(partial).isEmpty())
+        assertTrue(runCatching { LocalCanonicalModelCodec.canonicalToolCalls(partial) }.isFailure)
         val damaged = Json.parseToJsonElement("""{"role":"assistant","tool_calls":[{"id":"a","function":{"name":"read","arguments":"invalid"}}]}""").jsonObject
         assertEquals(listOf("read"), LocalCanonicalModelCodec.diagnosticToolNames(damaged))
         assertTrue(runCatching { LocalCanonicalModelCodec.canonicalToolCalls(damaged) }.isFailure)

@@ -113,6 +113,12 @@ class LocalModelProfileStoreAndroidTest {
         assertEquals(setOf(current.id, legacy.id), reloaded.map { it.id }.toSet())
         assertEquals(legacy.id, store.active("claude-sonnet-5-5", legacy.baseUrl, reloaded)?.id)
         assertEquals("claude-sonnet-5-5", reloaded.first { it.id == legacy.id }.model)
+        val draft = kotlinx.coroutines.runBlocking {
+            resolveLocalModelApiKeyDraft("", "claude-sonnet-5-5", legacy.baseUrl, null, reloaded,
+                { id -> if (id == legacy.id) "legacy-key" else "current-key" }, legacy.id)
+        }
+        assertEquals(legacy.id, draft.profile.id)
+        assertEquals("legacy-key", draft.key)
     }
 
     private fun planProfile(accountId: String) = LocalModelProfile(

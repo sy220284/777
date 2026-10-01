@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalGroupChatState
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -15,17 +16,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
-/**
- * Settings-facing projection of the local runtime.
- *
- * Streaming, job and resource counters change on hot paths. Settings does not need those updates,
- * so keeping this surface explicit prevents unrelated runtime churn from recomposing the screen.
- */
+/** Settings owns model identity, but ignores streaming, job and resource-counter churn. */
 data class LocalHarnessSettingsState(
     val loading: Boolean = true,
     val model: String = "deepseek-flash",
     val baseUrl: String = "https://api.deepseek.com",
-    val modelProfiles: List<LocalModelProfile> = emptyList(),
+    val modelSelection: LocalModelSelectionState = LocalModelSelectionState(),
     val mainMaxSteps: Int = 16,
     val subagentMaxSteps: Int = 20,
     val modelAttempts: Int = 3,
@@ -39,7 +35,9 @@ data class LocalHarnessSettingsState(
     val chatPersona: PersonaProfile = PersonaProfile(),
     val usage: DeepSeekUsageSnapshot = DeepSeekUsageSnapshot(),
     val error: String? = null,
-)
+) {
+    val modelProfiles: List<LocalModelProfile> get() = modelSelection.profiles
+}
 
 /**
  * Tasks-facing projection of the local runtime.
@@ -76,7 +74,7 @@ internal fun LocalHarnessState.toSettingsUiState(): LocalHarnessSettingsState =
         loading = loading,
         model = model,
         baseUrl = baseUrl,
-        modelProfiles = modelProfiles,
+        modelSelection = modelSelection,
         mainMaxSteps = mainMaxSteps,
         subagentMaxSteps = subagentMaxSteps,
         modelAttempts = modelAttempts,

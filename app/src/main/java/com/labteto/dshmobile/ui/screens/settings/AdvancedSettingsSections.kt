@@ -445,21 +445,30 @@ internal fun LocalModelSettingsCard(
     var baseUrl by remember { mutableStateOf(LocalModelPresets.entries.first().baseUrl) }
     var protocol by remember { mutableStateOf(LocalModelProtocol.CHAT_COMPLETIONS) }
     var custom by remember { mutableStateOf(false) }
+    var editingProfileId by remember { mutableStateOf<String?>(null) }
+    var editorGeneration by remember { mutableStateOf(0L) }
     var apiKey by remember { mutableStateOf("") }
     var testStatus by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var pendingRemoveId by remember { mutableStateOf<String?>(null) }
     val chatGpt by viewModel.chatGptState.collectAsState()
-    val savedRoute = local.modelProfiles.any {
+    val matchingRoutes = local.modelProfiles.filter {
         it.authKind == LocalModelAuthKind.API_KEY &&
             it.model == model.trim() && it.baseUrl == baseUrl.trim().trimEnd('/')
     }
+    val savedProfile = if (editingProfileId != null) matchingRoutes.firstOrNull { it.id == editingProfileId }
+        else matchingRoutes.singleOrNull()
+    val savedRoute = savedProfile != null
     val selectedPreset = LocalModelPresets.find(model, baseUrl)
-    val editRoute: (String, String) -> Unit = { name, url ->
+    val editRoute: (String, String, String?) -> Unit = { name, url, id ->
+        editorGeneration++
+        editingProfileId = id
         model = name
         baseUrl = url
-        protocol = local.modelProfiles.firstOrNull { it.authKind == LocalModelAuthKind.API_KEY && it.model == name && it.baseUrl == url }?.protocol ?: LocalModelPresets.protocolFor(name, url)
+        protocol = local.modelProfiles.filter { it.authKind == LocalModelAuthKind.API_KEY && it.model == name && it.baseUrl == url }
+            .let { routes -> if (id != null) routes.firstOrNull { it.id == id } else routes.singleOrNull() }
+            ?.protocol ?: LocalModelPresets.protocolFor(name, url)
         apiKey = ""
         testStatus = null
     }
@@ -485,7 +494,7 @@ internal fun LocalModelSettingsCard(
                             Text(profile.displayName ?: profile.model, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary,
                                 modifier = Modifier.weight(1f, fill = false), maxLines = 1,
                                 overflow = TextOverflow.Ellipsis)
-                            if (profile.model == local.model && profile.baseUrl == local.baseUrl) {
+                            if (local.modelSelection.isActive(profile)) {
                                 DsStatusPill(DsStatus.Done, stringResource(R.string.local_model_in_use))
                             }
                         }
@@ -508,12 +517,12 @@ internal fun LocalModelSettingsCard(
                         anchor = { Text("⋯", style = DsType.large20.withReadingWeight(), color = colors.labelSecondary,
                             modifier = Modifier.padding(horizontal = DsSpacing.small)) },
                         items = listOfNotNull(
-                            if (profile.model != local.model || profile.baseUrl != local.baseUrl)
+                            if (!local.modelSelection.isActive(profile))
                                 MenuItem(text = stringResource(R.string.local_model_use),
                                     onClick = { viewModel.selectLocalModel(profile.id) }) else null,
                             if (profile.authKind == LocalModelAuthKind.API_KEY)
                                 MenuItem(text = stringResource(R.string.local_model_edit), onClick = {
-                                    editRoute(profile.model, profile.baseUrl)
+                                    editRoute(profile.model, profile.baseUrl, profile.id)
                                     custom = LocalModelPresets.entries.none {
                                         it.model == profile.model && it.baseUrl == profile.baseUrl
                                     }
@@ -528,7 +537,7 @@ internal fun LocalModelSettingsCard(
             }
         }
         DsButton(stringResource(R.string.local_model_add), onClick = {
-            editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl)
+            editRoute(LocalModelPresets.entries.first().model, LocalModelPresets.entries.first().baseUrl, null)
             custom = false
             showEditor = true
         }, modifier = Modifier.fillMaxWidth(), icon = Icons.Outlined.Add)
@@ -538,7 +547,7 @@ internal fun LocalModelSettingsCard(
         DsBottomSheet(
             title = stringResource(R.string.local_model_add),
             subtitle = stringResource(R.string.local_model_preset_hint),
-            onDismiss = { showEditor = false },
+            onDismiss = { showEditor = false; editorGeneration++ },
         ) {
             Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
@@ -564,18 +573,18 @@ internal fun LocalModelSettingsCard(
                     items = LocalModelPresets.entries.map { preset ->
                         MenuItem("${preset.provider} · ${preset.model}") {
                             custom = false
-                            editRoute(preset.model, preset.baseUrl)
+                            editRoute(preset.model, preset.baseUrl, null)
                         }
                     } + MenuItem(stringResource(R.string.local_model_custom)) {
                         custom = true
-                        editRoute("", "")
+                        editRoute("", "", null)
                     },
                 )
                 if (custom) {
-                    OutlinedTextField(model, onValueChange = { model = it.take(160); testStatus = null },
+                    OutlinedTextField(model, onValueChange = { model = it.take(160); editingProfileId = null; editorGeneration++; testStatus = null },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
                         label = { Text(stringResource(R.string.advanced_default_model)) })
-                    OutlinedTextField(baseUrl, onValueChange = { baseUrl = it.take(1000); testStatus = null },
+                    OutlinedTextField(baseUrl, onValueChange = { baseUrl = it.take(1000); editingProfileId = null; editorGeneration++; testStatus = null },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
                         label = { Text(stringResource(R.string.advanced_endpoint)) })
                 } else {
@@ -607,8 +616,8 @@ internal fun LocalModelSettingsCard(
                         }
                     }
                 }
-                if (custom) LocalModelProtocolPicker(protocol) { protocol = it; testStatus = null }
-                OutlinedTextField(apiKey, onValueChange = { apiKey = it.take(8000); testStatus = null },
+                if (custom) LocalModelProtocolPicker(protocol) { protocol = it; editorGeneration++; testStatus = null }
+                OutlinedTextField(apiKey, onValueChange = { apiKey = it.take(8000); editorGeneration++; testStatus = null },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     label = { Text(stringResource(if (savedRoute) R.string.advanced_replace_model_key
                         else R.string.advanced_model_key)) },
@@ -624,12 +633,15 @@ internal fun LocalModelSettingsCard(
                         val testedUrl = baseUrl
                         val testedKey = apiKey
                         val testedProtocol = protocol
+                        val testedProfileId = editingProfileId
+                        val testedGeneration = editorGeneration
                         scope.launch {
-                            val result = viewModel.testLocalModel(testedKey, testedModel, testedUrl, testedProtocol)
-                            if (model == testedModel && baseUrl == testedUrl && apiKey == testedKey && protocol == testedProtocol) {
-                                testStatus = result
+                            try {
+                                val result = viewModel.testLocalModel(testedKey, testedModel, testedUrl, testedProtocol, testedProfileId)
+                                if (showEditor && editorGeneration == testedGeneration) testStatus = result
+                            } finally {
+                                testing = false
                             }
-                            testing = false
                         }
                     }, enabled = !testing && model.isNotBlank() && baseUrl.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(), variant = DsButtonVariant.Outline)
@@ -638,14 +650,27 @@ internal fun LocalModelSettingsCard(
                         testStatus = "请填写该模型的密钥"
                     } else {
                         saving = true
+                        val savedGeneration = editorGeneration
+                        val savedKey = apiKey
+                        val savedModel = model
+                        val savedUrl = baseUrl
+                        val savedProtocol = protocol
+                        val savedProfileId = editingProfileId
                         scope.launch {
-                            val result = runCatching { viewModel.saveLocalModel(apiKey, model, baseUrl, protocol) }
-                            saving = false
-                            result.onSuccess {
-                                apiKey = ""
-                                showEditor = false
+                            try {
+                                viewModel.saveLocalModel(savedKey, savedModel, savedUrl, savedProtocol, savedProfileId)
+                                if (showEditor && editorGeneration == savedGeneration) {
+                                    apiKey = ""
+                                    showEditor = false
+                                }
                                 report(modelSavedMessage)
-                            }.onFailure { testStatus = it.message ?: "保存失败" }
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                if (showEditor && editorGeneration == savedGeneration) testStatus = error.message ?: "保存失败"
+                            } finally {
+                                saving = false
+                            }
                         }
                     }
                 }, modifier = Modifier.fillMaxWidth(),
