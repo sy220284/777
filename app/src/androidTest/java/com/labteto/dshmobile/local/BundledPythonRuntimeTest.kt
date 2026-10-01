@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.labteto.dshmobile.local.runtime.BundledPythonRuntime
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
