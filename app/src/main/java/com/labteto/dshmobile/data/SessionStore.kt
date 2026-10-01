@@ -5,7 +5,6 @@ import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.connection.ConnectionManager
 import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.HostsStore
-import com.labteto.dshmobile.core.session.AssistantLiveState
 import com.labteto.dshmobile.core.session.ChunkRows
 import com.labteto.dshmobile.core.session.ConversationSnapshot
 import com.labteto.dshmobile.core.session.EventFold
@@ -70,10 +69,8 @@ import com.labteto.dshmobile.core.wire.dto.SessionUpdateQueueRequest
 import com.labteto.dshmobile.core.wire.dto.SkillEntry
 import com.labteto.dshmobile.core.wire.dto.SkillListRequest
 import com.labteto.dshmobile.core.wire.dto.SubagentListEntry
-import com.labteto.dshmobile.core.wire.dto.SubagentPromptRequest
 import com.labteto.dshmobile.core.wire.dto.TokenUsageView
 import com.labteto.dshmobile.core.wire.dto.USER_QUESTIONS_REQUEST_EVENT
-import com.labteto.dshmobile.core.wire.dto.UnknownSubagentListEntry
 import com.labteto.dshmobile.core.wire.dto.WorkspaceArchiveSessionRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceCreateRequest
 import com.labteto.dshmobile.core.wire.dto.WorkspaceDeleteRequest
@@ -221,15 +218,6 @@ class SessionStore @Inject constructor(
     private val _loadOlderFailed = MutableStateFlow(false)
     val loadOlderFailed: StateFlow<Boolean> = _loadOlderFailed.asStateFlow()
 
-    private val _subagents = MutableStateFlow<List<SubagentListEntry>>(emptyList())
-    val subagents: StateFlow<List<SubagentListEntry>> = _subagents.asStateFlow()
-
-    private val _subagentConversation = MutableStateFlow<ConversationSnapshot?>(null)
-    val subagentConversation: StateFlow<ConversationSnapshot?> = _subagentConversation.asStateFlow()
-
-    private val _subagentMode = MutableStateFlow<String?>(null)
-    val subagentMode: StateFlow<String?> = _subagentMode.asStateFlow()
-
     private val _pendingApproval = MutableStateFlow<PendingApproval?>(null)
     val pendingApproval: StateFlow<PendingApproval?> = _pendingApproval.asStateFlow()
 
@@ -344,6 +332,18 @@ class SessionStore @Inject constructor(
             }
         },
     )
+
+    private val subagentRuntime = SessionSubagentRuntime(
+        apiProvider = ::apiOrNull,
+        currentSessionId = { _currentSessionId.value },
+        activeHostKey = { activeHostKey },
+        remoteStreams = remoteStreams,
+        onConnectionError = ::setConnectionError,
+        logger = ::log,
+    )
+    val subagents: StateFlow<List<SubagentListEntry>> get() = subagentRuntime.subagents
+    val subagentConversation: StateFlow<ConversationSnapshot?> get() = subagentRuntime.conversation
+    val subagentMode: StateFlow<String?> get() = subagentRuntime.mode
 
     init {
         observeConnection()
@@ -929,9 +929,7 @@ class SessionStore @Inject constructor(
                 _currentConversation.value = null
                 _jobs.value = emptyList()
                 catalogs.resetSession()
-                _subagents.value = emptyList()
-                _subagentConversation.value = null
-                _subagentMode.value = null
+                subagentRuntime.resetSession()
             }
         }
         startFollow(sessionId)
@@ -1457,106 +1455,21 @@ class SessionStore @Inject constructor(
         loadSkills(sid)
     }
 
-    suspend fun refreshSubagents() {
-        val sid = currentSessionId.value ?: return
-        val api = apiOrNull() ?: return
-        when (val r = api.subagentList(sid)) {
-            is RpcResult.Ok -> synchronized(lock) {
-                if (currentId == sid) _subagents.value = r.value.entries
-            }
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun refreshSubagents() = subagentRuntime.refresh()
 
-    suspend fun interruptSubagent(childSessionId: String) {
-        val sid = currentSessionId.value ?: return
-        val api = apiOrNull() ?: return
-        when (val r = api.subagentInterrupt(childSessionId = childSessionId, parentSessionId = sid)) {
-            is RpcResult.Ok -> Unit
-            is RpcResult.Err -> setConnectionError(r.error.message)
-        }
-    }
+    suspend fun interruptSubagent(childSessionId: String) =
+        subagentRuntime.interrupt(childSessionId)
 
-    suspend fun promptSubagent(childSessionId: String, text: String, delivery: String = "queue"): Boolean {
-        val sid = currentSessionId.value ?: return false
-        val api = apiOrNull() ?: return false
-        val zone = TimeZone.getDefault().id
-        val request = SubagentPromptRequest(
-            requestId = newPromptRequestId(),
-            parentSessionId = sid,
-            childSessionId = childSessionId,
-            mode = "continuable",
-            delivery = delivery,
-            content = listOf(PromptContentPart.Text(text)),
-            clientTimeZone = zone,
-        )
-        return when (val r = api.subagentPrompt(request)) {
-            is RpcResult.Ok -> true
-            is RpcResult.Err -> { setConnectionError(r.error.message); false }
-        }
-    }
+    suspend fun promptSubagent(
+        childSessionId: String,
+        text: String,
+        delivery: String = "queue",
+    ): Boolean = subagentRuntime.prompt(childSessionId, text, delivery)
 
-    suspend fun openSubagentTranscript(childSessionId: String) {
-        val sid = currentSessionId.value ?: return
-        apiOrNull() ?: return
-        val entry = _subagents.value.firstOrNull { subagentEntryId(it) == childSessionId }
-        val mode = when (entry) {
-            is SubagentListEntry.ChildOneShot -> "one-shot"
-            is SubagentListEntry.ChildContinuable -> "continuable"
-            else -> null
-        }
-        _subagentMode.value = mode
-        if (mode == null) {
-            _subagentConversation.value = null
-            log("subagent $childSessionId has no readable transcript mode")
-            return
-        }
-        remoteStreams.cancelSubagentFollow()
-        _subagentConversation.value = null
-        val host = activeHostKey ?: return
-        val events = mutableListOf<SessionEventEnvelope>()
-        val live = AssistantLiveState()
-        var hasMore = false
-        val opened = remoteStreams.followSubagent(
-            parentSessionId = sid,
-            childSessionId = childSessionId,
-            mode = mode,
-            maxMessages = HISTORY_PAGE_SIZE,
-        ) { frame ->
-            if (activeHostKey == host && currentSessionId.value == sid) {
-                when (frame) {
-                    is SessionFollowFrame.Snapshot -> {
-                        events.clear()
-                        events.addAll(expandRecords(frame.records))
-                        live.seed(frame.assistantStream)
-                        hasMore = frame.hasMore
-                    }
-                    is SessionFollowFrame.Entry -> expandRecords(listOf(frame.record)).forEach { event ->
-                        if (events.none { it.seq == event.seq }) events.add(event)
-                        val data = event.data as? JsonObject
-                        live.acceptDurable(
-                            event.type,
-                            data?.get("turn")?.jsonPrimitive?.intOrNull,
-                            data?.get("step")?.jsonPrimitive?.intOrNull,
-                            event.seq,
-                            event.surfaceOp,
-                        )
-                    }
-                    is SessionFollowFrame.AssistantStream -> live.accept(frame.frame)
-                }
-                _subagentConversation.value = EventFold(childSessionId)
-                    .fold(events.sortedBy { it.seq }, live.transientEnvelopes())
-                    .copy(hasMore = hasMore)
-            }
-        }
-        if (!opened) {
-            log("cannot follow subagent $childSessionId: no connection generation")
-        }
-    }
+    suspend fun openSubagentTranscript(childSessionId: String) =
+        subagentRuntime.openTranscript(childSessionId)
 
-    fun closeSubagentTranscript() {
-        remoteStreams.cancelSubagentFollow()
-    }
+    fun closeSubagentTranscript() = subagentRuntime.closeTranscript()
 
     suspend fun createWorkspace(path: String) {
         val api = apiOrNull() ?: return
@@ -1812,13 +1725,6 @@ class SessionStore @Inject constructor(
             index--
         }
         return entries.subList(index.coerceAtLeast(0), entries.size)
-    }
-
-    private fun subagentEntryId(entry: SubagentListEntry): String? = when (entry) {
-        is SubagentListEntry.ChildOneShot -> entry.id
-        is SubagentListEntry.ChildContinuable -> entry.id
-        is SubagentListEntry.Diagnostic -> entry.id
-        is UnknownSubagentListEntry -> null
     }
 
     /**

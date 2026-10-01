@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 5173,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 1885,
+    "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 1791,
+    "app/src/main/java/com/labteto/dshmobile/data/SessionSubagentRuntime.kt": 176,
     "app/src/main/java/com/labteto/dshmobile/data/SessionAttachmentTransfer.kt": 100,
     "app/src/main/java/com/labteto/dshmobile/data/SessionCatalogRuntime.kt": 151,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt": 1802,
