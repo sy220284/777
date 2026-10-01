@@ -502,9 +502,16 @@ internal fun LocalModelSettingsCard(
                                 DsStatusPill(DsStatus.Done, stringResource(R.string.local_model_in_use))
                             }
                         }
+                        val duplicateApiRoute = profile.authKind == LocalModelAuthKind.API_KEY &&
+                            local.modelProfiles.count {
+                                it.authKind == LocalModelAuthKind.API_KEY &&
+                                    it.model == profile.model && it.baseUrl == profile.baseUrl
+                            } > 1
                         Text(
                             if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
                                 stringResource(R.string.chatgpt_model_source, profile.model)
+                            } else if (duplicateApiRoute) {
+                                "${profile.baseUrl} · ${profile.id.takeLast(6)}"
                             } else {
                                 profile.baseUrl
                             },
