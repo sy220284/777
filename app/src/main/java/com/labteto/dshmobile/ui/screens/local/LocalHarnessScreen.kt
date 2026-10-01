@@ -653,7 +653,7 @@ private fun LocalConversationSurface(
     onConfigureGroupMembers: (List<String>) -> Boolean,
     onSelectGalleryPersona: (String) -> Boolean,
     onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
-    onSaveGroupAnnouncement: (String) -> Boolean,
+    onSaveGroupAnnouncement: suspend (String) -> Result<Unit>,
     onGenerateGroupAnnouncement: suspend (String) -> Result<String>,
     onUndoPersonaCorrection: (Long, String, String) -> Unit,
     onPlanModeChange: (Boolean) -> Unit,
@@ -942,8 +942,25 @@ private fun LocalConversationSurface(
                     .clickable { showGroupAnnouncement = true },
             ) {
                 Column(Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)) {
-                    Text(stringResource(R.string.local_group_announcement_title),
-                        style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.local_group_announcement_title),
+                            style = DsType.small13Strong.withReadingWeight(),
+                            color = colors.labelPrimary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (state.groupChat.announcement.isNotBlank()) {
+                            Text(
+                                stringResource(R.string.local_group_announcement_active_short),
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.accent,
+                            )
+                        }
+                    }
                     Text(
                         state.groupChat.announcement.ifBlank {
                             stringResource(R.string.local_group_announcement_empty)
@@ -953,6 +970,13 @@ private fun LocalConversationSurface(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    if (state.groupChat.announcement.isNotBlank()) {
+                        Text(
+                            stringResource(R.string.local_group_announcement_active_hint),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelTertiary,
+                        )
+                    }
                 }
             }
         }
