@@ -65,6 +65,27 @@ class LocalModelProfileStoreAndroidTest {
 
 
     @Test
+    fun sameApiRouteProfilesWithDifferentStableIdsSurvivePersistenceTogether() {
+        val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
+        val json = Json { ignoreUnknownKeys = true }
+        val store = LocalModelProfileStore(preferences, json)
+        val first = LocalModelProfile(
+            id = "api-account-a",
+            model = "shared-model",
+            baseUrl = "https://same.example/v1",
+            displayName = "账户 A",
+        )
+        val second = first.copy(id = "api-account-b", displayName = "账户 B")
+
+        store.write(listOf(first, second))
+        store.setActive(second)
+
+        val reloaded = LocalModelProfileStore(preferences, json)
+        assertEquals(listOf(first, second), reloaded.read())
+        assertEquals(second, reloaded.active(second.model, second.baseUrl, reloaded.read()))
+    }
+
+    @Test
     fun officialClaudeLegacyProfileMigratesToNativeMessagesButCustomRoutesDoNot() {
         val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
         val json = Json { ignoreUnknownKeys = true }
