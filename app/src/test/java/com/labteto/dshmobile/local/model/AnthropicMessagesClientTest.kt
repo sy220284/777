@@ -273,15 +273,19 @@ class AnthropicMessagesClientTest {
         val reply = fixture(listOf(start, delta, stop), failClose = true).complete(route(), emptyList(), emptyList(), null, true)
         assertEquals(3L, reply.usage.completionTokens)
         listOf(
-            listOf(start, delta) to "ANTHROPIC_STREAM_INCOMPLETE",
+            listOf(start, delta) to "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
             listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}""", """{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}""") to "ANTHROPIC_PROTOCOL_ERROR",
             listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"private"}}""", """{"type":"content_block_stop","index":0}""", delta, stop) to "ANTHROPIC_PROTOCOL_ERROR",
             listOf(start, stop) to "MODEL_FINISH_null",
+            listOf(start, """{"type":"error","error":{"type":"overloaded_error","message":"busy"}}""") to "ANTHROPIC_STREAM_ERROR",
             listOf(start, """{"type":"message_delta","delta":{"stop_reason":"max_tokens"}}""", stop) to "MODEL_OUTPUT_TRUNCATED",
             listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t","name":"read","input":[]}}""", """{"type":"content_block_stop","index":0}""", """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""", stop) to "ANTHROPIC_PROTOCOL_ERROR",
         ).forEach { (frames, code) ->
-            val error = runCatching { fixture(frames).complete(route(), emptyList(), emptyList(), null, true) }.exceptionOrNull()
-            assertEquals(code, (error as? com.labteto.dshmobile.local.LocalModelException)?.code)
+            val error = runCatching {
+                fixture(frames).complete(route(), emptyList(), emptyList(), null, true)
+            }.exceptionOrNull() as? com.labteto.dshmobile.local.LocalModelException
+            assertEquals(code, error?.code)
+            assertFalse("HTTP 成功接收后的失败不得触发整轮重放：$code", error?.retryable ?: true)
         }
     }
 
