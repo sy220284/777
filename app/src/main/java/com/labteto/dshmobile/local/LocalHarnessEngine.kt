@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.send.coordinateLocalSend
@@ -451,23 +452,7 @@ class LocalHarnessEngine @Inject constructor(
         onChanged = { snapshot ->
             _state.update { current ->
                 current.copy(
-                    activeModelRequests = snapshot.activeModelRequests,
-                    activeAgents = projectWorkResourceCount(current.usageMode, snapshot.activeAgents),
-                    activeTerminals = projectWorkResourceCount(current.usageMode, snapshot.activeTerminals),
-                    activeVirtualDisplays = projectWorkResourceCount(
-                        current.usageMode,
-                        snapshot.activeVirtualDisplays,
-                    ),
-                    activeLanguageServers = projectWorkResourceCount(
-                        current.usageMode,
-                        snapshot.activeLanguageServers,
-                    ),
-                    maxModelRequests = snapshot.budget.maxModelRequests,
-                    maxAgents = snapshot.budget.maxAgents,
-                    maxTerminals = snapshot.budget.maxTerminals,
-                    maxVirtualDisplays = snapshot.budget.maxVirtualDisplays,
-                    maxLanguageServers = snapshot.budget.maxLanguageServers,
-                    resourcePressure = snapshot.pressure.name.lowercase(),
+                    resources = snapshot.toLocalHarnessResourceState(current.usageMode),
                     contextBudgetChars = localHistoryBudgetFor(memoryClassMb, snapshot.pressure).maxHistoryChars,
                 )
             }
@@ -705,12 +690,7 @@ class LocalHarnessEngine @Inject constructor(
         val initialResources = resourceScheduler.snapshot()
         _state.update {
             it.copy(
-                maxModelRequests = initialResources.budget.maxModelRequests,
-                maxAgents = initialResources.budget.maxAgents,
-                maxTerminals = initialResources.budget.maxTerminals,
-                maxVirtualDisplays = initialResources.budget.maxVirtualDisplays,
-                maxLanguageServers = initialResources.budget.maxLanguageServers,
-                resourcePressure = initialResources.pressure.name.lowercase(),
+                resources = initialResources.toLocalHarnessResourceState(it.usageMode),
                 contextBudgetChars = localHistoryBudgetFor(memoryClassMb, initialResources.pressure).maxHistoryChars,
             )
         }
@@ -5081,29 +5061,7 @@ class LocalHarnessEngine @Inject constructor(
             ),
             jobs = projectExecutionJobs(stored.usageMode, stored.id, jobs.snapshotInfos()),
             queuedInputCount = pendingInputs.size(),
-            activeModelRequests = resourceScheduler.snapshot().activeModelRequests,
-            activeAgents = projectWorkResourceCount(
-                stored.usageMode,
-                resourceScheduler.snapshot().activeAgents,
-            ),
-            activeTerminals = projectWorkResourceCount(
-                stored.usageMode,
-                resourceScheduler.snapshot().activeTerminals,
-            ),
-            activeVirtualDisplays = projectWorkResourceCount(
-                stored.usageMode,
-                resourceScheduler.snapshot().activeVirtualDisplays,
-            ),
-            activeLanguageServers = projectWorkResourceCount(
-                stored.usageMode,
-                resourceScheduler.snapshot().activeLanguageServers,
-            ),
-            maxModelRequests = resourceScheduler.budget.maxModelRequests,
-            maxAgents = resourceScheduler.budget.maxAgents,
-            maxTerminals = resourceScheduler.budget.maxTerminals,
-            maxVirtualDisplays = resourceScheduler.budget.maxVirtualDisplays,
-            maxLanguageServers = resourceScheduler.budget.maxLanguageServers,
-            resourcePressure = resourceScheduler.snapshot().pressure.name.lowercase(),
+            resources = resourceScheduler.snapshot().toLocalHarnessResourceState(stored.usageMode),
             contextChars = modelHistory.encodedChars,
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
             error = runRecoveryError,
