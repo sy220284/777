@@ -184,6 +184,7 @@ class SessionEventLogTest {
             val latest = requireNotNull(log.latest("checkpoint"))
             assertEquals(2L, latest.sequence)
             assertEquals("new", latest.data["value"]?.toString()?.trim('"'))
+            assertTrue(log.corruptionStats().malformedRows >= 1L)
         } finally {
             directory.deleteRecursively()
         }
