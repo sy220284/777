@@ -48,11 +48,11 @@ jobs:
             DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.ReadmeUiScreenshotCaptureTest --stacktrace
 
             mkdir -p docs/images/current
-            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/navigation.png > docs/images/current/navigation.png
-            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/chat.png > docs/images/current/chat.png
-            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/work.png > docs/images/current/work.png
-            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/character-tuning.png > docs/images/current/character-tuning.png
-            adb exec-out run-as com.sy220284.dshmobile.debug cat files/readme-screenshots/usage.png > docs/images/current/usage.png
+            adb exec-out run-as com.sy220284.dshmobile.debug toybox base64 files/readme-screenshots/navigation.png | tr -d '\r\n' | base64 --decode > docs/images/current/navigation.png
+            adb exec-out run-as com.sy220284.dshmobile.debug toybox base64 files/readme-screenshots/chat.png | tr -d '\r\n' | base64 --decode > docs/images/current/chat.png
+            adb exec-out run-as com.sy220284.dshmobile.debug toybox base64 files/readme-screenshots/work.png | tr -d '\r\n' | base64 --decode > docs/images/current/work.png
+            adb exec-out run-as com.sy220284.dshmobile.debug toybox base64 files/readme-screenshots/character-tuning.png | tr -d '\r\n' | base64 --decode > docs/images/current/character-tuning.png
+            adb exec-out run-as com.sy220284.dshmobile.debug toybox base64 files/readme-screenshots/usage.png | tr -d '\r\n' | base64 --decode > docs/images/current/usage.png
             test -s docs/images/current/navigation.png
             test -s docs/images/current/chat.png
             test -s docs/images/current/work.png
