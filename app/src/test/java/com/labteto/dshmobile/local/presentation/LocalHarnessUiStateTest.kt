@@ -23,8 +23,10 @@ class LocalHarnessUiStateTest {
         val base = LocalHarnessState()
         val hotPathUpdate = base.copy(
             running = true,
-            activeModelRequests = 1,
-            activeAgents = 1,
+            resources = base.resources.copy(
+                activeModelRequests = 1,
+                activeAgents = 1,
+            ),
             contextChars = 42_000,
         )
 
@@ -36,9 +38,11 @@ class LocalHarnessUiStateTest {
         val base = LocalHarnessState()
         val hotPathUpdate = base.copy(
             running = true,
-            activeModelRequests = 1,
-            activeTerminals = 1,
-            resourcePressure = "medium",
+            resources = base.resources.copy(
+                activeModelRequests = 1,
+                activeTerminals = 1,
+                resourcePressure = "medium",
+            ),
         )
 
         assertEquals(base.toTaskUiState(), hotPathUpdate.toTaskUiState())
@@ -48,12 +52,14 @@ class LocalHarnessUiStateTest {
     fun shellProjectionIgnoresStreamingAndResourceChurn() {
         val base = LocalHarnessState()
         val hotPathUpdate = base.copy(
-            activeModelRequests = 1,
-            activeAgents = 1,
-            activeTerminals = 1,
+            resources = base.resources.copy(
+                activeModelRequests = 1,
+                activeAgents = 1,
+                activeTerminals = 1,
+                resourcePressure = "high",
+            ),
             contextChars = 42_000,
             queuedInputCount = 3,
-            resourcePressure = "high",
         )
 
         assertEquals(base.toShellUiState(), hotPathUpdate.toShellUiState())

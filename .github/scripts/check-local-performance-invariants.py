@@ -136,6 +136,11 @@ for forbidden_runtime_fallback in (
             f"LocalHarnessEngine reintroduced runtime legacy chat-context fallback: {forbidden_runtime_fallback}"
         )
 
+if "withLegacyFallback" in engine:
+    violations.append("LocalHarnessEngine must migrate legacy chat context at the session read boundary")
+if "withLegacyFallback" in automation_chat:
+    violations.append("Automation Chat must consume canonical ChatContextState from LocalSessionCoordinator")
+
 if "cron: '*/30 * * * *'" not in cleanup_workflow:
     violations.append("Release cleanup must stay on the 30-minute schedule")
 if "keep = releases[:3]" not in cleanup_workflow or "remove = releases[3:]" not in cleanup_workflow:

@@ -8,13 +8,26 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 
 LINE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 5232,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 2011,
+    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 5173,
+    "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 1885,
+    "app/src/main/java/com/labteto/dshmobile/data/SessionAttachmentTransfer.kt": 100,
+    "app/src/main/java/com/labteto/dshmobile/data/SessionCatalogRuntime.kt": 151,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt": 1802,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt": 662,
-    "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt": 1537,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt": 240,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt": 340,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/RemoteSettingsController.kt": 190,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt": 47,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt": 72,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt": 404,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryController.kt": 143,
+    "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt": 393,
+    "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt": 603,
+    "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationWorker.kt": 450,
+    "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt": 217,
     "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionPlanner.kt": 1033,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryStore.kt": 1053,
+    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryStore.kt": 534,
+    "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaGalleryModels.kt": 118,
+    "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaGalleryMergePolicy.kt": 431,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStateContent.kt": 20,
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalHarnessUiState.kt": 130,
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 75,
@@ -27,10 +40,11 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt": 128,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRunnerFactory.kt": 135,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt": 323,
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt": 525,
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt": 523,
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessRuntimePolicy.kt": 98,
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt": 76,
-    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalBundledRuntimeEnvironment.kt": 41,
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessResourceProjection.kt": 23,
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalBundledRuntimeManager.kt": 56,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt": 67,
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupExecutionModels.kt": 22,
     "app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt": 172,
@@ -47,9 +61,9 @@ LINE_BUDGETS = {
 }
 
 ENGINE_MAX_PUBLIC_METHODS = 0
-ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 21
-AGGREGATE_STATE_MAX_FIELDS = 66
-LOCAL_ROOT_MAX_KOTLIN_FILES = 90
+ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 19
+AGGREGATE_STATE_MAX_FIELDS = 55
+LOCAL_ROOT_MAX_KOTLIN_FILES = 79
 PROJECTION_FIELD_BUDGETS = {
     "LocalHarnessSettingsState": 17,
     "LocalHarnessTaskState": 4,

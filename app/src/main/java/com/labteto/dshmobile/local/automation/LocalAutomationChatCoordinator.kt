@@ -10,7 +10,6 @@ import com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger
 import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
 import com.labteto.dshmobile.local.chat.proactiveConversationFocus
 import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
-import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -167,8 +166,8 @@ internal class LocalAutomationChatCoordinator(
                     ?: error("定时互动绑定的聊天已不存在")
                 require(session.usageMode == LocalUsageMode.CHAT) { "目标会话已不在聊天模式" }
                 require(!session.groupChat.enabled) { "群聊暂不支持定时角色互动" }
-                val sessionContext = session.chatContext.withLegacyFallback(session.chatState)
-                val sessionCharacterState = session.chatState.withoutLegacyConversationContext()
+                val sessionContext = session.chatContext
+                val sessionCharacterState = session.chatState
                 val runtime = state.value
                 val runProfile = modelGateway.profileForRun()
                 val persona = chatPersonaStore.get(session.personaId)
@@ -428,9 +427,9 @@ internal class LocalAutomationChatCoordinator(
                     // Re-read immediately before commit so a detached automation never overwrites a
                     // foreground turn that completed while the model was generating.
                     val latest = sessionCoordinator.read(session.id) ?: session
-                    val latestContext = latest.chatContext.withLegacyFallback(latest.chatState)
+                    val latestContext = latest.chatContext
                     val nextChatState = chatTurnCoordinator.applyDeterministicInteractionState(
-                        previous = latest.chatState.withoutLegacyConversationContext(),
+                        previous = latest.chatState,
                         userMessage = "",
                         assistantMessage = content,
                     ).withoutLegacyConversationContext()
