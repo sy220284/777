@@ -304,6 +304,14 @@ for helper_path in (
     if "modelGateway.withFrozenRoute(" not in strip_comments(read(helper_path)):
         die(f"{helper_path} must freeze model identity across the helper operation")
 
+chat_refresh = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt")
+)
+if "profile: LocalModelProfile" not in chat_refresh or "requestPlanner(before, prompt, boundEventLog, profile)" not in chat_refresh:
+    die("Chat post-turn refresh and retries must retain the originating model profile")
+if "profile = profile" not in engine[engine.find("requestPlanner ="):engine.find("private val chatReplyCoordinator")]:
+    die("Chat post-turn planner must pass its frozen profile into model requests")
+
 unexpected_consumers = sorted(engine_consumers - ENGINE_CONSUMER_ALLOWLIST)
 if unexpected_consumers:
     die(
