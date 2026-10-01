@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.memory
 
-import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.*
@@ -37,19 +36,16 @@ class MemoryStoreTest {
         assertEquals(2, all(store()).size)
     }
 
-    @Test fun bothCorruptFilesAllowFreshWriteWithoutRevivingBadData() {
-        AppLog.clear()
+    @Test fun bothCorruptFilesStopWritesAndPreserveRecoveryEvidence() {
         store().remember("remember apples", MemoryScope.GLOBAL)
-        File(temporary.root, "memories.json").writeText("broken primary")
-        File(temporary.root, "memories.json.bak").writeText("broken backup")
-        assertTrue(all(store()).isEmpty())
-        assertTrue(
-            AppLog.snapshot().any { entry ->
-                entry.tag == "MemoryStore" && entry.message.contains("备份不可用")
-            },
-        )
-        val record = store().remember("remember oranges", MemoryScope.GLOBAL)
-        assertEquals(record, all(store()).single())
+        val primary = File(temporary.root, "memories.json").apply { writeText("broken primary") }
+        val backup = File(temporary.root, "memories.json.bak").apply { writeText("broken backup") }
+
+        assertTrue(runCatching { all(store()) }.isFailure)
+        assertTrue(runCatching { store().remember("remember oranges", MemoryScope.GLOBAL) }.isFailure)
+        assertTrue(primary.isFile)
+        assertTrue(backup.isFile)
+        assertTrue(temporary.root.listFiles().orEmpty().any { it.name.startsWith("memories.corrupt-") })
     }
 
     @Test fun lineageWriteRestartRecallIsIsolatedFromIndependentConversations() {
@@ -407,6 +403,36 @@ class MemoryStoreTest {
 
         assertEquals(setOf("old-valid", "current", "other-active"), compacted.map { it.id }.toSet())
         assertFalse(compacted.any { it.id == "forgotten" })
+    }
+
+    @Test fun storageCompactionReservesCapacityForNearestRollbackPredecessor() {
+        fun record(
+            id: String,
+            active: Boolean,
+            supersededBy: String? = null,
+            importance: Int,
+        ) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.FACT,
+            content = id,
+            active = active,
+            supersededBy = supersededBy,
+            importance = importance,
+            createdAt = importance.toLong(),
+            updatedAt = importance.toLong(),
+        )
+
+        val compacted = compactMemoryRecords(
+            records = listOf(
+                record("old", active = false, supersededBy = "current", importance = 1),
+                record("current", active = true, importance = 100),
+                record("other", active = true, importance = 90),
+            ),
+            maxRecords = 2,
+        )
+
+        assertEquals(setOf("old", "current"), compacted.map { it.id }.toSet())
     }
 
     @Test fun storageCompactionPrioritizesPinnedAndImportantActiveRootsWhenOverCapacity() {
