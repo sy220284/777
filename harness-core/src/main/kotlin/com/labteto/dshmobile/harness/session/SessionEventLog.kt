@@ -57,9 +57,9 @@ class SessionEventLog(
 
     // Several Android adapters can open the same session while background maintenance is running.
     private val lock = PATH_LOCKS[(file.absolutePath.hashCode() and Int.MAX_VALUE) % PATH_LOCKS.size]
-    private val nextSequence = AtomicLong(synchronized(lock) { readNextSequence() })
     private val malformedRows = AtomicLong(0L)
     private val segmentReadFailures = AtomicLong(0L)
+    private val nextSequence = AtomicLong(synchronized(lock) { readNextSequence() })
 
     fun corruptionStats(): SessionEventCorruptionStats = SessionEventCorruptionStats(
         malformedRows = malformedRows.get(),
