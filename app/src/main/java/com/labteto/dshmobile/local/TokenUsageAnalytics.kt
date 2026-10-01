@@ -103,6 +103,7 @@ data class TokenUsageRecord(
     val timestamp: Long,
     val model: String,
     val context: TokenUsageContext = TokenUsageContext(),
+    val route: LocalModelRouteIdentity? = null,
     val inputTokens: Long = 0L,
     val cacheHitTokens: Long = 0L,
     val cacheMissTokens: Long = 0L,
@@ -274,6 +275,7 @@ internal fun DeepSeekUsageTracker.record(
     requestId = reply.requestId,
     context = context,
     promptBreakdown = reply.promptBreakdown,
+    route = reply.routeIdentity,
 )
 
 internal fun DeepSeekUsageTracker.record(
@@ -287,6 +289,7 @@ internal fun DeepSeekUsageTracker.record(
         requestId = reply.requestId,
         context = context,
         promptBreakdown = reply.promptBreakdown,
+        route = reply.routeIdentity,
     )
 }
 
