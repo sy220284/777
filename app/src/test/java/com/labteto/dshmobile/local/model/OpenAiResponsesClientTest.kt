@@ -460,6 +460,20 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun admittedApiKeyResponsesInterruptionIsNeverBlindlyReplayed() {
+        val error = client.streamInterruptedAfterAdmission(
+            planSharing = false,
+            requestId = "req-api-stream-1",
+            detail = "流断开",
+            cause = IOException("unexpected eof"),
+        )
+        assertEquals("RESPONSES_STREAM_INTERRUPTED_AFTER_ADMISSION", error.code)
+        assertFalse(error.retryable)
+        assertEquals("req-api-stream-1", error.requestId)
+        assertEquals("request_interrupted_after_admission", error.providerCode)
+    }
+
+    @Test
     fun apiKeyResponsesKeepsSamplingControlOutsidePlanSharing() {
         val payload = client.buildPayload(
             model = "gpt-test",
