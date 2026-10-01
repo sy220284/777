@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.session.SessionEventLog
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 
@@ -26,6 +27,8 @@ internal class LocalSessionArchiveMaintenance(
                 try {
                     archived += SessionEventLog(File(root, "$id.events.jsonl"), json)
                         .archiveLegacySegments()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (error: Exception) {
                     AppLog.error("LocalSessionArchiveMaintenance", "session archive migration failed", error)
                     return // Keep the original data intact; retry after the next app start.
