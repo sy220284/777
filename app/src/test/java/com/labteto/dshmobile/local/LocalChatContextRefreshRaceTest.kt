@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.*
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -28,6 +29,8 @@ class LocalChatContextRefreshRaceTest {
     private class Fixture(
         val log: LocalSessionEventLog, val state: InterceptedFlow,
         val coordinator: LocalChatContextRefreshCoordinator,
+        val profile: LocalModelProfile,
+        val observedProfiles: List<String>,
         val persisted: () -> Int,
     )
     private fun fixture(scope: CoroutineScope): Fixture {
@@ -43,20 +46,24 @@ class LocalChatContextRefreshRaceTest {
             ChatInteractionPlanner(json),
         )
         var persisted = 0
+        val profile = LocalModelProfile("profile-a", "model-a", "https://example.test/v1")
+        val observedProfiles = mutableListOf<String>()
         val coordinator = LocalChatContextRefreshCoordinator(
             state, scope, turns,
-            requestPlanner = { _, _, _ -> LocalModelReply(
+            requestPlanner = { _, _, _, selectedProfile ->
+                observedProfiles += selectedProfile.id
+                LocalModelReply(
                 buildJsonObject {}, """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""", null, emptyList(),
             ) },
             recordUsage = { _, _ -> }, persistBranchState = {}, persist = { persisted++ },
         )
-        return Fixture(log, state, coordinator) { persisted }
+        return Fixture(log, state, coordinator, profile, observedProfiles) { persisted }
     }
     @Test fun failedCompareFollowedBySessionSwitchCannotReportSuccessfulConsolidation() = runTest {
         val fixture = fixture(backgroundScope)
         val before = fixture.state.value
         fixture.state.beforeCompare = { fixture.state.delegate.value = before.copy(sessionId = "other") }
-        fixture.coordinator.refresh(PersonaProfile(), "s", before.chatState, before.chatContext.generation, fixture.log)
+        fixture.coordinator.refresh(PersonaProfile(), "s", before.chatState, before.chatContext.generation, fixture.log, fixture.profile)
         assertEquals("other", fixture.state.value.sessionId)
         assertEquals(before.chatContext.processedThroughSequence, fixture.state.value.chatContext.processedThroughSequence)
         assertEquals("stale-discarded", fixture.log.latest("chat/post-turn")?.data?.get("status")?.jsonPrimitive?.content)
@@ -72,12 +79,33 @@ class LocalChatContextRefreshRaceTest {
             ).copy(scene = ChatSceneState(location = "new"))
             fixture.state.delegate.value = before.copy(chatContext = context)
         }
-        fixture.coordinator.refresh(PersonaProfile(), "s", before.chatState, before.chatContext.generation, fixture.log)
+        fixture.coordinator.refresh(PersonaProfile(), "s", before.chatState, before.chatContext.generation, fixture.log, fixture.profile)
         assertEquals("new", fixture.state.value.chatContext.scene.location)
         assertEquals(listOf("new"), fixture.state.value.chatContext.pendingTurns.map { it.assistantMessageId })
         assertEquals(0L, fixture.state.value.chatContext.processedThroughSequence)
         assertEquals(1, fixture.persisted())
     }
+    @Test fun refreshPassesTheFrozenProfileToThePlanner() = runTest {
+        val fixture = fixture(backgroundScope)
+        val before = fixture.state.value
+        fixture.coordinator.refresh(
+            PersonaProfile(), "s", before.chatState, before.chatContext.generation,
+            fixture.log, fixture.profile,
+        )
+        assertEquals(listOf("profile-a"), fixture.observedProfiles)
+    }
+
+    @Test fun terminalProviderFailureDoesNotEnterDetachedPostTurnRetryLoop() {
+        assertFalse(shouldRetryChatPostTurnRequest(
+            LocalModelException("CHATGPT_PLAN_LIMIT_REACHED", "limit", false),
+        ))
+        assertTrue(shouldRetryChatPostTurnRequest(
+            LocalModelException("MODEL_NETWORK", "network", true),
+        ))
+        assertTrue(shouldRetryChatPostTurnRequest(IOException("socket reset")))
+        assertFalse(shouldRetryChatPostTurnRequest(IllegalStateException("bad state")))
+    }
+
     @Test fun enqueueRetryAfterSessionSwitchReturnsNoGenerationAndDoesNotPersistNewSession() = runTest {
         val fixture = fixture(backgroundScope)
         val before = fixture.state.value

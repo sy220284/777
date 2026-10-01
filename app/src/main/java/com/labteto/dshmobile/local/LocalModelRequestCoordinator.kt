@@ -45,10 +45,16 @@ internal class LocalModelRequestCoordinator(
         streamFilterPhrases: List<String> = emptyList(),
         requestLog: LocalSessionEventLog? = null,
         temperature: Double? = null,
+        profile: LocalModelProfile? = null,
         previewGuard: () -> Boolean = { true },
         overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
     ): LocalModelReply {
         val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
+        val frozenProfile = profile ?: modelGateway.profileForRoute(
+            snapshot.modelSelection.activeProfileId,
+            snapshot.model,
+            snapshot.baseUrl,
+        )
         val previewOwner = if (publishPreviewEnabled) {
             streamingPreviewStore.newOwner(
                 sessionId = snapshot.sessionId,
@@ -72,6 +78,11 @@ internal class LocalModelRequestCoordinator(
         log.append("request/header", buildJsonObject {
             put("model", snapshot.model)
             put("base_url", snapshot.baseUrl)
+            put("profile_id", frozenProfile.id)
+            put("provider", frozenProfile.provider)
+            put("auth_kind", frozenProfile.authKind.name)
+            put("protocol", frozenProfile.protocol.name)
+            frozenProfile.credentialRef?.takeLast(8)?.let { put("credential_ref_tail", it) }
             put("step", step)
             put("message_count", logMessages.size)
             put("context_chars", contextChars)
@@ -192,6 +203,7 @@ internal class LocalModelRequestCoordinator(
                                     messages = activeMessages,
                                     tools = tools,
                                     temperature = temperature,
+                                    profile = frozenProfile,
                                     onDelta = { delta ->
                                         val visible =
                                             streamFilter?.append(delta.content)?.text ?: delta.content

@@ -45,6 +45,41 @@ class LocalVisionPluginTest {
     }
 
     @Test
+    fun fallbackRouteKeepsExactProfileIdentityForCredentialResolution() = runTest {
+        val selected = LocalModelProfile(
+            id = "account-b",
+            model = "same-model",
+            baseUrl = "https://same.example/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+        )
+        val analyzer = RecordingAnalyzer()
+        val registry = PluginRegistry()
+        registry.install(
+            LocalVisionPlugin(
+                device = RecordingDevice(),
+                keyProvider = { null },
+                routeProvider = {
+                    LocalVisionRoute(selected.baseUrl, selected.model, profile = selected)
+                },
+                routeKeyProvider = { route ->
+                    if (route.profile?.id == selected.id) "account-b-key" else null
+                },
+                analyzer = analyzer,
+            ),
+        )
+
+        val result = registry.context.tools.execute(
+            name = "vision_analyze_screen",
+            input = buildJsonObject { put("prompt", "识别按钮") },
+            context = ToolContext(approval = { true }),
+        )
+
+        assertFalse(result.content, result.isError)
+        assertEquals("account-b-key", analyzer.calls.single().key)
+        assertEquals(selected.id, analyzer.calls.single().route.profile?.id)
+    }
+
+    @Test
     fun mainScreenAnalysisRequiresApprovalBeforeCapturingPixels() = runTest {
         val device = RecordingDevice()
         val analyzer = RecordingAnalyzer()

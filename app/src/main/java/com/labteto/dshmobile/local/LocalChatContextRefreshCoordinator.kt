@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.chat.loadPendingBatch
 import com.labteto.dshmobile.local.chat.groundContinuityEvidence
 import com.labteto.dshmobile.local.chat.withContextForPlanner
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -124,6 +125,13 @@ internal fun findChatContinuitySourceUserMessageId(
     }
 }
 
+internal fun shouldRetryChatPostTurnRequest(error: Throwable): Boolean =
+    when (error) {
+        is LocalModelException -> error.retryable
+        is IOException -> true
+        else -> false
+    }
+
 internal class LocalChatContextRefreshCoordinator(
     private val state: MutableStateFlow<LocalHarnessState>,
     private val scope: CoroutineScope,
@@ -132,6 +140,7 @@ internal class LocalChatContextRefreshCoordinator(
         snapshot: LocalHarnessState,
         prompt: String,
         eventLog: LocalSessionEventLog,
+        profile: LocalModelProfile,
     ) -> LocalModelReply?,
     private val recordUsage: (LocalHarnessState, LocalModelReply) -> Unit,
     private val persistBranchState: (String) -> Unit,
@@ -157,6 +166,7 @@ internal class LocalChatContextRefreshCoordinator(
         expectedAssistantMessageId: String,
         expectedBaseState: ChatCharacterState,
         boundEventLog: LocalSessionEventLog,
+        profile: LocalModelProfile,
         sourceUserMessageId: String? = null,
     ) {
         cancelScheduledRefresh()
@@ -176,6 +186,7 @@ internal class LocalChatContextRefreshCoordinator(
                 expectedBaseState = expectedBaseState,
                 expectedGeneration = generation,
                 boundEventLog = boundEventLog,
+                profile = profile,
             )
         }
         synchronized(scheduledRefreshLock) { scheduledRefreshJob = job }
@@ -192,6 +203,7 @@ internal class LocalChatContextRefreshCoordinator(
         expectedSessionId: String,
         expectedGeneration: Long,
         boundEventLog: LocalSessionEventLog,
+        profile: LocalModelProfile,
         retryAttempt: Int,
         reason: String,
     ) {
@@ -221,6 +233,7 @@ internal class LocalChatContextRefreshCoordinator(
                 expectedBaseState = latest.chatState,
                 expectedGeneration = expectedGeneration,
                 boundEventLog = boundEventLog,
+                profile = profile,
                 retryAttempt = retryAttempt + 1,
             )
         }
@@ -323,6 +336,7 @@ internal class LocalChatContextRefreshCoordinator(
         expectedBaseState: ChatCharacterState,
         expectedGeneration: Long,
         boundEventLog: LocalSessionEventLog,
+        profile: LocalModelProfile,
         retryAttempt: Int = 0,
     ) {
         val before = state.value
@@ -349,18 +363,22 @@ internal class LocalChatContextRefreshCoordinator(
             assistantMessage = "",
         )
         val plannerReply = try {
-            requestPlanner(before, prompt, boundEventLog)
+            requestPlanner(before, prompt, boundEventLog, profile)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
+            val retryable = shouldRetryChatPostTurnRequest(error)
             boundEventLog.append("chat/post-turn", buildJsonObject {
                 put("status", "failed")
                 put("detail", error.message.orEmpty().take(1_000))
                 put("pending_count", pending.size)
+                put("retryable", retryable)
             })
-            scheduleRetry(
-                persona, expectedSessionId, expectedGeneration, boundEventLog, retryAttempt, "request-failed",
-            )
+            if (retryable) {
+                scheduleRetry(
+                    persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "request-failed",
+                )
+            }
             return
         }
         if (plannerReply == null) {
@@ -369,7 +387,7 @@ internal class LocalChatContextRefreshCoordinator(
                 put("pending_count", pending.size)
             })
             scheduleRetry(
-                persona, expectedSessionId, expectedGeneration, boundEventLog, retryAttempt, "empty-reply",
+                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "empty-reply",
             )
             return
         }
@@ -388,7 +406,7 @@ internal class LocalChatContextRefreshCoordinator(
                 put("pending_count", pending.size)
             })
             scheduleRetry(
-                persona, expectedSessionId, expectedGeneration, boundEventLog, retryAttempt, "parse-failed",
+                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "parse-failed",
             )
             return
         }
@@ -445,7 +463,7 @@ internal class LocalChatContextRefreshCoordinator(
                 put("pending_preserved", true)
             })
             scheduleRetry(
-                persona, expectedSessionId, expectedGeneration, boundEventLog, retryAttempt, "stale-discarded",
+                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "stale-discarded",
             )
             return
         }
@@ -466,7 +484,7 @@ internal class LocalChatContextRefreshCoordinator(
                     pending.generation == expectedGeneration
             }) {
             scheduleRetry(
-                persona, expectedSessionId, expectedGeneration, boundEventLog, 0, "remaining-pending",
+                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, 0, "remaining-pending",
             )
         }
     }

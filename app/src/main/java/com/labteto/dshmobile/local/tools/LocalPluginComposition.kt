@@ -153,17 +153,10 @@ internal class LocalPluginComposition(
     private val devicePlugin = AndroidDevicePlugin(deviceProvider)
     private val visionPlugin = LocalVisionPlugin(
         device = deviceProvider,
-        keyProvider = {
-            val profile = modelGateway.activeProfile()
-            when {
-                profile == null || !modelGateway.hasCredential(profile) -> null
-                profile.authKind == com.labteto.dshmobile.local.LocalModelAuthKind.API_KEY -> apiKeys.get()
-                else -> "chatgpt-plan"
-            }
-        },
-        routeProvider = {
-            routeProvider()?.let { route -> route.copy(profile = modelGateway.activeProfile()) }
-        },
+        // Production always resolves credentials from the exact route profile below.
+        // Keep the legacy provider disabled so no tool can fall back to mutable global API-key state.
+        keyProvider = { null },
+        routeProvider = routeProvider,
         routeKeyProvider = { route ->
             val profile = route.profile
             when {

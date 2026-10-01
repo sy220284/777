@@ -200,8 +200,8 @@ class LocalHarnessViewModel @Inject constructor(
         val snapshot = state.value
         check(!snapshot.loading && !snapshot.running && snapshot.configured) { "请先配置模型并等待当前回复结束" }
         personaAutoFillService.generate(
-            model = snapshot.model,
-            baseUrl = snapshot.baseUrl,
+            model = snapshot.model, baseUrl = snapshot.baseUrl,
+            profileId = snapshot.modelSelection.activeProfileId,
             current = PersonaProfile(name = ""),
             recentMessages = emptyList(),
             description = description,
@@ -237,8 +237,8 @@ class LocalHarnessViewModel @Inject constructor(
         }
         return runCatching {
             personaInspectionService.inspect(
-                model = snapshot.model,
-                baseUrl = snapshot.baseUrl,
+                model = snapshot.model, baseUrl = snapshot.baseUrl,
+                profileId = snapshot.modelSelection.activeProfileId,
                 persona = entry.persona,
                 messages = dialogue,
             )
@@ -567,8 +567,8 @@ class LocalHarnessViewModel @Inject constructor(
         check(snapshot.configured) { "请先配置聊天模型" }
         check(snapshot.groupChat.members.size >= 2) { "请先添加至少两位群聊人物" }
         groupAnnouncementService.generate(
-            model = snapshot.model,
-            baseUrl = snapshot.baseUrl,
+            model = snapshot.model, baseUrl = snapshot.baseUrl,
+            profileId = snapshot.modelSelection.activeProfileId,
             members = snapshot.groupChat.members,
             direction = direction,
             current = snapshot.groupChat.announcement,

@@ -242,6 +242,7 @@ class PersonaAutoFillService @Inject constructor(
     suspend fun generate(
         model: String,
         baseUrl: String,
+        profileId: String? = null,
         current: PersonaProfile,
         recentMessages: List<LocalHarnessMessage>,
         description: String,
@@ -319,14 +320,15 @@ class PersonaAutoFillService @Inject constructor(
             },
         )
 
-        val reply = modelGateway.complete(
-            baseUrl = baseUrl,
-            model = model,
-            messages = messages,
-            tools = JsonArray(emptyList()),
-            temperature = 0.2,
-        )
-        withContext(Dispatchers.IO) {
+        return modelGateway.withFrozenRoute(profileId, model, baseUrl) {
+            val reply = modelGateway.complete(
+                baseUrl = baseUrl,
+                model = model,
+                messages = messages,
+                tools = JsonArray(emptyList()),
+                temperature = 0.2,
+            )
+            withContext(Dispatchers.IO) {
             usageTracker.record(
                 model = model,
                 usage = reply.usage,
@@ -352,7 +354,7 @@ class PersonaAutoFillService @Inject constructor(
             )
             val repairedReply = runCatching {
                 modelGateway.complete(
-                            baseUrl = baseUrl,
+                    baseUrl = baseUrl,
                     model = model,
                     messages = repairMessages,
                     tools = JsonArray(emptyList()),
@@ -382,7 +384,7 @@ class PersonaAutoFillService @Inject constructor(
             }
         }
 
-        return current.copy(
+        current.copy(
             id = PersonaProfile.DEFAULT_PERSONA_ID,
             name = draft.name.ifBlank { current.name.ifBlank { "默认角色" } },
             identity = draft.identity.ifBlank { current.identity },
@@ -404,6 +406,7 @@ class PersonaAutoFillService @Inject constructor(
             bannedPhrases = draft.bannedPhrases.ifEmpty { current.bannedPhrases },
             signaturePhrases = draft.signaturePhrases.ifEmpty { current.signaturePhrases },
         )
+        }
     }
 
     private companion object {
