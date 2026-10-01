@@ -94,6 +94,19 @@ Session Event Log 是主要事实源。
 
 ## 上下文与长对话
 
+Work 压缩已经额外生成 typed `LocalWorkCheckpoint`，结构字段包括：
+
+- 当前目标。
+- 关键约束。
+- 已确认决定。
+- 已失败尝试。
+- 未完成事项。
+- 阶段进展。
+- 重要产物。
+- 已涉及工具。
+
+该检查点随压缩后的模型历史持久化；安全进程恢复会从最近 `ModelHistoryCheckpoint` 读取它并注入续跑提示，减少多次压缩 / 进程重启后的任务漂移。
+
 当前使用双层治理：
 
 1. Android 资源 / 字符预算。
@@ -350,6 +363,11 @@ REJECTED
 - optimized APK 安装 / 启动。
 
 ## 官方差分验证
+
+验证分为两层：
+
+- `ReferenceConformanceTest` 只消费锁定上游生成的 official golden，不把本地预期伪装成官方结果。
+- `NativeRuntimeBehaviorContractTest` 覆盖 Android / 本机专属的恢复、审批和生命周期行为。
 
 本机 Harness 语义参考由：
 

@@ -80,6 +80,41 @@ class LocalHistoryCompactorTest {
     }
 
     @Test
+    fun workCompactionPersistsTypedCheckpointForResume() {
+        val history = listOf(
+            message("system", "系统"),
+            message("user", "目标：修复恢复链。文件 app/src/main/Test.kt " + "旧".repeat(900)),
+            message("user", "要求：保持旧会话兼容。" + "旧".repeat(900)),
+            message("assistant", "确认采用 Session Event 作为事实源。" + "旧".repeat(900)),
+            message("assistant", "失败尝试：直接重放写工具会产生重复副作用。" + "旧".repeat(900)),
+            message("user", "下一步继续补恢复测试。" + "旧".repeat(900)),
+            message("assistant", "已完成基础恢复逻辑。" + "旧".repeat(900)),
+            message("user", "最近请求" + "新".repeat(500)),
+            message("assistant", "最近答复" + "新".repeat(500)),
+        )
+
+        val compaction = LocalHistoryCompactor(
+            maxHistoryChars = 500,
+            tailChars = 260,
+            maxSummaryChars = 4_000,
+        ).compact(history, summaryMode = LocalHistorySummaryMode.WORK)
+            ?: error("expected typed work compaction")
+
+        val checkpoint = requireNotNull(compaction.workCheckpoint)
+        assertTrue(checkpoint.goals.any { it.contains("恢复链") })
+        assertTrue(checkpoint.constraints.any { it.contains("保持旧会话兼容") })
+        assertTrue(checkpoint.decisions.any { it.contains("Session Event") })
+        assertTrue(checkpoint.failures.any { it.contains("重复副作用") })
+        assertTrue(checkpoint.unfinished.any { it.contains("恢复测试") })
+        assertTrue(checkpoint.artifacts.contains("app/src/main/Test.kt"))
+        val restored = LocalWorkCheckpoint.latestFrom(compaction.messages)
+        assertEquals(checkpoint, restored)
+        val compactedMessage = compaction.messages.first { it["content"].toString().contains("<work-checkpoint>") }
+        assertTrue(compactedMessage["content"].toString().contains("结构化检查点"))
+        assertFalse(compactedMessage["content"].toString().contains("目标与需求："))
+    }
+
+    @Test
     fun summaryIsBoundedForVeryLargeOlderMessages() {
         val huge = "长".repeat(20_000)
         val history = listOf(
