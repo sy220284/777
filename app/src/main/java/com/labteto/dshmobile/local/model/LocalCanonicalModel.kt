@@ -197,6 +197,17 @@ internal object LocalCanonicalModelCodec {
     fun canonicalToolCalls(message: JsonObject): List<LocalCanonicalContent.ToolCall> =
         this.message(message).content.filterIsInstance<LocalCanonicalContent.ToolCall>()
 
+    /** Summary diagnostics tolerate old partial metadata; this never creates executable calls. */
+    fun diagnosticToolNames(message: JsonObject): List<String> {
+        val generic = message["model_tool_calls"] as? JsonArray
+        val calls = generic ?: message["tool_calls"] as? JsonArray ?: return emptyList()
+        return calls.mapNotNull { raw ->
+            val call = raw as? JsonObject ?: return@mapNotNull null
+            val name = if (generic != null) call["name"] else (call["function"] as? JsonObject)?.get("name")
+            (name as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull?.takeIf(String::isNotBlank)
+        }
+    }
+
     fun hasToolCalls(message: JsonObject): Boolean = canonicalToolCalls(message).isNotEmpty()
 
     fun compatibleReplay(

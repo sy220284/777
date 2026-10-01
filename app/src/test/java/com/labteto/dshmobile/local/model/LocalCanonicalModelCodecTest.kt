@@ -250,4 +250,14 @@ class LocalCanonicalModelCodecTest {
         val adapted = OpenAiResponsesToolAdapter.adapt(LocalCanonicalModelCodec.toLegacyTools(tools), false, true)
         assertEquals("false", adapted.single().jsonObject["parameters"]!!.jsonObject["additionalProperties"]!!.jsonPrimitive.content)
     }
+
+    @Test
+    fun summaryNamesRemainAvailableWithoutMakingDamagedHistoryExecutable() {
+        val partial = Json.parseToJsonElement("""{"role":"assistant","tool_calls":[{"function":{"name":"read"}}]}""").jsonObject
+        assertEquals(listOf("read"), LocalCanonicalModelCodec.diagnosticToolNames(partial))
+        assertTrue(LocalCanonicalModelCodec.canonicalToolCalls(partial).isEmpty())
+        val damaged = Json.parseToJsonElement("""{"role":"assistant","tool_calls":[{"id":"a","function":{"name":"read","arguments":"invalid"}}]}""").jsonObject
+        assertEquals(listOf("read"), LocalCanonicalModelCodec.diagnosticToolNames(damaged))
+        assertTrue(runCatching { LocalCanonicalModelCodec.canonicalToolCalls(damaged) }.isFailure)
+    }
 }

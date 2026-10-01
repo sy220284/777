@@ -312,9 +312,7 @@ internal class LocalHistoryCompactor(
         messages.asReversed()
             .asSequence()
             .flatMap { message ->
-                LocalCanonicalModelCodec.canonicalToolCalls(message)
-                    .asSequence()
-                    .map { it.name }
+                LocalCanonicalModelCodec.diagnosticToolNames(message).asSequence()
             }
             .distinct()
             .take(maxItems)
