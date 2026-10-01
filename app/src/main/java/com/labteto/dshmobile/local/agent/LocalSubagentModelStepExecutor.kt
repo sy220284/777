@@ -7,7 +7,9 @@ import com.labteto.dshmobile.local.*
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 /** Owns one subagent model-step request, retry and context-overflow recovery policy. */
@@ -82,6 +84,7 @@ internal class LocalSubagentModelStepExecutor(
         )
         var activeHistory = history
         var overflowRound = 0
+        var structureRecoveryUsed = false
         while (true) {
             try {
                 return executor.execute {
@@ -116,6 +119,25 @@ internal class LocalSubagentModelStepExecutor(
                     }
                 }
             } catch (error: Throwable) {
+                val modelError = error as? LocalModelException
+                if (
+                    !structureRecoveryUsed &&
+                    modelError?.code == "MODEL_HISTORY_INVALID"
+                ) {
+                    val recovered = minimalSafeHistory(activeHistory)
+                    if (recovered != activeHistory) {
+                        structureRecoveryUsed = true
+                        eventLog().append("subagent/history-recovery", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("step", step)
+                            put("reason", modelError.code)
+                            put("messages_before", activeHistory.size)
+                            put("messages_after", recovered.size)
+                        })
+                        activeHistory = recovered
+                        continue
+                    }
+                }
                 if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
                 val compacted = historyCompactor.compactForOverflow(
                     activeHistory,
@@ -155,6 +177,21 @@ internal class LocalSubagentModelStepExecutor(
                 })
                 activeHistory = compacted.messages
             }
+        }
+    }
+
+    private fun minimalSafeHistory(history: List<JsonObject>): List<JsonObject> {
+        val lastUserIndex = history.indexOfLast { message ->
+            (message["role"] as? JsonPrimitive)?.contentOrNull == "user"
+        }
+        if (lastUserIndex < 0) return history
+
+        val leadingSystem = history.takeWhile { message ->
+            (message["role"] as? JsonPrimitive)?.contentOrNull == "system"
+        }
+        return buildList {
+            addAll(leadingSystem)
+            if (lastUserIndex >= leadingSystem.size) add(history[lastUserIndex])
         }
     }
 }
