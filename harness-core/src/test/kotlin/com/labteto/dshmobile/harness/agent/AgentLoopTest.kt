@@ -48,6 +48,7 @@ class AgentLoopTest {
             model = AgentModel { AgentModelReply(content = "") },
             tools = AgentToolExecutor { error("不应调用工具") },
             eventSink = AgentEventSink { events += it },
+            rejectEmptyFinalReply = true,
             idFactory = { "turn-empty" },
         )
 
