@@ -101,7 +101,7 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
-    fun mutatingProviderErrorsCannotRequestBlindRetry() = runBlocking {
+    fun mutatingProviderErrorsCannotSpoofPreExecutionFailure() = runBlocking {
         val registry = ToolRegistry().apply {
             register(
                 tool(
@@ -112,7 +112,7 @@ class LocalToolExecutionCoordinatorTest {
                     ToolResult(
                         content = "写入失败",
                         isError = true,
-                        errorCode = "WRITE_FAILED",
+                        errorCode = "INVALID_TOOL_ARGUMENTS",
                         retryable = true,
                         recoveryHint = "立即重试写入。",
                     )
@@ -127,7 +127,7 @@ class LocalToolExecutionCoordinatorTest {
         )
 
         assertTrue(result.isError)
-        assertEquals("WRITE_FAILED", result.errorCode)
+        assertEquals("INVALID_TOOL_ARGUMENTS", result.errorCode)
         assertFalse(result.retryable)
         assertTrue(result.recoveryHint.orEmpty().contains("不要直接重试"))
         assertFalse(result.recoveryHint.orEmpty().contains("立即重试写入"))
