@@ -168,14 +168,15 @@ internal class LocalHistoryCompactor(
                 put("role", "user")
                 put(
                     "content",
-                    buildString {
-                        append("<compacted-summary>\n")
-                        append(summary)
-                        append("\n</compacted-summary>")
-                        workCheckpoint?.let { checkpoint ->
-                            append("\n")
-                            append(checkpoint.toModelBlock())
+                    if (workCheckpoint != null) {
+                        buildString {
+                            append("<compacted-summary>\n")
+                            append("较早工作历史已压缩为结构化检查点；字段均直接提取自原会话，当前工作区状态优先。")
+                            append("\n</compacted-summary>\n")
+                            append(workCheckpoint.toModelBlock())
                         }
+                    } else {
+                        "<compacted-summary>\n$summary\n</compacted-summary>"
                     },
                 )
             })
@@ -358,7 +359,12 @@ internal class LocalHistoryCompactor(
         val artifacts = messages.asReversed()
             .asSequence()
             .mapNotNull(::messageText)
-            .flatMap { text -> WORK_ARTIFACT_PATTERN.findAll(text).map { match -> match.value.trimEnd('.', ',', ';', ':') } }
+            .flatMap { text -> WORK_ARTIFACT_PATTERN.findAll(text).map { match ->
+                    truncateWithoutSplittingSurrogatePair(
+                        match.value.trimEnd('.', ',', ';', ':'),
+                        500,
+                    )
+                } }
             .filter(String::isNotBlank)
             .distinct()
             .take(6)

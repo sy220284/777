@@ -20,7 +20,6 @@ internal const val LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT = "agent/subagent-run-che
 internal const val LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT = "agent/automation-run-checkpoint"
 private const val LOCAL_AGENT_RUN_CHECKPOINT_VERSION = 1
 private const val MAX_RECOVERY_INPUT_CHARS = 8_000
-private const val MAX_RECOVERY_CONTINUATION_CHARS = 12_000
 
 internal enum class LocalAgentRunKind {
     FOREGROUND,
@@ -338,7 +337,7 @@ internal class LocalAgentRunCoordinator(
             append(RECOVERY_CONTINUATION_PROMPT)
             append("\n\n最近持久工作检查点如下。先核对当前工作区和外部状态，再继续未完成事项；不要重做已完成步骤。\n")
             append(checkpoint.toModelBlock())
-        }.take(MAX_RECOVERY_CONTINUATION_CHARS)
+        }
     }
 
     fun markRecoveryQueued(

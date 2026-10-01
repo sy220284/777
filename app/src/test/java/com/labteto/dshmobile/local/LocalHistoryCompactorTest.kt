@@ -83,11 +83,12 @@ class LocalHistoryCompactorTest {
     fun workCompactionPersistsTypedCheckpointForResume() {
         val history = listOf(
             message("system", "系统"),
-            message("user", "目标：修复恢复链，并保持旧会话兼容。文件 app/src/main/Test.kt"),
-            message("assistant", "确认采用 Session Event 作为事实源。"),
-            message("assistant", "失败尝试：直接重放写工具会产生重复副作用。"),
-            message("user", "下一步继续补恢复测试。"),
-            message("assistant", "已完成基础恢复逻辑。"),
+            message("user", "目标：修复恢复链。文件 app/src/main/Test.kt " + "旧".repeat(900)),
+            message("user", "要求：保持旧会话兼容。" + "旧".repeat(900)),
+            message("assistant", "确认采用 Session Event 作为事实源。" + "旧".repeat(900)),
+            message("assistant", "失败尝试：直接重放写工具会产生重复副作用。" + "旧".repeat(900)),
+            message("user", "下一步继续补恢复测试。" + "旧".repeat(900)),
+            message("assistant", "已完成基础恢复逻辑。" + "旧".repeat(900)),
             message("user", "最近请求" + "新".repeat(500)),
             message("assistant", "最近答复" + "新".repeat(500)),
         )
@@ -108,7 +109,9 @@ class LocalHistoryCompactorTest {
         assertTrue(checkpoint.artifacts.contains("app/src/main/Test.kt"))
         val restored = LocalWorkCheckpoint.latestFrom(compaction.messages)
         assertEquals(checkpoint, restored)
-        assertTrue(compaction.messages.any { it["content"].toString().contains("<work-checkpoint>") })
+        val compactedMessage = compaction.messages.first { it["content"].toString().contains("<work-checkpoint>") }
+        assertTrue(compactedMessage["content"].toString().contains("结构化检查点"))
+        assertFalse(compactedMessage["content"].toString().contains("目标与需求："))
     }
 
     @Test
