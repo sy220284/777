@@ -51,6 +51,8 @@ import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
 import com.labteto.dshmobile.local.tools.LocalGitHubCredentialStore
 import com.labteto.dshmobile.local.tools.LocalPluginCompositionFactory
 import com.labteto.dshmobile.local.usage.LocalTokenUsageContextBridge
+import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
+import com.labteto.dshmobile.local.runtime.localSharedStorageRoots
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
@@ -156,9 +158,7 @@ class LocalHarnessEngine @Inject constructor(
     private val modelConnectionTester: LocalModelConnectionTester,
     private val usageTracker: DeepSeekUsageTracker,
     private val githubCredentials: LocalGitHubCredentialStore,
-    private val bundledNodeRuntime: BundledNodeRuntime,
-    private val bundledPythonRuntime: BundledPythonRuntime,
-    private val bundledGitRuntime: BundledGitRuntime,
+    private val bundledRuntimeManager: LocalBundledRuntimeManager,
     private val web: LocalWebProvider,
     private val json: Json,
     private val automationScheduler: HarnessAutomationScheduler,
@@ -178,11 +178,7 @@ class LocalHarnessEngine @Inject constructor(
         file = File(root, "jobs.json"),
         json = json,
     )
-    private val runtimeEnvironment = LocalBundledRuntimeEnvironment(
-        node = bundledNodeRuntime,
-        python = bundledPythonRuntime,
-        git = bundledGitRuntime,
-    )
+    private val runtimeEnvironment = bundledRuntimeManager
     private val workspace = LocalWorkspace(
         root = File(root, "workspace"),
         extraSearchPaths = runtimeEnvironment::searchPaths,
@@ -731,9 +727,7 @@ class LocalHarnessEngine @Inject constructor(
                 // Migration may have copied an event log after the field was first constructed.
                 // Reopen it before any session load or tool can append to the migrated log.
                 eventLog = eventLogFor(currentSessionId)
-                bundledNodeRuntime.prepare()
-                bundledPythonRuntime.prepare()
-                bundledGitRuntime.prepare()
+                runtimeEnvironment.prepareAll()
                 pluginComposition.installStartup()
                 load()
                 startNextQueuedTurnIfIdle()?.start()
@@ -4911,7 +4905,7 @@ class LocalHarnessEngine @Inject constructor(
             pendingInputs = pendingInputs.size(),
             pendingInputLimit = MAX_PENDING_INPUTS,
             commands = commands,
-            runtimeStatuses = listOf(bundledNodeRuntime.status(), bundledPythonRuntime.status(), bundledGitRuntime.status()),
+            runtimeStatuses = runtimeEnvironment.statuses(),
             recentDiagnostics = AppLog.snapshot(),
         ) + "\n" + LocalSessionArchiveMaintenance.storageStatus(sessionsRoot) +
             "\n" + LocalProcessExitStatus.read(context)
