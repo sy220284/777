@@ -37,10 +37,12 @@ internal object UpdateCache {
             currentVersionCode = currentVersionCode,
             nowMillis = nowMillis,
         )
-        if (protectedForMillis != null) {
-            throw IOException(
-                "上一份更新仍由系统安装器处理，请先完成安装；安装包会在系统释放后自动清理",
-            )
+        // cleanupStale() is also called from startup, where an active handoff must remain
+        // protected. prepare(), however, is an explicit new user attempt: Android gives this
+        // ACTION_VIEW flow no cancellation callback, so retaining the old marker here would lock
+        // the user out for the full grace window after dismissing the installer.
+        if (protectedForMillis != null && root.exists() && !root.deleteRecursively()) {
+            throw IOException("无法释放上一份安装交接缓存，请稍后重试")
         }
         if (root.exists() && !root.deleteRecursively()) {
             throw IOException("无法清理旧更新缓存，请释放存储空间后重试")
