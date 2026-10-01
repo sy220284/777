@@ -80,6 +80,26 @@ class ToolRegistrySchemaValidationTest {
     }
 
     @Test
+    fun trackedExecutionReportsWhetherExecutorWasEntered() = runTest {
+        val (registry, calls) = registry("count")
+
+        val rejected = registry.executeTracked(
+            "strict_tool",
+            buildJsonObject { put("count", "3") },
+        )
+        val executed = registry.executeTracked(
+            "strict_tool",
+            buildJsonObject { put("count", 3) },
+        )
+
+        assertTrue(rejected.result.isError)
+        assertFalse(rejected.executionStarted)
+        assertFalse(executed.result.isError)
+        assertTrue(executed.executionStarted)
+        assertEquals(1, calls.size)
+    }
+
+    @Test
     fun validatesNestedAdditionalPropertyTypesButAllowsDeclaredDynamicKeys() = runTest {
         val (registry, calls) = registry()
 

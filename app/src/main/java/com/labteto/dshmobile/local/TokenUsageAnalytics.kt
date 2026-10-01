@@ -238,13 +238,9 @@ internal fun buildToolTokenUsageContext(
     fallbackTaskLabel: String? = null,
 ): TokenUsageContext {
     val checkpoint = callId?.takeIf(String::isNotBlank)?.let { targetCallId ->
-        eventLog.events()
-            .filter { event ->
-                event.type in TOOL_USAGE_CHECKPOINT_TYPES &&
-                    event.data["call_id"]?.jsonPrimitive?.contentOrNull == targetCallId
-            }
-            .lastOrNull()
-            ?.data
+        eventLog.latestMatching(TOOL_USAGE_CHECKPOINT_TYPES) { data ->
+            data["call_id"]?.jsonPrimitive?.contentOrNull == targetCallId
+        }?.data
     }
     val runId = checkpoint?.get("run_id")?.jsonPrimitive?.contentOrNull
     val parentRunId = checkpoint?.get("parent_run_id")?.jsonPrimitive?.contentOrNull

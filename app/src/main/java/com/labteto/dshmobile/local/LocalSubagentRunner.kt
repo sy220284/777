@@ -193,13 +193,9 @@ internal class LocalSubagentRunner(
         }
         val key = ""
         val parentRunId = parentCallId?.let { callId ->
-            eventLog().events()
-                .filter { event ->
-                    event.type == LOCAL_AGENT_RUN_CHECKPOINT_EVENT &&
-                        event.data["call_id"]?.jsonPrimitive?.contentOrNull == callId
-                }
-                .mapNotNull { event -> event.data["run_id"]?.jsonPrimitive?.contentOrNull }
-                .lastOrNull()
+            eventLog().latestMatching(setOf(LOCAL_AGENT_RUN_CHECKPOINT_EVENT)) { data ->
+                data["call_id"]?.jsonPrimitive?.contentOrNull == callId
+            }?.data?.get("run_id")?.jsonPrimitive?.contentOrNull
         }
         val runContext = runCoordinator?.start(
             sessionId = runSessionId(),

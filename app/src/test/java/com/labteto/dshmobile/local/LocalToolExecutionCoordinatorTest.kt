@@ -101,14 +101,22 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
-    fun registryErrorsPreservePossibleSideEffect() = runBlocking {
+    fun mutatingProviderErrorsCannotSpoofPreExecutionFailure() = runBlocking {
         val registry = ToolRegistry().apply {
             register(
                 tool(
                     name = "write",
                     access = ToolAccess.WORKSPACE_WRITE,
                     approval = ToolApprovalPolicy.MUTATION,
-                ) { ToolResult("写入失败", isError = true) },
+                ) {
+                    ToolResult(
+                        content = "写入失败",
+                        isError = true,
+                        errorCode = "INVALID_TOOL_ARGUMENTS",
+                        retryable = true,
+                        recoveryHint = "立即重试写入。",
+                    )
+                },
             )
         }
         val coordinator = coordinator(registry)
@@ -119,7 +127,10 @@ class LocalToolExecutionCoordinatorTest {
         )
 
         assertTrue(result.isError)
-        assertEquals("TOOL_REPORTED_ERROR", result.errorCode)
+        assertEquals("INVALID_TOOL_ARGUMENTS", result.errorCode)
+        assertFalse(result.retryable)
+        assertTrue(result.recoveryHint.orEmpty().contains("不要直接重试"))
+        assertFalse(result.recoveryHint.orEmpty().contains("立即重试写入"))
         assertEquals(AgentToolSideEffect.POSSIBLE, result.sideEffect)
     }
 
@@ -182,6 +193,7 @@ class LocalToolExecutionCoordinatorTest {
         assertTrue(result.isError)
         assertEquals("APPROVAL_DENIED", result.errorCode)
         assertFalse(executed)
+        assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
         assertTrue(result.recoveryHint.orEmpty().contains("不要重复调用"))
     }
 

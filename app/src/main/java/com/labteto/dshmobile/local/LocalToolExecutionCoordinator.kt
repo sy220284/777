@@ -131,7 +131,7 @@ internal class LocalToolExecutionCoordinator(
         }
 
         var approvalDenied = false
-        val result = registry.execute(
+        val invocation = registry.executeTracked(
             name = call.name,
             input = call.arguments,
             rawArguments = call.rawArguments,
@@ -149,6 +149,7 @@ internal class LocalToolExecutionCoordinator(
                 },
             ),
         )
+        val result = invocation.result
 
         if (!result.isError) {
             return AgentToolResult(
@@ -161,33 +162,50 @@ internal class LocalToolExecutionCoordinator(
             )
         }
 
-        val timedOut = result.content.startsWith("工具执行超时：")
+        val providerCode = result.errorCode?.takeIf(String::isNotBlank)
+        val timedOut = providerCode == "TOOL_TIMEOUT" ||
+            (providerCode == null && result.content.startsWith("工具执行超时："))
+        val readLike = registered.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
         val errorCode = when {
             approvalDenied -> "APPROVAL_DENIED"
+            providerCode != null -> providerCode
             timedOut -> "TOOL_TIMEOUT"
             else -> "TOOL_REPORTED_ERROR"
         }
-        val readLike = registered.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+        val mutationMayHaveSideEffect =
+            registered.access in MUTATING_ACCESSES && invocation.executionStarted
+        // Registry is the authority for whether the executor actually started. Provider error codes
+        // are descriptive only and cannot downgrade a mutating call to a pre-execution failure.
+        val retryable = when {
+            !invocation.executionStarted -> result.retryable
+            readLike -> result.retryable || (providerCode == null && timedOut)
+            else -> false
+        }
+        val recoveryHint = when {
+            mutationMayHaveSideEffect ->
+                "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
+            else -> result.recoveryHint ?: when {
+                approvalDenied -> "该工具没有获得批准；不要重复调用，改用已授权能力或等待用户调整权限。"
+                timedOut && readLike -> "只读工具超时，可缩小范围后重试一次。"
+                timedOut -> "工具执行超时；先检查当前状态，再决定是否重试。"
+                else -> "根据工具返回内容检查前置条件；确认状态后再决定下一步。"
+            }
+        }
         AppLog.warn(
             "LocalToolExecution",
-            "工具执行失败 tool=${call.name} code=$errorCode retryable=${timedOut && readLike}",
+            "工具执行失败 tool=${call.name} code=$errorCode retryable=$retryable",
         )
         return AgentToolResult(
             content = result.content,
             isError = true,
             errorCode = errorCode,
-            retryable = timedOut && readLike,
-            sideEffect = if (registered.access in MUTATING_ACCESSES) {
+            retryable = retryable,
+            sideEffect = if (mutationMayHaveSideEffect) {
                 AgentToolSideEffect.POSSIBLE
             } else {
                 AgentToolSideEffect.NONE
             },
-            recoveryHint = when {
-                approvalDenied -> "该工具没有获得批准；不要重复调用，改用已授权能力或等待用户调整权限。"
-                timedOut && readLike -> "只读工具超时，可缩小范围后重试一次。"
-                timedOut -> "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
-                else -> "根据工具返回内容检查前置条件；若可能有副作用，先核对当前状态。"
-            },
+            recoveryHint = recoveryHint,
         )
     }
 
