@@ -1230,7 +1230,7 @@ class LocalHarnessEngine @Inject constructor(
         val expectedSessionId = snapshot.sessionId
         val expectedAssistantMessageId = assistantMessage.id
         val boundEventLog = eventLogFor(expectedSessionId)
-        val key = modelRequestMarkerOrNull() ?: return false
+        val key = modelRequestMarkerOrNull() ?: return false; val profile = modelGateway.activeProfile() ?: return false
         val prompt = chatTurnCoordinator.replySuggestionsPrompt(
             persona = snapshot.chatPersona,
             state = snapshot.chatState,
@@ -1250,7 +1250,7 @@ class LocalHarnessEngine @Inject constructor(
                 step = CHAT_POST_TURN_MODEL_STEP + 1,
                 toolsOverride = JsonArray(emptyList()),
                 publishPreview = false,
-                requestLog = boundEventLog,
+                requestLog = boundEventLog, profile = profile,
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
