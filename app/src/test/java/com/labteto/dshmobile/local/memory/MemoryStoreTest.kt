@@ -36,16 +36,19 @@ class MemoryStoreTest {
         assertEquals(2, all(store()).size)
     }
 
-    @Test fun bothCorruptFilesStopWritesAndPreserveRecoveryEvidence() {
+    @Test fun bothCorruptFilesAllowFreshWriteWithoutRevivingBadData() {
+        AppLog.clear()
         store().remember("remember apples", MemoryScope.GLOBAL)
-        val primary = File(temporary.root, "memories.json").apply { writeText("broken primary") }
-        val backup = File(temporary.root, "memories.json.bak").apply { writeText("broken backup") }
-
-        assertTrue(runCatching { all(store()) }.isFailure)
-        assertTrue(runCatching { store().remember("remember oranges", MemoryScope.GLOBAL) }.isFailure)
-        assertTrue(primary.isFile)
-        assertTrue(backup.isFile)
-        assertTrue(temporary.root.listFiles().orEmpty().any { it.name.startsWith("memories.corrupt-") })
+        File(temporary.root, "memories.json").writeText("broken primary")
+        File(temporary.root, "memories.json.bak").writeText("broken backup")
+        assertTrue(all(store()).isEmpty())
+        assertTrue(
+            AppLog.snapshot().any { entry ->
+                entry.tag == "MemoryStore" && entry.message.contains("备份不可用")
+            },
+        )
+        val record = store().remember("remember oranges", MemoryScope.GLOBAL)
+        assertEquals(record, all(store()).single())
     }
 
     @Test fun lineageWriteRestartRecallIsIsolatedFromIndependentConversations() {
