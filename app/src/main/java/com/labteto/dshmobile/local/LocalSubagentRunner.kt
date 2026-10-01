@@ -78,6 +78,12 @@ internal class LocalSubagentRunner(
     private val runSessionId: () -> String = { state.value.sessionId },
     private val runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
 ) {
+    private val historyPolicy = LocalSubagentHistoryPolicy(
+        spillToolOutput = spillToolOutput,
+        historyCompactor = historyCompactor,
+        eventLog = eventLog,
+    )
+
     suspend fun run(
         task: String,
         inheritHistory: Boolean,
@@ -274,7 +280,7 @@ internal class LocalSubagentRunner(
                             put("content", message)
                         }
                     }
-                    compactSubagentHistory(history, subagentId, runHistoryBudget)
+                    historyPolicy.compactHistory(history, subagentId, runHistoryBudget)
                     modelStep += 1
                     val durableHistory = history.toList()
                     val selectedMode = resolveImageMode(snapshot.imageInputMode, snapshot.baseUrl, routeModel)
@@ -388,7 +394,7 @@ internal class LocalSubagentRunner(
                                 ?: error("缺少子代理第 ${event.step} 步模型响应")
                             history += reply.message
                             reply.content?.takeIf(String::isNotBlank)?.let { content ->
-                                rememberSubagentProgress(
+                                historyPolicy.rememberProgress(
                                     progress,
                                     "第 ${event.step} 步回复：${content.take(1_500)}",
                                 )
@@ -404,7 +410,7 @@ internal class LocalSubagentRunner(
                             })
                         }
                         is AgentEvent.ToolFinished -> {
-                            val boundedContent = retainSubagentToolResult(
+                            val boundedContent = historyPolicy.retainToolResult(
                                 event.call.id,
                                 event.output,
                                 runHistoryBudget,
@@ -418,7 +424,7 @@ internal class LocalSubagentRunner(
                                 sideEffect = event.sideEffect,
                                 recoveryHint = event.recoveryHint,
                             ).modelVisibleContent()
-                            rememberSubagentProgress(
+                            historyPolicy.rememberProgress(
                                 progress,
                                 "第 ${event.step} 步 · ${event.call.name}：" +
                                     truncateWithoutSplittingSurrogatePair(event.output, 1_500),
@@ -697,60 +703,8 @@ internal class LocalSubagentRunner(
         }
     }
 
-    private fun retainSubagentToolResult(
-        callId: String,
-        output: String,
-        budget: LocalHistoryBudget?,
-        history: List<JsonObject>,
-    ): String {
-        budget ?: return output
-        val adaptiveBudget = adaptiveToolResultBudget(
-            base = budget,
-            currentHistoryChars = history.sumOf { it.toString().length },
-            currentHistoryTokens = history.sumOf { estimateModelTokens(it.toString()) },
-        )
-        val retained = retainTextForModel(
-            value = output,
-            maxTokens = adaptiveBudget.maxToolResultTokens,
-            maxChars = adaptiveBudget.maxToolResultChars,
-        )
-        if (!retained.truncated) return retained.text
-        val stored = spillToolOutput(callId, output)
-        val recovery = if (stored) {
-            "可调用 tool_output_read，并传入 call_id=$callId 分段读取完整结果。"
-        } else {
-            "完整结果超过本机私有保留上限；请缩小原查询后重试。"
-        }
-        return retained.text +
-            "\n[已从模型上下文省略 ${retained.omittedBytes} 个 UTF-8 字节；$recovery]"
-    }
-
-    private fun compactSubagentHistory(
-        history: MutableList<JsonObject>,
-        subagentId: String,
-        budget: LocalHistoryBudget?,
-    ) {
-        val compaction = historyCompactor.compact(history, budget) ?: return
-        history.clear()
-        history += compaction.messages
-        eventLog().append("subagent/compaction", buildJsonObject {
-            put("agent_id", subagentId)
-            put("omitted_messages", compaction.omittedMessages)
-            put("summary", compaction.summary)
-            put("estimated_tokens_before", compaction.estimatedTokensBefore)
-            put("estimated_tokens_after", compaction.estimatedTokensAfter)
-        })
-    }
-
-    private fun rememberSubagentProgress(progress: ArrayDeque<String>, item: String) {
-        progress.addLast(item)
-        while (progress.size > SUBAGENT_PROGRESS_ITEMS) progress.removeFirst()
-    }
-
-
     private fun AgentToolCall.toLocalToolCall() = LocalToolCall(id, name, arguments, rawArguments)
     private companion object {
-        const val SUBAGENT_PROGRESS_ITEMS = 6
         const val MAX_DYNAMIC_STEPS = 512
         const val SUBAGENT_EVENT_CHARS = 65_536
         val SUBAGENT_VIRTUAL_SCREEN_TOOLS = setOf(
