@@ -14,7 +14,8 @@ internal fun List<JsonObject>.withoutLastCompletedAssistantReply(): List<JsonObj
         false,
     )
     val role = last["role"]?.jsonPrimitive?.contentOrNull
-    val calls = last["tool_calls"] as? JsonArray
+    val calls = (last["tool_calls"] as? JsonArray)
+        ?: (last["model_tool_calls"] as? JsonArray)
     if (role != "assistant" || !calls.isNullOrEmpty()) {
         throw LocalModelException(
             "MODEL_HISTORY_INVALID",
