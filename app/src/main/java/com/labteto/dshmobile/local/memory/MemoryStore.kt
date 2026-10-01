@@ -639,8 +639,7 @@ class MemoryStore internal constructor(
             recovered ?: MemoryDocument()
         } else {
             val corrupt = File(root, "memories.corrupt-${System.currentTimeMillis()}.json")
-            val moved = runCatching { file.renameTo(corrupt) }.getOrDefault(false)
-            if (!moved) runCatching { file.copyTo(corrupt, overwrite = false) }
+            runCatching { file.copyTo(corrupt, overwrite = false) }
 
             val recovered = decodeDocument(backup)
             if (recovered != null) {
