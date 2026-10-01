@@ -2,9 +2,11 @@ package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelAuthKind
 import com.labteto.dshmobile.local.LocalModelDelta
+import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.LocalModelPresets
 import com.labteto.dshmobile.local.LocalModelProtocol
+import com.labteto.dshmobile.local.LocalModelRouteIdentity
 import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.LocalModelToolCallingMode
 import com.labteto.dshmobile.local.normalizeModelBaseUrl
@@ -184,28 +186,18 @@ class LocalModelGateway @Inject constructor(
         streaming: Boolean,
         onDelta: (LocalModelDelta) -> Unit,
     ): LocalModelReply {
-        val routedTemperature = LocalModelPresets.samplingTemperatureFor(
-            route.model,
-            route.baseUrl,
-            temperature,
-        ).takeUnless {
-            route.protocol == LocalModelProtocol.RESPONSES &&
-                LocalModelPresets.toolCallingModeFor(
-                    route.model,
-                    route.baseUrl,
-                ) == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING
-        }
-        val request = LocalModelAdapterRequest(
+        val prepared = prepareLocalModelAdapterRequest(
             route = route,
-            messages = LocalCanonicalModelCodec.messages(messages),
-            tools = LocalCanonicalModelCodec.tools(tools),
-            temperature = routedTemperature,
+            messages = messages,
+            tools = tools,
+            temperature = temperature,
+            streaming = streaming,
         )
         return adapters.adapter(route.protocol).complete(
-            request = request,
-            streaming = streaming,
-            onDelta = onDelta,
-        )
+            request = prepared.request,
+            streaming = prepared.streaming,
+            onDelta = if (prepared.streaming) onDelta else { _: LocalModelDelta -> },
+        ).copy(routeIdentity = route.identity())
     }
 
     private fun probeMessages(): List<JsonObject> = listOf(buildJsonObject {
@@ -214,6 +206,74 @@ class LocalModelGateway @Inject constructor(
     })
 }
 
+internal data class LocalPreparedModelRequest(
+    val request: LocalModelAdapterRequest,
+    val streaming: Boolean,
+)
+
+internal fun prepareLocalModelAdapterRequest(
+    route: LocalResolvedModelRoute,
+    messages: List<JsonObject>,
+    tools: JsonArray,
+    temperature: Double?,
+    streaming: Boolean,
+): LocalPreparedModelRequest {
+    val canonicalMessages = LocalCanonicalModelCodec.messages(messages)
+    val canonicalTools = LocalCanonicalModelCodec.tools(tools)
+    if (canonicalTools.isNotEmpty() && !route.capabilities.toolCalling) {
+        throw LocalModelException(
+            code = "MODEL_TOOL_CALLING_UNSUPPORTED",
+            message = "当前模型路由不支持工具调用",
+            retryable = false,
+        )
+    }
+    if (
+        route.capabilities.imageInput == false &&
+        canonicalMessages.any { message ->
+            message.content.any { content -> content is LocalCanonicalContent.Image }
+        }
+    ) {
+        throw LocalModelException(
+            code = "MODEL_IMAGE_UNSUPPORTED",
+            message = "当前模型路由不支持图片输入",
+            retryable = false,
+        )
+    }
+    val routedMessages = if (route.capabilities.replay) {
+        canonicalMessages
+    } else {
+        canonicalMessages.map { it.copy(replay = null) }
+    }
+    val routedTemperature = temperature
+        ?.takeIf { route.capabilities.temperature }
+        .takeUnless {
+            route.protocol == LocalModelProtocol.RESPONSES &&
+                LocalModelPresets.toolCallingModeFor(
+                    route.model,
+                    route.baseUrl,
+                ) == LocalModelToolCallingMode.CHAT_COMPLETIONS_NO_REASONING
+        }
+    return LocalPreparedModelRequest(
+        request = LocalModelAdapterRequest(
+            route = route,
+            messages = routedMessages,
+            tools = canonicalTools,
+            temperature = routedTemperature,
+        ),
+        streaming = streaming && route.capabilities.streaming,
+    )
+}
+
+internal fun LocalResolvedModelRoute.identity(): LocalModelRouteIdentity =
+    LocalModelRouteIdentity(
+        profileId = profileId,
+        provider = provider.take(80),
+        model = model.take(128),
+        baseUrl = normalizeModelBaseUrl(baseUrl).take(512),
+        authKind = authKind.name,
+        protocol = protocol.name,
+        fingerprint = fingerprint,
+    )
 
 internal fun resolveLocalModelProtocol(
     authKind: LocalModelAuthKind,

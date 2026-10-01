@@ -41,7 +41,7 @@ import com.labteto.dshmobile.ui.theme.ThemePreference
 private enum class RootSurface { LOCAL, REMOTE }
 private enum class RootOverlay { TASKS, TOOLS, SETTINGS, PAIR }
 
-/** Application root: theme + locale-aware shell, connect vs. main routing. */
+/** Application root: theme-aware shell, connect vs. main routing. */
 @Composable
 fun AppRoot(
     viewModel: AppViewModel = hiltViewModel(),

@@ -5,9 +5,11 @@ import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -38,6 +40,13 @@ internal class LocalSessionRepository(
     private val storageLock = Any()
     private val deletedIds = mutableSetOf<String>()
     private val pending = linkedMapOf<String, LocalHarnessSession>()
+    /**
+     * Newest accepted snapshot that is not yet known to be durable.
+     *
+     * Reads prefer this snapshot so switching away and immediately reopening a session cannot
+     * observe an older disk image while the coalescing writer is still catching up.
+     */
+    private val latestSnapshots = mutableMapOf<String, LocalHarnessSession>()
     private val summaryCache = linkedMapOf<String, LocalSessionSummary>()
     private var summariesLoaded = false
     private val wakeups = Channel<Unit>(Channel.CONFLATED)
@@ -51,25 +60,48 @@ internal class LocalSessionRepository(
                         pending.keys.firstOrNull()?.let { pending.remove(it) }
                     } ?: break
                     try {
-                        synchronized(storageLock) {
-                            if (snapshot.id !in deletedIds) store.write(
-                                snapshot.id,
-                                json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
-                                updatedAt = snapshot.updatedAt,
-                            )
+                        val written = synchronized(storageLock) {
+                            val stillLatest = synchronized(lock) {
+                                snapshot.id !in deletedIds && latestSnapshots[snapshot.id] === snapshot
+                            }
+                            if (!stillLatest) {
+                                false
+                            } else {
+                                store.write(
+                                    snapshot.id,
+                                    json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
+                                    updatedAt = snapshot.updatedAt,
+                                )
+                                true
+                            }
                         }
-                        synchronized(lock) {
-                            if (snapshot.id !in deletedIds) summaryCache[snapshot.id] = snapshot.toSummary()
+                        if (written) {
+                            synchronized(lock) {
+                                if (snapshot.id !in deletedIds) {
+                                    summaryCache[snapshot.id] = snapshot.toSummary()
+                                    if (latestSnapshots[snapshot.id] === snapshot) {
+                                        latestSnapshots.remove(snapshot.id)
+                                    }
+                                }
+                            }
+                            onWritten()
                         }
-                        onWritten()
                         consecutiveFailures = 0
                     } catch (cancelled: CancellationException) {
-                        synchronized(lock) { if (snapshot.id !in deletedIds) pending.putIfAbsent(snapshot.id, snapshot) }
+                        synchronized(lock) {
+                            if (snapshot.id !in deletedIds && latestSnapshots[snapshot.id] === snapshot) {
+                                pending.putIfAbsent(snapshot.id, snapshot)
+                            }
+                        }
                         throw cancelled
                     } catch (error: Exception) {
                         // Keep the newest snapshot for this session. A failed disk write must not
                         // silently remove the only queued copy or spin at full speed on a bad disk.
-                        synchronized(lock) { if (snapshot.id !in deletedIds) pending.putIfAbsent(snapshot.id, snapshot) }
+                        synchronized(lock) {
+                            if (snapshot.id !in deletedIds && latestSnapshots[snapshot.id] === snapshot) {
+                                pending.putIfAbsent(snapshot.id, snapshot)
+                            }
+                        }
                         onError(error)
                         consecutiveFailures = (consecutiveFailures + 1).coerceAtMost(5)
                         delay((1_000L shl (consecutiveFailures - 1)).coerceAtMost(30_000L))
@@ -82,9 +114,70 @@ internal class LocalSessionRepository(
     fun enqueue(snapshot: LocalHarnessSession) {
         synchronized(lock) {
             if (snapshot.id in deletedIds) return
+            latestSnapshots[snapshot.id] = snapshot
             pending[snapshot.id] = snapshot
         }
         wakeups.trySend(Unit)
+    }
+
+    /**
+     * Persist one explicit user save before reporting success.
+     *
+     * The newest marker also prevents an older snapshot that was already dequeued from overwriting
+     * this save after it acquires the storage lock.
+     */
+    suspend fun writeNow(snapshot: LocalHarnessSession) = withContext(Dispatchers.IO) {
+        val previousLatest = synchronized(lock) {
+            check(snapshot.id !in deletedIds) { "会话已删除，无法保存" }
+            latestSnapshots.put(snapshot.id, snapshot)
+        }
+        try {
+            synchronized(storageLock) {
+                check(snapshot.id !in deletedIds) { "会话已删除，无法保存" }
+                store.write(
+                    snapshot.id,
+                    json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
+                    updatedAt = snapshot.updatedAt,
+                )
+            }
+            synchronized(lock) {
+                if (snapshot.id !in deletedIds) {
+                    summaryCache[snapshot.id] = snapshot.toSummary()
+                    if (latestSnapshots[snapshot.id] === snapshot) {
+                        latestSnapshots.remove(snapshot.id)
+                        pending.remove(snapshot.id)
+                    }
+                }
+            }
+            onWritten()
+        } catch (cancelled: CancellationException) {
+            synchronized(lock) {
+                if (latestSnapshots[snapshot.id] === snapshot) {
+                    if (previousLatest != null) {
+                        latestSnapshots[snapshot.id] = previousLatest
+                        pending[snapshot.id] = previousLatest
+                        wakeups.trySend(Unit)
+                    } else {
+                        latestSnapshots.remove(snapshot.id)
+                    }
+                }
+            }
+            throw cancelled
+        } catch (error: Exception) {
+            synchronized(lock) {
+                if (latestSnapshots[snapshot.id] === snapshot) {
+                    if (previousLatest != null) {
+                        latestSnapshots[snapshot.id] = previousLatest
+                        pending[snapshot.id] = previousLatest
+                        wakeups.trySend(Unit)
+                    } else {
+                        latestSnapshots.remove(snapshot.id)
+                    }
+                }
+            }
+            onError(error)
+            throw error
+        }
     }
 
     /** Block a queued or in-flight snapshot from recreating a deleted session. */
@@ -94,6 +187,7 @@ internal class LocalSessionRepository(
         synchronized(lock) {
             deletedIds += id
             pending.remove(id)
+            latestSnapshots.remove(id)
             summaryCache.remove(id)
         }
         removed
@@ -101,13 +195,25 @@ internal class LocalSessionRepository(
 
     fun read(id: String): LocalHarnessSession? = readWithLegacyApproval(id)?.session
 
-    fun readWithLegacyApproval(id: String): LocalSessionRead? =
-        store.read(id)?.document?.payload?.let { payload ->
-            LocalSessionRead(
-                session = json.decodeFromJsonElement(LocalHarnessSession.serializer(), payload),
-                legacySafeAutoApproval = legacySafeAutoApproval(payload),
-            )
+    fun readWithLegacyApproval(id: String): LocalSessionRead? = synchronized(storageLock) {
+        val persistedPayload = store.read(id)?.document?.payload
+        val (deleted, latest) = synchronized(lock) {
+            (id in deletedIds) to latestSnapshots[id]
         }
+        when {
+            deleted -> null
+            latest != null -> LocalSessionRead(
+                session = latest,
+                legacySafeAutoApproval = persistedPayload?.let(::legacySafeAutoApproval) == true,
+            )
+            else -> persistedPayload?.let { payload ->
+                LocalSessionRead(
+                    session = json.decodeFromJsonElement(LocalHarnessSession.serializer(), payload),
+                    legacySafeAutoApproval = legacySafeAutoApproval(payload),
+                )
+            }
+        }
+    }
 
     fun summaries(): List<LocalSessionSummary> {
         val needsLoad = synchronized(lock) { !summariesLoaded }

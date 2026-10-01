@@ -76,6 +76,7 @@ import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
 import com.labteto.dshmobile.local.chat.nextQuietHoursEndMillis
 import com.labteto.dshmobile.local.chat.proactiveConversationFocus
 import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
+import com.labteto.dshmobile.local.chat.saveGroupChatAnnouncement
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -1155,20 +1156,15 @@ class LocalHarnessEngine @Inject constructor(
         return true
     }
 
-    internal fun setGroupChatAnnouncement(text: String): Boolean {
-        val snapshot = _state.value
-        if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT ||
-            !snapshot.groupChat.enabled) return false
-        val announcement = text.trim().take(2_000)
-        _state.update { current ->
-            if (current.sessionId == snapshot.sessionId && current.groupChat.enabled) {
-                current.copy(groupChat = current.groupChat.copy(announcement = announcement))
-            } else current
-        }
-        if (_state.value.sessionId != snapshot.sessionId) return false
-        persist()
-        return true
-    }
+    internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> =
+        saveGroupChatAnnouncement(
+            state = _state,
+            text = text,
+            sessionId = currentSessionId,
+            transcriptProjectedThroughSequence = transcriptProjectionCursor,
+            sessionCoordinator = sessionCoordinator,
+            eventLog = eventLog,
+        )
 
     internal fun removeGroupChatMemberByGalleryId(galleryId: String) {
         val snapshot = _state.value
@@ -5214,6 +5210,7 @@ class LocalHarnessEngine @Inject constructor(
         )
         sessionCoordinator.enqueue(snapshot)
     }
+
 
     private fun sessionFileFor(id: String) = File(sessionsRoot, "$id.json")
 

@@ -53,14 +53,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 
-/** App-language choices deliberately limited to the two maintained translations. */
-data class LanguageOption(val tag: String, val label: String)
-
-val LanguageOptions = listOf(
-    LanguageOption("en", "English"),
-    LanguageOption("zh-CN", "中文"),
-)
-
 data class RemoteProjectSettingsState(
     val loading: Boolean = false,
     val available: Boolean = false,

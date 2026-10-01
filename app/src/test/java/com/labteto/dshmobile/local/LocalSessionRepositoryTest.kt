@@ -26,6 +26,55 @@ class LocalSessionRepositoryTest {
         assertEquals(null, repository.read("gone"))
     }
 
+    @Test fun readPrefersNewestQueuedSnapshotBeforeWriterRuns() = runTest {
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        repository.enqueue(
+            LocalHarnessSession(
+                id = "group",
+                usageMode = LocalUsageMode.CHAT,
+                groupChat = LocalGroupChatState(
+                    mode = LocalChatMode.GROUP,
+                    announcement = "雨夜客栈，众人刚刚收到同一封匿名信。",
+                ),
+            ),
+        )
+
+        assertEquals(
+            "雨夜客栈，众人刚刚收到同一封匿名信。",
+            repository.read("group")!!.groupChat.announcement,
+        )
+    }
+
+    @Test fun explicitWriteIsDurableBeforeReturnAndSupersedesQueuedSnapshot() = runTest {
+        val failures = mutableListOf<Throwable>()
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add)
+        repository.enqueue(
+            LocalHarnessSession(
+                id = "group",
+                usageMode = LocalUsageMode.CHAT,
+                groupChat = LocalGroupChatState(
+                    mode = LocalChatMode.GROUP,
+                    announcement = "旧公告",
+                ),
+            ),
+        )
+        repository.writeNow(
+            LocalHarnessSession(
+                id = "group",
+                usageMode = LocalUsageMode.CHAT,
+                groupChat = LocalGroupChatState(
+                    mode = LocalChatMode.GROUP,
+                    announcement = "新公告",
+                ),
+            ),
+        )
+        runCurrent()
+
+        val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add)
+        assertEquals("新公告", reopened.read("group")!!.groupChat.announcement)
+        assertTrue(failures.isEmpty())
+    }
+
     @Test fun coalescesSnapshotsWithoutDroppingOtherSessions() = runTest {
         val failures = mutableListOf<Throwable>()
         val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add)

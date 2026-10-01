@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.connection
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.automation.WebhookTokenStore
@@ -59,6 +61,22 @@ class ConnectionPersistenceAndroidTest {
         val settings = store.settingsOnce()
         assertEquals("dark", settings.themePreference)
         assertEquals(false, settings.notifyTurnComplete)
+    }
+
+    @Test
+    fun retiredLocalePreferenceIsRemovedWithoutChangingOtherSettings() = withStore { dataStore, _ ->
+        val legacyLocale = stringPreferencesKey("locale")
+        val theme = stringPreferencesKey("theme")
+        dataStore.edit { prefs ->
+            prefs[legacyLocale] = "en"
+            prefs[theme] = "dark"
+        }
+
+        val store = HostsStore(dataStore, RelayCredentialStore(dataStore), context)
+        store.clearRetiredLocalePreference()
+
+        assertNull(dataStore.data.first()[legacyLocale])
+        assertEquals("dark", store.settingsOnce().themePreference)
     }
 
     @Test

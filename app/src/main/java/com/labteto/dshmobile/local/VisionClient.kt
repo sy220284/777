@@ -121,6 +121,7 @@ class VisionClient @Inject constructor(
                     taskLabel = prompt.take(120),
                 ),
                 promptBreakdown = reply.promptBreakdown,
+                route = reply.routeIdentity,
             )
             return@withContext reply.content?.trim()?.takeIf(String::isNotBlank)
                 ?: error("当前模型返回了空文本")
@@ -160,6 +161,13 @@ class VisionClient @Inject constructor(
                         mode = LocalUsageMode.WORK,
                         action = TokenUsageAction.VISION,
                         taskLabel = prompt.take(120),
+                    ),
+                    route = LocalModelRouteIdentity(
+                        provider = LocalModelPresets.find(model, baseUrl)?.provider.orEmpty(),
+                        model = model,
+                        baseUrl = normalizeModelBaseUrl(baseUrl),
+                        authKind = LocalModelAuthKind.API_KEY.name,
+                        protocol = LocalModelProtocol.CHAT_COMPLETIONS.name,
                     ),
                 )
                 result

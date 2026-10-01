@@ -1,8 +1,11 @@
 package com.labteto.dshmobile
 
 import android.app.Application
+import android.app.LocaleManager
 import android.app.UiModeManager
 import android.content.Context
+import android.os.LocaleList
+import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.connection.KeepAliveWorker
 import com.labteto.dshmobile.notify.NotificationObserver
 import com.labteto.dshmobile.observability.AppLog
@@ -22,11 +25,13 @@ class DshApplication : Application() {
     // Injecting this constructs SessionStore + ConnectionManager and starts
     // their frame collectors; start() then begins notification classification.
     @Inject lateinit var notificationObserver: NotificationObserver
+    @Inject lateinit var hostsStore: HostsStore
 
     private val maintenanceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
+        clearRetiredApplicationLocale()
         AppLog.configurePersistence(File(filesDir, "diagnostics/app-log.tsv"))
         val uiModeManager = getSystemService(UiModeManager::class.java)
         uiModeManager.setApplicationNightMode(
@@ -39,6 +44,7 @@ class DshApplication : Application() {
         // to Android's installer is kept only until either this installed build reaches the target
         // version or the short installer handoff window expires.
         maintenanceScope.launch {
+            hostsStore.clearRetiredLocalePreference()
             val retryAfter = UpdateCache.cleanupStale(
                 cacheDir = cacheDir,
                 currentVersionCode = BuildConfig.VERSION_CODE.toLong(),
@@ -52,6 +58,19 @@ class DshApplication : Application() {
                     nowMillis = System.currentTimeMillis(),
                 )
             }
+        }
+    }
+
+    /**
+     * Clear the platform-level per-app locale left by older builds before any Activity exists.
+     *
+     * This is migration-only behavior. Remove it once the supported upgrade path no longer includes
+     * a build that exposed Android per-app language selection.
+     */
+    private fun clearRetiredApplicationLocale() {
+        val localeManager = getSystemService(LocaleManager::class.java)
+        if (!localeManager.applicationLocales.isEmpty) {
+            localeManager.applicationLocales = LocaleList.getEmptyLocaleList()
         }
     }
 
