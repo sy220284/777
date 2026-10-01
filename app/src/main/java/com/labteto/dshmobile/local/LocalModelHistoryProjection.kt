@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -138,11 +139,26 @@ private fun applyModelHistoryEvent(
             val callId = nested?.get("tool_call_id")?.jsonPrimitive?.contentOrNull
                 ?: event.data["id"]?.jsonPrimitive?.contentOrNull
                 ?: return false
-            val alreadyPresent = history.any { message ->
-                message["role"]?.jsonPrimitive?.contentOrNull == "tool" &&
-                    message["tool_call_id"]?.jsonPrimitive?.contentOrNull == callId
+
+            // A tool result is valid only inside the currently open assistant tool batch. Recovery
+            // must never manufacture an orphan result when an assistant event was lost/corrupted.
+            var ownerIndex = history.lastIndex
+            val currentBatchResults = linkedSetOf<String>()
+            while (ownerIndex >= 0 &&
+                history[ownerIndex]["role"]?.jsonPrimitive?.contentOrNull == "tool"
+            ) {
+                history[ownerIndex]["tool_call_id"]?.jsonPrimitive?.contentOrNull
+                    ?.let(currentBatchResults::add)
+                ownerIndex -= 1
             }
-            if (alreadyPresent) return false
+            val owner = history.getOrNull(ownerIndex)
+                ?.takeIf { it["role"]?.jsonPrimitive?.contentOrNull == "assistant" }
+                ?: return false
+            val ownerCalls = runCatching {
+                LocalCanonicalModelCodec.canonicalToolCalls(owner).mapTo(linkedSetOf()) { it.id }
+            }.getOrNull() ?: return false
+            if (callId !in ownerCalls || callId in currentBatchResults) return false
+
             val message = if (nested?.get("role")?.jsonPrimitive?.contentOrNull == "tool") {
                 nested
             } else {
