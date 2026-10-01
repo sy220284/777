@@ -7,8 +7,6 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Owns the explicit user-save transaction for a group announcement.
@@ -62,25 +60,12 @@ internal suspend fun saveGroupChatAnnouncement(
                 transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
             ),
         )
-        runCatching {
-            eventLog.append("group/announcement", buildJsonObject {
-                put("status", "saved")
-                put("active", announcement.isNotBlank())
-                put("chars", announcement.length)
-            })
-        }
         Result.success(Unit)
     } catch (cancelled: CancellationException) {
         rollbackGroupAnnouncement(state, before, announcement)
         throw cancelled
     } catch (error: Throwable) {
         rollbackGroupAnnouncement(state, before, announcement)
-        runCatching {
-            eventLog.append("group/announcement", buildJsonObject {
-                put("status", "failed")
-                put("detail", error.message.orEmpty().take(500))
-            })
-        }
         Result.failure(error)
     }
 }
