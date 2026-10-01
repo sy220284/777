@@ -135,7 +135,8 @@ internal class LocalModelConfigurationCoordinator(
         )
     }
 
-    private fun activate(profile: LocalModelProfile) {
+    private suspend fun activate(profile: LocalModelProfile) {
+        gateway.synchronizeCredentialSelection(profile)
         profiles.setActive(profile)
         gateway.activate(profile)
     }
