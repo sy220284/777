@@ -353,9 +353,9 @@ class AndroidDeviceProvider(
         value.take(maxChars)
             .replace(
                 Regex(
-                    """(?i)(验证码|校验码|动态码|verification\\s*code|security\\s*code|one[- ]time\\s*password|otp)\\s*[:：-]?\\s*[A-Z0-9]{4,12}""",
+                    """(?i)(验证码|校验码|动态码|verification\s*code|security\s*code|one[- ]time\s*password|otp)\s*[:：-]?\s*[A-Z0-9]{4,12}""",
                 ),
-                "$1：<已脱敏>",
+                "\$1：<已脱敏>",
             )
 
     private fun clipboardGet(): String {
