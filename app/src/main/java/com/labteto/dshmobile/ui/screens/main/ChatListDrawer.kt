@@ -144,6 +144,15 @@ fun ChatListDrawer(
     val store = rememberSessionStore()
     val scope = rememberCoroutineScope()
     val hostsStore = rememberHostsStore()
+    val sessionRowActions = remember(store) {
+        SessionRowActions(
+            open = { sessionId -> store.openSession(sessionId) },
+            unarchive = { sessionId -> store.unarchiveSession(sessionId) },
+            fork = { sessionId -> store.forkSession(sessionId) },
+            rename = { sessionId, title -> store.renameSession(sessionId, title) },
+            archive = { sessionId -> store.archiveSession(sessionId) },
+        )
+    }
 
     val sessions by store.sessions.collectAsStateWithLifecycle()
     val workspaces by store.workspaces.collectAsStateWithLifecycle()
@@ -307,7 +316,7 @@ fun ChatListDrawer(
                     }
                 }
                 items(searchHits.items, key = { it.session.sessionId }) { hit ->
-                    SearchResultRow(hit, store, scope, onClose)
+                    SearchResultRow(hit, sessionRowActions, scope, onClose)
                 }
                 if (searchHits.hasMore) {
                     item(key = "search-more") {
@@ -335,7 +344,7 @@ fun ChatListDrawer(
                             expandedSubagentParents + id
                         }
                     },
-                    store = store,
+                    actions = sessionRowActions,
                     scope = scope,
                     onClose = onClose,
                 )
@@ -354,7 +363,7 @@ fun ChatListDrawer(
                             expandedSubagentParents + id
                         }
                     },
-                    store = store,
+                    actions = sessionRowActions,
                     scope = scope,
                     onClose = onClose,
                 )
@@ -370,7 +379,7 @@ fun ChatListDrawer(
                         onToggle = { archivedExpanded = !archivedExpanded },
                     ) {
                         archivedSessions.forEach { session ->
-                            SessionRowItem(session, false, store, scope, onClose, archived = true)
+                            SessionRowItem(session, false, sessionRowActions, scope, onClose, archived = true)
                         }
                     }
                 }

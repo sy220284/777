@@ -51,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.data.SessionRow
-import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.data.WorkspaceRow
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
@@ -70,7 +69,6 @@ import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.rememberHostsStore
-import com.labteto.dshmobile.ui.rememberSessionStore
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -154,13 +152,21 @@ internal fun WorkspaceMenu(
  * "Subagents" heading per workspace, which said nothing about which run produced which — with a
  * dozen of them from three sessions it was a wall of near-identical rows.
  */
+internal data class SessionRowActions(
+    val open: suspend (String) -> Unit,
+    val unarchive: suspend (String) -> Boolean,
+    val fork: suspend (String) -> Unit,
+    val rename: suspend (String, String) -> Unit,
+    val archive: suspend (String) -> Unit,
+)
+
 internal fun LazyListScope.sessionTreeItem(
     session: SessionRow,
     currentSessionId: String?,
     tree: Map<String, List<SessionRow>>,
     expandedIds: Set<String>,
     onToggle: (String) -> Unit,
-    store: SessionStore,
+    actions: SessionRowActions,
     scope: CoroutineScope,
     onClose: () -> Unit,
     depth: Int = 0,
@@ -171,7 +177,7 @@ internal fun LazyListScope.sessionTreeItem(
             SessionRowItem(
                 session = session,
                 isCurrent = session.sessionId == currentSessionId,
-                store = store,
+                actions = actions,
                 scope = scope,
                 onClose = onClose,
                 depth = depth,
@@ -189,7 +195,7 @@ internal fun LazyListScope.sessionTreeItem(
                 tree = tree,
                 expandedIds = expandedIds,
                 onToggle = onToggle,
-                store = store,
+                actions = actions,
                 scope = scope,
                 onClose = onClose,
                 depth = depth + 1,
@@ -203,7 +209,7 @@ internal fun LazyListScope.sessionTreeItem(
 internal fun SessionRowItem(
     session: SessionRow,
     isCurrent: Boolean,
-    store: SessionStore,
+    actions: SessionRowActions,
     scope: CoroutineScope,
     onClose: () -> Unit,
     archived: Boolean = false,
@@ -234,11 +240,11 @@ internal fun SessionRowItem(
                 .combinedClickable(
                     onClick = {
                         scope.launch {
-                            if (archived && !store.unarchiveSession(session.sessionId)) {
+                            if (archived && !actions.unarchive(session.sessionId)) {
                                 restoreFailed = true
                                 return@launch
                             }
-                            store.openSession(session.sessionId)
+                            actions.open(session.sessionId)
                             onClose()
                         }
                     },
@@ -313,7 +319,7 @@ internal fun SessionRowItem(
                 if (archived) {
                     SheetRow(title = stringResource(R.string.archived_restore)) {
                         menuOpen = false
-                        scope.launch { restoreFailed = !store.unarchiveSession(session.sessionId) }
+                        scope.launch { restoreFailed = !actions.unarchive(session.sessionId) }
                     }
                 } else {
                     SheetRow(title = stringResource(R.string.chatlist_session_rename)) {
@@ -322,7 +328,7 @@ internal fun SessionRowItem(
                     }
                     SheetRow(title = stringResource(R.string.chatlist_session_fork)) {
                         menuOpen = false
-                        scope.launch { store.forkSession(session.sessionId) }
+                        scope.launch { actions.fork(session.sessionId) }
                     }
                     SheetRow(title = stringResource(R.string.chatlist_session_archive)) {
                         menuOpen = false
@@ -343,7 +349,7 @@ internal fun SessionRowItem(
             title = stringResource(R.string.chatlist_session_rename),
             onDismiss = { renameOpen = false },
             onConfirm = {
-                scope.launch { store.renameSession(session.sessionId, it) }
+                scope.launch { actions.rename(session.sessionId, it) }
                 renameOpen = false
             },
         )
@@ -356,7 +362,7 @@ internal fun SessionRowItem(
             confirmLabel = stringResource(R.string.common_archive),
             onDismiss = { archiveConfirmOpen = false },
             onConfirm = {
-                scope.launch { store.archiveSession(session.sessionId) }
+                scope.launch { actions.archive(session.sessionId) }
                 archiveConfirmOpen = false
             },
         )
@@ -374,7 +380,7 @@ internal fun SessionRowItem(
 @Composable
 internal fun SearchResultRow(
     hit: SearchHit,
-    store: SessionStore,
+    actions: SessionRowActions,
     scope: CoroutineScope,
     onClose: () -> Unit,
 ) {
@@ -386,7 +392,7 @@ internal fun SearchResultRow(
             .clip(DsShapes.row)
             .clickable {
                 scope.launch {
-                    store.openSession(hit.session.sessionId)
+                    actions.open(hit.session.sessionId)
                     onClose()
                 }
             }
