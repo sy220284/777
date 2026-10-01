@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
+import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -35,7 +36,13 @@ internal class LocalSessionRepository(
     private val onWritten: () -> Unit,
     private val onError: (Throwable) -> Unit,
 ) {
-    private val store = VersionedSessionStore(root, json)
+    private val store = VersionedSessionStore(
+        root = root,
+        json = json,
+        onReadFailure = { id, error ->
+            AppLog.error(TAG, "session/corrupt-skipped id=$id", error)
+        },
+    )
     private val lock = Any()
     private val storageLock = Any()
     private val deletedIds = mutableSetOf<String>()
@@ -241,7 +248,8 @@ internal class LocalSessionRepository(
                 store.read(id)
             } catch (future: FutureSessionVersionException) {
                 throw future
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                AppLog.error(TAG, "session/corrupt-skipped id=$id", error)
                 null
             } ?: return@mapNotNull null
 
@@ -307,4 +315,5 @@ internal class LocalSessionRepository(
             ?.takeIf { it.isNotBlank() }
             ?.let { if (it.length > 72) it.take(72) + "…" else it },
     )
+    private companion object { const val TAG = "LocalSessionRepository" }
 }
