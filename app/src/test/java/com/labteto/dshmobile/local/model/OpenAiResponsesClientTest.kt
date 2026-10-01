@@ -148,6 +148,44 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun chatGptPlanNamespacedFunctionCallRemainsExecutableAndReplayable() {
+        val response = Json.parseToJsonElement("""{
+            "id":"resp-namespaced-tool",
+            "output":[
+                {"type":"function_call","namespace":"local","call_id":"call-read","name":"read","arguments":"{\\"path\\":\\"AGENTS.md\\"}"}
+            ]
+        }""").jsonObject
+        val reply = client.parseCompleted(
+            response = response,
+            promptBreakdown = TokenPromptBreakdown(),
+        )
+
+        assertEquals(1, reply.toolCalls.size)
+        assertEquals("read", reply.toolCalls.single().name)
+        assertEquals("AGENTS.md", reply.toolCalls.single().arguments["path"]?.jsonPrimitive?.content)
+
+        val toolOutput = buildJsonObject {
+            put("role", "tool")
+            put("tool_call_id", "call-read")
+            put("content", "规则内容")
+        }
+        val input = client.buildPayload(
+            model = "gpt-test",
+            messages = listOf(reply.message, toolOutput),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = true,
+        )["input"]!!.jsonArray
+
+        assertEquals(2, input.size)
+        assertEquals("function_call", input[0].jsonObject["type"]?.jsonPrimitive?.content)
+        assertEquals("local", input[0].jsonObject["namespace"]?.jsonPrimitive?.content)
+        assertEquals("read", input[0].jsonObject["name"]?.jsonPrimitive?.content)
+        assertEquals("function_call_output", input[1].jsonObject["type"]?.jsonPrimitive?.content)
+        assertEquals("call-read", input[1].jsonObject["call_id"]?.jsonPrimitive?.content)
+    }
+
+    @Test
     fun optionalToolArgumentsStayNonStrictUnlessExplicitlyDeclared() {
         val tools = Json.parseToJsonElement("""[
             {"type":"function","function":{"name":"read_file","parameters":{
