@@ -92,8 +92,8 @@ class PersonaInspectionService @Inject constructor(
 
         return modelGateway.withFrozenRoute(model, baseUrl) {
             val reply = modelGateway.complete(
-            baseUrl = baseUrl,
-            model = model,
+                baseUrl = baseUrl,
+                model = model,
             messages = listOf(
                 buildJsonObject {
                     put("role", "system")
@@ -104,9 +104,9 @@ class PersonaInspectionService @Inject constructor(
                     put("content", prompt)
                 },
             ),
-            tools = JsonArray(emptyList()),
-        )
-        withContext(Dispatchers.IO) {
+                tools = JsonArray(emptyList()),
+            )
+            withContext(Dispatchers.IO) {
             usageTracker.record(
                 model = model,
                 usage = reply.usage,
@@ -123,7 +123,7 @@ class PersonaInspectionService @Inject constructor(
         }.getOrElse { cause ->
             throw IllegalStateException("人物检查结果格式无法解析，请再试一次", cause)
         }
-        sanitize(decoded)
+            sanitize(decoded)
         }
     }
 
