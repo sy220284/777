@@ -30,7 +30,8 @@ class LocalChatRuntime @Inject constructor(
     internal fun switchChatMode(mode: LocalChatMode) = engine.switchChatMode(mode)
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean =
         engine.configureGroupChatMembers(entries)
-    internal fun setGroupChatAnnouncement(text: String): Boolean = engine.setGroupChatAnnouncement(text)
+    internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> =
+        engine.setGroupChatAnnouncement(text)
     internal fun removeGroupChatMemberByGalleryId(galleryId: String) =
         engine.removeGroupChatMemberByGalleryId(galleryId)
     internal suspend fun generateReplySuggestions(): Boolean = engine.generateReplySuggestions()
