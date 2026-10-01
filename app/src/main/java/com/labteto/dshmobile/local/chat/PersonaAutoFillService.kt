@@ -321,13 +321,13 @@ class PersonaAutoFillService @Inject constructor(
 
         return modelGateway.withFrozenRoute(model, baseUrl) {
             val reply = modelGateway.complete(
-            baseUrl = baseUrl,
-            model = model,
-            messages = messages,
-            tools = JsonArray(emptyList()),
-            temperature = 0.2,
-        )
-        withContext(Dispatchers.IO) {
+                baseUrl = baseUrl,
+                model = model,
+                messages = messages,
+                tools = JsonArray(emptyList()),
+                temperature = 0.2,
+            )
+            withContext(Dispatchers.IO) {
             usageTracker.record(
                 model = model,
                 usage = reply.usage,
@@ -353,7 +353,7 @@ class PersonaAutoFillService @Inject constructor(
             )
             val repairedReply = runCatching {
                 modelGateway.complete(
-                            baseUrl = baseUrl,
+                    baseUrl = baseUrl,
                     model = model,
                     messages = repairMessages,
                     tools = JsonArray(emptyList()),
