@@ -172,7 +172,7 @@ internal fun nextDailyWindowRun(
     error("Unable to resolve future daily window")
 }
 
-private fun validateWindowMinutes(startMinuteOfDay: Int, endMinuteOfDay: Int) {
+internal fun validateWindowMinutes(startMinuteOfDay: Int, endMinuteOfDay: Int) {
     require(startMinuteOfDay in 0 until 24 * 60) { "window start must be within a day" }
     require(endMinuteOfDay in 0 until 24 * 60) { "window end must be within a day" }
     require(startMinuteOfDay != endMinuteOfDay) { "window start and end must differ" }
