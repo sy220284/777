@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.update
 
+import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -366,7 +367,7 @@ class UpdateChecker @Inject constructor(
         // identifies the published tag without parsing HTML. The APK is still verified
         // against the release's SHA256SUMS before Android is asked to install it.
         val request = Request.Builder().url(RELEASES_URL).get().build()
-        githubClient.newCall(request).execute().use { response ->
+        withCancellableHttpResponse(githubClient.newCall(request)) { response ->
             if (!response.isSuccessful) {
                 throw IOException("访问 GitHub 发行页失败：HTTP ${response.code}")
             }
@@ -417,7 +418,7 @@ class UpdateChecker @Inject constructor(
 
         repeat(MAX_REQUEST_ATTEMPTS) { attempt ->
             try {
-                githubClient.newCall(request).execute().use { response ->
+                val bytes = withCancellableHttpResponse(githubClient.newCall(request)) { response ->
                     if (!response.isSuccessful) {
                         val retryable = response.code == 408 ||
                             response.code == 429 ||
@@ -426,15 +427,17 @@ class UpdateChecker @Inject constructor(
                             throw IOException("${purpose}失败：HTTP ${response.code}")
                         }
                         lastError = IOException("${purpose}暂时失败：HTTP ${response.code}")
+                        null
                     } else {
                         val body = response.body ?: throw IOException("${purpose}返回空响应")
                         val declared = body.contentLength()
                         if (declared > maxBytes) {
                             throw IOException("${purpose}响应异常过大：$declared 字节")
                         }
-                        return readChecksumBytes(body.byteStream(), maxBytes)
+                        readChecksumBytes(body.byteStream(), maxBytes)
                     }
                 }
+                if (bytes != null) return bytes
             } catch (error: IOException) {
                 lastError = error
             }

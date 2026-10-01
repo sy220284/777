@@ -6,6 +6,8 @@ import java.io.InputStream
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -69,6 +71,7 @@ interface RpcTransport {
      * file-upload route harness 0.1.3 added (`/api/session/uploadFileBinary`).
      *
      * [body] is read once on an IO thread and must be positioned at the first byte to send;
+     * Cancellation closes [body] to unblock a pipe/provider read; the caller still owns normal closure.
      * [contentLength] is declared up front so the host can refuse an oversized upload before
      * reading it. [onProgress] is called with the running byte count as the body is written.
      * Returns the carrier response (the route answers 200 with a bare `{ok, value|error}`
@@ -195,20 +198,21 @@ class OkHttpRpcTransport(
             .cookied(cookie)
             .get()
             .build()
-        val response = try {
-            downloadClient.newCall(request).execute()
-        } catch (e: IOException) {
-            throw RpcTransportException(0, "transport failure: ${e.message}", e)
-        }
-        response.use { resp ->
-            if (!resp.isSuccessful) throw RpcTransportException(resp.code, carrierMessage(resp.code))
-            val body = resp.body
-                ?: throw RpcTransportException(resp.code, "download carried no body")
-            consume(
-                resp.header("Content-Type"),
-                resp.header("Content-Disposition"),
-                body.byteStream(),
-            )
+        try {
+            withCancellableHttpResponse(downloadClient.newCall(request)) { resp ->
+                if (!resp.isSuccessful) throw RpcTransportException(resp.code, carrierMessage(resp.code))
+                val body = resp.body
+                    ?: throw RpcTransportException(resp.code, "download carried no body")
+                consume(
+                    resp.header("Content-Type"),
+                    resp.header("Content-Disposition"),
+                    body.byteStream().checkingCancellation(currentCoroutineContext()),
+                )
+            }
+        } catch (error: RpcTransportException) {
+            throw error
+        } catch (error: IOException) {
+            throw RpcTransportException(0, "transport failure: ${error.message}", error)
         }
     }
 
@@ -221,6 +225,8 @@ class OkHttpRpcTransport(
     ): RpcHttpResponse = withContext(Dispatchers.IO) {
         val target = base.resolve(path)
             ?: throw RpcTransportException(0, "cannot resolve $path against $base")
+        val transferContext = currentCoroutineContext()
+        val checkedBody = body.checkingCancellation(transferContext)
         val requestBody = object : RequestBody() {
             override fun contentType(): MediaType? = contentType.toMediaType()
             override fun contentLength(): Long = contentLength
@@ -229,9 +235,11 @@ class OkHttpRpcTransport(
                 val buffer = ByteArray(64 * 1024)
                 var sent = 0L
                 while (true) {
-                    val read = body.read(buffer)
+                    val read = checkedBody.read(buffer)
                     if (read < 0) break
+                    transferContext.ensureActive()
                     sink.write(buffer, 0, read)
+                    transferContext.ensureActive()
                     sent += read
                     onProgress?.invoke(sent)
                 }
@@ -244,23 +252,25 @@ class OkHttpRpcTransport(
             .cookied(cookie)
             .post(requestBody)
             .build()
-        val response = try {
-            downloadClient.newCall(request).execute()
-        } catch (e: IOException) {
-            throw RpcTransportException(0, "transport failure: ${e.message}", e)
-        }
-        response.use { resp ->
-            val responseBody = readResponseBody(
-                resp,
-                if (resp.isSuccessful) MAX_RPC_RESPONSE_BYTES else MAX_ERROR_RESPONSE_BYTES,
-            )
-            if (!resp.isSuccessful) throw RpcTransportException(
-                resp.code,
-                carrierMessage(resp.code, responseBody),
-            )
-            RpcHttpResponse(resp.code, responseBody)
+        try {
+            withCancellableHttpResponse(downloadClient.newCall(request), cancelResources = { body.close() }) { resp ->
+                val responseBody = readResponseBody(
+                    resp,
+                    if (resp.isSuccessful) MAX_RPC_RESPONSE_BYTES else MAX_ERROR_RESPONSE_BYTES,
+                )
+                if (!resp.isSuccessful) throw RpcTransportException(
+                    resp.code,
+                    carrierMessage(resp.code, responseBody),
+                )
+                RpcHttpResponse(resp.code, responseBody)
+            }
+        } catch (error: RpcTransportException) {
+            throw error
+        } catch (error: IOException) {
+            throw RpcTransportException(0, "transport failure: ${error.message}", error)
         }
     }
+
 
     private fun readResponseBody(response: Response, maxBytes: Int): String {
         val body = response.body ?: return ""
