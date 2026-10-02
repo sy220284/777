@@ -61,6 +61,7 @@ internal class ChatDiaryStore(
         val duplicateIndex = entries.indexOfLast { existing ->
             existing.active &&
                 existing.subjectKey == candidate.subjectKey &&
+                existing.sourceMode == candidate.sourceMode &&
                 now - existing.updatedAt <= DUPLICATE_WINDOW_MILLIS &&
                 diarySimilarity(existing.event, candidate.event) >= DUPLICATE_SIMILARITY
         }
@@ -197,7 +198,11 @@ internal class ChatDiaryStore(
             val entry = entries[index]
             val remaining = entry.sources.filterNot { it.sessionId in sessionIds }
             if (remaining.size != entry.sources.size) {
-                entries[index] = entry.copy(sources = remaining, updatedAt = now)
+                entries[index] = if (remaining.isEmpty()) {
+                    entry.copy(active = false, sources = emptyList(), updatedAt = now)
+                } else {
+                    entry.copy(sources = remaining, updatedAt = now)
+                }
                 changed++
             }
         }
