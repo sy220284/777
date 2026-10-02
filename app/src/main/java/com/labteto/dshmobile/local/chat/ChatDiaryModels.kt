@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.chat
 
 import kotlinx.serialization.Serializable
 
+internal const val MAX_CHAT_DIARY_ENTRIES = 4_000
+
 @Serializable
 enum class ChatDiarySourceMode {
     DIRECT,
