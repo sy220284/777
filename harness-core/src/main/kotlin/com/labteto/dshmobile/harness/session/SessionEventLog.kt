@@ -8,6 +8,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.ArrayDeque
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
@@ -59,15 +60,24 @@ class SessionEventLog(
         require(maxEventBytes >= maxBytes) { "单条事件上限不能小于日志分段目标" }
     }
 
-    // Several Android adapters can open the same session while background maintenance is running.
-    private val lock = PATH_LOCKS[(file.absolutePath.hashCode() and Int.MAX_VALUE) % PATH_LOCKS.size]
+    // All live adapters for the same durable path share one lock and one sequence cursor.
+    // The first adapter after process start reads the durable tail once; later adapters reuse the
+    // same path state instead of re-enumerating segments on every append.
+    private val pathState = PATH_STATES.computeIfAbsent(file.canonicalFile.path) { SharedPathState() }
+    private val lock = pathState.lock
     private val malformedRows = AtomicLong()
     private val segmentReadFailures = AtomicLong()
     private val archiveFailures = AtomicLong()
-    private val nextSequence = AtomicLong(synchronized(lock) {
-        repairTornActiveTailUnsafe()
-        readNextSequence()
-    })
+    private val nextSequence = pathState.nextSequence
+
+    init {
+        synchronized(lock) {
+            if (nextSequence.get() == UNINITIALIZED_SEQUENCE) {
+                repairTornActiveTailUnsafe()
+                nextSequence.set(readNextSequence())
+            }
+        }
+    }
 
     fun diagnostics(): SessionEventLogDiagnostics = SessionEventLogDiagnostics(
         malformedRows = malformedRows.get(),
@@ -77,14 +87,6 @@ class SessionEventLog(
 
     fun append(type: String, data: JsonObject): SessionEvent = synchronized(lock) {
         require(type.isNotBlank()) { "事件类型不能为空" }
-        // Multiple live adapters can hold separate SessionEventLog instances for the same path.
-        // The striped path lock serializes their writes, but each instance has its own in-memory
-        // counter. Reconcile from the durable tail while holding that shared lock so a stale
-        // instance cannot reuse a sequence that another instance has already committed.
-        val durableNextSequence = readNextSequence()
-        if (nextSequence.get() != durableNextSequence) {
-            nextSequence.set(durableNextSequence)
-        }
         val event = SessionEvent(
             sequence = nextSequence.get(),
             type = type,
@@ -112,13 +114,7 @@ class SessionEventLog(
 
     /** Latest durable event sequence, or -1 when the log is empty. */
     fun latestSequence(): Long = synchronized(lock) {
-        // Another live instance for the same path may have appended or cleared the durable log.
-        // Reconcile under the shared path lock instead of trusting this instance's stale counter.
-        val durableNextSequence = readNextSequence()
-        if (nextSequence.get() != durableNextSequence) {
-            nextSequence.set(durableNextSequence)
-        }
-        durableNextSequence - 1L
+        nextSequence.get().coerceAtLeast(0L) - 1L
     }
 
     /**
@@ -822,8 +818,14 @@ class SessionEventLog(
         }
     }
 
+    private class SharedPathState {
+        val lock = Any()
+        val nextSequence = AtomicLong(UNINITIALIZED_SEQUENCE)
+    }
+
     private companion object {
-        val PATH_LOCKS = Array(64) { Any() }
+        const val UNINITIALIZED_SEQUENCE = Long.MIN_VALUE
+        val PATH_STATES = ConcurrentHashMap<String, SharedPathState>()
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
         const val DEFAULT_MAX_EVENT_BYTES = 32L * 1024L * 1024L
         const val MIN_MAX_BYTES = 512L
