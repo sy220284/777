@@ -262,24 +262,31 @@ internal class LocalHistoryCompactor(
             tailTokens = aggressiveTailTokens,
             maxToolResultTokens = 1,
         )
+        // Emergency overflow recovery follows the same first step as normal context governance:
+        // shrink stale tool payloads before discarding older semantic history.
+        val projection = projectStaleToolResults(working, overflowBudget)
+        val projectedWorking = projection?.messages ?: working
+        val projectedChars = if (projection == null) encodedChars else projectedWorking.sumOf { it.toString().length }
+        val projectedTokens = projection?.estimatedTokensAfter ?: encodedTokens
         val compacted = compact(
-            history = working,
+            history = projectedWorking,
             budget = overflowBudget,
-            currentChars = encodedChars,
-            currentTokens = encodedTokens,
+            currentChars = projectedChars,
+            currentTokens = projectedTokens,
             extraTokens = protectedTokens,
             summaryMode = summaryMode,
-        ) ?: return null
+        )
+        val recovered = compacted ?: projection ?: return null
 
         val rebuilt = buildList {
             addAll(protectedHead)
-            addAll(compacted.messages.drop(1))
+            addAll(recovered.messages.drop(1))
             addAll(protectedSuffix)
         }
         val before = history.sumOf { estimateModelTokens(it.toString()) }
         val after = rebuilt.sumOf { estimateModelTokens(it.toString()) }
         if (after >= before) return null
-        return compacted.copy(
+        return recovered.copy(
             messages = rebuilt,
             estimatedTokensBefore = before,
             estimatedTokensAfter = after,
