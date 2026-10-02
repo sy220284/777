@@ -74,14 +74,14 @@ class OpenAiResponsesClient @Inject constructor(
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
         )
         validateRequestPayload(payload)
+        val admissionTracker = LocalModelAdmissionTracker()
         val request = Request.Builder()
             .url(responsesEndpoint(baseUrl, planSharing))
             .header("Authorization", "Bearer $accessToken")
             .header("Content-Type", "application/json")
-            .post(payload.toString().toRequestBody(JSON_MEDIA))
+            .post(payload.toString().toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
             .build()
         var admittedRequestId: String? = null
-        var responseAdmitted = false
         try {
             withCancellableModelResponse(modelHttp.newCall(request)) { response ->
                 val requestId = response.header("x-request-id")
@@ -97,7 +97,7 @@ class OpenAiResponsesClient @Inject constructor(
                         retryAfterMs = retryAfterMs,
                     )
                 }
-                responseAdmitted = true
+                admissionTracker.markAdmitted()
                 admittedRequestId = requestId
                 val responseBody = response.body ?: throw streamInterruptedAfterAdmission(
                     planSharing = planSharing,
@@ -171,12 +171,12 @@ class OpenAiResponsesClient @Inject constructor(
         } catch (error: LocalModelException) {
             // In-stream failures can arrive after real inference has started on any Responses route.
             // Preserve diagnostics but never blindly replay the whole accepted request.
-            if (responseAdmitted && error.retryable) {
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED && error.retryable) {
                 throw error.withoutReplayAfterAdmission()
             }
             throw error
         } catch (error: SocketTimeoutException) {
-            if (responseAdmitted) {
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
                 throw streamInterruptedAfterAdmission(
                     planSharing = planSharing,
                     requestId = admittedRequestId,
@@ -184,14 +184,15 @@ class OpenAiResponsesClient @Inject constructor(
                     cause = error,
                 )
             }
-            throw LocalModelException(
+            throw modelTransportFailure(
                 code = "MODEL_TIMEOUT",
-                message = "Responses API 推理超时",
-                retryable = true,
+                detail = "Responses API 推理超时",
+                tracker = admissionTracker,
+                requestId = admittedRequestId,
                 cause = error,
             )
         } catch (error: IOException) {
-            if (responseAdmitted) {
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
                 throw streamInterruptedAfterAdmission(
                     planSharing = planSharing,
                     requestId = admittedRequestId,
@@ -199,7 +200,13 @@ class OpenAiResponsesClient @Inject constructor(
                     cause = error,
                 )
             }
-            throw networkFailure(error)
+            throw modelTransportFailure(
+                code = "MODEL_NETWORK",
+                detail = "Responses API 网络请求失败：${error.message ?: "网络异常"}",
+                tracker = admissionTracker,
+                requestId = admittedRequestId,
+                cause = error,
+            )
         }
     }
 
@@ -228,6 +235,8 @@ class OpenAiResponsesClient @Inject constructor(
                 cause = cause,
                 requestId = requestId,
                 providerCode = "stream_interrupted_after_admission",
+                admissionState = LocalModelAdmissionState.ADMITTED,
+                continuationEligible = true,
             )
         } else {
             modelPostAdmissionFailure(
@@ -606,6 +615,7 @@ class OpenAiResponsesClient @Inject constructor(
                 requestId = requestId,
                 retryAfterMs = retryAfterMs,
                 statusOverride = status,
+                admissionState = LocalModelAdmissionState.REJECTED,
             )
         }
 
@@ -628,6 +638,7 @@ class OpenAiResponsesClient @Inject constructor(
                 status = status,
                 providerRetryAfterMs = retryAfterMs,
                 requestId = requestId,
+                admissionState = LocalModelAdmissionState.REJECTED,
             )
         }
 
@@ -641,6 +652,7 @@ class OpenAiResponsesClient @Inject constructor(
             requestId = requestId,
             providerCode = remoteCode,
             providerParam = remoteParam,
+            admissionState = LocalModelAdmissionState.REJECTED,
         )
     }
 
@@ -651,6 +663,7 @@ class OpenAiResponsesClient @Inject constructor(
         requestId: String?,
         retryAfterMs: Long?,
         statusOverride: Int? = null,
+        admissionState: LocalModelAdmissionState = LocalModelAdmissionState.ADMITTED,
     ): LocalModelException {
         val knownStatus = statusOverride ?: when (code) {
             "subscription_sharing_user_not_eligible",
@@ -721,6 +734,7 @@ class OpenAiResponsesClient @Inject constructor(
             requestId = requestId,
             providerCode = code,
             providerParam = param,
+            admissionState = admissionState,
         )
     }
 
