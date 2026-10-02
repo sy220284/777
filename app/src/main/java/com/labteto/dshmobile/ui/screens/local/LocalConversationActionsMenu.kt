@@ -39,7 +39,7 @@ internal fun ConversationActionsMenu(
         DsPopupMenu(
             expanded = expanded,
             onDismiss = { expanded = false },
-            containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.CHROME),
+            containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU, base = colors.bgBase),
             items = listOf(
                 MenuItem(
                     text = stringResource(if (pinned) R.string.local_unpin_session else R.string.advanced_pin),
