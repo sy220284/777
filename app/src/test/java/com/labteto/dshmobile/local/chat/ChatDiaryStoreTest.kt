@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -33,7 +34,7 @@ class ChatDiaryStoreTest {
     }
 
     @Test
-    fun bothCorruptDiaryFilesCanRestartWithFreshDurableData() {
+    fun bothCorruptDiaryFilesFailClosedWithoutOverwritingHistory() {
         val memory = store()
         memory.record(request(
             delta = ChatDiaryDelta(
@@ -48,16 +49,13 @@ class ChatDiaryStoreTest {
         File(dir, "diary.json.bak").writeText("broken-backup")
 
         val fresh = ChatDiaryStore(dir, json)
-        assertTrue(fresh.listActive("gallery:a").isEmpty())
-        assertNotNull(fresh.record(request(
-            delta = ChatDiaryDelta(
-                event = "用户确认下周一起去书店",
-                feeling = "我觉得这次安排很踏实",
-                importance = 4,
-            ),
-            evidence = "用户确认下周一起去书店",
-        )))
-        assertEquals(1, ChatDiaryStore(dir, json).listActive("gallery:a").size)
+        assertThrows(IllegalStateException::class.java) {
+            fresh.listActive("gallery:a")
+        }
+        assertTrue(
+            dir.listFiles().orEmpty().count { it.name.contains(".corrupt-") } >= 2,
+        )
+        assertTrue(!File(dir, "diary.json").isFile)
     }
 
     @Test

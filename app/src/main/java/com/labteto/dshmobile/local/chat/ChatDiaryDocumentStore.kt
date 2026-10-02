@@ -45,10 +45,13 @@ internal class ChatDiaryDocumentStore(
             return recovered
         }
 
+        val hadDurableData = file.isFile || backup.isFile
         if (file.isFile) quarantine(file, "primary")
         if (backup.isFile) quarantine(backup, "backup")
-        if (currentStamp.first > 0L || currentStamp.second > 0L) {
-            AppLog.error("ChatDiaryStore", "人物日记主文件与备份均无法解析；损坏文件已隔离")
+        if (hadDurableData) {
+            val message = "人物日记主文件与备份均无法解析；损坏文件已隔离，未用空日记覆盖历史"
+            AppLog.error("ChatDiaryStore", message)
+            throw IllegalStateException(message)
         }
         return ChatDiaryDocument().also { document ->
             cached = document
