@@ -90,6 +90,7 @@ internal fun appendAutomationReceipt(
 
 private const val AUTOMATION_HISTORY_DAYS = 30L
 private const val AUTOMATION_HISTORY_RECORDS = 200
+private const val AUTOMATION_MAX_TASKS = 256
 
 internal fun Int.saturatingIncrement(): Int =
     if (this >= Int.MAX_VALUE) Int.MAX_VALUE else (this + 1).coerceAtLeast(0)
@@ -300,7 +301,12 @@ class AutomationStore internal constructor(
 
     @Synchronized
     fun upsert(task: AutomationTask) {
-        val current = read().tasks.filterNot { it.id == task.id } + task
+        val document = read()
+        val replacing = document.tasks.any { it.id == task.id }
+        require(replacing || document.tasks.size < AUTOMATION_MAX_TASKS) {
+            "自动任务数量已达上限（$AUTOMATION_MAX_TASKS），请删除不再使用的任务后重试"
+        }
+        val current = document.tasks.filterNot { it.id == task.id } + task
         write(AutomationDocument(tasks = current))
     }
 
@@ -330,7 +336,12 @@ class AutomationStore internal constructor(
 
         val corrupt = File(file.parentFile, "automations.corrupt-${System.currentTimeMillis()}.json")
         runCatching { file.copyTo(corrupt, overwrite = true) }
-        val recovered = readValid(backup) ?: return AutomationDocument()
+        val recovered = readValid(backup)
+        if (recovered == null) {
+            throw IllegalStateException(
+                "自动任务存储已损坏，主文件与备份均无法读取；损坏副本已保留：${corrupt.name}",
+            )
+        }
         restoreBackup()
         return recovered
     }
