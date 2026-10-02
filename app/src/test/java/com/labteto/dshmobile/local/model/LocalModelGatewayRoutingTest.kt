@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.LocalModelProtocol
 import com.labteto.dshmobile.local.LocalModelRuntimeCapabilities
+import com.labteto.dshmobile.local.routeFingerprint
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -12,6 +13,7 @@ import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -252,6 +254,25 @@ class LocalModelGatewayRoutingTest {
             assertEquals(1, canonical.content.filterIsInstance<LocalCanonicalContent.Image>().size)
             assertEquals("read", prepared.request.tools.single().name)
         }
+    }
+
+
+    @Test
+    fun routeFingerprintTracksPhysicalRouteInsteadOfUiProfileId() {
+        val first = LocalModelProfile(
+            id = "profile-a",
+            provider = "OpenAI",
+            model = "gpt-test",
+            baseUrl = "https://api.openai.com/v1/",
+            authKind = LocalModelAuthKind.CHATGPT_PLAN,
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+            credentialRef = "account-1",
+        )
+        val alias = first.copy(id = "profile-b")
+        val anotherAccount = first.copy(id = "profile-c", credentialRef = "account-2")
+
+        assertEquals(first.routeFingerprint(), alias.routeFingerprint())
+        assertNotEquals(first.routeFingerprint(), anotherAccount.routeFingerprint())
     }
 
     @Test

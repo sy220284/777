@@ -1,7 +1,11 @@
 package com.labteto.dshmobile.local.model
 
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okio.Buffer
 import org.junit.Assert.assertEquals
@@ -58,6 +62,49 @@ class ModelAdmissionSafetyTest {
         assertTrue(error.continuationEligible)
         assertEquals(LocalModelAdmissionState.MAYBE_ADMITTED, error.admissionState)
         assertEquals("request_maybe_admitted", error.providerCode)
+    }
+
+    @Test
+    fun cancellableModelResponsePreservesNotSentCancellationState() = runBlocking {
+        val tracker = LocalModelAdmissionTracker()
+        val body = "{}".toRequestBody("application/json".toMediaType())
+            .withModelAdmissionTracking(tracker)
+        val client = OkHttpClient.Builder().addInterceptor {
+            throw CancellationException("cancel before send")
+        }.build()
+        val request = Request.Builder().url("https://example.test").post(body).build()
+
+        val failure = runCatching {
+            withCancellableModelResponse(client.newCall(request), tracker) { error("unreachable") }
+        }.exceptionOrNull()
+
+        assertTrue(failure is LocalModelCancellationException)
+        assertEquals(
+            LocalModelAdmissionState.NOT_SENT,
+            (failure as LocalModelCancellationException).admissionState,
+        )
+    }
+
+    @Test
+    fun cancellableModelResponsePreservesMaybeAdmittedCancellationState() = runBlocking {
+        val tracker = LocalModelAdmissionTracker()
+        val body = "{}".toRequestBody("application/json".toMediaType())
+            .withModelAdmissionTracking(tracker)
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            chain.request().body?.writeTo(Buffer())
+            throw CancellationException("cancel after send")
+        }.build()
+        val request = Request.Builder().url("https://example.test").post(body).build()
+
+        val failure = runCatching {
+            withCancellableModelResponse(client.newCall(request), tracker) { error("unreachable") }
+        }.exceptionOrNull()
+
+        assertTrue(failure is LocalModelCancellationException)
+        assertEquals(
+            LocalModelAdmissionState.MAYBE_ADMITTED,
+            (failure as LocalModelCancellationException).admissionState,
+        )
     }
 
     @Test

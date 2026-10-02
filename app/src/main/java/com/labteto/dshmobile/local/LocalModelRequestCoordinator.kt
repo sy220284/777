@@ -6,11 +6,13 @@ import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.observability.AppLog
+import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.model.resolveLocalModelProtocol
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -61,33 +63,61 @@ internal class LocalModelRequestCoordinator(
             snapshot.baseUrl,
         )
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
+        val resolvedProtocol = resolveLocalModelProtocol(
+            authKind = frozenProfile.authKind,
+            profile = frozenProfile,
+            model = frozenProfile.model,
+            baseUrl = frozenProfile.baseUrl,
+        )
         val runtimeCapabilities = LocalModelPresets.runtimeCapabilitiesFor(
             model = frozenProfile.model,
             baseUrl = frozenProfile.baseUrl,
-            protocol = resolveLocalModelProtocol(
-                authKind = frozenProfile.authKind,
-                profile = frozenProfile,
-                model = frozenProfile.model,
-                baseUrl = frozenProfile.baseUrl,
-            ),
+            protocol = resolvedProtocol,
             authKind = frozenProfile.authKind,
         )
+        val routeFingerprint = frozenProfile.routeFingerprint()
         val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
-            promptCacheBaselines.get(snapshot.sessionId, frozenProfile.id)
+            promptCacheBaselines.get(snapshot.sessionId, routeFingerprint)
         } else {
             null
         }
         val operationalLimit = operationalInputLimitTokens(
             frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
         )
-        val pressure = LocalPromptPressureMeter.measure(
+        val modelContextWindow = documentedContextWindowTokens(
+            frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
+        )
+        val baselinePressure = LocalPromptPressureMeter.measure(
             messages = messages,
             tools = tools,
             operationalLimitTokens = operationalLimit,
-            modelContextWindowTokens = documentedContextWindowTokens(
-                frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
-            ),
+            modelContextWindowTokens = modelContextWindow,
         )
+        val workProjection = if (executionControl != null && snapshot.usageMode == LocalUsageMode.WORK) {
+            projectWorkRequestContext(
+                messages = messages,
+                tools = tools,
+                compactor = historyCompactor,
+                operationalLimitTokens = operationalLimit,
+                measuredPressure = baselinePressure,
+            )
+        } else {
+            LocalWorkRequestProjection(
+                messages = messages,
+                projected = false,
+                estimatedTokensBefore = baselinePressure.estimatedInputTokens,
+                estimatedTokensAfter = baselinePressure.estimatedInputTokens,
+            )
+        }
+        val requestMessages = workProjection.messages
+        val pressure = if (workProjection.projected) {
+            LocalPromptPressureMeter.measure(
+                messages = requestMessages,
+                tools = tools,
+                operationalLimitTokens = operationalLimit,
+                modelContextWindowTokens = modelContextWindow,
+            )
+        } else baselinePressure
         pressureStore.record(snapshot.sessionId, pressure)
         val contextWindow = pressureStore.window(snapshot.sessionId)
         val previewOwner = if (publishPreviewEnabled) {
@@ -100,7 +130,19 @@ internal class LocalModelRequestCoordinator(
             null
         }
         val log = requestLog ?: defaultEventLog()
-        val logMessages = redactModelImages(messages)
+        if (workProjection.projected) {
+            log.append("request/history-projection", buildJsonObject {
+                put("step", step)
+                put("mode", snapshot.usageMode.name.lowercase())
+                put("source_message_count", messages.size)
+                put("projected_message_count", requestMessages.size)
+                put("estimated_tokens_before", workProjection.estimatedTokensBefore)
+                put("estimated_tokens_after", workProjection.estimatedTokensAfter)
+                put("omitted_messages", workProjection.omittedMessages)
+                put("strategy", "work_checkpoint_plus_recent_tail")
+            })
+        }
+        val logMessages = redactModelImages(requestMessages)
         val contextChars = logMessages.sumOf { it.toString().length }
         val toolNames = buildJsonArray {
             tools.forEach { element ->
@@ -116,7 +158,8 @@ internal class LocalModelRequestCoordinator(
             put("profile_id", frozenProfile.id)
             put("provider", frozenProfile.provider)
             put("auth_kind", frozenProfile.authKind.name)
-            put("protocol", frozenProfile.protocol.name)
+            put("protocol", resolvedProtocol.name)
+            put("route_fingerprint", routeFingerprint)
             frozenProfile.credentialRef?.takeLast(8)?.let { put("credential_ref_tail", it) }
             credentialDiagnostic.clientIdTail?.let { put("client_id_tail", it) }
             credentialDiagnostic.selectedAccountTail?.let { put("selected_account_tail", it) }
@@ -125,7 +168,10 @@ internal class LocalModelRequestCoordinator(
             credentialDiagnostic.planScopeGranted?.let { put("plan_scope_granted", it) }
             credentialDiagnostic.resourceInvokeGranted?.let { put("resource_invoke_granted", it) }
             put("step", step)
+            put("source_message_count", messages.size)
             put("message_count", logMessages.size)
+            put("history_projected", workProjection.projected)
+            put("estimated_input_tokens_before_projection", workProjection.estimatedTokensBefore)
             put("context_chars", contextChars)
             put("estimated_input_tokens", pressure.estimatedInputTokens)
             put("operational_input_limit_tokens", pressure.operationalLimitTokens)
@@ -155,12 +201,13 @@ internal class LocalModelRequestCoordinator(
             put("tool_names", toolNames)
         })
 
-        var failureContextLogged = false
+        var failureContextDiagnosticLogged = false
         var lastProviderError: LocalModelException? = null
         var attemptStartedNanos = System.nanoTime()
         val executor = AgentRequestExecutor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
+                (error as? LocalModelException)?.let { lastProviderError = it }
                 (error as? LocalModelException)?.retryable == true || error is java.io.IOException
             },
             backoffMillis = { failedAttempt, error ->
@@ -183,15 +230,24 @@ internal class LocalModelRequestCoordinator(
                         }
                         val durationMs = (System.nanoTime() - attemptStartedNanos) / 1_000_000
                         val providerError = lastProviderError
+                        val localPreflight = providerError?.code in setOf(
+                            "WORK_BUDGET_EXHAUSTED",
+                            "MODEL_CONTEXT_BUDGET_EXCEEDED",
+                            "MODEL_ROUTE_CIRCUIT_OPEN",
+                        )
                         AppLog.warn(
                             "LocalModelRequest",
                             buildString {
-                                append("模型请求失败 model=${snapshot.model} step=$step attempt=${event.attempt} ")
+                                append(if (localPreflight) "模型请求本地拒绝 " else "模型请求失败 ")
+                                append("model=${snapshot.model} step=$step attempt=${event.attempt} ")
                                 append("duration_ms=$durationMs session_id=${snapshot.sessionId} ")
                                 providerError?.code?.let { append("code=$it ") }
-                                providerError?.let { append("failure_kind=${modelFailureKind(it)} admission_state=${it.admissionState.name.lowercase()} ") }
+                                providerError?.let {
+                                    append("failure_kind=${modelFailureKind(it)} admission_state=${it.admissionState.name.lowercase()} ")
+                                }
+                                append("origin=${if (localPreflight) "local_preflight" else "provider_or_transport"} ")
                                 append("retryable=${event.retryable} profile_id=${frozenProfile.id} ")
-                                append("auth_kind=${frozenProfile.authKind.name} protocol=${frozenProfile.protocol.name} ")
+                                append("auth_kind=${frozenProfile.authKind.name} protocol=${resolvedProtocol.name} ")
                                 credentialDiagnostic.credentialRefTail?.let { append("credential_ref_tail=$it ") }
                                 credentialDiagnostic.clientIdTail?.let { append("client_id_tail=$it ") }
                                 credentialDiagnostic.selectedAccountTail?.let { append("selected_account_tail=$it ") }
@@ -203,22 +259,42 @@ internal class LocalModelRequestCoordinator(
                                 append("detail=${event.reason.take(800)}")
                             },
                         )
-                        if (!failureContextLogged) {
+                        if (!failureContextDiagnosticLogged) {
                             runCatching {
-                                log.append("request/context-full", buildJsonObject {
+                                log.append("request/context-diagnostic", buildJsonObject {
                                     put("step", step)
-                                    put("model", snapshot.model)
-                                    put("messages", JsonArray(logMessages))
-                                    put("tools", tools)
+                                    put("model", frozenProfile.model)
+                                    put("profile_id", frozenProfile.id)
+                                    put("provider", frozenProfile.provider)
+                                    put("auth_kind", frozenProfile.authKind.name)
+                                    put("protocol", resolvedProtocol.name)
+                                    put("route_fingerprint", routeFingerprint)
+                                    put("message_count", logMessages.size)
+                                    put("context_chars", contextChars)
+                                    put("estimated_input_tokens", pressure.estimatedInputTokens)
+                                    put("operational_input_limit_tokens", pressure.operationalLimitTokens)
+                                    put("tool_count", tools.size)
+                                    put("tool_names", toolNames)
                                 })
                             }
-                            failureContextLogged = true
+                            failureContextDiagnosticLogged = true
                         }
                         log.append("request/error", buildJsonObject {
                             put("duration_ms", durationMs)
                             put("session_id", snapshot.sessionId)
                             put("step", step)
                             put("attempt", event.attempt)
+                            put("origin", if (localPreflight) "local_preflight" else "provider_or_transport")
+                            providerError?.let { error ->
+                                put("code", error.code)
+                                put("failure_kind", modelFailureKind(error))
+                                put("admission_state", error.admissionState.name.lowercase())
+                                put("continuation_eligible", error.continuationEligible)
+                                error.status?.let { put("status", it) }
+                                error.requestId?.let { put("request_id", it) }
+                                error.providerCode?.let { put("provider_code", it) }
+                                error.providerParam?.let { put("provider_param", it) }
+                            }
                             put("retryable", event.retryable)
                             put("will_retry", event.willRetry)
                             put("detail", event.reason.take(2_000))
@@ -254,7 +330,7 @@ internal class LocalModelRequestCoordinator(
             },
         )
 
-        var activeMessages = messages
+        var activeMessages = requestMessages
         var overflowRound = 0
         while (true) {
             try {
@@ -304,6 +380,24 @@ internal class LocalModelRequestCoordinator(
                                             streamPreview.append(visible)
                                         },
                                     )
+                                } catch (cancelled: CancellationException) {
+                                    val admission =
+                                        (cancelled as? LocalModelCancellationException)?.admissionState
+                                    log.append("request/cancelled", buildJsonObject {
+                                        put("step", step)
+                                        admission?.let {
+                                            put("admission_state", it.name.lowercase())
+                                            put(
+                                                "budget_settlement",
+                                                if (it == com.labteto.dshmobile.local.model.LocalModelAdmissionState.NOT_SENT) {
+                                                    "released"
+                                                } else {
+                                                    "uncertain_exposure"
+                                                },
+                                            )
+                                        }
+                                    })
+                                    throw cancelled
                                 } catch (error: LocalModelException) {
                                     lastProviderError = error
                                     log.append("request/provider-error", buildJsonObject {
@@ -329,8 +423,28 @@ internal class LocalModelRequestCoordinator(
                                 if (reply.usage.reported) {
                                     pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
                                 }
+                                log.append("request/completed", buildJsonObject {
+                                    put("step", step)
+                                    put("request_id", reply.requestId)
+                                    put("reported", reply.usage.reported)
+                                    put("prompt_tokens", reply.usage.promptTokens)
+                                    put("cache_hit_tokens", reply.usage.cacheHitTokens)
+                                    put("cache_miss_tokens", reply.usage.cacheMissTokens)
+                                    put("completion_tokens", reply.usage.completionTokens)
+                                    put("reasoning_tokens", reply.usage.reasoningTokens)
+                                    put("total_tokens", reply.usage.totalTokens)
+                                    val route = reply.routeIdentity
+                                    route?.profileId?.let { put("profile_id", it) }
+                                    route?.provider?.takeIf(String::isNotBlank)?.let { put("provider", it) }
+                                    route?.authKind?.takeIf(String::isNotBlank)?.let { put("auth_kind", it) }
+                                    route?.protocol?.takeIf(String::isNotBlank)?.let { put("protocol", it) }
+                                    put("route_fingerprint", routeFingerprint)
+                                    route?.fingerprint?.takeIf(String::isNotBlank)?.let {
+                                        put("reply_route_fingerprint", it)
+                                    }
+                                })
                                 if (runtimeCapabilities.promptCacheDiagnostics && reply.requestId.isNotBlank()) {
-                                    promptCacheBaselines.put(snapshot.sessionId, frozenProfile.id, reply.requestId)
+                                    promptCacheBaselines.put(snapshot.sessionId, routeFingerprint, reply.requestId)
                                     reply.promptCacheDiagnostic?.let { diagnostic ->
                                         log.append("request/cache-diagnostic", buildJsonObject {
                                             put("step", step)

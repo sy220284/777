@@ -1314,7 +1314,7 @@ class SessionStore @Inject constructor(
 
     private fun apiOrNull(): DshApiClient? {
         val api = connectionManager.connectedApi
-        if (api == null) log("not connected — ignoring request")
+        if (api == null) AppLog.debug(TAG, "not connected — ignoring request")
         return api
     }
 

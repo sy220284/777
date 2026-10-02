@@ -1,7 +1,9 @@
 package com.labteto.dshmobile.observability
 
 import android.util.Log
+import com.labteto.dshmobile.BuildConfig
 import java.io.File
+import java.util.UUID
 import java.util.ArrayDeque
 import java.util.Base64
 import java.util.concurrent.ArrayBlockingQueue
@@ -15,6 +17,10 @@ data class AppLogEntry(
     val message: String,
     val throwableType: String? = null,
     val throwableMessage: String? = null,
+    val appVersion: String? = null,
+    val appVersionCode: Int? = null,
+    val processInstanceId: String? = null,
+    val processStartedAtMillis: Long? = null,
 )
 
 /**
@@ -47,6 +53,8 @@ object AppLog {
     private val persistenceLock = Any()
     private val entries = ArrayDeque<AppLogEntry>(MAX_ENTRIES)
     private val persistenceExecutor = createAppLogPersistenceExecutor()
+    private val processInstanceId = UUID.randomUUID().toString().substringBefore('-')
+    private val processStartedAtMillis = System.currentTimeMillis()
 
     @Volatile
     private var persistentFile: File? = null
@@ -57,26 +65,32 @@ object AppLog {
     }
 
     fun debug(tag: String, message: String) {
-        record("D", tag, message, null)
-        runCatching { Log.d(tag, message) }
+        val safeMessage = sanitizeDiagnosticText(message)
+        record("D", tag, safeMessage, null)
+        runCatching { Log.d(tag, safeMessage) }
     }
 
     fun info(tag: String, message: String) {
-        record("I", tag, message, null)
-        runCatching { Log.i(tag, message) }
+        val safeMessage = sanitizeDiagnosticText(message)
+        record("I", tag, safeMessage, null)
+        runCatching { Log.i(tag, safeMessage) }
     }
 
     fun warn(tag: String, message: String, throwable: Throwable? = null) {
-        record("W", tag, message, throwable)
+        val safeMessage = sanitizeDiagnosticText(message)
+        record("W", tag, safeMessage, throwable)
+        val safeThrowable = throwable?.let(::sanitizedThrowableForLogcat)
         runCatching {
-            if (throwable == null) Log.w(tag, message) else Log.w(tag, message, throwable)
+            if (safeThrowable == null) Log.w(tag, safeMessage) else Log.w(tag, safeMessage, safeThrowable)
         }
     }
 
     fun error(tag: String, message: String, throwable: Throwable? = null) {
-        record("E", tag, message, throwable)
+        val safeMessage = sanitizeDiagnosticText(message)
+        record("E", tag, safeMessage, throwable)
+        val safeThrowable = throwable?.let(::sanitizedThrowableForLogcat)
         runCatching {
-            if (throwable == null) Log.e(tag, message) else Log.e(tag, message, throwable)
+            if (safeThrowable == null) Log.e(tag, safeMessage) else Log.e(tag, safeMessage, safeThrowable)
         }
     }
 
@@ -94,6 +108,10 @@ object AppLog {
                     it.message,
                     it.throwableType.orEmpty(),
                     it.throwableMessage.orEmpty(),
+                    it.appVersion.orEmpty(),
+                    it.appVersionCode?.toString().orEmpty(),
+                    it.processInstanceId.orEmpty(),
+                    it.processStartedAtMillis?.toString().orEmpty(),
                 ).joinToString("\u0000")
             }
             .sortedBy(AppLogEntry::timestampMillis)
@@ -115,20 +133,19 @@ object AppLog {
             timestampMillis = System.currentTimeMillis(),
             level = level,
             tag = tag.take(64),
-            message = message.take(2_000),
+            message = sanitizeDiagnosticText(message).take(2_000),
             throwableType = throwable?.javaClass?.simpleName,
-            throwableMessage = throwable?.message?.take(1_000),
+            throwableMessage = throwable?.message?.let(::sanitizeDiagnosticText)?.take(1_000),
+            appVersion = BuildConfig.VERSION_NAME,
+            appVersionCode = BuildConfig.VERSION_CODE,
+            processInstanceId = processInstanceId,
+            processStartedAtMillis = processStartedAtMillis,
         )
         synchronized(lock) {
             while (entries.size >= MAX_ENTRIES) entries.removeFirst()
             entries.addLast(entry)
         }
-        persistAsync(
-            entry.copy(
-                message = sanitizeDiagnosticText(entry.message),
-                throwableMessage = entry.throwableMessage?.let(::sanitizeDiagnosticText),
-            ),
-        )
+        persistAsync(entry)
     }
 
     private fun persistAsync(entry: AppLogEntry) {
@@ -169,11 +186,15 @@ object AppLog {
         encode(entry.message),
         encode(entry.throwableType.orEmpty()),
         encode(entry.throwableMessage.orEmpty()),
+        encode(entry.appVersion.orEmpty()),
+        entry.appVersionCode?.toString().orEmpty(),
+        encode(entry.processInstanceId.orEmpty()),
+        entry.processStartedAtMillis?.toString().orEmpty(),
     ).joinToString("\t")
 
     private fun decodeEntry(line: String): AppLogEntry? {
         val parts = line.split('\t')
-        if (parts.size != 6) return null
+        if (parts.size != 6 && parts.size != 10) return null
         return runCatching {
             AppLogEntry(
                 timestampMillis = parts[0].toLong(),
@@ -182,6 +203,10 @@ object AppLog {
                 message = decode(parts[3]),
                 throwableType = decode(parts[4]).takeIf(String::isNotBlank),
                 throwableMessage = decode(parts[5]).takeIf(String::isNotBlank),
+                appVersion = parts.getOrNull(6)?.let(::decode)?.takeIf(String::isNotBlank),
+                appVersionCode = parts.getOrNull(7)?.toIntOrNull(),
+                processInstanceId = parts.getOrNull(8)?.let(::decode)?.takeIf(String::isNotBlank),
+                processStartedAtMillis = parts.getOrNull(9)?.toLongOrNull(),
             )
         }.getOrNull()
     }
@@ -191,6 +216,13 @@ object AppLog {
 
     private fun decode(value: String): String =
         String(Base64.getDecoder().decode(value), Charsets.UTF_8)
+}
+
+private fun sanitizedThrowableForLogcat(throwable: Throwable): Throwable {
+    val safeMessage = sanitizeDiagnosticText(throwable.message.orEmpty()).ifBlank { null }
+    return RuntimeException(safeMessage).also { sanitized ->
+        sanitized.stackTrace = throwable.stackTrace
+    }
 }
 
 internal fun sanitizeDiagnosticText(value: String): String {
