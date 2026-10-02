@@ -30,6 +30,7 @@ internal class LocalModelRequestCoordinator(
     private val defaultEventLog: () -> LocalSessionEventLog,
     private val streamingPreviewStore: LocalStreamingPreviewStore,
     private val persistOverflowCompaction: (LocalHarnessState, LocalHistorySummaryMode) -> Unit,
+    private val pressureStore: LocalRequestPressureStore = LocalRequestPressureStore(),
     private val maxStreamPreviewChars: Int = 4_096,
     private val streamPreviewIntervalMs: Long = 50L,
 ) {
@@ -48,6 +49,8 @@ internal class LocalModelRequestCoordinator(
         profile: LocalModelProfile? = null,
         previewGuard: () -> Boolean = { true },
         overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
+        executionBudget: LocalWorkExecutionBudget? = null,
+        routeCircuitBreaker: LocalModelRouteCircuitBreaker? = null,
     ): LocalModelReply {
         val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
         val frozenProfile = profile ?: modelGateway.profileForRoute(
@@ -56,6 +59,14 @@ internal class LocalModelRequestCoordinator(
             snapshot.baseUrl,
         )
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
+        val operationalLimit = operationalInputLimitTokens(frozenProfile.model, frozenProfile.baseUrl)
+        val pressure = LocalPromptPressureMeter.measure(
+            messages = messages,
+            tools = tools,
+            operationalLimitTokens = operationalLimit,
+            modelContextWindowTokens = documentedContextWindowTokens(frozenProfile.model, frozenProfile.baseUrl),
+        )
+        pressureStore.record(snapshot.sessionId, pressure)
         val previewOwner = if (publishPreviewEnabled) {
             streamingPreviewStore.newOwner(
                 sessionId = snapshot.sessionId,
@@ -93,6 +104,13 @@ internal class LocalModelRequestCoordinator(
             put("step", step)
             put("message_count", logMessages.size)
             put("context_chars", contextChars)
+            put("estimated_input_tokens", pressure.estimatedInputTokens)
+            put("operational_input_limit_tokens", pressure.operationalLimitTokens)
+            pressure.modelContextWindowTokens?.let { put("model_context_window_tokens", it) }
+            put("system_tokens_estimate", pressure.systemTokens)
+            put("history_tokens_estimate", pressure.historyTokens)
+            put("current_user_tokens_estimate", pressure.currentUserTokens)
+            put("tool_definition_tokens_estimate", pressure.toolDefinitionTokens)
             put("tool_count", tools.size)
             put("tool_names", toolNames)
             put("plan_mode", snapshot.planMode)
@@ -103,6 +121,8 @@ internal class LocalModelRequestCoordinator(
             put("model", snapshot.model)
             put("message_count", logMessages.size)
             put("context_chars", contextChars)
+            put("estimated_input_tokens", pressure.estimatedInputTokens)
+            put("operational_input_limit_tokens", pressure.operationalLimitTokens)
             put("tool_count", tools.size)
             put("tool_names", toolNames)
         })
@@ -225,7 +245,11 @@ internal class LocalModelRequestCoordinator(
                         val streamFilter = streamFilterPhrases
                             .takeIf { it.isNotEmpty() }
                             ?.let(::ChatStreamFilter)
-                        resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                        val routeKey = frozenProfile.id
+                        routeCircuitBreaker?.requireClosed(routeKey)
+                        val budgetLease = executionBudget?.reserve(pressure.estimatedInputTokens)
+                        try {
+                            resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
                             val reply = try {
                                 modelGateway.completeStreaming(
                                     baseUrl = snapshot.baseUrl,
@@ -264,6 +288,12 @@ internal class LocalModelRequestCoordinator(
                                 ?.let(streamPreview::append)
                             streamPreview.flush()
                             reply
+                            }
+                        } catch (error: LocalModelException) {
+                            routeCircuitBreaker?.observeFailure(routeKey, error)
+                            throw error
+                        } finally {
+                            budgetLease?.settle()
                         }
                     }
                 } finally {
