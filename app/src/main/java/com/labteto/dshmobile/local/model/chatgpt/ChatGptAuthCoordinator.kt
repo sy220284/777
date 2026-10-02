@@ -51,14 +51,15 @@ class ChatGptAuthCoordinator @Inject constructor(
     private suspend fun refreshLocked() {
         val stored = accounts.list()
         val selectedId = accounts.selectedId()?.takeIf { id -> stored.any { it.id == id } }
-            ?: stored.firstOrNull()?.id
         if (selectedId == null) {
-            _state.value = ChatGptUiState()
+            _state.value = ChatGptUiState(
+                phase = ChatGptAuthPhase.DISCONNECTED,
+                accounts = stored.map(::summary),
+            )
             return
         }
         val selected = stored.first { it.id == selectedId }
         if (!hasUsableCredentials(selected)) {
-            accounts.select(selectedId)
             _state.value = ChatGptUiState(
                 phase = ChatGptAuthPhase.DISCONNECTED,
                 accounts = stored.map(::summary),
@@ -67,7 +68,6 @@ class ChatGptAuthCoordinator @Inject constructor(
             return
         }
         try {
-            accounts.select(selectedId)
             val models = sessions.listModels(selectedId)
             _state.value = ChatGptUiState(
                 phase = ChatGptAuthPhase.CONNECTED,

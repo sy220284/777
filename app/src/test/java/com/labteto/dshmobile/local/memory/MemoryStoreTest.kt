@@ -409,6 +409,36 @@ class MemoryStoreTest {
         assertFalse(compacted.any { it.id == "forgotten" })
     }
 
+    @Test fun storageCompactionReservesCapacityForNearestRollbackPredecessor() {
+        fun record(
+            id: String,
+            active: Boolean,
+            supersededBy: String? = null,
+            importance: Int,
+        ) = MemoryRecord(
+            id = id,
+            scope = MemoryScope.GLOBAL,
+            kind = MemoryKind.FACT,
+            content = id,
+            active = active,
+            supersededBy = supersededBy,
+            importance = importance,
+            createdAt = importance.toLong(),
+            updatedAt = importance.toLong(),
+        )
+
+        val compacted = compactMemoryRecords(
+            records = listOf(
+                record("old", active = false, supersededBy = "current", importance = 1),
+                record("current", active = true, importance = 100),
+                record("other", active = true, importance = 90),
+            ),
+            maxRecords = 2,
+        )
+
+        assertEquals(setOf("old", "current"), compacted.map { it.id }.toSet())
+    }
+
     @Test fun storageCompactionPrioritizesPinnedAndImportantActiveRootsWhenOverCapacity() {
         fun active(id: String, pinned: Boolean, importance: Int, updatedAt: Long) = MemoryRecord(
             id = id,

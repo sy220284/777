@@ -493,6 +493,12 @@
     <string name="tools_server_name">服务名称</string>
     <string name="tools_endpoint">HTTP / HTTPS 地址</string>
     <string name="tools_endpoint_hint">连接后自动发现工具；外部工具仍按高风险能力进行权限检查。</string>
+    <string name="tools_stdio_title">本地 stdio 服务</string>
+    <string name="tools_stdio_command">启动命令</string>
+    <string name="tools_stdio_command_hint">每行填写一项：第一行为可执行命令，后续行为参数。</string>
+    <string name="tools_stdio_working_directory">工作目录（可选）</string>
+    <string name="tools_stdio_working_directory_hint">留空时使用默认工作目录。</string>
+    <string name="tools_stdio_connect">连接 stdio 服务</string>
     <string name="tools_processing">处理中…</string>
     <string name="tools_connect">连接服务</string>
     <string name="tools_remote_extensions">远程 Harness 扩展</string>

@@ -34,22 +34,33 @@ internal fun compactMemoryRecords(
         )
 
     val selected = linkedSetOf<String>()
-    activeRoots.take(maxRecords).forEach { selected += it.id }
-    if (selected.size >= maxRecords) {
-        return records.filter { it.id in selected }
+    val selectedRoots = mutableListOf<String>()
+    activeRoots.forEach { root ->
+        val nearestPredecessor = predecessors[root.id].orEmpty().firstOrNull()
+        val required = 1 + if (nearestPredecessor != null && nearestPredecessor.id !in selected) 1 else 0
+        if (selected.size + required > maxRecords) return@forEach
+        selected += root.id
+        selectedRoots += root.id
+        nearestPredecessor?.let { selected += it.id }
+    }
+    if (selected.isEmpty()) {
+        activeRoots.firstOrNull()?.let { selected += it.id }
     }
 
-    // Fill rollback history breadth-first: all active memories keep their nearest predecessor
-    // before one long supersession chain is allowed to consume the remaining capacity.
-    var frontier = activeRoots
-        .take(maxRecords)
-        .map(MemoryRecord::id)
+    // Fill deeper rollback history breadth-first. A retained active root that has a predecessor is
+    // admitted together with that nearest predecessor, so capacity pressure cannot leave a kept
+    // replacement without the state needed to roll it back.
+    var frontier = (selectedRoots + selected).distinct()
+    val traversed = mutableSetOf<String>()
     while (frontier.isNotEmpty() && selected.size < maxRecords) {
         val nextFrontier = mutableListOf<String>()
         frontier.forEach { successorId ->
+            if (!traversed.add(successorId)) return@forEach
             predecessors[successorId].orEmpty().forEach { predecessor ->
                 if (selected.size >= maxRecords) return@forEach
                 if (selected.add(predecessor.id)) {
+                    nextFrontier += predecessor.id
+                } else if (predecessor.id !in traversed) {
                     nextFrontier += predecessor.id
                 }
             }

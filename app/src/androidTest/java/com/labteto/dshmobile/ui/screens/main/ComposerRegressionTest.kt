@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.screens.main
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
@@ -23,7 +27,7 @@ class ComposerRegressionTest {
     private fun photo(data: String) = PendingAttachment.Image("image/png", data, null, 12, 2, 2)
 
     @Test fun sessionSwitchUsesNewComposerAndAllImagesInOneSend() {
-        val repository = ComposerRepository()
+        val repository = ComposerRepository(CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
         val first = repository.get(ComposerKey("host", "first"))
         val second = repository.get(ComposerKey("host", "second"))
         first.text = "first"; first.attachments.add(photo("first"))
@@ -157,7 +161,7 @@ class ComposerRegressionTest {
     }
 
     @Test fun rejectedSendRestoresOriginWithoutDroppingNewAttachments() {
-        val repository = ComposerRepository()
+        val repository = ComposerRepository(CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
         val original = repository.get(ComposerKey("host-a", "session"))
         val other = repository.get(ComposerKey("host-b", "session"))
         val submitted = listOf(photo("one"), photo("two"))
@@ -170,7 +174,10 @@ class ComposerRegressionTest {
     }
 
     @Test fun composerRepositoryEvictsLeastRecentlyUsedDrafts() {
-        val repository = ComposerRepository(maxCachedDrafts = 2)
+        val repository = ComposerRepository(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            maxCachedDrafts = 2,
+        )
         val first = repository.get(ComposerKey("host", "first"))
         val second = repository.get(ComposerKey("host", "second"))
         first.text = "keep"
