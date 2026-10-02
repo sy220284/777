@@ -21,15 +21,11 @@ class ChatPersonaGalleryStore internal constructor(
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
         this(File(context.filesDir, "local-harness/chat/persona-gallery.json"), json)
 
-    private val durableFile = RecoveringChatDocumentFile(file)
+    private val documentStore = PersonaGalleryDocumentStore(file, json)
     private val historyStore = PersonaGalleryHistoryStore(
         File(requireNotNull(file.parentFile), "persona-history"),
         json,
     )
-
-    private val backupFile = File(file.parentFile, "${file.name}.bak")
-    private var cachedDocument: GalleryDocument? = null
-    private var cachedStamp: DocumentStamp? = null
 
     @Synchronized
     fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
@@ -156,7 +152,7 @@ class ChatPersonaGalleryStore internal constructor(
                 )
             },
         )
-        write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return entry
     }
 
@@ -193,7 +189,7 @@ class ChatPersonaGalleryStore internal constructor(
                 updatedAt = now,
             )
         }
-        write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return entry
     }
 
@@ -244,7 +240,7 @@ class ChatPersonaGalleryStore internal constructor(
                     .copy(id = entryId, updatedAt = now),
                 updatedAt = now,
             )
-            write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+            documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
             return PersonaGallerySaveOutcome(entry = entry, storyId = null)
         }
 
@@ -274,7 +270,7 @@ class ChatPersonaGalleryStore internal constructor(
             stories = baseEntry.stories.filterNot { it.id == storyId } + savedStory,
             updatedAt = now,
         )
-        write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return PersonaGallerySaveOutcome(entry = entry, storyId = storyId)
     }
 
@@ -289,7 +285,7 @@ class ChatPersonaGalleryStore internal constructor(
                 .copy(id = current.id, updatedAt = now),
             updatedAt = now,
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) merged else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) merged else it }))
         return merged
     }
 
@@ -303,7 +299,7 @@ class ChatPersonaGalleryStore internal constructor(
             portraitPath = clean,
             updatedAt = now,
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated
     }
 
@@ -351,7 +347,7 @@ class ChatPersonaGalleryStore internal constructor(
             stories = current.stories.map { if (it.id == storyId) updatedStory else it },
             updatedAt = now,
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return removed
     }
 
@@ -365,7 +361,7 @@ class ChatPersonaGalleryStore internal constructor(
             groupChatState = chatState,
             updatedAt = maxOf(current.updatedAt, now),
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated
     }
 
@@ -379,7 +375,7 @@ class ChatPersonaGalleryStore internal constructor(
             groupChatState = mergedState,
             updatedAt = maxOf(current.updatedAt, now),
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated
     }
 
@@ -395,7 +391,7 @@ class ChatPersonaGalleryStore internal constructor(
             },
             updatedAt = now,
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return true
     }
 
@@ -413,7 +409,7 @@ class ChatPersonaGalleryStore internal constructor(
             },
             updatedAt = now,
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return true
     }
 
@@ -421,7 +417,7 @@ class ChatPersonaGalleryStore internal constructor(
     fun delete(id: String): Boolean {
         val doc = readNormalized()
         if (doc.entries.none { it.id == id }) return false
-        write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == id }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == id }))
         historyStore.deleteEntry(id)
         return true
     }
@@ -435,7 +431,7 @@ class ChatPersonaGalleryStore internal constructor(
             stories = current.stories.filterNot { it.id == storyId },
             updatedAt = System.currentTimeMillis(),
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         historyStore.deleteStory(id, storyId)
         return true
     }
@@ -466,7 +462,7 @@ class ChatPersonaGalleryStore internal constructor(
             stories = current.stories.map { if (it.id == storyId) updatedStory else it },
             updatedAt = updatedStory.updatedAt,
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return true
     }
 
@@ -548,7 +544,7 @@ class ChatPersonaGalleryStore internal constructor(
             .toList()
 
     private fun readNormalized(): GalleryDocument {
-        val raw = read()
+        val raw = documentStore.read()
         val migratedEntries = if (raw.version < 4) {
             compactLegacyDuplicateGalleryEntries(raw.entries)
         } else {
@@ -574,58 +570,8 @@ class ChatPersonaGalleryStore internal constructor(
             )
         }
         val normalized = raw.copy(version = 4, entries = entries)
-        if (normalized != raw) write(normalized)
+        if (normalized != raw) documentStore.write(normalized)
         return normalized
     }
 
-    private fun read(): GalleryDocument {
-        val stamp = documentStamp()
-        cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
-        val document = durableFile.read(
-            defaultValue = ::GalleryDocument,
-            decode = { encoded -> json.decodeFromString(GalleryDocument.serializer(), encoded) },
-        )
-        cachedDocument = document
-        cachedStamp = documentStamp()
-        return document
-    }
-
-    private fun write(doc: GalleryDocument) {
-        val hotDocument = doc.copy(
-            entries = doc.entries.map { entry ->
-                entry.copy(
-                    stories = entry.stories.map { story ->
-                        story.copy(
-                            history = story.history
-                                .filter { it.role == "user" || it.role == "assistant" }
-                                .takeLast(PersonaGalleryHistoryStore.HOT_GALLERY_HISTORY_MESSAGES),
-                            historyTotalCount = maxOf(story.historyTotalCount, story.history.size),
-                        )
-                    },
-                )
-            },
-        )
-        val encoded = json.encodeToString(GalleryDocument.serializer(), hotDocument)
-        durableFile.write(encoded) { candidate ->
-            runCatching {
-                json.decodeFromString(GalleryDocument.serializer(), candidate)
-            }.isSuccess
-        }
-        cachedDocument = hotDocument
-        cachedStamp = documentStamp()
-    }
-
-    private fun documentStamp(): DocumentStamp = DocumentStamp(
-        primaryModified = file.takeIf(File::isFile)?.lastModified() ?: -1L,
-        primaryLength = file.takeIf(File::isFile)?.length() ?: -1L,
-        backupModified = backupFile.takeIf(File::isFile)?.lastModified() ?: -1L,
-        backupLength = backupFile.takeIf(File::isFile)?.length() ?: -1L,
-    )
-
-    private data class DocumentStamp(
-        val primaryModified: Long,
-        val primaryLength: Long,
-        val backupModified: Long,
-        val backupLength: Long,
-    )
 }
