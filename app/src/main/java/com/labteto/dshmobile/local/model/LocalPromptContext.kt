@@ -93,25 +93,6 @@ internal fun withTailEphemeralContext(
     return result
 }
 
-internal fun chatGuardRewriteMessages(
-    messages: List<JsonObject>,
-    repairPrompt: String,
-): List<JsonObject> {
-    if (messages.isEmpty()) return withTailEphemeralContext(emptyList(), repairPrompt)
-    val selected = mutableListOf<JsonObject>()
-    selected += messages.first()
-    if (
-        messages.size > 1 &&
-        messages[1]["role"]?.jsonPrimitive?.contentOrNull == "system"
-    ) {
-        selected += messages[1]
-    }
-    messages.takeLast(CHAT_GUARD_REWRITE_TAIL_MESSAGES).forEach { message ->
-        if (message !in selected) selected += message
-    }
-    return withTailEphemeralContext(selected, repairPrompt)
-}
-
 internal fun withEphemeralContext(
     history: List<JsonObject>,
     context: String,

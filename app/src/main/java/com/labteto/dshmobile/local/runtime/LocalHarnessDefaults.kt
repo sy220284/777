@@ -25,7 +25,6 @@ internal const val MAX_EVENT_CHARS = 65_536
 internal const val MAX_ATTACHMENT_BYTES = 20L * 1024L * 1024L
 internal const val MAX_HANDOFF_CHARS = 3_500
 internal const val MAX_EPHEMERAL_CONTEXT_CHARS = 10_000
-internal const val CHAT_GUARD_REWRITE_TAIL_MESSAGES = 5
 internal const val CHAT_RECENT_HISTORY_MESSAGES = 20
 internal const val CHAT_ROLEPLAY_TEMPERATURE = 0.85
 internal const val CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS = 3_000

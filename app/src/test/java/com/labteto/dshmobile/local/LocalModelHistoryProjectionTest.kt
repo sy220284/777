@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -222,6 +223,7 @@ class LocalModelHistoryProjectionTest {
     @Test
     fun duplicateToolResultIsNotReapplied() {
         val checkpoint = listOf(
+            assistantCall("call-1"),
             buildJsonObject {
                 put("role", "tool")
                 put("tool_call_id", "call-1")
@@ -238,8 +240,75 @@ class LocalModelHistoryProjectionTest {
 
         val restored = restoreLocalModelHistory(events, emptyList(), codec)
 
-        assertEquals(1, restored.messages.size)
+        assertEquals(2, restored.messages.size)
         assertFalse(restored.replayedTail)
+    }
+
+    @Test
+    fun incompleteCheckpointToolBatchIsDiscarded() {
+        val checkpoint = listOf(
+            buildJsonObject {
+                put("role", "assistant")
+                put("tool_calls", JsonArray(listOf(
+                    assistantCall("call-a")["tool_calls"]!!.jsonArray.first(),
+                    assistantCall("call-b")["tool_calls"]!!.jsonArray.first(),
+                )))
+            },
+            buildJsonObject {
+                put("role", "tool")
+                put("tool_call_id", "call-a")
+                put("content", "只完成一半")
+            },
+        )
+
+        val restored = restoreLocalModelHistory(
+            listOf(event(0L, ModelHistoryCheckpointCodec.EVENT_TYPE, codec.encode(checkpoint, "incomplete"))),
+            emptyList(),
+            codec,
+        )
+
+        assertTrue(restored.messages.isEmpty())
+        assertTrue(restored.checkpointRecommended)
+    }
+
+    @Test
+    fun malformedCheckpointToolCallsTypeIsDiscarded() {
+        val malformed = buildJsonObject {
+            put("role", "assistant")
+            put("tool_calls", "broken")
+        }
+
+        val restored = restoreLocalModelHistory(
+            listOf(event(0L, ModelHistoryCheckpointCodec.EVENT_TYPE, codec.encode(listOf(malformed), "malformed-type"))),
+            emptyList(),
+            codec,
+        )
+
+        assertTrue(restored.messages.isEmpty())
+        assertTrue(restored.checkpointRecommended)
+    }
+
+    @Test
+    fun malformedCheckpointToolCallWithoutIdIsDiscarded() {
+        val malformed = buildJsonObject {
+            put("role", "assistant")
+            put("tool_calls", JsonArray(listOf(buildJsonObject {
+                put("type", "function")
+                put("function", buildJsonObject {
+                    put("name", "read")
+                    put("arguments", "{}")
+                })
+            })))
+        }
+
+        val restored = restoreLocalModelHistory(
+            listOf(event(0L, ModelHistoryCheckpointCodec.EVENT_TYPE, codec.encode(listOf(malformed), "malformed"))),
+            emptyList(),
+            codec,
+        )
+
+        assertTrue(restored.messages.isEmpty())
+        assertTrue(restored.checkpointRecommended)
     }
 
     private fun message(role: String, content: String): JsonObject = buildJsonObject {

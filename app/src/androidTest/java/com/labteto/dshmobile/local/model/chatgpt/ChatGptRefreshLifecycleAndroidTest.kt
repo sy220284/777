@@ -28,6 +28,7 @@ import okio.Timeout
 import okio.buffer
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -54,11 +55,24 @@ class ChatGptRefreshLifecycleAndroidTest {
                     assertNull(accounts.get(original.id))
                     assertTrue(accounts.list().isEmpty())
                 } else {
-                    assertEquals("", accounts.get(original.id)!!.refreshToken)
-                    assertEquals("", accounts.get(original.id)!!.accessToken)
+                    val disconnected = accounts.get(original.id)!!
+                    assertEquals("", disconnected.refreshToken)
+                    assertEquals("", disconnected.accessToken)
+                    assertNull(disconnected.email)
+                    assertNull(disconnected.displayName)
                 }
             } finally { release.countDown(); refresh.cancelAndJoin() }
         }
+    }
+
+    @Test
+    fun accountStringNeverContainsRawCredentials() {
+        val account = record()
+        val rendered = account.toString()
+        assertFalse(rendered.contains(account.idToken))
+        assertFalse(rendered.contains(account.accessToken))
+        assertFalse(rendered.contains(account.refreshToken))
+        assertTrue(rendered.contains("credentials=<redacted>"))
     }
 
     @Test
@@ -146,7 +160,8 @@ class ChatGptRefreshLifecycleAndroidTest {
 
     private fun record() = ChatGptAccountRecord(
         id = "test-account", clientId = "client", issuer = CHATGPT_ISSUER, subject = "subject",
-        hostId = "host", idToken = "id", accessToken = "expired", refreshToken = "refresh",
+        email = "user@example.com", displayName = "测试用户",
+        hostId = "host", idToken = "id-token-secret", accessToken = "access-token-secret", refreshToken = "refresh-token-secret",
         scopes = setOf(CHATGPT_PLAN_SCOPE), accessTokenExpiresAtEpochSeconds = 0, savedAtEpochSeconds = 1,
     )
 

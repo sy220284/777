@@ -87,6 +87,7 @@ import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.withoutLastCompletedAssistantReply
 import com.labteto.dshmobile.local.model.withModelToolCallEventData
 import com.labteto.dshmobile.local.model.LocalModelAccountStateCoordinator
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
@@ -952,38 +953,6 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    /** Create a brand-new character for the current empty chat. */
-    internal fun createChatPersona(profile: PersonaProfile) {
-        val snapshot = _state.value
-        if (
-            snapshot.running ||
-            snapshot.loading ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.groupChat.enabled ||
-            snapshot.transcriptIndex.hasDialogue
-        ) return
-
-        scope.launch {
-            val saved = chatPersonaStore.upsert(
-                profile.copy(id = "persona-${UUID.randomUUID()}"),
-            )
-            _state.update { state ->
-                if (state.sessionId != snapshot.sessionId) state else state.copy(
-                    personaId = saved.id,
-                    galleryId = null,
-                    galleryStoryId = null,
-                    gallerySaveSuppressedThrough = 0L,
-                    chatPersona = saved,
-                    chatState = ChatCharacterState(behaviorTuning = saved.behaviorTuning),
-                    replySuggestions = emptyList(),
-                    chatBranches = LocalChatBranchState(),
-                    handoffSummary = null,
-                )
-            }
-            if (_state.value.sessionId == snapshot.sessionId) persist()
-        }
-    }
-
     internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) {
         val snapshot = _state.value
         if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return
@@ -1563,7 +1532,7 @@ class LocalHarnessEngine @Inject constructor(
             val snapshot = _state.value
             val key = modelRequestMarker()
             val messages = withEphemeralContext(
-                modelHistory.dropLast(1),
+                modelHistory.snapshot().withoutLastCompletedAssistantReply(),
                 "基于本轮已有结果重写最终回复；不要调用工具或声称重新执行。",
             )
             val reply = completeWithRetry(
@@ -1582,7 +1551,7 @@ class LocalHarnessEngine @Inject constructor(
             val event = eventLog.append("assistant/message", JsonObject(
                 data + ("replaces" to JsonPrimitive(messageId)),
             ))
-            modelHistory.reset(modelHistory.dropLast(1))
+            modelHistory.reset(modelHistory.snapshot().withoutLastCompletedAssistantReply())
             modelHistory.append(reply.message)
             updateContextMetrics()
             _state.update {
@@ -2668,7 +2637,7 @@ class LocalHarnessEngine @Inject constructor(
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = withChatTurnContext(
                     history = boundedChatRequestHistory(
-                        if (replacingMessageId == null) modelHistory.snapshot() else modelHistory.dropLast(1),
+                        if (replacingMessageId == null) modelHistory.snapshot() else modelHistory.snapshot().withoutLastCompletedAssistantReply(),
                         recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
                         currentFacts = snapshot.chatContext
                             .canonicalFactLines(),
@@ -2740,7 +2709,7 @@ class LocalHarnessEngine @Inject constructor(
                 ),
             )
             if (replacingMessageId != null) {
-                modelHistory.reset(modelHistory.dropLast(1))
+                modelHistory.reset(modelHistory.snapshot().withoutLastCompletedAssistantReply())
                 _state.update { state ->
                     val retained = state.messages.filterNot { it.id == replacingMessageId }
                     state.copy(
