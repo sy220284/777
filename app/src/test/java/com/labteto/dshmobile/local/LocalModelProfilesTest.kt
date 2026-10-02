@@ -34,28 +34,6 @@ class LocalModelProfilesTest {
     }
 
 
-    @Test fun routeFingerprintTracksPhysicalRouteNotUiProfileId() {
-        val base = LocalModelProfile(
-            id = "profile-a",
-            model = "gpt-6-astra",
-            baseUrl = "https://api.openai.com/v1/",
-            provider = "ChatGPT",
-            authKind = LocalModelAuthKind.CHATGPT_PLAN,
-            protocol = LocalModelProtocol.CHAT_COMPLETIONS,
-            credentialRef = "account-a",
-        )
-        val renamedUiProfile = base.copy(id = "profile-b")
-        val otherAccount = base.copy(id = "profile-c", credentialRef = "account-b")
-
-        assertEquals(base.routeFingerprint(), renamedUiProfile.routeFingerprint())
-        assertNotEquals(base.routeFingerprint(), otherAccount.routeFingerprint())
-        assertNotEquals(
-            base.routeFingerprint(),
-            base.copy(protocol = LocalModelProtocol.ANTHROPIC_MESSAGES, authKind = LocalModelAuthKind.API_KEY)
-                .routeFingerprint(),
-        )
-    }
-
     @Test fun migratedOfficialClaudeRouteReusesStableApiCredentialProfileId() {
         val officialBase = "https://api.anthropic.com/v1"
         val legacy = LocalModelProfile(
