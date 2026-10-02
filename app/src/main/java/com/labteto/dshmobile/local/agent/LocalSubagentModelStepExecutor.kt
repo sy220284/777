@@ -87,6 +87,7 @@ internal class LocalSubagentModelStepExecutor(
         var activeHistory = history
         var overflowRound = 0
         var structureRecoveryAttempted = false
+        var continuationRound = 0
         while (true) {
             try {
                 return executor.execute {
@@ -95,6 +96,22 @@ internal class LocalSubagentModelStepExecutor(
                     )
                 }
             } catch (error: Throwable) {
+                val modelError = error as? LocalModelException
+                val continuation = modelError?.let {
+                    subagentContinuationMessage(it, continuationRound)
+                }
+                if (continuation != null) {
+                    continuationRound += 1
+                    activeHistory = activeHistory + continuation
+                    durableHistory?.append(continuation)
+                    eventLog().append("subagent/continuation-queued", buildJsonObject {
+                        put("agent_id", subagentId)
+                        put("step", step)
+                        put("continuation_index", continuationRound)
+                        put("reason", modelError.code)
+                    })
+                    continue
+                }
                 if (!structureRecoveryAttempted) {
                     LocalSubagentStructureRecovery.recover(
                         error, activeHistory, subagentId, step, eventLog(),
