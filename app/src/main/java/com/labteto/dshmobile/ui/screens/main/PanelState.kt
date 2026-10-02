@@ -14,6 +14,8 @@ internal class PreviewTab(val path: String) {
     var error by mutableStateOf<String?>(null)
 }
 
+private const val MAX_PREVIEW_TABS = 12
+
 internal class PanelState(val key: ComposerKey) {
     val directoryScroll = mutableMapOf<String, androidx.compose.foundation.lazy.LazyListState>()
     var section by mutableIntStateOf(0)
@@ -30,8 +32,8 @@ internal class PanelState(val key: ComposerKey) {
     fun open(path: String) {
         val index = previews.indexOfFirst { it.path == path }
         if (index >= 0) selectedPreview = index else {
-            // Bound decoded documents retained by this panel; the selected document can be reloaded.
             previews.forEach { it.bytes = null }
+            if (previews.size >= MAX_PREVIEW_TABS) previews.removeAt(0)
             previews.add(PreviewTab(path)); selectedPreview = previews.lastIndex
         }
         section = 1
