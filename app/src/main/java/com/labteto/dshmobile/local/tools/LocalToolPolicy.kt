@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolMetadata
 
 internal enum class LocalAutoApprovalScope {
     NONE,
@@ -98,6 +99,42 @@ internal object LocalToolPolicy {
         "session_event_search", "session_search", "memory_search", "memory_list",
         "session_trace", "session_event_trace", "session_event_read" -> ToolAccess.READ_ONLY
         else -> error("内置工具尚未声明权限：$name")
+    }
+
+    fun metadata(name: String): ToolMetadata {
+        val canonical = canonical(name)
+        val family = when (canonical) {
+            "read", "tool_output_read", "file_inspect", "list_files", "glob", "grep", "write", "edit",
+            "apply_patch", "download_file", "json_query", "present" -> "文件"
+            "bash", "job_list", "job_output", "job_kill" -> "运行时"
+            "web_search", "web_fetch", "http_request", "network_diagnose" -> "网络"
+            "environment_info", "capability_search" -> "环境"
+            "update_plan", "exit_plan_mode", "todo_write", "create_goal", "get_goal", "update_goal",
+            "ask_user_question" -> "任务"
+            "skill" -> "技能"
+            "subagent", "subagent_fork", "workflow", "list_subagent_models", "list_agents",
+            "send_message", "interrupt_agent" -> "智能体"
+            "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" -> "记忆"
+            "session_event_search", "session_search", "session_trace", "session_event_trace",
+            "session_event_read" -> "会话"
+            else -> error("内置工具尚未声明能力族：$name")
+        }
+        val usageNotes = when (canonical) {
+            "read" -> listOf("模型可见输出受上下文预算限制；发生省略时按返回的 call_id 使用 tool_output_read 分段恢复完整结果")
+            "subagent", "subagent_fork" -> listOf(
+                "会独立发起模型请求并消耗所选路由对应的 API 或 ChatGPT 套餐额度；并行子代理会分别产生模型消费",
+            )
+            "workflow" -> listOf(
+                "每个子任务可能独立发起模型请求并消耗所选 Worker 路由对应额度；并行模式会并行产生模型消费",
+            )
+            "environment_info" -> listOf("持久模型历史与最近成功请求的实际输入 Token 分开报告")
+            else -> emptyList()
+        }
+        return ToolMetadata(
+            family = family,
+            discoveryKeywords = emptySet(),
+            usageNotes = usageNotes,
+        )
     }
 
     /**
