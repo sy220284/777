@@ -43,16 +43,7 @@ internal class LocalSubagentHistoryPolicy(
         subagentId: String,
         budget: LocalHistoryBudget?,
     ) {
-        val projection = budget?.let { projectStaleToolResults(history, it) }
-        if (projection != null) {
-            history.clear()
-            history += projection.messages
-            eventLog().append("subagent/tool-history-projection", buildJsonObject {
-                put("agent_id", subagentId)
-                put("estimated_tokens_before", projection.estimatedTokensBefore)
-                put("estimated_tokens_after", projection.estimatedTokensAfter)
-            })
-        }
+        projectStaleSubagentToolResults(history, budget, subagentId, eventLog())
         val compaction = historyCompactor.compact(history, budget) ?: return
         history.clear()
         history += compaction.messages
@@ -65,10 +56,8 @@ internal class LocalSubagentHistoryPolicy(
         })
     }
 
-    fun rememberProgress(progress: ArrayDeque<String>, item: String) {
-        progress.addLast(item)
-        while (progress.size > MAX_PROGRESS_ITEMS) progress.removeFirst()
-    }
+    fun rememberProgress(progress: ArrayDeque<String>, item: String) =
+        progress.addLast(item).also { while (progress.size > MAX_PROGRESS_ITEMS) progress.removeFirst() }
 
     private companion object {
         const val MAX_PROGRESS_ITEMS = 6
