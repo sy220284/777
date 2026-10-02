@@ -146,6 +146,27 @@ class LocalToolRouterTest {
         assertTrue(summary.contains("GitHub：已启用 1/1"))
     }
 
+    @Test
+    fun capabilitySummaryBoundsRepeatedFamilyRequirements() {
+        val tools = (0 until 8).map { index ->
+            tool(
+                "remote_$index",
+                "远端工具 $index",
+                ToolExposure.OPTIONAL,
+                "MCP",
+                setOf("mcp"),
+                listOf("连接条件-$index"),
+            )
+        }
+
+        val summary = LocalToolRouter.capabilitySummary(tools, emptySet())
+
+        assertTrue(summary.contains("连接条件-0"))
+        assertTrue(summary.contains("连接条件-3"))
+        assertTrue(summary.contains("另有 4 项"))
+        assertTrue(!summary.contains("连接条件-7"))
+    }
+
     private fun tool(
         name: String,
         description: String,
