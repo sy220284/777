@@ -25,7 +25,7 @@ class ChatGptModelProfilesTest {
         assertTrue(profiles.all { it.authKind == LocalModelAuthKind.CHATGPT_PLAN })
         assertTrue(profiles.all { it.protocol == LocalModelProtocol.RESPONSES })
         assertTrue(profiles.all { it.credentialRef == "account-a" })
-        assertTrue(profiles.all { it.baseUrl == CHATGPT_PLAN_MODEL_BASE_URL })
+        assertTrue(profiles.all { it.baseUrl == CHATGPT_RESOURCE })
     }
 
     @Test
