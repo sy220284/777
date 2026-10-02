@@ -66,6 +66,27 @@ class LocalToolRouterTest {
     }
 
     @Test
+    fun optionalToolActivationPreservesStableCoreAndOnlyAppends() {
+        val tools = listOf(
+            tool("z_core", "核心二", ToolExposure.CORE, "文件"),
+            tool("a_core", "核心一", ToolExposure.CORE, "文件"),
+            tool("repo_status", "仓库状态", ToolExposure.OPTIONAL, "GitHub", setOf("仓库")),
+            tool("external_extra", "外部扩展", ToolExposure.OPTIONAL, "MCP", setOf("外部工具")),
+            tool("internal_only", "内部工具", ToolExposure.INTERNAL, "内部"),
+        )
+        val enabled = linkedSetOf("repo_status")
+        val first = names(LocalToolRouter.visibleSchemas(tools, enabled))
+
+        enabled += "external_extra"
+        val second = names(LocalToolRouter.visibleSchemas(tools.reversed(), enabled))
+
+        assertEquals(listOf("a_core", "z_core", "repo_status"), first)
+        assertEquals(first, second.take(first.size))
+        assertEquals("external_extra", second.last())
+        assertTrue("internal_only" !in second)
+    }
+
+    @Test
     fun capabilitySearchHardCapsLargeOptionalCatalogDeterministically() {
         val tools = (0 until 1_000).map { index ->
             tool(
