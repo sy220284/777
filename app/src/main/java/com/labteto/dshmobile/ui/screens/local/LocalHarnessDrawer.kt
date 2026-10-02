@@ -112,6 +112,7 @@ internal fun LocalModeDrawer(
     groupMemberCount: Int,
     onOpenGroupChat: () -> Unit,
     onOpenPersonaGallery: () -> Unit,
+    onOpenDiary: () -> Unit,
     onTasks: () -> Unit,
     onTools: () -> Unit,
     onSettings: () -> Unit,
@@ -243,6 +244,11 @@ internal fun LocalModeDrawer(
                                 title = stringResource(R.string.persona_gallery_title),
                                 trailing = galleryCount.toString(),
                                 onClick = onOpenPersonaGallery,
+                            )
+                            DrawerPrimaryAction(
+                                icon = FeatherIcons.FileText,
+                                title = stringResource(R.string.chat_diary_title),
+                                onClick = onOpenDiary,
                             )
                             DrawerPrimaryAction(
                                 icon = Icons.Outlined.Schedule,
