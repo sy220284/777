@@ -3934,7 +3934,7 @@ class LocalHarnessEngine @Inject constructor(
                 query = args.optionalString("query").orEmpty(),
             )
             "network_diagnose" -> web.diagnose(args.string("url"))
-            "environment_info" -> environmentInfo()
+            "environment_info" -> environmentInfo(binding)
             "capability_search" -> if (binding == null) {
                 searchCapabilities(args.string("query"))
             } else {
@@ -4763,9 +4763,17 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun environmentInfo(): String {
+    private fun environmentInfo(binding: LocalWorkRunBinding? = null): String {
+        val targetSessionId = binding?.sessionId ?: currentSessionId
         val latestRequest = usageTracker.analyticsSnapshot().recentRecords
-            .firstOrNull { record -> record.reported && record.inputTokens > 0L }
+            .firstOrNull { record ->
+                record.reported &&
+                    record.inputTokens > 0L &&
+                    record.context.sessionId == targetSessionId
+            }
+        val enabledOptional = binding?.enabledOptionalTools?.let { tools ->
+            synchronized(tools) { tools.toSet() }
+        } ?: toolExecutionCoordinator.enabledOptionalSnapshot()
         val commands = listOf(
             "sh", "ls", "cat", "cp", "mv", "rm", "mkdir", "sed", "grep", "find",
             "git", "curl", "wget", "python3", "python", "node",
@@ -4776,7 +4784,7 @@ class LocalHarnessEngine @Inject constructor(
             contextChars = modelHistory.encodedChars,
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
             latestRequest = latestRequest,
-            capabilitySummary = toolExecutionCoordinator.capabilitySummary(),
+            capabilitySummary = toolExecutionCoordinator.capabilitySummary(enabledOptional),
             pendingInputs = pendingInputs.size(),
             pendingInputLimit = MAX_PENDING_INPUTS,
             commands = commands,
