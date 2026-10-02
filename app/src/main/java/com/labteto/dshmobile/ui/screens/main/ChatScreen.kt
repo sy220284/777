@@ -96,7 +96,6 @@ fun ChatScreen(
     val resources = LocalResources.current
     val toast = rememberDsToast()
 
-    val conversation by store.currentConversation.collectAsStateWithLifecycle()
     val currentSessionId by store.currentSessionId.collectAsStateWithLifecycle()
     val sessions by store.sessions.collectAsStateWithLifecycle()
     val models by store.models.collectAsStateWithLifecycle()
@@ -109,15 +108,11 @@ fun ChatScreen(
     val subagentConversation by store.subagentConversation.collectAsStateWithLifecycle()
     val subagentMode by store.subagentMode.collectAsStateWithLifecycle()
     val connectionError by store.connectionError.collectAsStateWithLifecycle()
-    val loadingOlder by store.loadingOlder.collectAsStateWithLifecycle()
-    val loadOlderFailed by store.loadOlderFailed.collectAsStateWithLifecycle()
     val pendingApproval by store.pendingApproval.collectAsStateWithLifecycle()
     val pendingQuestions by store.pendingQuestions.collectAsStateWithLifecycle()
     val permissions by store.permissions.collectAsStateWithLifecycle()
     val pendingPermission by store.pendingPermission.collectAsStateWithLifecycle()
     val agentPresets by store.agentPresets.collectAsStateWithLifecycle()
-    val sessionStats by store.sessionStats.collectAsStateWithLifecycle()
-    val tokenUsage by store.tokenUsage.collectAsStateWithLifecycle()
     val contextBreakdown by store.contextBreakdown.collectAsStateWithLifecycle()
     val contextPressure by store.contextPressure.collectAsStateWithLifecycle()
     val imageLimits by store.imageLimits.collectAsStateWithLifecycle()
@@ -141,12 +136,6 @@ fun ChatScreen(
     var panelMode by remember { mutableStateOf(WorkspacePanelMode.WORKSPACE) }
     var feedback by remember { mutableStateOf<Triple<ComposerKey, String, Boolean>?>(null) }
     var sheet by remember { mutableStateOf<ChatSheet?>(null) }
-
-    // Hoisted above the tab swap so each view keeps its own scroll position across switches.
-    val chatListState = rememberLazyListState()
-    val (scrollHint, scrollConnection) = rememberConversationScrollHint(chatListState, reverseLayout = true)
-    val trajectoryListState = rememberLazyListState()
-    LaunchedEffect(currentSessionId, tab) { scrollHint.hide() }
 
     val commandFailed = stringResource(R.string.err_command_failed)
     val unknownCommand = stringResource(R.string.err_command_unknown)
@@ -391,7 +380,7 @@ fun ChatScreen(
         Column(modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
             ChatTopBar(
                 title = title,
-                running = conversation?.running == true,
+                running = currentSession?.running == true,
                 models = models,
                 modelsLoading = modelsLoading,
                 detailsOpen = detailsOpen,
@@ -409,120 +398,24 @@ fun ChatScreen(
             connectionError?.let {
                 androidx.compose.material3.TextButton(onClick = { store.retryConnection() }) { ConnectionBanner(it) }
             }
-            if (conversation?.gap == true) {
-                ConnectionBanner(stringResource(R.string.common_reconnecting))
-            }
-
-            val contextNodes = conversation?.nodes.orEmpty()
-            val eventTimes = remember(conversation?.journal) {
-                conversation?.journal?.associate { it.seq to it.time }.orEmpty()
-            }
-            val nodeContext = remember(
-                contextNodes,
-                eventTimes,
-                conversation?.running,
-                currentSession?.cwd,
-                currentSessionId,
-                composer.key,
-            ) {
-                ChatNodeContext(
-                    nodes = contextNodes,
-                    eventTimes = eventTimes,
-                    running = conversation?.running == true,
-                    cwd = currentSession?.cwd,
-                    onOpenSubagent = { childId ->
-                        scope.launch { store.openSubagentTranscript(childId) }
-                        sheet = ChatSheet.Subagents
-                    },
-                    onBranchFrom = { seq ->
-                        scope.launch { currentSessionId?.let { store.forkSession(it, seq) } }
-                    },
-                    onFeedback = { seq, positive ->
-                        contextNodes
-                            .filterIsInstance<com.labteto.dshmobile.core.session.AssistantMessageNode>()
-                            .firstOrNull { it.seq == seq }
-                            ?.messageId
-                            ?.let { feedback = Triple(composer.key, it, positive) }
-                    },
-                    onCopied = { toast.second(resources.getString(R.string.chat_copy_success)) },
-                )
-            }
-
-            Box(
-                Modifier.weight(1f).fillMaxWidth().then(
-                    if (tab == ChatTab.Chat) Modifier.nestedScroll(scrollConnection) else Modifier,
-                ),
-            ) {
-                AnimatedContent(
-                    targetState = tab,
-                    transitionSpec = {
-                        val forward = targetState.ordinal > initialState.ordinal
-                        (
-                            slideInHorizontally { width -> if (forward) width / 6 else -width / 6 } +
-                                fadeIn(DsAnimations.fade)
-                            )
-                            .togetherWith(fadeOut(DsAnimations.fade)) using SizeTransform(clip = false)
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                    label = "chatTab",
-                ) { current ->
-                    when (current) {
-                        ChatTab.Chat -> ChatTranscript(
-                            conversation = conversation,
-                            loading = conversation == null && currentSessionId != null,
-                            loadingOlder = loadingOlder,
-                            loadOlderFailed = loadOlderFailed,
-                            context = nodeContext,
-                            listState = chatListState,
-                            onLoadOlder = { scope.launch { store.loadOlder() } },
-                        )
-                        ChatTab.Trajectory -> TrajectoryTab(
-                            conversation = conversation,
-                            stats = sessionStats,
-                            usage = tokenUsage,
-                            cwd = currentSession?.cwd,
-                            listState = trajectoryListState,
-                        )
-                    }
-                }
-                if (tab == ChatTab.Chat) {
-                    ConversationScrollShortcut(
-                        target = scrollHint.target,
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 8.dp),
-                        onClick = { target ->
-                            scrollHint.hide()
-                            scope.launch {
-                                chatListState.animateScrollToItem(
-                                    if (target == ConversationScrollTarget.START) {
-                                        (chatListState.layoutInfo.totalItemsCount -
-                                            if (conversation?.hasMore == true) 2 else 1).coerceAtLeast(0)
-                                    } else 0,
-                                )
-                            }
-                        },
-                    )
-                }
-            }
-
-            val hasBlockingInteraction =
-                pendingApproval?.sessionId == currentSessionId ||
-                    pendingQuestions?.sessionId == currentSessionId
-            if (!hasBlockingInteraction) {
-                conversation?.let { conv ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 160.dp)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        parseTodos(conv.projections["todos"])?.let { TodoDock(it) }
-                        parseGoal(conv.projections["goal"])?.let { GoalBar(it, store) }
-                        QueueDock(conv.queue, store)
-                    }
-                }
-            }
+            ChatConversationSurface(
+                store = store,
+                currentSessionId = currentSessionId,
+                currentSession = currentSession,
+                composerKey = composer.key,
+                tab = tab,
+                transcriptModifier = Modifier.weight(1f).fillMaxWidth(),
+                approvalSessionId = pendingApproval?.sessionId,
+                questionSessionId = pendingQuestions?.sessionId,
+                onOpenSubagent = { childId ->
+                    scope.launch { store.openSubagentTranscript(childId) }
+                    sheet = ChatSheet.Subagents
+                },
+                onFeedback = { messageId, positive ->
+                    feedback = Triple(composer.key, messageId, positive)
+                },
+                onCopied = { toast.second(resources.getString(R.string.chat_copy_success)) },
+            )
 
             // Server-initiated requests take over the bottom of the screen: they block the turn,
             // so burying them behind a scroll would strand the session.
@@ -605,7 +498,7 @@ fun ChatScreen(
                 onPermissionPick = { value -> scope.launch { report(store.setPermissionPreset(value)) } },
                 contextBreakdown = contextBreakdown,
                 contextPressure = contextPressure,
-                running = conversation?.running == true,
+                running = currentSession?.running == true,
                 enabled = currentSessionId != null && !composer.submitting,
                 preparing = composer.preparing,
                 onOpenAttachments = { sheet = ChatSheet.Attachments },
@@ -627,20 +520,12 @@ fun ChatScreen(
 
     }
     panelKey?.let { key ->
-        // File deliverables are only shown in this panel. Avoid scanning the whole transcript on
-        // every streamed reply while the panel is closed.
-        val conversationFiles = if (key == composer.key) {
-            remember(conversation?.nodes, currentSession?.cwd) {
-                conversationFileIndex(conversation?.nodes.orEmpty(), currentSession?.cwd)
-            }
-        } else {
-            ConversationFileIndex()
-        }
-        WorkspacePanels(
+        ConversationWorkspacePanelHost(
             store = store,
-            state = store.panels.get(key),
+            key = key,
+            currentComposerKey = composer.key,
+            currentCwd = currentSession?.cwd,
             mode = panelMode,
-            conversationFiles = conversationFiles,
             onDismiss = { panelKey = null },
         )
     }
@@ -668,7 +553,7 @@ fun ChatScreen(
             skills = skills,
             skillsLoading = skillsLoading,
             mode = mode,
-            running = conversation?.running == true,
+            running = currentSession?.running == true,
             currentTab = tab,
             subagentCount = subagents.size,
             onModeChange = { mode = it },
