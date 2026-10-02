@@ -112,7 +112,7 @@ class ChatDiaryStoreTest {
     }
 
     @Test
-    fun similarUpdatesRefineOneEntryInsteadOfCreatingDiary流水账() {
+    fun similarUpdatesRefineOneEntryInsteadOfAppendingEveryTurn() {
         val memory = store()
         memory.record(request(
             delta = ChatDiaryDelta(
