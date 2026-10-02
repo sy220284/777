@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.delay
 
 /**
  * Work-run-local admission budget.
@@ -18,25 +19,27 @@ internal class LocalWorkExecutionBudget(
     private var pendingExposureTokens: Long = 0L
     private var admittedRequests: Int = 0
 
-    @Synchronized
-    fun reserve(estimatedInputTokens: Int): Lease {
+    suspend fun reserve(estimatedInputTokens: Int): Lease {
         val estimate = estimatedInputTokens.coerceAtLeast(1).toLong()
-        if (admittedRequests >= maxRequests) {
-            throw budgetExceeded("模型请求次数已达到 $maxRequests 次")
+        while (true) {
+            val admitted = synchronized(this) {
+                if (admittedRequests >= maxRequests) {
+                    throw budgetExceeded("模型请求次数已达到 $maxRequests 次")
+                }
+                if (committedExposureTokens + pendingExposureTokens + estimate > exposureLimitTokens) {
+                    throw budgetExceeded("本轮预计模型输入已达到安全上限")
+                }
+                if (pendingExposureTokens == 0L || pendingExposureTokens + estimate <= pendingLimitTokens) {
+                    pendingExposureTokens += estimate
+                    admittedRequests += 1
+                    true
+                } else {
+                    false
+                }
+            }
+            if (admitted) return Lease(this, estimate)
+            delay(PENDING_RECHECK_MILLIS)
         }
-        if (committedExposureTokens + pendingExposureTokens + estimate > exposureLimitTokens) {
-            throw budgetExceeded("本轮预计模型输入已达到安全上限")
-        }
-        if (pendingExposureTokens > 0L && pendingExposureTokens + estimate > pendingLimitTokens) {
-            throw LocalModelException(
-                code = "WORK_BUDGET_BUSY",
-                message = "并发模型请求预计输入过大，请等待正在执行的请求完成后继续",
-                retryable = true,
-            )
-        }
-        pendingExposureTokens += estimate
-        admittedRequests += 1
-        return Lease(this, estimate)
     }
 
     @Synchronized
@@ -83,6 +86,7 @@ internal class LocalWorkExecutionBudget(
         const val DEFAULT_EXPOSURE_LIMIT_TOKENS = 1_000_000L
         const val DEFAULT_PENDING_LIMIT_TOKENS = 256_000L
         const val DEFAULT_MAX_REQUESTS = 64
+        const val PENDING_RECHECK_MILLIS = 100L
     }
 }
 
