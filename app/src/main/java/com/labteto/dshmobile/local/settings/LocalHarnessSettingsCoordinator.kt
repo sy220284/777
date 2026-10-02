@@ -43,13 +43,15 @@ internal class LocalHarnessSettingsCoordinator(
 
     fun configureWorkerProfile(profileId: String?) {
         val normalized = profileId?.trim()?.takeIf(String::isNotBlank)
+        val current = state()
+        require(normalized == null || current.modelSelection.profiles.any { it.id == normalized }) {
+            "子代理工作模型已不存在，请重新选择"
+        }
         preferences.edit().apply {
             if (normalized == null) remove(KEY_WORKER_PROFILE_ID) else putString(KEY_WORKER_PROFILE_ID, normalized)
         }.apply()
-        updateState { current ->
-            current.copy(
-                modelSelection = current.modelSelection.copy(workerProfileId = normalized),
-            )
+        updateState {
+            it.copy(modelSelection = it.modelSelection.copy(workerProfileId = normalized))
         }
     }
 
