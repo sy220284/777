@@ -55,6 +55,7 @@ class LocalSettingsRuntime @Inject constructor(
     suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null) = engine.testModelConfiguration(apiKey, model, baseUrl, protocol, profileId)
     fun configureImageInputMode(mode: LocalImageInputMode) = engine.configureImageInputMode(mode)
     fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int) = engine.configureRuntimeLimits(main, subagent, attempts)
+    fun configureWorkerProfile(profileId: String?) = engine.configureWorkerProfile(profileId)
     fun configurePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean) =
         engine.configurePersonalization(rules, autoRecall, autoMemory)
     fun configureChatStyleGuard(enabled: Boolean) = engine.configureChatStyleGuard(enabled)
