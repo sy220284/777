@@ -61,10 +61,17 @@ internal class LocalToolExecutionCoordinator(
         return LocalToolRouter.capabilitySummary(tools, enabledOptional)
     }
 
-    fun visibleSchemas(policy: LocalAgentRunPolicy): JsonArray {
+    fun visibleSchemas(
+        policy: LocalAgentRunPolicy,
+        maxOptionalDefinitionTokens: Int = LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
+    ): JsonArray {
         if (!policy.toolsEnabled) return JsonArray(emptyList())
         val tools = registry.names().mapNotNull(registry::get)
-        return LocalToolRouter.visibleSchemas(tools, enabledOptionalSnapshot())
+        return LocalToolRouter.visibleSchemas(
+            tools = tools,
+            enabledOptional = enabledOptionalSnapshot(),
+            maxOptionalDefinitionTokens = maxOptionalDefinitionTokens,
+        )
     }
 
     fun visibleToolNames(policy: LocalAgentRunPolicy): List<String> =
