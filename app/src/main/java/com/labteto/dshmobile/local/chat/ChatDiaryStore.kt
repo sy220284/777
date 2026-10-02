@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.UUID
+import com.labteto.dshmobile.observability.AppLog
 import kotlinx.serialization.json.Json
 
 /**
@@ -108,12 +109,27 @@ internal class ChatDiaryStore(
         val broad = isExplicitDiaryRecall(query)
         val now = System.currentTimeMillis()
 
-        return readDocument().entries.asSequence()
+        val eligible = readDocument().entries.asSequence()
             .filter { entry ->
                 entry.active &&
                     entry.subjectKey == cleanSubject &&
                     (!groupAudience || entry.disclosure != ChatDiaryDisclosure.PRIVATE)
             }
+            .toList()
+        val candidates = if (broad || eligible.size <= MAX_NORMAL_RECALL_CANDIDATES) {
+            eligible
+        } else {
+            val recent = eligible.sortedByDescending(ChatDiaryEntry::updatedAt)
+                .take(MAX_NORMAL_RECALL_CANDIDATES)
+            val important = eligible.asSequence()
+                .filter { it.importance >= IMPORTANT_RECALL_THRESHOLD }
+                .sortedByDescending(ChatDiaryEntry::updatedAt)
+                .take(MAX_IMPORTANT_RECALL_CANDIDATES)
+                .toList()
+            (recent + important).distinctBy(ChatDiaryEntry::id)
+        }
+
+        return candidates.asSequence()
             .map { entry ->
                 val lexical = diaryTerms(entry.event + " " + entry.relationshipMeaning + " " + entry.unresolvedEcho)
                     .count(queryTerms::contains)
@@ -283,12 +299,33 @@ internal class ChatDiaryStore(
     }
 
     private fun readDocument(): ChatDiaryDocument {
-        val stamp = stamp()
-        cached?.takeIf { cachedStamp == stamp }?.let { return it }
-        val decoded = decode(file) ?: decode(backup) ?: ChatDiaryDocument()
-        cached = decoded
-        cachedStamp = stamp()
-        return decoded
+        val currentStamp = stamp()
+        cached?.takeIf { cachedStamp == currentStamp }?.let { return it }
+
+        decode(file)?.let { document ->
+            cached = document
+            cachedStamp = currentStamp
+            return document
+        }
+
+        val recovered = decode(backup)
+        if (recovered != null) {
+            if (file.isFile) quarantine(file, "primary")
+            runCatching { backup.copyTo(file, overwrite = true) }
+            cached = recovered
+            cachedStamp = stamp()
+            return recovered
+        }
+
+        if (file.isFile) quarantine(file, "primary")
+        if (backup.isFile) quarantine(backup, "backup")
+        if (currentStamp.first > 0L || currentStamp.second > 0L) {
+            AppLog.error("ChatDiaryStore", "人物日记主文件与备份均无法解析；损坏文件已隔离")
+        }
+        return ChatDiaryDocument().also { document ->
+            cached = document
+            cachedStamp = stamp()
+        }
     }
 
     private fun decode(target: File): ChatDiaryDocument? {
@@ -298,11 +335,25 @@ internal class ChatDiaryStore(
         }.getOrNull()
     }
 
+    private fun quarantine(target: File, label: String) {
+        if (!target.isFile) return
+        val corrupt = File(root, "diary.$label.corrupt-${System.currentTimeMillis()}.json")
+        val moved = runCatching { target.renameTo(corrupt) }.getOrDefault(false)
+        if (!moved) {
+            runCatching {
+                target.copyTo(corrupt, overwrite = false)
+                target.delete()
+            }
+        }
+    }
+
     private fun writeDocument(document: ChatDiaryDocument) {
         root.mkdirs()
         val temp = File(root, "diary.json.tmp")
         temp.writeText(json.encodeToString(ChatDiaryDocument.serializer(), document))
-        if (file.isFile) runCatching { file.copyTo(backup, overwrite = true) }
+        if (file.isFile && decode(file) != null) {
+            runCatching { file.copyTo(backup, overwrite = true) }
+        }
         runCatching {
             Files.move(
                 temp.toPath(),
@@ -313,7 +364,9 @@ internal class ChatDiaryStore(
         }.getOrElse {
             Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
-        if (!backup.isFile) runCatching { file.copyTo(backup, overwrite = true) }
+        if (!backup.isFile || decode(backup) == null) {
+            runCatching { file.copyTo(backup, overwrite = true) }
+        }
         cached = document
         cachedStamp = stamp()
     }
@@ -413,6 +466,9 @@ internal class ChatDiaryStore(
         const val MIN_IMPORTANCE = 2
         const val MINOR_IMPORTANCE = 3
         const val MIN_RECALL_SEMANTIC_SCORE = 24
+        const val MAX_NORMAL_RECALL_CANDIDATES = 256
+        const val MAX_IMPORTANT_RECALL_CANDIDATES = 64
+        const val IMPORTANT_RECALL_THRESHOLD = 4
         const val DUPLICATE_WINDOW_MILLIS = 6 * 60 * 60 * 1_000L
         const val DAY_MILLIS = 24 * 60 * 60 * 1_000L
         const val DUPLICATE_SIMILARITY = 0.72
