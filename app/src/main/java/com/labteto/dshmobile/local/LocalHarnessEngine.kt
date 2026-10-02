@@ -953,38 +953,6 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    /** Create a brand-new character for the current empty chat. */
-    internal fun createChatPersona(profile: PersonaProfile) {
-        val snapshot = _state.value
-        if (
-            snapshot.running ||
-            snapshot.loading ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.groupChat.enabled ||
-            snapshot.transcriptIndex.hasDialogue
-        ) return
-
-        scope.launch {
-            val saved = chatPersonaStore.upsert(
-                profile.copy(id = "persona-${UUID.randomUUID()}"),
-            )
-            _state.update { state ->
-                if (state.sessionId != snapshot.sessionId) state else state.copy(
-                    personaId = saved.id,
-                    galleryId = null,
-                    galleryStoryId = null,
-                    gallerySaveSuppressedThrough = 0L,
-                    chatPersona = saved,
-                    chatState = ChatCharacterState(behaviorTuning = saved.behaviorTuning),
-                    replySuggestions = emptyList(),
-                    chatBranches = LocalChatBranchState(),
-                    handoffSummary = null,
-                )
-            }
-            if (_state.value.sessionId == snapshot.sessionId) persist()
-        }
-    }
-
     internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) {
         val snapshot = _state.value
         if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return
@@ -2724,7 +2692,7 @@ class LocalHarnessEngine @Inject constructor(
                 },
             )
 
-            if (reply.content.isNullOrBlank()) {
+            if (replacingMessageId != null && reply.content.isNullOrBlank()) {
                 error("模型没有返回可用回复")
             }
 
@@ -3386,7 +3354,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
                 agentRunCoordinator.recordEvent(runContext, event)
             },
-            maxSteps = mainStepLimit, rejectEmptyFinalReply = true,
+            maxSteps = mainStepLimit,
             stepLimitExtender = localForegroundStepLimitExtender(runPolicy.allowToolExecution, mainMaxSteps, input, { runState.value }, { resourceScheduler.snapshot().pressure }, { runEventLog.append("turn/budget-extended", it) }),
             idFactory = { runContext.runId },
         )
