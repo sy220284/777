@@ -35,33 +35,6 @@ internal fun inheritedHistoryBeforeToolCall(
     return if (boundary >= 0) history.take(boundary).toMutableList() else history.toMutableList()
 }
 
-internal enum class LocalSubagentStatus {
-    COMPLETED,
-    STEP_LIMIT,
-    CANCELLED,
-    FAILED,
-}
-
-internal data class LocalSubagentResult(
-    val status: LocalSubagentStatus,
-    val output: String,
-    val errorCode: String? = null,
-    val retryable: Boolean = false,
-) {
-    val succeeded: Boolean get() = status == LocalSubagentStatus.COMPLETED
-}
-
-internal class LocalSubagentExecutionException(
-    val errorCode: String?,
-    val retryable: Boolean,
-    message: String,
-) : IllegalStateException(message)
-
-internal fun LocalSubagentResult.requireCompletedOutput(): String {
-    if (!succeeded) throw LocalSubagentExecutionException(errorCode, retryable, output)
-    return output
-}
-
 internal class LocalSubagentRunner(
     private val modelGateway: LocalModelGateway,
     private val state: StateFlow<LocalHarnessState>,
