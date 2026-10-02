@@ -28,6 +28,9 @@ internal class LocalWorkRunBinding(
     val pendingInputs = AgentInputQueue(maxPendingInputs)
     val interactions = LocalInteractionCoordinator(state)
     val enabledOptionalTools = linkedSetOf<String>()
+    /** Main Agent and every child spawned by this Work run share one admission budget and breaker. */
+    val executionBudget = LocalWorkExecutionBudget()
+    val routeCircuitBreaker = LocalModelRouteCircuitBreaker()
 
     @Volatile
     var transcriptProjectionCursor: Long? = initialTranscriptProjectionCursor
