@@ -4,7 +4,10 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -92,9 +95,11 @@ class LocalApprovalPolicyTest {
         approval: ToolApprovalPolicy,
     ) = HarnessTool(
         name = name,
-        schema = JsonObject(emptyMap()),
+        schema = functionToolSchema(name, "测试工具"),
         access = access,
         approvalPolicy = approval,
+        exposure = ToolExposure.CORE,
+        metadata = ToolMetadata("测试"),
         executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
     )
 }
