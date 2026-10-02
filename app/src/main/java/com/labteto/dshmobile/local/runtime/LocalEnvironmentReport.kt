@@ -10,6 +10,8 @@ internal object LocalEnvironmentReport {
         resources: HarnessResourceSnapshot,
         contextChars: Int,
         contextBudgetChars: Int,
+        latestRequest: TokenUsageRecord?,
+        capabilitySummary: String,
         pendingInputs: Int,
         pendingInputLimit: Int,
         commands: List<String>,
@@ -26,7 +28,22 @@ internal object LocalEnvironmentReport {
                 "语言服务 ${resources.activeLanguageServers}/${resources.budget.maxLanguageServers}；" +
                 "压力 ${resources.pressure.name.lowercase()}",
         )
-        appendLine("上下文：$contextChars/$contextBudgetChars 字符")
+        appendLine("持久模型历史（非本次实际发送量）：$contextChars/$contextBudgetChars 字符")
+        if (latestRequest == null) {
+            appendLine("最近真实请求：暂无可核对的已上报输入 Token")
+        } else {
+            appendLine(
+                "最近真实请求实际输入：${latestRequest.inputTokens} token；" +
+                    "模型 ${latestRequest.model}；动作 ${latestRequest.context.action.name.lowercase()}",
+            )
+            val breakdown = latestRequest.promptBreakdown
+            appendLine(
+                "最近请求诊断估算：history=${breakdown.historyTokens}，" +
+                    "current_user=${breakdown.currentUserTokens}，tools=${breakdown.toolDefinitionTokens}，" +
+                    "system=${breakdown.systemBaseTokens + breakdown.personaStateTokens + breakdown.memoryRuleTokens + breakdown.otherSystemTokens}",
+            )
+        }
+        appendLine(capabilitySummary)
         appendLine("待处理补充消息：$pendingInputs/$pendingInputLimit")
         appendLine("可执行命令：${if (commands.isEmpty()) "未检测到" else commands.joinToString()}")
         appendLine("内置运行时：${runtimeStatuses.joinToString("；")}")
