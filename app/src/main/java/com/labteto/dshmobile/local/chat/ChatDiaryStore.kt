@@ -426,7 +426,7 @@ internal class ChatDiaryStore(
     }
 
     private fun entryRevisions(entry: ChatDiaryEntry): List<ChatDiaryRevision> =
-        entry.revisions.takeIf(List<ChatDiaryRevision>::isNotEmpty)
+        entry.revisions.takeIf { it.isNotEmpty() }
             ?: listOf(
                 ChatDiaryRevision(
                     event = entry.event,
