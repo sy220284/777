@@ -90,7 +90,6 @@ internal fun appendAutomationReceipt(
 
 private const val AUTOMATION_HISTORY_DAYS = 30L
 private const val AUTOMATION_HISTORY_RECORDS = 200
-private const val AUTOMATION_MAX_TASKS = 256
 
 internal fun Int.saturatingIncrement(): Int =
     if (this >= Int.MAX_VALUE) Int.MAX_VALUE else (this + 1).coerceAtLeast(0)
@@ -302,10 +301,7 @@ class AutomationStore internal constructor(
     @Synchronized
     fun upsert(task: AutomationTask) {
         val document = read()
-        val replacing = document.tasks.any { it.id == task.id }
-        require(replacing || document.tasks.size < AUTOMATION_MAX_TASKS) {
-            "自动任务数量已达上限（$AUTOMATION_MAX_TASKS），请删除不再使用的任务后重试"
-        }
+        AutomationStorePolicy.requireCapacity(document.tasks, task.id)
         val current = document.tasks.filterNot { it.id == task.id } + task
         write(AutomationDocument(tasks = current))
     }
