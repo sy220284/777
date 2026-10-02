@@ -4657,26 +4657,55 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun searchSessions(query: String, scopeSessionId: String = currentSessionId): String {
         val hits = mutableListOf<String>()
-        val candidates = (sessionSummaries().map(LocalSessionSummary::id) + scopeSessionId).distinct()
+        val summaries = sessionSummaries()
+        val candidates = (summaries.map(LocalSessionSummary::id) + scopeSessionId).distinct()
+        var scanned = 0
         for (id in candidates) {
-            if (hits.size >= MAX_SESSION_SEARCH_HITS) break
-            if (!canReadSessionFrom(scopeSessionId, id)) continue
+            if (hits.size >= MAX_SESSION_SEARCH_HITS || scanned >= MAX_SESSION_SEARCH_SCANNED) break
+            if (!canReadSessionFrom(scopeSessionId, id, summaries)) continue
+            scanned += 1
             val result = eventLogFor(id).search(query, limit = 1)
             result.takeUnless { it == "未找到会话事件" || it == "会话事件日志为空" }
                 ?.let { hits += "会话 $id\n$it" }
         }
-        return if (hits.isEmpty()) "未找到当前项目或会话链中的历史事件"
-        else hits.joinToString("\n\n")
+        val suffix = if (scanned >= MAX_SESSION_SEARCH_SCANNED) {
+            "\n\n搜索已达到单次扫描预算 $MAX_SESSION_SEARCH_SCANNED 个会话；可缩小项目/关键词后继续。"
+        } else {
+            ""
+        }
+        return if (hits.isEmpty()) "未找到当前项目或会话链中的历史事件$suffix"
+        else hits.joinToString("\n\n") + suffix
     }
 
-    private fun canReadSessionFrom(scopeSessionId: String, targetSessionId: String): Boolean {
+    private fun canReadSessionFrom(
+        scopeSessionId: String,
+        targetSessionId: String,
+        summaries: List<LocalSessionSummary> = sessionSummaries(),
+    ): Boolean {
         if (scopeSessionId == targetSessionId) return true
-        val source = sessionCoordinator.read(scopeSessionId) ?: return false
-        val target = sessionCoordinator.read(targetSessionId) ?: return false
-        val sameProject = source.projectId?.takeIf(String::isNotBlank)?.let { it == target.projectId } == true
-        val sourceLineage = source.lineageId.ifBlank { source.id }
-        val targetLineage = target.lineageId.ifBlank { target.id }
-        return sameProject || (sourceLineage.isNotBlank() && sourceLineage == targetLineage)
+        val sourceScope = sessionAccessScope(scopeSessionId, summaries) ?: return false
+        val targetScope = sessionAccessScope(targetSessionId, summaries) ?: return false
+        val sameProject = sourceScope.first?.takeIf(String::isNotBlank)
+            ?.let { it == targetScope.first } == true
+        val sourceLineage = sourceScope.second
+        val targetLineage = targetScope.second
+        return sameProject || (!sourceLineage.isNullOrBlank() && sourceLineage == targetLineage)
+    }
+
+    private fun sessionAccessScope(
+        sessionId: String,
+        summaries: List<LocalSessionSummary>,
+    ): Pair<String?, String?>? {
+        if (sessionId == currentSessionId) {
+            val current = _state.value
+            return current.projectId to current.lineageId.ifBlank { current.sessionId }
+        }
+        activeWorkRuns[sessionId]?.state?.value?.let { active ->
+            return active.projectId to active.lineageId.ifBlank { active.sessionId }
+        }
+        return summaries.firstOrNull { it.id == sessionId }?.let { summary ->
+            summary.projectId to summary.lineageId?.ifBlank { summary.id }
+        }
     }
 
     private fun eventLogForAuthorized(
