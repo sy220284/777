@@ -2035,11 +2035,11 @@ class LocalHarnessEngine @Inject constructor(
         withContext(Dispatchers.IO) { sessionStorageManager.exportAll(output) }
 
     internal suspend fun environmentInfoForUi(): String = withContext(Dispatchers.IO) {
-        environmentInfo()
+        environmentInfoCoordinator.build(null)
     }
 
     internal suspend fun diagnosticReportForUi(): String = withContext(Dispatchers.IO) {
-        DiagnosticReport.build(AppLog.exportSnapshot(), environmentInfo())
+        DiagnosticReport.build(AppLog.exportSnapshot(), environmentInfoCoordinator.build(null))
     }
 
     internal suspend fun githubConnectorConfiguredForUi(): Boolean = githubCredentials.configured()
