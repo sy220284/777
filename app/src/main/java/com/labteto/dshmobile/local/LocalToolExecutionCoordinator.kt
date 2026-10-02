@@ -39,15 +39,19 @@ internal class LocalToolExecutionCoordinator(
         synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
 
     fun enableOptionalTools(names: Collection<String>) {
-        val registered = registry.names().toSet()
         synchronized(enabledOptionalTools) {
             enabledOptionalTools += names.filter { name ->
-                name in registered && LocalToolRouter.isOptional(name)
+                registry.get(name)?.let(LocalToolRouter::isOptional) == true
             }
         }
     }
 
     fun enableGitHubConnectorTools() = enableOptionalTools(GITHUB_CONNECTOR_TOOL_NAMES)
+
+    fun capabilitySummary(): String {
+        val tools = registry.names().mapNotNull(registry::get)
+        return LocalToolRouter.capabilitySummary(tools, enabledOptionalSnapshot())
+    }
 
     fun visibleSchemas(policy: LocalAgentRunPolicy): JsonArray {
         if (!policy.toolsEnabled) return JsonArray(emptyList())
