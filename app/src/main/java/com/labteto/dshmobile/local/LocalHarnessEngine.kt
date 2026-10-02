@@ -288,6 +288,7 @@ class LocalHarnessEngine @Inject constructor(
             foregroundSessionId = { currentSessionId },
             foregroundHistory = { modelHistory },
             foregroundPendingInputs = { pendingInputs.size() },
+            pendingInputLimit = MAX_PENDING_INPUTS,
             foregroundWorkBudget = { sessionId ->
                 activeWorkRuns[sessionId]?.executionControl?.budget?.snapshot()
             },
