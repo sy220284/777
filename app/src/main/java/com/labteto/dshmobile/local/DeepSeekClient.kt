@@ -583,7 +583,7 @@ internal fun providerErrorDetail(body: String, json: Json): String? = runCatchin
         .firstOrNull(String::isNotBlank)
 }.getOrNull()
 
-class LocalModelException(
+internal class LocalModelException(
     val code: String,
     message: String,
     val retryable: Boolean,
