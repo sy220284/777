@@ -20,24 +20,22 @@ jobs:
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
-      - name: Resolve every Gradle dependency and generate verification metadata
-        shell: bash
+      - name: Resolve CI dependency graph and generate verification metadata
         run: |
-          cat > "$RUNNER_TEMP/resolve-all.gradle" <<'EOF'
-          gradle.projectsEvaluated {
-              rootProject.tasks.register("resolveAllForVerification") {
-                  doLast {
-                      rootProject.allprojects.each { project ->
-                          project.configurations.findAll { it.canBeResolved }.each { configuration ->
-                              println("Resolving " + project.path + ":" + configuration.name)
-                              configuration.resolve()
-                          }
-                      }
-                  }
-              }
-          }
-          EOF
-          ./gradlew --write-verification-metadata sha256             -I "$RUNNER_TEMP/resolve-all.gradle"             resolveAllForVerification
+          ./gradlew --write-verification-metadata sha256 \
+            :core:test \
+            :harness-core:test \
+            :harness-runtime-android:test \
+            :harness-interop:test \
+            :harness-device-android:testDebugUnitTest \
+            :mock-harness:test \
+            :app:testDebugUnitTest \
+            :reference-validation:test \
+            :app:lintDebug \
+            :app:assembleDebug \
+            :app:assembleDebugAndroidTest \
+            :app:assembleOptimized \
+            --stacktrace
           test -s gradle/verification-metadata.xml
 
       - name: Upload Gradle verification metadata
