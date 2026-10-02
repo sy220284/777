@@ -79,10 +79,7 @@ class LocalAgentRunCoordinatorTest {
                             put("role", "system")
                             put("content", "系统")
                         },
-                        buildJsonObject {
-                            put("role", "user")
-                            put("content", checkpoint.toModelBlock())
-                        },
+                        buildTrustedWorkCheckpointModelMessage(checkpoint.toModelBlock()),
                     ),
                     reason = "test",
                 ),
