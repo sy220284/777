@@ -1157,6 +1157,7 @@
     <string name="local_current_session">当前</string>
     <string name="chatlist_exit_remote_control">退出远程控制</string>
     <string name="local_work_process">工作过程</string>
+    <string name="local_work_process_preparing">正在准备下一步…</string>
     <string name="local_process_thinking">思考</string>
     <string name="local_work_process_steps">%1$d 步</string>
     <string name="local_work_process_expand">展开工作过程</string>
