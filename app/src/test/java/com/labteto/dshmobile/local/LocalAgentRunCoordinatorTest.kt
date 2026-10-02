@@ -368,6 +368,32 @@ class LocalAgentRunCoordinatorTest {
     }
 
     @Test
+    fun legacyCheckpointWithoutRouteIdentityNeverAutoResumes() {
+        withCoordinator { coordinator, log ->
+            log.append(
+                LOCAL_AGENT_RUN_CHECKPOINT_EVENT,
+                buildJsonObject {
+                    put("version", 1)
+                    put("status", "running")
+                    put("run_id", "legacy-run")
+                    put("model", "deepseek-flash")
+                    put("base_url", "https://api.deepseek.com")
+                    put("input", "继续旧任务")
+                    put("memory_input", "继续旧任务")
+                },
+            )
+
+            val decision = requireNotNull(
+                coordinator.recoveryDecision("s1", SessionRepairResult()),
+            )
+
+            assertNull(decision.queuedInput)
+            assertTrue(decision.blockedReason.orEmpty().contains("旧版检查点"))
+            assertTrue(decision.blockedReason.orEmpty().contains("模型路由身份"))
+        }
+    }
+
+    @Test
     fun incompatibleCheckpointVersionIsIgnored() {
         withCoordinator { coordinator, log ->
             log.append(
