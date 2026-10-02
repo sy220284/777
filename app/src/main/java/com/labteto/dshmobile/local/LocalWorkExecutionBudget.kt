@@ -52,9 +52,10 @@ internal class LocalWorkExecutionBudget(
     )
 
     @Synchronized
-    private fun settle(estimate: Long) {
+    private fun settle(estimate: Long, reportedInputTokens: Long?) {
         pendingExposureTokens = (pendingExposureTokens - estimate).coerceAtLeast(0L)
-        committedExposureTokens = (committedExposureTokens + estimate).coerceAtMost(Long.MAX_VALUE)
+        val committed = reportedInputTokens?.takeIf { it > 0L } ?: estimate
+        committedExposureTokens = (committedExposureTokens + committed).coerceAtMost(Long.MAX_VALUE)
     }
 
     private fun budgetExceeded(detail: String) = LocalModelException(
@@ -69,8 +70,8 @@ internal class LocalWorkExecutionBudget(
     ) {
         private val settled = AtomicBoolean(false)
 
-        fun settle() {
-            if (settled.compareAndSet(false, true)) owner.settle(estimate)
+        fun settle(reportedInputTokens: Long? = null) {
+            if (settled.compareAndSet(false, true)) owner.settle(estimate, reportedInputTokens)
         }
     }
 
@@ -124,3 +125,13 @@ internal fun isTerminalRouteFailure(code: String): Boolean =
         "MODEL_CREDENTIAL_MISSING",
         "NO_MODEL_CREDENTIAL",
     )
+
+
+internal fun shouldAutoContinueWorkFailure(
+    errorCode: String?,
+    automaticContinuationCount: Int,
+    pendingInputs: Int,
+): Boolean =
+    errorCode == "CHATGPT_PLAN_STREAM_INTERRUPTED" &&
+        automaticContinuationCount == 0 &&
+        pendingInputs == 0
