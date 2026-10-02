@@ -85,6 +85,7 @@ import com.labteto.dshmobile.local.chat.LocalReplySuggestionCoordinator
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.withoutLastCompletedAssistantReply
@@ -4138,7 +4139,7 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun startPersistentReadonlySubagent(
+    private suspend fun startPersistentReadonlySubagent(
         task: String,
         model: String?,
         maxSteps: Int,
@@ -4147,11 +4148,24 @@ class LocalHarnessEngine @Inject constructor(
         boundState: LocalHarnessState = _state.value,
         historySnapshot: () -> List<JsonObject> = modelHistory::snapshot,
     ): String {
+        val runProfile = modelGateway.profileForRun(model)
+        val effectiveProtocol = if (runProfile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
+            LocalModelProtocol.RESPONSES
+        } else {
+            runProfile.protocol
+        }
         val boundSubagents = persistentSubagentRunner(sessionId, boundState, historySnapshot)
         val payload = buildJsonObject {
+            put("version", PERSISTENT_SUBAGENT_RESUME_VERSION)
             put("session_id", sessionId)
             put("task", task)
-            model?.let { put("model", it) }
+            put("profile_id", runProfile.id)
+            put("model", runProfile.model)
+            put("base_url", runProfile.baseUrl)
+            put("auth_kind", runProfile.authKind.name)
+            put("protocol", effectiveProtocol.name)
+            runProfile.credentialRef?.let { put("credential_ref", it) }
+            put("route_fingerprint", runProfile.routeFingerprint())
             put("max_steps", maxSteps)
             put("virtual_screen", virtualScreen)
         }.toString()
@@ -4161,16 +4175,17 @@ class LocalHarnessEngine @Inject constructor(
             resumePayload = payload,
             ownerSessionId = sessionId,
         ) { jobId, _ ->
-            val result = boundSubagents.runResult(
-                task = task,
-                inheritHistory = false,
-                allowMutation = false,
-                backgroundJobId = jobId,
-                modelOverride = model,
-                maxSteps = maxSteps,
-                virtualScreen = virtualScreen,
-            )
-            result.requireCompletedOutput()
+            withContext(LocalModelRunContext(runProfile)) {
+                boundSubagents.runResult(
+                    task = task,
+                    inheritHistory = false,
+                    allowMutation = false,
+                    backgroundJobId = jobId,
+                    modelOverride = null,
+                    maxSteps = maxSteps,
+                    virtualScreen = virtualScreen,
+                ).requireCompletedOutput()
+            }
         }
     }
 
@@ -4245,24 +4260,60 @@ class LocalHarnessEngine @Inject constructor(
                         }
                     }
                     "subagent_readonly" -> {
+                        val version = payload["version"]?.jsonPrimitive?.intOrNull
+                            ?: error("旧版持久子代理缺少路由身份，已停止自动续跑")
+                        require(version == PERSISTENT_SUBAGENT_RESUME_VERSION) {
+                            "持久子代理恢复版本不受支持：$version"
+                        }
                         val task = payload["task"]?.jsonPrimitive?.contentOrNull
                             ?: error("恢复任务缺少 task")
-                        val model = payload["model"]?.jsonPrimitive?.contentOrNull
+                        val profileId = payload["profile_id"]?.jsonPrimitive?.contentOrNull
+                            ?: error("恢复任务缺少 profile_id")
+                        val routeModel = payload["model"]?.jsonPrimitive?.contentOrNull
+                            ?: error("恢复任务缺少 model")
+                        val routeBaseUrl = payload["base_url"]?.jsonPrimitive?.contentOrNull
+                            ?: error("恢复任务缺少 base_url")
+                        val authKind = payload["auth_kind"]?.jsonPrimitive?.contentOrNull
+                            ?: error("恢复任务缺少 auth_kind")
+                        val protocol = payload["protocol"]?.jsonPrimitive?.contentOrNull
+                            ?: error("恢复任务缺少 protocol")
+                        val credentialRef = payload["credential_ref"]?.jsonPrimitive?.contentOrNull
+                        val routeFingerprint = payload["route_fingerprint"]?.jsonPrimitive?.contentOrNull
+                            ?: error("恢复任务缺少 route_fingerprint")
                         val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
                             ?.coerceIn(1, 128) ?: _state.value.subagentMaxSteps
                         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
                         val boundSubagents = persistentSubagentRunner(sessionId, _state.value)
                         jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, _ ->
-                            val result = boundSubagents.runResult(
-                                task = task,
-                                inheritHistory = false,
-                                allowMutation = false,
-                                backgroundJobId = jobId,
-                                modelOverride = model,
-                                maxSteps = maxSteps,
-                                virtualScreen = virtualScreen,
+                            val recoveredProfile = modelGateway.profileForRoute(
+                                profileId = profileId,
+                                model = routeModel,
+                                baseUrl = routeBaseUrl,
                             )
-                            result.requireCompletedOutput()
+                            val effectiveProtocol = if (recoveredProfile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
+                                LocalModelProtocol.RESPONSES.name
+                            } else {
+                                recoveredProfile.protocol.name
+                            }
+                            require(
+                                recoveredProfile.authKind.name == authKind &&
+                                    effectiveProtocol == protocol &&
+                                    recoveredProfile.credentialRef == credentialRef &&
+                                    recoveredProfile.routeFingerprint() == routeFingerprint
+                            ) {
+                                "持久子代理原模型路由身份已变化，已停止自动续跑"
+                            }
+                            withContext(LocalModelRunContext(recoveredProfile)) {
+                                boundSubagents.runResult(
+                                    task = task,
+                                    inheritHistory = false,
+                                    allowMutation = false,
+                                    backgroundJobId = jobId,
+                                    modelOverride = null,
+                                    maxSteps = maxSteps,
+                                    virtualScreen = virtualScreen,
+                                ).requireCompletedOutput()
+                            }
                         }
                     }
                     else -> {
