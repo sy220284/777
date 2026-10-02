@@ -141,6 +141,32 @@ internal fun LocalAgentSettingsCard(
                 }
             },
         )
+
+        val selectedWorker = local.workerProfileId?.let { id ->
+            local.modelProfiles.firstOrNull { it.id == id }
+        }
+        DsMenu(
+            anchor = {
+                DsValueRow(
+                    label = "子代理工作模型",
+                    value = selectedWorker?.let { profile ->
+                        profile.displayName?.takeIf(String::isNotBlank)
+                            ?: (profile.provider + " · " + profile.model).trim(' ', '·')
+                    } ?: "自动选择",
+                    hint = "显式指定模型优先；未指定时使用这里的 Worker 档案，再回退到安全自动路由。",
+                )
+            },
+            items = listOf(
+                MenuItem("自动选择") { viewModel.configureWorkerProfile(null) },
+            ) + local.modelProfiles.map { profile ->
+                MenuItem(
+                    profile.displayName?.takeIf(String::isNotBlank)
+                        ?: (profile.provider + " · " + profile.model).trim(' ', '·'),
+                ) {
+                    viewModel.configureWorkerProfile(profile.id)
+                }
+            },
+        )
     }
 }
 
