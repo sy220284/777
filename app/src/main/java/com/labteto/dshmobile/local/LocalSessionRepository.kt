@@ -37,6 +37,7 @@ internal class LocalSessionRepository(
     private val onError: (Throwable) -> Unit,
 ) {
     private val store = VersionedSessionStore(root, json)
+    private val summaryIndex = LocalSessionSummaryIndex(root, json)
     private val lock = Any()
     private val storageLock = Any()
     private val deletedIds = mutableSetOf<String>()
@@ -61,25 +62,26 @@ internal class LocalSessionRepository(
                         pending.keys.firstOrNull()?.let { pending.remove(it) }
                     } ?: break
                     try {
-                        val written = synchronized(storageLock) {
+                        val sourceModifiedAt = synchronized(storageLock) {
                             val stillLatest = synchronized(lock) {
                                 snapshot.id !in deletedIds && latestSnapshots[snapshot.id] === snapshot
                             }
                             if (!stillLatest) {
-                                false
+                                null
                             } else {
                                 store.write(
                                     snapshot.id,
                                     json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
                                     updatedAt = snapshot.updatedAt,
                                 )
-                                true
+                                store.lastModified(snapshot.id)
                             }
                         }
-                        if (written) {
+                        if (sourceModifiedAt != null) {
+                            persistSummaryIndex(snapshot, sourceModifiedAt)
                             synchronized(lock) {
                                 if (snapshot.id !in deletedIds) {
-                                    summaryCache[snapshot.id] = snapshot.toSummary()
+                                    cacheSummaryLocked(snapshot.toSummary())
                                     if (latestSnapshots[snapshot.id] === snapshot) {
                                         latestSnapshots.remove(snapshot.id)
                                     }
@@ -133,17 +135,19 @@ internal class LocalSessionRepository(
             latestSnapshots.put(snapshot.id, snapshot)
         }
         try {
-            synchronized(storageLock) {
+            val sourceModifiedAt = synchronized(storageLock) {
                 check(snapshot.id !in deletedIds) { "会话已删除，无法保存" }
                 store.write(
                     snapshot.id,
                     json.encodeToJsonElement(LocalHarnessSession.serializer(), snapshot).jsonObject,
                     updatedAt = snapshot.updatedAt,
                 )
+                requireNotNull(store.lastModified(snapshot.id)) { "会话写入后无法读取文件代际：${snapshot.id}" }
             }
+            persistSummaryIndex(snapshot, sourceModifiedAt)
             synchronized(lock) {
                 if (snapshot.id !in deletedIds) {
-                    summaryCache[snapshot.id] = snapshot.toSummary()
+                    cacheSummaryLocked(snapshot.toSummary())
                     if (latestSnapshots[snapshot.id] === snapshot) {
                         latestSnapshots.remove(snapshot.id)
                         pending.remove(snapshot.id)
@@ -185,6 +189,7 @@ internal class LocalSessionRepository(
     fun delete(id: String): Boolean = synchronized(storageLock) {
         val removed = store.delete(id)
         check(store.read(id) == null) { "会话文件删除失败：$id" }
+        summaryIndex.delete(id)
         synchronized(lock) {
             deletedIds += id
             pending.remove(id)
@@ -249,8 +254,14 @@ internal class LocalSessionRepository(
         }
     }
 
-    private fun loadSummaries(): List<LocalSessionSummary> = store.ids()
-        .mapNotNull { id ->
+    private fun loadSummaries(): List<LocalSessionSummary> {
+        val ids = store.ids()
+        val validIds = ids.toSet()
+        summaryIndex.prune(validIds)
+        return ids.mapNotNull { id ->
+            val sourceModifiedAt = store.lastModified(id) ?: return@mapNotNull null
+            summaryIndex.read(id, sourceModifiedAt)?.let { return@mapNotNull it }
+
             val loaded = try {
                 store.read(id)
             } catch (future: FutureSessionVersionException) {
@@ -266,47 +277,14 @@ internal class LocalSessionRepository(
             } ?: return@mapNotNull null
 
             runCatching {
-                val payload = loaded.document.payload
-                val messages = payload["messages"] as? JsonArray
-                val transcriptIndex = (payload["transcriptIndex"] as? JsonObject)?.let { encoded ->
-                    runCatching {
-                        json.decodeFromJsonElement(LocalTranscriptRuntimeIndex.serializer(), encoded)
-                    }.getOrNull()
+                val summary = summaryFromPayload(loaded.document.payload, loaded.document.id, loaded.document.updatedAt)
+                store.lastModified(id)?.let { currentGeneration ->
+                    runCatching { summaryIndex.write(summary, currentGeneration) }
+                        .onFailure { error ->
+                            AppLog.warn("LocalSessionRepository", "session/summary-index-rebuild-failed id=$id", error)
+                        }
                 }
-                LocalSessionSummary(
-                    id = payload["id"]?.jsonPrimitive?.contentOrNull
-                        ?.takeIf(String::isNotBlank)
-                        ?: loaded.document.id,
-                    title = payload["title"]?.jsonPrimitive?.contentOrNull ?: "新会话",
-                    updatedAt = payload["updatedAt"]?.jsonPrimitive?.longOrNull
-                        ?.takeIf { it > 0L }
-                        ?: loaded.document.updatedAt,
-                    usageMode = runCatching {
-                        LocalUsageMode.valueOf(
-                            payload["usageMode"]?.jsonPrimitive?.contentOrNull
-                                ?: LocalUsageMode.WORK.name,
-                        )
-                    }.getOrDefault(LocalUsageMode.WORK),
-                    chatMode = runCatching {
-                        val group = payload["groupChat"] as? JsonObject
-                        LocalChatMode.valueOf(
-                            group?.get("mode")?.jsonPrimitive?.contentOrNull
-                                ?: LocalChatMode.SINGLE.name,
-                        )
-                    }.getOrDefault(LocalChatMode.SINGLE),
-                    blank = when {
-                        transcriptIndex != null -> transcriptIndex.totalMessageCount == 0L
-                        else -> messages?.none { element ->
-                            val message = element as? JsonObject ?: return@none false
-                            message["content"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
-                        } ?: true
-                    },
-                    summaryPreview = transcriptIndex?.latestUserContent
-                        ?.replace(Regex("\\s+"), " ")
-                        ?.trim()
-                        ?.takeIf { it.isNotBlank() }
-                        ?.let { if (it.length > 72) it.take(72) + "…" else it },
-                )
+                summary
             }.getOrElse { error ->
                 AppLog.warn(
                     "LocalSessionRepository",
@@ -317,6 +295,78 @@ internal class LocalSessionRepository(
                 null
             }
         }
+    }
+
+    private fun summaryFromPayload(
+        payload: JsonObject,
+        fallbackId: String,
+        fallbackUpdatedAt: Long,
+    ): LocalSessionSummary {
+        val messages = payload["messages"] as? JsonArray
+        val transcriptIndex = (payload["transcriptIndex"] as? JsonObject)?.let { encoded ->
+            runCatching {
+                json.decodeFromJsonElement(LocalTranscriptRuntimeIndex.serializer(), encoded)
+            }.getOrNull()
+        }
+        return LocalSessionSummary(
+            id = payload["id"]?.jsonPrimitive?.contentOrNull
+                ?.takeIf(String::isNotBlank)
+                ?: fallbackId,
+            title = payload["title"]?.jsonPrimitive?.contentOrNull ?: "新会话",
+            updatedAt = payload["updatedAt"]?.jsonPrimitive?.longOrNull
+                ?.takeIf { it > 0L }
+                ?: fallbackUpdatedAt,
+            usageMode = runCatching {
+                LocalUsageMode.valueOf(
+                    payload["usageMode"]?.jsonPrimitive?.contentOrNull
+                        ?: LocalUsageMode.WORK.name,
+                )
+            }.getOrDefault(LocalUsageMode.WORK),
+            chatMode = runCatching {
+                val group = payload["groupChat"] as? JsonObject
+                LocalChatMode.valueOf(
+                    group?.get("mode")?.jsonPrimitive?.contentOrNull
+                        ?: LocalChatMode.SINGLE.name,
+                )
+            }.getOrDefault(LocalChatMode.SINGLE),
+            personaId = payload["personaId"]?.jsonPrimitive?.contentOrNull,
+            galleryId = payload["galleryId"]?.jsonPrimitive?.contentOrNull,
+            blank = when {
+                transcriptIndex != null -> transcriptIndex.totalMessageCount == 0L
+                else -> messages?.none { element ->
+                    val message = element as? JsonObject ?: return@none false
+                    message["content"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
+                } ?: true
+            },
+            summaryPreview = transcriptIndex?.latestUserContent
+                ?.replace(Regex("\\s+"), " ")
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?.let { if (it.length > 72) it.take(72) + "…" else it },
+            projectId = payload["projectId"]?.jsonPrimitive?.contentOrNull,
+            lineageId = payload["lineageId"]?.jsonPrimitive?.contentOrNull
+                ?.takeIf(String::isNotBlank),
+        )
+    }
+
+    private fun persistSummaryIndex(snapshot: LocalHarnessSession, sourceModifiedAt: Long) {
+        runCatching { summaryIndex.write(snapshot.toSummary(), sourceModifiedAt) }
+            .onFailure { error ->
+                // The sidecar is derivative. A failed index write must not roll back a durable Session.
+                AppLog.warn(
+                    "LocalSessionRepository",
+                    "session/summary-index-write-failed id=${snapshot.id}",
+                    error,
+                )
+            }
+    }
+
+    private fun cacheSummaryLocked(summary: LocalSessionSummary) {
+        val current = summaryCache[summary.id]
+        if (current == null || current.updatedAt <= summary.updatedAt) {
+            summaryCache[summary.id] = summary
+        }
+    }
 
     private fun LocalHarnessSession.toSummary(): LocalSessionSummary = LocalSessionSummary(
         id = id,
@@ -334,5 +384,7 @@ internal class LocalSessionRepository(
             ?.trim()
             ?.takeIf { it.isNotBlank() }
             ?.let { if (it.length > 72) it.take(72) + "…" else it },
+        projectId = projectId,
+        lineageId = lineageId.ifBlank { id },
     )
 }
