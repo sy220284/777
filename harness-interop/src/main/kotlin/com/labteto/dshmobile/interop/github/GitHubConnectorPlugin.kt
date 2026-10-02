@@ -350,14 +350,8 @@ class GitHubConnectorPlugin(
         val normalizedPath = ("/" + segments.joinToString("/")).lowercase()
         if (mutation) {
             require(normalizedPath.startsWith("/repos/")) { "GitHub 写请求只允许 /repos/... 仓库范围 API" }
-            require(FORBIDDEN_MUTATION_PATHS.none(normalizedPath::contains)) {
-                "该 GitHub 管理接口未向 Agent 开放"
-            }
-            require(!(segments.size == 3 && method in setOf("PATCH", "DELETE"))) {
-                "仓库本体修改/删除未向 Agent 开放"
-            }
-            require(!normalizedPath.endsWith("/transfer")) {
-                "仓库转移未向 Agent 开放"
+            require(MUTATION_PATH_RULES.any { rule -> rule.matches(normalizedPath) }) {
+                "该 GitHub 写接口未向 Agent 开放"
             }
         } else {
             require(READ_PATH_PREFIXES.any { prefix ->
@@ -450,13 +444,18 @@ class GitHubConnectorPlugin(
             "/user",
             "/rate_limit",
         )
-        val FORBIDDEN_MUTATION_PATHS = listOf(
-            "/actions/secrets",
-            "/dependabot/secrets",
-            "/codespaces/secrets",
-            "/deploy_keys",
-            "/hooks",
-            "/keys",
+        // Mutation scope is allowlisted by content/collaboration API family. Repository
+        // administration, ownership and credential surfaces therefore stay closed by default when
+        // GitHub adds new endpoints or a path is accidentally omitted from this connector.
+        val MUTATION_PATH_RULES = listOf(
+            Regex("^/repos/[^/]+/[^/]+/issues(?:/.*)?$"),
+            Regex("^/repos/[^/]+/[^/]+/pulls(?:/.*)?$"),
+            Regex("^/repos/[^/]+/[^/]+/contents(?:/.*)?$"),
+            Regex("^/repos/[^/]+/[^/]+/git/(?:blobs|trees|commits|refs|tags)(?:/.*)?$"),
+            Regex("^/repos/[^/]+/[^/]+/releases(?:/.*)?$"),
+            Regex("^/repos/[^/]+/[^/]+/(?:labels|milestones|statuses|merges|dispatches)(?:/.*)?$"),
+            Regex("^/repos/[^/]+/[^/]+/actions/workflows/[^/]+/dispatches$"),
+            Regex("^/repos/[^/]+/[^/]+/actions/runs/[0-9]+/(?:rerun|rerun-failed-jobs|cancel)$"),
         )
         val TOOL_NAMES = listOf("github_status", "github_api_get", "github_api_request")
     }
