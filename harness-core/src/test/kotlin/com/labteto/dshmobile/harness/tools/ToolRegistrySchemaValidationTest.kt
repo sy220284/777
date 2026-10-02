@@ -202,6 +202,34 @@ executor = HarnessToolExecutor { _, _, _ -> ToolResult("ran") },
     }
 
     @Test
+    fun metadataRejectsUnboundedDiscoveryAndDependencyText() {
+        assertTrue(
+            runCatching {
+                ToolMetadata(
+                    family = "测试",
+                    discoveryKeywords = (0..32).map { "k$it" }.toSet(),
+                )
+            }.isFailure,
+        )
+        assertTrue(
+            runCatching {
+                ToolMetadata(
+                    family = "测试",
+                    requirements = listOf("x".repeat(513)),
+                )
+            }.isFailure,
+        )
+        assertTrue(
+            runCatching {
+                ToolMetadata(
+                    family = "测试",
+                    usageNotes = List(17) { "note-$it" },
+                )
+            }.isFailure,
+        )
+    }
+
+    @Test
     fun enforcesArrayAndNumericBoundsDeclaredByTools() = runTest {
         val calls = mutableListOf<String>()
         val registry = ToolRegistry()
