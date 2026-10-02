@@ -43,9 +43,13 @@ internal class LocalSubagentHistoryPolicy(
         budget: LocalHistoryBudget?,
     ) {
         val compaction = if (budget != null) {
+            val effectiveBudget = workSteadyStateHistoryBudget(
+                base = budget,
+                currentHistoryTokens = history.estimatedTokens,
+            )
             history.compact(
                 compactor = historyCompactor,
-                budget = budget,
+                budget = effectiveBudget,
                 summaryMode = LocalHistorySummaryMode.WORK,
             )
         } else {
