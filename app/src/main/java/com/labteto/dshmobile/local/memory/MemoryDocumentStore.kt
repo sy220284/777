@@ -127,9 +127,6 @@ internal class MemoryDocumentStore(
 
     private fun writeSnapshot(document: MemoryDocument) {
         root.mkdirs()
-        if (decodeDocument(file) != null) {
-            runCatching { file.copyTo(backup, overwrite = true) }
-        }
         val temporary = File(root, file.name + ".tmp")
         temporary.writeText(json.encodeToString(MemoryDocument.serializer(), document))
         runCatching {
@@ -142,9 +139,11 @@ internal class MemoryDocumentStore(
         }.getOrElse {
             Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
-        if (decodeDocument(backup) == null && decodeDocument(file) != null) {
-            runCatching { file.copyTo(backup, overwrite = true) }
-        }
+        check(decodeDocument(file) != null) { "长期记忆快照写入后校验失败" }
+
+        // Snapshot 与 backup 必须是同一 WAL 基线。先同步 backup，再清空 WAL：
+        // 任一中间崩溃窗口里，至少存在一组可重放的一致 base + WAL。
+        file.copyTo(backup, overwrite = true)
         FileOutputStream(journal, false).use { it.fd.sync() }
         cachedDocument = document
         cachedStamp = documentStamp()
