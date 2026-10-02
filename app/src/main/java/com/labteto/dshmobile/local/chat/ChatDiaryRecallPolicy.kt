@@ -10,9 +10,10 @@ internal data class ChatLongTermMemoryBudget(
 
 internal fun chatLongTermMemoryBudget(contextWindowTokens: Int?): ChatLongTermMemoryBudget {
     val total = when {
-        contextWindowTokens != null && contextWindowTokens <= 8_192 -> 800
-        contextWindowTokens != null && contextWindowTokens <= 16_384 -> 1_400
-        contextWindowTokens != null && contextWindowTokens <= 32_768 -> 1_800
+        contextWindowTokens == null -> 800
+        contextWindowTokens <= 8_192 -> 800
+        contextWindowTokens <= 16_384 -> 1_400
+        contextWindowTokens <= 32_768 -> 1_800
         else -> 2_200
     }
     return ChatLongTermMemoryBudget(
