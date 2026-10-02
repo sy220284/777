@@ -11,6 +11,7 @@ internal object LocalEnvironmentReport {
         contextChars: Int,
         contextBudgetChars: Int,
         requestPressure: LocalPromptPressure? = null,
+        contextWindow: LocalContextWindowSnapshot? = null,
         workBudget: LocalWorkExecutionBudget.Snapshot? = null,
         pendingInputs: Int,
         pendingInputLimit: Int,
@@ -29,6 +30,12 @@ internal object LocalEnvironmentReport {
                 "压力 ${resources.pressure.name.lowercase()}",
         )
         appendLine("持久模型历史：$contextChars/$contextBudgetChars 字符")
+        contextWindow?.let { window ->
+            appendLine(
+                "上下文窗口代际：#${window.generation}；起始 ${window.prefillTokens} token" +
+                    "（${window.prefillSource}）；本代峰值 ${window.peakInputTokens} token",
+            )
+        }
         requestPressure?.let { pressure ->
             append("最近真实请求：")
             append(pressure.contextChars).append(" 字符，预计 ")
