@@ -30,7 +30,14 @@ internal class ChatDiaryStore(
         val now = System.currentTimeMillis()
         val document = readDocument()
         val entries = document.entries.toMutableList()
-        val disclosure = normalizedDisclosure(delta.disclosure, request.sourceMode)
+        val disclosure = if (
+            request.sourceMode == ChatDiarySourceMode.DIRECT &&
+            PRIVACY_SIGNAL.containsMatchIn(request.evidenceText)
+        ) {
+            ChatDiaryDisclosure.PRIVATE
+        } else {
+            normalizedDisclosure(delta.disclosure, request.sourceMode)
+        }
 
         val candidate = ChatDiaryEntry(
             id = UUID.randomUUID().toString(),
@@ -307,12 +314,21 @@ internal class ChatDiaryStore(
             .take(limit)
 
     private fun diarySimilarity(left: String, right: String): Double {
-        val a = diaryBigrams(normalizeDiaryText(left))
-        val b = diaryBigrams(normalizeDiaryText(right))
+        val normalizedLeft = normalizeDiaryText(left)
+        val normalizedRight = normalizeDiaryText(right)
+        if (hasNegation(normalizedLeft) != hasNegation(normalizedRight)) return 0.0
+        val a = diaryBigrams(normalizedLeft)
+        val b = diaryBigrams(normalizedRight)
         if (a.isEmpty() || b.isEmpty()) return 0.0
         val shared = a.count(b::contains).toDouble()
-        return shared / a.union(b).size.toDouble()
+        val union = a.union(b).size.toDouble()
+        val containment = shared / minOf(a.size, b.size).toDouble()
+        val jaccard = if (union == 0.0) 0.0 else shared / union
+        return maxOf(containment, jaccard)
     }
+
+    private fun hasNegation(text: String): Boolean =
+        NEGATION_SIGNAL.containsMatchIn(text)
 
     private fun diaryTerms(text: String): Set<String> {
         val normalized = normalizeDiaryText(text)
@@ -352,5 +368,7 @@ internal class ChatDiaryStore(
         const val DAY_MILLIS = 24 * 60 * 60 * 1_000L
         const val DUPLICATE_SIMILARITY = 0.72
         const val MIN_EVIDENCE_COVERAGE = 0.18
+        val NEGATION_SIGNAL = Regex("""(?:不再|不用|不要|别再|别|没有|没|未|不|取消|撤销|拒绝)""")
+        val PRIVACY_SIGNAL = Regex("""(?:别告诉|不要告诉|别跟.+说|不要跟.+说|保密|秘密|只告诉你|只跟你说|别让.+知道)""")
     }
 }
