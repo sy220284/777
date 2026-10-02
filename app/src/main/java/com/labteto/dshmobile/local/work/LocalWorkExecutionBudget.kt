@@ -25,18 +25,28 @@ internal class LocalWorkExecutionBudget(
     private var pendingExposureTokens: Long = 0L
     private var reservedRequests: Int = 0
     private var admittedRequests: Int = 0
-    private var estimateScale: Double = 1.0
-    private var calibrationSamples: Int = 0
+    private data class EstimateCalibration(
+        var scale: Double = 1.0,
+        var samples: Int = 0,
+    )
 
-    suspend fun reserve(estimatedInputTokens: Int): Lease {
+    private val calibrations = linkedMapOf<String, EstimateCalibration>()
+    private var lastCalibrationKey: String = DEFAULT_CALIBRATION_KEY
+
+    suspend fun reserve(
+        estimatedInputTokens: Int,
+        calibrationKey: String = DEFAULT_CALIBRATION_KEY,
+    ): Lease {
         val rawEstimate = estimatedInputTokens.coerceAtLeast(1).toLong()
+        val normalizedCalibrationKey = calibrationKey.trim().takeIf(String::isNotBlank)
+            ?: DEFAULT_CALIBRATION_KEY
         while (true) {
             var reservedEstimate = 0L
             val reserved = synchronized(this) {
                 if (admittedRequests + reservedRequests >= maxRequests) {
                     throw budgetExceeded("模型请求次数已达到 $maxRequests 次")
                 }
-                reservedEstimate = calibratedEstimate(rawEstimate)
+                reservedEstimate = calibratedEstimate(rawEstimate, normalizedCalibrationKey)
                 val committed = committedExposureTokens()
                 if (saturatingAdd(committed, reservedEstimate) > exposureLimitTokens) {
                     throw budgetExceeded("本轮预计模型输入已达到安全上限")
@@ -60,7 +70,9 @@ internal class LocalWorkExecutionBudget(
                     false
                 }
             }
-            if (reserved) return Lease(this, rawEstimate, reservedEstimate)
+            if (reserved) {
+                return Lease(this, rawEstimate, reservedEstimate, normalizedCalibrationKey)
+            }
             delay(PENDING_RECHECK_MILLIS)
         }
     }
@@ -75,19 +87,27 @@ internal class LocalWorkExecutionBudget(
         admittedRequests = admittedRequests,
         reservedRequests = reservedRequests,
         maxRequests = maxRequests,
-        estimateCalibrationPermille = (estimateScale * 1_000.0).toInt().coerceAtLeast(1),
-        calibrationSamples = calibrationSamples,
+        estimateCalibrationPermille = (
+            calibrations[lastCalibrationKey]?.scale?.times(1_000.0) ?: 1_000.0
+            ).toInt().coerceAtLeast(1),
+        calibrationSamples = calibrations.values.sumOf { it.samples },
+        calibrationRoutes = calibrations.size,
     )
 
     @Synchronized
-    private fun commit(rawEstimate: Long, reservedEstimate: Long, reportedInputTokens: Long?) {
+    private fun commit(
+        rawEstimate: Long,
+        reservedEstimate: Long,
+        reportedInputTokens: Long?,
+        calibrationKey: String,
+    ) {
         pendingExposureTokens = (pendingExposureTokens - reservedEstimate).coerceAtLeast(0L)
         reservedRequests = (reservedRequests - 1).coerceAtLeast(0)
         admittedRequests += 1
         val reported = reportedInputTokens?.takeIf { it > 0L }
         if (reported != null) {
             reportedExposureTokens = saturatingAdd(reportedExposureTokens, reported)
-            updateCalibration(rawEstimate, reported)
+            updateCalibration(calibrationKey, rawEstimate, reported)
         } else {
             uncertainExposureTokens = saturatingAdd(uncertainExposureTokens, reservedEstimate)
         }
@@ -100,24 +120,31 @@ internal class LocalWorkExecutionBudget(
     }
 
     @Synchronized
-    private fun calibratedEstimate(rawEstimate: Long): Long {
-        if (calibrationSamples <= 0) return rawEstimate
-        return ceil(rawEstimate.toDouble() * estimateScale)
+    private fun calibratedEstimate(rawEstimate: Long, calibrationKey: String): Long {
+        val calibration = calibrations[calibrationKey] ?: return rawEstimate
+        if (calibration.samples <= 0) return rawEstimate
+        return ceil(rawEstimate.toDouble() * calibration.scale)
             .toLong()
             .coerceAtLeast(1L)
     }
 
     @Synchronized
-    private fun updateCalibration(rawEstimate: Long, reportedInputTokens: Long) {
+    private fun updateCalibration(
+        calibrationKey: String,
+        rawEstimate: Long,
+        reportedInputTokens: Long,
+    ) {
         if (rawEstimate <= 0L || reportedInputTokens <= 0L) return
         val observed = (reportedInputTokens.toDouble() / rawEstimate.toDouble())
             .coerceIn(MIN_ESTIMATE_SCALE, MAX_ESTIMATE_SCALE)
-        estimateScale = if (calibrationSamples == 0) {
+        val calibration = calibrations.getOrPut(calibrationKey) { EstimateCalibration() }
+        calibration.scale = if (calibration.samples == 0) {
             observed
         } else {
-            estimateScale * 0.75 + observed * 0.25
+            calibration.scale * 0.75 + observed * 0.25
         }
-        calibrationSamples = (calibrationSamples + 1).coerceAtMost(Int.MAX_VALUE)
+        calibration.samples = (calibration.samples + 1).coerceAtMost(Int.MAX_VALUE)
+        lastCalibrationKey = calibrationKey
     }
 
     @Synchronized
@@ -134,12 +161,13 @@ internal class LocalWorkExecutionBudget(
         private val owner: LocalWorkExecutionBudget,
         private val rawEstimate: Long,
         private val reservedEstimate: Long,
+        private val calibrationKey: String,
     ) {
         private val settled = AtomicBoolean(false)
 
         fun commit(reportedInputTokens: Long? = null) {
             if (settled.compareAndSet(false, true)) {
-                owner.commit(rawEstimate, reservedEstimate, reportedInputTokens)
+                owner.commit(rawEstimate, reservedEstimate, reportedInputTokens, calibrationKey)
             }
         }
 
@@ -159,6 +187,7 @@ internal class LocalWorkExecutionBudget(
         val maxRequests: Int,
         val estimateCalibrationPermille: Int,
         val calibrationSamples: Int,
+        val calibrationRoutes: Int,
     )
 
     private fun saturatingAdd(left: Long, right: Long): Long {
@@ -173,6 +202,7 @@ internal class LocalWorkExecutionBudget(
         const val PENDING_RECHECK_MILLIS = 100L
         const val MIN_ESTIMATE_SCALE = 0.35
         const val MAX_ESTIMATE_SCALE = 1.25
+        const val DEFAULT_CALIBRATION_KEY = "default"
     }
 }
 
@@ -266,7 +296,7 @@ internal suspend fun executeWithModelAdmission(
         )
     }
     control?.circuitBreaker?.requireClosed(profileId)
-    val lease = control?.budget?.reserve(pressure.estimatedInputTokens)
+    val lease = control?.budget?.reserve(pressure.estimatedInputTokens, profileId)
     try {
         val reply = block()
         lease?.commit(reply.usage.promptTokens.takeIf { reply.usage.reported })
