@@ -2991,6 +2991,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
                 compactHistoryIfNeeded(
                     extraTokens = productContextTokens + estimateModelTokens(tools.toString()),
+                    binding = binding,
                 )
                 val durableRequestMessages = if (snapshot.usageMode == LocalUsageMode.CHAT) {
                     withChatTurnContext(
@@ -4686,13 +4687,13 @@ class LocalHarnessEngine @Inject constructor(
             currentHistoryChars = history.encodedChars,
             currentHistoryTokens = history.estimatedTokens,
         )
+        val stored = callId?.let { toolOutputStore.store(sessionId, it, result) } != null
         val retained = retainTextForModel(
             value = result,
             maxTokens = budget.maxToolResultTokens,
             maxChars = budget.maxToolResultChars,
         )
         if (!retained.truncated) return retained.text
-        val stored = callId?.let { toolOutputStore.store(sessionId, it, result) } != null
         val recovery = when {
             callId == null -> "请缩小查询范围后继续读取。"
             stored -> "可调用 tool_output_read，并传入 call_id=$callId 分段读取完整结果。"
