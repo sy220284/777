@@ -636,7 +636,7 @@ internal fun LocalConversationSurface(
                             onRegenerate = onRegenerate,
                         )
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
-                        is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages)
+                        is LocalTranscriptItem.WorkProcess -> WorkProcessRow(transcriptItem.messages, state.running && state.usageMode == LocalUsageMode.WORK && transcriptItem.key == (transcriptItems.lastOrNull() as? LocalTranscriptItem.WorkProcess)?.key)
                     }
                 }
                 if (state.usageMode == LocalUsageMode.CHAT && state.running) {
@@ -670,6 +670,7 @@ internal fun LocalConversationSurface(
                 sessionId = state.sessionId,
                 streamingState = streamingState,
                 surfaceColor = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+                hasDurableProgress = transcriptItems.lastOrNull() is LocalTranscriptItem.WorkProcess,
             )
         }
 
