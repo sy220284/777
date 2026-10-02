@@ -4991,12 +4991,10 @@ class LocalHarnessEngine @Inject constructor(
             configured = modelConfigured,
             model = model,
             baseUrl = baseUrl,
-            modelSelection = LocalModelSelectionState(
-                profiles = modelProfiles,
-                activeProfileId = activeModelProfile?.id,
-                workerProfileId = preferences
-                    .getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null)
-                    ?.takeIf { workerId -> modelProfiles.any { it.id == workerId } },
+            modelSelection = LocalModelSelectionState.restored(
+                modelProfiles,
+                activeModelProfile?.id,
+                preferences.getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null),
             ),
             mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
             subagentMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
