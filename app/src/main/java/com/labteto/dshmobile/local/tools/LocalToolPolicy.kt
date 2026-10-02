@@ -12,25 +12,6 @@ internal enum class LocalAutoApprovalScope {
 
 /** Explicit classifications: adding a built-in requires deciding its permissions and approval boundary. */
 internal object LocalToolPolicy {
-    /**
-     * Shell is a process escape hatch, not a workspace-bounded file API. A child process shares the
-     * app UID and can therefore reach app-private state outside the workspace even when its cwd starts
-     * inside the workspace. Static command inspection remains defence-in-depth only; bash never
-     * qualifies for global auto-approval.
-     */
-    // Reuse the boundary's canonical deny set so shell prompts and file enforcement cannot drift.
-    // This is intentionally conservative for shell text: a visible forbidden prefix keeps a prompt.
-    private val FIRMWARE_PATH_MARKERS = LocalSandboxBoundary.DEFAULT_FORBIDDEN_PREFIXES
-
-    /**
-     * Operation names that rewrite history or discard work that cannot be restored from a remote.
-     *
-     * These are deliberate user-visible guardrails rather than sandbox enforcement: the user data a
-     * force-push destroys is exactly what the boundary is meant to leave reachable, so the prompt is
-     * the only thing standing between a mistake and an unrecoverable loss.
-     */
-    private val DESTRUCTIVE_GIT_OPERATIONS = listOf("reset --hard", "clean -fd", "clean -fdx", "filter-branch")
-
     private val aliases = mapOf(
         "read_file" to "read", "write_file" to "write", "edit_file" to "edit",
         "glob_files" to "glob", "search_text" to "grep", "run_shell" to "bash",
