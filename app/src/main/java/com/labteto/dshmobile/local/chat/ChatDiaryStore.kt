@@ -51,9 +51,7 @@ internal class ChatDiaryStore(
             importance = delta.importance,
             sourceMode = request.sourceMode,
             disclosure = disclosure,
-            sourceSessionId = request.sourceSessionId,
-            sourceUserMessageIds = request.sourceUserMessageIds.cleanIds(),
-            sourceAssistantMessageIds = request.sourceAssistantMessageIds.cleanIds(),
+            sources = diarySources(request),
             generation = request.generation,
             createdAt = now,
             updatedAt = now,
@@ -79,10 +77,9 @@ internal class ChatDiaryStore(
                 unresolvedEcho = richer(previous.unresolvedEcho, candidate.unresolvedEcho, MAX_ECHO_CHARS),
                 importance = maxOf(previous.importance, candidate.importance),
                 disclosure = stricterDisclosure(previous.disclosure, candidate.disclosure),
-                sourceUserMessageIds = (previous.sourceUserMessageIds + candidate.sourceUserMessageIds)
-                    .distinct().takeLast(MAX_SOURCE_IDS),
-                sourceAssistantMessageIds = (previous.sourceAssistantMessageIds + candidate.sourceAssistantMessageIds)
-                    .distinct().takeLast(MAX_SOURCE_IDS),
+                sources = (previous.sources + candidate.sources)
+                    .distinct()
+                    .takeLast(MAX_SOURCE_IDS),
                 updatedAt = now,
             ).also { entries[duplicateIndex] = it }
         } else {
@@ -150,15 +147,41 @@ internal class ChatDiaryStore(
         var changed = 0
         entries.indices.forEach { index ->
             val entry = entries[index]
-            if (!entry.active || entry.sourceSessionId != sourceSessionId) return@forEach
-            val sourcedIds = entry.sourceUserMessageIds + entry.sourceAssistantMessageIds
-            val invalid = if (discardedMessageIds.isNotEmpty()) {
-                sourcedIds.any(discardedMessageIds::contains)
-            } else {
-                entry.createdAt >= createdAtInclusive
+            if (!entry.active || entry.sources.none { it.sessionId == sourceSessionId }) return@forEach
+            val remaining = entry.sources.filterNot { source ->
+                if (source.sessionId != sourceSessionId) {
+                    false
+                } else if (discardedMessageIds.isNotEmpty()) {
+                    source.userMessageId in discardedMessageIds ||
+                        source.assistantMessageId in discardedMessageIds
+                } else {
+                    entry.updatedAt >= createdAtInclusive
+                }
             }
-            if (invalid) {
-                entries[index] = entry.copy(active = false, updatedAt = now)
+            if (remaining.size != entry.sources.size) {
+                entries[index] = if (remaining.isEmpty()) {
+                    entry.copy(active = false, sources = emptyList(), updatedAt = now)
+                } else {
+                    entry.copy(sources = remaining, updatedAt = now)
+                }
+                changed++
+            }
+        }
+        if (changed > 0) writeDocument(ChatDiaryDocument(entries = entries))
+        return changed
+    }
+
+    @Synchronized
+    fun detachSourceSessions(sessionIds: Set<String>): Int {
+        if (sessionIds.isEmpty()) return 0
+        val entries = readDocument().entries.toMutableList()
+        val now = System.currentTimeMillis()
+        var changed = 0
+        entries.indices.forEach { index ->
+            val entry = entries[index]
+            val remaining = entry.sources.filterNot { it.sessionId in sessionIds }
+            if (remaining.size != entry.sources.size) {
+                entries[index] = entry.copy(sources = remaining, updatedAt = now)
                 changed++
             }
         }
@@ -303,8 +326,29 @@ internal class ChatDiaryStore(
             .filter(String::isNotBlank)
             .joinToString(" ")
 
-    private fun List<String>.cleanIds(): List<String> =
-        asSequence().map(String::trim).filter(String::isNotBlank).distinct().takeLast(MAX_SOURCE_IDS).toList()
+    private fun diarySources(request: ChatDiaryWriteRequest): List<ChatDiarySourceRef> {
+        val users = request.sourceUserMessageIds.map(String::trim)
+        val assistants = request.sourceAssistantMessageIds.map(String::trim)
+        val count = maxOf(users.size, assistants.size)
+        val sources = (0 until count).mapNotNull { index ->
+            val userId = users.getOrNull(index).orEmpty()
+            val assistantId = assistants.getOrNull(index).orEmpty()
+            if (userId.isBlank() && assistantId.isBlank()) {
+                null
+            } else {
+                ChatDiarySourceRef(
+                    sessionId = request.sourceSessionId,
+                    userMessageId = userId,
+                    assistantMessageId = assistantId,
+                )
+            }
+        }.distinct()
+        return if (sources.isNotEmpty()) {
+            sources.takeLast(MAX_SOURCE_IDS)
+        } else {
+            listOf(ChatDiarySourceRef(sessionId = request.sourceSessionId))
+        }
+    }
 
     private fun richer(left: String, right: String, limit: Int): String =
         listOf(left.trim(), right.trim())
