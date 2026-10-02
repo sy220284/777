@@ -49,6 +49,7 @@ class ChatDiaryStoreTest {
                 importance = 3,
                 disclosure = "SHAREABLE",
             ),
+            evidence = "用户说他一直喜欢雨天散步，角色说以后下雨会想到这句话",
         ))
         memory.record(request(
             delta = ChatDiaryDelta(
