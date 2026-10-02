@@ -115,7 +115,7 @@ internal class LocalMemoryCoordinator(
         val recallDiary = shouldRecallDiary(query)
         if (!recallFacts && !recallDiary) return ""
 
-        val subjectLabel = viewerName?.trim().takeUnless { it.isNullOrBlank() }
+        val subjectLabel = viewerName?.trim()?.takeIf(String::isNotBlank)
             ?: snapshot.chatPersona.name
         val contextWindow = documentedContextWindowTokens(
             snapshot.model,
