@@ -7,7 +7,7 @@ import com.labteto.dshmobile.local.LocalModelProtocol
 import com.labteto.dshmobile.local.LocalModelPresets
 import com.labteto.dshmobile.local.modelProfileId
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
-import com.labteto.dshmobile.local.model.chatgpt.chatGptPlanProfiles
+import com.labteto.dshmobile.local.model.chatgpt.refreshChatGptPlanProfiles
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.contentOrNull
@@ -62,13 +62,8 @@ internal class LocalModelProfileStore(
         editor.apply()
     }
 
-    fun replaceChatGpt(accountId: String, models: List<ChatGptModelOption>): List<LocalModelProfile> {
-        val retained = read().filterNot {
-            it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
-        }
-        val added = chatGptPlanProfiles(accountId, models)
-        return (retained + added).distinctBy(LocalModelProfile::id).also(::write)
-    }
+    fun replaceChatGpt(accountId: String, models: List<ChatGptModelOption>): List<LocalModelProfile> =
+        refreshChatGptPlanProfiles(read(), accountId, models).also(::write)
 
     fun migrateV2IfNeeded() {
         if (preferences.contains(KEY_PROFILES_V3)) return
