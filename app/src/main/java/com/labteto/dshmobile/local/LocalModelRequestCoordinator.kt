@@ -63,15 +63,16 @@ internal class LocalModelRequestCoordinator(
             snapshot.baseUrl,
         )
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
+        val resolvedProtocol = resolveLocalModelProtocol(
+            authKind = frozenProfile.authKind,
+            profile = frozenProfile,
+            model = frozenProfile.model,
+            baseUrl = frozenProfile.baseUrl,
+        )
         val runtimeCapabilities = LocalModelPresets.runtimeCapabilitiesFor(
             model = frozenProfile.model,
             baseUrl = frozenProfile.baseUrl,
-            protocol = resolveLocalModelProtocol(
-                authKind = frozenProfile.authKind,
-                profile = frozenProfile,
-                model = frozenProfile.model,
-                baseUrl = frozenProfile.baseUrl,
-            ),
+            protocol = resolvedProtocol,
             authKind = frozenProfile.authKind,
         )
         val routeFingerprint = frozenProfile.routeFingerprint()
@@ -157,7 +158,8 @@ internal class LocalModelRequestCoordinator(
             put("profile_id", frozenProfile.id)
             put("provider", frozenProfile.provider)
             put("auth_kind", frozenProfile.authKind.name)
-            put("protocol", frozenProfile.protocol.name)
+            put("protocol", resolvedProtocol.name)
+            put("route_fingerprint", routeFingerprint)
             frozenProfile.credentialRef?.takeLast(8)?.let { put("credential_ref_tail", it) }
             credentialDiagnostic.clientIdTail?.let { put("client_id_tail", it) }
             credentialDiagnostic.selectedAccountTail?.let { put("selected_account_tail", it) }
@@ -245,7 +247,7 @@ internal class LocalModelRequestCoordinator(
                                 }
                                 append("origin=${if (localPreflight) "local_preflight" else "provider_or_transport"} ")
                                 append("retryable=${event.retryable} profile_id=${frozenProfile.id} ")
-                                append("auth_kind=${frozenProfile.authKind.name} protocol=${frozenProfile.protocol.name} ")
+                                append("auth_kind=${frozenProfile.authKind.name} protocol=${resolvedProtocol.name} ")
                                 credentialDiagnostic.credentialRefTail?.let { append("credential_ref_tail=$it ") }
                                 credentialDiagnostic.clientIdTail?.let { append("client_id_tail=$it ") }
                                 credentialDiagnostic.selectedAccountTail?.let { append("selected_account_tail=$it ") }
@@ -265,7 +267,7 @@ internal class LocalModelRequestCoordinator(
                                     put("profile_id", frozenProfile.id)
                                     put("provider", frozenProfile.provider)
                                     put("auth_kind", frozenProfile.authKind.name)
-                                    put("protocol", frozenProfile.protocol.name)
+                                    put("protocol", resolvedProtocol.name)
                                     put("route_fingerprint", routeFingerprint)
                                     put("message_count", logMessages.size)
                                     put("context_chars", contextChars)
@@ -436,8 +438,9 @@ internal class LocalModelRequestCoordinator(
                                     route?.provider?.takeIf(String::isNotBlank)?.let { put("provider", it) }
                                     route?.authKind?.takeIf(String::isNotBlank)?.let { put("auth_kind", it) }
                                     route?.protocol?.takeIf(String::isNotBlank)?.let { put("protocol", it) }
+                                    put("route_fingerprint", routeFingerprint)
                                     route?.fingerprint?.takeIf(String::isNotBlank)?.let {
-                                        put("route_fingerprint", it)
+                                        put("reply_route_fingerprint", it)
                                     }
                                 })
                                 if (runtimeCapabilities.promptCacheDiagnostics && reply.requestId.isNotBlank()) {
