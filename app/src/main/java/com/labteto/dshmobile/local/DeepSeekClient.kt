@@ -76,13 +76,13 @@ class DeepSeekClient @Inject constructor(
                 if (shouldSendToolChoice(baseUrl, model)) put("tool_choice", "auto")
             }
         }
+        val admissionTracker = LocalModelAdmissionTracker()
         val request = Request.Builder()
             .url(endpoint(baseUrl))
             .header("Authorization", "Bearer $apiKey")
             .header("Content-Type", "application/json")
-            .post(payload.toString().toRequestBody(JSON_MEDIA))
+            .post(payload.toString().toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
             .build()
-        var responseAdmitted = false
         try {
             withCancellableModelResponse(modelHttp.newCall(request)) { response ->
                 if (!response.isSuccessful) {
@@ -92,9 +92,12 @@ class DeepSeekClient @Inject constructor(
                         code = "MODEL_HTTP_${response.code}",
                         message = "模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
+                        status = response.code,
+                        requestId = requestId,
+                        admissionState = LocalModelAdmissionState.REJECTED,
                     )
                 }
-                responseAdmitted = true
+                admissionTracker.markAdmitted()
                 val body = response.readModelBodyBounded()
                 parse(body).copy(
                     requestId = requestId,
@@ -104,7 +107,7 @@ class DeepSeekClient @Inject constructor(
         } catch (error: LocalModelException) {
             throw error
         } catch (error: SocketTimeoutException) {
-            if (responseAdmitted) {
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
                 throw modelPostAdmissionFailure(
                     code = "MODEL_RESPONSE_INTERRUPTED_AFTER_ADMISSION",
                     detail = "模型响应读取超时",
@@ -112,14 +115,15 @@ class DeepSeekClient @Inject constructor(
                     cause = error,
                 )
             }
-            throw LocalModelException(
+            throw modelTransportFailure(
                 code = "MODEL_TIMEOUT",
-                message = "模型推理超时：${error.message ?: "请求未在时限内完成"}",
-                retryable = true,
+                detail = "模型推理超时：${error.message ?: "请求未在时限内完成"}",
+                tracker = admissionTracker,
+                requestId = requestId,
                 cause = error,
             )
         } catch (error: java.io.IOException) {
-            if (responseAdmitted) {
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
                 throw modelPostAdmissionFailure(
                     code = "MODEL_RESPONSE_INTERRUPTED_AFTER_ADMISSION",
                     detail = "模型响应连接中断",
@@ -127,10 +131,11 @@ class DeepSeekClient @Inject constructor(
                     cause = error,
                 )
             }
-            throw LocalModelException(
+            throw modelTransportFailure(
                 code = "MODEL_NETWORK",
-                message = "模型网络请求失败：${error.message ?: "网络异常"}",
-                retryable = true,
+                detail = "模型网络请求失败：${error.message ?: "网络异常"}",
+                tracker = admissionTracker,
+                requestId = requestId,
                 cause = error,
             )
         }
@@ -165,13 +170,13 @@ class DeepSeekClient @Inject constructor(
                 if (shouldSendToolChoice(baseUrl, model)) put("tool_choice", "auto")
             }
         }
+        val admissionTracker = LocalModelAdmissionTracker()
         val request = Request.Builder()
             .url(endpoint(baseUrl))
             .header("Authorization", "Bearer $apiKey")
             .header("Content-Type", "application/json")
-            .post(payload.toString().toRequestBody(JSON_MEDIA))
+            .post(payload.toString().toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
             .build()
-        var responseAdmitted = false
         try {
             withCancellableModelResponse(modelHttp.newCall(request)) { response ->
                 if (!response.isSuccessful) {
@@ -181,9 +186,12 @@ class DeepSeekClient @Inject constructor(
                         code = "MODEL_HTTP_${response.code}",
                         message = "模型请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
                         retryable = response.code == 408 || response.code == 429 || response.code >= 500,
+                        status = response.code,
+                        requestId = requestId,
+                        admissionState = LocalModelAdmissionState.REJECTED,
                     )
                 }
-                responseAdmitted = true
+                admissionTracker.markAdmitted()
                 val responseBody = response.body ?: throw modelPostAdmissionFailure(
                     code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
                     detail = "模型流式响应为空",
@@ -359,7 +367,7 @@ class DeepSeekClient @Inject constructor(
         } catch (error: LocalModelException) {
             throw error
         } catch (error: SocketTimeoutException) {
-            if (responseAdmitted) {
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
                 throw modelPostAdmissionFailure(
                     code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
                     detail = "模型流式响应超时",
@@ -367,14 +375,15 @@ class DeepSeekClient @Inject constructor(
                     cause = error,
                 )
             }
-            throw LocalModelException(
+            throw modelTransportFailure(
                 code = "MODEL_TIMEOUT",
-                message = "模型推理超时：${error.message ?: "请求未在时限内完成"}",
-                retryable = true,
+                detail = "模型推理超时：${error.message ?: "请求未在时限内完成"}",
+                tracker = admissionTracker,
+                requestId = requestId,
                 cause = error,
             )
         } catch (error: java.io.IOException) {
-            if (responseAdmitted) {
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
                 throw modelPostAdmissionFailure(
                     code = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
                     detail = "模型流式连接中断",
@@ -382,10 +391,11 @@ class DeepSeekClient @Inject constructor(
                     cause = error,
                 )
             }
-            throw LocalModelException(
+            throw modelTransportFailure(
                 code = "MODEL_NETWORK",
-                message = "模型网络请求失败：${error.message ?: "网络异常"}",
-                retryable = true,
+                detail = "模型网络请求失败：${error.message ?: "网络异常"}",
+                tracker = admissionTracker,
+                requestId = requestId,
                 cause = error,
             )
         }
