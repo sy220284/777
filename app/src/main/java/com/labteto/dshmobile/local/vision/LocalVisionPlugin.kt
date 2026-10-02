@@ -331,6 +331,13 @@ class LocalVisionPlugin(
         return "data:$mime;base64,$encoded"
     }
 
+    private fun JsonObject.requiredString(name: String): String =
+        this[name]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf(String::isNotEmpty)
+            ?: error("缺少参数：$name")
+
+    private fun JsonObject.optionalBoolean(name: String): Boolean =
+        this[name]?.jsonPrimitive?.booleanOrNull == true
+
     private companion object {
         val VISION_DISCOVERY_KEYWORDS = setOf(
             "vision", "视觉", "图片", "图像", "截图", "屏幕", "识别", "像素",
