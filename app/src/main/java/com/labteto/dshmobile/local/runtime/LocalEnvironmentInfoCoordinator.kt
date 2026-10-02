@@ -20,6 +20,7 @@ internal class LocalEnvironmentInfoCoordinator(
     private val foregroundSessionId: () -> String,
     private val foregroundHistory: () -> LocalModelHistoryBuffer,
     private val foregroundPendingInputs: () -> Int,
+    private val pendingInputLimit: Int,
     private val foregroundWorkBudget: (String) -> LocalWorkExecutionBudget.Snapshot?,
 ) {
     fun build(binding: LocalWorkRunBinding?): String {
@@ -44,7 +45,7 @@ internal class LocalEnvironmentInfoCoordinator(
             latestRequest = latestRequest,
             capabilitySummary = toolExecutionCoordinator.capabilitySummary(enabledOptional),
             pendingInputs = pendingInputCount,
-            pendingInputLimit = LocalHarnessEngine.MAX_PENDING_INPUTS,
+            pendingInputLimit = pendingInputLimit,
             commands = commands,
             runtimeStatuses = runtimeStatuses(),
             recentDiagnostics = diagnostics(),
