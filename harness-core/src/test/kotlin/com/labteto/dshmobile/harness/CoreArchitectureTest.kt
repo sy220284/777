@@ -11,9 +11,13 @@ import com.labteto.dshmobile.harness.session.SessionDocument
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
+import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
@@ -47,8 +51,12 @@ class CoreArchitectureTest {
                 context.tools.register(
                     HarnessTool(
                         name = "echo",
-                        schema = buildJsonObject { put("name", "echo") },
-                        executor = HarnessToolExecutor { _, input, _ ->
+                        schema = functionToolSchema("echo", "测试工具"),
+                                        access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("测试"),
+executor = HarnessToolExecutor { _, input, _ ->
                             ToolResult(input["text"].toString())
                         },
                     ),
@@ -155,8 +163,12 @@ class CoreArchitectureTest {
                 context.tools.register(
                     HarnessTool(
                         name = "partial-tool",
-                        schema = buildJsonObject { put("name", "partial-tool") },
-                        executor = HarnessToolExecutor { _, _, _ -> ToolResult("partial") },
+                        schema = functionToolSchema("partial-tool", "测试工具"),
+                                        access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("测试"),
+executor = HarnessToolExecutor { _, _, _ -> ToolResult("partial") },
                     ),
                 )
                 error("install exploded")
@@ -185,8 +197,12 @@ class CoreArchitectureTest {
                 context.tools.register(
                     HarnessTool(
                         name = "first-tool",
-                        schema = buildJsonObject { put("name", "first-tool") },
-                        executor = HarnessToolExecutor { _, _, _ -> ToolResult("first") },
+                        schema = functionToolSchema("first-tool", "测试工具"),
+                                        access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("测试"),
+executor = HarnessToolExecutor { _, _, _ -> ToolResult("first") },
                     ),
                 )
             }
@@ -201,8 +217,12 @@ class CoreArchitectureTest {
                 context.tools.register(
                     HarnessTool(
                         name = "second-tool",
-                        schema = buildJsonObject { put("name", "second-tool") },
-                        executor = HarnessToolExecutor { _, _, _ -> ToolResult("second") },
+                        schema = functionToolSchema("second-tool", "测试工具"),
+                                        access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("测试"),
+executor = HarnessToolExecutor { _, _, _ -> ToolResult("second") },
                     ),
                 )
                 error("second failed")
@@ -226,8 +246,12 @@ class CoreArchitectureTest {
                 context.tools.register(
                     HarnessTool(
                         name = "stable-tool",
-                        schema = buildJsonObject { put("name", "stable-tool") },
-                        executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+                        schema = functionToolSchema("stable-tool", "测试工具"),
+                                        access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("测试"),
+executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
                     ),
                 )
             }
@@ -254,9 +278,12 @@ class CoreArchitectureTest {
         registry.context.tools.register(
             HarnessTool(
                 name = "danger",
-                schema = buildJsonObject { put("name", "danger") },
+                schema = functionToolSchema("danger", "测试工具"),
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
-                executor = HarnessToolExecutor { _, _, _ ->
+                                access = ToolAccess.READ_ONLY,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("测试"),
+executor = HarnessToolExecutor { _, _, _ ->
                     executions += 1
                     ToolResult("executed")
                 },
@@ -298,9 +325,13 @@ class CoreArchitectureTest {
         registry.context.tools.register(
             HarnessTool(
                 name = "slow",
-                schema = buildJsonObject { put("name", "slow") },
+                schema = functionToolSchema("slow", "测试工具"),
                 timeoutMillis = 25L,
-                executor = HarnessToolExecutor { _, _, _ ->
+                                access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("测试"),
+executor = HarnessToolExecutor { _, _, _ ->
                     delay(5_000L)
                     ToolResult("late")
                 },
