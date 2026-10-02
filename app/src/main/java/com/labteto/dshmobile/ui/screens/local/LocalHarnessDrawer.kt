@@ -130,6 +130,13 @@ internal fun LocalModeDrawer(
         }
     }
     val selectedIds = remember { mutableStateListOf<String>() }
+
+    LaunchedEffect(usageMode) {
+        selectionOpen = false
+        selectedIds.clear()
+    }
+
+    val galleryById = remember(gallery) { gallery.associateBy { it.id } }
     val visibleSessions = remember(sessions, usageMode, pinnedSessionIds) {
         sessions.filter { !it.blank && it.usageMode == usageMode }
             .sortedWith(
@@ -283,9 +290,7 @@ internal fun LocalModeDrawer(
                     }
                 }
                 items(filteredSessions, key = { "session:${it.id}" }) { session ->
-                    val galleryEntry = session.galleryId?.let { id ->
-                        gallery.firstOrNull { it.id == id }
-                    }
+                    val galleryEntry = session.galleryId?.let { galleryById[it] }
                     val displayTitle = sessionTitleOverrides[session.id] ?: session.title
                     LocalSessionDrawerRow(
                         title = displayTitle,
