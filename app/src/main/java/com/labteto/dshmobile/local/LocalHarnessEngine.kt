@@ -618,9 +618,8 @@ class LocalHarnessEngine @Inject constructor(
             )
         },
         historySnapshot = historySnapshot,
+        executionControl = activeWorkRuns[sessionId]?.executionControl ?: LocalWorkExecutionControl(),
     )
-
-
     /**
      * Detached work runner for scheduled/webhook work.
      *
@@ -648,6 +647,7 @@ class LocalHarnessEngine @Inject constructor(
                 onApprovalBlocked = onApprovalBlocked,
             )
         },
+        executionControl = LocalWorkExecutionControl(),
     )
 
     private val runStateLock = Any()
