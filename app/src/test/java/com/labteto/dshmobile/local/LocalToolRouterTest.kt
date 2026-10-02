@@ -107,6 +107,39 @@ class LocalToolRouterTest {
     }
 
     @Test
+    fun optionalPromptBudgetNeverDropsCoreAndRejectsOversizedOptionalSchema() {
+        val core = tool("read", "读取文件", ToolExposure.CORE, "文件")
+        val small = tool("small_remote", "小型远端工具", ToolExposure.OPTIONAL, "MCP")
+        val huge = tool(
+            "huge_remote",
+            "超大远端工具" + "x".repeat(12_000),
+            ToolExposure.OPTIONAL,
+            "MCP",
+        )
+
+        assertEquals(
+            listOf("read"),
+            names(
+                LocalToolRouter.visibleSchemas(
+                    tools = listOf(core, small, huge),
+                    enabledOptional = linkedSetOf("small_remote", "huge_remote"),
+                    maxOptionalDefinitionTokens = 0,
+                ),
+            ),
+        )
+        assertEquals(
+            listOf("read", "small_remote"),
+            names(
+                LocalToolRouter.visibleSchemas(
+                    tools = listOf(core, small, huge),
+                    enabledOptional = linkedSetOf("small_remote", "huge_remote"),
+                    maxOptionalDefinitionTokens = LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun staleEnabledNameCannotResurrectAnUnregisteredTool() {
         val core = tool("read", "读取文件", ToolExposure.CORE, "文件")
         val removed = tool("removed", "已卸载工具", ToolExposure.OPTIONAL, "MCP", setOf("MCP"))
