@@ -21,8 +21,7 @@ internal class LocalSubagentHistoryPolicy(
             currentHistoryChars = history.encodedChars,
             currentHistoryTokens = history.estimatedTokens,
         )
-        val stored = retention == com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE &&
-            spillToolOutput(callId, output)
+        val stored = retention == com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE && spillToolOutput(callId, output)
         val retained = retainTextForModel(
             value = output,
             maxTokens = adaptiveBudget.maxToolResultTokens,
