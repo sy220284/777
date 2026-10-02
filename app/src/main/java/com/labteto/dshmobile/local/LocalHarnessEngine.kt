@@ -272,6 +272,27 @@ class LocalHarnessEngine @Inject constructor(
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
     private val requestPressureStore = LocalRequestPressureStore()
+    private val environmentInfoCoordinator by lazy {
+        LocalEnvironmentInfoCoordinator(
+            workspacePath = { workspace.path },
+            resourceSnapshot = resourceScheduler::snapshot,
+            historyBudget = ::currentHistoryBudget,
+            requestPressureStore = requestPressureStore,
+            usageTracker = usageTracker,
+            toolExecutionCoordinator = toolExecutionCoordinator,
+            commandAvailable = runtimeProcess::isCommandAvailable,
+            runtimeStatuses = bundledRuntimeManager::statuses,
+            diagnostics = AppLog::snapshot,
+            storageStatus = { LocalSessionArchiveMaintenance.storageStatus(sessionsRoot) },
+            processExitStatus = { LocalProcessExitStatus.read(context) },
+            foregroundSessionId = { currentSessionId },
+            foregroundHistory = { modelHistory },
+            foregroundPendingInputs = { pendingInputs.size() },
+            foregroundWorkBudget = { sessionId ->
+                activeWorkRuns[sessionId]?.executionControl?.budget?.snapshot()
+            },
+        )
+    }
     private val streamingPreviewStore = LocalStreamingPreviewStore()
     private val modelRequestCoordinator by lazy {
         LocalModelRequestCoordinator(
@@ -4858,42 +4879,8 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun environmentInfo(binding: LocalWorkRunBinding? = null): String {
-        val targetSessionId = binding?.sessionId ?: currentSessionId
-        val targetHistory = binding?.modelHistory ?: modelHistory
-        val targetPendingInputs = binding?.pendingInputs?.size() ?: pendingInputs.size()
-        val latestRequest = usageTracker.analyticsSnapshot().recentRecords
-            .firstOrNull { record ->
-                record.reported &&
-                    record.inputTokens > 0L &&
-                    record.context.sessionId == targetSessionId
-            }
-        val enabledOptional = binding?.enabledOptionalTools?.let { tools ->
-            synchronized(tools) { tools.toSet() }
-        } ?: toolExecutionCoordinator.enabledOptionalSnapshot()
-        val commands = listOf(
-            "sh", "ls", "cat", "cp", "mv", "rm", "mkdir", "sed", "grep", "find",
-            "git", "curl", "wget", "python3", "python", "node",
-        ).filter(runtimeProcess::isCommandAvailable)
-        return LocalEnvironmentReport.build(
-            workspacePath = workspace.path,
-            resources = resourceScheduler.snapshot(),
-            contextChars = targetHistory.encodedChars,
-            contextBudgetChars = currentHistoryBudget(binding).maxHistoryChars,
-            requestPressure = requestPressureStore.latest(targetSessionId),
-            contextWindow = requestPressureStore.window(targetSessionId),
-            workBudget = binding?.executionControl?.budget?.snapshot()
-                ?: activeWorkRuns[targetSessionId]?.executionControl?.budget?.snapshot(),
-            latestRequest = latestRequest,
-            capabilitySummary = toolExecutionCoordinator.capabilitySummary(enabledOptional),
-            pendingInputs = targetPendingInputs,
-            pendingInputLimit = MAX_PENDING_INPUTS,
-            commands = commands,
-            runtimeStatuses = bundledRuntimeManager.statuses(),
-            recentDiagnostics = AppLog.snapshot(),
-        ) + "\n" + LocalSessionArchiveMaintenance.storageStatus(sessionsRoot) +
-            "\n" + LocalProcessExitStatus.read(context)
-    }
+    private fun environmentInfo(binding: LocalWorkRunBinding? = null): String =
+        environmentInfoCoordinator.build(binding)
 
     private suspend fun load() {
         val storedModel = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
