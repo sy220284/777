@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Derives a bounded Work-only request surface from the durable model history.
@@ -67,8 +69,18 @@ internal fun projectWorkRequestContext(
     }
 
     val target = workRequestProjectionTargetTokens(limit)
-    val historyTokens = messages.sumOf { estimateModelTokens(it.toString()) }
-    val historyChars = messages.sumOf { it.toString().length }
+    val leadingSystemCount = messages.takeWhile { message ->
+        message["role"]?.jsonPrimitive?.contentOrNull == "system"
+    }.size
+    val protectedHead = messages.take(leadingSystemCount)
+    val compactableMessages = if (leadingSystemCount > 1) {
+        listOf(protectedHead.first()) + messages.drop(leadingSystemCount)
+    } else {
+        messages
+    }
+    val protectedHeadTokens = protectedHead.drop(1).sumOf { estimateModelTokens(it.toString()) }
+    val historyTokens = compactableMessages.sumOf { estimateModelTokens(it.toString()) }
+    val historyChars = compactableMessages.sumOf { it.toString().length }
     val budget = LocalHistoryBudget(
         // Token pressure owns the Work request projection. Character limits remain a separate heap
         // guard and should not accidentally make this route-specific projection more aggressive.
@@ -81,10 +93,10 @@ internal fun projectWorkRequestContext(
         maxToolResultTokens = WORK_REQUEST_TOOL_RESULT_TOKENS,
     )
     val compacted = compactHistoryWithStaleToolProjection(
-        history = messages,
+        history = compactableMessages,
         compactor = compactor,
         budget = budget,
-        extraTokens = beforePressure.toolDefinitionTokens,
+        extraTokens = beforePressure.toolDefinitionTokens + protectedHeadTokens,
         summaryMode = LocalHistorySummaryMode.WORK,
         currentChars = historyChars,
         currentTokens = historyTokens,
@@ -94,9 +106,14 @@ internal fun projectWorkRequestContext(
         estimatedTokensBefore = beforePressure.estimatedInputTokens,
         estimatedTokensAfter = beforePressure.estimatedInputTokens,
     )
+    val projectedMessages = if (leadingSystemCount > 1) {
+        protectedHead + compacted.messages.drop(1)
+    } else {
+        compacted.messages
+    }
 
     val afterPressure = LocalPromptPressureMeter.measure(
-        messages = compacted.messages,
+        messages = projectedMessages,
         tools = tools,
         operationalLimitTokens = limit,
     )
@@ -109,7 +126,7 @@ internal fun projectWorkRequestContext(
         )
     }
     return LocalWorkRequestProjection(
-        messages = compacted.messages,
+        messages = projectedMessages,
         projected = true,
         estimatedTokensBefore = beforePressure.estimatedInputTokens,
         estimatedTokensAfter = afterPressure.estimatedInputTokens,
