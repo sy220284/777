@@ -1,7 +1,11 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.chat.ChatMemorySelector
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.chatLongTermMemoryBudget
+import com.labteto.dshmobile.local.chat.shouldRecallDiary
+import com.labteto.dshmobile.local.chat.takeWithinModelTokenBudget
 import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
 import com.labteto.dshmobile.local.chat.relationshipMemoryMatchesSubject
@@ -18,6 +22,7 @@ internal class LocalMemoryCoordinator(
     private val state: MutableStateFlow<LocalHarnessState>,
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
+    private val diaryStore: ChatDiaryStore,
     private val currentSessionId: () -> String,
     private val eventLog: () -> LocalSessionEventLog,
     private val persist: () -> Unit,
@@ -89,45 +94,105 @@ internal class LocalMemoryCoordinator(
     fun chatRelationshipMemoryContext(
         query: String,
         snapshot: LocalHarnessState,
+    ): String = chatMemoryContext(query, snapshot)
+
+    fun chatMemoryContext(
+        query: String,
+        snapshot: LocalHarnessState,
+        viewerSubjectKey: String? = null,
+        viewerName: String? = null,
+        groupAudience: Boolean = snapshot.groupChat.enabled,
     ): String {
-        if (
-            snapshot.chatPersona.isUnboundChatPersona() ||
-            !snapshot.autoRecall ||
-            !ChatMemorySelector.shouldRecall(query)
-        ) return ""
-        val relationshipKinds = setOf(
-            MemoryKind.RELATIONSHIP_FACT,
-            MemoryKind.RELATIONSHIP_STATE,
-            MemoryKind.RELATIONSHIP_PREFERENCE,
-        )
-        val currentSubjectKey = chatRelationshipSubjectKey(
+        if (!snapshot.autoRecall) return ""
+        val subjectKey = viewerSubjectKey ?: chatRelationshipSubjectKey(
             snapshot.galleryId,
             snapshot.personaId,
         )
-        val recalled = memoryStore.search(
-            query = ChatMemorySelector.semanticQuery(query, snapshot.chatPersona.name),
-            allowedScopes = setOf(MemoryScope.GLOBAL, MemoryScope.LINEAGE),
-            projectId = null,
-            lineageId = snapshot.lineageId,
-            allowedKinds = relationshipKinds,
-            maxItems = 4,
-            maxChars = 4_000,
-            recordFilter = { memory ->
-                relationshipMemoryMatchesSubject(
-                    memory = memory,
-                    currentSubjectKey = currentSubjectKey,
-                    currentLineageId = snapshot.lineageId,
-                    subjectLabel = snapshot.chatPersona.name,
-                )
-            },
-        ).distinctBy { it.id }
-        if (recalled.isEmpty()) return ""
+        if (subjectKey.isNullOrBlank()) return ""
+        if (viewerSubjectKey == null && snapshot.chatPersona.isUnboundChatPersona()) return ""
 
-        return buildString {
-            appendLine("【本轮相关长期记忆】仅用于补足当前输入缺失的信息；已在当前状态出现的内容忽略。")
-            recalled.forEach { appendLine("- ${it.content}") }
-            append("与本轮冲突时以本轮为准；除非用户追问，不主动回顾。")
+        val recallFacts = ChatMemorySelector.shouldRecall(query)
+        val recallDiary = shouldRecallDiary(query)
+        if (!recallFacts && !recallDiary) return ""
+
+        val subjectLabel = viewerName?.trim().takeUnless { it.isNullOrBlank() }
+            ?: snapshot.chatPersona.name
+        val contextWindow = documentedContextWindowTokens(
+            snapshot.model,
+            snapshot.baseUrl,
+            snapshot.modelSelection.activeProfile?.contextWindowTokensOverride,
+        )
+        val budget = chatLongTermMemoryBudget(contextWindow)
+        val blocks = mutableListOf<String>()
+
+        if (recallFacts) {
+            val relationshipKinds = setOf(
+                MemoryKind.RELATIONSHIP_FACT,
+                MemoryKind.RELATIONSHIP_STATE,
+                MemoryKind.RELATIONSHIP_PREFERENCE,
+            )
+            val recalled = memoryStore.search(
+                query = ChatMemorySelector.semanticQuery(query, subjectLabel),
+                allowedScopes = setOf(MemoryScope.GLOBAL, MemoryScope.LINEAGE),
+                projectId = null,
+                lineageId = snapshot.lineageId,
+                allowedKinds = relationshipKinds,
+                maxItems = 4,
+                maxChars = (budget.factTokens * 3).coerceAtLeast(720),
+                recordFilter = { memory ->
+                    relationshipMemoryMatchesSubject(
+                        memory = memory,
+                        currentSubjectKey = subjectKey,
+                        currentLineageId = snapshot.lineageId,
+                        subjectLabel = subjectLabel,
+                    )
+                },
+            ).distinctBy { it.id }
+            if (recalled.isNotEmpty()) {
+                blocks += takeWithinModelTokenBudget(
+                    buildString {
+                        appendLine("【本轮相关长期事实】仅用于补足当前输入缺失的信息。")
+                        recalled.forEach { appendLine("- ${it.content}") }
+                    }.trim(),
+                    budget.factTokens,
+                )
+            }
         }
+
+        if (recallDiary) {
+            val diary = diaryStore.search(
+                query = query,
+                subjectKey = subjectKey,
+                groupAudience = groupAudience,
+                maxItems = when {
+                    budget.diaryTokens <= 500 -> 1
+                    budget.diaryTokens <= 900 -> 2
+                    else -> 3
+                },
+            )
+            if (diary.isNotEmpty()) {
+                blocks += takeWithinModelTokenBudget(
+                    buildString {
+                        appendLine("【相关人物日记｜角色自己的长期经历】")
+                        appendLine("用于恢复经历与当时心理，不逐条复述；当前输入和当前状态优先。")
+                        diary.forEach { entry ->
+                            appendLine("- 事件：${entry.event}")
+                            entry.feeling.takeIf(String::isNotBlank)?.let { appendLine("  感受：$it") }
+                            entry.innerThought.takeIf(String::isNotBlank)?.let { appendLine("  心里：$it") }
+                            entry.relationshipMeaning.takeIf(String::isNotBlank)?.let { appendLine("  关系意义：$it") }
+                            entry.unresolvedEcho.takeIf(String::isNotBlank)?.let { appendLine("  余波：$it") }
+                        }
+                    }.trim(),
+                    budget.diaryTokens,
+                )
+            }
+        }
+
+        return takeWithinModelTokenBudget(
+            blocks.filter(String::isNotBlank).joinToString("\n\n") +
+                if (blocks.isEmpty()) "" else "\n\n与本轮冲突时以本轮为准；不要为了展示记忆而主动回顾。",
+            budget.totalTokens,
+        )
     }
 
     fun hydrateNewChatStateFromRelationshipMemory() {
