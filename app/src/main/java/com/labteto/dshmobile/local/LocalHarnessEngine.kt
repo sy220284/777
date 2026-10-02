@@ -1223,6 +1223,7 @@ class LocalHarnessEngine @Inject constructor(
             activeWorkRuns[state.sessionId]?.job?.isCompleted == false ||
             pendingInputs.size() != 0
         ) return@synchronized LocalChatUserEditResult.BUSY
+        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
         if (state.usageMode == LocalUsageMode.WORK) return@synchronized editAndResendWorkUserMessage(
             messageId,
             requestedText,
@@ -1287,28 +1288,6 @@ class LocalHarnessEngine @Inject constructor(
         }
 
         val discarded = activeTranscript.drop(originalIndex)
-        memoryStore.rollbackSourceSessionFrom(
-            sourceSessionId = state.sessionId,
-            createdAtInclusive = original.createdAt,
-            discardedMessageIds = discarded.mapTo(linkedSetOf(), LocalHarnessMessage::id),
-        )
-        if (!state.groupChat.enabled) {
-            val galleryId = state.galleryId
-            val storyId = state.galleryStoryId
-            if (galleryId != null && storyId != null) {
-                chatPersonaGalleryStore.excludeHistoryMessages(
-                    id = galleryId,
-                    storyId = storyId,
-                    messageKeys = discarded.map { com.labteto.dshmobile.local.chat.galleryMessageArchiveKey(it) },
-                    replacementChatState = baseState,
-                )
-            }
-        } else {
-            baseGroupState.members.forEach { member ->
-                chatPersonaGalleryStore.replaceGroupChatState(member.galleryId, member.chatState)
-            }
-        }
-
         val edited = transcriptRuntime.newMessage("user", content)
         val rewritten = rewriteChatTranscriptFromUserEdit(
             activeMessages = activeTranscript,
@@ -1337,48 +1316,76 @@ class LocalHarnessEngine @Inject constructor(
             originalMessageId = messageId,
             content = content,
         )
-        modelHistory.reset(
-            buildEditedChatModelHistory(
-                eventLog = eventLog,
-                messages = rewritten,
-                groupMode = state.groupChat.enabled,
-                editedMessageId = edited.id,
-                editedModelMessage = editedModelMessage,
-                systemPrompt = if (state.groupChat.enabled) groupChatSystemPrompt() else chatSystemPrompt(),
-            ),
+        val rewrittenHistory = buildEditedChatModelHistory(
+            eventLog = eventLog,
+            messages = rewritten,
+            groupMode = state.groupChat.enabled,
+            editedMessageId = edited.id,
+            editedModelMessage = editedModelMessage,
+            systemPrompt = if (state.groupChat.enabled) groupChatSystemPrompt() else chatSystemPrompt(),
         )
-        updateContextMetrics()
 
         val restoredGroupState = if (state.groupChat.enabled) {
             baseGroupState.copy(context = baseContext)
         } else {
             baseGroupState
         }
+        val committedChatState = baseState.withoutLegacyConversationContext()
+        val committedChatContext = if (state.groupChat.enabled) state.chatContext else baseContext
         persistChatTimelineBaseline(
             eventLog,
             json,
             state.copy(
-                chatState = baseState.withoutLegacyConversationContext(),
-                chatContext = baseContext,
+                chatState = committedChatState,
+                chatContext = committedChatContext,
                 groupChat = restoredGroupState,
             ),
         )
-
-        val userEvent = eventLog.append("user/message", buildJsonObject {
-            put("content", content)
-            put("model_message", editedModelMessage)
-            put("edited_from", messageId)
-            put("queued", false)
-            put("transcript", encodeTranscriptMessages(listOf(edited)))
-        })
-        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, userEvent.sequence)
-
+        val rewrite = appendTimelineRewriteCommit(
+            eventLog = eventLog,
+            reason = "user-edited",
+            activeTranscript = rewritten,
+            modelHistory = rewrittenHistory,
+            state = LocalTimelineRewriteState(
+                plan = state.plan,
+                todos = state.todos,
+                goal = state.goal,
+                planMode = state.planMode,
+                chatState = committedChatState,
+                chatContext = committedChatContext,
+                chatBranches = LocalChatBranchState(),
+                groupChat = restoredGroupState,
+            ),
+            projection = LocalTimelineRewriteProjectionInput(
+                sourceSessionId = state.sessionId,
+                createdAtInclusive = original.createdAt,
+                discardedMessageIds = discarded.map(LocalHarnessMessage::id),
+                directGalleryId = state.galleryId.takeIf { !state.groupChat.enabled },
+                directStoryId = state.galleryStoryId.takeIf { !state.groupChat.enabled },
+                directMessageKeys = if (state.groupChat.enabled) emptyList() else discarded.map {
+                    com.labteto.dshmobile.local.chat.galleryMessageArchiveKey(it)
+                },
+                directReplacementChatState = committedChatState.takeIf {
+                    !state.groupChat.enabled && state.galleryId != null && state.galleryStoryId != null
+                },
+                groupGalleryStates = if (state.groupChat.enabled) {
+                    baseGroupState.members.map { it.galleryId to it.chatState }
+                } else {
+                    emptyList()
+                },
+            ),
+            editedMessageId = edited.id,
+            editedModelMessage = editedModelMessage,
+        )
+        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, rewrite.sequence)
+        modelHistory.reset(rewrittenHistory)
+        updateContextMetrics()
         _state.update { current ->
             current.copy(
                 messages = rewritten.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                 transcriptIndex = buildLocalTranscriptRuntimeIndex(rewritten),
-                chatState = baseState.withoutLegacyConversationContext(),
-                chatContext = if (current.groupChat.enabled) current.chatContext else baseContext,
+                chatState = committedChatState,
+                chatContext = committedChatContext,
                 groupChat = restoredGroupState,
                 replySuggestions = emptyList(),
                 chatBranches = LocalChatBranchState(),
@@ -1387,15 +1394,7 @@ class LocalHarnessEngine @Inject constructor(
                 error = null,
             )
         }
-        val rewrittenTranscriptSequence = persistRewrittenChatTranscript(
-            eventLog = eventLog,
-            reason = "user-edited",
-            activeTranscript = rewritten,
-        )
-        transcriptProjectionCursor = maxOf(
-            transcriptProjectionCursor ?: -1L,
-            rewrittenTranscriptSequence,
-        )
+        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
         checkpointModelHistory(if (state.groupChat.enabled) "group/user-edited" else "chat/user-edited")
         persist()
         automationScheduler.onChatUserActivity(
