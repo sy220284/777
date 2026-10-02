@@ -143,9 +143,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-private const val INTERNAL_WORK_CONTINUATION_PROMPT =
-    "继续当前工作任务。上一模型请求已进入服务端流后中断；基于已有历史、检查点和工具结果继续未完成部分。禁止重做已经完成并有结果的工具调用，先核对现有进度再行动。"
-
 /**
  * A native Android implementation of the DeepSeek Harness execution loop.
  *
@@ -3443,49 +3440,26 @@ class LocalHarnessEngine @Inject constructor(
             }
         } catch (_: TimeoutCancellationException) {
             foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
-            runState.update { it.copy(error = "本轮执行超过 15 分钟，已暂停并保留已有进度") }
+            val timeoutError = LocalModelException(
+                code = "WORK_SLICE_TIMEOUT",
+                message = "本轮执行达到 15 分钟切片上限",
+                retryable = false,
+                continuationEligible = binding != null,
+            )
+            val queued = binding?.let {
+                queueAutomaticWorkContinuation(it, runContext.runId, timeoutError)
+            } == true
+            if (!queued) {
+                runState.update { it.copy(error = "本轮执行超过 15 分钟，已暂停并保留已有进度") }
+            }
         } catch (_: CancellationException) {
             foregroundOutcome = LocalExecutionService.OUTCOME_CANCELLED
             // TurnCancelled durably records and projects the visible stop message.
         } catch (error: Exception) {
             foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
             val modelError = error as? LocalModelException
-            val continuationEligible =
-                binding != null &&
-                    shouldAutoContinueWorkFailure(
-                        errorCode = modelError?.code,
-                        automaticContinuationCount = binding.automaticContinuationCount,
-                        pendingInputs = binding.pendingInputs.size(),
-                    )
-            val queued = if (continuationEligible) {
-                val continuationId = "continuation-" + runContext.runId
-                binding!!.pendingInputs.offer(
-                    QueuedAgentInput(
-                        content = INTERNAL_WORK_CONTINUATION_PROMPT,
-                        memoryInput = "",
-                        modelMessage = buildJsonObject {
-                            put("role", "user")
-                            put("content", INTERNAL_WORK_CONTINUATION_PROMPT)
-                        },
-                        id = continuationId,
-                    ),
-                ).also { accepted ->
-                    if (accepted) {
-                        binding.automaticContinuationCount += 1
-                        binding.continuationParentRunId = runContext.runId
-                        runState.update {
-                            it.copy(
-                                error = null,
-                                queuedInputCount = binding.pendingInputs.size(),
-                            )
-                        }
-                        runEventLog.append("turn/continuation-queued", buildJsonObject {
-                            put("source_run_id", runContext.runId)
-                            put("reason", modelError?.code.orEmpty())
-                            put("continuation_id", continuationId)
-                        })
-                    }
-                }
+            val queued = if (binding != null && modelError != null) {
+                queueAutomaticWorkContinuation(binding, runContext.runId, modelError)
             } else {
                 false
             }
