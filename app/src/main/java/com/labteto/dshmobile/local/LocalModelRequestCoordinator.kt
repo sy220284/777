@@ -60,9 +60,10 @@ internal class LocalModelRequestCoordinator(
         )
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
         val runtimeCapabilities = LocalModelPresets.runtimeCapabilitiesFor(
-            frozenProfile.model,
-            frozenProfile.baseUrl,
-            frozenProfile.protocol,
+            model = frozenProfile.model,
+            baseUrl = frozenProfile.baseUrl,
+            protocol = frozenProfile.protocol,
+            authKind = frozenProfile.authKind,
         )
         val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
             promptCacheBaselines.get(snapshot.sessionId, frozenProfile.id)
