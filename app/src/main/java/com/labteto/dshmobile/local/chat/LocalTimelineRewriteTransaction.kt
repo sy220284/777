@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
+import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.memory.MemoryStore
 import java.util.UUID
 import kotlinx.serialization.Serializable
@@ -153,6 +154,7 @@ internal fun recoverPendingTimelineRewriteProjection(
     eventLog: LocalSessionEventLog,
     memoryStore: MemoryStore,
     galleryStore: ChatPersonaGalleryStore,
+    diaryStore: ChatDiaryStore? = null,
 ): Boolean {
     val rewrite = eventLog.latestMatching(setOf("chat/active-transcript")) { data ->
         data[LOCAL_TIMELINE_REWRITE_ID_KEY]?.jsonPrimitive?.contentOrNull != null &&
@@ -175,6 +177,11 @@ internal fun recoverPendingTimelineRewriteProjection(
     )
 
     memoryStore.rollbackSourceSessionFrom(
+        sourceSessionId = plan.sourceSessionId,
+        createdAtInclusive = plan.createdAtInclusive,
+        discardedMessageIds = plan.discardedMessageIds.toSet(),
+    )
+    diaryStore?.rollbackSourceSessionFrom(
         sourceSessionId = plan.sourceSessionId,
         createdAtInclusive = plan.createdAtInclusive,
         discardedMessageIds = plan.discardedMessageIds.toSet(),
