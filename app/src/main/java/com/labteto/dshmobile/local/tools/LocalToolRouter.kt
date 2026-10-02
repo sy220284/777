@@ -91,7 +91,11 @@ internal object LocalToolRouter {
                     append(" ").append(enabled).append("/").append(familyTools.size)
                     val requirements = familyTools.flatMap { it.metadata.requirements }.distinct()
                     if (requirements.isNotEmpty()) {
-                        append("；前置条件：").append(requirements.joinToString("；"))
+                        val shown = requirements.take(MAX_SUMMARY_REQUIREMENTS_PER_FAMILY)
+                        append("；前置条件：").append(shown.joinToString("；"))
+                        if (requirements.size > shown.size) {
+                            append("；另有 ").append(requirements.size - shown.size).append(" 项")
+                        }
                     }
                     appendLine()
                 }
@@ -103,4 +107,10 @@ internal object LocalToolRouter {
         tool.schema["function"]?.jsonObject
             ?.get("description")?.jsonPrimitive?.contentOrNull
             .orEmpty()
+
+    fun conciseDescription(tool: HarnessTool): String =
+        description(tool).take(MAX_CAPABILITY_DESCRIPTION_CHARS)
+
+    private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
+    private const val MAX_CAPABILITY_DESCRIPTION_CHARS = 480
 }
