@@ -21,6 +21,7 @@ class ToolRegistrySchemaValidationTest {
                     put("type", "function")
                     put("function", buildJsonObject {
                         put("name", "strict_tool")
+                        put("description", "严格测试工具")
                         put("parameters", buildJsonObject {
                             put("type", "object")
                             put("properties", buildJsonObject {
@@ -48,13 +49,50 @@ class ToolRegistrySchemaValidationTest {
                         })
                     })
                 },
-                executor = HarnessToolExecutor { _, input, _ ->
+                                access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("测试"),
+executor = HarnessToolExecutor { _, input, _ ->
                     calls += input.toString()
                     ToolResult("ok")
                 },
             ),
         )
         return registry to calls
+    }
+
+    @Test
+    fun registrationRejectsMismatchedSchemaNameAndUndiscoverableOptionalTool() {
+        val mismatched = runCatching {
+            ToolRegistry().register(
+                HarnessTool(
+                    name = "declared_name",
+                    schema = functionToolSchema("other_name", "测试工具"),
+                    access = ToolAccess.READ_ONLY,
+                    approvalPolicy = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.CORE,
+                    metadata = ToolMetadata("测试"),
+                    executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+                ),
+            )
+        }
+        assertTrue(mismatched.isFailure)
+
+        val undiscoverable = runCatching {
+            ToolRegistry().register(
+                HarnessTool(
+                    name = "optional_tool",
+                    schema = functionToolSchema("optional_tool", "测试工具"),
+                    access = ToolAccess.READ_ONLY,
+                    approvalPolicy = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL,
+                    metadata = ToolMetadata("测试"),
+                    executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+                ),
+            )
+        }
+        assertTrue(undiscoverable.isFailure)
     }
 
     @Test
@@ -131,6 +169,7 @@ class ToolRegistrySchemaValidationTest {
                     put("type", "function")
                     put("function", buildJsonObject {
                         put("name", "approved")
+                        put("description", "审批测试工具")
                         put("parameters", buildJsonObject {
                             put("type", "object")
                             put("properties", buildJsonObject {
@@ -143,7 +182,9 @@ class ToolRegistrySchemaValidationTest {
                 },
                 access = ToolAccess.WORKSPACE_WRITE,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
-                executor = HarnessToolExecutor { _, _, _ -> ToolResult("ran") },
+                                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("测试"),
+executor = HarnessToolExecutor { _, _, _ -> ToolResult("ran") },
             ),
         )
 
@@ -161,6 +202,34 @@ class ToolRegistrySchemaValidationTest {
     }
 
     @Test
+    fun metadataRejectsUnboundedDiscoveryAndDependencyText() {
+        assertTrue(
+            runCatching {
+                ToolMetadata(
+                    family = "测试",
+                    discoveryKeywords = (0..32).map { "k$it" }.toSet(),
+                )
+            }.isFailure,
+        )
+        assertTrue(
+            runCatching {
+                ToolMetadata(
+                    family = "测试",
+                    requirements = listOf("x".repeat(513)),
+                )
+            }.isFailure,
+        )
+        assertTrue(
+            runCatching {
+                ToolMetadata(
+                    family = "测试",
+                    usageNotes = List(17) { "note-$it" },
+                )
+            }.isFailure,
+        )
+    }
+
+    @Test
     fun enforcesArrayAndNumericBoundsDeclaredByTools() = runTest {
         val calls = mutableListOf<String>()
         val registry = ToolRegistry()
@@ -171,6 +240,7 @@ class ToolRegistrySchemaValidationTest {
                     put("type", "function")
                     put("function", buildJsonObject {
                         put("name", "bounded")
+                        put("description", "边界测试工具")
                         put("parameters", buildJsonObject {
                             put("type", "object")
                             put("properties", buildJsonObject {
@@ -190,7 +260,11 @@ class ToolRegistrySchemaValidationTest {
                         })
                     })
                 },
-                executor = HarnessToolExecutor { _, input, _ ->
+                                access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("测试"),
+executor = HarnessToolExecutor { _, input, _ ->
                     calls += input.toString()
                     ToolResult("ok")
                 },

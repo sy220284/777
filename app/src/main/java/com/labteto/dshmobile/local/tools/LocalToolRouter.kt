@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.tools.HarnessTool
+import com.labteto.dshmobile.harness.tools.ToolExposure
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -9,45 +10,22 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Keeps the model-facing tool surface small without hiding capabilities permanently.
  *
- * Core conversation/file/web tools stay visible. Android, vision, runtime, MCP, LSP, automation and
- * webhook tools are discovered on demand through capability_search. GitHub stays optional too, but a
- * configured connector may be pre-enabled at Work-turn start so the first model step can call it directly.
+ * Exposure and discovery are declared by each tool through the shared HarnessTool contract.
+ * No tool is classified by name prefix or a hand-maintained allowlist.
  */
 internal object LocalToolRouter {
-    private val optionalExact = setOf(
-        "runtime_command_status",
-        "process_exec",
-        "terminal_open",
-        "terminal_write",
-        "terminal_read",
-        "terminal_status",
-        "terminal_close",
-        "schedule_task",
-        "schedule_recurring_task",
-        "scheduled_task_list",
-        "cancel_scheduled_task",
-    )
-
-    fun isOptional(name: String): Boolean =
-        name in optionalExact ||
-            name.startsWith("android_") ||
-            (name.startsWith("vision_") && name != "vision_analyze_file") ||
-            name.startsWith("github_") ||
-            name.startsWith("mcp_") ||
-            name.startsWith("lsp_") ||
-            name.startsWith("webhook_")
+    fun isOptional(tool: HarnessTool): Boolean = tool.exposure == ToolExposure.OPTIONAL
 
     fun visibleSchemas(tools: List<HarnessTool>, enabledOptional: Set<String>): JsonArray {
         val core = tools
-            .filterNot { tool -> isOptional(tool.name) }
+            .filter { tool -> tool.exposure == ToolExposure.CORE }
             .sortedBy(HarnessTool::name)
         val optionalByName = tools
             .asSequence()
-            .filter { tool -> isOptional(tool.name) }
+            .filter { tool -> tool.exposure == ToolExposure.OPTIONAL }
             .associateBy(HarnessTool::name)
         val optional = enabledOptional.mapNotNull(optionalByName::get)
-        // Core stays byte-for-byte stable. LinkedHashSet activation order makes every newly
-        // discovered optional tool append after the existing optional prefix instead of reordering it.
+        // Core remains deterministic for prompt-cache stability; optional tools append in activation order.
         return JsonArray((core + optional).map(HarnessTool::schema))
     }
 
@@ -65,19 +43,21 @@ internal object LocalToolRouter {
             .toSet()
         val scored = mutableListOf<Pair<HarnessTool, Int>>()
         for (tool in tools) {
-            if (!isOptional(tool.name)) continue
+            if (!isOptional(tool)) continue
             val haystack = buildString {
                 append(tool.name.lowercase())
-                append(' ')
-                append(description(tool).lowercase())
-                append(' ')
-                append(familyTags(tool.name))
+                append(' ').append(description(tool).lowercase())
+                append(' ').append(tool.metadata.family.lowercase())
+                append(' ').append(tool.metadata.discoveryKeywords.joinToString(" ").lowercase())
+                append(' ').append(tool.metadata.requirements.joinToString(" ").lowercase())
+                append(' ').append(tool.metadata.usageNotes.joinToString(" ").lowercase())
             }
             var score = 0
             for (term in terms) {
                 score += when {
                     tool.name.equals(term, ignoreCase = true) -> 100
                     tool.name.contains(term, ignoreCase = true) -> 25
+                    tool.metadata.family.equals(term, ignoreCase = true) -> 20
                     haystack.contains(term) -> 10
                     else -> 0
                 }
@@ -93,28 +73,44 @@ internal object LocalToolRouter {
             .map { pair -> pair.first }
     }
 
+    fun capabilitySummary(
+        tools: List<HarnessTool>,
+        enabledOptional: Set<String>,
+    ): String {
+        val optional = tools.filter(::isOptional)
+        if (optional.isEmpty()) return "可选扩展能力：无"
+        return buildString {
+            appendLine("可选扩展能力（注册表真实状态）：")
+            optional
+                .groupBy { it.metadata.family }
+                .toSortedMap(String.CASE_INSENSITIVE_ORDER)
+                .forEach { (family, familyTools) ->
+                    val enabled = familyTools.count { it.name in enabledOptional }
+                    append("- ").append(family).append("：")
+                    append(if (enabled == familyTools.size) "已启用" else if (enabled == 0) "未启用" else "部分启用")
+                    append(" ").append(enabled).append("/").append(familyTools.size)
+                    val requirements = familyTools.flatMap { it.metadata.requirements }.distinct()
+                    if (requirements.isNotEmpty()) {
+                        val shown = requirements.take(MAX_SUMMARY_REQUIREMENTS_PER_FAMILY)
+                        append("；前置条件：").append(shown.joinToString("；"))
+                        if (requirements.size > shown.size) {
+                            append("；另有 ").append(requirements.size - shown.size).append(" 项")
+                        }
+                    }
+                    appendLine()
+                }
+            append("未启用能力可通过 capability_search 按能力名称、用途或关键词发现并启用。")
+        }.trimEnd()
+    }
+
     fun description(tool: HarnessTool): String =
         tool.schema["function"]?.jsonObject
             ?.get("description")?.jsonPrimitive?.contentOrNull
             .orEmpty()
 
-    private fun familyTags(name: String): String = when {
-        name.startsWith("android_") ->
-            "android 安卓 手机 设备 应用 界面 无障碍 点击 输入 滑动 通知 剪贴板 虚拟屏"
-        name.startsWith("vision_") ->
-            "vision 视觉 图片 图像 截图 屏幕 识别"
-        name.startsWith("github_") ->
-            "github git 仓库 repository repo pr pull request issue actions 工作流 提交 commit 分支 branch 代码托管"
-        name.startsWith("mcp_") ->
-            "mcp 外部工具 服务 连接 扩展"
-        name.startsWith("lsp_") ->
-            "lsp 语言服务器 代码 定义 引用 符号 重命名 诊断"
-        name.startsWith("webhook_") ->
-            "webhook 回调 外部触发 监听"
-        name.startsWith("terminal_") || name == "process_exec" || name == "runtime_command_status" ->
-            "runtime 运行时 进程 终端 命令 shell git python node"
-        name.startsWith("schedule_") || name.startsWith("scheduled_") || name == "cancel_scheduled_task" ->
-            "automation 自动化 定时 周期 后台 任务"
-        else -> ""
-    }
+    fun conciseDescription(tool: HarnessTool): String =
+        description(tool).take(MAX_CAPABILITY_DESCRIPTION_CHARS)
+
+    private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
+    private const val MAX_CAPABILITY_DESCRIPTION_CHARS = 480
 }

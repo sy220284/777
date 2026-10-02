@@ -9,8 +9,11 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
@@ -60,9 +63,17 @@ class LspPlugin(
             context.tools.register(
                 HarnessTool(
                     name = name,
-                    schema = schema(name),
+                    schema = schemaFor(name),
                     access = ToolAccess.READ_ONLY,
                     approvalPolicy = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL,
+                    metadata = ToolMetadata(
+                        family = "LSP",
+                        discoveryKeywords = LSP_DISCOVERY_KEYWORDS,
+                        requirements = listOf(
+                            "项目需能自动检测到可运行的语言服务器；首次启动外部语言服务进程需要人工审批",
+                        ),
+                    ),
                     executor = HarnessToolExecutor { toolContext, input, _ ->
                         mutex.withLock { execute(name, input, toolContext) }
                     },
@@ -219,20 +230,17 @@ class LspPlugin(
 
     private fun startApprovalTool(resolved: List<String>): HarnessTool = HarnessTool(
         name = "lsp_start",
-        schema = buildJsonObject {
-            put("type", "function")
-            put("function", buildJsonObject {
-                put("name", "lsp_start")
-                put("description", "启动代码智能进程：${resolved.firstOrNull().orEmpty()}")
-                put("parameters", buildJsonObject {
-                    put("type", "object")
-                    put("properties", buildJsonObject { })
-                    put("additionalProperties", false)
-                })
-            })
-        },
+        schema = functionToolSchema(
+            name = "lsp_start",
+            description = "启动代码智能进程：${resolved.firstOrNull().orEmpty()}",
+        ),
         access = ToolAccess.PROCESS,
         approvalPolicy = ToolApprovalPolicy.ALWAYS,
+        exposure = ToolExposure.INTERNAL,
+        metadata = ToolMetadata(
+            family = "LSP",
+            usageNotes = listOf("仅作为首次启动语言服务器时的内部审批描述，不暴露给模型"),
+        ),
         executor = HarnessToolExecutor { _, _, _ -> ToolResult("代码智能进程已批准") },
     )
 
@@ -276,54 +284,44 @@ class LspPlugin(
     private fun bounded(output: String): String =
         if (output.length <= 40_000) output else output.take(40_000) + "\\n[结果过长，已截断]"
 
-    private fun schema(name: String) = buildJsonObject {
-        put("type", "function")
-        put("function", buildJsonObject {
-            put("name", name)
-            put("description", when (name) {
-                "lsp_status" -> "查看当前项目代码智能状态；语言服务器由 777 自动检测并按需启动"
-                "lsp_definition" -> "查询代码定义；需要时自动启动匹配的语言服务器"
-                "lsp_references" -> "查询代码引用；需要时自动启动匹配的语言服务器"
-                "lsp_hover" -> "查询代码类型与说明；需要时自动启动匹配的语言服务器"
-                "lsp_implementation" -> "查询接口/抽象成员的实现位置；需要时自动启动匹配的语言服务器"
-                "lsp_workspace_symbols" -> "按关键词查询整个工作区的代码符号；需要时自动启动语言服务器"
-                "lsp_rename_preview" -> "计算重命名 WorkspaceEdit，只返回修改预览，不直接写文件"
-                "lsp_diagnostics" -> "同步当前文件并读取语言服务器诊断；published=false 仅表示本次未收到诊断发布"
-                else -> "列出文件中的代码符号；需要时自动启动匹配的语言服务器"
-            })
-            put("parameters", buildJsonObject {
-                put("type", "object")
-                put("properties", buildJsonObject {
-                    if (name == "lsp_workspace_symbols") {
-                        put("query", buildJsonObject { put("type", "string") })
-                    } else if (name != "lsp_status") {
-                        put("path", buildJsonObject { put("type", "string") })
-                        put("language_id", buildJsonObject { put("type", "string") })
-                        put("line", buildJsonObject { put("type", "integer"); put("minimum", 0) })
-                        put("character", buildJsonObject { put("type", "integer"); put("minimum", 0) })
-                        if (name == "lsp_rename_preview") {
-                            put("new_name", buildJsonObject { put("type", "string") })
-                        }
-                    }
-                })
-                when (name) {
-                    "lsp_workspace_symbols" ->
-                        put("required", buildJsonArray { add(JsonPrimitive("query")) })
-                    "lsp_rename_preview" ->
-                        put("required", buildJsonArray {
-                            add(JsonPrimitive("path"))
-                            add(JsonPrimitive("new_name"))
-                        })
-                    else -> if (name != "lsp_status") {
-                        put("required", buildJsonArray { add(JsonPrimitive("path")) })
-                    }
+    private fun schemaFor(name: String): JsonObject {
+        val description = when (name) {
+            "lsp_status" -> "查看当前项目代码智能状态；语言服务器由 777 自动检测并按需启动"
+            "lsp_definition" -> "查询代码定义；需要时自动启动匹配的语言服务器"
+            "lsp_references" -> "查询代码引用；需要时自动启动匹配的语言服务器"
+            "lsp_hover" -> "查询代码类型与说明；需要时自动启动匹配的语言服务器"
+            "lsp_implementation" -> "查询接口/抽象成员的实现位置；需要时自动启动匹配的语言服务器"
+            "lsp_workspace_symbols" -> "按关键词查询整个工作区的代码符号；需要时自动启动语言服务器"
+            "lsp_rename_preview" -> "计算重命名 WorkspaceEdit，只返回修改预览，不直接写文件"
+            "lsp_diagnostics" -> "同步当前文件并读取语言服务器诊断；published=false 仅表示本次未收到诊断发布"
+            else -> "列出文件中的代码符号；需要时自动启动匹配的语言服务器"
+        }
+        val properties = buildJsonObject {
+            if (name == "lsp_workspace_symbols") {
+                put("query", buildJsonObject { put("type", "string") })
+            } else if (name != "lsp_status") {
+                put("path", buildJsonObject { put("type", "string") })
+                put("language_id", buildJsonObject { put("type", "string") })
+                put("line", buildJsonObject { put("type", "integer"); put("minimum", 0) })
+                put("character", buildJsonObject { put("type", "integer"); put("minimum", 0) })
+                if (name == "lsp_rename_preview") {
+                    put("new_name", buildJsonObject { put("type", "string") })
                 }
-                put("additionalProperties", false)
-            })
-        })
+            }
+        }
+        val required = when (name) {
+            "lsp_workspace_symbols" -> setOf("query")
+            "lsp_rename_preview" -> setOf("path", "new_name")
+            "lsp_status" -> emptySet()
+            else -> setOf("path")
+        }
+        return functionToolSchema(name, description, properties, required)
     }
 
     companion object {
+        private val LSP_DISCOVERY_KEYWORDS = setOf(
+            "lsp", "语言服务器", "代码", "定义", "引用", "符号", "重命名", "诊断", "hover", "implementation",
+        )
         private val names = listOf(
             "lsp_status",
             "lsp_definition",

@@ -272,6 +272,28 @@ class LocalHarnessEngine @Inject constructor(
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
     private val requestPressureStore = LocalRequestPressureStore()
+    private val environmentInfoCoordinator by lazy {
+        LocalEnvironmentInfoCoordinator(
+            workspacePath = { workspace.path },
+            resourceSnapshot = resourceScheduler::snapshot,
+            historyBudget = ::currentHistoryBudget,
+            requestPressureStore = requestPressureStore,
+            usageTracker = usageTracker,
+            toolExecutionCoordinator = toolExecutionCoordinator,
+            commandAvailable = runtimeProcess::isCommandAvailable,
+            runtimeStatuses = bundledRuntimeManager::statuses,
+            diagnostics = AppLog::snapshot,
+            storageStatus = { LocalSessionArchiveMaintenance.storageStatus(sessionsRoot) },
+            processExitStatus = { LocalProcessExitStatus.read(context) },
+            foregroundSessionId = { currentSessionId },
+            foregroundHistory = { modelHistory },
+            foregroundPendingInputs = { pendingInputs.size() },
+            pendingInputLimit = MAX_PENDING_INPUTS,
+            foregroundWorkBudget = { sessionId ->
+                activeWorkRuns[sessionId]?.executionControl?.budget?.snapshot()
+            },
+        )
+    }
     private val streamingPreviewStore = LocalStreamingPreviewStore()
     private val modelRequestCoordinator by lazy {
         LocalModelRequestCoordinator(
@@ -2013,11 +2035,11 @@ class LocalHarnessEngine @Inject constructor(
         withContext(Dispatchers.IO) { sessionStorageManager.exportAll(output) }
 
     internal suspend fun environmentInfoForUi(): String = withContext(Dispatchers.IO) {
-        environmentInfo()
+        environmentInfoCoordinator.build(null)
     }
 
     internal suspend fun diagnosticReportForUi(): String = withContext(Dispatchers.IO) {
-        DiagnosticReport.build(AppLog.exportSnapshot(), environmentInfo())
+        DiagnosticReport.build(AppLog.exportSnapshot(), environmentInfoCoordinator.build(null))
     }
 
     internal suspend fun githubConnectorConfiguredForUi(): Boolean = githubCredentials.configured()
@@ -4017,7 +4039,7 @@ class LocalHarnessEngine @Inject constructor(
                 query = args.optionalString("query").orEmpty(),
             )
             "network_diagnose" -> web.diagnose(args.string("url"))
-            "environment_info" -> environmentInfo()
+            "environment_info" -> environmentInfoCoordinator.build(binding)
             "capability_search" -> if (binding == null) {
                 searchCapabilities(args.string("query"))
             } else {
@@ -4856,28 +4878,6 @@ class LocalHarnessEngine @Inject constructor(
             snapshot.groupChat.enabled -> groupChatSystemPrompt()
             else -> chatSystemPrompt()
         }
-    }
-
-    private fun environmentInfo(): String {
-        val commands = listOf(
-            "sh", "ls", "cat", "cp", "mv", "rm", "mkdir", "sed", "grep", "find",
-            "git", "curl", "wget", "python3", "python", "node",
-        ).filter(runtimeProcess::isCommandAvailable)
-        return LocalEnvironmentReport.build(
-            workspacePath = workspace.path,
-            resources = resourceScheduler.snapshot(),
-            contextChars = modelHistory.encodedChars,
-            contextBudgetChars = currentHistoryBudget().maxHistoryChars,
-            requestPressure = requestPressureStore.latest(currentSessionId),
-            contextWindow = requestPressureStore.window(currentSessionId),
-            workBudget = activeWorkRuns[currentSessionId]?.executionControl?.budget?.snapshot(),
-            pendingInputs = pendingInputs.size(),
-            pendingInputLimit = MAX_PENDING_INPUTS,
-            commands = commands,
-            runtimeStatuses = bundledRuntimeManager.statuses(),
-            recentDiagnostics = AppLog.snapshot(),
-        ) + "\n" + LocalSessionArchiveMaintenance.storageStatus(sessionsRoot) +
-            "\n" + LocalProcessExitStatus.read(context)
     }
 
     private suspend fun load() {

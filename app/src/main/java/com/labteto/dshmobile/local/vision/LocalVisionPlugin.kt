@@ -10,7 +10,11 @@ import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
+import com.labteto.dshmobile.harness.tools.simpleToolProperties
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -63,12 +67,18 @@ class LocalVisionPlugin(
         context.tools.register(
             HarnessTool(
                 name = "vision_status",
-                schema = schema(
+                schema = functionToolSchema(
                     name = "vision_status",
                     description = "检查当前使用模型是否可以处理图片",
                 ),
                 access = ToolAccess.READ_ONLY,
                 approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "视觉",
+                    discoveryKeywords = VISION_DISCOVERY_KEYWORDS,
+                    requirements = VISION_REQUIREMENTS,
+                ),
                 executor = HarnessToolExecutor { toolContext, _, _ ->
                     val route = routeFor(toolContext)
                     val key = route?.let { routeKeyProvider(it) }
@@ -85,15 +95,21 @@ class LocalVisionPlugin(
         context.tools.register(
             HarnessTool(
                 name = "vision_analyze_screen",
-                schema = schema(
+                schema = functionToolSchema(
                     name = "vision_analyze_screen",
                     description = "截取当前主屏并交给当前使用模型分析；仅当前模型支持图片时可用",
-                    properties = mapOf("prompt" to "string"),
+                    properties = simpleToolProperties(mapOf("prompt" to "string")),
                     required = setOf("prompt"),
                 ),
                 access = ToolAccess.NETWORK,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 240_000L,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "视觉",
+                    discoveryKeywords = VISION_DISCOVERY_KEYWORDS,
+                    requirements = VISION_REQUIREMENTS + "需要 Android 屏幕截图能力与相应设备授权",
+                ),
                 executor = HarnessToolExecutor { toolContext, input, _ ->
                     analyze(
                         fixedRoute = routeFor(toolContext),
@@ -111,15 +127,21 @@ class LocalVisionPlugin(
         context.tools.register(
             HarnessTool(
                 name = "vision_analyze_vscreen",
-                schema = schema(
+                schema = functionToolSchema(
                     name = "vision_analyze_vscreen",
                     description = "分析 Agent 虚拟屏画面并返回视觉判断和坐标；不把图片写入文字模型历史",
-                    properties = mapOf("id" to "string", "prompt" to "string"),
+                    properties = simpleToolProperties(mapOf("id" to "string", "prompt" to "string")),
                     required = setOf("id", "prompt"),
                 ),
                 access = ToolAccess.NETWORK,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 240_000L,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "视觉",
+                    discoveryKeywords = VISION_DISCOVERY_KEYWORDS,
+                    requirements = VISION_REQUIREMENTS + "需要已创建且可截图的虚拟屏",
+                ),
                 executor = HarnessToolExecutor { toolContext, input, _ ->
                     analyze(
                         fixedRoute = routeFor(toolContext),
@@ -137,19 +159,25 @@ class LocalVisionPlugin(
         context.tools.register(
             HarnessTool(
                 name = "vision_analyze_file",
-                schema = schema(
+                schema = functionToolSchema(
                     name = "vision_analyze_file",
                     description = "使用当前模型分析工作区内的 PNG/JPEG/WebP/GIF 图片；当前模型不支持图片时会明确返回不支持；相同图片与分析要求可复用已批准分析缓存",
-                    properties = mapOf(
+                    properties = simpleToolProperties(mapOf(
                         "path" to "string",
                         "prompt" to "string",
                         "refresh" to "boolean",
-                    ),
+                    )),
                     required = setOf("path", "prompt"),
                 ),
                 access = ToolAccess.NETWORK,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 240_000L,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata(
+                    family = "视觉",
+                    discoveryKeywords = VISION_DISCOVERY_KEYWORDS,
+                    requirements = VISION_REQUIREMENTS + "图片必须位于本机 Harness 工作区且为真实 PNG/JPEG/WebP/GIF",
+                ),
                 executor = HarnessToolExecutor { toolContext, input, _ ->
                     val route = routeFor(toolContext)
                     val key = route?.let { routeKeyProvider(it) }
@@ -157,6 +185,8 @@ class LocalVisionPlugin(
                         return@HarnessToolExecutor ToolResult(
                             "当前模型尚未配置，请先在模型设置中选择模型并填写接口地址和密钥",
                             isError = true,
+                            errorCode = "VISION_MODEL_NOT_CONFIGURED",
+                            recoveryHint = "先在模型设置中选择并保存支持图片的模型与凭据。",
                         )
                     }
                     val prompt = input.requiredString("prompt")
@@ -301,31 +331,6 @@ class LocalVisionPlugin(
         return "data:$mime;base64,$encoded"
     }
 
-    private fun schema(
-        name: String,
-        description: String,
-        properties: Map<String, String> = emptyMap(),
-        required: Set<String> = emptySet(),
-    ): JsonObject = buildJsonObject {
-        put("type", "function")
-        put("function", buildJsonObject {
-            put("name", name)
-            put("description", description)
-            put("parameters", buildJsonObject {
-                put("type", "object")
-                put("properties", buildJsonObject {
-                    properties.forEach { (property, type) ->
-                        put(property, buildJsonObject { put("type", type) })
-                    }
-                })
-                put("required", buildJsonArray {
-                    required.forEach { add(JsonPrimitive(it)) }
-                })
-                put("additionalProperties", false)
-            })
-        })
-    }
-
     private fun JsonObject.requiredString(name: String): String =
         this[name]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf(String::isNotEmpty)
             ?: error("缺少参数：$name")
@@ -334,6 +339,12 @@ class LocalVisionPlugin(
         this[name]?.jsonPrimitive?.booleanOrNull == true
 
     private companion object {
+        val VISION_DISCOVERY_KEYWORDS = setOf(
+            "vision", "视觉", "图片", "图像", "截图", "屏幕", "识别", "像素",
+        )
+        val VISION_REQUIREMENTS = listOf(
+            "当前模型必须已配置有效凭据并支持图片理解",
+        )
         const val MAX_IMAGE_FILE_BYTES = 16L * 1024L * 1024L
     }
 }

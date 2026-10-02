@@ -5,9 +5,12 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
@@ -51,9 +54,11 @@ class NativeRuntimeBehaviorContractTest {
             register(
                 HarnessTool(
                     name = "dangerous_write",
-                    schema = buildJsonObject { },
+                    schema = functionToolSchema("dangerous_write", "危险写入测试"),
                     access = ToolAccess.WORKSPACE_WRITE,
                     approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                    exposure = ToolExposure.CORE,
+                    metadata = ToolMetadata("测试"),
                     executor = HarnessToolExecutor { _, _, _ ->
                         executed = true
                         ToolResult("written")

@@ -6,7 +6,10 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.UnknownHostException
@@ -60,19 +63,27 @@ class GitHubConnectorPlugin(
         context.tools.register(
             HarnessTool(
                 name = "github_status",
-                schema = functionSchema(
+                schema = functionToolSchema(
                     name = "github_status",
                     description = "检查内置 GitHub 连接器是否已配置，并验证当前凭据与 API 限流状态；不会返回凭据本身",
                 ),
                 access = ToolAccess.NETWORK,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
                 timeoutMillis = READ_TIMEOUT_MILLIS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "GitHub",
+                    discoveryKeywords = GITHUB_DISCOVERY_KEYWORDS,
+                    requirements = listOf("需要先在工具页配置有效的 GitHub 连接器凭据"),
+                    usageNotes = emptyList(),
+                ),
                 executor = HarnessToolExecutor { _, _, _ -> statusTool() },
             ),
         )
         context.tools.register(
             HarnessTool(
                 name = "github_api_get",
-                schema = functionSchema(
+                schema = functionToolSchema(
                     name = "github_api_get",
                     description = "调用已认证的 GitHub REST GET API；凭据由连接器内部注入。适合仓库、PR、Issue、提交、Actions、搜索与限流查询",
                     properties = buildJsonObject {
@@ -81,7 +92,15 @@ class GitHubConnectorPlugin(
                     required = setOf("path"),
                 ),
                 access = ToolAccess.NETWORK,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
                 timeoutMillis = READ_TIMEOUT_MILLIS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "GitHub",
+                    discoveryKeywords = GITHUB_DISCOVERY_KEYWORDS,
+                    requirements = listOf("需要先在工具页配置有效的 GitHub 连接器凭据"),
+                    usageNotes = listOf("单次 GitHub API 响应上限 2 MiB；模型可见输出若因上下文预算省略，可按返回的 call_id 使用 tool_output_read 分段恢复完整结果"),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val path = input.requiredString("path")
                     executeTool(method = "GET", path = path, body = null, mutation = false)
@@ -91,7 +110,7 @@ class GitHubConnectorPlugin(
         context.tools.register(
             HarnessTool(
                 name = "github_api_request",
-                schema = functionSchema(
+                schema = functionToolSchema(
                     name = "github_api_request",
                     description = "调用已认证的 GitHub REST 写 API；仅允许仓库范围 POST/PATCH/PUT/DELETE，凭据由连接器内部注入，写操作不会自动重试",
                     properties = buildJsonObject {
@@ -114,6 +133,13 @@ class GitHubConnectorPlugin(
                 access = ToolAccess.PRIVILEGED,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = WRITE_TIMEOUT_MILLIS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "GitHub",
+                    discoveryKeywords = GITHUB_DISCOVERY_KEYWORDS,
+                    requirements = listOf("需要先在工具页配置有效的 GitHub 连接器凭据"),
+                    usageNotes = listOf("写操作不会自动重试；返回失败或连接中断后应先检查远端状态，避免重复副作用"),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val method = input.requiredString("method").uppercase()
                     require(method in MUTATION_METHODS) { "GitHub 写请求仅支持 POST/PATCH/PUT/DELETE" }
@@ -211,6 +237,8 @@ class GitHubConnectorPlugin(
             ?: return ToolResult(
                 content = "[GITHUB_NOT_CONFIGURED] 请先在工具页配置 GitHub 连接器凭据。",
                 isError = true,
+                errorCode = "GITHUB_NOT_CONFIGURED",
+                recoveryHint = "在工具页配置并验证 GitHub 凭据后再调用。",
             )
         return runCatching {
             val response = request(token, method, path, body, mutation)
@@ -223,6 +251,12 @@ class GitHubConnectorPlugin(
             ToolResult(
                 content = "[GITHUB_REQUEST_FAILED] ${error.message ?: error::class.java.simpleName}",
                 isError = true,
+                errorCode = "GITHUB_REQUEST_FAILED",
+                recoveryHint = if (mutation) {
+                    "写请求结果未知时先检查 GitHub 当前状态，不要直接重试。"
+                } else {
+                    "检查网络、限流与请求范围后再重试。"
+                },
             )
         }
     }
@@ -379,27 +413,6 @@ class GitHubConnectorPlugin(
         put("description", description)
     }
 
-    private fun functionSchema(
-        name: String,
-        description: String,
-        properties: JsonObject = JsonObject(emptyMap()),
-        required: Set<String> = emptySet(),
-    ): JsonObject = buildJsonObject {
-        put("type", "function")
-        put("function", buildJsonObject {
-            put("name", name)
-            put("description", description)
-            put("parameters", buildJsonObject {
-                put("type", "object")
-                put("properties", properties)
-                put("required", buildJsonArray {
-                    required.forEach { add(JsonPrimitive(it)) }
-                })
-                put("additionalProperties", false)
-            })
-        })
-    }
-
     private companion object {
         const val DEFAULT_API_BASE_URL = "https://api.github.com"
         const val USER_AGENT = "777-android-github-connector"
@@ -412,6 +425,10 @@ class GitHubConnectorPlugin(
         const val MIN_TOKEN_CHARS = 16
         const val MAX_TOKEN_CHARS = 4_096
         const val ERROR_PREVIEW_CHARS = 1_000
+        val GITHUB_DISCOVERY_KEYWORDS = setOf(
+            "github", "git", "仓库", "repository", "repo", "pr", "pull request", "issue",
+            "actions", "工作流", "提交", "commit", "分支", "branch", "代码托管",
+        )
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
         val MUTATION_METHODS = setOf("POST", "PATCH", "PUT", "DELETE")
         val TRANSIENT_HTTP_STATUSES = setOf(502, 503, 504)

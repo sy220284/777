@@ -20,7 +20,10 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
+import com.labteto.dshmobile.harness.tools.simpleToolProperties
 import com.labteto.dshmobile.local.LocalAutomationWorkException
 import com.labteto.dshmobile.local.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.automation.LocalAutomationRuntime
@@ -70,6 +73,7 @@ class AutomationPlugin(
                 "notify" to "boolean",
             ),
             required = setOf("id", "prompt"),
+            access = ToolAccess.SESSION_WRITE,
             approval = ToolApprovalPolicy.ALWAYS,
         ) { input ->
             val now = System.currentTimeMillis()
@@ -105,6 +109,7 @@ class AutomationPlugin(
                 "notify" to "boolean",
             ),
             required = setOf("id", "prompt", "interval_minutes"),
+            access = ToolAccess.SESSION_WRITE,
             approval = ToolApprovalPolicy.ALWAYS,
         ) { input ->
             val first = checkedAutomationFutureMillis(
@@ -133,6 +138,7 @@ class AutomationPlugin(
             name = "scheduled_task_list",
             description = "列出 Android 后台 Harness 任务及最近结果",
             access = ToolAccess.READ_ONLY,
+            approval = ToolApprovalPolicy.NEVER,
         ) {
             val tasks = store.list()
             if (tasks.isEmpty()) "暂无后台任务" else tasks.joinToString("\n\n") { task ->
@@ -152,6 +158,7 @@ class AutomationPlugin(
             description = "取消并删除 Android 后台 Harness 任务",
             properties = mapOf("id" to "string"),
             required = setOf("id"),
+            access = ToolAccess.SESSION_WRITE,
             approval = ToolApprovalPolicy.ALWAYS,
         ) { input ->
             scheduler.cancelTask(input.required("id")).toString()
@@ -178,32 +185,23 @@ class AutomationPlugin(
         description: String,
         properties: Map<String, String> = emptyMap(),
         required: Set<String> = emptySet(),
-        access: ToolAccess = ToolAccess.SESSION_WRITE,
-        approval: ToolApprovalPolicy = ToolApprovalPolicy.NEVER,
+        access: ToolAccess,
+        approval: ToolApprovalPolicy,
         execute: suspend (JsonObject) -> String,
     ) {
         context.tools.register(
             HarnessTool(
                 name = name,
-                schema = buildJsonObject {
-                    put("type", "function")
-                    put("function", buildJsonObject {
-                        put("name", name)
-                        put("description", description)
-                        put("parameters", buildJsonObject {
-                            put("type", "object")
-                            put("properties", buildJsonObject {
-                                properties.forEach { (key, type) ->
-                                    put(key, buildJsonObject { put("type", type) })
-                                }
-                            })
-                            put("required", buildJsonArray { required.forEach { add(JsonPrimitive(it)) } })
-                            put("additionalProperties", false)
-                        })
-                    })
-                },
+                schema = functionToolSchema(
+                    name = name,
+                    description = description,
+                    properties = simpleToolProperties(properties),
+                    required = required,
+                ),
                 access = access,
                 approvalPolicy = approval,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = automationToolMetadata(name),
                 executor = HarnessToolExecutor { _, input, _ ->
                     ToolResult(execute(input))
                 },

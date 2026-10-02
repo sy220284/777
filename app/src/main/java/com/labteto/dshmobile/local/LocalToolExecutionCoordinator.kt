@@ -39,15 +39,27 @@ internal class LocalToolExecutionCoordinator(
         synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
 
     fun enableOptionalTools(names: Collection<String>) {
-        val registered = registry.names().toSet()
         synchronized(enabledOptionalTools) {
             enabledOptionalTools += names.filter { name ->
-                name in registered && LocalToolRouter.isOptional(name)
+                registry.get(name)?.let(LocalToolRouter::isOptional) == true
             }
         }
     }
 
-    fun enableGitHubConnectorTools() = enableOptionalTools(GITHUB_CONNECTOR_TOOL_NAMES)
+    fun enableGitHubConnectorTools() {
+        val githubTools = registry.names().mapNotNull(registry::get)
+            .filter { tool ->
+                LocalToolRouter.isOptional(tool) &&
+                    tool.metadata.family.equals(GITHUB_TOOL_FAMILY, ignoreCase = true)
+            }
+            .map(HarnessTool::name)
+        enableOptionalTools(githubTools)
+    }
+
+    fun capabilitySummary(enabledOptional: Set<String> = enabledOptionalSnapshot()): String {
+        val tools = registry.names().mapNotNull(registry::get)
+        return LocalToolRouter.capabilitySummary(tools, enabledOptional)
+    }
 
     fun visibleSchemas(policy: LocalAgentRunPolicy): JsonArray {
         if (!policy.toolsEnabled) return JsonArray(emptyList())
@@ -77,7 +89,7 @@ internal class LocalToolExecutionCoordinator(
             appendLine("已为当前回合启用 " + matches.size + " 个扩展工具：")
             matches.forEach { tool ->
                 append("- ").append(tool.name)
-                LocalToolRouter.description(tool).takeIf(String::isNotBlank)?.let {
+                LocalToolRouter.conciseDescription(tool).takeIf(String::isNotBlank)?.let {
                     append("：").append(it)
                 }
                 appendLine()
@@ -220,7 +232,7 @@ internal class LocalToolExecutionCoordinator(
     }
 
     private companion object {
-        val GITHUB_CONNECTOR_TOOL_NAMES = setOf("github_status", "github_api_get", "github_api_request")
+        const val GITHUB_TOOL_FAMILY = "GitHub"
         val MUTATING_ACCESSES = setOf(
             ToolAccess.WORKSPACE_WRITE,
             ToolAccess.SESSION_WRITE,
