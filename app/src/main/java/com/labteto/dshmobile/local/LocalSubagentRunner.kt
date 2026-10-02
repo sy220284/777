@@ -35,26 +35,6 @@ internal fun inheritedHistoryBeforeToolCall(
     return if (boundary >= 0) history.take(boundary).toMutableList() else history.toMutableList()
 }
 
-internal enum class LocalSubagentStatus {
-    COMPLETED,
-    STEP_LIMIT,
-    CANCELLED,
-    FAILED,
-}
-
-internal data class LocalSubagentResult(
-    val status: LocalSubagentStatus,
-    val output: String,
-    val errorCode: String? = null,
-) {
-    val succeeded: Boolean get() = status == LocalSubagentStatus.COMPLETED
-}
-
-internal fun LocalSubagentResult.requireCompletedOutput(): String {
-    if (!succeeded) throw IllegalStateException(output)
-    return output
-}
-
 internal class LocalSubagentRunner(
     private val modelGateway: LocalModelGateway,
     private val state: StateFlow<LocalHarnessState>,
@@ -78,6 +58,7 @@ internal class LocalSubagentRunner(
     private val runCoordinator: LocalAgentRunCoordinator? = null,
     private val runSessionId: () -> String = { state.value.sessionId },
     private val runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
+    private val executionControl: LocalWorkExecutionControl? = null,
 ) {
     private val historyPolicy = com.labteto.dshmobile.local.agent.LocalSubagentHistoryPolicy(
         spillToolOutput = spillToolOutput,
@@ -91,6 +72,7 @@ internal class LocalSubagentRunner(
         resourceScheduler = resourceScheduler,
         eventLog = eventLog,
         historyCompactor = historyCompactor,
+        executionControl = executionControl,
     )
 
     suspend fun run(
@@ -163,6 +145,7 @@ internal class LocalSubagentRunner(
             mutableListOf()
         }
         val progress = ArrayDeque<String>()
+        val progressTracker = LocalAgentProgressTracker()
         val runProfile = try { modelGateway.profileForRun(modelOverride) } catch (error: Exception) {
             if (error is kotlinx.coroutines.CancellationException) throw error
             return LocalSubagentResult(LocalSubagentStatus.FAILED,
@@ -399,6 +382,7 @@ internal class LocalSubagentRunner(
                         is AgentEvent.AssistantObserved -> {
                             val reply = repliesByStep.remove(event.step)
                                 ?: error("缺少子代理第 ${event.step} 步模型响应")
+                            progressTracker.recordAssistant(reply.content.orEmpty(), reply.toolCalls.size)
                             history += reply.message
                             reply.content?.takeIf(String::isNotBlank)?.let { content ->
                                 historyPolicy.rememberProgress(
@@ -417,6 +401,7 @@ internal class LocalSubagentRunner(
                             })
                         }
                         is AgentEvent.ToolFinished -> {
+                            progressTracker.recordToolResult(event.call, event.output, event.isError)
                             val boundedContent = historyPolicy.retainToolResult(
                                 event.call.id,
                                 event.output,
@@ -495,6 +480,14 @@ internal class LocalSubagentRunner(
                 stepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
                     val liveBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
                     if (currentLimit >= MAX_DYNAMIC_STEPS) return@AgentStepLimitExtender null
+                    if (!progressTracker.claimExtensionProgress()) {
+                        eventLog().append("subagent/budget-stopped", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("steps_used", stepsUsed)
+                            put("reason", "no-new-evidence")
+                        })
+                        return@AgentStepLimitExtender null
+                    }
                     val next = nextAdaptiveAgentStepLimit(
                         currentLimit = currentLimit,
                         configuredBase = maxSteps,
@@ -558,7 +551,7 @@ internal class LocalSubagentRunner(
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
                 append("\n建议：模型超时可重试；网页/工具超时请查看对应工具错误码。")
             }
-            return LocalSubagentResult(LocalSubagentStatus.FAILED, output, error.code)
+            return LocalSubagentResult(LocalSubagentStatus.FAILED, output, error.code, error.retryable)
         } catch (error: Exception) {
             val partial = progress.joinToString("\n")
             val output = buildString {

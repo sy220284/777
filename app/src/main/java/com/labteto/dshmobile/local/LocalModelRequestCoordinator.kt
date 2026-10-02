@@ -8,6 +8,7 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
+import com.labteto.dshmobile.local.model.resolveLocalModelProtocol
 import java.util.UUID
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -30,6 +31,8 @@ internal class LocalModelRequestCoordinator(
     private val defaultEventLog: () -> LocalSessionEventLog,
     private val streamingPreviewStore: LocalStreamingPreviewStore,
     private val persistOverflowCompaction: (LocalHarnessState, LocalHistorySummaryMode) -> Unit,
+    private val pressureStore: LocalRequestPressureStore = LocalRequestPressureStore(),
+    private val promptCacheBaselines: LocalPromptCacheBaselineStore = LocalPromptCacheBaselineStore(),
     private val maxStreamPreviewChars: Int = 4_096,
     private val streamPreviewIntervalMs: Long = 50L,
 ) {
@@ -48,6 +51,7 @@ internal class LocalModelRequestCoordinator(
         profile: LocalModelProfile? = null,
         previewGuard: () -> Boolean = { true },
         overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
+        executionControl: LocalWorkExecutionControl? = null,
     ): LocalModelReply {
         val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
         val frozenProfile = profile ?: modelGateway.profileForRoute(
@@ -56,6 +60,31 @@ internal class LocalModelRequestCoordinator(
             snapshot.baseUrl,
         )
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
+        val runtimeCapabilities = LocalModelPresets.runtimeCapabilitiesFor(
+            model = frozenProfile.model,
+            baseUrl = frozenProfile.baseUrl,
+            protocol = resolveLocalModelProtocol(
+                authKind = frozenProfile.authKind,
+                profile = frozenProfile,
+                model = frozenProfile.model,
+                baseUrl = frozenProfile.baseUrl,
+            ),
+            authKind = frozenProfile.authKind,
+        )
+        val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
+            promptCacheBaselines.get(snapshot.sessionId, frozenProfile.id)
+        } else {
+            null
+        }
+        val operationalLimit = operationalInputLimitTokens(frozenProfile.model, frozenProfile.baseUrl)
+        val pressure = LocalPromptPressureMeter.measure(
+            messages = messages,
+            tools = tools,
+            operationalLimitTokens = operationalLimit,
+            modelContextWindowTokens = documentedContextWindowTokens(frozenProfile.model, frozenProfile.baseUrl),
+        )
+        pressureStore.record(snapshot.sessionId, pressure)
+        val contextWindow = pressureStore.window(snapshot.sessionId)
         val previewOwner = if (publishPreviewEnabled) {
             streamingPreviewStore.newOwner(
                 sessionId = snapshot.sessionId,
@@ -93,6 +122,18 @@ internal class LocalModelRequestCoordinator(
             put("step", step)
             put("message_count", logMessages.size)
             put("context_chars", contextChars)
+            put("estimated_input_tokens", pressure.estimatedInputTokens)
+            put("operational_input_limit_tokens", pressure.operationalLimitTokens)
+            pressure.modelContextWindowTokens?.let { put("model_context_window_tokens", it) }
+            put("system_tokens_estimate", pressure.systemTokens)
+            put("history_tokens_estimate", pressure.historyTokens)
+            put("current_user_tokens_estimate", pressure.currentUserTokens)
+            put("tool_definition_tokens_estimate", pressure.toolDefinitionTokens)
+            contextWindow?.let { window ->
+                put("context_generation", window.generation)
+                put("context_prefill_tokens", window.prefillTokens)
+                put("context_prefill_source", window.prefillSource)
+            }
             put("tool_count", tools.size)
             put("tool_names", toolNames)
             put("plan_mode", snapshot.planMode)
@@ -103,6 +144,8 @@ internal class LocalModelRequestCoordinator(
             put("model", snapshot.model)
             put("message_count", logMessages.size)
             put("context_chars", contextChars)
+            put("estimated_input_tokens", pressure.estimatedInputTokens)
+            put("operational_input_limit_tokens", pressure.operationalLimitTokens)
             put("tool_count", tools.size)
             put("tool_names", toolNames)
         })
@@ -225,45 +268,76 @@ internal class LocalModelRequestCoordinator(
                         val streamFilter = streamFilterPhrases
                             .takeIf { it.isNotEmpty() }
                             ?.let(::ChatStreamFilter)
-                        resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                            val reply = try {
-                                modelGateway.completeStreaming(
-                                    baseUrl = snapshot.baseUrl,
-                                    model = snapshot.model,
-                                    messages = activeMessages,
-                                    tools = tools,
-                                    temperature = temperature,
-                                    profile = frozenProfile,
-                                    onDelta = { delta ->
-                                        val visible =
-                                            streamFilter?.append(delta.content)?.text ?: delta.content
-                                        streamPreview.append(visible)
-                                    },
-                                )
-                            } catch (error: LocalModelException) {
-                                lastProviderError = error
-                                log.append("request/provider-error", buildJsonObject {
-                                    put("step", step)
-                                    put("code", error.code)
-                                    error.status?.let { put("status", it) }
-                                    error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
-                                    error.requestId?.let { put("request_id", it) }
-                                    error.providerCode?.let { put("provider_code", it) }
-                                    error.providerParam?.let { put("provider_param", it) }
-                                    error.cause?.let { cause ->
-                                        put("cause_type", cause::class.java.simpleName)
-                                        cause.message?.takeIf(String::isNotBlank)?.let {
-                                            put("cause_detail", it.take(800))
+                        val activePressure = LocalPromptPressureMeter.measure(
+                            messages = activeMessages,
+                            tools = tools,
+                            operationalLimitTokens = operationalLimit,
+                            modelContextWindowTokens = pressure.modelContextWindowTokens,
+                        )
+                        pressureStore.record(snapshot.sessionId, activePressure)
+                        executeWithModelAdmission(
+                            control = executionControl,
+                            profileId = frozenProfile.id,
+                            model = frozenProfile.model,
+                            baseUrl = frozenProfile.baseUrl,
+                            messages = activeMessages,
+                            tools = tools,
+                        ) {
+                            resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                                try {
+                                    modelGateway.completeStreaming(
+                                        baseUrl = snapshot.baseUrl,
+                                        model = snapshot.model,
+                                        messages = activeMessages,
+                                        tools = tools,
+                                        temperature = temperature,
+                                        profile = frozenProfile,
+                                        promptCacheComparisonResponseId = cacheComparisonResponseId,
+                                        onDelta = { delta ->
+                                            val visible = streamFilter?.append(delta.content)?.text ?: delta.content
+                                            streamPreview.append(visible)
+                                        },
+                                    )
+                                } catch (error: LocalModelException) {
+                                    lastProviderError = error
+                                    log.append("request/provider-error", buildJsonObject {
+                                        put("step", step)
+                                        put("code", error.code)
+                                        error.status?.let { put("status", it) }
+                                        error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
+                                        error.requestId?.let { put("request_id", it) }
+                                        error.providerCode?.let { put("provider_code", it) }
+                                        error.providerParam?.let { put("provider_param", it) }
+                                        error.cause?.let { cause ->
+                                            put("cause_type", cause::class.java.simpleName)
+                                            cause.message?.takeIf(String::isNotBlank)?.let {
+                                                put("cause_detail", it.take(800))
+                                            }
                                         }
+                                    })
+                                    throw error
+                                }
+                            }.also { reply ->
+                                streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
+                                streamPreview.flush()
+                                if (reply.usage.reported) {
+                                    pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
+                                }
+                                if (runtimeCapabilities.promptCacheDiagnostics && reply.requestId.isNotBlank()) {
+                                    promptCacheBaselines.put(snapshot.sessionId, frozenProfile.id, reply.requestId)
+                                    reply.promptCacheDiagnostic?.let { diagnostic ->
+                                        log.append("request/cache-diagnostic", buildJsonObject {
+                                            put("step", step)
+                                            put("type", diagnostic.type)
+                                            diagnostic.reason?.let { put("reason", it) }
+                                            diagnostic.comparisonReusableTokens?.let { put("comparison_reusable_tokens", it) }
+                                            diagnostic.cacheMissedTokens?.let { put("cache_missed_tokens", it) }
+                                            cacheComparisonResponseId?.let { put("comparison_response_id", it) }
+                                            put("response_id", reply.requestId)
+                                        })
                                     }
-                                })
-                                throw error
+                                }
                             }
-                            streamFilter?.flush()?.text
-                                ?.takeIf(String::isNotEmpty)
-                                ?.let(streamPreview::append)
-                            streamPreview.flush()
-                            reply
                         }
                     }
                 } finally {

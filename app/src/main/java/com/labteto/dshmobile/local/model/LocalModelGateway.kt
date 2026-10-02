@@ -86,6 +86,7 @@ class LocalModelGateway @Inject constructor(
         tools: JsonArray,
         temperature: Double? = null,
         profile: LocalModelProfile? = null,
+        promptCacheComparisonResponseId: String? = null,
     ): LocalModelReply =
         completeResolved(
             route = resolveRoute(model, baseUrl, profile),
@@ -94,6 +95,7 @@ class LocalModelGateway @Inject constructor(
             temperature = temperature,
             streaming = false,
             onDelta = {},
+            promptCacheComparisonResponseId = promptCacheComparisonResponseId,
         )
 
     suspend fun completeStreaming(
@@ -104,6 +106,7 @@ class LocalModelGateway @Inject constructor(
         temperature: Double? = null,
         onDelta: (LocalModelDelta) -> Unit = {},
         profile: LocalModelProfile? = null,
+        promptCacheComparisonResponseId: String? = null,
     ): LocalModelReply =
         completeResolved(
             route = resolveRoute(model, baseUrl, profile),
@@ -112,6 +115,7 @@ class LocalModelGateway @Inject constructor(
             temperature = temperature,
             streaming = true,
             onDelta = onDelta,
+            promptCacheComparisonResponseId = promptCacheComparisonResponseId,
         )
 
     suspend fun probeApiKey(
@@ -174,7 +178,12 @@ class LocalModelGateway @Inject constructor(
             authKind = resolved.authKind,
             protocol = protocol,
             bearerToken = resolved.bearerToken,
-            capabilities = LocalModelPresets.runtimeCapabilitiesFor(model, baseUrl, protocol),
+            capabilities = LocalModelPresets.runtimeCapabilitiesFor(
+                model = model,
+                baseUrl = baseUrl,
+                protocol = protocol,
+                authKind = resolved.authKind,
+            ),
         )
     }
 
@@ -185,6 +194,7 @@ class LocalModelGateway @Inject constructor(
         temperature: Double?,
         streaming: Boolean,
         onDelta: (LocalModelDelta) -> Unit,
+        promptCacheComparisonResponseId: String? = null,
     ): LocalModelReply {
         val prepared = prepareLocalModelAdapterRequest(
             route = route,
@@ -192,6 +202,7 @@ class LocalModelGateway @Inject constructor(
             tools = tools,
             temperature = temperature,
             streaming = streaming,
+            promptCacheComparisonResponseId = promptCacheComparisonResponseId,
         )
         return adapters.adapter(route.protocol).complete(
             request = prepared.request,
@@ -217,6 +228,7 @@ internal fun prepareLocalModelAdapterRequest(
     tools: JsonArray,
     temperature: Double?,
     streaming: Boolean,
+    promptCacheComparisonResponseId: String? = null,
 ): LocalPreparedModelRequest {
     val canonicalMessages = LocalCanonicalModelCodec.messages(messages).filterNot(::isEmptyCanonicalAssistant)
     validateCanonicalModelHistory(canonicalMessages)
@@ -260,6 +272,8 @@ internal fun prepareLocalModelAdapterRequest(
             messages = routedMessages,
             tools = canonicalTools,
             temperature = routedTemperature,
+            promptCacheComparisonResponseId = promptCacheComparisonResponseId
+                ?.takeIf { route.protocol == LocalModelProtocol.RESPONSES && route.capabilities.promptCacheDiagnostics },
         ),
         streaming = streaming && route.capabilities.streaming,
     )

@@ -297,8 +297,8 @@ class SettingsViewModel @Inject constructor(
     fun forgetMemory(id: String, onDone: (String?) -> Unit = {}) =
         memorySettingsController.forget(id, onDone)
 
-    fun configureLocalAgent(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) {
-        localHarness.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
+    fun configureLocalAgent(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int, workerProfileId: String?) {
+        localHarness.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts, workerProfileId)
     }
 
     suspend fun diagnoseNetwork(target: String): String = localHarness.diagnoseNetwork(target)

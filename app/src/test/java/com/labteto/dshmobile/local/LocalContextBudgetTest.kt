@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalContextBudgetTest {
@@ -22,7 +23,7 @@ class LocalContextBudgetTest {
     }
 
     @Test
-    fun thirdPartyRouteWithSameModelNameDoesNotGuessOfficialWindow() {
+    fun unknownRouteGetsOperationalGuardWithoutInventingProviderWindow() {
         val budget = localHistoryBudgetFor(
             memoryClassMb = 512,
             pressure = HarnessResourcePressure.LOW,
@@ -30,9 +31,11 @@ class LocalContextBudgetTest {
             baseUrl = "https://api.example.com/v1",
         )
 
-        assertNull(budget.maxHistoryTokens)
-        assertNull(budget.outputReserveTokens)
-        assertNull(budget.headroomTokens)
+        assertNotNull(budget.maxHistoryTokens)
+        assertTrue(budget.maxHistoryTokens!! > 0)
+        assertEquals(0, budget.outputReserveTokens)
+        assertNotNull(budget.headroomTokens)
+        assertNull(documentedContextWindowTokens("deepseek-flash", "https://api.example.com/v1"))
     }
 
     @Test

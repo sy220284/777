@@ -320,6 +320,13 @@ data class LocalModelRouteIdentity(
     val fingerprint: String = "",
 )
 
+data class LocalPromptCacheDiagnostic(
+    val type: String,
+    val reason: String? = null,
+    val comparisonReusableTokens: Long? = null,
+    val cacheMissedTokens: Long? = null,
+)
+
 /** Parsed model response retained verbatim for the next request. */
 data class LocalModelReply(
     val message: JsonObject,
@@ -331,4 +338,5 @@ data class LocalModelReply(
     val promptBreakdown: TokenPromptBreakdown = TokenPromptBreakdown(),
     val canonicalMessage: LocalCanonicalMessage? = null,
     val routeIdentity: LocalModelRouteIdentity? = null,
+    val promptCacheDiagnostic: LocalPromptCacheDiagnostic? = null,
 )

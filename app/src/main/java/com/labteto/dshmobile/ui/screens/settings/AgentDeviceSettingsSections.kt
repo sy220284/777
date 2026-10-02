@@ -63,13 +63,9 @@ import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsMenu
-
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
-import com.labteto.dshmobile.ui.components.DsValueRow
-import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -115,7 +111,7 @@ internal fun LocalAgentSettingsCard(
             range = 4..128,
             onDelta = { delta ->
                 clampUpdate(local.mainMaxSteps, delta, 4, 128) {
-                    viewModel.configureLocalAgent(it, local.subagentMaxSteps, local.modelAttempts)
+                    viewModel.configureLocalAgent(it, local.subagentMaxSteps, local.modelAttempts, local.modelSelection.workerProfileId)
                 }
             },
         )
@@ -126,7 +122,7 @@ internal fun LocalAgentSettingsCard(
             range = 1..128,
             onDelta = { delta ->
                 clampUpdate(local.subagentMaxSteps, delta, 1, 128) {
-                    viewModel.configureLocalAgent(local.mainMaxSteps, it, local.modelAttempts)
+                    viewModel.configureLocalAgent(local.mainMaxSteps, it, local.modelAttempts, local.modelSelection.workerProfileId)
                 }
             },
         )
@@ -137,10 +133,12 @@ internal fun LocalAgentSettingsCard(
             range = 1..5,
             onDelta = { delta ->
                 clampUpdate(local.modelAttempts, delta, 1, 5) {
-                    viewModel.configureLocalAgent(local.mainMaxSteps, local.subagentMaxSteps, it)
+                    viewModel.configureLocalAgent(local.mainMaxSteps, local.subagentMaxSteps, it, local.modelSelection.workerProfileId)
                 }
             },
         )
+
+        AgentWorkerModelSettingRow(local) { viewModel.configureLocalAgent(local.mainMaxSteps, local.subagentMaxSteps, local.modelAttempts, it) }
     }
 }
 

@@ -300,4 +300,35 @@ class LocalModelProfilesTest {
     }
 
 
+
+    @Test fun promptCacheDiagnosticsFollowChatGptPlanRouteIdentityInsteadOfModelName() {
+        listOf("gpt-5.6", "gpt-6-astra", "future-plan-model", "totally-new-name").forEach { model ->
+            assertTrue(
+                LocalModelPresets.runtimeCapabilitiesFor(
+                    model = model,
+                    baseUrl = "https://api.openai.com/v1",
+                    protocol = LocalModelProtocol.RESPONSES,
+                    authKind = LocalModelAuthKind.CHATGPT_PLAN,
+                ).promptCacheDiagnostics,
+            )
+        }
+
+        assertFalse(
+            LocalModelPresets.runtimeCapabilitiesFor(
+                model = "gpt-5.6",
+                baseUrl = "https://api.openai.com/v1",
+                protocol = LocalModelProtocol.RESPONSES,
+                authKind = LocalModelAuthKind.API_KEY,
+            ).promptCacheDiagnostics,
+        )
+        assertFalse(
+            LocalModelPresets.runtimeCapabilitiesFor(
+                model = "future-plan-model",
+                baseUrl = "https://api.openai.com/v1",
+                protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+                authKind = LocalModelAuthKind.CHATGPT_PLAN,
+            ).promptCacheDiagnostics,
+        )
+    }
+
 }

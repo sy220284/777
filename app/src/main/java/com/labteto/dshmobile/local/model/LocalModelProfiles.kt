@@ -79,6 +79,11 @@ enum class LocalModelToolCallingMode {
     RESPONSES_ONLY,
 }
 
+enum class LocalModelPromptUpdateMode {
+    REPLACE,
+    APPEND_ONLY,
+}
+
 data class LocalModelRuntimeCapabilities(
     val streaming: Boolean = true,
     val toolCalling: Boolean = true,
@@ -90,6 +95,13 @@ data class LocalModelRuntimeCapabilities(
     val imageInput: Boolean? = null,
     val temperature: Boolean = true,
     val maxImageBytes: Long = 20L * 1024L * 1024L,
+    /** Provider/model documented window. Null means unknown, never "unlimited". */
+    val contextWindowTokens: Int? = null,
+    val defaultMaxOutputTokens: Int? = null,
+    val systemPromptUpdateMode: LocalModelPromptUpdateMode = LocalModelPromptUpdateMode.REPLACE,
+    val toolUpdateMode: LocalModelPromptUpdateMode = LocalModelPromptUpdateMode.REPLACE,
+    val promptCacheUsage: Boolean = true,
+    val promptCacheDiagnostics: Boolean = false,
 )
 
 data class LocalModelPreset(
@@ -107,6 +119,10 @@ data class LocalModelPreset(
             LocalModelProtocol.CHAT_COMPLETIONS
         },
     val temperatureSupported: Boolean = true,
+    val contextWindowTokens: Int? = null,
+    val defaultMaxOutputTokens: Int? = null,
+    val systemPromptUpdateMode: LocalModelPromptUpdateMode = LocalModelPromptUpdateMode.REPLACE,
+    val toolUpdateMode: LocalModelPromptUpdateMode = LocalModelPromptUpdateMode.REPLACE,
 ) {
     val chatEndpoint: String
         get() = baseUrl.trimEnd('/') + "/chat/completions"
@@ -132,6 +148,10 @@ object LocalModelPresets {
             ),
             imageInputSupported = true,
             modelsEndpoint = "https://api.deepseek.com/models",
+            contextWindowTokens = 1_000_000,
+            defaultMaxOutputTokens = 256_000,
+            systemPromptUpdateMode = LocalModelPromptUpdateMode.APPEND_ONLY,
+            toolUpdateMode = LocalModelPromptUpdateMode.APPEND_ONLY,
         ),
         LocalModelPreset(
             provider = "DeepSeek",
@@ -140,6 +160,10 @@ object LocalModelPresets {
             capabilities = setOf(LocalModelCapability.TEXT),
             imageInputSupported = false,
             modelsEndpoint = "https://api.deepseek.com/models",
+            contextWindowTokens = 1_000_000,
+            defaultMaxOutputTokens = 256_000,
+            systemPromptUpdateMode = LocalModelPromptUpdateMode.APPEND_ONLY,
+            toolUpdateMode = LocalModelPromptUpdateMode.APPEND_ONLY,
         ),
         LocalModelPreset(
             provider = "MiniMax",
@@ -462,10 +486,18 @@ object LocalModelPresets {
         model: String,
         baseUrl: String,
         protocol: LocalModelProtocol = protocolFor(model, baseUrl),
+        authKind: LocalModelAuthKind = LocalModelAuthKind.API_KEY,
     ): LocalModelRuntimeCapabilities {
         val preset = find(model, baseUrl)
         val image = preset?.imageInputSupported
         val maxImageBytes = maxNativeImageBytesFor(model, baseUrl)
+        val contextWindowTokens = preset?.contextWindowTokens
+        val defaultMaxOutputTokens = preset?.defaultMaxOutputTokens
+        val systemPromptUpdateMode = preset?.systemPromptUpdateMode ?: LocalModelPromptUpdateMode.REPLACE
+        val toolUpdateMode = preset?.toolUpdateMode ?: LocalModelPromptUpdateMode.REPLACE
+        val promptCacheDiagnostics =
+            protocol == LocalModelProtocol.RESPONSES &&
+                authKind == LocalModelAuthKind.CHATGPT_PLAN
         return when (protocol) {
             LocalModelProtocol.CHAT_COMPLETIONS -> LocalModelRuntimeCapabilities(
                 structuredOutput = false,
@@ -473,6 +505,10 @@ object LocalModelPresets {
                 imageInput = image,
                 temperature = preset?.temperatureSupported != false,
                 maxImageBytes = maxImageBytes,
+                contextWindowTokens = contextWindowTokens,
+                defaultMaxOutputTokens = defaultMaxOutputTokens,
+                systemPromptUpdateMode = systemPromptUpdateMode,
+                toolUpdateMode = toolUpdateMode,
             )
             LocalModelProtocol.RESPONSES -> LocalModelRuntimeCapabilities(
                 structuredOutput = true,
@@ -480,6 +516,11 @@ object LocalModelPresets {
                 imageInput = image,
                 temperature = preset?.temperatureSupported != false,
                 maxImageBytes = maxImageBytes,
+                contextWindowTokens = contextWindowTokens,
+                defaultMaxOutputTokens = defaultMaxOutputTokens,
+                systemPromptUpdateMode = systemPromptUpdateMode,
+                toolUpdateMode = toolUpdateMode,
+                promptCacheDiagnostics = promptCacheDiagnostics,
             )
             LocalModelProtocol.ANTHROPIC_MESSAGES -> LocalModelRuntimeCapabilities(
                 structuredOutput = false,
@@ -487,6 +528,10 @@ object LocalModelPresets {
                 imageInput = image,
                 temperature = preset?.temperatureSupported != false,
                 maxImageBytes = maxImageBytes,
+                contextWindowTokens = contextWindowTokens,
+                defaultMaxOutputTokens = defaultMaxOutputTokens,
+                systemPromptUpdateMode = systemPromptUpdateMode,
+                toolUpdateMode = toolUpdateMode,
             )
         }
     }

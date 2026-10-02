@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
-import java.net.URI
 
 /**
  * Two independent guards share one policy object:
@@ -64,7 +63,7 @@ internal fun localHistoryBudgetFor(
         HarnessResourcePressure.HIGH -> 0.65
     }
 
-    val routed = officialDeepSeekContext(model, baseUrl)
+    val routed = routedContextBudget(model, baseUrl)
     return LocalHistoryBudget(
         maxHistoryChars = (base.maxHistoryChars * scale).toInt().coerceAtLeast(180_000),
         tailChars = (base.tailChars * scale).toInt().coerceAtLeast(80_000),
@@ -85,40 +84,54 @@ private data class RoutedContextBudget(
     val headroomTokens: Int,
 )
 
-private fun officialDeepSeekContext(model: String?, baseUrl: String?): RoutedContextBudget? {
-    val normalized = model?.trim()?.lowercase() ?: return null
-    if (normalized !in OFFICIAL_DEEPSEEK_MODELS) return null
-    if (!isOfficialDeepSeekEndpoint(baseUrl)) return null
-
+private fun routedContextBudget(model: String?, baseUrl: String?): RoutedContextBudget {
+    val capabilities = if (model.isNullOrBlank() || baseUrl.isNullOrBlank()) {
+        LocalModelRuntimeCapabilities()
+    } else {
+        LocalModelPresets.runtimeCapabilitiesFor(model, baseUrl)
+    }
+    val window = capabilities.contextWindowTokens
+    if (window == null) {
+        return RoutedContextBudget(
+            messageBudgetTokens = UNKNOWN_ROUTE_OPERATIONAL_INPUT_TOKENS,
+            tailTokens = UNKNOWN_ROUTE_TAIL_TOKENS,
+            outputReserveTokens = 0,
+            headroomTokens = UNKNOWN_ROUTE_HEADROOM_TOKENS,
+        )
+    }
+    val outputReserve = capabilities.defaultMaxOutputTokens
+        ?.coerceIn(1, (window / 2).coerceAtLeast(1))
+        ?: minOf(DEFAULT_OUTPUT_RESERVE_TOKENS, window / 4)
+    val headroom = minOf(DEFAULT_HEADROOM_TOKENS, (window * 0.08).toInt()).coerceAtLeast(1)
     val messageBudget = minOf(
-        (OFFICIAL_CONTEXT_WINDOW_TOKENS * CONTEXT_TRIGGER_RATIO).toInt(),
-        OFFICIAL_CONTEXT_WINDOW_TOKENS - OFFICIAL_OUTPUT_RESERVE_TOKENS - OFFICIAL_HEADROOM_TOKENS,
-    )
-    val tail = ((OFFICIAL_CONTEXT_WINDOW_TOKENS - OFFICIAL_OUTPUT_RESERVE_TOKENS) * TAIL_RATIO)
-        .toInt()
-        .coerceAtLeast(1)
+        (window * CONTEXT_TRIGGER_RATIO).toInt(),
+        window - outputReserve - headroom,
+    ).coerceAtLeast(minOf(UNKNOWN_ROUTE_OPERATIONAL_INPUT_TOKENS, window / 2))
+    val tail = ((window - outputReserve) * TAIL_RATIO).toInt().coerceAtLeast(1)
     return RoutedContextBudget(
         messageBudgetTokens = messageBudget,
-        tailTokens = tail,
-        outputReserveTokens = OFFICIAL_OUTPUT_RESERVE_TOKENS,
-        headroomTokens = OFFICIAL_HEADROOM_TOKENS,
+        tailTokens = tail.coerceAtMost(messageBudget),
+        outputReserveTokens = outputReserve,
+        headroomTokens = headroom,
     )
 }
 
-private fun isOfficialDeepSeekEndpoint(baseUrl: String?): Boolean {
-    val value = baseUrl?.trim()?.takeIf(String::isNotEmpty) ?: return false
-    return runCatching {
-        val normalized = normalizeModelBaseUrl(value)
-        val uri = URI(normalized)
-        uri.scheme.equals("https", ignoreCase = true) &&
-            uri.host.equals("api.deepseek.com", ignoreCase = true)
-    }.getOrDefault(false)
-}
+/**
+ * Unknown model capacity must never mean unlimited input. This is an operational exposure ceiling,
+ * not a claim about the provider's real context window.
+ */
+internal fun operationalInputLimitTokens(model: String?, baseUrl: String?): Int =
+    routedContextBudget(model, baseUrl).messageBudgetTokens
 
-private val OFFICIAL_DEEPSEEK_MODELS = setOf("deepseek-flash", "deepseek-v4-flash", "deepseek-v4-pro")
-private const val OFFICIAL_CONTEXT_WINDOW_TOKENS = 1_000_000
-private const val OFFICIAL_OUTPUT_RESERVE_TOKENS = 256_000
-private const val OFFICIAL_HEADROOM_TOKENS = 65_536
+internal fun documentedContextWindowTokens(model: String?, baseUrl: String?): Int? =
+    if (model.isNullOrBlank() || baseUrl.isNullOrBlank()) null
+    else LocalModelPresets.runtimeCapabilitiesFor(model, baseUrl).contextWindowTokens
+
+private const val UNKNOWN_ROUTE_OPERATIONAL_INPUT_TOKENS = 192_000
+private const val UNKNOWN_ROUTE_TAIL_TOKENS = 48_000
+private const val UNKNOWN_ROUTE_HEADROOM_TOKENS = 16_000
+private const val DEFAULT_OUTPUT_RESERVE_TOKENS = 32_000
+private const val DEFAULT_HEADROOM_TOKENS = 65_536
 private const val CONTEXT_TRIGGER_RATIO = 0.8
 private const val TAIL_RATIO = 0.16
 private const val DEFAULT_TOOL_RESULT_TOKENS = 16_000

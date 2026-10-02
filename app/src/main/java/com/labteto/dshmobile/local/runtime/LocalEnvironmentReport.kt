@@ -10,6 +10,9 @@ internal object LocalEnvironmentReport {
         resources: HarnessResourceSnapshot,
         contextChars: Int,
         contextBudgetChars: Int,
+        requestPressure: LocalPromptPressure? = null,
+        contextWindow: LocalContextWindowSnapshot? = null,
+        workBudget: LocalWorkExecutionBudget.Snapshot? = null,
         latestRequest: TokenUsageRecord?,
         capabilitySummary: String,
         pendingInputs: Int,
@@ -21,7 +24,7 @@ internal object LocalEnvironmentReport {
         appendLine("安卓本机 Harness 环境")
         appendLine("工作区：$workspacePath")
         appendLine(
-            "执行预算：模型 ${resources.activeModelRequests}/${resources.budget.maxModelRequests}；" +
+            "并发槽位：模型 ${resources.activeModelRequests}/${resources.budget.maxModelRequests}；" +
                 "智能体 ${resources.activeAgents}/${resources.budget.maxAgents}；" +
                 "终端 ${resources.activeTerminals}/${resources.budget.maxTerminals}；" +
                 "虚拟屏 ${resources.activeVirtualDisplays}/${resources.budget.maxVirtualDisplays}；" +
@@ -29,16 +32,40 @@ internal object LocalEnvironmentReport {
                 "压力 ${resources.pressure.name.lowercase()}",
         )
         appendLine("持久模型历史（非本次实际发送量）：$contextChars/$contextBudgetChars 字符")
+        contextWindow?.let { window ->
+            appendLine(
+                "上下文窗口代际：#${window.generation}；起始 ${window.prefillTokens} token" +
+                    "（${window.prefillSource}）；本代峰值 ${window.peakInputTokens} token",
+            )
+        }
+        requestPressure?.let { pressure ->
+            append("最近请求预算估算：")
+            append(pressure.contextChars).append(" 字符，预计 ")
+            append(pressure.estimatedInputTokens).append("/")
+            append(pressure.operationalLimitTokens).append(" 输入 token")
+            pressure.modelContextWindowTokens?.let { append("；模型窗口 ").append(it).append(" token") }
+            appendLine()
+            appendLine(
+                "请求构成估算：system=${pressure.systemTokens}，history=${pressure.historyTokens}，" +
+                    "current_user=${pressure.currentUserTokens}，tools=${pressure.toolDefinitionTokens}",
+            )
+        }
+        workBudget?.let { budget ->
+            appendLine(
+                "工作消费护栏：预计暴露 ${budget.committedExposureTokens} + 待发送 ${budget.pendingExposureTokens}" +
+                    " / ${budget.exposureLimitTokens} token；请求 ${budget.admittedRequests}/${budget.maxRequests}",
+            )
+        }
         if (latestRequest == null) {
-            appendLine("最近真实请求：暂无可核对的已上报输入 Token")
+            appendLine("最近成功请求实际输入：暂无可核对的已上报输入 Token")
         } else {
             appendLine(
-                "最近真实请求实际输入：${latestRequest.inputTokens} token；" +
+                "最近成功请求实际输入：${latestRequest.inputTokens} token；" +
                     "模型 ${latestRequest.model}；动作 ${latestRequest.context.action.name.lowercase()}",
             )
             val breakdown = latestRequest.promptBreakdown
             appendLine(
-                "最近请求诊断估算：history=${breakdown.historyTokens}，" +
+                "最近成功请求诊断拆分：history=${breakdown.historyTokens}，" +
                     "current_user=${breakdown.currentUserTokens}，tools=${breakdown.toolDefinitionTokens}，" +
                     "system=${breakdown.systemBaseTokens + breakdown.personaStateTokens + breakdown.memoryRuleTokens + breakdown.otherSystemTokens}",
             )
