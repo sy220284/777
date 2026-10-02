@@ -255,13 +255,13 @@ internal class LocalSubagentRunner(
                 history.insert(index, insertion)
             }
             virtualScreenId?.let { id ->
-                history += buildJsonObject {
+                history.append(buildJsonObject {
                     put("role", "system")
                     put(
                         "content",
                         "【独立虚拟屏】id=$id；界面操作仅用 android_vscreen_* 并传入该 id，禁止操作主屏。",
                     )
-                }
+                })
             }
             history.append(buildJsonObject { put("role", "user"); put("content", task) })
 
@@ -408,7 +408,7 @@ internal class LocalSubagentRunner(
                                 event.call.id,
                                 event.output,
                                 runHistoryBudget,
-                                history,
+                                history, event.retention,
                             )
                             val modelOutput = AgentToolResult(
                                 content = boundedContent,
@@ -421,7 +421,9 @@ internal class LocalSubagentRunner(
                             historyPolicy.rememberProgress(
                                 progress,
                                 "第 ${event.step} 步 · ${event.call.name}：" +
-                                    truncateWithoutSplittingSurrogatePair(event.output, 1_500),
+                                    truncateWithoutSplittingSurrogatePair(
+                                        durableToolResultContent(event.output, event.retention), 1_500,
+                                    ),
                             )
                             eventLog().append("subagent/tool-result", buildJsonObject {
                                 put("agent_id", subagentId)
@@ -430,20 +432,18 @@ internal class LocalSubagentRunner(
                                 put("name", event.call.name)
                                 put(
                                     "content",
-                                    truncateWithoutSplittingSurrogatePair(event.output, SUBAGENT_EVENT_CHARS),
+                                    truncateWithoutSplittingSurrogatePair(
+                                        durableToolResultContent(event.output, event.retention), SUBAGENT_EVENT_CHARS,
+                                    ),
                                 )
-                                put("model_content", modelOutput)
+                                put("model_content", durableToolResultContent(modelOutput, event.retention))
                                 put("is_error", event.isError)
                                 event.errorCode?.let { put("error_code", it) }
                                 put("retryable", event.retryable)
                                 put("side_effect", event.sideEffect.name.lowercase())
                                 event.recoveryHint?.let { put("recovery_hint", it) }
                             })
-                            history.append(buildJsonObject {
-                                put("role", "tool")
-                                put("tool_call_id", event.call.id)
-                                put("content", modelOutput)
-                            })
+                            history.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
                         }
                         is AgentEvent.TurnCompleted -> {
                             eventLog().append("subagent/end", buildJsonObject {
