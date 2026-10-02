@@ -84,6 +84,7 @@ class McpToolBridgePlugin(
         val displayTarget: String,
         val client: McpClient,
         val toolNames: List<String>,
+        val definitionBytes: Int,
     ) {
         data class DisconnectTicket(
             val started: Boolean,
@@ -378,6 +379,9 @@ class McpToolBridgePlugin(
                 "MCP 服务工具过多：${definitions.size}，上限 $MAX_REMOTE_TOOLS"
             }
             val names = definitions.map { definition -> localToolName(serverId, definition.name) }
+            val definitionBytes = definitions.sumOf { definition ->
+                definition.raw.toString().toByteArray(Charsets.UTF_8).size
+            }
             require(names.distinct().size == names.size) {
                 "MCP 工具名规范化后发生冲突，请调整服务端工具名"
             }
@@ -387,6 +391,7 @@ class McpToolBridgePlugin(
                 displayTarget = displayTarget,
                 client = client,
                 toolNames = names,
+                definitionBytes = definitionBytes,
             )
             val connectedMessage = buildString {
                 append("已连接 MCP 服务：").append(serverId)
@@ -400,6 +405,17 @@ class McpToolBridgePlugin(
 
             mutex.withLock {
                 require(acceptingConnections) { "MCP 插件正在卸载，连接已取消" }
+                require(servers.size < MAX_CONNECTED_SERVERS) {
+                    "MCP 已连接服务数超过总上限 $MAX_CONNECTED_SERVERS"
+                }
+                val totalTools = servers.values.sumOf { it.toolNames.size } + names.size
+                require(totalTools <= MAX_TOTAL_REMOTE_TOOLS) {
+                    "MCP 工具总数超过全局上限 $MAX_TOTAL_REMOTE_TOOLS"
+                }
+                val totalDefinitionBytes = servers.values.sumOf { it.definitionBytes } + definitionBytes
+                require(totalDefinitionBytes <= MAX_TOTAL_DEFINITION_BYTES) {
+                    "MCP 工具定义总大小超过全局上限"
+                }
                 definitions.zip(names).forEach { (definition, localName) ->
                     context.tools.register(
                         HarnessTool(
@@ -622,6 +638,9 @@ class McpToolBridgePlugin(
 
     private companion object {
         const val MAX_REMOTE_TOOLS = 128
+        const val MAX_CONNECTED_SERVERS = 8
+        const val MAX_TOTAL_REMOTE_TOOLS = 192
+        const val MAX_TOTAL_DEFINITION_BYTES = 8 * 1024 * 1024
         const val MAX_TOOL_NAME_LENGTH = 64
         const val MAX_REMOTE_DESCRIPTION_CHARS = 1_024
         const val MAX_DISCOVERY_KEYWORD_CHARS = 128
