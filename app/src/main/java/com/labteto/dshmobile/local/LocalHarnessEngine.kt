@@ -4503,8 +4503,7 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             historySnapshot = binding.modelHistory::snapshot,
-            executionBudget = binding.executionBudget,
-            routeCircuitBreaker = binding.routeCircuitBreaker,
+            executionControl = binding.executionControl,
         )
 
     private suspend fun runWorkflow(
@@ -4688,8 +4687,7 @@ class LocalHarnessEngine @Inject constructor(
         overflowPersister = binding?.let { runBinding ->
             { snapshot, mode -> persistOverflowCompaction(snapshot, mode, runBinding) }
         },
-        executionBudget = binding?.executionBudget,
-        routeCircuitBreaker = binding?.routeCircuitBreaker,
+        executionControl = binding?.executionControl,
     )
 
     private fun persistForegroundOverflowCompaction(
@@ -4857,7 +4855,7 @@ class LocalHarnessEngine @Inject constructor(
             contextChars = modelHistory.encodedChars,
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
             requestPressure = requestPressureStore.latest(currentSessionId),
-            workBudget = activeWorkRuns[currentSessionId]?.executionBudget?.snapshot(),
+            workBudget = activeWorkRuns[currentSessionId]?.executionControl?.budget?.snapshot(),
             pendingInputs = pendingInputs.size(),
             pendingInputLimit = MAX_PENDING_INPUTS,
             commands = commands,
