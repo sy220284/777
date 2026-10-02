@@ -136,7 +136,7 @@ internal class LocalHarnessSettingsCoordinator(
         const val KEY_MAIN_MAX_STEPS = "main_max_steps"
         const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
         const val KEY_MODEL_ATTEMPTS = "model_attempts"
-        const val KEY_WORKER_PROFILE_ID = "worker_profile_id"
+        const val KEY_WORKER_PROFILE_ID = LOCAL_WORKER_PROFILE_ID_PREFERENCE
         const val KEY_IMAGE_INPUT_MODE = "image_input_mode"
         const val KEY_CHAT_STYLE_GUARD = "chat_style_guard_enabled"
         const val KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES = "chat_style_guard_custom_phrases"
