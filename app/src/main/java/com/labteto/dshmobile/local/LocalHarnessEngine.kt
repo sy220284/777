@@ -4881,6 +4881,7 @@ class LocalHarnessEngine @Inject constructor(
         // Only mutate the durable event tail after the persisted session format is accepted.
         // A future-version session must remain completely untouched.
         val recovery = eventLog.repairInterruptedTail()
+        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
             eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
@@ -4983,21 +4984,23 @@ class LocalHarnessEngine @Inject constructor(
             galleryStoryId = stored.galleryStoryId,
             gallerySaveSuppressedThrough = stored.gallerySaveSuppressedThrough,
             chatPersona = chatPersonaStore.get(stored.personaId),
-            chatState = stored.chatState,
-            chatContext = stored.chatContext.boundDurablePending(eventLog),
+            chatState = projectedControls.chatState,
+            chatContext = projectedControls.chatContext.boundDurablePending(eventLog),
             replySuggestions = stored.replySuggestions,
             chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !stored.groupChat.enabled) {
                 restoreMaterializedChatBranchState(
                     current = projectedControls.chatBranches,
                     activeMessages = restoredTranscript.messages,
-                    chatState = stored.chatState,
+                    chatState = projectedControls.chatState,
                     replySuggestions = stored.replySuggestions,
                 )
             } else {
                 LocalChatBranchState()
             },
             groupChat = if (stored.usageMode == LocalUsageMode.CHAT) {
-                stored.groupChat.copy(context = stored.groupChat.context.boundDurablePending(eventLog, "group"))
+                projectedControls.groupChat.copy(
+                    context = projectedControls.groupChat.context.boundDurablePending(eventLog, "group"),
+                )
             } else {
                 LocalGroupChatState()
             },
