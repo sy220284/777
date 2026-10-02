@@ -583,6 +583,7 @@ class LocalModelException(
 
 internal fun contextWindowExceeded(error: Throwable): Boolean {
     val modelError = error as? LocalModelException ?: return false
+    if (modelError.code == "MODEL_CONTEXT_BUDGET_EXCEEDED") return true
     if (modelError.code !in setOf("MODEL_HTTP_400", "MODEL_HTTP_413", "MODEL_HTTP_422")) {
         return false
     }
