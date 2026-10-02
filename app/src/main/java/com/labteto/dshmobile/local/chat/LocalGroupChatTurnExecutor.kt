@@ -658,15 +658,12 @@ internal class LocalGroupChatTurnExecutor(
                     scene = ChatSceneState(),
                     continuity = ChatContinuityState(),
                 )
-                runCatching {
-                    chatPersonaGalleryStore.updateGroupChatState(reply.member.galleryId, privateState)
-                }.onFailure { error ->
-                    eventLog.append("group/state-persist", buildJsonObject {
-                        put("gallery_id", reply.member.galleryId)
-                        put("status", "failed")
-                        put("detail", error.message.orEmpty().take(1_000))
-                    })
-                }
+                persistGroupGalleryStateWithCompensation(
+                    eventLog = eventLog,
+                    galleryStore = chatPersonaGalleryStore,
+                    galleryId = reply.member.galleryId,
+                    chatState = privateState,
+                )
             }
 
             val nextCursor = (snapshot.groupChat.turnCursor + 1) % members.size
