@@ -64,6 +64,26 @@ class MemoryStoreTest {
         )
     }
 
+    @Test fun compactedSnapshotBackupUsesSameWalBaseAsPrimary() {
+        val memoryStore = store()
+        val expectedIds = linkedSetOf<String>()
+        repeat(132) { index ->
+            expectedIds += memoryStore.remember(
+                content = "durable memory $index",
+                scope = MemoryScope.GLOBAL,
+                importance = index % 100,
+            ).id
+        }
+        val journal = File(temporary.root, "memories.wal.jsonl")
+        assertTrue(journal.isFile)
+        assertTrue(File(temporary.root, "memories.json.bak").isFile)
+
+        File(temporary.root, "memories.json").writeText("broken primary after compaction")
+
+        val recoveredIds = all(store()).mapTo(linkedSetOf()) { it.id }
+        assertEquals(expectedIds, recoveredIds)
+    }
+
     @Test fun lineageWriteRestartRecallIsIsolatedFromIndependentConversations() {
         val record = store().remember("apples project decision", MemoryScope.LINEAGE, lineageId = "lineage")
         val restarted = store()
