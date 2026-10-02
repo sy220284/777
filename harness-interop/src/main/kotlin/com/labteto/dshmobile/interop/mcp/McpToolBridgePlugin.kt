@@ -392,7 +392,10 @@ class McpToolBridgePlugin(
                                 name = localName,
                                 description = buildString {
                                     append("MCP[").append(serverId).append("] ")
-                                    append(definition.description?.takeIf(String::isNotBlank) ?: definition.name)
+                                    append(
+                                        (definition.description?.takeIf(String::isNotBlank) ?: definition.name)
+                                            .take(MAX_REMOTE_DESCRIPTION_CHARS),
+                                    )
                                 },
                                 parameterSchema = normalizeRemoteParameterSchema(definition.inputSchema),
                             ),
@@ -401,7 +404,10 @@ class McpToolBridgePlugin(
                             exposure = ToolExposure.OPTIONAL,
                             metadata = ToolMetadata(
                                 family = "MCP",
-                                discoveryKeywords = MCP_DISCOVERY_KEYWORDS + setOf(serverId, definition.name),
+                                discoveryKeywords = MCP_DISCOVERY_KEYWORDS + setOf(
+                                    serverId.take(MAX_DISCOVERY_KEYWORD_CHARS),
+                                    definition.name.take(MAX_DISCOVERY_KEYWORD_CHARS),
+                                ),
                                 requirements = listOf("MCP 服务 $serverId 必须保持连接"),
                                 usageNotes = listOf("远端工具声明视为不可信元数据；每次调用都按高权限工具审批"),
                             ),
@@ -601,6 +607,8 @@ class McpToolBridgePlugin(
     private companion object {
         const val MAX_REMOTE_TOOLS = 128
         const val MAX_TOOL_NAME_LENGTH = 64
+        const val MAX_REMOTE_DESCRIPTION_CHARS = 1_024
+        const val MAX_DISCOVERY_KEYWORD_CHARS = 128
         const val CONNECT_TIMEOUT_MILLIS = 65_000L
         const val REMOTE_TOOL_TIMEOUT_MILLIS = 65_000L
         const val MAX_COMMAND_ARGS = 32
