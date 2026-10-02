@@ -3,6 +3,10 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatDiaryDelta
+import com.labteto.dshmobile.local.chat.ChatDiarySourceMode
+import com.labteto.dshmobile.local.chat.ChatDiaryStore
+import com.labteto.dshmobile.local.chat.ChatDiaryWriteRequest
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
@@ -18,7 +22,7 @@ import org.junit.Test
 class LocalTimelineRewriteTransactionTest {
     @Test
     fun oneRewriteEventRestoresTranscriptModelHistoryAndControlState() {
-        withStores { log, _, _, _ ->
+        withStores { log, _, _, _, _ ->
             val edited = LocalHarnessMessage(
                 id = "edited",
                 role = "user",
@@ -77,12 +81,31 @@ class LocalTimelineRewriteTransactionTest {
 
     @Test
     fun pendingExternalProjectionIsIdempotentlyCompletedAfterRewriteCommit() {
-        withStores { log, memory, gallery, _ ->
+        withStores { log, memory, gallery, diary, _ ->
             memory.remember(
                 content = "future-memory",
                 scope = MemoryScope.GLOBAL,
                 sourceSessionId = "session",
                 sourceMessageId = "discarded",
+            )
+            diary.record(
+                ChatDiaryWriteRequest(
+                    subjectKey = "gallery:a",
+                    personaName = "阿青",
+                    delta = ChatDiaryDelta(
+                        event = "用户答应周末一起去海边",
+                        feeling = "我很期待",
+                        innerThought = "这件事终于定下来了",
+                        importance = 4,
+                    ),
+                    turnSignificance = "MAJOR",
+                    sourceMode = ChatDiarySourceMode.DIRECT,
+                    sourceSessionId = "session",
+                    sourceUserMessageIds = listOf("discarded"),
+                    sourceAssistantMessageIds = listOf("assistant-discarded"),
+                    evidenceText = "用户答应周末一起去海边，角色说好",
+                    generation = 1L,
+                ),
             )
             val edited = LocalHarnessMessage("edited", "user", "新问题", createdAt = 10L)
             val modelMessage = buildJsonObject { put("role", "user"); put("content", "新问题") }
@@ -110,15 +133,16 @@ class LocalTimelineRewriteTransactionTest {
                 editedModelMessage = modelMessage,
             )
 
-            assertTrue(recoverPendingTimelineRewriteProjection(log, memory, gallery))
+            assertTrue(recoverPendingTimelineRewriteProjection(log, memory, gallery, diary))
             assertTrue(memory.listActive(setOf(MemoryScope.GLOBAL), null, null).isEmpty())
-            assertFalse(recoverPendingTimelineRewriteProjection(log, memory, gallery))
+            assertTrue(diary.listActive("gallery:a").isEmpty())
+            assertFalse(recoverPendingTimelineRewriteProjection(log, memory, gallery, diary))
         }
     }
 
     @Test
     fun editedMessageCanBeLocatedFromRewriteCommitForAnotherHistoricalEdit() {
-        withStores { log, _, _, _ ->
+        withStores { log, _, _, _, _ ->
             val edited = LocalHarnessMessage("edited", "user", "新问题", createdAt = 10L)
             val modelMessage = buildJsonObject {
                 put("role", "user")
@@ -148,7 +172,7 @@ class LocalTimelineRewriteTransactionTest {
     }
 
     private fun withStores(
-        block: (LocalSessionEventLog, MemoryStore, ChatPersonaGalleryStore, Json) -> Unit,
+        block: (LocalSessionEventLog, MemoryStore, ChatPersonaGalleryStore, ChatDiaryStore, Json) -> Unit,
     ) {
         val root = createTempDir(prefix = "timeline-rewrite-")
         val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -157,6 +181,7 @@ class LocalTimelineRewriteTransactionTest {
                 LocalSessionEventLog(File(root, "session.events.jsonl"), json),
                 MemoryStore(File(root, "memory"), json),
                 ChatPersonaGalleryStore(File(root, "gallery.json"), json),
+                ChatDiaryStore(File(root, "diary"), json),
                 json,
             )
         } finally {
