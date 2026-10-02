@@ -257,6 +257,9 @@ class LocalHarnessEngine @Inject constructor(
             requestApproval = { call, tool, summary -> approve(call, summary, tool) },
         )
     }
+    private val toolSchemaProjection by lazy {
+        LocalToolSchemaProjection(toolRegistry, toolExecutionCoordinator)
+    }
     private val runtimeProcess = AndroidProcessRuntime(
         defaultWorkingDirectory = File(workspace.path),
         dynamicSearchPaths = bundledRuntimeManager::searchPaths,
@@ -631,7 +634,11 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
-                subagentToolSchemas(allowMutation, allowVirtualScreen, enabledOptional)
+                toolSchemaProjection.subagentSchemas(
+                    allowMutation = allowMutation,
+                    allowVirtualScreen = allowVirtualScreen,
+                    enabledOptional = enabledOptional,
+                )
             },
             executeTool = { call, allowMutation, enabledOptional ->
                 val canonical = call.copy(name = LocalToolPolicy.canonical(call.name))
@@ -3850,91 +3857,25 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    private fun subagentToolSchemas(
-        allowMutation: Boolean,
-        allowVirtualScreen: Boolean,
-    ): JsonArray = subagentToolSchemas(
-        allowMutation = allowMutation,
-        allowVirtualScreen = allowVirtualScreen,
-        enabledOptional = toolExecutionCoordinator.enabledOptionalSnapshot(),
-    )
-
-    private fun subagentToolSchemas(
-        allowMutation: Boolean,
-        allowVirtualScreen: Boolean,
-        enabledOptional: Set<String>,
-    ): JsonArray {
-        val enabled = enabledOptional +
-            if (allowVirtualScreen) SUBAGENT_VIRTUAL_SCREEN_TOOLS else emptySet()
-        val tools = toolRegistry.names()
-            .mapNotNull(toolRegistry::get)
-            .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
-            .filter { tool -> tool.name !in SUBAGENT_VIRTUAL_SCREEN_TOOLS || allowVirtualScreen }
-            .filter { tool -> allowMutation || tool.name != "download_file" }
-            .filter { tool ->
-                allowMutation ||
-                    tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
-                    (allowVirtualScreen && tool.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS)
-            }
-        return LocalToolRouter.visibleSchemas(tools, enabled)
-    }
-
     private fun modelToolSchemas(
         runPolicy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding? = null,
     ): JsonArray {
-        val runtimeState = binding?.state?.value ?: _state.value
-        val history = binding?.modelHistory?.snapshot() ?: modelHistory.snapshot()
-        val optionalPromptBudget = optionalToolPromptBudget(runtimeState, history)
-        if (binding == null) {
-            return toolExecutionCoordinator.visibleSchemas(
-                policy = runPolicy,
-                maxOptionalDefinitionTokens = optionalPromptBudget,
-            )
+        val enabledOptional = binding?.let { run ->
+            synchronized(run.enabledOptionalTools) { run.enabledOptionalTools.toSet() }
         }
-        if (!runPolicy.toolsEnabled) return JsonArray(emptyList())
-        val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
-        return LocalToolRouter.visibleSchemas(
-            tools = tools,
-            enabledOptional = binding.enabledOptionalTools.toSet(),
-            maxOptionalDefinitionTokens = optionalPromptBudget,
-        )
-    }
-
-    private fun optionalToolPromptBudget(
-        state: LocalHarnessState,
-        history: List<JsonObject>,
-    ): Int {
-        val profile = state.modelSelection.activeProfile
-        val operationalLimit = operationalInputLimitTokens(
-            state.model,
-            state.baseUrl,
-            profile?.contextWindowTokensOverride,
-        )
-        val basePressure = LocalPromptPressureMeter.measure(
-            messages = history,
-            tools = JsonArray(emptyList()),
-            operationalLimitTokens = operationalLimit,
-            modelContextWindowTokens = documentedContextWindowTokens(
-                state.model,
-                state.baseUrl,
-                profile?.contextWindowTokensOverride,
-            ),
-        )
-        val remaining = basePressure.remainingOperationalTokens
-        return minOf(
-            LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
-            (remaining / 4).coerceAtLeast(0),
+        return toolSchemaProjection.modelSchemas(
+            policy = runPolicy,
+            state = binding?.state?.value ?: _state.value,
+            history = binding?.modelHistory?.snapshot() ?: modelHistory.snapshot(),
+            enabledOptional = enabledOptional,
         )
     }
 
     private fun runToolNames(
         runPolicy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding?,
-    ): List<String> = modelToolSchemas(runPolicy, binding).mapNotNull { element ->
-        val function = (element as? JsonObject)?.get("function") as? JsonObject
-        (function?.get("name") as? JsonPrimitive)?.contentOrNull
-    }
+    ): List<String> = toolSchemaProjection.names(modelToolSchemas(runPolicy, binding))
 
     private fun clearRunCapabilities(binding: LocalWorkRunBinding?) {
         if (binding == null) {
