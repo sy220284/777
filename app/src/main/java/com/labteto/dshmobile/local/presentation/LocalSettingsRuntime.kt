@@ -49,7 +49,7 @@ class LocalSettingsRuntime @Inject constructor(
     suspend fun disconnectChatGptAccount(id: String): String? = chatGpt.disconnect(id)
     suspend fun removeChatGptAccount(id: String): String? = chatGpt.remove(id)
     fun configureModel(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)
-    suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null) = engine.saveModelConfiguration(apiKey, model, baseUrl, protocol, profileId)
+    suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) = engine.saveModelConfiguration(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
     fun selectModel(id: String) = engine.selectModel(id)
     fun removeModel(id: String) = engine.removeModelProfile(id)
     suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null) = engine.testModelConfiguration(apiKey, model, baseUrl, protocol, profileId)
