@@ -717,6 +717,7 @@ class LocalHarnessEngine @Inject constructor(
             sessionsRoot = sessionsRoot,
             conversationFilesCoordinator = conversationFilesCoordinator,
             memoryStore = memoryStore,
+            diaryStore = chatDiaryStore,
             currentSessionId = { currentSessionId },
             activateSession = { id, transcriptCursor ->
                 currentSessionId = id
