@@ -54,7 +54,7 @@ internal class LocalSubagentRunner(
     private val resourceScheduler: HarnessResourceScheduler,
     private val acquireVirtualScreen: suspend (String) -> String? = { null },
     private val releaseVirtualScreen: (String) -> Unit = { },
-    private val historyBudget: ((String, String) -> LocalHistoryBudget)? = null,
+    private val historyBudget: ((LocalModelProfile) -> LocalHistoryBudget)? = null,
     private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
     private val runCoordinator: LocalAgentRunCoordinator? = null,
     private val runSessionId: () -> String = { state.value.sessionId },
@@ -155,7 +155,7 @@ internal class LocalSubagentRunner(
         }
         val snapshot = state.value.copy(model = runProfile.model, baseUrl = runProfile.baseUrl)
         val routeModel = runProfile.model
-        val runHistoryBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
+        val runHistoryBudget = historyBudget?.invoke(runProfile)
         val stepLimit = adaptiveAgentStepLimit(
             configuredBase = maxSteps,
             task = task,
@@ -480,7 +480,7 @@ internal class LocalSubagentRunner(
                 },
                 maxSteps = stepLimit,
                 stepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
-                    val liveBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
+                    val liveBudget = historyBudget?.invoke(runProfile)
                     if (currentLimit >= MAX_DYNAMIC_STEPS) return@AgentStepLimitExtender null
                     if (!progressTracker.claimExtensionProgress()) {
                         eventLog().append("subagent/budget-stopped", buildJsonObject {
