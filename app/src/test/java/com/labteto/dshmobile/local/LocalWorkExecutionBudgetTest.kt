@@ -8,9 +8,15 @@ import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 class LocalWorkExecutionBudgetTest {
+    @Before
+    fun resetRouteHealth() {
+        LocalModelRouteHealth.resetForTest()
+    }
+
     @Test
     fun largeFirstRequestCanRunButConcurrentExposureWaitsInsteadOfFailing() = runTest {
         val budget = LocalWorkExecutionBudget(
@@ -133,4 +139,73 @@ class LocalWorkExecutionBudgetTest {
         val error = runCatching { breaker.requireClosed("route") }.exceptionOrNull() as LocalModelException
         assertEquals("MODEL_ROUTE_CIRCUIT_OPEN", error.code)
     }
+
+    @Test
+    fun repeatedTransientTransportFailuresOpenRouteCooldown() {
+        val breaker = LocalModelRouteCircuitBreaker()
+        repeat(2) { breaker.observeFailure("route", streamInterrupted()) }
+        assertFalse(breaker.isOpen("route"))
+        assertEquals(2, LocalModelRouteHealth.consecutiveFailures("route"))
+
+        breaker.observeFailure("route", streamInterrupted())
+
+        assertTrue(breaker.isOpen("route"))
+        val error = runCatching { breaker.requireClosed("route") }.exceptionOrNull() as LocalModelException
+        assertEquals("MODEL_ROUTE_CIRCUIT_COOLDOWN", error.code)
+        assertFalse(error.retryable)
+        assertEquals("route_circuit_cooldown", com.labteto.dshmobile.local.model.modelFailureKind(error))
+    }
+
+    @Test
+    fun successfulRequestResetsTransientStreakAndCooldown() {
+        val breaker = LocalModelRouteCircuitBreaker()
+        repeat(3) { breaker.observeFailure("route", streamInterrupted()) }
+        assertTrue(breaker.isOpen("route"))
+
+        breaker.observeSuccess("route")
+
+        assertFalse(breaker.isOpen("route"))
+        assertEquals(0, LocalModelRouteHealth.consecutiveFailures("route"))
+    }
+
+    @Test
+    fun expiredCooldownAllowsOneProbeAndProlongsOnRepeatFailure() {
+        var now = 1_000L
+        LocalModelRouteHealth.resetForTest { now }
+        val breaker = LocalModelRouteCircuitBreaker()
+        repeat(3) { breaker.observeFailure("route", streamInterrupted()) }
+        val first = LocalModelRouteHealth.activeCooldown("route")
+        assertTrue(breaker.isOpen("route"))
+
+        now += 91_000L
+
+        assertFalse(breaker.isOpen("route"))
+        breaker.observeFailure("route", streamInterrupted())
+        val second = LocalModelRouteHealth.activeCooldown("route")
+        assertTrue(second!!.millis > first!!.millis)
+    }
+
+    @Test
+    fun durableAccountFaultDoesNotArmTransientCooldown() {
+        val breaker = LocalModelRouteCircuitBreaker()
+        breaker.observeFailure(
+            "route",
+            LocalModelException(
+                code = "CHATGPT_PLAN_LIMIT_REACHED",
+                message = "limit",
+                retryable = false,
+            ),
+        )
+
+        assertTrue(breaker.isOpen("route"))
+        assertEquals(0, LocalModelRouteHealth.consecutiveFailures("route"))
+    }
+
+    private fun streamInterrupted() = LocalModelException(
+        code = "CHATGPT_PLAN_STREAM_INTERRUPTED",
+        message = "stream was reset: CANCEL",
+        retryable = false,
+        admissionState = com.labteto.dshmobile.local.model.LocalModelAdmissionState.ADMITTED,
+        continuationEligible = true,
+    )
 }
