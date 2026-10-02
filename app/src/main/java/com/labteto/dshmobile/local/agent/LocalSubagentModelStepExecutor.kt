@@ -103,13 +103,9 @@ internal class LocalSubagentModelStepExecutor(
                 if (continuation != null) {
                     continuationRound += 1
                     activeHistory = activeHistory + continuation
-                    durableHistory?.append(continuation)
-                    eventLog().append("subagent/continuation-queued", buildJsonObject {
-                        put("agent_id", subagentId)
-                        put("step", step)
-                        put("continuation_index", continuationRound)
-                        put("reason", modelError.code)
-                    })
+                    recordSubagentContinuation(
+                        continuation, modelError, continuationRound, durableHistory, eventLog(), subagentId, step,
+                    )
                     continue
                 }
                 if (!structureRecoveryAttempted) {
@@ -135,15 +131,7 @@ internal class LocalSubagentModelStepExecutor(
                     compactor = historyCompactor,
                     summaryMode = LocalHistorySummaryMode.WORK,
                 )?.let { durableCompaction ->
-                    eventLog().append("subagent/compaction", buildJsonObject {
-                        put("agent_id", subagentId)
-                        put("trigger", "context-overflow")
-                        put("round", overflowRound)
-                        put("omitted_messages", durableCompaction.omittedMessages)
-                        put("summary", durableCompaction.summary)
-                        put("estimated_tokens_before", durableCompaction.estimatedTokensBefore)
-                        put("estimated_tokens_after", durableCompaction.estimatedTokensAfter)
-                    })
+                    recordSubagentCompaction(durableCompaction, eventLog(), subagentId, overflowRound)
                 }
                 eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
                     put("agent_id", subagentId)
