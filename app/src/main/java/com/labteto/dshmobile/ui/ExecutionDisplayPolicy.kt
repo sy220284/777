@@ -7,9 +7,10 @@ import com.labteto.dshmobile.R
  * Presentation-only policy for agent-driven execution.
  *
  * Runtime arguments/results stay available to the execution layer and durable logs. User-facing
- * transcript surfaces reduce every tool call to a semantic operation category plus lifecycle
- * state. Raw command text, file paths, search terms, arguments and tool output must never be used
- * as a fallback label.
+ * transcript surfaces may pair the semantic operation category with model-authored progress text
+ * so the user can understand the concrete step without exposing raw tool arguments/results.
+ * Raw command text, file paths, search terms, arguments and tool output must never be used as a
+ * fallback label.
  */
 private val COMMAND_EXECUTION_TOOL_NAMES = setOf(
     "bash",
