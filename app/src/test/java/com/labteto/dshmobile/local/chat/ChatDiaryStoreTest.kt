@@ -16,6 +16,51 @@ class ChatDiaryStoreTest {
     private fun store() = ChatDiaryStore(File(temporary.root, "diary"), json)
 
     @Test
+    fun corruptedPrimaryRecoversFromDiaryBackup() {
+        val memory = store()
+        val saved = memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户答应周末和我去海边",
+                feeling = "我很期待",
+                importance = 4,
+            ),
+            evidence = "用户答应周末和我去海边",
+        ))!!
+        File(File(temporary.root, "diary"), "diary.json").writeText("broken")
+
+        val recovered = store().listActive("gallery:a")
+        assertEquals(listOf(saved.id), recovered.map { it.id })
+    }
+
+    @Test
+    fun bothCorruptDiaryFilesCanRestartWithFreshDurableData() {
+        val memory = store()
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户答应周末和我去海边",
+                feeling = "我很期待",
+                importance = 4,
+            ),
+            evidence = "用户答应周末和我去海边",
+        ))
+        val dir = File(temporary.root, "diary")
+        File(dir, "diary.json").writeText("broken-primary")
+        File(dir, "diary.json.bak").writeText("broken-backup")
+
+        val fresh = ChatDiaryStore(dir, json)
+        assertTrue(fresh.listActive("gallery:a").isEmpty())
+        assertNotNull(fresh.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户确认下周一起去书店",
+                feeling = "我觉得这次安排很踏实",
+                importance = 4,
+            ),
+            evidence = "用户确认下周一起去书店",
+        )))
+        assertEquals(1, ChatDiaryStore(dir, json).listActive("gallery:a").size)
+    }
+
+    @Test
     fun meaningfulDiaryKeepsEventFeelingThoughtAndRelationshipMeaning() {
         val diary = store().record(
             request(
