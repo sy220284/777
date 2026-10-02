@@ -194,6 +194,19 @@ internal class LocalSessionRepository(
         removed
     }
 
+    /**
+     * Session lifecycle calls this only after active runs/jobs have been cancelled and durable
+     * deletion has crossed the storage lock. At that point no old writer remains authoritative,
+     * so deletion tombstones no longer need to live for the process lifetime.
+     */
+    fun releaseDeletionBarrier(ids: Set<String>) {
+        synchronized(lock) {
+            ids.forEach { id ->
+                if (id !in pending && id !in latestSnapshots) deletedIds.remove(id)
+            }
+        }
+    }
+
     fun read(id: String): LocalHarnessSession? = readWithLegacyApproval(id)?.session
 
     fun readWithLegacyApproval(id: String): LocalSessionRead? = synchronized(storageLock) {
