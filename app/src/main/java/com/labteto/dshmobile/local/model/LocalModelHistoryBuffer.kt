@@ -6,7 +6,7 @@ import com.labteto.dshmobile.local.LocalHistoryCompactor
 import com.labteto.dshmobile.local.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.applyOverflowCompaction
 import com.labteto.dshmobile.local.estimateModelTokens
-import com.labteto.dshmobile.local.projectStaleToolResults
+import com.labteto.dshmobile.local.compactHistoryWithStaleToolProjection
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -84,24 +84,11 @@ internal class LocalModelHistoryBuffer {
         extraTokens: Int = 0,
         summaryMode: LocalHistorySummaryMode,
     ): LocalHistoryCompaction? {
-        val projection = projectStaleToolResults(messages, budget)
-        if (projection != null) reset(projection.messages)
-
-        val compaction = compactor.compact(
-            history = messages,
-            budget = budget,
-            currentChars = encodedChars,
-            currentTokens = estimatedTokens,
-            extraTokens = extraTokens,
-            summaryMode = summaryMode,
-        )
-        if (compaction != null) {
-            reset(compaction.messages)
-            return compaction.copy(
-                estimatedTokensBefore = projection?.estimatedTokensBefore ?: compaction.estimatedTokensBefore,
-            )
-        }
-        return projection
+        val compaction = compactHistoryWithStaleToolProjection(
+            messages, compactor, budget, extraTokens, summaryMode, encodedChars, estimatedTokens,
+        ) ?: return null
+        reset(compaction.messages)
+        return compaction
     }
 
     private fun recalculateMetrics() {
