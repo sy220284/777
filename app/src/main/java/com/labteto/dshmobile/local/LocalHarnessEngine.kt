@@ -1230,7 +1230,7 @@ class LocalHarnessEngine @Inject constructor(
             activeWorkRuns[state.sessionId]?.job?.isCompleted == false ||
             pendingInputs.size() != 0
         ) return@synchronized LocalChatUserEditResult.BUSY
-        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
+        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
         if (state.usageMode == LocalUsageMode.WORK) return@synchronized editAndResendWorkUserMessage(
             messageId,
             requestedText,
@@ -1405,7 +1405,7 @@ class LocalHarnessEngine @Inject constructor(
                 error = null,
             )
         }
-        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
+        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
         checkpointModelHistory(if (state.groupChat.enabled) "group/user-edited" else "chat/user-edited")
         persist()
         automationScheduler.onChatUserActivity(
@@ -4896,7 +4896,7 @@ class LocalHarnessEngine @Inject constructor(
         // Only mutate the durable event tail after the persisted session format is accepted.
         // A future-version session must remain completely untouched.
         val recovery = eventLog.repairInterruptedTail()
-        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
+        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
             eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
