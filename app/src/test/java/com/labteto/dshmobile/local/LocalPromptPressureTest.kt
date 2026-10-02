@@ -34,4 +34,34 @@ class LocalPromptPressureTest {
         val limit = operationalInputLimitTokens("unknown-model", "https://example.com/v1")
         assertTrue(limit in 1..300_000)
     }
+
+    @Test
+    fun pressureStoreBoundsSessionsAndResetsGenerationPrefillAfterCompaction() {
+        val store = LocalRequestPressureStore(maxSessions = 2)
+        val pressure = LocalPromptPressure(
+            contextChars = 100,
+            estimatedInputTokens = 50,
+            systemTokens = 10,
+            historyTokens = 20,
+            currentUserTokens = 20,
+            toolDefinitionTokens = 0,
+            operationalLimitTokens = 1_000,
+        )
+
+        store.record("a", pressure)
+        store.recordReportedUsage("a", 48)
+        assertEquals("server", store.window("a")?.prefillSource)
+        assertEquals(48L, store.window("a")?.prefillTokens)
+
+        store.advanceGeneration("a", 24)
+        assertEquals(2, store.window("a")?.generation)
+        assertEquals("estimated", store.window("a")?.prefillSource)
+        assertEquals(24L, store.window("a")?.prefillTokens)
+
+        store.record("b", pressure)
+        store.record("c", pressure)
+        assertEquals(2, store.trackedSessionCount())
+        assertEquals(null, store.window("a"))
+    }
+
 }
