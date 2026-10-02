@@ -12,6 +12,13 @@ internal enum class LocalAutoApprovalScope {
 
 /** Explicit classifications: adding a built-in requires deciding its permissions and approval boundary. */
 internal object LocalToolPolicy {
+    // Reuse the sandbox boundary's canonical deny set so shell approval and file enforcement cannot drift.
+    private val FIRMWARE_PATH_MARKERS = LocalSandboxBoundary.DEFAULT_FORBIDDEN_PREFIXES
+
+    // Destructive Git operations remain explicit user-visible approval boundaries.
+    private val DESTRUCTIVE_GIT_OPERATIONS =
+        listOf("reset --hard", "clean -fd", "clean -fdx", "filter-branch")
+
     private val aliases = mapOf(
         "read_file" to "read", "write_file" to "write", "edit_file" to "edit",
         "glob_files" to "glob", "search_text" to "grep", "run_shell" to "bash",
