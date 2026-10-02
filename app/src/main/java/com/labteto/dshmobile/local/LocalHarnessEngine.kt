@@ -2043,7 +2043,15 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     internal suspend fun diagnosticReportForUi(): String = withContext(Dispatchers.IO) {
-        DiagnosticReport.build(AppLog.exportSnapshot(), environmentInfoCoordinator.build(null))
+        val appLogs = AppLog.exportSnapshot()
+        val baseReport = DiagnosticReport.build(appLogs, environmentInfoCoordinator.build(null))
+        appendLocalDiagnosticDetails(
+            baseReport = baseReport,
+            sessionId = currentSessionId,
+            eventLog = eventLogFor(currentSessionId),
+            usageTracker = usageTracker,
+            appLogs = appLogs,
+        )
     }
 
     internal suspend fun githubConnectorConfiguredForUi(): Boolean = githubCredentials.configured()
