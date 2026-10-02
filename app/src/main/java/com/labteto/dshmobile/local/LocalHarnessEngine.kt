@@ -862,7 +862,6 @@ class LocalHarnessEngine @Inject constructor(
     internal fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) =
         settingsCoordinator.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
 
-    /** Persist the default worker route used when a delegated task does not select one explicitly. */
     internal fun configureWorkerProfile(profileId: String?) =
         settingsCoordinator.configureWorkerProfile(profileId)
 
@@ -4992,8 +4991,7 @@ class LocalHarnessEngine @Inject constructor(
             model = model,
             baseUrl = baseUrl,
             modelSelection = LocalModelSelectionState.restored(
-                modelProfiles,
-                activeModelProfile?.id,
+                modelProfiles, activeModelProfile?.id,
                 preferences.getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null),
             ),
             mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
