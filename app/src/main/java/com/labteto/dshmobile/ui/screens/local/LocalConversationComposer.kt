@@ -1,0 +1,351 @@
+package com.labteto.dshmobile.ui.screens.local
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.LocalImportedAttachment
+import com.labteto.dshmobile.local.LocalModelProfile
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.isUnboundChatPersona
+import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
+import com.labteto.dshmobile.local.send.LocalSendResult
+import com.labteto.dshmobile.ui.components.DsButton
+import com.labteto.dshmobile.ui.components.DsButtonSize
+import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsCard
+import com.labteto.dshmobile.ui.components.DsComposerAction
+import com.labteto.dshmobile.ui.components.DsComposerField
+import com.labteto.dshmobile.ui.components.DsComposerMetrics
+import com.labteto.dshmobile.ui.components.DsConversationComposer
+import com.labteto.dshmobile.ui.components.DsPopupMenu
+import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.DsSpacing
+import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
+import com.labteto.dshmobile.ui.theme.withReadingWeight
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+@Composable
+internal fun LocalConversationComposer(
+    state: LocalConversationSurfaceState,
+    activeModelProfile: LocalModelProfile?,
+    input: String,
+    attachments: List<LocalImportedAttachment>,
+    onInputChange: (String) -> Unit,
+    onRemoveAttachment: (Int) -> Unit,
+    onClearAttachments: () -> Unit,
+    onOpenAttachmentPicker: () -> Unit,
+    onShowReplySuggestions: () -> Unit,
+    onGenerateReplySuggestions: suspend () -> Boolean,
+    onConfigure: () -> Unit,
+    onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
+    onStop: () -> Unit,
+    onPlanModeChange: (Boolean) -> Unit,
+    onAutoApprove: () -> Unit,
+    onDisableAutoApprove: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    val backgroundState = LocalAppBackgroundState.current
+    val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var menuOpen by remember(state.sessionId) { mutableStateOf(false) }
+    var focused by remember(state.sessionId) { mutableStateOf(false) }
+    var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
+
+    LaunchedEffect(state.running) {
+        if (state.running) menuOpen = false
+    }
+
+    val expanded = focused || input.contains('\n') || attachments.isNotEmpty()
+    val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
+    val canSend = !state.loading &&
+        groupChatReady &&
+        (input.isNotBlank() || attachments.isNotEmpty())
+    val attachmentLabel = stringResource(R.string.chat_composer_add_attachment)
+    val replySuggestionsLabel = stringResource(R.string.local_reply_suggestions_open)
+    val replySuggestionsAvailable =
+        state.usageMode == LocalUsageMode.CHAT &&
+            !state.groupChat.enabled &&
+            state.messages.any { it.role == "assistant" && it.content.isNotBlank() }
+
+    fun openReplySuggestions() {
+        if (!replySuggestionsAvailable || replySuggestionsLoading || state.running) return
+        if (state.replySuggestions.any { it.text.isNotBlank() }) {
+            onShowReplySuggestions()
+            return
+        }
+        replySuggestionsLoading = true
+        scope.launch {
+            val generated = try {
+                onGenerateReplySuggestions()
+            } finally {
+                replySuggestionsLoading = false
+            }
+            if (generated) onShowReplySuggestions()
+        }
+    }
+
+    fun submit() {
+        if (!state.configured) {
+            onConfigure()
+            return
+        }
+        val result = onSend(input, attachments.toList())
+        if (!result.accepted) return
+        onInputChange("")
+        onClearAttachments()
+        focusManager.clearFocus(force = true)
+        keyboardController?.hide()
+    }
+
+    @Composable
+    fun MenuControl() {
+        if (state.running) return
+        Box {
+            DsComposerAction(
+                icon = Icons.Filled.Add,
+                contentDescription = attachmentLabel,
+                onClick = { menuOpen = true },
+                tint = colors.labelPrimary,
+                containerColor = colors.hoverSolid,
+            )
+            DsPopupMenu(
+                expanded = menuOpen,
+                onDismiss = { menuOpen = false },
+                focusable = false,
+                items = listOf(
+                    MenuItem(
+                        text = attachmentLabel,
+                        icon = Icons.Outlined.AttachFile,
+                        onClick = onOpenAttachmentPicker,
+                    ),
+                ),
+            )
+        }
+    }
+
+    @Composable
+    fun ReplySuggestionsControl() {
+        if (!replySuggestionsAvailable) return
+        DsComposerAction(
+            icon = Icons.Outlined.AutoAwesome,
+            contentDescription = if (replySuggestionsLoading) {
+                stringResource(R.string.common_loading)
+            } else {
+                replySuggestionsLabel
+            },
+            onClick = ::openReplySuggestions,
+            enabled = !state.running && !replySuggestionsLoading,
+            tint = if (replySuggestionsLoading) colors.labelTertiary else colors.labelSecondary,
+            containerColor = Color.Transparent,
+        )
+    }
+
+    @Composable
+    fun SendControl(queue: Boolean = false) {
+        DsComposerAction(
+            icon = Icons.Filled.ArrowUpward,
+            contentDescription = if (queue && state.queuedInputCount > 0) {
+                stringResource(R.string.local_queue_message_count, state.queuedInputCount)
+            } else if (queue) {
+                stringResource(R.string.local_queue_message)
+            } else {
+                stringResource(R.string.chat_composer_send)
+            },
+            onClick = ::submit,
+            enabled = canSend,
+            tint = if (canSend) colors.onAccent else colors.labelTertiary,
+            containerColor = if (canSend) colors.buttonInfoFill else colors.buttonPrimaryDimmed,
+            visualSize = DsComposerMetrics.primaryActionVisualSize,
+        )
+    }
+
+    @Composable
+    fun StopControl() {
+        DsComposerAction(
+            icon = Icons.Filled.Stop,
+            contentDescription = stringResource(R.string.chat_composer_stop),
+            onClick = onStop,
+            tint = colors.onAccent,
+            containerColor = colors.error,
+            visualSize = DsComposerMetrics.primaryActionVisualSize,
+        )
+    }
+
+    DsConversationComposer(
+        surfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard,
+        shadowElevation = if (backgroundState.hasImage) 0.dp else 1.dp,
+    ) {
+        ChatGptPlanUsageBar(activeModelProfile)
+        attachments.forEachIndexed { index, attachment ->
+            ImportedAttachmentRow(
+                attachment = attachment,
+                workspacePath = state.workspacePath,
+                onRemove = { onRemoveAttachment(index) },
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+        ) {
+            if (!expanded) {
+                MenuControl()
+                ReplySuggestionsControl()
+            }
+            DsComposerField(
+                value = input,
+                onValueChange = onInputChange,
+                placeholder = when {
+                    state.usageMode == LocalUsageMode.WORK ->
+                        stringResource(R.string.local_work_composer_hint)
+                    state.groupChat.enabled ->
+                        stringResource(R.string.local_group_chat_composer_hint)
+                    state.chatPersona.isUnboundChatPersona() ->
+                        stringResource(R.string.local_chat_composer_no_persona_hint)
+                    else ->
+                        stringResource(R.string.local_chat_composer_persona_hint, state.chatPersona.name)
+                },
+                modifier = Modifier.weight(1f),
+                maxLines = 5,
+                onFocusedChange = { focused = it },
+            )
+            if (!expanded) {
+                if (state.running) StopControl() else SendControl()
+            }
+        }
+
+        if (expanded) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                MenuControl()
+                ReplySuggestionsControl()
+                if (state.usageMode == LocalUsageMode.WORK) {
+                    DsComposerAction(
+                        icon = FeatherIcons.CheckSquare,
+                        contentDescription = stringResource(
+                            if (state.planMode) R.string.local_plan_button_on
+                            else R.string.local_plan_button_off,
+                        ),
+                        onClick = { onPlanModeChange(!state.planMode) },
+                        enabled = !state.running,
+                        tint = if (state.planMode) colors.accent else colors.labelSecondary,
+                        containerColor = if (state.planMode) colors.accentTertiary else Color.Transparent,
+                    )
+                    DsComposerAction(
+                        icon = Icons.Outlined.Shield,
+                        contentDescription = stringResource(R.string.local_auto_approve_short),
+                        onClick = if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
+                        tint = if (state.safeAutoApprovalEnabled) colors.accent else colors.labelSecondary,
+                        containerColor =
+                            if (state.safeAutoApprovalEnabled) colors.accentTertiary else Color.Transparent,
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                if (state.running) {
+                    StopControl()
+                    if (state.usageMode == LocalUsageMode.WORK) SendControl(queue = true)
+                } else {
+                    SendControl()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImportedAttachmentRow(
+    attachment: LocalImportedAttachment,
+    workspacePath: String,
+    onRemove: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    var thumbnail by remember(attachment.relativePath, workspacePath) {
+        mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
+    }
+    LaunchedEffect(attachment.relativePath, workspacePath) {
+        thumbnail = if (attachment.mediaType.startsWith("image/")) {
+            withContext(Dispatchers.IO) {
+                decodeLocalAttachmentThumbnail(workspacePath, attachment.relativePath)
+            }
+        } else {
+            null
+        }
+    }
+    DsCard {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            thumbnail?.let { image ->
+                Image(
+                    bitmap = image,
+                    contentDescription = null,
+                    modifier = Modifier.size(52.dp).clip(DsShapes.block),
+                )
+            }
+            androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                Text(
+                    attachment.name,
+                    style = DsType.small13Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                )
+                val dimensions = if (attachment.width != null && attachment.height != null) {
+                    " · ${attachment.width}×${attachment.height}"
+                } else {
+                    ""
+                }
+                Text(
+                    "${attachment.mediaType}$dimensions · ${attachment.bytes} B",
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                )
+            }
+            DsButton(
+                stringResource(R.string.common_remove),
+                onRemove,
+                variant = DsButtonVariant.Ghost,
+                size = DsButtonSize.Small,
+            )
+        }
+    }
+}
