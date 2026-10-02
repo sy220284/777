@@ -27,7 +27,7 @@ internal class LocalWorkExecutionBudget(
         if (committedExposureTokens + pendingExposureTokens + estimate > exposureLimitTokens) {
             throw budgetExceeded("本轮预计模型输入已达到安全上限")
         }
-        if (pendingExposureTokens + estimate > pendingLimitTokens) {
+        if (pendingExposureTokens > 0L && pendingExposureTokens + estimate > pendingLimitTokens) {
             throw LocalModelException(
                 code = "WORK_BUDGET_BUSY",
                 message = "并发模型请求预计输入过大，请等待正在执行的请求完成后继续",
