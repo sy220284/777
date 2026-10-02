@@ -1,7 +1,9 @@
 package com.labteto.dshmobile.observability
 
 import android.util.Log
+import com.labteto.dshmobile.BuildConfig
 import java.io.File
+import java.util.UUID
 import java.util.ArrayDeque
 import java.util.Base64
 import java.util.concurrent.ArrayBlockingQueue
@@ -15,6 +17,10 @@ data class AppLogEntry(
     val message: String,
     val throwableType: String? = null,
     val throwableMessage: String? = null,
+    val appVersion: String? = null,
+    val appVersionCode: Int? = null,
+    val processInstanceId: String? = null,
+    val processStartedAtMillis: Long? = null,
 )
 
 /**
@@ -47,6 +53,8 @@ object AppLog {
     private val persistenceLock = Any()
     private val entries = ArrayDeque<AppLogEntry>(MAX_ENTRIES)
     private val persistenceExecutor = createAppLogPersistenceExecutor()
+    private val processInstanceId = UUID.randomUUID().toString().substringBefore('-')
+    private val processStartedAtMillis = System.currentTimeMillis()
 
     @Volatile
     private var persistentFile: File? = null
@@ -94,6 +102,10 @@ object AppLog {
                     it.message,
                     it.throwableType.orEmpty(),
                     it.throwableMessage.orEmpty(),
+                    it.appVersion.orEmpty(),
+                    it.appVersionCode?.toString().orEmpty(),
+                    it.processInstanceId.orEmpty(),
+                    it.processStartedAtMillis?.toString().orEmpty(),
                 ).joinToString("\u0000")
             }
             .sortedBy(AppLogEntry::timestampMillis)
@@ -118,6 +130,10 @@ object AppLog {
             message = message.take(2_000),
             throwableType = throwable?.javaClass?.simpleName,
             throwableMessage = throwable?.message?.take(1_000),
+            appVersion = BuildConfig.VERSION_NAME,
+            appVersionCode = BuildConfig.VERSION_CODE,
+            processInstanceId = processInstanceId,
+            processStartedAtMillis = processStartedAtMillis,
         )
         synchronized(lock) {
             while (entries.size >= MAX_ENTRIES) entries.removeFirst()
@@ -169,11 +185,15 @@ object AppLog {
         encode(entry.message),
         encode(entry.throwableType.orEmpty()),
         encode(entry.throwableMessage.orEmpty()),
+        encode(entry.appVersion.orEmpty()),
+        entry.appVersionCode?.toString().orEmpty(),
+        encode(entry.processInstanceId.orEmpty()),
+        entry.processStartedAtMillis?.toString().orEmpty(),
     ).joinToString("\t")
 
     private fun decodeEntry(line: String): AppLogEntry? {
         val parts = line.split('\t')
-        if (parts.size != 6) return null
+        if (parts.size != 6 && parts.size != 10) return null
         return runCatching {
             AppLogEntry(
                 timestampMillis = parts[0].toLong(),
@@ -182,6 +202,10 @@ object AppLog {
                 message = decode(parts[3]),
                 throwableType = decode(parts[4]).takeIf(String::isNotBlank),
                 throwableMessage = decode(parts[5]).takeIf(String::isNotBlank),
+                appVersion = parts.getOrNull(6)?.let(::decode)?.takeIf(String::isNotBlank),
+                appVersionCode = parts.getOrNull(7)?.toIntOrNull(),
+                processInstanceId = parts.getOrNull(8)?.let(::decode)?.takeIf(String::isNotBlank),
+                processStartedAtMillis = parts.getOrNull(9)?.toLongOrNull(),
             )
         }.getOrNull()
     }
