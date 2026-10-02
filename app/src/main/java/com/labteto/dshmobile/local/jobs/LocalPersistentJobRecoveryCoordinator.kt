@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.web.LocalWebTools
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
