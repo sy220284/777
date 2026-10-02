@@ -520,7 +520,7 @@ class WebhookPlugin(
                         ),
                     ),
                 ),
-                access = ToolAccess.NETWORK,
+                access = ToolAccess.PROCESS,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
@@ -562,7 +562,7 @@ class WebhookPlugin(
             HarnessTool(
                 name = "webhook_stop",
                 schema = functionToolSchema("webhook_stop", "停止 Harness Webhook"),
-                access = ToolAccess.NETWORK,
+                access = ToolAccess.PROCESS,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
