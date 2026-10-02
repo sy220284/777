@@ -29,7 +29,7 @@ internal class LocalSubagentModelRequestBoundary(
         step: Int,
     ): LocalModelReply = executeWithModelAdmission(
         control = executionControl,
-        profileId = profile.id,
+        routeFingerprint = profile.routeFingerprint(),
         model = model,
         baseUrl = baseUrl,
         contextWindowTokensOverride = profile.contextWindowTokensOverride,
