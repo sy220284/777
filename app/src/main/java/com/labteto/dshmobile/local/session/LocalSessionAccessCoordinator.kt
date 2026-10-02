@@ -65,4 +65,8 @@ internal class LocalSessionAccessCoordinator(
             summary.projectId to summary.lineageId?.ifBlank { summary.id }
         }
     }
+    private companion object {
+        const val MAX_SESSION_SEARCH_HITS = 50
+        const val MAX_SESSION_SEARCH_SCANNED = 64
+    }
 }
