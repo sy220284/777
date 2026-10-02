@@ -4927,13 +4927,38 @@ class LocalHarnessEngine @Inject constructor(
             ?.let { event -> decodeLocalAgentInboxPending(event.data) }
             .orEmpty()
         pendingInputs.restore(restoredInbox)
+        val modelProfiles = modelConfiguration.readProfiles()
+        var recoveredRunProfile: LocalModelProfile? = null
         var runRecoveryError: String? = null
         agentRunCoordinator.recoveryDecision(sessionId, recovery)?.let { decision ->
-            val blocked = decision.blockedReason
+            val route = decision.route
+            val exactRecoveryProfile = route?.let { identity ->
+                modelProfiles.firstOrNull { candidate ->
+                    candidate.id == identity.profileId &&
+                        candidate.model == identity.model &&
+                        normalizeModelBaseUrl(candidate.baseUrl) == normalizeModelBaseUrl(identity.baseUrl) &&
+                        candidate.authKind.name == identity.authKind &&
+                        (if (candidate.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
+                            LocalModelProtocol.RESPONSES.name
+                        } else {
+                            candidate.protocol.name
+                        }) == identity.protocol &&
+                        candidate.credentialRef == identity.credentialRef &&
+                        candidate.routeFingerprint() == identity.fingerprint
+                }
+            }
+            val routeMismatch = route != null &&
+                (exactRecoveryProfile == null || !modelGateway.hasCredential(exactRecoveryProfile))
+            val blocked = when {
+                decision.blockedReason != null -> decision.blockedReason
+                routeMismatch -> "上次任务绑定的模型账户或凭据身份已变化，已停止自动续跑。请恢复原模型配置后再继续。"
+                else -> null
+            }
             if (blocked != null) {
                 runRecoveryError = blocked
                 agentRunCoordinator.markRecoveryBlocked(sessionId, decision.runId, blocked)
             } else {
+                recoveredRunProfile = exactRecoveryProfile
                 val queued = decision.queuedInput
                 if (queued != null && pendingInputs.snapshot().none { it.id == queued.id }) {
                     if (pendingInputs.offer(queued)) {
@@ -4964,15 +4989,17 @@ class LocalHarnessEngine @Inject constructor(
             LocalConversationMode.PROJECT,
             LocalConversationMode.CONTINUATION -> LOCAL_PROJECT_ID
         }
-        val modelProfiles = modelConfiguration.readProfiles()
-        val activeModelProfile = modelConfiguration.activeProfile(model, baseUrl, modelProfiles)
+        val activeModelProfile = recoveredRunProfile
+            ?: modelConfiguration.activeProfile(model, baseUrl, modelProfiles)
         val modelConfigured = activeModelProfile != null && modelGateway.hasCredential(activeModelProfile)
         activeModelProfile?.takeIf { modelConfigured }?.let(modelGateway::activate)
+        val restoredModel = activeModelProfile?.model ?: model
+        val restoredBaseUrl = activeModelProfile?.baseUrl ?: baseUrl
         _state.value = LocalHarnessState(
             loading = false,
             configured = modelConfigured,
-            model = model,
-            baseUrl = baseUrl,
+            model = restoredModel,
+            baseUrl = restoredBaseUrl,
             modelSelection = LocalModelSelectionState.restored(
                 modelProfiles, activeModelProfile?.id,
                 preferences.getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null),
