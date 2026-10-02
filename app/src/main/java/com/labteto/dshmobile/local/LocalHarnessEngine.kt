@@ -2914,6 +2914,7 @@ class LocalHarnessEngine @Inject constructor(
             parentRunId = continuationParentRunId,
         )
         var lastModelErrorCode: String? = null
+        val progressTracker = LocalAgentProgressTracker()
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
         val startedToolCallIds = linkedSetOf<String>()
@@ -3167,6 +3168,7 @@ class LocalHarnessEngine @Inject constructor(
                     is AgentEvent.AssistantObserved -> {
                         val reply = repliesByStep.remove(event.step)
                             ?: error("缺少第 ${event.step} 步模型响应")
+                        progressTracker.recordAssistant(reply.content.orEmpty(), reply.toolCalls.size)
                         val beforeAssistant = runState.value
                         val transcriptMessages = buildList {
                             reply.reasoning?.takeIf {
@@ -3260,6 +3262,7 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.ToolFinished -> {
+                        progressTracker.recordToolResult(event.call, event.output, event.isError)
                         val boundedContent = retainToolResult(
                             sessionId = runSessionId,
                             callId = event.call.id,
@@ -3386,7 +3389,15 @@ class LocalHarnessEngine @Inject constructor(
                 agentRunCoordinator.recordEvent(runContext, event)
             },
             maxSteps = mainStepLimit,
-            stepLimitExtender = localForegroundStepLimitExtender(runPolicy.allowToolExecution, mainMaxSteps, input, { runState.value }, { resourceScheduler.snapshot().pressure }, { runEventLog.append("turn/budget-extended", it) }),
+            stepLimitExtender = localForegroundStepLimitExtender(
+                enabled = runPolicy.allowToolExecution,
+                configuredBase = mainMaxSteps,
+                task = input,
+                state = { runState.value },
+                pressure = { resourceScheduler.snapshot().pressure },
+                onExtended = { runEventLog.append("turn/budget-extended", it) },
+                canExtend = progressTracker::claimExtensionProgress,
+            ),
             idFactory = { runContext.runId },
         )
 
