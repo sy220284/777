@@ -18,9 +18,15 @@ val dshVersionName: String = System.getenv("DSH_VERSION_NAME")?.takeIf { it.isNo
 
 val dshForkRevision: Int = dshVersionName
     .substringAfter('-', "")
-    .substringAfterLast('.', "")
-    .toIntOrNull()
-    ?.coerceIn(0, 999)
+    .takeIf(String::isNotBlank)
+    ?.let { suffix ->
+        val revision = suffix.substringAfterLast('.', "").toIntOrNull()
+            ?: error("发布版本后缀缺少数字 revision：$dshVersionName")
+        require(revision in 0..999) {
+            "发布 revision 必须在 0..999，避免 versionCode 碰撞：$dshVersionName"
+        }
+        revision
+    }
     ?: 0
 
 val dshVersionCode: Int = dshVersionName
