@@ -13,18 +13,10 @@ internal enum class LocalAutoApprovalScope {
 /** Explicit classifications: adding a built-in requires deciding its permissions and approval boundary. */
 internal object LocalToolPolicy {
     /**
-     * Shell commands are auto-approved by default, because the sandbox boundary is defined by what a
-     * command can *reach*, not by what it is called.
-     *
-     * Everything the device already refused before this policy existed stays refused: firmware
-     * partitions are mounted read-only and other apps' private directories are unreachable under the
-     * untrusted-app SELinux domain. Auto-approval therefore does not create access the kernel does
-     * not already grant.
-     *
-     * These markers are a best-effort second line, not a guarantee. Shell text admits too many
-     * equivalent spellings — `cd / && cat system/x`, quoted splices, variable expansion — for static
-     * matching to be airtight, and the kernel is what actually holds. Their purpose is to keep the
-     * prompt in front of a command that visibly names firmware, so the user sees it before it runs.
+     * Shell is a process escape hatch, not a workspace-bounded file API. A child process shares the
+     * app UID and can therefore reach app-private state outside the workspace even when its cwd starts
+     * inside the workspace. Static command inspection remains defence-in-depth only; bash never
+     * qualifies for global auto-approval.
      */
     // Reuse the boundary's canonical deny set so shell prompts and file enforcement cannot drift.
     // This is intentionally conservative for shell text: a visible forbidden prefix keeps a prompt.
@@ -165,10 +157,8 @@ internal object LocalToolPolicy {
      */
     fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file" -> LocalAutoApprovalScope.WORKSPACE
-        // Shell execution is approved by the sandbox boundary. The per-command check in
-        // canAutoApproveCommand() still withholds firmware-targeting and history-rewriting commands,
-        // and it needs the command text, so it runs in the parameter-aware caller instead.
-        "bash" -> LocalAutoApprovalScope.WORKSPACE
+        // A shell can leave cwd and reach same-UID app-private state; require explicit approval.
+        "bash" -> LocalAutoApprovalScope.NONE
         else -> if (access(name) == ToolAccess.READ_ONLY) {
             LocalAutoApprovalScope.READ_ONLY
         } else {
