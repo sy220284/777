@@ -282,7 +282,7 @@ internal class LocalModelRequestCoordinator(
                         pressureStore.record(snapshot.sessionId, activePressure)
                         executeWithModelAdmission(
                             control = executionControl,
-                            profileId = frozenProfile.id,
+                            routeFingerprint = frozenProfile.routeFingerprint(),
                             model = frozenProfile.model,
                             baseUrl = frozenProfile.baseUrl,
                             contextWindowTokensOverride = frozenProfile.contextWindowTokensOverride,
