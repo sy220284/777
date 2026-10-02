@@ -124,6 +124,62 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun workProcessUsesModelProgressAsTheVisibleStepDescription() {
+        val nodes = buildWorkProcessNodes(
+            listOf(
+                message("p1", "progress", "读取权威规则和当前工作过程组件"),
+                message("t1", "tool", "/private/path/AGENTS.md raw body", toolName = "read"),
+                message("t2", "tool", "/private/path/UI.kt raw body", toolName = "read_file"),
+            ),
+        )
+
+        assertEquals(1, nodes.size)
+        assertEquals("读取权威规则和当前工作过程组件", nodes.single().summary)
+        assertEquals(AgentOperationKind.Inspect, nodes.single().kind)
+        assertEquals(2, nodes.single().count)
+        assertTrue(nodes.single().summary?.contains("/private/path") == false)
+    }
+
+    @Test
+    fun eachProgressMessageStartsANewVisibleWorkStep() {
+        val nodes = buildWorkProcessNodes(
+            listOf(
+                message("p1", "progress", "先定位展示逻辑"),
+                message("t1", "tool", "matches", toolName = "grep"),
+                message("p2", "progress", "再补回归测试"),
+                message("t2", "tool", "updated", toolName = "edit_file"),
+            ),
+        )
+
+        assertEquals(2, nodes.size)
+        assertEquals("先定位展示逻辑", nodes[0].summary)
+        assertEquals(AgentOperationKind.Search, nodes[0].kind)
+        assertEquals("再补回归测试", nodes[1].summary)
+        assertEquals(AgentOperationKind.Update, nodes[1].kind)
+    }
+
+    @Test
+    fun progressAppearsBeforeItsToolFinishesSoCurrentStepIsVisibleImmediately() {
+        val nodes = buildWorkProcessNodes(
+            listOf(message("p1", "progress", "正在运行 Android 16 仪器测试")),
+        )
+
+        assertEquals(1, nodes.size)
+        assertEquals("正在运行 Android 16 仪器测试", nodes.single().summary)
+        assertEquals(0, nodes.single().count)
+    }
+
+    @Test
+    fun workProcessSummaryIsWhitespaceNormalizedAndBounded() {
+        val summary = localWorkProcessSummary(
+            "  检查主线\n\n   然后核对组件   " + "a".repeat(LOCAL_WORK_PROCESS_SUMMARY_LIMIT),
+        )
+
+        assertTrue(summary!!.startsWith("检查主线 然后核对组件 "))
+        assertTrue(summary.length <= LOCAL_WORK_PROCESS_SUMMARY_LIMIT)
+    }
+
+    @Test
     fun reasoningOnlyWorkProcessProducesNoUserFacingNode() {
         val nodes = buildWorkProcessNodes(
             listOf(message("r1", "reasoning", "这段自由推理不能出现在界面里")),
@@ -135,7 +191,10 @@ class LocalTranscriptPresentationTest {
     @Test
     fun workProcessShowsRecentNodesUntilUserRequestsEverything() {
         val nodes = (1..12).map { index ->
-            LocalWorkProcessNode(kind = AgentOperationKind.Generic, count = index)
+            LocalWorkProcessNode(
+                operationKinds = listOf(AgentOperationKind.Generic),
+                count = index,
+            )
         }
         val recent = visibleWorkProcessNodes(nodes, showAll = false)
         val all = visibleWorkProcessNodes(nodes, showAll = true)
