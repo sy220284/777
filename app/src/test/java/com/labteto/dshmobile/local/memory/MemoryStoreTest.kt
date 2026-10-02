@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.memory
 
-import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.*
@@ -37,19 +36,32 @@ class MemoryStoreTest {
         assertEquals(2, all(store()).size)
     }
 
-    @Test fun bothCorruptFilesAllowFreshWriteWithoutRevivingBadData() {
-        AppLog.clear()
+    @Test fun bothCorruptFilesFailClosedAndPreserveDamagedData() {
         store().remember("remember apples", MemoryScope.GLOBAL)
         File(temporary.root, "memories.json").writeText("broken primary")
         File(temporary.root, "memories.json.bak").writeText("broken backup")
-        assertTrue(all(store()).isEmpty())
+
+        val failure = runCatching { all(store()) }.exceptionOrNull()
+        assertTrue(failure is IllegalStateException)
+        assertTrue(failure?.message.orEmpty().contains("主文件与备份均无法读取"))
+        assertTrue(temporary.root.listFiles().orEmpty().any { it.name.startsWith("memories.corrupt-") })
+    }
+
+    @Test fun tornJournalTailIsQuarantinedAndValidMutationsSurviveRestart() {
+        val memoryStore = store()
+        val first = memoryStore.remember("remember apples", MemoryScope.GLOBAL)
+        val second = memoryStore.remember("remember oranges", MemoryScope.GLOBAL)
+        val journal = File(temporary.root, "memories.wal.jsonl")
+        assertTrue(journal.isFile)
+        journal.appendText("{broken-tail")
+
+        val restarted = store()
+        assertEquals(setOf(first.id, second.id), all(restarted).map { it.id }.toSet())
         assertTrue(
-            AppLog.snapshot().any { entry ->
-                entry.tag == "MemoryStore" && entry.message.contains("备份不可用")
+            temporary.root.listFiles().orEmpty().any {
+                it.name.startsWith("memories.wal.corrupt-")
             },
         )
-        val record = store().remember("remember oranges", MemoryScope.GLOBAL)
-        assertEquals(record, all(store()).single())
     }
 
     @Test fun lineageWriteRestartRecallIsIsolatedFromIndependentConversations() {
