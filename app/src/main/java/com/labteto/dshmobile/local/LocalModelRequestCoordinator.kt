@@ -6,11 +6,13 @@ import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.observability.AppLog
+import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.model.resolveLocalModelProtocol
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -366,6 +368,24 @@ internal class LocalModelRequestCoordinator(
                                             streamPreview.append(visible)
                                         },
                                     )
+                                } catch (cancelled: CancellationException) {
+                                    val admission =
+                                        (cancelled as? LocalModelCancellationException)?.admissionState
+                                    log.append("request/cancelled", buildJsonObject {
+                                        put("step", step)
+                                        admission?.let {
+                                            put("admission_state", it.name.lowercase())
+                                            put(
+                                                "budget_settlement",
+                                                if (it == com.labteto.dshmobile.local.model.LocalModelAdmissionState.NOT_SENT) {
+                                                    "released"
+                                                } else {
+                                                    "uncertain_exposure"
+                                                },
+                                            )
+                                        }
+                                    })
+                                    throw cancelled
                                 } catch (error: LocalModelException) {
                                     lastProviderError = error
                                     log.append("request/provider-error", buildJsonObject {
