@@ -110,16 +110,34 @@ internal class LocalWorkExecutionBudget(
     }
 }
 
-/** Per-run route breaker. Only durable account/credential faults stop sibling workers. */
+/**
+ * Two-tier route breaker.
+ *
+ * - Durable account/credential faults are per-run: they stop sibling workers of the same run.
+ * - Transient transport faults are route-scoped and outlive one work run, because an unreachable
+ *   route is otherwise replayed once per automatic continuation and every replay re-sends the whole
+ *   conversation prefix. One measured session produced ten identical
+ *   `CHATGPT_PLAN_STREAM_INTERRUPTED` attempts on a single profile, burning roughly 361k estimated
+ *   input tokens before the user intervened manually.
+ */
 internal class LocalModelRouteCircuitBreaker {
     private val openRoutes = linkedMapOf<String, String>()
 
     @Synchronized
     fun requireClosed(fingerprint: String) {
-        val reason = openRoutes[fingerprint] ?: return
+        val reason = openRoutes[fingerprint]
+        if (reason != null) {
+            throw LocalModelException(
+                code = "MODEL_ROUTE_CIRCUIT_OPEN",
+                message = "当前模型路由已停止继续请求：$reason",
+                retryable = false,
+            )
+        }
+        val cooldown = LocalModelRouteHealth.activeCooldown(fingerprint) ?: return
         throw LocalModelException(
-            code = "MODEL_ROUTE_CIRCUIT_OPEN",
-            message = "当前模型路由已停止继续请求：$reason",
+            code = "MODEL_ROUTE_CIRCUIT_COOLDOWN",
+            message = "当前模型路由连续 ${cooldown.failureStreak} 次传输失败（${cooldown.reason}），" +
+                "已暂停 ${cooldown.millis / 1_000} 秒，避免继续重放同一上下文；可切换到别亳模型档案后继续。",
             retryable = false,
         )
     }
@@ -128,12 +146,99 @@ internal class LocalModelRouteCircuitBreaker {
     fun observeFailure(fingerprint: String, error: LocalModelException) {
         if (isTerminalRouteFailure(error)) {
             openRoutes.putIfAbsent(fingerprint, error.code)
+            LocalModelRouteHealth.recordSuccess(fingerprint)
+            return
         }
+        LocalModelRouteHealth.recordFailure(fingerprint, modelFailureKind(error))
     }
 
     @Synchronized
-    fun isOpen(fingerprint: String): Boolean = fingerprint in openRoutes
+    fun observeSuccess(fingerprint: String) {
+        LocalModelRouteHealth.recordSuccess(fingerprint)
+    }
+
+    @Synchronized
+    fun isOpen(fingerprint: String): Boolean =
+        fingerprint in openRoutes || LocalModelRouteHealth.activeCooldown(fingerprint) != null
 }
+
+internal data class LocalRouteCooldown(
+    val reason: String,
+    val failureStreak: Int,
+    val millis: Long,
+    val until: Long,
+)
+
+/**
+ * Route health belongs to the provider route, not to one work run, so the transient-failure streak
+ * is process-wide: a route that keeps dropping streams must not be replayed once per continuation
+ * turn with a freshly reset counter. Durable account faults stay per-run and are not registered
+ * here, because they are already answered by the durable tier.
+ */
+internal object LocalModelRouteHealth {
+    private val failures = linkedMapOf<String, Int>()
+    private val cooldowns = linkedMapOf<String, LocalRouteCooldown>()
+    private var clock: () -> Long = System::currentTimeMillis
+
+    @Synchronized
+    fun recordFailure(fingerprint: String, failureKind: String) {
+        if (failureKind !in TRANSIENT_ROUTE_FAILURE_KINDS) return
+        val streak = (failures[fingerprint] ?: 0) + 1
+        failures[fingerprint] = streak
+        if (streak < TRANSIENT_FAILURE_THRESHOLD) return
+        val previous = cooldowns[fingerprint]?.millis ?: 0L
+        val millis = if (previous == 0L) {
+            TRANSIENT_COOLDOWN_MILLIS
+        } else {
+            (previous * 2).coerceAtMost(MAX_TRANSIENT_COOLDOWN_MILLIS)
+        }
+        cooldowns[fingerprint] = LocalRouteCooldown(
+            reason = failureKind,
+            failureStreak = streak,
+            millis = millis,
+            until = clock() + millis,
+        )
+    }
+
+    @Synchronized
+    fun recordSuccess(fingerprint: String) {
+        failures.remove(fingerprint)
+        cooldowns.remove(fingerprint)
+    }
+
+    @Synchronized
+    fun activeCooldown(fingerprint: String): LocalRouteCooldown? {
+        val cooldown = cooldowns[fingerprint] ?: return null
+        return if (cooldown.until > clock()) cooldown else null
+    }
+
+    @Synchronized
+    fun consecutiveFailures(fingerprint: String): Int = failures[fingerprint] ?: 0
+
+    @Synchronized
+    internal fun resetForTest(replacementClock: (() -> Long)? = null) {
+        failures.clear()
+        cooldowns.clear()
+        clock = replacementClock ?: System::currentTimeMillis
+    }
+}
+
+private val TRANSIENT_ROUTE_FAILURE_KINDS = setOf(
+    "stream_interrupted",
+    "request_maybe_admitted",
+    "network_failure",
+    "connection_reset",
+    "unexpected_eof",
+    "timeout",
+    "dns_failure",
+    "connect_failed",
+    "tls_failure",
+    "provider_failure",
+)
+
+private const val TRANSIENT_FAILURE_THRESHOLD = 3
+private const val TRANSIENT_COOLDOWN_MILLIS = 90_000L
+private const val MAX_TRANSIENT_COOLDOWN_MILLIS = 900_000L
 
 private fun isTerminalRouteFailure(error: LocalModelException): Boolean =
     modelFailureKind(error) in setOf(
@@ -203,6 +308,7 @@ internal suspend fun executeWithModelAdmission(
     val lease = control?.budget?.reserve(pressure.estimatedInputTokens)
     try {
         val reply = block()
+        control?.circuitBreaker?.observeSuccess(profileId)
         lease?.commit(reply.usage.promptTokens.takeIf { reply.usage.reported })
         return reply
     } catch (cancelled: CancellationException) {
