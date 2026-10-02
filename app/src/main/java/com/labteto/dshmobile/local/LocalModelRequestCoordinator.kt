@@ -421,6 +421,25 @@ internal class LocalModelRequestCoordinator(
                                 if (reply.usage.reported) {
                                     pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
                                 }
+                                log.append("request/completed", buildJsonObject {
+                                    put("step", step)
+                                    put("request_id", reply.requestId)
+                                    put("reported", reply.usage.reported)
+                                    put("prompt_tokens", reply.usage.promptTokens)
+                                    put("cache_hit_tokens", reply.usage.cacheHitTokens)
+                                    put("cache_miss_tokens", reply.usage.cacheMissTokens)
+                                    put("completion_tokens", reply.usage.completionTokens)
+                                    put("reasoning_tokens", reply.usage.reasoningTokens)
+                                    put("total_tokens", reply.usage.totalTokens)
+                                    val route = reply.routeIdentity
+                                    route?.profileId?.let { put("profile_id", it) }
+                                    route?.provider?.takeIf(String::isNotBlank)?.let { put("provider", it) }
+                                    route?.authKind?.takeIf(String::isNotBlank)?.let { put("auth_kind", it) }
+                                    route?.protocol?.takeIf(String::isNotBlank)?.let { put("protocol", it) }
+                                    route?.fingerprint?.takeIf(String::isNotBlank)?.let {
+                                        put("route_fingerprint", it)
+                                    }
+                                })
                                 if (runtimeCapabilities.promptCacheDiagnostics && reply.requestId.isNotBlank()) {
                                     promptCacheBaselines.put(snapshot.sessionId, routeFingerprint, reply.requestId)
                                     reply.promptCacheDiagnostic?.let { diagnostic ->
