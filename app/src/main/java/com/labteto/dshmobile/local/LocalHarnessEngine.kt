@@ -4863,19 +4863,7 @@ class LocalHarnessEngine @Inject constructor(
         agentRunCoordinator.recoveryDecision(sessionId, recovery)?.let { decision ->
             val route = decision.route
             val exactRecoveryProfile = route?.let { identity ->
-                modelProfiles.firstOrNull { candidate ->
-                    candidate.id == identity.profileId &&
-                        candidate.model == identity.model &&
-                        normalizeModelBaseUrl(candidate.baseUrl) == normalizeModelBaseUrl(identity.baseUrl) &&
-                        candidate.authKind.name == identity.authKind &&
-                        (if (candidate.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-                            LocalModelProtocol.RESPONSES.name
-                        } else {
-                            candidate.protocol.name
-                        }) == identity.protocol &&
-                        candidate.credentialRef == identity.credentialRef &&
-                        candidate.routeFingerprint() == identity.fingerprint
-                }
+                resolveRecoveryModelProfile(modelProfiles, identity)
             }
             val routeMismatch = route != null &&
                 (exactRecoveryProfile == null || !modelGateway.hasCredential(exactRecoveryProfile))
