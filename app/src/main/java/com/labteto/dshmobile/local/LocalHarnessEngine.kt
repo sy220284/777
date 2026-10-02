@@ -3890,26 +3890,13 @@ class LocalHarnessEngine @Inject constructor(
     ): List<String> = toolSchemaProjection.names(modelToolSchemas(runPolicy, binding))
 
     private fun clearRunCapabilities(binding: LocalWorkRunBinding?) {
-        if (binding == null) {
-            toolExecutionCoordinator.clearTurnCapabilities()
-        } else {
-            synchronized(binding.enabledOptionalTools) { binding.enabledOptionalTools.clear() }
-        }
+        binding?.enabledOptionalTools?.let(toolExecutionCoordinator::clearTurnCapabilities)
+            ?: toolExecutionCoordinator.clearTurnCapabilities()
     }
 
     private fun enableRunGitHubCapabilities(binding: LocalWorkRunBinding?) {
-        if (binding == null) {
-            toolExecutionCoordinator.enableGitHubConnectorTools()
-        } else {
-            val registered = toolRegistry.names().toSet()
-            synchronized(binding.enabledOptionalTools) {
-                binding.enabledOptionalTools += setOf(
-                    "github_status",
-                    "github_api_get",
-                    "github_api_request",
-                ).filter { it in registered }
-            }
-        }
+        binding?.enabledOptionalTools?.let(toolExecutionCoordinator::enableGitHubConnectorTools)
+            ?: toolExecutionCoordinator.enableGitHubConnectorTools()
     }
 
     private fun searchCapabilities(query: String): String =
