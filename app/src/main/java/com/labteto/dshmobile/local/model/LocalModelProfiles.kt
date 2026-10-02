@@ -486,6 +486,7 @@ object LocalModelPresets {
         model: String,
         baseUrl: String,
         protocol: LocalModelProtocol = protocolFor(model, baseUrl),
+        authKind: LocalModelAuthKind = LocalModelAuthKind.API_KEY,
     ): LocalModelRuntimeCapabilities {
         val preset = find(model, baseUrl)
         val image = preset?.imageInputSupported
@@ -494,8 +495,9 @@ object LocalModelPresets {
         val defaultMaxOutputTokens = preset?.defaultMaxOutputTokens
         val systemPromptUpdateMode = preset?.systemPromptUpdateMode ?: LocalModelPromptUpdateMode.REPLACE
         val toolUpdateMode = preset?.toolUpdateMode ?: LocalModelPromptUpdateMode.REPLACE
-        val promptCacheDiagnostics = protocol == LocalModelProtocol.RESPONSES &&
-            supportsResponsesPromptCacheDiagnostics(model, baseUrl)
+        val promptCacheDiagnostics =
+            protocol == LocalModelProtocol.RESPONSES &&
+                authKind == LocalModelAuthKind.CHATGPT_PLAN
         return when (protocol) {
             LocalModelProtocol.CHAT_COMPLETIONS -> LocalModelRuntimeCapabilities(
                 structuredOutput = false,
@@ -533,19 +535,6 @@ object LocalModelPresets {
             )
         }
     }
-}
-
-internal fun supportsResponsesPromptCacheDiagnostics(model: String, baseUrl: String): Boolean {
-    val officialOpenAi = runCatching {
-        URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.openai.com", ignoreCase = true)
-    }.getOrDefault(false)
-    if (!officialOpenAi) return false
-
-    val normalized = model.trim().lowercase()
-    val match = Regex("""^gpt-(\d+)(?:\.(\d+))?(?:[.-].*)?$""").find(normalized) ?: return false
-    val major = match.groupValues[1].toIntOrNull() ?: return false
-    val minor = match.groupValues[2].takeIf(String::isNotEmpty)?.toIntOrNull()
-    return major > 5 || (major == 5 && minor != null && minor >= 6)
 }
 
 /** Fix the retired official preset without changing proxy model aliases or credential identity. */
