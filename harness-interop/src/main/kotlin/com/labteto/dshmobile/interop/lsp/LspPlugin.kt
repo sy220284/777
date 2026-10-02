@@ -63,7 +63,7 @@ class LspPlugin(
             context.tools.register(
                 HarnessTool(
                     name = name,
-                    schema = schema(name),
+                    schema = schemaFor(name),
                     access = ToolAccess.READ_ONLY,
                     approvalPolicy = ToolApprovalPolicy.NEVER,
                     exposure = ToolExposure.OPTIONAL,
@@ -292,7 +292,7 @@ class LspPlugin(
     private fun bounded(output: String): String =
         if (output.length <= 40_000) output else output.take(40_000) + "\\n[结果过长，已截断]"
 
-    private fun schema(name: String): JsonObject {
+    private fun schemaFor(name: String): JsonObject {
         val description = when (name) {
             "lsp_status" -> "查看当前项目代码智能状态；语言服务器由 777 自动检测并按需启动"
             "lsp_definition" -> "查询代码定义；需要时自动启动匹配的语言服务器"
