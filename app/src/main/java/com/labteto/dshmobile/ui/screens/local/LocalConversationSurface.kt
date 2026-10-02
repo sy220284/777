@@ -686,7 +686,7 @@ internal fun LocalConversationSurface(
             sendRejectMessage = sendRejectMessage,
             stateError = state.error,
             restoreRequest = state.messages.lastOrNull { it.role == "user" }?.content,
-            onRestoreRequest = { drafts.putBoundedLocalDraft(state.sessionId, it },)
+            onRestoreRequest = { drafts.putBoundedLocalDraft(state.sessionId, it) },
             onSwitchModelSource = {
                 if (state.modelProfiles.isNotEmpty()) showModelPicker = true else onConfigure()
             },
@@ -716,7 +716,7 @@ internal fun LocalConversationSurface(
                     key = { suggestion -> suggestion.label + "|" + suggestion.text },
                 ) { suggestion ->
                     Surface(
-                        onClick = { drafts.putBoundedLocalDraft(state.sessionId, suggestion.text },)
+                        onClick = { drafts.putBoundedLocalDraft(state.sessionId, suggestion.text) },
                         shape = DsShapes.pillFull,
                         color = colors.wallpaperSurface(
                             WallpaperSurfaceLevel.FLOATING,
@@ -746,7 +746,7 @@ internal fun LocalConversationSurface(
             activeModelProfile = activeModelProfile,
             input = input,
             attachments = attachments,
-            onInputChange = { drafts.putBoundedLocalDraft(state.sessionId, it },)
+            onInputChange = { drafts.putBoundedLocalDraft(state.sessionId, it) },
             onRemoveAttachment = { index -> attachments.removeAt(index) },
             onClearAttachments = attachments::clear,
             onOpenAttachmentPicker = { showAttachmentPicker = true },
