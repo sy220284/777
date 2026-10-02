@@ -22,7 +22,11 @@ internal class LocalSessionEventLogRegistry(
     private val logs = object : LinkedHashMap<String, LocalSessionEventLog>(16, 0.75f, true) {
         override fun removeEldestEntry(
             eldest: MutableMap.MutableEntry<String, LocalSessionEventLog>?,
-        ): Boolean = size > maxEntries
+        ): Boolean {
+            val evict = size > maxEntries
+            if (evict) eldest?.value?.close()
+            return evict
+        }
     }
 
     @Synchronized
@@ -38,7 +42,10 @@ internal class LocalSessionEventLogRegistry(
     @Synchronized
     fun clearAndEvict(sessionIds: Set<String>) {
         sessionIds.forEach { id ->
-            logs.remove(id)?.clear()
+            logs.remove(id)?.let { log ->
+                log.clear()
+                log.close()
+            }
         }
     }
 }
