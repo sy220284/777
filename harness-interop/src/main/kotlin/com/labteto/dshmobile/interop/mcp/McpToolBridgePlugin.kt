@@ -29,6 +29,21 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 
+internal fun boundedMcpToolResult(
+    result: JsonObject,
+    maxChars: Int = MAX_MCP_TOOL_RESULT_CHARS,
+): String {
+    val text = result.toString()
+    if (text.length <= maxChars) return text
+    val notice = "\n...[MCP 结果过大，已在进入会话历史前截断；请缩小远端查询范围]...\n"
+    val retained = (maxChars - notice.length).coerceAtLeast(0)
+    val head = retained * 2 / 3
+    val tail = retained - head
+    return text.take(head) + notice + text.takeLast(tail)
+}
+
+internal const val MAX_MCP_TOOL_RESULT_CHARS = 256 * 1024
+
 data class McpServerSnapshot(
     val id: String,
     val transport: String,
@@ -423,7 +438,7 @@ class McpToolBridgePlugin(
                                     try {
                                         val result = client.callTool(definition.name, input)
                                         ToolResult(
-                                            content = result.toString(),
+                                            content = boundedMcpToolResult(result),
                                             isError = result["isError"]?.jsonPrimitive?.booleanOrNull == true,
                                         )
                                     } finally {
