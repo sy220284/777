@@ -142,7 +142,7 @@ internal fun LocalAgentSettingsCard(
             },
         )
 
-        val selectedWorker = local.workerProfileId?.let { id ->
+        val selectedWorker = local.modelSelection.workerProfileId?.let { id ->
             local.modelProfiles.firstOrNull { it.id == id }
         }
         DsMenu(
