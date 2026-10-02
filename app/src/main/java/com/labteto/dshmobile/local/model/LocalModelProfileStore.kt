@@ -54,7 +54,11 @@ internal class LocalModelProfileStore(
     }.getOrDefault(emptyList())
 
     fun write(profiles: List<LocalModelProfile>) {
-        preferences.edit().putString(KEY_PROFILES_V3, encode(profiles)).apply()
+        val editor = preferences.edit().putString(KEY_PROFILES_V3, encode(profiles))
+        preferences.getString(LOCAL_WORKER_PROFILE_ID_PREFERENCE, null)
+            ?.takeIf { workerId -> profiles.none { it.id == workerId } }
+            ?.let { editor.remove(LOCAL_WORKER_PROFILE_ID_PREFERENCE) }
+        editor.apply()
     }
 
     fun replaceChatGpt(accountId: String, models: List<ChatGptModelOption>): List<LocalModelProfile> {
