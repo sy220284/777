@@ -23,6 +23,8 @@ class ChatDiaryPromptTest {
         val system = chatPostTurnModelMessages(prompt)
             .first()["content"]!!.jsonPrimitive.content
         assertTrue(system.contains("不写流水账"))
+        assertTrue(system.contains("精炼成稿"))
+        assertTrue(system.contains("完整的当前版本"))
         assertTrue(system.contains("心理活动"))
         assertTrue(system.contains("关系意味着什么"))
         assertTrue(system.contains("角色本人视角"))
