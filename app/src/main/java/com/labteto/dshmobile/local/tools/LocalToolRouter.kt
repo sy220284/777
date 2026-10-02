@@ -16,18 +16,18 @@ import kotlinx.serialization.json.jsonPrimitive
 internal object LocalToolRouter {
     fun isOptional(tool: HarnessTool): Boolean = tool.exposure == ToolExposure.OPTIONAL
 
-    fun visibleSchemas(tools: List<HarnessTool>, enabledOptional: Set<String>): JsonArray =
-        JsonArray(
-            tools
-                .filter { tool ->
-                    when (tool.exposure) {
-                        ToolExposure.CORE -> true
-                        ToolExposure.OPTIONAL -> tool.name in enabledOptional
-                        ToolExposure.INTERNAL -> false
-                    }
-                }
-                .map(HarnessTool::schema),
-        )
+    fun visibleSchemas(tools: List<HarnessTool>, enabledOptional: Set<String>): JsonArray {
+        val core = tools
+            .filter { tool -> tool.exposure == ToolExposure.CORE }
+            .sortedBy(HarnessTool::name)
+        val optionalByName = tools
+            .asSequence()
+            .filter { tool -> tool.exposure == ToolExposure.OPTIONAL }
+            .associateBy(HarnessTool::name)
+        val optional = enabledOptional.mapNotNull(optionalByName::get)
+        // Core remains deterministic for prompt-cache stability; optional tools append in activation order.
+        return JsonArray((core + optional).map(HarnessTool::schema))
+    }
 
     fun search(
         tools: List<HarnessTool>,
