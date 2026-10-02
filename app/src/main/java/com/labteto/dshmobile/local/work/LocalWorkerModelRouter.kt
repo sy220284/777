@@ -13,9 +13,7 @@ internal object LocalWorkerModelRouter {
     ): String? {
         explicitSelection?.trim()?.takeIf(String::isNotBlank)?.let { return it }
 
-        snapshot.workerProfileId
-            ?.takeIf { workerId -> snapshot.modelSelection.profiles.any { it.id == workerId } }
-            ?.let { return it }
+        snapshot.modelSelection.workerProfile?.id?.let { return it }
 
         val parent = snapshot.modelSelection.activeProfile
         if (parent?.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
