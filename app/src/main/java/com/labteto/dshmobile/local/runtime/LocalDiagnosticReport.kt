@@ -153,6 +153,7 @@ private val DIAGNOSTIC_EVENT_KEYS = listOf(
     "failure_kind",
     "origin",
     "admission_state",
+    "budget_settlement",
     "continuation_eligible",
     "request_id",
     "provider_code",
