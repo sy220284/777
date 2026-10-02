@@ -24,9 +24,14 @@ internal fun chatLongTermMemoryBudget(contextWindowTokens: Int?): ChatLongTermMe
 
 internal fun shouldRecallDiary(query: String): Boolean {
     val text = query.trim().lowercase()
-    if (text.isBlank()) return false
-    if (ChatMemorySelector.shouldRecall(text)) return true
-    return DIARY_RECALL_HINTS.any(text::contains)
+    if (text.isBlank() || text in LOW_INFORMATION_REPLIES) return false
+    if (RESET_HINTS.any(text::contains)) return false
+    return isExplicitDiaryRecall(text) || text.length >= 6
+}
+
+internal fun isExplicitDiaryRecall(query: String): Boolean {
+    val text = query.trim().lowercase()
+    return ChatMemorySelector.shouldRecall(text) || DIARY_RECALL_HINTS.any(text::contains)
 }
 
 internal fun takeWithinModelTokenBudget(text: String, maxTokens: Int): String {
@@ -45,3 +50,6 @@ private val DIARY_RECALL_HINTS = listOf(
     "那天", "那次", "那时候", "后来", "经历", "发生过", "想起", "回忆", "记忆",
     "为什么会", "你当时", "你那时", "心里怎么想", "怎么想的", "怎么变成",
 )
+
+private val LOW_INFORMATION_REPLIES = setOf("嗯", "嗯嗯", "好", "好的", "行", "可以", "继续", "接着", "哈哈", "哦", "啊")
+private val RESET_HINTS = listOf("换个话题", "先不聊这个", "不聊这个", "别提这个", "别再提", "到此为止")
