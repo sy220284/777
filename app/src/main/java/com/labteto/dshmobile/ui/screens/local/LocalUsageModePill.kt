@@ -34,6 +34,11 @@ import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
+internal fun localHarnessModeSwitchEnabled(
+    current: LocalUsageMode,
+    running: Boolean,
+): Boolean = !running || current == LocalUsageMode.WORK
+
 @Composable
 internal fun LocalUsageModePill(
     selected: LocalUsageMode,
