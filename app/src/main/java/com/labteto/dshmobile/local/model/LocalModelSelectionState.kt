@@ -24,4 +24,16 @@ data class LocalModelSelectionState(
         activeProfileId = activeProfileId,
         workerProfileId = workerProfileId?.takeIf { id -> profiles.any { it.id == id } },
     )
+
+    companion object {
+        fun restored(
+            profiles: List<LocalModelProfile>,
+            activeProfileId: String?,
+            workerProfileId: String?,
+        ): LocalModelSelectionState = LocalModelSelectionState(
+            profiles = profiles,
+            activeProfileId = activeProfileId,
+            workerProfileId = workerProfileId?.takeIf { id -> profiles.any { it.id == id } },
+        )
+    }
 }
