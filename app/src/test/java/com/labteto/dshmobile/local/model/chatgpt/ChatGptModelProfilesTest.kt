@@ -39,4 +39,42 @@ class ChatGptModelProfilesTest {
         assertEquals("account-a", first.credentialRef)
         assertEquals("account-b", second.credentialRef)
     }
+
+    @Test
+    fun refreshedCatalogReplacesOnlyTheSelectedAccountsPlanModels() {
+        val accountAOld = chatGptPlanProfiles(
+            "account-a",
+            listOf(
+                ChatGptModelOption("old-model", "Old"),
+                ChatGptModelOption("keep-model", "Keep"),
+            ),
+        )
+        val accountB = chatGptPlanProfiles(
+            "account-b",
+            listOf(ChatGptModelOption("other-account-model", "Other")),
+        )
+        val apiProfile = com.labteto.dshmobile.local.LocalModelProfile(
+            id = "api",
+            model = "api-model",
+            baseUrl = "https://example.test/v1",
+        )
+
+        val refreshed = refreshChatGptPlanProfiles(
+            existing = accountAOld + accountB + apiProfile,
+            accountId = "account-a",
+            models = listOf(
+                ChatGptModelOption("keep-model", "Keep renamed"),
+                ChatGptModelOption("new-model", "New"),
+            ),
+        )
+
+        assertEquals(
+            setOf("keep-model", "new-model"),
+            refreshed.filter { it.credentialRef == "account-a" }.map { it.model }.toSet(),
+        )
+        assertTrue(refreshed.none { it.model == "old-model" })
+        assertTrue(refreshed.any { it.credentialRef == "account-b" && it.model == "other-account-model" })
+        assertTrue(refreshed.any { it.id == apiProfile.id })
+    }
+
 }
