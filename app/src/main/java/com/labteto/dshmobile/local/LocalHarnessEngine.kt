@@ -268,6 +268,7 @@ class LocalHarnessEngine @Inject constructor(
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
+    private val requestPressureStore = LocalRequestPressureStore()
     private val streamingPreviewStore = LocalStreamingPreviewStore()
     private val modelRequestCoordinator by lazy {
         LocalModelRequestCoordinator(
@@ -278,6 +279,7 @@ class LocalHarnessEngine @Inject constructor(
             defaultEventLog = { eventLog },
             streamingPreviewStore = streamingPreviewStore,
             persistOverflowCompaction = ::persistForegroundOverflowCompaction,
+            pressureStore = requestPressureStore,
             maxStreamPreviewChars = MAX_STREAM_PREVIEW_CHARS,
             streamPreviewIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
         )
@@ -4608,6 +4610,8 @@ class LocalHarnessEngine @Inject constructor(
         overflowPersister = binding?.let { runBinding ->
             { snapshot, mode -> persistOverflowCompaction(snapshot, mode, runBinding) }
         },
+        executionBudget = binding?.executionBudget,
+        routeCircuitBreaker = binding?.routeCircuitBreaker,
     )
 
     private fun persistForegroundOverflowCompaction(
@@ -4774,6 +4778,8 @@ class LocalHarnessEngine @Inject constructor(
             resources = resourceScheduler.snapshot(),
             contextChars = modelHistory.encodedChars,
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
+            requestPressure = requestPressureStore.latest(currentSessionId),
+            workBudget = activeWorkRuns[currentSessionId]?.executionBudget?.snapshot(),
             pendingInputs = pendingInputs.size(),
             pendingInputLimit = MAX_PENDING_INPUTS,
             commands = commands,
