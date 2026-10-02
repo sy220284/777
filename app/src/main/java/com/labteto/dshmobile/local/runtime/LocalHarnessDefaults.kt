@@ -14,6 +14,7 @@ internal const val DEFAULT_SUBAGENT_MAX_STEPS = 20
 internal const val DEFAULT_MODEL_ATTEMPTS = 3
 internal const val DEFAULT_WEB_FETCH_BYTES = 4 * 1024 * 1024
 internal const val MAX_WEB_FETCH_BYTES = 4 * 1024 * 1024
+internal const val PERSISTENT_SUBAGENT_RESUME_VERSION = 1
 internal const val PERSISTENT_RECOVERY_RETRY_MILLIS = 500L
 internal const val DEFAULT_DOWNLOAD_BYTES = 20 * 1024 * 1024
 internal const val MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
