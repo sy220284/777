@@ -154,6 +154,12 @@ class VersionedSessionStore(
         .map { file -> file.name.removeSuffix(SESSION_SUFFIX) }
 
     @Synchronized
+    fun lastModified(id: String): Long? {
+        validateId(id)
+        return fileFor(id).takeIf(File::isFile)?.lastModified()?.takeIf { it > 0L }
+    }
+
+    @Synchronized
     fun list(): List<SessionLoadResult> = ids()
         .mapNotNull { id ->
             try {

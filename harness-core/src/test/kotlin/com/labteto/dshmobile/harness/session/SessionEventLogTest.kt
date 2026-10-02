@@ -52,6 +52,9 @@ class SessionEventLogTest {
                 log.append("test/event", buildJsonObject { put("value", "row-$index-" + "x".repeat(48)) })
             }
             val expectedNext = log.snapshot().last().sequence + 1L
+            // A process restart drops the process-local shared path cursor. Closing the sole
+            // adapter reproduces that boundary inside this JVM before mutating durable bytes.
+            log.close()
 
             // Simulate a torn final write. Startup must skip it and recover from the newest
             // complete row without requiring a full historical replay.
@@ -99,6 +102,8 @@ class SessionEventLogTest {
                 .maxOrNull()
                 ?: error("expected a valid event in rotated segment")
 
+            // Drop the live process-local cursor before simulating the post-crash disk state.
+            log.close()
             file.writeText("{broken tail only")
 
             val restarted = SessionEventLog(file, json, maxBytes = 700, clock = { 2L })
@@ -483,6 +488,27 @@ class SessionEventLogTest {
                 .toList()
 
             assertEquals((target - 2L..target + 2L).toList(), window)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun sharedPathStateLivesUntilLastAdapterClosesThenReinitializesFromDisk() {
+        val directory = Files.createTempDirectory("harness-event-shared-owner").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val first = SessionEventLog(file, json, clock = { 1L })
+            val second = SessionEventLog(file, json, clock = { 2L })
+            assertEquals(0L, first.append("test", buildJsonObject { put("value", "a") }).sequence)
+            first.close()
+            assertEquals(1L, second.append("test", buildJsonObject { put("value", "b") }).sequence)
+            second.close()
+
+            assertTrue(file.delete())
+            val recreated = SessionEventLog(file, json, clock = { 3L })
+            assertEquals(0L, recreated.append("test", buildJsonObject { put("value", "fresh") }).sequence)
+            recreated.close()
         } finally {
             directory.deleteRecursively()
         }

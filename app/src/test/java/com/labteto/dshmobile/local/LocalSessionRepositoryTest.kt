@@ -1,9 +1,12 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -100,6 +103,62 @@ class LocalSessionRepositoryTest {
         assertTrue(summaries.getValue("first").blank)
         assertFalse(summaries.getValue("second").blank)
         assertTrue(failures.isEmpty())
+    }
+
+    @Test fun summaryIndexServesColdListWithoutOpeningMainSessionDocument() = runTest {
+        val failures = mutableListOf<Throwable>()
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add)
+        repository.writeNow(
+            LocalHarnessSession(
+                id = "indexed",
+                title = "索引标题",
+                updatedAt = 10L,
+                projectId = "project-a",
+                lineageId = "lineage-a",
+            ),
+        )
+        val main = java.io.File(temporary.root, "indexed.json")
+        val generation = main.lastModified()
+        assertTrue(java.io.File(temporary.root, ".summaries/indexed.summary").isFile)
+
+        main.writeText("{broken")
+        assertTrue(main.setLastModified(generation))
+
+        val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, failures::add)
+        val summary = reopened.summaries().single { it.id == "indexed" }
+
+        assertEquals("索引标题", summary.title)
+        assertEquals("project-a", summary.projectId)
+        assertEquals("lineage-a", summary.lineageId)
+        assertEquals("{broken", main.readText())
+        assertTrue(failures.isEmpty())
+    }
+
+    @Test fun staleSummarySidecarRebuildsOnlyFromItsAuthoritativeSession() = runTest {
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        repository.writeNow(LocalHarnessSession(id = "stale", title = "旧标题", updatedAt = 1L))
+
+        val store = VersionedSessionStore(temporary.root, Json)
+        val updated = LocalHarnessSession(
+            id = "stale",
+            title = "新标题",
+            updatedAt = 2L,
+            projectId = "project-new",
+            lineageId = "lineage-new",
+        )
+        store.write(
+            id = updated.id,
+            payload = Json.encodeToJsonElement(LocalHarnessSession.serializer(), updated).jsonObject,
+            updatedAt = updated.updatedAt,
+        )
+
+        val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        val summary = reopened.summaries().single { it.id == "stale" }
+
+        assertEquals("新标题", summary.title)
+        assertEquals("project-new", summary.projectId)
+        assertEquals("lineage-new", summary.lineageId)
+        assertTrue(java.io.File(temporary.root, ".summaries/stale.summary").isFile)
     }
 
     @Test fun legacySessionWithoutUsageModeDefaultsToWork() {

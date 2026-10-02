@@ -16,7 +16,11 @@ import kotlinx.serialization.json.jsonPrimitive
 internal object LocalToolRouter {
     fun isOptional(tool: HarnessTool): Boolean = tool.exposure == ToolExposure.OPTIONAL
 
-    fun visibleSchemas(tools: List<HarnessTool>, enabledOptional: Set<String>): JsonArray {
+    fun visibleSchemas(
+        tools: List<HarnessTool>,
+        enabledOptional: Set<String>,
+        maxOptionalDefinitionTokens: Int = DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
+    ): JsonArray {
         val core = tools
             .filter { tool -> tool.exposure == ToolExposure.CORE }
             .sortedBy(HarnessTool::name)
@@ -24,15 +28,34 @@ internal object LocalToolRouter {
             .asSequence()
             .filter { tool -> tool.exposure == ToolExposure.OPTIONAL }
             .associateBy(HarnessTool::name)
-        val optional = enabledOptional.mapNotNull(optionalByName::get)
+
+        var remainingTokens = maxOptionalDefinitionTokens
+            .coerceIn(0, MAX_OPTIONAL_TOOL_PROMPT_TOKENS)
+        val optional = ArrayList<HarnessTool>()
+        for (name in enabledOptional) {
+            if (optional.size >= MAX_OPTIONAL_PROMPT_TOOLS || remainingTokens <= 0) break
+            val tool = optionalByName[name] ?: continue
+            val schema = tool.schema
+            val complexity = schemaComplexity(schema)
+            if (
+                complexity.depth > MAX_OPTIONAL_SCHEMA_DEPTH ||
+                complexity.properties > MAX_OPTIONAL_SCHEMA_PROPERTIES
+            ) continue
+            val tokens = estimateModelTokens(schema.toString())
+            if (tokens > MAX_OPTIONAL_SCHEMA_TOKENS || tokens > remainingTokens) continue
+            optional += tool
+            remainingTokens -= tokens
+        }
+
         // Core remains deterministic for prompt-cache stability; optional tools append in activation order.
+        // Registry limits protect process resources; this separate budget protects the model prompt.
         return JsonArray((core + optional).map(HarnessTool::schema))
     }
 
     fun search(
         tools: List<HarnessTool>,
         query: String,
-        limit: Int = 32,
+        limit: Int = 16,
     ): List<HarnessTool> {
         val normalized = query.trim().lowercase()
         require(normalized.isNotEmpty()) { "能力搜索内容不能为空" }
@@ -111,6 +134,45 @@ internal object LocalToolRouter {
     fun conciseDescription(tool: HarnessTool): String =
         description(tool).take(MAX_CAPABILITY_DESCRIPTION_CHARS)
 
+    private data class SchemaComplexity(
+        val depth: Int,
+        val properties: Int,
+    )
+
+    private fun schemaComplexity(schema: kotlinx.serialization.json.JsonElement): SchemaComplexity {
+        fun visit(element: kotlinx.serialization.json.JsonElement, depth: Int): SchemaComplexity =
+            when (element) {
+                is kotlinx.serialization.json.JsonObject -> {
+                    var maxDepth = depth
+                    var properties = (element["properties"] as? kotlinx.serialization.json.JsonObject)?.size ?: 0
+                    element.values.forEach { child ->
+                        val nested = visit(child, depth + 1)
+                        maxDepth = maxOf(maxDepth, nested.depth)
+                        properties += nested.properties
+                    }
+                    SchemaComplexity(maxDepth, properties)
+                }
+                is kotlinx.serialization.json.JsonArray -> {
+                    var maxDepth = depth
+                    var properties = 0
+                    element.forEach { child ->
+                        val nested = visit(child, depth + 1)
+                        maxDepth = maxOf(maxDepth, nested.depth)
+                        properties += nested.properties
+                    }
+                    SchemaComplexity(maxDepth, properties)
+                }
+                else -> SchemaComplexity(depth, 0)
+            }
+        return visit(schema, 1)
+    }
+
+    internal const val DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS = 8_000
+    private const val MAX_OPTIONAL_TOOL_PROMPT_TOKENS = 12_000
+    private const val MAX_OPTIONAL_PROMPT_TOOLS = 16
+    private const val MAX_OPTIONAL_SCHEMA_TOKENS = 2_000
+    private const val MAX_OPTIONAL_SCHEMA_DEPTH = 12
+    private const val MAX_OPTIONAL_SCHEMA_PROPERTIES = 256
     private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
     private const val MAX_CAPABILITY_DESCRIPTION_CHARS = 480
 }

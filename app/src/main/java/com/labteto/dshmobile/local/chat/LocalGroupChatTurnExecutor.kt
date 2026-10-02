@@ -72,6 +72,7 @@ internal class LocalGroupChatTurnExecutor(
     private val persistBranchStateAction: (String) -> Unit,
     private val checkpointHistoryAction: (String) -> Unit,
     private val persistAction: () -> Unit,
+    private val persistNowAction: suspend () -> Unit,
     private val finishTurn: (Job?) -> Unit,
 ) {
     private val eventLog: LocalSessionEventLog
@@ -91,6 +92,18 @@ internal class LocalGroupChatTurnExecutor(
     private fun checkpointModelHistory(reason: String) = checkpointHistoryAction(reason)
 
     private fun persist() = persistAction()
+
+    private suspend fun persistNow() = persistNowAction()
+
+    private fun projectGalleryState(groupChat: LocalGroupChatState, phase: String) {
+        projectGroupGalleryState(groupChat, chatPersonaGalleryStore).failures.forEach { failure ->
+            eventLog.append("group/state-persist", buildJsonObject {
+                put("gallery_id", failure.galleryId)
+                put("phase", phase)
+                put("detail", failure.detail)
+            })
+        }
+    }
 
     private suspend fun completeWithRetry(
         key: String,
@@ -652,23 +665,6 @@ internal class LocalGroupChatTurnExecutor(
                     )
                 },
             )
-            repliesForStateUpdate.forEach { reply ->
-                val nextState = refreshedStates[reply.member.galleryId] ?: return@forEach
-                val privateState = nextState.copy(
-                    scene = ChatSceneState(),
-                    continuity = ChatContinuityState(),
-                )
-                runCatching {
-                    chatPersonaGalleryStore.updateGroupChatState(reply.member.galleryId, privateState)
-                }.onFailure { error ->
-                    eventLog.append("group/state-persist", buildJsonObject {
-                        put("gallery_id", reply.member.galleryId)
-                        put("status", "failed")
-                        put("detail", error.message.orEmpty().take(1_000))
-                    })
-                }
-            }
-
             val nextCursor = (snapshot.groupChat.turnCursor + 1) % members.size
             currentGroup = currentGroup.copy(turnCursor = nextCursor)
             _state.update { current ->
@@ -692,7 +688,8 @@ internal class LocalGroupChatTurnExecutor(
                 persistChatBranchState("group/branch-completed")
             }
             checkpointModelHistory("group/completed")
-            persist()
+            persistNow()
+            projectGalleryState(_state.value.groupChat, "turn-complete")
         } catch (cancelled: CancellationException) {
             eventLog.append("turn/end", buildJsonObject {
                 put("reason", "aborted")

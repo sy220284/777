@@ -17,9 +17,6 @@ import com.labteto.dshmobile.harness.agent.AgentEventSink
 import com.labteto.dshmobile.harness.agent.AgentLoop
 import com.labteto.dshmobile.harness.agent.AgentModel
 import com.labteto.dshmobile.harness.agent.AgentModelReply
-import com.labteto.dshmobile.harness.agent.AgentRequestEvent
-import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
-import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolBatchExecutor
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolExecutor
@@ -28,25 +25,13 @@ import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.capability.ProcessRequest
-import com.labteto.dshmobile.harness.jobs.JobSnapshot
-import com.labteto.dshmobile.harness.resource.HarnessResourceBudget
-import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
-import com.labteto.dshmobile.harness.session.HandoffGoal
-import com.labteto.dshmobile.harness.session.HandoffMessage
-import com.labteto.dshmobile.harness.session.HandoffState
-import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.harness.session.SessionRecovery
-import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.harness.tools.HarnessTool
-import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
-import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
-import com.labteto.dshmobile.harness.tools.ToolContext
-import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
 import com.labteto.dshmobile.local.tools.LocalGitHubCredentialStore
 import com.labteto.dshmobile.local.tools.LocalPluginCompositionFactory
@@ -55,27 +40,15 @@ import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.chatPostTurnModelMessages
-import com.labteto.dshmobile.local.chat.ChatSceneState
-import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.canonicalFactLines
-import com.labteto.dshmobile.local.chat.commitProcessed
 import com.labteto.dshmobile.local.chat.enqueuePendingDurably
 import com.labteto.dshmobile.local.chat.boundDurablePending
-import com.labteto.dshmobile.local.chat.rebaseGeneration
 import com.labteto.dshmobile.local.chat.restoreBranchContext
-import com.labteto.dshmobile.local.chat.withContextForPlanner
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
-import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
-import com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger
-import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
-import com.labteto.dshmobile.local.chat.nextQuietHoursEndMillis
-import com.labteto.dshmobile.local.chat.proactiveConversationFocus
-import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
 import com.labteto.dshmobile.local.chat.saveGroupChatAnnouncement
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
@@ -85,6 +58,8 @@ import com.labteto.dshmobile.local.chat.LocalReplySuggestionCoordinator
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.compact
+import com.labteto.dshmobile.local.model.compactOverflow
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.withoutLastCompletedAssistantReply
@@ -93,7 +68,6 @@ import com.labteto.dshmobile.local.model.LocalModelAccountStateCoordinator
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.memory.MemoryStore
-import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
@@ -104,7 +78,6 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -114,9 +87,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -133,11 +104,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -217,6 +186,7 @@ class LocalHarnessEngine @Inject constructor(
         interactionPlanner = chatInteractionPlanner,
     )
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
+    private val eventLogRegistry by lazy { LocalSessionEventLogRegistry(sessionsRoot, json) }
     private val sessionStorageManager by lazy { LocalSessionStorageManager(sessionsRoot, json) }
     private val sessionRepository by lazy {
         LocalSessionRepository(sessionsRoot, json, scope,
@@ -229,6 +199,15 @@ class LocalHarnessEngine @Inject constructor(
             repository = sessionRepository,
             eventLogFor = ::eventLogFor,
             runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
+        )
+    }
+    private val sessionAccessCoordinator by lazy {
+        LocalSessionAccessCoordinator(
+            summaries = ::sessionSummaries,
+            currentSessionId = { currentSessionId },
+            currentState = { _state.value },
+            activeState = { id -> activeWorkRuns[id]?.state?.value },
+            eventLogFor = ::eventLogFor,
         )
     }
     private val agentRunCoordinator by lazy {
@@ -245,6 +224,9 @@ class LocalHarnessEngine @Inject constructor(
             enabledOptionalTools = enabledOptionalTools,
             requestApproval = { call, tool, summary -> approve(call, summary, tool) },
         )
+    }
+    private val toolSchemaProjection by lazy {
+        LocalToolSchemaProjection(toolRegistry, toolExecutionCoordinator)
     }
     private val runtimeProcess = AndroidProcessRuntime(
         defaultWorkingDirectory = File(workspace.path),
@@ -460,6 +442,7 @@ class LocalHarnessEngine @Inject constructor(
             ::persistChatBranchState,
             ::checkpointModelHistory,
             ::persist,
+            ::persistNow,
             { completedJob ->
                 synchronized(runStateLock) { if (activeJob === completedJob) activeJob = null }
                 startNextQueuedTurnIfIdle()?.start()
@@ -551,6 +534,22 @@ class LocalHarnessEngine @Inject constructor(
             defaultSessionId = { currentSessionId },
         )
     }
+    private val persistentJobRecoveryCoordinator by lazy {
+        LocalPersistentJobRecoveryCoordinator(
+            scope = scope,
+            jobs = jobs,
+            json = json,
+            modelGateway = modelGateway,
+            webTools = webTools,
+            currentSessionId = { currentSessionId },
+            currentState = { _state.value },
+            defaultHistory = modelHistory::snapshot,
+            subagentRunner = { sessionId, boundState, history ->
+                persistentSubagentRunner(sessionId, boundState, history)
+            },
+            eventLogFor = ::eventLogFor,
+        )
+    }
 
     private val automationWorkCoordinator by lazy {
         LocalAutomationWorkCoordinator(
@@ -603,7 +602,11 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
-                subagentToolSchemas(allowMutation, allowVirtualScreen, enabledOptional)
+                toolSchemaProjection.subagentSchemas(
+                    allowMutation = allowMutation,
+                    allowVirtualScreen = allowVirtualScreen,
+                    enabledOptional = enabledOptional,
+                )
             },
             executeTool = { call, allowMutation, enabledOptional ->
                 val canonical = call.copy(name = LocalToolPolicy.canonical(call.name))
@@ -626,7 +629,13 @@ class LocalHarnessEngine @Inject constructor(
         sessionId = sessionId,
         boundState = boundState,
         runKind = LocalAgentRunKind.SUBAGENT,
-        schemasProvider = ::subagentToolSchemas,
+        schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
+            toolSchemaProjection.subagentSchemas(
+                allowMutation = allowMutation,
+                allowVirtualScreen = allowVirtualScreen,
+                enabledOptional = enabledOptional,
+            )
+        },
         executeTool = { call, allowMutation, memoryTools, enabledOptional ->
             executePersistentSubagentTool(
                 call = call,
@@ -655,7 +664,13 @@ class LocalHarnessEngine @Inject constructor(
         sessionId = sessionId,
         boundState = boundState,
         runKind = LocalAgentRunKind.AUTOMATION,
-        schemasProvider = ::subagentToolSchemas,
+        schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
+            toolSchemaProjection.subagentSchemas(
+                allowMutation = allowMutation,
+                allowVirtualScreen = allowVirtualScreen,
+                enabledOptional = enabledOptional,
+            )
+        },
         executeTool = { call, allowMutation, memoryTools, enabledOptional ->
             executeAutomationSubagentTool(
                 call = call,
@@ -674,7 +689,6 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
-    private var persistentRecoveryJob: Job? = null
     private val interactions = LocalInteractionCoordinator(_state)
     private val memoryCoordinator by lazy {
         LocalMemoryCoordinator(
@@ -728,9 +742,10 @@ class LocalHarnessEngine @Inject constructor(
                 loadSession(id)
                 syncVisibleWorkRun(id)
             },
-            restartInterruptedSafeJobs = ::restartInterruptedSafeJobs,
+            restartInterruptedSafeJobs = persistentJobRecoveryCoordinator::schedule,
             startNextQueuedTurnIfIdle = ::startNextQueuedTurnIfIdle,
             sessionSummaries = ::sessionSummaries,
+            beforeEventLogsDeleted = eventLogRegistry::clearAndEvict,
             localProjectId = LOCAL_PROJECT_ID,
         )
     }
@@ -760,7 +775,7 @@ class LocalHarnessEngine @Inject constructor(
                 pluginComposition.installStartup()
                 load()
                 startNextQueuedTurnIfIdle()?.start()
-                scheduleInterruptedSafeJobs()
+                persistentJobRecoveryCoordinator.schedule()
                 scope.launch { maybeCleanupUnreferencedLocalImages() }
                 scope.launch { LocalSessionArchiveMaintenance(sessionsRoot, json, { currentSessionId }).run() }
             }.onFailure { error ->
@@ -2109,7 +2124,9 @@ class LocalHarnessEngine @Inject constructor(
                 put("mode", "global")
                 put("tool", pending.toolName)
             })
-            binding.interactions.answerApproval(callId, true)
+            if (pending.canAutoApproveSafely) {
+                binding.interactions.answerApproval(callId, true)
+            }
             return
         }
         approvalCoordinator.enableAutoApprovalForPending(callId)
@@ -2275,7 +2292,9 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun isRunBusy(): Boolean = synchronized(runStateLock) {
-        sessionTransitioning || activeJob?.isCompleted == false
+        sessionTransitioning ||
+            activeJob?.isCompleted == false ||
+            activeWorkRuns.values.any { it.job?.isCompleted == false }
     }
 
     private fun beginSessionTransition(): Boolean {
@@ -2822,6 +2841,7 @@ class LocalHarnessEngine @Inject constructor(
                     expectedBaseState = _state.value.chatState,
                     profile = snapshot.modelSelection.activeProfile,
                     sourceUserMessageId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
+                    assistantEventSequence = assistantEvent.sequence,
                 )
             }
         } catch (cancelled: CancellationException) {
@@ -2904,6 +2924,7 @@ class LocalHarnessEngine @Inject constructor(
         runState.update { it.copy(running = true, error = null, deviceApprovalLease = false, workflowProgress = null) }
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var finalChatAssistant: LocalHarnessMessage? = null
+        var finalChatAssistantSequence: Long? = null
         var modelStep = 0
         var requestPrepared = false
         var ephemeralContext = ""
@@ -2928,6 +2949,7 @@ class LocalHarnessEngine @Inject constructor(
             usageMode = runSnapshot.usageMode,
             model = runSnapshot.model,
             baseUrl = runSnapshot.baseUrl,
+            routeProfile = runSnapshot.modelSelection.activeProfile,
             planMode = runSnapshot.planMode,
             policy = runPolicy,
             safeAutoApprovalEnabled = runSnapshot.safeAutoApprovalEnabled,
@@ -3229,6 +3251,7 @@ class LocalHarnessEngine @Inject constructor(
                             finalChatAssistant = transcriptMessages.lastOrNull { message ->
                                 message.role == "assistant" && message.content.isNotBlank()
                             }
+                            finalChatAssistantSequence = assistantEvent.sequence
                         }
                         if (
                             beforeAssistant.usageMode == LocalUsageMode.CHAT &&
@@ -3451,6 +3474,7 @@ class LocalHarnessEngine @Inject constructor(
                         expectedBaseState = postTurnSnapshot.chatState,
                         profile = runSnapshot.modelSelection.activeProfile,
                         sourceUserMessageId = sourceMessageId ?: runSnapshot.transcriptIndex.latestUserMessageId,
+                        assistantEventSequence = finalChatAssistantSequence,
                     )
                 }
             }
@@ -3629,7 +3653,8 @@ class LocalHarnessEngine @Inject constructor(
             if (sessionId == currentSessionId) {
                 approve(call, summary, tool)
             } else {
-                approvalPreferences.isSafeAutoApprovalEnabled()
+                approvalPreferences.isSafeAutoApprovalEnabled() &&
+                    canAutoApprove(tool)
             }
         },
     )
@@ -3724,12 +3749,13 @@ class LocalHarnessEngine @Inject constructor(
             planModeEnabled = false,
             approval = { call, tool, _ ->
                 if (
-                    approvalPreferences.isSafeAutoApprovalEnabled()
+                    approvalPreferences.isSafeAutoApprovalEnabled() &&
+                    canAutoApprove(tool)
                 ) {
                     eventLogFor(sessionId).append("approval/auto", buildJsonObject {
                         put("tool", call.name)
                         put("access", tool.access.name.lowercase())
-                        put("mode", "automation-global")
+                        put("mode", "automation-safe")
                     })
                     true
                 } else {
@@ -3811,74 +3837,34 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    private fun subagentToolSchemas(
-        allowMutation: Boolean,
-        allowVirtualScreen: Boolean,
-    ): JsonArray = subagentToolSchemas(
-        allowMutation = allowMutation,
-        allowVirtualScreen = allowVirtualScreen,
-        enabledOptional = toolExecutionCoordinator.enabledOptionalSnapshot(),
-    )
-
-    private fun subagentToolSchemas(
-        allowMutation: Boolean,
-        allowVirtualScreen: Boolean,
-        enabledOptional: Set<String>,
-    ): JsonArray {
-        val enabled = enabledOptional +
-            if (allowVirtualScreen) SUBAGENT_VIRTUAL_SCREEN_TOOLS else emptySet()
-        val tools = toolRegistry.names()
-            .mapNotNull(toolRegistry::get)
-            .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
-            .filter { tool -> tool.name !in SUBAGENT_VIRTUAL_SCREEN_TOOLS || allowVirtualScreen }
-            .filter { tool -> allowMutation || tool.name != "download_file" }
-            .filter { tool ->
-                allowMutation ||
-                    tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
-                    (allowVirtualScreen && tool.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS)
-            }
-        return LocalToolRouter.visibleSchemas(tools, enabled)
-    }
-
     private fun modelToolSchemas(
         runPolicy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding? = null,
     ): JsonArray {
-        if (binding == null) return toolExecutionCoordinator.visibleSchemas(runPolicy)
-        if (!runPolicy.toolsEnabled) return JsonArray(emptyList())
-        val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
-        return LocalToolRouter.visibleSchemas(tools, binding.enabledOptionalTools.toSet())
+        val enabledOptional = binding?.let { run ->
+            synchronized(run.enabledOptionalTools) { run.enabledOptionalTools.toSet() }
+        }
+        return toolSchemaProjection.modelSchemas(
+            policy = runPolicy,
+            state = binding?.state?.value ?: _state.value,
+            history = binding?.modelHistory?.snapshot() ?: modelHistory.snapshot(),
+            enabledOptional = enabledOptional,
+        )
     }
 
     private fun runToolNames(
         runPolicy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding?,
-    ): List<String> = modelToolSchemas(runPolicy, binding).mapNotNull { element ->
-        val function = (element as? JsonObject)?.get("function") as? JsonObject
-        (function?.get("name") as? JsonPrimitive)?.contentOrNull
-    }
+    ): List<String> = toolSchemaProjection.names(modelToolSchemas(runPolicy, binding))
 
     private fun clearRunCapabilities(binding: LocalWorkRunBinding?) {
-        if (binding == null) {
-            toolExecutionCoordinator.clearTurnCapabilities()
-        } else {
-            synchronized(binding.enabledOptionalTools) { binding.enabledOptionalTools.clear() }
-        }
+        binding?.enabledOptionalTools?.let(toolExecutionCoordinator::clearTurnCapabilities)
+            ?: toolExecutionCoordinator.clearTurnCapabilities()
     }
 
     private fun enableRunGitHubCapabilities(binding: LocalWorkRunBinding?) {
-        if (binding == null) {
-            toolExecutionCoordinator.enableGitHubConnectorTools()
-        } else {
-            val registered = toolRegistry.names().toSet()
-            synchronized(binding.enabledOptionalTools) {
-                binding.enabledOptionalTools += setOf(
-                    "github_status",
-                    "github_api_get",
-                    "github_api_request",
-                ).filter { it in registered }
-            }
-        }
+        binding?.enabledOptionalTools?.let(toolExecutionCoordinator::enableGitHubConnectorTools)
+            ?: toolExecutionCoordinator.enableGitHubConnectorTools()
     }
 
     private fun searchCapabilities(query: String): String =
@@ -4053,7 +4039,7 @@ class LocalHarnessEngine @Inject constructor(
                 val maxSteps = args.int("max_steps", executionState.value.subagentMaxSteps).coerceIn(1, 128)
                 val virtualScreen = args.boolean("virtual_screen", false)
                 if (args.boolean("run_in_background", false)) {
-                    startPersistentReadonlySubagent(
+                    persistentJobRecoveryCoordinator.startReadonlySubagent(
                         task = task,
                         model = model,
                         maxSteps = maxSteps,
@@ -4092,18 +4078,18 @@ class LocalHarnessEngine @Inject constructor(
                 args.optionalString("model"),
                 binding,
             )
-            "session_search" -> searchSessions(args.string("query"))
+            "session_search" -> sessionAccessCoordinator.search(args.string("query"), boundSessionId)
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
                 memoryTools(binding).execute(call.name, args, allowMutation)
-            "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId).search(
+            "session_event_search" -> sessionAccessCoordinator.authorizedLog(args.optionalString("session_id"), boundSessionId).search(
                 query = args.string("query"),
                 limit = args.int("limit", 50),
                 afterSequence = args.long("after_sequence", -1L),
             )
-            "session_trace" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId).tail(args.int("limit", 40))
-            "session_event_trace" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId)
+            "session_trace" -> sessionAccessCoordinator.authorizedLog(args.optionalString("session_id"), boundSessionId).tail(args.int("limit", 40))
+            "session_event_trace" -> sessionAccessCoordinator.authorizedLog(args.optionalString("session_id"), boundSessionId)
                 .read(args.int("seq", -1).toLong(), before = 1, after = 1)
-            "session_event_read" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId).read(
+            "session_event_read" -> sessionAccessCoordinator.authorizedLog(args.optionalString("session_id"), boundSessionId).read(
                 sequence = args.int("seq", -1).toLong(),
                 before = args.int("before", 0),
                 after = args.int("after", 0), offsetChars = args.int("offset_chars", 0),
@@ -4138,163 +4124,6 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun startPersistentReadonlySubagent(
-        task: String,
-        model: String?,
-        maxSteps: Int,
-        virtualScreen: Boolean,
-        sessionId: String = currentSessionId,
-        boundState: LocalHarnessState = _state.value,
-        historySnapshot: () -> List<JsonObject> = modelHistory::snapshot,
-    ): String {
-        val boundSubagents = persistentSubagentRunner(sessionId, boundState, historySnapshot)
-        val payload = buildJsonObject {
-            put("session_id", sessionId)
-            put("task", task)
-            model?.let { put("model", it) }
-            put("max_steps", maxSteps)
-            put("virtual_screen", virtualScreen)
-        }.toString()
-        return jobs.startPersistent(
-            label = "子代理：${task.take(100)}",
-            resumeKind = "subagent_readonly",
-            resumePayload = payload,
-            ownerSessionId = sessionId,
-        ) { jobId, _ ->
-            val result = boundSubagents.runResult(
-                task = task,
-                inheritHistory = false,
-                allowMutation = false,
-                backgroundJobId = jobId,
-                modelOverride = model,
-                maxSteps = maxSteps,
-                virtualScreen = virtualScreen,
-            )
-            result.requireCompletedOutput()
-        }
-    }
-
-    private fun restartInterruptedSafeJobs() {
-        synchronized(runStateLock) {
-            persistentRecoveryJob?.cancel()
-            persistentRecoveryJob = null
-        }
-        scheduleInterruptedSafeJobs()
-    }
-
-    private fun scheduleInterruptedSafeJobs() {
-        synchronized(runStateLock) {
-            if (persistentRecoveryJob?.isActive == true) return
-            persistentRecoveryJob = scope.launch {
-                try {
-                    while (true) {
-                        val targetSession = currentSessionId
-                        resumeInterruptedSafeJobsPass(targetSession)
-                        val remaining = jobs.interruptedSnapshots().any { snapshot ->
-                            interruptedJobSessionId(snapshot, targetSession) == targetSession
-                        }
-                        if (!remaining) break
-                        delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
-                    }
-                } finally {
-                    val completed = currentCoroutineContext()[Job]
-                    synchronized(runStateLock) {
-                        if (persistentRecoveryJob === completed) persistentRecoveryJob = null
-                    }
-                }
-            }
-        }
-    }
-
-    private fun resumeInterruptedSafeJobsPass(targetSession: String) {
-        jobs.interruptedSnapshots().forEach { snapshot ->
-            val payloadText = snapshot.resumePayload
-            if (payloadText.isNullOrBlank()) {
-                jobs.failInterrupted(snapshot.id, "任务恢复失败：缺少恢复元数据")
-                return@forEach
-            }
-            val payload = try {
-                json.parseToJsonElement(payloadText).jsonObject
-            } catch (error: Exception) {
-                jobs.failInterrupted(snapshot.id, "任务恢复失败：恢复元数据损坏")
-                recordJobResumeError(snapshot, targetSession, error)
-                return@forEach
-            }
-            val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
-            if (sessionId != targetSession) return@forEach
-            if (jobs.availableSlots() <= 0) return
-
-            try {
-                when (snapshot.resumeKind) {
-                    "web_fetch" -> {
-                        val url = payload["url"]?.jsonPrimitive?.contentOrNull
-                            ?: error("恢复任务缺少 url")
-                        val maxBytes = payload["max_bytes"]?.jsonPrimitive?.intOrNull
-                            ?: DEFAULT_WEB_FETCH_BYTES
-                        val format = payload["format"]?.jsonPrimitive?.contentOrNull ?: "text"
-                        val timeoutSeconds = payload["timeout_seconds"]?.jsonPrimitive?.contentOrNull
-                            ?.toLongOrNull() ?: BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
-                        jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { _, report ->
-                            report("正在恢复网页抓取：$url")
-                            webTools.fetch(
-                                url,
-                                maxBytes.coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES),
-                                format,
-                                timeoutSeconds.coerceIn(30L, BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS),
-                            )
-                        }
-                    }
-                    "subagent_readonly" -> {
-                        val task = payload["task"]?.jsonPrimitive?.contentOrNull
-                            ?: error("恢复任务缺少 task")
-                        val model = payload["model"]?.jsonPrimitive?.contentOrNull
-                        val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
-                            ?.coerceIn(1, 128) ?: _state.value.subagentMaxSteps
-                        val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
-                        val boundSubagents = persistentSubagentRunner(sessionId, _state.value)
-                        jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, _ ->
-                            val result = boundSubagents.runResult(
-                                task = task,
-                                inheritHistory = false,
-                                allowMutation = false,
-                                backgroundJobId = jobId,
-                                modelOverride = model,
-                                maxSteps = maxSteps,
-                                virtualScreen = virtualScreen,
-                            )
-                            result.requireCompletedOutput()
-                        }
-                    }
-                    else -> {
-                        jobs.failInterrupted(
-                            snapshot.id,
-                            "任务恢复失败：不支持的恢复类型 ${snapshot.resumeKind.orEmpty()}",
-                        )
-                    }
-                }
-            } catch (error: Exception) {
-                // Persistence failures leave the record interrupted so the coordinator can retry.
-                recordJobResumeError(snapshot, sessionId, error)
-            }
-        }
-    }
-
-    private fun interruptedJobSessionId(snapshot: JobSnapshot, fallbackSessionId: String): String? {
-        val payloadText = snapshot.resumePayload ?: return null
-        return runCatching {
-            json.parseToJsonElement(payloadText).jsonObject["session_id"]
-                ?.jsonPrimitive?.contentOrNull
-                ?: fallbackSessionId
-        }.getOrNull()
-    }
-
-    private fun recordJobResumeError(snapshot: JobSnapshot, sessionId: String, error: Throwable) {
-        eventLogFor(sessionId).append("job/resume-error", buildJsonObject {
-            put("job_id", snapshot.id)
-            put("kind", snapshot.resumeKind.orEmpty())
-            put("detail", (error.message ?: error::class.java.simpleName).take(2_000))
-        })
-    }
     private suspend fun approve(
         call: LocalToolCall,
         summary: String,
@@ -4309,7 +4138,7 @@ class LocalHarnessEngine @Inject constructor(
             })
             return true
         }
-        if (_state.value.safeAutoApprovalEnabled) {
+        if (_state.value.safeAutoApprovalEnabled && canAutoApprove(tool)) {
             eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
@@ -4327,7 +4156,7 @@ class LocalHarnessEngine @Inject constructor(
                 arguments = call.rawArguments,
                 access = tool.access.name.lowercase(),
                 impact = approvalImpact(tool),
-                canAutoApproveSafely = canAutoApprove(tool, call.arguments),
+                canAutoApproveSafely = canAutoApprove(tool),
                 canApproveDeviceTurn = canUseDeviceApprovalLease(tool),
             ),
         )
@@ -4349,7 +4178,10 @@ class LocalHarnessEngine @Inject constructor(
             })
             return true
         }
-        if (snapshot.safeAutoApprovalEnabled || approvalPreferences.isSafeAutoApprovalEnabled()) {
+        if (
+            (snapshot.safeAutoApprovalEnabled || approvalPreferences.isSafeAutoApprovalEnabled()) &&
+            canAutoApprove(tool)
+        ) {
             binding.eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
@@ -4367,7 +4199,7 @@ class LocalHarnessEngine @Inject constructor(
                 arguments = call.rawArguments,
                 access = tool.access.name.lowercase(),
                 impact = approvalImpact(tool),
-                canAutoApproveSafely = canAutoApprove(tool, call.arguments),
+                canAutoApproveSafely = canAutoApprove(tool),
                 canApproveDeviceTurn = canUseDeviceApprovalLease(tool),
             ),
         )
@@ -4515,7 +4347,13 @@ class LocalHarnessEngine @Inject constructor(
             sessionId = binding.sessionId,
             boundState = binding.state.value,
             runKind = LocalAgentRunKind.SUBAGENT,
-            schemasProvider = ::subagentToolSchemas,
+            schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
+            toolSchemaProjection.subagentSchemas(
+                allowMutation = allowMutation,
+                allowVirtualScreen = allowVirtualScreen,
+                enabledOptional = enabledOptional,
+            )
+        },
             executeTool = { call, allowMutation, boundMemoryTools, enabledOptional ->
                 executePersistentSubagentTool(
                     call = call,
@@ -4565,30 +4403,12 @@ class LocalHarnessEngine @Inject constructor(
         ).run(tasks, mode, requiredEvidence)
     }
 
-    private fun searchSessions(query: String): String {
-        val hits = (sessionSummaries().map(LocalSessionSummary::id) + currentSessionId).distinct().mapNotNull { id ->
-            val result = eventLogFor(id).search(query, limit = 1)
-            result.takeUnless { it == "未找到会话事件" || it == "会话事件日志为空" }
-                ?.let { "会话 $id\n$it" }
-        }
-        return if (hits.isEmpty()) "未找到历史会话事件" else hits.take(50).joinToString("\n\n")
-    }
-
-    private fun eventLogForAuthorized(
-        requestedId: String?,
-        defaultSessionId: String = currentSessionId,
-    ): LocalSessionEventLog {
-        val id = requestedId?.takeIf(String::isNotBlank) ?: defaultSessionId
-        require(id == currentSessionId || sessionSummaries().any { it.id == id }) { "会话不存在或无权访问：$id" }
-        return eventLogFor(id)
-    }
-
     internal fun transcriptPageForUi(
         sessionId: String,
         cursor: LocalTranscriptPageCursor? = null,
         limit: Int = 200,
     ): LocalTranscriptPage = LocalSessionTranscriptPager(
-        eventLog = eventLogForAuthorized(sessionId),
+        eventLog = sessionAccessCoordinator.authorizedLog(sessionId),
     ).page(
         cursor = cursor,
         limit = limit,
@@ -4598,13 +4418,13 @@ class LocalHarnessEngine @Inject constructor(
         sessionId: String,
         limit: Int,
     ): List<LocalHarnessMessage> = LocalSessionTranscriptPager(
-        eventLog = eventLogForAuthorized(sessionId),
+        eventLog = sessionAccessCoordinator.authorizedLog(sessionId),
     ).page(limit = limit).messages
 
     internal fun completeTranscriptForUi(
         sessionId: String,
     ): List<LocalHarnessMessage> = LocalSessionTranscriptPager(
-        eventLog = eventLogForAuthorized(sessionId),
+        eventLog = sessionAccessCoordinator.authorizedLog(sessionId),
     ).all()
 
     private fun cancelChatPostTurn() {
@@ -4620,6 +4440,7 @@ class LocalHarnessEngine @Inject constructor(
         expectedBaseState: ChatCharacterState,
         profile: LocalModelProfile?,
         sourceUserMessageId: String? = null,
+        assistantEventSequence: Long? = null,
     ) {
         if (profile == null) return
         chatContextRefreshCoordinator.schedule(
@@ -4632,6 +4453,7 @@ class LocalHarnessEngine @Inject constructor(
             boundEventLog = eventLogFor(expectedSessionId),
             profile = profile,
             sourceUserMessageId = sourceUserMessageId,
+            assistantEventSequence = assistantEventSequence,
         )
     }
 
@@ -4814,16 +4636,24 @@ class LocalHarnessEngine @Inject constructor(
         val workMode = targetState.value.usageMode == LocalUsageMode.WORK
         val budget = if (workMode) {
             workSteadyStateHistoryBudget(baseBudget, history.estimatedTokens, extraTokens)
-        } else baseBudget
+        } else {
+            baseBudget
+        }
         val workSteadyStateApplied = workMode && budget.maxHistoryTokens != baseBudget.maxHistoryTokens
+        val summaryMode = if (targetState.value.usageMode == LocalUsageMode.CHAT) {
+            LocalHistorySummaryMode.CHAT
+        } else {
+            LocalHistorySummaryMode.WORK
+        }
         val compaction = history.compact(
             compactor = historyCompactor,
             budget = budget,
             extraTokens = extraTokens,
-            summaryMode = if (targetState.value.usageMode == LocalUsageMode.CHAT) {
-                LocalHistorySummaryMode.CHAT
+            summaryMode = summaryMode,
+            structuredWorkState = if (summaryMode == LocalHistorySummaryMode.WORK) {
+                structuredWorkState(targetState.value, log)
             } else {
-                LocalHistorySummaryMode.WORK
+                null
             },
         ) ?: run {
             updateContextMetrics(binding)
@@ -4941,13 +4771,26 @@ class LocalHarnessEngine @Inject constructor(
             ?.let { event -> decodeLocalAgentInboxPending(event.data) }
             .orEmpty()
         pendingInputs.restore(restoredInbox)
+        val modelProfiles = modelConfiguration.readProfiles()
+        var recoveredRunProfile: LocalModelProfile? = null
         var runRecoveryError: String? = null
         agentRunCoordinator.recoveryDecision(sessionId, recovery)?.let { decision ->
-            val blocked = decision.blockedReason
+            val route = decision.route
+            val exactRecoveryProfile = route?.let { identity ->
+                resolveRecoveryModelProfile(modelProfiles, identity)
+            }
+            val routeMismatch = route != null &&
+                (exactRecoveryProfile == null || !modelGateway.hasCredential(exactRecoveryProfile))
+            val blocked = when {
+                decision.blockedReason != null -> decision.blockedReason
+                routeMismatch -> "上次任务绑定的模型账户或凭据身份已变化，已停止自动续跑。请恢复原模型配置后再继续。"
+                else -> null
+            }
             if (blocked != null) {
                 runRecoveryError = blocked
                 agentRunCoordinator.markRecoveryBlocked(sessionId, decision.runId, blocked)
             } else {
+                recoveredRunProfile = exactRecoveryProfile
                 val queued = decision.queuedInput
                 if (queued != null && pendingInputs.snapshot().none { it.id == queued.id }) {
                     if (pendingInputs.offer(queued)) {
@@ -4978,15 +4821,17 @@ class LocalHarnessEngine @Inject constructor(
             LocalConversationMode.PROJECT,
             LocalConversationMode.CONTINUATION -> LOCAL_PROJECT_ID
         }
-        val modelProfiles = modelConfiguration.readProfiles()
-        val activeModelProfile = modelConfiguration.activeProfile(model, baseUrl, modelProfiles)
+        val activeModelProfile = recoveredRunProfile
+            ?: modelConfiguration.activeProfile(model, baseUrl, modelProfiles)
         val modelConfigured = activeModelProfile != null && modelGateway.hasCredential(activeModelProfile)
         activeModelProfile?.takeIf { modelConfigured }?.let(modelGateway::activate)
+        val restoredModel = activeModelProfile?.model ?: model
+        val restoredBaseUrl = activeModelProfile?.baseUrl ?: baseUrl
         _state.value = LocalHarnessState(
             loading = false,
             configured = modelConfigured,
-            model = model,
-            baseUrl = baseUrl,
+            model = restoredModel,
+            baseUrl = restoredBaseUrl,
             modelSelection = LocalModelSelectionState.restored(
                 modelProfiles, activeModelProfile?.id,
                 preferences.getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null),
@@ -5056,6 +4901,12 @@ class LocalHarnessEngine @Inject constructor(
         )
         var wroteHistoryCheckpoint = false
         if (_state.value.groupChat.enabled) {
+            projectGroupGalleryState(_state.value.groupChat, chatPersonaGalleryStore).failures.forEach { failure ->
+                AppLog.warn(
+                    "LocalHarnessEngine",
+                    "群聊人物库投影恢复失败 galleryId=${failure.galleryId} detail=${failure.detail}",
+                )
+            }
             // Group model history is already restored from its durable checkpoint/event tail.
             // Rebuilding it from the bounded UI transcript would silently discard older context.
             refreshGroupModelSystemPrompt()
@@ -5138,29 +4989,35 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun persist(binding: LocalWorkRunBinding? = null) {
+    private fun persistenceSnapshot(binding: LocalWorkRunBinding? = null): LocalHarnessSession {
         // Capture durable projection boundaries before reading mutable state. If a concurrent update
         // lands afterwards, replaying its event is safe and idempotent. Reading state first could
         // instead persist old state with a newer cursor and make recovery skip that event.
-        val sessionId = binding?.sessionId ?: currentSessionId
         val log = binding?.eventLog ?: eventLog
         val controlProjectedThroughSequence = log.latestSequence()
         val transcriptProjectedThroughSequence =
             binding?.transcriptProjectionCursor ?: transcriptProjectionCursor
         val state = binding?.state?.value ?: _state.value
-        val snapshot = sessionCoordinator.snapshot(
-            sessionId = sessionId,
+        return sessionCoordinator.snapshot(
+            sessionId = binding?.sessionId ?: currentSessionId,
             state = state,
             controlProjectedThroughSequence = controlProjectedThroughSequence,
             transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
         )
-        sessionCoordinator.enqueue(snapshot)
+    }
+
+    private fun persist(binding: LocalWorkRunBinding? = null) {
+        sessionCoordinator.enqueue(persistenceSnapshot(binding))
+    }
+
+    private suspend fun persistNow() {
+        sessionCoordinator.writeNow(persistenceSnapshot())
     }
 
 
     private fun sessionFileFor(id: String) = File(sessionsRoot, "$id.json")
 
-    private fun eventLogFor(id: String) = LocalSessionEventLog(File(sessionsRoot, "$id.events.jsonl"), json)
+    private fun eventLogFor(id: String) = eventLogRegistry.get(id)
 
     private fun sessionSummaries(): List<LocalSessionSummary> = try {
         sessionCoordinator.summaries()

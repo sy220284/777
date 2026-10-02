@@ -263,7 +263,6 @@ class HarnessWebhookService : Service() {
     @Inject lateinit var json: Json
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val executionMutex = Mutex()
     private val executionLimiter = WebhookExecutionLimiter(MAX_PENDING_RUNS)
     private val listener by lazy { WebhookListener(scope, handle = ::handle) }
 
@@ -367,7 +366,6 @@ class HarnessWebhookService : Service() {
                 respond(client, 202, """{"accepted":true,"request_id":"$requestId","result_url":"/result/$requestId"}""")
                 val job = scope.launch {
                     executeWebhookRun(
-                        executionMutex,
                         update = { status, result, error -> resultStore.update(requestId, status, result, error) },
                         run = { automationRuntime.runPrompt(prompt) },
                     )

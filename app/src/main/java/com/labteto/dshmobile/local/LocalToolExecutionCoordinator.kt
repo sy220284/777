@@ -31,29 +31,32 @@ internal class LocalToolExecutionCoordinator(
         summary: String,
     ) -> Boolean,
 ) {
-    fun clearTurnCapabilities() {
-        synchronized(enabledOptionalTools) { enabledOptionalTools.clear() }
+    fun clearTurnCapabilities(target: MutableSet<String> = enabledOptionalTools) {
+        synchronized(target) { target.clear() }
     }
 
     fun enabledOptionalSnapshot(): Set<String> =
         synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
 
-    fun enableOptionalTools(names: Collection<String>) {
-        synchronized(enabledOptionalTools) {
-            enabledOptionalTools += names.filter { name ->
+    fun enableOptionalTools(
+        names: Collection<String>,
+        target: MutableSet<String> = enabledOptionalTools,
+    ) {
+        synchronized(target) {
+            target += names.filter { name ->
                 registry.get(name)?.let(LocalToolRouter::isOptional) == true
             }
         }
     }
 
-    fun enableGitHubConnectorTools() {
+    fun enableGitHubConnectorTools(target: MutableSet<String> = enabledOptionalTools) {
         val githubTools = registry.names().mapNotNull(registry::get)
             .filter { tool ->
                 LocalToolRouter.isOptional(tool) &&
                     tool.metadata.family.equals(GITHUB_TOOL_FAMILY, ignoreCase = true)
             }
             .map(HarnessTool::name)
-        enableOptionalTools(githubTools)
+        enableOptionalTools(githubTools, target)
     }
 
     fun capabilitySummary(enabledOptional: Set<String> = enabledOptionalSnapshot()): String {
@@ -61,10 +64,17 @@ internal class LocalToolExecutionCoordinator(
         return LocalToolRouter.capabilitySummary(tools, enabledOptional)
     }
 
-    fun visibleSchemas(policy: LocalAgentRunPolicy): JsonArray {
+    fun visibleSchemas(
+        policy: LocalAgentRunPolicy,
+        maxOptionalDefinitionTokens: Int = LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
+    ): JsonArray {
         if (!policy.toolsEnabled) return JsonArray(emptyList())
         val tools = registry.names().mapNotNull(registry::get)
-        return LocalToolRouter.visibleSchemas(tools, enabledOptionalSnapshot())
+        return LocalToolRouter.visibleSchemas(
+            tools = tools,
+            enabledOptional = enabledOptionalSnapshot(),
+            maxOptionalDefinitionTokens = maxOptionalDefinitionTokens,
+        )
     }
 
     fun visibleToolNames(policy: LocalAgentRunPolicy): List<String> =

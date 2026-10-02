@@ -28,24 +28,38 @@ internal data class LocalHistoryCompaction(
     val estimatedTokensAfter: Int = 0,
 )
 
+internal data class LocalStructuredWorkState(
+    val goals: List<String> = emptyList(),
+    val plan: List<String> = emptyList(),
+    val unfinished: List<String> = emptyList(),
+    val progress: List<String> = emptyList(),
+    val facts: List<String> = emptyList(),
+    val artifacts: List<String> = emptyList(),
+    val tools: List<String> = emptyList(),
+)
+
 internal data class LocalWorkCheckpoint(
     val goals: List<String>,
+    val plan: List<String> = emptyList(),
     val constraints: List<String>,
     val decisions: List<String>,
     val failures: List<String>,
     val unfinished: List<String>,
     val progress: List<String>,
+    val facts: List<String> = emptyList(),
     val artifacts: List<String>,
     val tools: List<String>,
 ) {
     fun toJsonObject(): JsonObject = buildJsonObject {
-        put("version", 1)
+        put("version", 2)
         put("goals", JsonArray(goals.map(::JsonPrimitive)))
+        put("plan", JsonArray(plan.map(::JsonPrimitive)))
         put("constraints", JsonArray(constraints.map(::JsonPrimitive)))
         put("decisions", JsonArray(decisions.map(::JsonPrimitive)))
         put("failures", JsonArray(failures.map(::JsonPrimitive)))
         put("unfinished", JsonArray(unfinished.map(::JsonPrimitive)))
         put("progress", JsonArray(progress.map(::JsonPrimitive)))
+        put("facts", JsonArray(facts.map(::JsonPrimitive)))
         put("artifacts", JsonArray(artifacts.map(::JsonPrimitive)))
         put("tools", JsonArray(tools.map(::JsonPrimitive)))
     }
@@ -85,11 +99,13 @@ internal data class LocalWorkCheckpoint(
                     .filter(String::isNotBlank)
             return LocalWorkCheckpoint(
                 goals = list("goals"),
+                plan = list("plan"),
                 constraints = list("constraints"),
                 decisions = list("decisions"),
                 failures = list("failures"),
                 unfinished = list("unfinished"),
                 progress = list("progress"),
+                facts = list("facts"),
                 artifacts = list("artifacts"),
                 tools = list("tools"),
             )
@@ -130,6 +146,7 @@ internal class LocalHistoryCompactor(
         currentTokens: Int? = null,
         extraTokens: Int = 0,
         summaryMode: LocalHistorySummaryMode = LocalHistorySummaryMode.WORK,
+        structuredWorkState: LocalStructuredWorkState? = null,
     ): LocalHistoryCompaction? {
         val source = durableModelHistorySnapshot(history)
         val sourceChanged = source !== history
@@ -190,7 +207,7 @@ internal class LocalHistoryCompactor(
 
         val omitted = source.subList(firstBodyIndex, start)
         val workCheckpoint = if (summaryMode == LocalHistorySummaryMode.WORK) {
-            buildWorkCheckpoint(omitted, effectiveSummaryChars)
+            buildWorkCheckpoint(omitted, effectiveSummaryChars, structuredWorkState)
         } else {
             null
         }
@@ -231,6 +248,7 @@ internal class LocalHistoryCompactor(
     fun compactForOverflow(
         history: List<JsonObject>,
         summaryMode: LocalHistorySummaryMode = LocalHistorySummaryMode.WORK,
+        structuredWorkState: LocalStructuredWorkState? = null,
     ): LocalHistoryCompaction? {
         val source = durableModelHistorySnapshot(history)
         if (source.size < 3) return null
@@ -292,6 +310,7 @@ internal class LocalHistoryCompactor(
             currentTokens = projectedTokens,
             extraTokens = protectedTokens,
             summaryMode = summaryMode,
+            structuredWorkState = structuredWorkState,
         )
         val recovered = compacted ?: projection ?: return null
 
@@ -328,11 +347,13 @@ internal class LocalHistoryCompactor(
                     append(messages.size)
                     append(" 条模型消息；内容均提取自原会话，实时目标、计划、任务和工作区状态优先。")
                     appendSummarySection("目标与需求", sections.goals)
+                    appendSummarySection("当前计划", sections.plan)
                     appendSummarySection("约束与边界", sections.constraints)
                     appendSummarySection("关键决定与阶段结论", sections.decisions)
                     appendSummarySection("失败尝试与风险", sections.failures)
                     appendSummarySection("未完成事项", sections.unfinished)
                     appendSummarySection("其他阶段进展", sections.progress)
+                    appendSummarySection("结构化执行事实", sections.facts)
                     if (sections.artifacts.isNotEmpty()) {
                         append("\n\n重要产物：")
                         sections.artifacts.forEach { append("\n- ").append(it) }
@@ -366,6 +387,7 @@ internal class LocalHistoryCompactor(
     private fun buildWorkCheckpoint(
         messages: List<JsonObject>,
         summaryLimit: Int,
+        structuredWorkState: LocalStructuredWorkState?,
     ): LocalWorkCheckpoint {
         val used = linkedSetOf<String>()
         val maxPerItem = (summaryLimit / 48).coerceIn(100, 360)
@@ -387,15 +409,40 @@ internal class LocalHistoryCompactor(
             .toList()
             .asReversed()
 
-        // Prioritize the facts most likely to change future execution. Every row remains a direct
-        // extract from model-visible history; classification only decides which heading owns it.
+        fun mergeStructured(
+            structured: List<String>,
+            fallback: List<String>,
+            maxItems: Int,
+        ): List<String> = (structured + fallback)
+            .map(::normalize)
+            .filter(String::isNotBlank)
+            .distinct()
+            .take(maxItems)
+            .map { truncateWithoutSplittingSurrogatePair(it, maxPerItem) }
+
+        // Runtime-owned goal/plan/todo/tool facts are authoritative. Keyword classification remains
+        // only as a bounded fallback for older history that predates the structured run state.
         val constraints = select(cues = WORK_CONSTRAINT_CUES, maxItems = 3)
         val failures = select(cues = WORK_FAILURE_CUES, maxItems = 3)
-        val unfinished = select(cues = WORK_UNFINISHED_CUES, maxItems = 4)
         val decisions = select(role = "assistant", cues = WORK_DECISION_CUES, maxItems = 3)
-        val goals = select(role = "user", maxItems = 4)
-        val progress = select(role = "assistant", maxItems = 3)
-        val artifacts = messages.asReversed()
+        val goals = mergeStructured(
+            structuredWorkState?.goals.orEmpty(),
+            select(role = "user", maxItems = 4),
+            maxItems = 5,
+        )
+        val plan = mergeStructured(structuredWorkState?.plan.orEmpty(), emptyList(), maxItems = 8)
+        val unfinished = mergeStructured(
+            structuredWorkState?.unfinished.orEmpty(),
+            select(cues = WORK_UNFINISHED_CUES, maxItems = 4),
+            maxItems = 8,
+        )
+        val progress = mergeStructured(
+            structuredWorkState?.progress.orEmpty(),
+            select(role = "assistant", maxItems = 3),
+            maxItems = 8,
+        )
+        val facts = mergeStructured(structuredWorkState?.facts.orEmpty(), emptyList(), maxItems = 10)
+        val extractedArtifacts = messages.asReversed()
             .asSequence()
             .mapNotNull(::messageText)
             .flatMap { text -> WORK_ARTIFACT_PATTERN.findAll(text).map { match ->
@@ -409,15 +456,26 @@ internal class LocalHistoryCompactor(
             .take(6)
             .toList()
             .asReversed()
-        val tools = recentTools(messages, maxItems = 8)
+        val artifacts = mergeStructured(
+            structuredWorkState?.artifacts.orEmpty(),
+            extractedArtifacts,
+            maxItems = 8,
+        )
+        val tools = mergeStructured(
+            structuredWorkState?.tools.orEmpty(),
+            recentTools(messages, maxItems = 8),
+            maxItems = 12,
+        )
 
         return LocalWorkCheckpoint(
             goals = goals,
+            plan = plan,
             constraints = constraints,
             decisions = decisions,
             failures = failures,
             unfinished = unfinished,
             progress = progress,
+            facts = facts,
             artifacts = artifacts,
             tools = tools,
         )

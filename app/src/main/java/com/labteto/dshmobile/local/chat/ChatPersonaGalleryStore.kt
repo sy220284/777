@@ -21,14 +21,26 @@ class ChatPersonaGalleryStore internal constructor(
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
         this(File(context.filesDir, "local-harness/chat/persona-gallery.json"), json)
 
-    private val durableFile = RecoveringChatDocumentFile(file)
-
-    private val backupFile = File(file.parentFile, "${file.name}.bak")
-    private var cachedDocument: GalleryDocument? = null
-    private var cachedStamp: DocumentStamp? = null
+    private val documentStore = PersonaGalleryDocumentStore(file, json)
+    private val history = PersonaGalleryHistoryCoordinator(
+        File(requireNotNull(file.parentFile), "persona-history"),
+        json,
+    )
 
     @Synchronized
     fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
+
+    @Synchronized
+    internal fun loadStoryHistory(
+        id: String,
+        storyId: String,
+        limit: Int,
+    ): PersonaGalleryHistoryPage {
+        val entry = readNormalized().entries.firstOrNull { it.id == id }
+            ?: error("人物档案不存在")
+        require(entry.stories.any { it.id == storyId }) { "人物故事不存在" }
+        return history.page(entry, storyId, limit)
+    }
 
     @Synchronized
     fun exportPersona(id: String, compact: Boolean = false): String {
@@ -48,7 +60,7 @@ class ChatPersonaGalleryStore internal constructor(
     ): PersonaTransferDocument {
         val entry = readNormalized().entries.firstOrNull { it.id == id }
             ?: error("人物档案不存在")
-        return PersonaTransferDocuments.encode(json, entry, format)
+        return PersonaTransferDocuments.encode(json, history.hydrate(entry), format)
     }
 
     @Synchronized
@@ -105,7 +117,7 @@ class ChatPersonaGalleryStore internal constructor(
             samePersonaIdentity(it.persona, importedPersona)
         }.singleOrNull()
         val entryId = matched?.id ?: "gallery-${UUID.randomUUID()}"
-        val entry = if (matched != null) {
+        val mergedEntry = if (matched != null) {
             matched.copy(
                 persona = mergePersonaProfiles(matched.persona, importedPersona)
                     .copy(id = entryId, updatedAt = now),
@@ -122,7 +134,8 @@ class ChatPersonaGalleryStore internal constructor(
                 updatedAt = now,
             )
         }
-        write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+        val entry = history.archiveEntry(mergedEntry)
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return entry
     }
 
@@ -159,7 +172,7 @@ class ChatPersonaGalleryStore internal constructor(
                 updatedAt = now,
             )
         }
-        write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return entry
     }
 
@@ -210,30 +223,37 @@ class ChatPersonaGalleryStore internal constructor(
                     .copy(id = entryId, updatedAt = now),
                 updatedAt = now,
             )
-            write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+            documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
             return PersonaGallerySaveOutcome(entry = entry, storyId = null)
         }
 
         val storyId = baseStory?.id ?: "story-${UUID.randomUUID()}"
+        val archivedHistory = this.history.merge(entryId, storyId, incomingHistory)
         val incomingStory = PersonaGalleryStory(
             id = storyId,
             title = baseStory?.title?.takeIf(String::isNotBlank)
                 ?: defaultStoryTitle(incomingHistory),
             notes = notes.trim().take(4_000),
-            history = incomingHistory,
+            history = archivedHistory.messages,
+            historyTotalCount = archivedHistory.totalCount,
+            historyArchived = true,
             chatState = chatState,
             sourceSessionIds = listOf(sourceSessionId).filter(String::isNotBlank),
             excludedMessageKeys = excluded,
             updatedAt = now,
         )
-        val savedStory = baseStory?.let { mergeGalleryStories(it, incomingStory).copy(updatedAt = now) }
-            ?: incomingStory
+        val savedStory = (baseStory?.let { mergeGalleryStories(it, incomingStory).copy(updatedAt = now) }
+            ?: incomingStory).copy(
+                history = archivedHistory.messages,
+                historyTotalCount = archivedHistory.totalCount,
+                historyArchived = true,
+            )
         val entry = baseEntry.copy(
             persona = mergePersonaProfiles(baseEntry.persona, persona).copy(id = entryId, updatedAt = now),
             stories = baseEntry.stories.filterNot { it.id == storyId } + savedStory,
             updatedAt = now,
         )
-        write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return PersonaGallerySaveOutcome(entry = entry, storyId = storyId)
     }
 
@@ -248,7 +268,7 @@ class ChatPersonaGalleryStore internal constructor(
                 .copy(id = current.id, updatedAt = now),
             updatedAt = now,
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) merged else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) merged else it }))
         return merged
     }
 
@@ -262,7 +282,7 @@ class ChatPersonaGalleryStore internal constructor(
             portraitPath = clean,
             updatedAt = now,
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated
     }
 
@@ -287,23 +307,19 @@ class ChatPersonaGalleryStore internal constructor(
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return 0
         val story = current.stories.firstOrNull { it.id == storyId } ?: return 0
-        val removed = story.history.count { galleryMessageArchiveKey(it) in keys }
         val now = System.currentTimeMillis()
-        val updatedStory = story.copy(
-            history = story.history.filterNot { galleryMessageArchiveKey(it) in keys },
-            excludedMessageKeys = mergePersonaLines(
-                story.excludedMessageKeys,
-                keys.toList(),
-                MAX_GALLERY_EXCLUDED_MESSAGE_KEYS,
-            ),
-            chatState = replacementChatState,
+        val (updatedStory, removed) = history.exclude(
+            entryId = id,
+            story = story,
+            keys = keys,
+            replacementChatState = replacementChatState,
             updatedAt = now,
         )
         val updated = current.copy(
             stories = current.stories.map { if (it.id == storyId) updatedStory else it },
             updatedAt = now,
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return removed
     }
 
@@ -317,7 +333,7 @@ class ChatPersonaGalleryStore internal constructor(
             groupChatState = chatState,
             updatedAt = maxOf(current.updatedAt, now),
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated
     }
 
@@ -331,7 +347,7 @@ class ChatPersonaGalleryStore internal constructor(
             groupChatState = mergedState,
             updatedAt = maxOf(current.updatedAt, now),
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated
     }
 
@@ -347,7 +363,7 @@ class ChatPersonaGalleryStore internal constructor(
             },
             updatedAt = now,
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return true
     }
 
@@ -365,7 +381,7 @@ class ChatPersonaGalleryStore internal constructor(
             },
             updatedAt = now,
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return true
     }
 
@@ -373,7 +389,8 @@ class ChatPersonaGalleryStore internal constructor(
     fun delete(id: String): Boolean {
         val doc = readNormalized()
         if (doc.entries.none { it.id == id }) return false
-        write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == id }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == id }))
+        history.deleteEntry(id)
         return true
     }
 
@@ -386,7 +403,8 @@ class ChatPersonaGalleryStore internal constructor(
             stories = current.stories.filterNot { it.id == storyId },
             updatedAt = System.currentTimeMillis(),
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        history.deleteStory(id, storyId)
         return true
     }
 
@@ -395,140 +413,31 @@ class ChatPersonaGalleryStore internal constructor(
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return false
         val story = current.stories.firstOrNull { it.id == storyId } ?: return false
-        val updatedStory = removeArchivedGalleryMessage(story, messageKey)
-            ?.copy(updatedAt = System.currentTimeMillis())
-            ?: return false
+        val updatedStory = history.deleteMessage(
+            entryId = id,
+            story = story,
+            messageKey = messageKey,
+            updatedAt = System.currentTimeMillis(),
+        ) ?: return false
         val updated = current.copy(
             stories = current.stories.map { if (it.id == storyId) updatedStory else it },
             updatedAt = updatedStory.updatedAt,
         )
-        write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
         return true
     }
 
-    private fun fullSharePersona(profile: PersonaProfile): PersonaProfile = profile.copy(
-        id = PersonaProfile.DEFAULT_PERSONA_ID,
-        name = profile.name.trim().take(80).ifBlank { "默认角色" },
-        identity = profile.identity.trim().take(2_000),
-        background = profile.background.trim().take(4_000),
-        personality = profile.personality.trim().take(2_000),
-        speechStyle = profile.speechStyle.trim().take(2_000),
-        relationship = profile.relationship.trim().take(2_000),
-        worldSetting = profile.worldSetting.trim().take(4_000),
-        franchise = profile.franchise.trim().take(120),
-        timelinePosition = profile.timelinePosition.trim().take(2_000),
-        coreMotivations = shareLines(profile.coreMotivations, 12, 240),
-        valuePriorities = shareLines(profile.valuePriorities, 12, 240),
-        behaviorPatterns = shareLines(profile.behaviorPatterns, 20, 240),
-        internalContradictions = shareLines(profile.internalContradictions, 12, 240),
-        knowledgeBoundary = shareLines(profile.knowledgeBoundary, 20, 240),
-        loreEntries = shareLoreEntries(profile.loreEntries, 80),
-        presetId = profile.presetId.trim().take(120),
-        hardConstraints = shareLines(profile.hardConstraints, 20, 240),
-        exampleDialogues = shareLines(profile.exampleDialogues, 12, 240),
-        bannedPhrases = shareLines(profile.bannedPhrases, 30, 240),
-        signaturePhrases = shareLines(profile.signaturePhrases, 20, 240),
-        corrections = shareLines(profile.corrections, 20, 240),
-        updatedAt = 0L,
-    )
-
-    private fun compactSharePersona(profile: PersonaProfile): PersonaProfile = profile.copy(
-        id = PersonaProfile.DEFAULT_PERSONA_ID,
-        name = profile.name.trim().take(80).ifBlank { "默认角色" },
-        identity = profile.identity.trim().take(160),
-        background = profile.background.trim().take(180),
-        personality = profile.personality.trim().take(160),
-        speechStyle = profile.speechStyle.trim().take(160),
-        relationship = profile.relationship.trim().take(120),
-        worldSetting = profile.worldSetting.trim().take(180),
-        franchise = profile.franchise.trim().take(60),
-        timelinePosition = profile.timelinePosition.trim().take(100),
-        coreMotivations = shareLines(profile.coreMotivations, 2, 60),
-        valuePriorities = shareLines(profile.valuePriorities, 2, 60),
-        behaviorPatterns = shareLines(profile.behaviorPatterns, 2, 60),
-        internalContradictions = shareLines(profile.internalContradictions, 1, 60),
-        knowledgeBoundary = shareLines(profile.knowledgeBoundary, 2, 60),
-        loreEntries = emptyList(),
-        presetId = profile.presetId.trim().take(80),
-        hardConstraints = shareLines(profile.hardConstraints, 4, 60),
-        exampleDialogues = shareLines(profile.exampleDialogues, 2, 80),
-        bannedPhrases = shareLines(profile.bannedPhrases, 6, 30),
-        signaturePhrases = shareLines(profile.signaturePhrases, 4, 40),
-        corrections = emptyList(),
-        updatedAt = 0L,
-    )
-
-    private fun shareLoreEntries(values: List<PersonaLoreEntry>, limit: Int): List<PersonaLoreEntry> =
-        values.asSequence()
-            .filter { it.content.isNotBlank() }
-            .map { entry ->
-                entry.copy(
-                    id = entry.id.trim().take(80),
-                    title = entry.title.trim().take(120),
-                    content = entry.content.trim().take(4_000),
-                    keywords = shareLines(entry.keywords, 16, 80),
-                    secondaryKeywords = shareLines(entry.secondaryKeywords, 16, 80),
-                    priority = entry.priority.coerceIn(0, 100),
-                    spoilerLevel = entry.spoilerLevel.coerceIn(0, 3),
-                )
-            }
-            .take(limit)
-            .toList()
-
-    private fun shareLines(values: List<String>, limit: Int, maxChars: Int): List<String> =
-        values.asSequence()
-            .map { it.trim().take(maxChars) }
-            .filter(String::isNotBlank)
-            .distinct()
-            .take(limit)
-            .toList()
-
     private fun readNormalized(): GalleryDocument {
-        val raw = read()
-        val entries = if (raw.version < 4) {
+        val raw = documentStore.read()
+        val migratedEntries = if (raw.version < 4) {
             compactLegacyDuplicateGalleryEntries(raw.entries)
         } else {
             raw.entries.map(::migrateLegacyEntry)
         }
+        val entries = migratedEntries.map(history::migrate)
         val normalized = raw.copy(version = 4, entries = entries)
-        if (normalized != raw) write(normalized)
+        if (normalized != raw) documentStore.write(normalized)
         return normalized
     }
 
-    private fun read(): GalleryDocument {
-        val stamp = documentStamp()
-        cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
-        val document = durableFile.read(
-            defaultValue = ::GalleryDocument,
-            decode = { encoded -> json.decodeFromString(GalleryDocument.serializer(), encoded) },
-        )
-        cachedDocument = document
-        cachedStamp = documentStamp()
-        return document
-    }
-
-    private fun write(doc: GalleryDocument) {
-        val encoded = json.encodeToString(GalleryDocument.serializer(), doc)
-        durableFile.write(encoded) { candidate ->
-            runCatching {
-                json.decodeFromString(GalleryDocument.serializer(), candidate)
-            }.isSuccess
-        }
-        cachedDocument = doc
-        cachedStamp = documentStamp()
-    }
-
-    private fun documentStamp(): DocumentStamp = DocumentStamp(
-        primaryModified = file.takeIf(File::isFile)?.lastModified() ?: -1L,
-        primaryLength = file.takeIf(File::isFile)?.length() ?: -1L,
-        backupModified = backupFile.takeIf(File::isFile)?.lastModified() ?: -1L,
-        backupLength = backupFile.takeIf(File::isFile)?.length() ?: -1L,
-    )
-
-    private data class DocumentStamp(
-        val primaryModified: Long,
-        val primaryLength: Long,
-        val backupModified: Long,
-        val backupLength: Long,
-    )
 }

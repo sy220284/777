@@ -28,6 +28,8 @@ internal class OpenSessionFoldState {
     private var queue = emptyList<QueueItem>()
     private var followCursor: Int? = null
     private val liveAssistant = AssistantLiveState()
+    private var durableSnapshot: ConversationSnapshot? = null
+    private var incrementalFold: EventFold.Incremental? = null
 
     fun reset(blank: Boolean) {
         events.clear()
@@ -37,6 +39,8 @@ internal class OpenSessionFoldState {
         queue = emptyList()
         followCursor = null
         liveAssistant.clear()
+        durableSnapshot = null
+        incrementalFold = null
     }
 
     fun clearFollowCursor() {
@@ -69,7 +73,13 @@ internal class OpenSessionFoldState {
             seq = envelope.seq,
             surfaceOp = envelope.surfaceOp,
         )
-        appendEvent(envelope)
+        val appendOnly = appendEvent(envelope)
+        if (appendOnly) {
+            incrementalFold?.apply(envelope)?.let { durableSnapshot = it }
+        } else {
+            durableSnapshot = null
+            incrementalFold = null
+        }
     }
 
     fun acceptAssistant(frame: SessionFollowFrame.AssistantStream): Boolean =
@@ -90,6 +100,8 @@ internal class OpenSessionFoldState {
             mergeProjection(key, asOf, value)
         }
         liveAssistant.seed(frame.assistantStream)
+        durableSnapshot = null
+        incrementalFold = null
     }
 
     fun pageAnchor(): Pair<Long?, Int?> = events.firstOrNull()?.seq to followCursor
@@ -106,13 +118,23 @@ internal class OpenSessionFoldState {
             events.sortBy(SessionEventEnvelope::seq)
         }
         hasMore = nextHasMore(fresh.size, hostHasMore, overDelivered)
+        if (fresh.isNotEmpty()) {
+            durableSnapshot = null
+            incrementalFold = null
+        }
     }
 
     fun rebuild(sessionId: String, running: Boolean?): ConversationSnapshot {
-        val durable = events.toList()
-        val snapshot = EventFold(sessionId).fold(durable, liveAssistant.transientEnvelopes())
+        val durable = durableSnapshot ?: EventFold(sessionId).fold(events).also { folded ->
+            durableSnapshot = folded
+            incrementalFold = EventFold.Incremental(folded, sessionId)
+        }
+        val snapshot = EventFold(sessionId).overlayTransient(
+            durable,
+            liveAssistant.transientEnvelopes(),
+        )
         return snapshot.copy(
-            blank = if (durable.isEmpty()) blank else snapshot.blank,
+            blank = if (events.isEmpty()) blank else snapshot.blank,
             running = running ?: snapshot.running,
             hasMore = hasMore,
             queue = queue,
@@ -120,11 +142,12 @@ internal class OpenSessionFoldState {
         )
     }
 
-    private fun appendEvent(envelope: SessionEventEnvelope) {
+    /** True only for a strictly newer append that can advance the incremental fold. */
+    private fun appendEvent(envelope: SessionEventEnvelope): Boolean {
         val lastSeq = events.lastOrNull()?.seq
         if (lastSeq == null || envelope.seq > lastSeq) {
             events.add(envelope)
-            return
+            return true
         }
         val index = events.indexOfFirst { it.seq == envelope.seq }
         if (index >= 0) {
@@ -133,5 +156,6 @@ internal class OpenSessionFoldState {
             events.add(envelope)
             events.sortBy(SessionEventEnvelope::seq)
         }
+        return false
     }
 }

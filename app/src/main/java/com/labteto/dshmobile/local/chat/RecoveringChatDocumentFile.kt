@@ -27,6 +27,9 @@ internal class RecoveringChatDocumentFile(
                 restoreBackup()
                 return recovered
             }
+            if (backup.isFile) {
+                throw IllegalStateException("聊天数据备份已损坏，无法自动恢复：${backup.path}")
+            }
             return defaultValue()
         }
 
@@ -35,7 +38,9 @@ internal class RecoveringChatDocumentFile(
             restoreBackup()
             return recovered
         }
-        return defaultValue()
+        throw IllegalStateException(
+            "聊天数据主文件与备份均已损坏；损坏主文件已隔离，未用空数据覆盖原内容",
+        )
     }
 
     fun write(serialized: String, validate: (String) -> Boolean) {
