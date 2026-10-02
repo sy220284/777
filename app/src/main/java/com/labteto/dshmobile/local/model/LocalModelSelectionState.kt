@@ -15,4 +15,13 @@ data class LocalModelSelectionState(
         get() = profiles.firstOrNull { it.id == workerProfileId }
 
     fun isActive(profile: LocalModelProfile): Boolean = profile.id == activeProfileId
+
+    fun replaceProfiles(
+        profiles: List<LocalModelProfile>,
+        activeProfileId: String?,
+    ): LocalModelSelectionState = copy(
+        profiles = profiles,
+        activeProfileId = activeProfileId,
+        workerProfileId = workerProfileId?.takeIf { id -> profiles.any { it.id == id } },
+    )
 }
