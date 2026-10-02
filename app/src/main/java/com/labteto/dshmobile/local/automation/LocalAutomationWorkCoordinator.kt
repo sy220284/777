@@ -66,69 +66,27 @@ internal class LocalAutomationWorkCoordinator(
         val sessionId = session.id
         val boundState = boundState(session)
         val boundEventLog = eventLogFor(sessionId)
-        var executionTask = prompt
-        var recoveredProfile: LocalModelProfile? = null
-
-        if (recoverInterrupted) {
-            val repair = boundEventLog.repairInterruptedTail()
-            agentRunCoordinator.recoveryDecision(
+        val recovery = if (recoverInterrupted) {
+            prepareAutomationWorkRecovery(
+                prompt = prompt,
                 sessionId = sessionId,
-                repair = repair,
-                kind = LocalAgentRunKind.AUTOMATION,
-            )?.let { decision ->
-                decision.completedOutput?.let { recovered ->
-                    val output = recovered.ifBlank { "后台任务已完成" }
-                    ensureRecoveredTranscript(
-                        session = session,
-                        output = output,
-                        eventLog = boundEventLog,
-                    )
-                    return LocalAutomationRunResult(sessionId = sessionId, output = output)
-                }
-                decision.blockedReason?.let { blocked ->
-                    agentRunCoordinator.markRecoveryBlocked(
-                        sessionId = sessionId,
-                        runId = decision.runId,
-                        reason = blocked,
-                        kind = LocalAgentRunKind.AUTOMATION,
-                    )
-                    throw LocalHarnessBlockedException(blocked, sessionId)
-                }
-                decision.queuedInput?.let { queued ->
-                    decision.route?.let { identity ->
-                        recoveredProfile = state.value.modelProfiles.firstOrNull { candidate ->
-                            candidate.id == identity.profileId &&
-                                candidate.model == identity.model &&
-                                normalizeModelBaseUrl(candidate.baseUrl) == normalizeModelBaseUrl(identity.baseUrl) &&
-                                candidate.authKind.name == identity.authKind &&
-                                (if (candidate.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-                                    LocalModelProtocol.RESPONSES.name
-                                } else {
-                                    candidate.protocol.name
-                                }) == identity.protocol &&
-                                candidate.credentialRef == identity.credentialRef &&
-                                candidate.routeFingerprint() == identity.fingerprint
-                        }
-                        if (recoveredProfile == null) {
-                            val reason = "后台任务原模型路由已不存在或身份发生变化，已停止自动续跑。"
-                            agentRunCoordinator.markRecoveryBlocked(
-                                sessionId = sessionId,
-                                runId = decision.runId,
-                                reason = reason,
-                                kind = LocalAgentRunKind.AUTOMATION,
-                            )
-                            throw LocalHarnessBlockedException(reason, sessionId)
-                        }
-                    }
-                    executionTask = queued.content
-                    agentRunCoordinator.markRecoveryQueued(
-                        sessionId = sessionId,
-                        runId = decision.runId,
-                        kind = LocalAgentRunKind.AUTOMATION,
-                    )
-                }
-            }
+                eventLog = boundEventLog,
+                profiles = state.value.modelProfiles,
+                agentRunCoordinator = agentRunCoordinator,
+            )
+        } else {
+            LocalAutomationWorkRecoveryPlan(prompt)
         }
+        recovery.completedOutput?.let { output ->
+            ensureRecoveredTranscript(
+                session = session,
+                output = output,
+                eventLog = boundEventLog,
+            )
+            return LocalAutomationRunResult(sessionId = sessionId, output = output)
+        }
+        val executionTask = recovery.executionTask
+        val recoveredProfile = recovery.profile
 
         val userMessage = LocalHarnessMessage(
             id = UUID.randomUUID().toString(),
