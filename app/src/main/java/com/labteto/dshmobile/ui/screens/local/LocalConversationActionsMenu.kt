@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -13,9 +15,10 @@ import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
 @Composable
 internal fun ConversationActionsMenu(
@@ -24,25 +27,28 @@ internal fun ConversationActionsMenu(
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val colors = DsTheme.colors
     var expanded by remember { mutableStateOf(false) }
     Box {
         DsIconButton(
             icon = Icons.Filled.MoreVert,
             contentDescription = stringResource(R.string.local_session_actions),
             onClick = { expanded = true },
-            tint = DsTheme.colors.labelSecondary,
+            tint = colors.labelSecondary,
         )
         DsPopupMenu(
             expanded = expanded,
             onDismiss = { expanded = false },
+            containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU, base = colors.bgBase),
             items = listOf(
                 MenuItem(
                     text = stringResource(if (pinned) R.string.local_unpin_session else R.string.advanced_pin),
+                    icon = Icons.Outlined.PushPin,
                     onClick = onTogglePin,
                 ),
                 MenuItem(
                     text = stringResource(R.string.common_rename),
-                    icon = FeatherIcons.Edit3,
+                    icon = Icons.Outlined.Edit,
                     onClick = onRename,
                 ),
                 MenuItem(
