@@ -6,7 +6,8 @@ import com.labteto.dshmobile.local.LocalModelDelta
 import com.labteto.dshmobile.local.LocalModelProtocol
 import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.LocalModelRuntimeCapabilities
-import com.labteto.dshmobile.local.localModelRouteFingerprint
+import com.labteto.dshmobile.local.normalizeModelBaseUrl
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,13 +22,15 @@ internal data class LocalResolvedModelRoute(
     val capabilities: LocalModelRuntimeCapabilities,
 ) {
     val fingerprint: String by lazy {
-        localModelRouteFingerprint(
-            protocol = protocol,
-            authKind = authKind,
-            profileId = profileId,
-            baseUrl = baseUrl,
-            model = model,
-        )
+        val raw = listOf(
+            protocol.name,
+            authKind.name,
+            profileId.orEmpty(),
+            normalizeModelBaseUrl(baseUrl),
+            model.trim(),
+        ).joinToString("\u0000")
+        MessageDigest.getInstance("SHA-256").digest(raw.toByteArray())
+            .joinToString("") { "%02x".format(it) }
     }
 }
 
