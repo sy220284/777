@@ -114,6 +114,7 @@ internal class LocalModelRouteCircuitBreaker {
 internal fun isTerminalRouteFailure(code: String): Boolean =
     code in setOf(
         "CHATGPT_PLAN_LIMIT_REACHED",
+        "MODEL_ROUTE_CIRCUIT_OPEN",
         "WORK_BUDGET_EXHAUSTED",
         "MODEL_AUTH_FAILED",
         "MODEL_CREDENTIAL_MISSING",
