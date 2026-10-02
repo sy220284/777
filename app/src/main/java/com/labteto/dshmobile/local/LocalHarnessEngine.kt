@@ -5073,11 +5073,15 @@ class LocalHarnessEngine @Inject constructor(
         // lands afterwards, replaying its event is safe and idempotent. Reading state first could
         // instead persist old state with a newer cursor and make recovery skip that event.
         val log = binding?.eventLog ?: eventLog
+        val controlProjectedThroughSequence = log.latestSequence()
+        val transcriptProjectedThroughSequence =
+            binding?.transcriptProjectionCursor ?: transcriptProjectionCursor
+        val state = binding?.state?.value ?: _state.value
         return sessionCoordinator.snapshot(
             sessionId = binding?.sessionId ?: currentSessionId,
-            state = binding?.state?.value ?: _state.value,
-            controlProjectedThroughSequence = log.latestSequence(),
-            transcriptProjectedThroughSequence = binding?.transcriptProjectionCursor ?: transcriptProjectionCursor,
+            state = state,
+            controlProjectedThroughSequence = controlProjectedThroughSequence,
+            transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
         )
     }
 
