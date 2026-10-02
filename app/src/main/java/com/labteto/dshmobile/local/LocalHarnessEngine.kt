@@ -1205,6 +1205,7 @@ class LocalHarnessEngine @Inject constructor(
     /** Generate reply suggestions only on explicit user request. */
     internal suspend fun generateReplySuggestions(): Boolean =
         replySuggestionCoordinator.generate()
+    internal fun chatDiaryEntries(subjectKey: String, limit: Int = 200) = chatDiaryStore.listActive(subjectKey, limit)
 
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult {
