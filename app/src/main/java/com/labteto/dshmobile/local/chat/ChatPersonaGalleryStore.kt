@@ -129,7 +129,7 @@ class ChatPersonaGalleryStore internal constructor(
             samePersonaIdentity(it.persona, importedPersona)
         }.singleOrNull()
         val entryId = matched?.id ?: "gallery-${UUID.randomUUID()}"
-        val entry = if (matched != null) {
+        val mergedEntry = if (matched != null) {
             matched.copy(
                 persona = mergePersonaProfiles(matched.persona, importedPersona)
                     .copy(id = entryId, updatedAt = now),
@@ -146,6 +146,16 @@ class ChatPersonaGalleryStore internal constructor(
                 updatedAt = now,
             )
         }
+        val entry = mergedEntry.copy(
+            stories = mergedEntry.stories.map { story ->
+                val archive = historyStore.merge(entryId, story.id, story.history)
+                story.copy(
+                    history = archive.messages,
+                    historyTotalCount = archive.totalCount,
+                    historyArchived = true,
+                )
+            },
+        )
         write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return entry
     }
@@ -239,19 +249,26 @@ class ChatPersonaGalleryStore internal constructor(
         }
 
         val storyId = baseStory?.id ?: "story-${UUID.randomUUID()}"
+        val archivedHistory = historyStore.merge(entryId, storyId, incomingHistory)
         val incomingStory = PersonaGalleryStory(
             id = storyId,
             title = baseStory?.title?.takeIf(String::isNotBlank)
                 ?: defaultStoryTitle(incomingHistory),
             notes = notes.trim().take(4_000),
-            history = incomingHistory,
+            history = archivedHistory.messages,
+            historyTotalCount = archivedHistory.totalCount,
+            historyArchived = true,
             chatState = chatState,
             sourceSessionIds = listOf(sourceSessionId).filter(String::isNotBlank),
             excludedMessageKeys = excluded,
             updatedAt = now,
         )
-        val savedStory = baseStory?.let { mergeGalleryStories(it, incomingStory).copy(updatedAt = now) }
-            ?: incomingStory
+        val savedStory = (baseStory?.let { mergeGalleryStories(it, incomingStory).copy(updatedAt = now) }
+            ?: incomingStory).copy(
+                history = archivedHistory.messages,
+                historyTotalCount = archivedHistory.totalCount,
+                historyArchived = true,
+            )
         val entry = baseEntry.copy(
             persona = mergePersonaProfiles(baseEntry.persona, persona).copy(id = entryId, updatedAt = now),
             stories = baseEntry.stories.filterNot { it.id == storyId } + savedStory,
