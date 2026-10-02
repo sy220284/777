@@ -69,6 +69,7 @@ internal class LocalSessionLifecycleCoordinator(
     private val restartInterruptedSafeJobs: () -> Unit,
     private val startNextQueuedTurnIfIdle: () -> Job?,
     private val sessionSummaries: () -> List<LocalSessionSummary>,
+    private val beforeEventLogsDeleted: (Set<String>) -> Unit = {},
     private val localProjectId: String,
 ) {
     // Keep only the user's latest tap while a session is being persisted and restored.
@@ -395,6 +396,7 @@ internal class LocalSessionLifecycleCoordinator(
                         }
                     }
                 }
+                beforeEventLogsDeleted(ids)
                 withContext(Dispatchers.IO) {
                     ids.forEach { id ->
                         sessionCoordinator.delete(id)
@@ -410,6 +412,8 @@ internal class LocalSessionLifecycleCoordinator(
                 conversationFilesCoordinator.invalidate(ids)
                 memoryStore.detachSourceSessions(ids)
                 diaryStore.detachSourceSessions(ids)
+                // All run/job producers are drained and the storage lock deletion has completed.
+                sessionCoordinator.releaseDeletionBarrier(ids)
                 state.update { it.copy(sessions = sessionSummaries()) }
                 persist()
                 ids.size
