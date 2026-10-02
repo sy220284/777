@@ -301,40 +301,32 @@ class LocalModelProfilesTest {
 
 
 
-    @Test fun promptCacheDiagnosticsStayOnOfficialOpenAiGpt56PlusResponsesRoutes() {
-        assertTrue(
+    @Test fun promptCacheDiagnosticsFollowChatGptPlanRouteIdentityInsteadOfModelName() {
+        listOf("gpt-5.6", "gpt-6-astra", "future-plan-model", "totally-new-name").forEach { model ->
+            assertTrue(
+                LocalModelPresets.runtimeCapabilitiesFor(
+                    model = model,
+                    baseUrl = "https://api.openai.com/v1",
+                    protocol = LocalModelProtocol.RESPONSES,
+                    authKind = LocalModelAuthKind.CHATGPT_PLAN,
+                ).promptCacheDiagnostics,
+            )
+        }
+
+        assertFalse(
             LocalModelPresets.runtimeCapabilitiesFor(
-                "gpt-5.6",
-                "https://api.openai.com/v1",
-                LocalModelProtocol.RESPONSES,
-            ).promptCacheDiagnostics,
-        )
-        assertTrue(
-            LocalModelPresets.runtimeCapabilitiesFor(
-                "gpt-6-astra",
-                "https://api.openai.com/v1",
-                LocalModelProtocol.RESPONSES,
+                model = "gpt-5.6",
+                baseUrl = "https://api.openai.com/v1",
+                protocol = LocalModelProtocol.RESPONSES,
+                authKind = LocalModelAuthKind.API_KEY,
             ).promptCacheDiagnostics,
         )
         assertFalse(
             LocalModelPresets.runtimeCapabilitiesFor(
-                "gpt-5.5",
-                "https://api.openai.com/v1",
-                LocalModelProtocol.RESPONSES,
-            ).promptCacheDiagnostics,
-        )
-        assertFalse(
-            LocalModelPresets.runtimeCapabilitiesFor(
-                "gpt-5.6",
-                "https://proxy.example/v1",
-                LocalModelProtocol.RESPONSES,
-            ).promptCacheDiagnostics,
-        )
-        assertFalse(
-            LocalModelPresets.runtimeCapabilitiesFor(
-                "gpt-5.6",
-                "https://api.openai.com/v1",
-                LocalModelProtocol.CHAT_COMPLETIONS,
+                model = "future-plan-model",
+                baseUrl = "https://api.openai.com/v1",
+                protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+                authKind = LocalModelAuthKind.CHATGPT_PLAN,
             ).promptCacheDiagnostics,
         )
     }
