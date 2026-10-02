@@ -4806,10 +4806,22 @@ class LocalHarnessEngine @Inject constructor(
         extraTokens: Int = 0,
         binding: LocalWorkRunBinding? = null,
     ) {
-        val budget = currentHistoryBudget(binding)
+        val baseBudget = currentHistoryBudget(binding)
         val history = binding?.modelHistory ?: modelHistory
         val targetState = binding?.state ?: _state
         val log = binding?.eventLog ?: eventLog
+        val budget = if (targetState.value.usageMode == LocalUsageMode.WORK) {
+            workSteadyStateHistoryBudget(
+                base = baseBudget,
+                currentHistoryTokens = history.estimatedTokens,
+                extraTokens = extraTokens,
+            )
+        } else {
+            baseBudget
+        }
+        val workSteadyStateApplied =
+            targetState.value.usageMode == LocalUsageMode.WORK &&
+                budget.maxHistoryTokens != baseBudget.maxHistoryTokens
         val compaction = history.compact(
             compactor = historyCompactor,
             budget = budget,
@@ -4835,6 +4847,9 @@ class LocalHarnessEngine @Inject constructor(
                 put("estimated_tokens_before", compaction.estimatedTokensBefore)
                 put("estimated_tokens_after", compaction.estimatedTokensAfter)
                 put("extra_request_tokens", extraTokens)
+                put("work_steady_state", workSteadyStateApplied)
+                budget.maxHistoryTokens?.let { put("history_budget_tokens", it) }
+                budget.tailTokens?.let { put("tail_budget_tokens", it) }
             },
         )
         checkpointModelHistory("session/compaction", binding)
