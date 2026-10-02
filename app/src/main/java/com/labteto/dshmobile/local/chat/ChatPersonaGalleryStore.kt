@@ -31,7 +31,7 @@ class ChatPersonaGalleryStore internal constructor(
     fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
 
     @Synchronized
-    fun loadStoryHistory(
+    internal fun loadStoryHistory(
         id: String,
         storyId: String,
         limit: Int,
@@ -228,7 +228,7 @@ class ChatPersonaGalleryStore internal constructor(
         }
 
         val storyId = baseStory?.id ?: "story-${UUID.randomUUID()}"
-        val archivedHistory = history.merge(entryId, storyId, incomingHistory)
+        val archivedHistory = this.history.merge(entryId, storyId, incomingHistory)
         val incomingStory = PersonaGalleryStory(
             id = storyId,
             title = baseStory?.title?.takeIf(String::isNotBlank)
