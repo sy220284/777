@@ -44,6 +44,13 @@ internal class LocalWorkRunBinding(
     @Volatile
     var turnsSinceModelHistoryCheckpoint: Int = 0
 
+    /** At most one automatic continuation is allowed for an admitted Responses stream interruption. */
+    @Volatile
+    var automaticContinuationCount: Int = 0
+
+    @Volatile
+    var continuationParentRunId: String? = null
+
     val transcriptRuntime = LocalTranscriptRuntime(
         state = state,
         pruneToolResult = pruneToolResult,
