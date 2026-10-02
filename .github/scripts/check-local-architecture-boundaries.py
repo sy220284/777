@@ -67,6 +67,7 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 46,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 19,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryBuffer.kt": 106,
+    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryCompaction.kt": 40,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt": 128,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRunnerFactory.kt": 135,
     "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt": 585,
