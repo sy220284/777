@@ -3328,6 +3328,7 @@ class LocalHarnessEngine @Inject constructor(
                             )
                             put("model_content", durableToolResultContent(modelOutput, event.retention))
                             put("is_error", event.isError)
+                            put("retention", event.retention.name.lowercase())
                             event.errorCode?.let { put("error_code", it) }
                             put("retryable", event.retryable)
                             put("side_effect", event.sideEffect.name.lowercase())
