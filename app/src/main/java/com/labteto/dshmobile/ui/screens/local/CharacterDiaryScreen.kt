@@ -74,7 +74,7 @@ internal fun characterDiarySubjects(
     chatRelationshipSubjectKey(currentGalleryId, currentPersona.id)?.let { key ->
         subjects[key] = CharacterDiarySubject(
             key = key,
-            name = currentPersona.name.ifBlank { currentGalleryId.orEmpty() },
+            name = currentPersona.name.ifBlank { currentGalleryId ?: currentPersona.id },
         )
     }
     gallery.forEach { entry ->
