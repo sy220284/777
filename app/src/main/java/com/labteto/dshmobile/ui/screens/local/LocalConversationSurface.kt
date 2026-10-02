@@ -179,16 +179,10 @@ internal fun LocalConversationSurface(
     val scope = rememberCoroutineScope()
     val drafts = rememberSaveable(
         saver = listSaver(
-            save = { map -> map.entries.flatMap { listOf(it.key, it.value) } },
-            restore = { values ->
-                mutableStateMapOf<String, String>().apply {
-                    values.chunked(2).forEach { pair ->
-                        if (pair.size == 2) this[pair[0]] = pair[1]
-                    }
-                }
-            },
+            save = LocalSessionDraftCache::save,
+            restore = LocalSessionDraftCache::restore,
         ),
-    ) { mutableStateMapOf<String, String>() }
+    ) { LocalSessionDraftCache() }
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
