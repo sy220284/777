@@ -460,8 +460,8 @@ class HarnessAutomationScheduler @Inject constructor(
             lastError = null,
             failureStreak = 0,
         )
-        workManager.cancelUniqueWork(workName(id))
         store.upsert(updated)
+        workManager.cancelUniqueWork(workName(id))
         if (!wasPaused) {
             if (usesChainedChatScheduling(updated) || updated.recurringMinutes == null) {
                 enqueueOneTime(id, nextRun)
