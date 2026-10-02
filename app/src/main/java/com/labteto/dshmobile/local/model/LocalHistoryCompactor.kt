@@ -131,51 +131,55 @@ internal class LocalHistoryCompactor(
         extraTokens: Int = 0,
         summaryMode: LocalHistorySummaryMode = LocalHistorySummaryMode.WORK,
     ): LocalHistoryCompaction? {
+        val source = durableModelHistorySnapshot(history)
+        val sourceChanged = source !== history
         val effectiveMaxHistoryChars = budget?.maxHistoryChars ?: maxHistoryChars
         val effectiveTailChars = budget?.tailChars ?: tailChars
         val effectiveSummaryChars = budget?.maxSummaryChars ?: maxSummaryChars
         val effectiveMaxHistoryTokens = budget?.maxHistoryTokens
         val effectiveTailTokens = budget?.tailTokens
-        val encodedChars = currentChars ?: history.sumOf { it.toString().length }
-        val encodedTokens = currentTokens ?: history.sumOf { estimateModelTokens(it.toString()) }
+        val encodedChars = if (sourceChanged) source.sumOf { it.toString().length }
+            else currentChars ?: source.sumOf { it.toString().length }
+        val encodedTokens = if (sourceChanged) source.sumOf { estimateModelTokens(it.toString()) }
+            else currentTokens ?: source.sumOf { estimateModelTokens(it.toString()) }
         val extraTokenRatio = effectiveMaxHistoryTokens?.takeIf { it > 0 }?.let {
             extraTokens.toDouble() / it.toDouble()
         } ?: 0.0
-        val historyDepth = (history.size.toDouble() / 80.0).coerceIn(0.0, 1.0)
+        val historyDepth = (source.size.toDouble() / 80.0).coerceIn(0.0, 1.0)
         val triggerRatio = (0.92 - historyDepth * 0.08 - extraTokenRatio.coerceIn(0.0, 0.5) * 0.28)
             .coerceIn(0.68, 0.92)
         val charPressure = encodedChars > (effectiveMaxHistoryChars * triggerRatio).toInt()
         val tokenPressure = effectiveMaxHistoryTokens?.let {
             encodedTokens + extraTokens > (it * triggerRatio).toInt()
         } == true
-        if (history.size < 3 || (!charPressure && !tokenPressure)) return null
+        if (source.size < 3 || (!charPressure && !tokenPressure)) return null
 
         var start = 1
         var keptChars = 0
         var keptTokens = 0
-        for (index in history.lastIndex downTo 1) {
-            val encoded = history[index].toString()
+        for (index in source.lastIndex downTo 1) {
+            val encoded = source[index].toString()
             keptChars += encoded.length
             keptTokens += estimateModelTokens(encoded)
             if (
                 keptChars > effectiveTailChars ||
                 (effectiveTailTokens != null && keptTokens > effectiveTailTokens)
             ) {
-                start = (index until history.size).firstOrNull { candidate ->
-                    history[candidate]["role"].asText() == "user"
+                start = (index until source.size).firstOrNull { candidate ->
+                    source[candidate]["role"].asText() == "user"
                 } ?: index
                 break
             }
         }
         // A tail can begin inside a large tool batch. Keep its assistant call and every result
         // together; cutting only by message size would manufacture an orphan tool result.
-        if (history.getOrNull(start)?.get("role").asText() == "tool") {
-            while (start > 1 && history[start - 1]["role"].asText() == "tool") start -= 1
-            if (start > 1 && history[start - 1]["role"].asText() == "assistant") start -= 1
+        if (source.getOrNull(start)?.get("role").asText() == "tool") {
+            while (start > 1 && source[start - 1]["role"].asText() == "tool") start -= 1
+            if (start > 1 && source[start - 1]["role"].asText() == "assistant") start -= 1
         }
-        if (start <= 1 || start >= history.size) return null
+        if (start <= 1 || start >= source.size) return null
 
-        val omitted = history.subList(1, start)
+        val omitted = source.subList(1, start)
         val workCheckpoint = if (summaryMode == LocalHistorySummaryMode.WORK) {
             buildWorkCheckpoint(omitted, effectiveSummaryChars)
         } else {
@@ -183,7 +187,7 @@ internal class LocalHistoryCompactor(
         }
         val summary = buildSummary(omitted, effectiveSummaryChars, summaryMode, workCheckpoint)
         val compacted = buildList {
-            add(history.first())
+            add(source.first())
             add(
                 buildTrustedWorkCheckpointModelMessage(
                     if (workCheckpoint != null) {
@@ -198,7 +202,7 @@ internal class LocalHistoryCompactor(
                     },
                 ),
             )
-            addAll(history.drop(start))
+            addAll(source.drop(start))
         }
         val estimatedTokensBefore = encodedTokens + extraTokens
         val estimatedTokensAfter = compacted.sumOf { estimateModelTokens(it.toString()) } + extraTokens
@@ -219,28 +223,29 @@ internal class LocalHistoryCompactor(
         history: List<JsonObject>,
         summaryMode: LocalHistorySummaryMode = LocalHistorySummaryMode.WORK,
     ): LocalHistoryCompaction? {
-        if (history.size < 3) return null
+        val source = durableModelHistorySnapshot(history)
+        if (source.size < 3) return null
 
         // Preserve the leading system prefix exactly. Request-only context such as persona/profile
         // facts is injected immediately after the base system prompt and must survive emergency
         // recovery. A later system message (for example the current chat turn's dynamic context)
         // stays at its original tail boundary instead of being hoisted ahead of retained history.
-        val leadingSystemCount = history.takeWhile { it["role"].asText() == "system" }.size
-        val protectedHead = history.take(leadingSystemCount)
+        val leadingSystemCount = source.takeWhile { it["role"].asText() == "system" }.size
+        val protectedHead = source.take(leadingSystemCount)
         val firstBodyIndex = leadingSystemCount
-        if (firstBodyIndex >= history.lastIndex) return null
+        if (firstBodyIndex >= source.lastIndex) return null
 
-        val latestTailSystemIndex = (history.lastIndex downTo firstBodyIndex)
-            .firstOrNull { history[it]["role"].asText() == "system" }
-        val compactableEndExclusive = latestTailSystemIndex ?: history.size
-        val compactableBody = history.subList(firstBodyIndex, compactableEndExclusive)
+        val latestTailSystemIndex = (source.lastIndex downTo firstBodyIndex)
+            .firstOrNull { source[it]["role"].asText() == "system" }
+        val compactableEndExclusive = latestTailSystemIndex ?: source.size
+        val compactableBody = source.subList(firstBodyIndex, compactableEndExclusive)
         if (compactableBody.size < 2) return null
 
         val leadingSystem = protectedHead.firstOrNull() ?: buildJsonObject {
             put("role", "system")
             put("content", "")
         }
-        val protectedSuffix = latestTailSystemIndex?.let { history.subList(it, history.size) }.orEmpty()
+        val protectedSuffix = latestTailSystemIndex?.let { source.subList(it, source.size) }.orEmpty()
         val protectedTokens =
             protectedHead.drop(1).sumOf { estimateModelTokens(it.toString()) } +
                 protectedSuffix.sumOf { estimateModelTokens(it.toString()) }
