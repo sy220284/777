@@ -49,8 +49,7 @@ internal class LocalModelRequestCoordinator(
         profile: LocalModelProfile? = null,
         previewGuard: () -> Boolean = { true },
         overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
-        executionBudget: LocalWorkExecutionBudget? = null,
-        routeCircuitBreaker: LocalModelRouteCircuitBreaker? = null,
+        executionControl: LocalWorkExecutionControl? = null,
     ): LocalModelReply {
         val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
         val frozenProfile = profile ?: modelGateway.profileForRoute(
@@ -252,65 +251,51 @@ internal class LocalModelRequestCoordinator(
                             modelContextWindowTokens = pressure.modelContextWindowTokens,
                         )
                         pressureStore.record(snapshot.sessionId, activePressure)
-                        if (activePressure.estimatedInputTokens > activePressure.operationalLimitTokens) {
-                            throw LocalModelException(
-                                code = "MODEL_CONTEXT_BUDGET_EXCEEDED",
-                                message = "预计输入 ${activePressure.estimatedInputTokens} token，超过当前路由安全上限 ${activePressure.operationalLimitTokens}",
-                                retryable = false,
-                            )
-                        }
-                        val routeKey = frozenProfile.id
-                        routeCircuitBreaker?.requireClosed(routeKey)
-                        val budgetLease = executionBudget?.reserve(activePressure.estimatedInputTokens)
-                        try {
+                        executeWithModelAdmission(
+                            control = executionControl,
+                            profileId = frozenProfile.id,
+                            model = frozenProfile.model,
+                            baseUrl = frozenProfile.baseUrl,
+                            messages = activeMessages,
+                            tools = tools,
+                        ) {
                             resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                                val reply = try {
-                                modelGateway.completeStreaming(
-                                    baseUrl = snapshot.baseUrl,
-                                    model = snapshot.model,
-                                    messages = activeMessages,
-                                    tools = tools,
-                                    temperature = temperature,
-                                    profile = frozenProfile,
-                                    onDelta = { delta ->
-                                        val visible =
-                                            streamFilter?.append(delta.content)?.text ?: delta.content
-                                        streamPreview.append(visible)
-                                    },
-                                )
-                            } catch (error: LocalModelException) {
-                                lastProviderError = error
-                                log.append("request/provider-error", buildJsonObject {
-                                    put("step", step)
-                                    put("code", error.code)
-                                    error.status?.let { put("status", it) }
-                                    error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
-                                    error.requestId?.let { put("request_id", it) }
-                                    error.providerCode?.let { put("provider_code", it) }
-                                    error.providerParam?.let { put("provider_param", it) }
-                                    error.cause?.let { cause ->
-                                        put("cause_type", cause::class.java.simpleName)
-                                        cause.message?.takeIf(String::isNotBlank)?.let {
-                                            put("cause_detail", it.take(800))
+                                try {
+                                    modelGateway.completeStreaming(
+                                        baseUrl = snapshot.baseUrl,
+                                        model = snapshot.model,
+                                        messages = activeMessages,
+                                        tools = tools,
+                                        temperature = temperature,
+                                        profile = frozenProfile,
+                                        onDelta = { delta ->
+                                            val visible = streamFilter?.append(delta.content)?.text ?: delta.content
+                                            streamPreview.append(visible)
+                                        },
+                                    )
+                                } catch (error: LocalModelException) {
+                                    lastProviderError = error
+                                    log.append("request/provider-error", buildJsonObject {
+                                        put("step", step)
+                                        put("code", error.code)
+                                        error.status?.let { put("status", it) }
+                                        error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
+                                        error.requestId?.let { put("request_id", it) }
+                                        error.providerCode?.let { put("provider_code", it) }
+                                        error.providerParam?.let { put("provider_param", it) }
+                                        error.cause?.let { cause ->
+                                            put("cause_type", cause::class.java.simpleName)
+                                            cause.message?.takeIf(String::isNotBlank)?.let {
+                                                put("cause_detail", it.take(800))
+                                            }
                                         }
-                                    }
-                                })
-                                throw error
-                            }
-                                streamFilter?.flush()?.text
-                                    ?.takeIf(String::isNotEmpty)
-                                    ?.let(streamPreview::append)
+                                    })
+                                    throw error
+                                }
+                            }.also {
+                                streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
                                 streamPreview.flush()
-                                budgetLease?.settle(
-                                    reply.usage.promptTokens.takeIf { reply.usage.reported },
-                                )
-                                reply
                             }
-                        } catch (error: LocalModelException) {
-                            routeCircuitBreaker?.observeFailure(routeKey, error)
-                            throw error
-                        } finally {
-                            budgetLease?.settle()
                         }
                     }
                 } finally {
