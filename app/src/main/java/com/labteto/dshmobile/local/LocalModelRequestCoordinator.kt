@@ -301,6 +301,9 @@ internal class LocalModelRequestCoordinator(
                                     ?.takeIf(String::isNotEmpty)
                                     ?.let(streamPreview::append)
                                 streamPreview.flush()
+                                budgetLease?.settle(
+                                    reply.usage.promptTokens.takeIf { reply.usage.reported },
+                                )
                                 reply
                             }
                         } catch (error: LocalModelException) {
