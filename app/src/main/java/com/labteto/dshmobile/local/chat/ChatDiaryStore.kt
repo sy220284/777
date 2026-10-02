@@ -92,7 +92,7 @@ internal class ChatDiaryStore(
 
         writeDocument(
             ChatDiaryDocument(
-                entries = compact(entries, MAX_ENTRIES, protectedId = saved.id),
+                entries = compact(entries, MAX_CHAT_DIARY_ENTRIES, protectedId = saved.id),
             ),
         )
         return saved
@@ -232,7 +232,7 @@ internal class ChatDiaryStore(
         readDocument().entries.asSequence()
             .filter { it.active && it.subjectKey == subjectKey }
             .sortedByDescending(ChatDiaryEntry::updatedAt)
-            .take(limit.coerceIn(1, MAX_ENTRIES))
+            .take(limit.coerceIn(1, MAX_CHAT_DIARY_ENTRIES))
             .toList()
 
     private fun sanitizeDelta(request: ChatDiaryWriteRequest): ChatDiaryDelta? {
@@ -520,7 +520,6 @@ internal class ChatDiaryStore(
         else (0 until text.length - 1).mapTo(linkedSetOf()) { text.substring(it, it + 2) }
 
     private companion object {
-        const val MAX_ENTRIES = 4_000
         const val MAX_SOURCE_IDS = 16
         const val MAX_REFINEMENT_REVISIONS = 8
         const val MAX_EVENT_CHARS = 320
