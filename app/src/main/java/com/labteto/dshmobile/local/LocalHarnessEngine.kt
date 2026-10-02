@@ -143,6 +143,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+private const val INTERNAL_WORK_CONTINUATION_PROMPT =
+    "继续当前工作任务。上一模型请求已进入服务端流后中断；基于已有历史、检查点和工具结果继续未完成部分。禁止重做已经完成并有结果的工具调用，先核对现有进度再行动。"
+
 /**
  * A native Android implementation of the DeepSeek Harness execution loop.
  *
@@ -2881,6 +2884,8 @@ class LocalHarnessEngine @Inject constructor(
                 kind = LocalAgentRunKind.FOREGROUND,
             )
         } else 1
+        val continuationParentRunId = binding?.continuationParentRunId
+        if (binding != null) binding.continuationParentRunId = null
         val runContext = agentRunCoordinator.start(
             sessionId = foregroundSessionId,
             usageMode = runSnapshot.usageMode,
@@ -2902,7 +2907,9 @@ class LocalHarnessEngine @Inject constructor(
             ),
             toolNames = runToolNames(runPolicy, binding),
             contextChars = runSnapshot.contextChars,
+            parentRunId = continuationParentRunId,
         )
+        var lastModelErrorCode: String? = null
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
         val startedToolCallIds = linkedSetOf<String>()
@@ -3047,6 +3054,7 @@ class LocalHarnessEngine @Inject constructor(
                         }
                     }
                 } catch (error: Throwable) {
+                    if (error is LocalModelException) lastModelErrorCode = error.code
                     val nativeImageRejected =
                         nativeImagesSent &&
                             imageInputUnsupported(error)
@@ -3331,15 +3339,29 @@ class LocalHarnessEngine @Inject constructor(
                     is AgentEvent.TurnFailed -> {
                         settlePendingTools("failed")
                         val detail = event.reason.take(2_000)
-                        val transcriptMessage = runTranscript.newMessage("system", "执行失败：$detail")
-                        val turnEnd = runEventLog.append("turn/end", buildJsonObject {
-                            put("reason", "error")
-                            put("detail", detail)
-                            put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
-                            put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
-                        })
-                        runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
-                        checkpointModelHistoryAtTurnBoundary("turn/failed", binding)
+                        val continuationEligible =
+                            binding != null &&
+                                lastModelErrorCode == "CHATGPT_PLAN_STREAM_INTERRUPTED" &&
+                                binding.automaticContinuationCount == 0 &&
+                                binding.pendingInputs.size() == 0
+                        if (continuationEligible) {
+                            runEventLog.append("turn/end", buildJsonObject {
+                                put("reason", "stream_interrupted_continuation")
+                                put("detail", detail)
+                                put("messages", runState.value.transcriptIndex.totalMessageCount)
+                            })
+                            checkpointModelHistoryAtTurnBoundary("turn/stream-interrupted", binding)
+                        } else {
+                            val transcriptMessage = runTranscript.newMessage("system", "执行失败：$detail")
+                            val turnEnd = runEventLog.append("turn/end", buildJsonObject {
+                                put("reason", "error")
+                                put("detail", detail)
+                                put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
+                                put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
+                            })
+                            runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
+                            checkpointModelHistoryAtTurnBoundary("turn/failed", binding)
+                        }
                         persist(binding)
                     }
                     is AgentEvent.TurnCancelled -> {
@@ -3393,8 +3415,48 @@ class LocalHarnessEngine @Inject constructor(
             // TurnCancelled durably records and projects the visible stop message.
         } catch (error: Exception) {
             foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
-            runState.update { it.copy(error = error.message ?: "本机执行失败") }
-            // TurnFailed durably records and projects the visible failure message.
+            val modelError = error as? LocalModelException
+            val continuationEligible =
+                binding != null &&
+                    modelError?.code == "CHATGPT_PLAN_STREAM_INTERRUPTED" &&
+                    binding.automaticContinuationCount == 0 &&
+                    binding.pendingInputs.size() == 0
+            val queued = if (continuationEligible) {
+                val continuationId = "continuation-" + runContext.runId
+                binding!!.pendingInputs.offer(
+                    QueuedAgentInput(
+                        content = INTERNAL_WORK_CONTINUATION_PROMPT,
+                        memoryInput = "",
+                        modelMessage = buildJsonObject {
+                            put("role", "user")
+                            put("content", INTERNAL_WORK_CONTINUATION_PROMPT)
+                        },
+                        id = continuationId,
+                    ),
+                ).also { accepted ->
+                    if (accepted) {
+                        binding.automaticContinuationCount += 1
+                        binding.continuationParentRunId = runContext.runId
+                        runState.update {
+                            it.copy(
+                                error = null,
+                                queuedInputCount = binding.pendingInputs.size(),
+                            )
+                        }
+                        runEventLog.append("turn/continuation-queued", buildJsonObject {
+                            put("source_run_id", runContext.runId)
+                            put("reason", modelError?.code.orEmpty())
+                            put("continuation_id", continuationId)
+                        })
+                    }
+                }
+            } else {
+                false
+            }
+            if (!queued) {
+                runState.update { it.copy(error = error.message ?: "本机执行失败") }
+            }
+            // TurnFailed has already settled tool side effects and checkpointed model-visible state.
         } finally {
             if (binding != null) binding.interactions.cancelAll() else interactions.cancelAll()
             runState.update {
