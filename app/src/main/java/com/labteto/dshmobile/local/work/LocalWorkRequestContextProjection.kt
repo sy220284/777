@@ -48,9 +48,10 @@ internal fun projectWorkRequestContext(
     tools: JsonArray,
     compactor: LocalHistoryCompactor,
     operationalLimitTokens: Int,
+    measuredPressure: LocalPromptPressure? = null,
 ): LocalWorkRequestProjection {
     val limit = operationalLimitTokens.coerceAtLeast(1)
-    val beforePressure = LocalPromptPressureMeter.measure(
+    val beforePressure = measuredPressure ?: LocalPromptPressureMeter.measure(
         messages = messages,
         tools = tools,
         operationalLimitTokens = limit,
