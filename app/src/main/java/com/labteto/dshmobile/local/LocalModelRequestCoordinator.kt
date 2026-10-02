@@ -361,8 +361,15 @@ internal class LocalModelRequestCoordinator(
                 } else {
                     LocalHistorySummaryMode.WORK
                 }
-                val compacted = historyCompactor.compactForOverflow(activeMessages, summaryMode)
-                    ?: throw error
+                val compacted = historyCompactor.compactForOverflow(
+                    history = activeMessages,
+                    summaryMode = summaryMode,
+                    structuredWorkState = if (summaryMode == LocalHistorySummaryMode.WORK) {
+                        structuredWorkState(snapshot, log)
+                    } else {
+                        null
+                    },
+                ) ?: throw error
                 val madeProgress =
                     compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
                         compacted.messages != activeMessages
