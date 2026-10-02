@@ -27,8 +27,7 @@ class LocalGroupGalleryStateSyncTest {
             notes = "",
         ).entry
         val state = ChatCharacterState(
-            trust = 77,
-            closeness = 66,
+            dynamics = RelationshipDynamics(trust = 77, warmth = 66),
             updatedAt = 1234L,
         )
         val group = LocalGroupChatState(
@@ -48,8 +47,8 @@ class LocalGroupGalleryStateSyncTest {
         assertEquals(1, projectGroupGalleryState(group, gallery).projected)
 
         val projected = gallery.list().single { it.id == saved.id }.groupChatState
-        assertEquals(77, projected.trust)
-        assertEquals(66, projected.closeness)
+        assertEquals(77, projected.dynamics.trust)
+        assertEquals(66, projected.dynamics.warmth)
     }
 
     @Test
@@ -64,7 +63,10 @@ class LocalGroupGalleryStateSyncTest {
         ).entry
         gallery.updateGroupChatState(
             saved.id,
-            ChatCharacterState(trust = 88, closeness = 70, updatedAt = 2000L),
+            ChatCharacterState(
+                dynamics = RelationshipDynamics(trust = 88, warmth = 70),
+                updatedAt = 2000L,
+            ),
         )
 
         val group = LocalGroupChatState(
@@ -83,6 +85,6 @@ class LocalGroupGalleryStateSyncTest {
         val result = projectGroupGalleryState(group, gallery)
         assertEquals(0, result.projected)
         assertTrue(result.failures.isEmpty())
-        assertEquals(88, gallery.list().single { it.id == saved.id }.groupChatState.trust)
+        assertEquals(88, gallery.list().single { it.id == saved.id }.groupChatState.dynamics.trust)
     }
 }
