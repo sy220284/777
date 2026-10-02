@@ -491,7 +491,7 @@ internal class LocalSubagentRunner(
                         runCoordinator?.recordEvent(context, event)
                     }
                 },
-                maxSteps = stepLimit, rejectEmptyFinalReply = true,
+                maxSteps = stepLimit,
                 stepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
                     val liveBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
                     if (currentLimit >= MAX_DYNAMIC_STEPS) return@AgentStepLimitExtender null

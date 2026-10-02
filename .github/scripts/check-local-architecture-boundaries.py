@@ -63,7 +63,7 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryBuffer.kt": 106,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt": 128,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRunnerFactory.kt": 135,
-    "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt": 585,
+    "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt": 584,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelStepExecutor.kt": 153,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentStructureRecovery.kt": 81,
     "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt": 690,
