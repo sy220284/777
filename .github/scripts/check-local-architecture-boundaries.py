@@ -427,7 +427,7 @@ for required_contract in (
     "val approvalPolicy: ToolApprovalPolicy,",
     "val exposure: ToolExposure,",
     "val metadata: ToolMetadata,",
-    "validateToolRegistration(tool)",
+    "validateToolRegistration(",
 ):
     if required_contract not in tool_registry_source:
         die(f"HarnessTool registration contract is missing: {required_contract}")
