@@ -230,18 +230,10 @@ class LspPlugin(
 
     private fun startApprovalTool(resolved: List<String>): HarnessTool = HarnessTool(
         name = "lsp_start",
-        schema = buildJsonObject {
-            put("type", "function")
-            put("function", buildJsonObject {
-                put("name", "lsp_start")
-                put("description", "启动代码智能进程：${resolved.firstOrNull().orEmpty()}")
-                put("parameters", buildJsonObject {
-                    put("type", "object")
-                    put("properties", buildJsonObject { })
-                    put("additionalProperties", false)
-                })
-            })
-        },
+        schema = functionToolSchema(
+            name = "lsp_start",
+            description = "启动代码智能进程：${resolved.firstOrNull().orEmpty()}",
+        ),
         access = ToolAccess.PROCESS,
         approvalPolicy = ToolApprovalPolicy.ALWAYS,
         exposure = ToolExposure.INTERNAL,
