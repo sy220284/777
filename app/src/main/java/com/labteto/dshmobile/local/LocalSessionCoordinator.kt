@@ -122,7 +122,7 @@ internal class LocalSessionCoordinator(
     ): LocalHarnessSession = LocalHarnessSession(
         id = sessionId,
         title = state.transcriptIndex.firstUserTitle ?: "新会话",
-        updatedAt = System.currentTimeMillis(),
+        updatedAt = state.transcriptIndex.latestCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
         usageMode = state.usageMode,
         personaId = state.personaId,
         chatState = state.chatState,
