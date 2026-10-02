@@ -169,6 +169,7 @@ class SessionEventLogTest {
             repeat(28) { index ->
                 log.append("test", buildJsonObject { put("value", "repeat-me-".repeat(6) + index) })
             }
+            while (log.archiveLegacySegments(limit = 16) > 0) Unit
             val archive = directory.listFiles().orEmpty().first { it.name.endsWith(".gz") }
             val raw = File(archive.path.removeSuffix(".gz"))
             GZIPInputStream(archive.inputStream()).use { input -> raw.writeBytes(input.readBytes()) }
@@ -177,6 +178,7 @@ class SessionEventLogTest {
             val restarted = SessionEventLog(file, json, maxBytes = 700)
             assertEquals(28, restarted.snapshot().size)
             restarted.append("test", buildJsonObject { put("value", "new") })
+            while (restarted.archiveLegacySegments(limit = 16) > 0) Unit
             assertTrue(!raw.exists())
             assertTrue(File(raw.path + ".gz").isFile)
             assertEquals((0L..28L).toList(), restarted.snapshot().map(SessionEvent::sequence))
@@ -195,6 +197,7 @@ class SessionEventLogTest {
             repeat(36) { index ->
                 log.append("test", buildJsonObject { put("value", "repeat-me-".repeat(5) + index) })
             }
+            while (log.archiveLegacySegments(limit = 16) > 0) Unit
             val archives = directory.listFiles().orEmpty().filter { it.name.endsWith(".gz") }
             assertTrue(archives.size >= 2)
             archives.take(2).forEach { archive ->
@@ -253,6 +256,7 @@ class SessionEventLogTest {
                     put("value", "row-$index-" + "x".repeat(48))
                 })
             }
+            while (log.archiveLegacySegments(limit = 16) > 0) Unit
             file.appendText("{broken-row\n")
             log.snapshot()
             assertTrue(log.diagnostics().malformedRows > 0)
@@ -463,6 +467,7 @@ class SessionEventLogTest {
                     buildJsonObject { put("value", "row-$index-" + "x".repeat(44)) },
                 )
             }
+            while (log.archiveLegacySegments(limit = 16) > 0) Unit
             val archived = directory.listFiles().orEmpty()
                 .filter { it.name.startsWith("session.events.jsonl.part-") && it.name.endsWith(".gz") }
                 .minByOrNull(File::getName)
