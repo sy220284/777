@@ -50,9 +50,10 @@ class LocalToolPolicyTest {
     }
 
     @Test fun safeAutoApprovalScopeFollowsTheSandboxBoundary() {
-        for (name in listOf("write", "edit", "apply_patch", "download_file", "bash")) {
+        for (name in listOf("write", "edit", "apply_patch", "download_file")) {
             assertEquals(LocalAutoApprovalScope.WORKSPACE, LocalToolPolicy.autoApprovalScope(name))
         }
+        assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("bash"))
         for (name in listOf("read", "file_inspect", "session_trace", "session_event_read")) {
             assertEquals(LocalAutoApprovalScope.READ_ONLY, LocalToolPolicy.autoApprovalScope(name))
         }
