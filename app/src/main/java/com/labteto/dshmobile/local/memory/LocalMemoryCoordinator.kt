@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.chat.ChatMemorySelector
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.chatLongTermMemoryBudget
+import com.labteto.dshmobile.local.chat.diaryRecallUsageInstruction
 import com.labteto.dshmobile.local.chat.shouldRecallDiary
 import com.labteto.dshmobile.local.chat.takeWithinModelTokenBudget
 import com.labteto.dshmobile.local.chat.isUnboundChatPersona
@@ -174,7 +175,8 @@ internal class LocalMemoryCoordinator(
                 blocks += takeWithinModelTokenBudget(
                     buildString {
                         appendLine("【相关人物日记｜角色自己的长期经历】")
-                        appendLine("用于恢复经历与当时心理，不逐条复述；当前输入和当前状态优先。")
+                        appendLine(diaryRecallUsageInstruction(groupAudience))
+                        appendLine("当前输入和当前状态优先。")
                         diary.forEach { entry ->
                             appendLine("- 事件：${entry.event}")
                             entry.feeling.takeIf(String::isNotBlank)?.let { appendLine("  感受：$it") }
