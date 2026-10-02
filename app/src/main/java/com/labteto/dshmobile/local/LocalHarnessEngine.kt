@@ -862,6 +862,10 @@ class LocalHarnessEngine @Inject constructor(
     internal fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) =
         settingsCoordinator.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
 
+    /** Persist the default worker route used when a delegated task does not select one explicitly. */
+    internal fun configureWorkerProfile(profileId: String?) =
+        settingsCoordinator.configureWorkerProfile(profileId)
+
     /** Persist user-authored behavioral rules and memory recall preference. */
     internal fun configurePersonalization(customRules: String, autoRecall: Boolean, autoMemory: Boolean) =
         settingsCoordinator.configurePersonalization(customRules, autoRecall, autoMemory)
@@ -4027,7 +4031,7 @@ class LocalHarnessEngine @Inject constructor(
             "read_skill" -> workspace.readSkill(args.string("name"))
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
-                val model = args.optionalString("model")
+                val model = resolveWorkerModelSelection(args.optionalString("model"), executionState.value)
                 val maxSteps = args.int("max_steps", executionState.value.subagentMaxSteps).coerceIn(1, 128)
                 val virtualScreen = args.boolean("virtual_screen", false)
                 if (args.boolean("run_in_background", false)) {
@@ -4056,6 +4060,7 @@ class LocalHarnessEngine @Inject constructor(
                     inheritHistory = true,
                     allowMutation = allowMutation,
                     parentCallId = call.id,
+                    modelOverride = resolveWorkerModelSelection(null, executionState.value),
                     maxSteps = executionState.value.subagentMaxSteps,
                 )
             "list_subagent_models" -> modelGateway.availableProfiles().joinToString("\n") { "${it.id} | ${it.model} | ${it.provider} | ${it.authKind} | ${it.baseUrl}" }
@@ -4506,6 +4511,27 @@ class LocalHarnessEngine @Inject constructor(
             executionControl = binding.executionControl,
         )
 
+    private fun resolveWorkerModelSelection(
+        explicitSelection: String?,
+        snapshot: LocalHarnessState,
+    ): String? {
+        explicitSelection?.trim()?.takeIf(String::isNotBlank)?.let { return it }
+        snapshot.workerProfileId
+            ?.takeIf { workerId -> snapshot.modelSelection.profiles.any { it.id == workerId } }
+            ?.let { return it }
+
+        // Safety fallback for plan-backed primary models: when exactly one API-key route exists,
+        // use it for delegated read-only work. Ambiguous routes never guess a billing identity.
+        val parent = snapshot.modelSelection.activeProfile
+        if (parent?.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
+            snapshot.modelSelection.profiles
+                .filter { it.authKind == LocalModelAuthKind.API_KEY }
+                .singleOrNull()
+                ?.let { return it.id }
+        }
+        return null
+    }
+
     private suspend fun runWorkflow(
         tasks: List<String>,
         mode: String,
@@ -4515,13 +4541,7 @@ class LocalHarnessEngine @Inject constructor(
     ): String {
         val targetState = binding?.state ?: _state
         val runner = binding?.let(::workSubagents) ?: subagents
-        val parentProfile = targetState.value.modelSelection.activeProfile
-        val apiKeyWorkers = if (modelOverride.isNullOrBlank() && parentProfile?.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-            modelGateway.availableProfiles().filter { it.authKind == LocalModelAuthKind.API_KEY }
-        } else {
-            emptyList()
-        }
-        val workerSelection = modelOverride ?: apiKeyWorkers.singleOrNull()?.id
+        val workerSelection = resolveWorkerModelSelection(modelOverride, targetState.value)
         targetState.update { it.copy(workflowProgress = null) }
         return LocalWorkflowCoordinator(
             execute = { prompt -> runner.runResult(
@@ -4979,6 +4999,9 @@ class LocalHarnessEngine @Inject constructor(
             mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
             subagentMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
             modelAttempts = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
+            workerProfileId = preferences
+                .getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null)
+                ?.takeIf { workerId -> modelProfiles.any { it.id == workerId } },
             imageInputMode = runCatching {
                 LocalImageInputMode.valueOf(
                     preferences.getString(LocalHarnessSettingsCoordinator.KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)
