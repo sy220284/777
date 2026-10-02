@@ -114,12 +114,47 @@ class SessionEventLogTest {
         val directory = Files.createTempDirectory("harness-event-sequence").toFile()
         val file = directory.resolve("session.events.jsonl")
         try {
-            val log = SessionEventLog(file, json, maxBytes = 512, clock = { 1L })
+            val log = SessionEventLog(
+                file,
+                json,
+                maxBytes = 512,
+                maxEventBytes = 512,
+                clock = { 1L },
+            )
             runCatching {
                 log.append("too-large", buildJsonObject { put("value", "x".repeat(2_000)) })
             }
             val accepted = log.append("accepted", buildJsonObject { put("value", "ok") })
             assertEquals(0L, accepted.sequence)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun eventLargerThanSegmentTargetGetsItsOwnSegmentWithoutLosingSequence() {
+        val directory = Files.createTempDirectory("harness-event-oversized-segment").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(
+                file = file,
+                json = json,
+                maxBytes = 512,
+                maxEventBytes = 4_096,
+                clock = { 1L },
+            )
+            val large = log.append(
+                "test/large",
+                buildJsonObject { put("value", "x".repeat(1_500)) },
+            )
+            val next = log.append("test/next", buildJsonObject { put("value", "ok") })
+
+            assertEquals(0L, large.sequence)
+            assertEquals(1L, next.sequence)
+            assertEquals(listOf(0L, 1L), log.snapshot().map(SessionEvent::sequence))
+            assertTrue(directory.listFiles().orEmpty().any {
+                it.name.startsWith("session.events.jsonl.part-")
+            })
         } finally {
             directory.deleteRecursively()
         }
