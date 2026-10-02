@@ -62,7 +62,12 @@ internal class LocalModelRequestCoordinator(
         val runtimeCapabilities = LocalModelPresets.runtimeCapabilitiesFor(
             model = frozenProfile.model,
             baseUrl = frozenProfile.baseUrl,
-            protocol = frozenProfile.protocol,
+            protocol = resolveLocalModelProtocol(
+                authKind = frozenProfile.authKind,
+                profile = frozenProfile,
+                model = frozenProfile.model,
+                baseUrl = frozenProfile.baseUrl,
+            ),
             authKind = frozenProfile.authKind,
         )
         val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
