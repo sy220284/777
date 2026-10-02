@@ -1360,8 +1360,12 @@ class LocalHarnessEngine @Inject constructor(
                 sourceSessionId = state.sessionId,
                 createdAtInclusive = original.createdAt,
                 discardedMessageIds = discarded.map(LocalHarnessMessage::id),
-                directGalleryId = state.galleryId.takeIf { !state.groupChat.enabled },
-                directStoryId = state.galleryStoryId.takeIf { !state.groupChat.enabled },
+                directGalleryId = state.galleryId.takeIf {
+                    !state.groupChat.enabled && state.galleryStoryId != null
+                },
+                directStoryId = state.galleryStoryId.takeIf {
+                    !state.groupChat.enabled && state.galleryId != null
+                },
                 directMessageKeys = if (state.groupChat.enabled) emptyList() else discarded.map {
                     com.labteto.dshmobile.local.chat.galleryMessageArchiveKey(it)
                 },
