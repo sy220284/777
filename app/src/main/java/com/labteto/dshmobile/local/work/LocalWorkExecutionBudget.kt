@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
+import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.modelFailureKind
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
@@ -302,7 +303,11 @@ internal suspend fun executeWithModelAdmission(
         lease?.commit(reply.usage.promptTokens.takeIf { reply.usage.reported })
         return reply
     } catch (cancelled: CancellationException) {
-        lease?.commit()
+        when ((cancelled as? LocalModelCancellationException)?.admissionState) {
+            LocalModelAdmissionState.NOT_SENT,
+            LocalModelAdmissionState.REJECTED -> lease?.release()
+            else -> lease?.commit()
+        }
         throw cancelled
     } catch (error: LocalModelException) {
         when (error.admissionState) {
