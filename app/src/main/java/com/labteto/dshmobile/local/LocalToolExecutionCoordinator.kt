@@ -31,29 +31,32 @@ internal class LocalToolExecutionCoordinator(
         summary: String,
     ) -> Boolean,
 ) {
-    fun clearTurnCapabilities() {
-        synchronized(enabledOptionalTools) { enabledOptionalTools.clear() }
+    fun clearTurnCapabilities(target: MutableSet<String> = enabledOptionalTools) {
+        synchronized(target) { target.clear() }
     }
 
     fun enabledOptionalSnapshot(): Set<String> =
         synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
 
-    fun enableOptionalTools(names: Collection<String>) {
-        synchronized(enabledOptionalTools) {
-            enabledOptionalTools += names.filter { name ->
+    fun enableOptionalTools(
+        names: Collection<String>,
+        target: MutableSet<String> = enabledOptionalTools,
+    ) {
+        synchronized(target) {
+            target += names.filter { name ->
                 registry.get(name)?.let(LocalToolRouter::isOptional) == true
             }
         }
     }
 
-    fun enableGitHubConnectorTools() {
+    fun enableGitHubConnectorTools(target: MutableSet<String> = enabledOptionalTools) {
         val githubTools = registry.names().mapNotNull(registry::get)
             .filter { tool ->
                 LocalToolRouter.isOptional(tool) &&
                     tool.metadata.family.equals(GITHUB_TOOL_FAMILY, ignoreCase = true)
             }
             .map(HarnessTool::name)
-        enableOptionalTools(githubTools)
+        enableOptionalTools(githubTools, target)
     }
 
     fun capabilitySummary(enabledOptional: Set<String> = enabledOptionalSnapshot()): String {
