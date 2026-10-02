@@ -61,7 +61,10 @@ class SessionEventLog(
     private val malformedRows = AtomicLong()
     private val segmentReadFailures = AtomicLong()
     private val archiveFailures = AtomicLong()
-    private val nextSequence = AtomicLong(synchronized(lock) { readNextSequence() })
+    private val nextSequence = AtomicLong(synchronized(lock) {
+        repairTornActiveTailUnsafe()
+        readNextSequence()
+    })
 
     fun diagnostics(): SessionEventLogDiagnostics = SessionEventLogDiagnostics(
         malformedRows = malformedRows.get(),
@@ -75,7 +78,6 @@ class SessionEventLog(
         // The striped path lock serializes their writes, but each instance has its own in-memory
         // counter. Reconcile from the durable tail while holding that shared lock so a stale
         // instance cannot reuse a sequence that another instance has already committed.
-        repairTornActiveTailUnsafe()
         val durableNextSequence = readNextSequence()
         if (nextSequence.get() != durableNextSequence) {
             nextSequence.set(durableNextSequence)
@@ -91,7 +93,12 @@ class SessionEventLog(
         require(incomingBytes <= maxBytes) { "单条会话事件超过日志分段上限" }
         file.parentFile?.mkdirs()
         if (file.isFile && file.length() + incomingBytes > maxBytes) rotateActiveSegment()
-        file.appendText(encoded)
+        try {
+            file.appendText(encoded)
+        } catch (error: Exception) {
+            runCatching { repairTornActiveTailUnsafe() }
+            throw error
+        }
         nextSequence.incrementAndGet()
         // Archive maintenance must not turn a committed append into an apparent failure.
         runCatching { compressOneLegacySegmentUnsafe() }
