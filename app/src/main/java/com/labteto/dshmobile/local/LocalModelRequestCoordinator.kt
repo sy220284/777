@@ -245,12 +245,26 @@ internal class LocalModelRequestCoordinator(
                         val streamFilter = streamFilterPhrases
                             .takeIf { it.isNotEmpty() }
                             ?.let(::ChatStreamFilter)
+                        val activePressure = LocalPromptPressureMeter.measure(
+                            messages = activeMessages,
+                            tools = tools,
+                            operationalLimitTokens = operationalLimit,
+                            modelContextWindowTokens = pressure.modelContextWindowTokens,
+                        )
+                        pressureStore.record(snapshot.sessionId, activePressure)
+                        if (activePressure.estimatedInputTokens > activePressure.operationalLimitTokens) {
+                            throw LocalModelException(
+                                code = "MODEL_CONTEXT_BUDGET_EXCEEDED",
+                                message = "预计输入 ${activePressure.estimatedInputTokens} token，超过当前路由安全上限 ${activePressure.operationalLimitTokens}",
+                                retryable = false,
+                            )
+                        }
                         val routeKey = frozenProfile.id
                         routeCircuitBreaker?.requireClosed(routeKey)
-                        val budgetLease = executionBudget?.reserve(pressure.estimatedInputTokens)
+                        val budgetLease = executionBudget?.reserve(activePressure.estimatedInputTokens)
                         try {
                             resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                            val reply = try {
+                                val reply = try {
                                 modelGateway.completeStreaming(
                                     baseUrl = snapshot.baseUrl,
                                     model = snapshot.model,
@@ -283,11 +297,11 @@ internal class LocalModelRequestCoordinator(
                                 })
                                 throw error
                             }
-                            streamFilter?.flush()?.text
-                                ?.takeIf(String::isNotEmpty)
-                                ?.let(streamPreview::append)
-                            streamPreview.flush()
-                            reply
+                                streamFilter?.flush()?.text
+                                    ?.takeIf(String::isNotEmpty)
+                                    ?.let(streamPreview::append)
+                                streamPreview.flush()
+                                reply
                             }
                         } catch (error: LocalModelException) {
                             routeCircuitBreaker?.observeFailure(routeKey, error)
