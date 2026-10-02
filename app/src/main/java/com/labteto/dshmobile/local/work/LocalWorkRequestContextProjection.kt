@@ -18,6 +18,31 @@ internal data class LocalWorkRequestProjection(
     val omittedMessages: Int = 0,
 )
 
+
+internal fun workSteadyStateHistoryBudget(
+    base: LocalHistoryBudget,
+    currentHistoryTokens: Int,
+    extraTokens: Int = 0,
+): LocalHistoryBudget {
+    val operationalLimit = base.maxHistoryTokens ?: return base
+    val totalRequestTokens = currentHistoryTokens.toLong() + extraTokens.coerceAtLeast(0).toLong()
+    if (totalRequestTokens <= workRequestProjectionTriggerTokens(operationalLimit).toLong()) {
+        return base
+    }
+    val target = workRequestProjectionTargetTokens(operationalLimit)
+    return base.copy(
+        maxHistoryTokens = target,
+        tailTokens = minOf(
+            base.tailTokens ?: WORK_REQUEST_TAIL_TOKENS,
+            WORK_REQUEST_TAIL_TOKENS,
+            (target * 0.38).toInt().coerceAtLeast(1_024),
+        ),
+        maxSummaryChars = minOf(base.maxSummaryChars, WORK_REQUEST_SUMMARY_CHARS),
+        maxToolResultChars = minOf(base.maxToolResultChars, WORK_REQUEST_TOOL_RESULT_CHARS),
+        maxToolResultTokens = minOf(base.maxToolResultTokens, WORK_REQUEST_TOOL_RESULT_TOKENS),
+    )
+}
+
 internal fun projectWorkRequestContext(
     messages: List<JsonObject>,
     tools: JsonArray,
