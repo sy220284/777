@@ -78,7 +78,7 @@ internal class LocalReplySuggestionCoordinator(
         val reply = try {
             requestModel(
                 snapshot,
-                chatPostTurnModelMessages(prompt),
+                chatReplySuggestionModelMessages(prompt),
                 boundEventLog,
                 profile,
             )
