@@ -34,6 +34,19 @@ data class ChatDiarySourceRef(
 )
 
 @Serializable
+data class ChatDiaryRevision(
+    val event: String,
+    val feeling: String = "",
+    val innerThought: String = "",
+    val relationshipMeaning: String = "",
+    val unresolvedEcho: String = "",
+    val importance: Int = 3,
+    val disclosure: ChatDiaryDisclosure = ChatDiaryDisclosure.SHAREABLE,
+    val sources: List<ChatDiarySourceRef> = emptyList(),
+    val updatedAt: Long,
+)
+
+@Serializable
 data class ChatDiaryEntry(
     val id: String,
     val subjectKey: String,
@@ -47,6 +60,7 @@ data class ChatDiaryEntry(
     val sourceMode: ChatDiarySourceMode = ChatDiarySourceMode.DIRECT,
     val disclosure: ChatDiaryDisclosure = ChatDiaryDisclosure.SHAREABLE,
     val sources: List<ChatDiarySourceRef> = emptyList(),
+    val revisions: List<ChatDiaryRevision> = emptyList(),
     val generation: Long = 0L,
     val active: Boolean = true,
     val createdAt: Long,
@@ -55,7 +69,7 @@ data class ChatDiaryEntry(
 
 @Serializable
 internal data class ChatDiaryDocument(
-    val formatVersion: Int = 1,
+    val formatVersion: Int = 2,
     val entries: List<ChatDiaryEntry> = emptyList(),
 )
 
