@@ -13,6 +13,12 @@ import kotlinx.serialization.json.put
 private const val WORK_CHECKPOINT_PROVENANCE_KEY = "_dsh_work_checkpoint_source"
 private const val WORK_CHECKPOINT_PROVENANCE_VALUE = "history_compactor_v1"
 
+internal fun buildTrustedWorkCheckpointModelMessage(content: String): JsonObject = buildJsonObject {
+    put("role", "user")
+    put(WORK_CHECKPOINT_PROVENANCE_KEY, WORK_CHECKPOINT_PROVENANCE_VALUE)
+    put("content", content)
+}
+
 internal data class LocalHistoryCompaction(
     val messages: List<JsonObject>,
     val omittedMessages: Int,
@@ -178,11 +184,8 @@ internal class LocalHistoryCompactor(
         val summary = buildSummary(omitted, effectiveSummaryChars, summaryMode, workCheckpoint)
         val compacted = buildList {
             add(history.first())
-            add(buildJsonObject {
-                put("role", "user")
-                put(WORK_CHECKPOINT_PROVENANCE_KEY, WORK_CHECKPOINT_PROVENANCE_VALUE)
-                put(
-                    "content",
+            add(
+                buildTrustedWorkCheckpointModelMessage(
                     if (workCheckpoint != null) {
                         buildString {
                             append("<compacted-summary>\n")
@@ -193,8 +196,8 @@ internal class LocalHistoryCompactor(
                     } else {
                         "<compacted-summary>\n$summary\n</compacted-summary>"
                     },
-                )
-            })
+                ),
+            )
             addAll(history.drop(start))
         }
         val estimatedTokensBefore = encodedTokens + extraTokens
