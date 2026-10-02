@@ -2938,7 +2938,7 @@ class LocalHarnessEngine @Inject constructor(
             contextChars = runSnapshot.contextChars,
             parentRunId = continuationParentRunId,
         )
-        var lastModelErrorCode: String? = null
+        var lastModelError: LocalModelException? = null
         val progressTracker = LocalAgentProgressTracker()
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
@@ -3084,7 +3084,7 @@ class LocalHarnessEngine @Inject constructor(
                         }
                     }
                 } catch (error: Throwable) {
-                    if (error is LocalModelException) lastModelErrorCode = error.code
+                    if (error is LocalModelException) lastModelError = error
                     val nativeImageRejected =
                         nativeImagesSent &&
                             imageInputUnsupported(error)
@@ -3370,7 +3370,7 @@ class LocalHarnessEngine @Inject constructor(
                         val continuationEligible =
                             binding != null &&
                                 shouldAutoContinueWorkFailure(
-                                    errorCode = lastModelErrorCode,
+                                    error = lastModelError,
                                     automaticContinuationCount = binding.automaticContinuationCount,
                                     pendingInputs = binding.pendingInputs.size(),
                                 )
