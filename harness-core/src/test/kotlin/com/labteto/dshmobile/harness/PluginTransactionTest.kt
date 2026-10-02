@@ -95,7 +95,14 @@ class PluginTransactionTest {
         val owner = object : HarnessPlugin {
             override val id = "owner"
             override suspend fun install(context: HarnessContext) {
-                context.tools.register(HarnessTool("slow", buildJsonObject {}, executor = HarnessToolExecutor { _, _, _ ->
+                context.tools.register(HarnessTool(
+                    name = "slow",
+                    schema = functionToolSchema("slow", "测试工具"),
+                    access = ToolAccess.READ_ONLY,
+                    approvalPolicy = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.CORE,
+                    metadata = ToolMetadata("测试"),
+                    executor = HarnessToolExecutor { _, _, _ ->
                     entered.complete(Unit); finish.await()
                     assertFalse(closed)
                     ToolResult("done")
@@ -138,7 +145,14 @@ class PluginTransactionTest {
         registry.install(object : HarnessPlugin {
             override val id = "owner"
             override suspend fun install(context: HarnessContext) {
-                context.tools.register(HarnessTool("slow", buildJsonObject {}, executor = HarnessToolExecutor { _, _, _ ->
+                context.tools.register(HarnessTool(
+                    name = "slow",
+                    schema = functionToolSchema("slow", "测试工具"),
+                    access = ToolAccess.READ_ONLY,
+                    approvalPolicy = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.CORE,
+                    metadata = ToolMetadata("测试"),
+                    executor = HarnessToolExecutor { _, _, _ ->
                     entered.complete(Unit); finish.await(); ToolResult("done")
                 }))
             }
@@ -164,7 +178,14 @@ class PluginTransactionTest {
             override val id = "owner"
             override suspend fun install(context: HarnessContext) {
                 if (++installs > 1) error("restore failed")
-                context.tools.register(HarnessTool("resource", buildJsonObject {}, executor = HarnessToolExecutor { _, _, _ ->
+                context.tools.register(HarnessTool(
+                    name = "resource",
+                    schema = functionToolSchema("resource", "测试工具"),
+                    access = ToolAccess.READ_ONLY,
+                    approvalPolicy = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.CORE,
+                    metadata = ToolMetadata("测试"),
+                    executor = HarnessToolExecutor { _, _, _ ->
                     error("closed resource must never execute")
                 }))
             }
@@ -177,7 +198,14 @@ class PluginTransactionTest {
         assertEquals(PluginLifecycleState.FAILED, registry.lifecycleSnapshot("owner")?.state)
         assertTrue(registry.context.tools.execute("resource", buildJsonObject {}).isError)
         assertTrue(registry.uninstall("owner"))
-        registry.context.tools.register(HarnessTool("healthy", buildJsonObject {}, executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") }))
+        registry.context.tools.register(HarnessTool(
+                    name = "healthy",
+                    schema = functionToolSchema("healthy", "测试工具"),
+                    access = ToolAccess.READ_ONLY,
+                    approvalPolicy = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.CORE,
+                    metadata = ToolMetadata("测试"),
+                    executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") }))
         assertEquals("ok", registry.context.tools.execute("healthy", buildJsonObject {}).content)
     }
 
