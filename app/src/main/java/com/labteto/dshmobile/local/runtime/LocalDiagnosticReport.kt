@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.observability.AppLogEntry
+import com.labteto.dshmobile.observability.sanitizeDiagnosticText
 import java.util.ArrayDeque
 
 /**
@@ -64,7 +65,11 @@ internal fun appendLocalDiagnosticDetails(
         DIAGNOSTIC_EVENT_KEYS.forEach { key ->
             event.data[key]?.toString()?.let { value ->
                 append(" ").append(key).append("=")
-                append(value.replace("\n", " ").take(MAX_DIAGNOSTIC_FIELD_CHARS))
+                append(
+                    sanitizeDiagnosticText(value)
+                        .replace("\n", " ")
+                        .take(MAX_DIAGNOSTIC_FIELD_CHARS),
+                )
             }
         }
         appendLine()
@@ -100,7 +105,7 @@ internal fun appendLocalDiagnosticDetails(
             context.runKind?.let { append(" run_kind=").append(it.take(64)) }
             context.agentId?.let { append(" agent_id=").append(it.take(160)) }
             context.step?.let { append(" step=").append(it) }
-            context.taskLabel?.let { append(" task=").append(it.replace("\n", " ").take(160)) }
+            context.taskLabel?.let { append(" task_label_chars=").append(it.length) }
             append(" model=").append(record.model.take(160))
             route?.provider?.takeIf(String::isNotBlank)?.let { append(" provider=").append(it.take(80)) }
             route?.profileId?.takeIf(String::isNotBlank)?.let { append(" profile_id=").append(it.take(160)) }
