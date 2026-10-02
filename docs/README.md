@@ -11,6 +11,7 @@
 | 文档 | 内容 |
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 当前 8 模块结构、app 内 capability runtime、状态投影、Engine / Coordinator 边界 |
+| [SYSTEM-AUDIT-GUIDE.zh-CN.md](SYSTEM-AUDIT-GUIDE.zh-CN.md) | 全量系统联审权威规范：顶层审计视角、具体维度、多轮执行方法、问题分级与输出标准 |
 | [PROTOCOL.md](PROTOCOL.md) | 当前远程 Web 协议与本机 Session / Agent 协议边界 |
 | [COMPATIBILITY.md](COMPATIBILITY.md) | 当前 Android、ABI、本机语义参考和远程 Harness / relay 支持矩阵 |
 | [SECURITY.md](SECURITY.md) | 凭据、工作区、工具、恢复、Web、设备、数据和更新安全边界 |
