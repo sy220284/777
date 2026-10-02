@@ -18,4 +18,23 @@ class LocalModelSelectionStateTest {
             assertFalse(selection.copy(activeProfileId = null).isActive(first))
         }
     }
+
+    @Test fun workerProfileSurvivesProfileRefreshOnlyWhileStillAvailable() {
+        val primary = LocalModelProfile("primary", "gpt-test", "https://api.openai.com/v1")
+        val worker = LocalModelProfile("worker", "deepseek-chat", "https://api.deepseek.com")
+        val selection = LocalModelSelectionState(
+            profiles = listOf(primary, worker),
+            activeProfileId = primary.id,
+            workerProfileId = worker.id,
+        )
+
+        val refreshed = selection.replaceProfiles(listOf(worker, primary), primary.id)
+        assertEquals(worker.id, refreshed.workerProfileId)
+        assertEquals(worker, refreshed.workerProfile)
+
+        val removed = refreshed.replaceProfiles(listOf(primary), primary.id)
+        assertNull(removed.workerProfileId)
+        assertNull(removed.workerProfile)
+    }
+
 }
