@@ -4810,18 +4810,11 @@ class LocalHarnessEngine @Inject constructor(
         val history = binding?.modelHistory ?: modelHistory
         val targetState = binding?.state ?: _state
         val log = binding?.eventLog ?: eventLog
-        val budget = if (targetState.value.usageMode == LocalUsageMode.WORK) {
-            workSteadyStateHistoryBudget(
-                base = baseBudget,
-                currentHistoryTokens = history.estimatedTokens,
-                extraTokens = extraTokens,
-            )
-        } else {
-            baseBudget
-        }
-        val workSteadyStateApplied =
-            targetState.value.usageMode == LocalUsageMode.WORK &&
-                budget.maxHistoryTokens != baseBudget.maxHistoryTokens
+        val workMode = targetState.value.usageMode == LocalUsageMode.WORK
+        val budget = if (workMode) {
+            workSteadyStateHistoryBudget(baseBudget, history.estimatedTokens, extraTokens)
+        } else baseBudget
+        val workSteadyStateApplied = workMode && budget.maxHistoryTokens != baseBudget.maxHistoryTokens
         val compaction = history.compact(
             compactor = historyCompactor,
             budget = budget,
