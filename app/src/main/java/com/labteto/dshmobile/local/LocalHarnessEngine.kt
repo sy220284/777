@@ -661,7 +661,13 @@ class LocalHarnessEngine @Inject constructor(
         sessionId = sessionId,
         boundState = boundState,
         runKind = LocalAgentRunKind.SUBAGENT,
-        schemasProvider = ::subagentToolSchemas,
+        schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
+            toolSchemaProjection.subagentSchemas(
+                allowMutation = allowMutation,
+                allowVirtualScreen = allowVirtualScreen,
+                enabledOptional = enabledOptional,
+            )
+        },
         executeTool = { call, allowMutation, memoryTools, enabledOptional ->
             executePersistentSubagentTool(
                 call = call,
@@ -690,7 +696,13 @@ class LocalHarnessEngine @Inject constructor(
         sessionId = sessionId,
         boundState = boundState,
         runKind = LocalAgentRunKind.AUTOMATION,
-        schemasProvider = ::subagentToolSchemas,
+        schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
+            toolSchemaProjection.subagentSchemas(
+                allowMutation = allowMutation,
+                allowVirtualScreen = allowVirtualScreen,
+                enabledOptional = enabledOptional,
+            )
+        },
         executeTool = { call, allowMutation, memoryTools, enabledOptional ->
             executeAutomationSubagentTool(
                 call = call,
@@ -4380,7 +4392,13 @@ class LocalHarnessEngine @Inject constructor(
             sessionId = binding.sessionId,
             boundState = binding.state.value,
             runKind = LocalAgentRunKind.SUBAGENT,
-            schemasProvider = ::subagentToolSchemas,
+            schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
+            toolSchemaProjection.subagentSchemas(
+                allowMutation = allowMutation,
+                allowVirtualScreen = allowVirtualScreen,
+                enabledOptional = enabledOptional,
+            )
+        },
             executeTool = { call, allowMutation, boundMemoryTools, enabledOptional ->
                 executePersistentSubagentTool(
                     call = call,
