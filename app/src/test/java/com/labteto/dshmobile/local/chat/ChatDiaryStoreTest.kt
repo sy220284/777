@@ -279,6 +279,55 @@ class ChatDiaryStoreTest {
         assertEquals(listOf("s"), remaining.sources.map { it.sessionId }.distinct())
     }
 
+
+    @Test
+    fun deletingLastSourceSessionInvalidatesDiaryInsteadOfLeavingGhostEntry() {
+        val memory = store()
+        val saved = memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户答应周末和我去海边",
+                feeling = "我很期待",
+                importance = 4,
+            ),
+        ))!!
+
+        assertEquals(1, memory.detachSourceSessions(setOf("s")))
+        assertTrue(memory.listActive("gallery:a").none { it.id == saved.id })
+    }
+
+    @Test
+    fun sameEventFromDirectAndGroupKeepsSeparateProvenance() {
+        val memory = store()
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户确认周末一起去露营",
+                feeling = "我很期待",
+                importance = 4,
+                disclosure = "SHAREABLE",
+            ),
+            evidence = "用户确认周末一起去露营",
+        ))
+        memory.record(request(
+            sourceMode = ChatDiarySourceMode.GROUP,
+            delta = ChatDiaryDelta(
+                event = "用户确认周末一起去露营",
+                feeling = "大家都听见后，我更确定这件事了",
+                importance = 4,
+                disclosure = "PUBLIC",
+            ),
+            userId = "u2",
+            assistantId = "a2",
+            evidence = "群聊里用户确认周末一起去露营",
+        ))
+
+        val entries = memory.listActive("gallery:a")
+        assertEquals(2, entries.size)
+        assertEquals(
+            setOf(ChatDiarySourceMode.DIRECT, ChatDiarySourceMode.GROUP),
+            entries.map { it.sourceMode }.toSet(),
+        )
+    }
+
     @Test
     fun timelineRewriteInvalidatesDiaryDerivedFromDiscardedMessage() {
         val memory = store()
