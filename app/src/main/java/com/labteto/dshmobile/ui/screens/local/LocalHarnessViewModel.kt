@@ -20,6 +20,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
+import com.labteto.dshmobile.local.chat.ChatDiaryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
@@ -139,6 +140,8 @@ class LocalHarnessViewModel @Inject constructor(
     fun selectModel(model: String) = runtime.model.selectModel(model)
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult = runtime.chat.send(text, attachments)
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
+    internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
+        withContext(Dispatchers.IO) { runtime.chat.diaryEntries(subjectKey) }
     fun createGroupChatSession() = runtime.chat.createGroupChatSession()
     fun createSingleChatSession() = runtime.chat.createSingleChatSession()
     fun openGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.GROUP)
