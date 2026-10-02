@@ -11,7 +11,10 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.json.JsonArray
@@ -52,7 +55,14 @@ class AndroidRuntimePlugin(
                 name = "runtime_command_status",
                 schema = runtimeStatusSchema(),
                 access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
                 timeoutMillis = 5_000L,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "运行时",
+                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    requirements = emptyList(),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val commands = input["commands"]
                         ?.takeIf { it is JsonArray }
@@ -86,6 +96,12 @@ class AndroidRuntimePlugin(
                 access = ToolAccess.PROCESS,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = PROCESS_TOOL_TIMEOUT_MILLIS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "运行时",
+                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    requirements = listOf("目标命令必须存在；可先调用 runtime_command_status 检查"),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val command = input.requiredStringArray("command")
                     val workingDirectory = resolveWorkingDirectory(input.optionalString("working_directory"))
@@ -120,6 +136,12 @@ class AndroidRuntimePlugin(
                 access = ToolAccess.PROCESS,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 10_000L,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "运行时",
+                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    requirements = listOf("目标命令必须存在；可先调用 runtime_command_status 检查"),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val command = input["command"]
                         ?.takeIf { it is JsonArray }
@@ -152,6 +174,12 @@ class AndroidRuntimePlugin(
                 access = ToolAccess.PROCESS,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 10_000L,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "运行时",
+                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    requirements = emptyList(),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
                     try {
@@ -169,7 +197,14 @@ class AndroidRuntimePlugin(
                 name = "terminal_read",
                 schema = terminalSessionSchema("terminal_read", "读取持久终端当前可用输出"),
                 access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
                 timeoutMillis = 10_000L,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "运行时",
+                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    requirements = emptyList(),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
                     try {
@@ -186,7 +221,14 @@ class AndroidRuntimePlugin(
                 name = "terminal_status",
                 schema = terminalSessionSchema("terminal_status", "检查持久终端会话是否仍在运行"),
                 access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
                 timeoutMillis = 5_000L,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "运行时",
+                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    requirements = emptyList(),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
                     val alive = terminalProvider.isAlive(sessionId)
@@ -209,6 +251,12 @@ class AndroidRuntimePlugin(
                 access = ToolAccess.PROCESS,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = 10_000L,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "运行时",
+                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    requirements = emptyList(),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val sessionId = input.requiredString("session_id")
                     try {
@@ -301,7 +349,7 @@ class AndroidRuntimePlugin(
         }
     }.trimEnd()
 
-    private fun runtimeStatusSchema(): JsonObject = functionSchema(
+    private fun runtimeStatusSchema(): JsonObject = functionToolSchema(
         "runtime_command_status",
         "检查本机进程环境中常用命令是否可执行",
         buildJsonObject {
@@ -315,7 +363,7 @@ class AndroidRuntimePlugin(
         },
     )
 
-    private fun processExecSchema(): JsonObject = functionSchema(
+    private fun processExecSchema(): JsonObject = functionToolSchema(
         "process_exec",
         "直接执行一个本机进程参数数组；用于 Git、Python、Node 等已存在的命令",
         buildJsonObject {
@@ -345,7 +393,7 @@ class AndroidRuntimePlugin(
         required = setOf("command"),
     )
 
-    private fun terminalOpenSchema(): JsonObject = functionSchema(
+    private fun terminalOpenSchema(): JsonObject = functionToolSchema(
         "terminal_open",
         "打开一个跨多次工具调用保持存活的交互进程；当前为管道终端，不伪装完整 PTY",
         buildJsonObject {
@@ -361,7 +409,7 @@ class AndroidRuntimePlugin(
         },
     )
 
-    private fun terminalWriteSchema(): JsonObject = functionSchema(
+    private fun terminalWriteSchema(): JsonObject = functionToolSchema(
         "terminal_write",
         "向持久终端写入标准输入",
         buildJsonObject {
@@ -371,7 +419,7 @@ class AndroidRuntimePlugin(
         required = setOf("session_id", "input"),
     )
 
-    private fun terminalSessionSchema(name: String, description: String): JsonObject = functionSchema(
+    private fun terminalSessionSchema(name: String, description: String): JsonObject = functionToolSchema(
         name,
         description,
         buildJsonObject {
@@ -380,42 +428,15 @@ class AndroidRuntimePlugin(
         required = setOf("session_id"),
     )
 
-    private fun functionSchema(
-        name: String,
-        description: String,
-        properties: JsonObject,
-        required: Set<String> = emptySet(),
-    ): JsonObject = buildJsonObject {
-        put("type", "function")
-        put(
-            "function",
-            buildJsonObject {
-                put("name", name)
-                put("description", description)
-                put(
-                    "parameters",
-                    buildJsonObject {
-                        put("type", "object")
-                        put("properties", properties)
-                        put(
-                            "required",
-                            buildJsonArray {
-                                required.forEach { add(JsonPrimitive(it)) }
-                            },
-                        )
-                        put("additionalProperties", false)
-                    },
-                )
-            },
-        )
-    }
-
     private companion object {
         const val MIN_PROCESS_TIMEOUT_MILLIS = 100L
         const val DEFAULT_PROCESS_TIMEOUT_MILLIS = 30_000L
         const val MAX_PROCESS_TIMEOUT_MILLIS = 120_000L
         const val PROCESS_TOOL_TIMEOUT_MILLIS = 125_000L
         const val MAX_TOOL_OUTPUT_CHARS = 120_000
+        val RUNTIME_DISCOVERY_KEYWORDS = setOf(
+            "runtime", "运行时", "进程", "终端", "命令", "shell", "git", "python", "node",
+        )
         val TOOL_NAMES = listOf(
             "runtime_command_status",
             "process_exec",
