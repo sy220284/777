@@ -301,6 +301,10 @@ class SettingsViewModel @Inject constructor(
         localHarness.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
     }
 
+    fun configureWorkerProfile(profileId: String?) {
+        localHarness.configureWorkerProfile(profileId)
+    }
+
     suspend fun diagnoseNetwork(target: String): String = localHarness.diagnoseNetwork(target)
 
     suspend fun localSessionStorageStatus(): LocalSessionStorageStatus =
