@@ -118,6 +118,47 @@ class LocalWorkExecutionBudgetTest {
     }
 
     @Test
+    fun reportedUsageCalibratesLaterUncertainExposure() = runTest {
+        val budget = LocalWorkExecutionBudget(
+            exposureLimitTokens = 500_000,
+            pendingLimitTokens = 500_000,
+            maxRequests = 10,
+        )
+
+        budget.reserve(100_000).commit(reportedInputTokens = 50_000)
+        budget.reserve(100_000).commit()
+
+        val snapshot = budget.snapshot()
+        assertEquals(50_000L, snapshot.reportedExposureTokens)
+        assertEquals(50_000L, snapshot.uncertainExposureTokens)
+        assertEquals(100_000L, snapshot.committedExposureTokens)
+        assertEquals(500, snapshot.estimateCalibrationPermille)
+        assertEquals(1, snapshot.calibrationSamples)
+    }
+
+    @Test
+    fun exposureOverlapWaitsWhenOnlyPendingReservationCausesTheLimit() = runTest {
+        val budget = LocalWorkExecutionBudget(
+            exposureLimitTokens = 200_000,
+            pendingLimitTokens = 200_000,
+            maxRequests = 10,
+        )
+        val first = budget.reserve(140_000)
+        val waiting = async { budget.reserve(80_000) }
+        runCurrent()
+        assertFalse(waiting.isCompleted)
+
+        first.release()
+        advanceUntilIdle()
+        val second = waiting.await()
+        second.commit(reportedInputTokens = 60_000)
+
+        val snapshot = budget.snapshot()
+        assertEquals(60_000L, snapshot.reportedExposureTokens)
+        assertEquals(60_000L, snapshot.committedExposureTokens)
+    }
+
+    @Test
     fun terminalPlanLimitOpensCircuitForSiblingRequests() {
         val breaker = LocalModelRouteCircuitBreaker()
         assertFalse(breaker.isOpen("route"))
