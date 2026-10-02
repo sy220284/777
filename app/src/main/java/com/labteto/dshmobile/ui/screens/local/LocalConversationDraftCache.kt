@@ -1,21 +1,45 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+
 private const val MAX_LOCAL_SESSION_DRAFTS = 12
 
 /**
- * Keep only the most recently touched local-session drafts. Blank drafts do not need persistence.
+ * Small UI-only LRU for per-session composer drafts.
  *
- * Re-inserting an existing key updates its recency even when the backing map preserves insertion
- * order only, and keeps restored legacy maps bounded after the first edit.
+ * SnapshotStateMap deliberately does not define iteration order, so recency is tracked separately
+ * and persisted in that order. Blank drafts release their entry immediately.
  */
-internal fun MutableMap<String, String>.putBoundedLocalDraft(sessionId: String, value: String) {
-    if (value.isBlank()) {
-        remove(sessionId)
-        return
+internal class LocalSessionDraftCache {
+    private val values = mutableStateMapOf<String, String>()
+    private val recency = mutableStateListOf<String>()
+
+    operator fun get(sessionId: String): String? = values[sessionId]
+
+    fun putBoundedLocalDraft(sessionId: String, value: String) {
+        recency.remove(sessionId)
+        if (value.isBlank()) {
+            values.remove(sessionId)
+            return
+        }
+        values[sessionId] = value
+        recency += sessionId
+        while (recency.size > MAX_LOCAL_SESSION_DRAFTS) {
+            values.remove(recency.removeAt(0))
+        }
     }
-    remove(sessionId)
-    this[sessionId] = value
-    while (size > MAX_LOCAL_SESSION_DRAFTS) {
-        keys.firstOrNull()?.let(::remove) ?: break
+
+    fun save(): List<String> = recency.flatMap { sessionId ->
+        values[sessionId]?.let { value -> listOf(sessionId, value) }.orEmpty()
+    }
+
+    companion object {
+        fun restore(saved: List<String>): LocalSessionDraftCache =
+            LocalSessionDraftCache().apply {
+                saved.chunked(2).forEach { pair ->
+                    if (pair.size == 2) putBoundedLocalDraft(pair[0], pair[1])
+                }
+            }
     }
 }
