@@ -4086,7 +4086,7 @@ class LocalHarnessEngine @Inject constructor(
                 args.optionalString("model"),
                 binding,
             )
-            "session_search" -> searchSessions(args.string("query"))
+            "session_search" -> searchSessions(args.string("query"), boundSessionId)
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
                 memoryTools(binding).execute(call.name, args, allowMutation)
             "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId).search(
@@ -4559,13 +4559,28 @@ class LocalHarnessEngine @Inject constructor(
         ).run(tasks, mode, requiredEvidence)
     }
 
-    private fun searchSessions(query: String): String {
-        val hits = (sessionSummaries().map(LocalSessionSummary::id) + currentSessionId).distinct().mapNotNull { id ->
+    private fun searchSessions(query: String, scopeSessionId: String = currentSessionId): String {
+        val hits = mutableListOf<String>()
+        val candidates = (sessionSummaries().map(LocalSessionSummary::id) + scopeSessionId).distinct()
+        for (id in candidates) {
+            if (hits.size >= MAX_SESSION_SEARCH_HITS) break
+            if (!canReadSessionFrom(scopeSessionId, id)) continue
             val result = eventLogFor(id).search(query, limit = 1)
             result.takeUnless { it == "未找到会话事件" || it == "会话事件日志为空" }
-                ?.let { "会话 $id\n$it" }
+                ?.let { hits += "会话 $id\n$it" }
         }
-        return if (hits.isEmpty()) "未找到历史会话事件" else hits.take(50).joinToString("\n\n")
+        return if (hits.isEmpty()) "未找到当前项目或会话链中的历史事件"
+        else hits.joinToString("\n\n")
+    }
+
+    private fun canReadSessionFrom(scopeSessionId: String, targetSessionId: String): Boolean {
+        if (scopeSessionId == targetSessionId) return true
+        val source = sessionCoordinator.read(scopeSessionId) ?: return false
+        val target = sessionCoordinator.read(targetSessionId) ?: return false
+        val sameProject = source.projectId?.takeIf(String::isNotBlank)?.let { it == target.projectId } == true
+        val sourceLineage = source.lineageId.ifBlank { source.id }
+        val targetLineage = target.lineageId.ifBlank { target.id }
+        return sameProject || (sourceLineage.isNotBlank() && sourceLineage == targetLineage)
     }
 
     private fun eventLogForAuthorized(
@@ -4573,7 +4588,9 @@ class LocalHarnessEngine @Inject constructor(
         defaultSessionId: String = currentSessionId,
     ): LocalSessionEventLog {
         val id = requestedId?.takeIf(String::isNotBlank) ?: defaultSessionId
-        require(id == currentSessionId || sessionSummaries().any { it.id == id }) { "会话不存在或无权访问：$id" }
+        require(canReadSessionFrom(defaultSessionId, id)) {
+            "会话不存在，或不属于当前项目/会话链：$id"
+        }
         return eventLogFor(id)
     }
 
