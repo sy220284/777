@@ -10,7 +10,7 @@ class ChatDiaryPromptTest {
     private val planner = ChatInteractionPlanner(Json { ignoreUnknownKeys = true })
 
     @Test
-    fun diaryPromptDemandsNarrativePsychologyInsteadOf流水账() {
+    fun diaryPromptDemandsNarrativePsychologyInsteadOfChronologyList() {
         val prompt = planner.prompt(
             persona = PersonaProfile(name = "阿青", personality = "嘴硬心软"),
             state = ChatCharacterState(),
