@@ -542,10 +542,10 @@ internal fun supportsResponsesPromptCacheDiagnostics(model: String, baseUrl: Str
     if (!officialOpenAi) return false
 
     val normalized = model.trim().lowercase()
-    val match = Regex("""^gpt-(\d+)\.(\d+)(?:[.-].*)?$""").find(normalized) ?: return false
+    val match = Regex("""^gpt-(\d+)(?:\.(\d+))?(?:[.-].*)?$""").find(normalized) ?: return false
     val major = match.groupValues[1].toIntOrNull() ?: return false
-    val minor = match.groupValues[2].toIntOrNull() ?: return false
-    return major > 5 || (major == 5 && minor >= 6)
+    val minor = match.groupValues[2].takeIf(String::isNotEmpty)?.toIntOrNull()
+    return major > 5 || (major == 5 && minor != null && minor >= 6)
 }
 
 /** Fix the retired official preset without changing proxy model aliases or credential identity. */
