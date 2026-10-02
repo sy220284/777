@@ -149,11 +149,10 @@ internal class LocalSessionLifecycleCoordinator(
                             usageMode == LocalUsageMode.CHAT &&
                             sourceState.usageMode == LocalUsageMode.CHAT
                         ) {
-                            buildChatContinuationHandoff(
-                                state = sourceState.chatState,
-                                messages = sourceState.messages,
-                                context = sourceState.chatContext,
-                            )
+                            // Chat continuity/pending state is transferred below. Long-range
+                            // narrative recall now comes from character diaries, so duplicating old
+                            // dialogue into a handoff summary only wastes context.
+                            null
                         } else {
                             buildHandoffSummary(sourceState)
                         }
