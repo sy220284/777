@@ -8,7 +8,11 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
+import com.labteto.dshmobile.harness.tools.simpleToolProperties
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -129,4 +133,6 @@ class AndroidDevicePlugin(
             "android_scroll", "android_wait", "android_tap_text", "android_type", "android_tap",
             "android_swipe", "android_screenshot",
         )
-    }}
+    }
+}
+
