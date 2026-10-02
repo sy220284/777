@@ -109,7 +109,8 @@ internal fun appendLocalDiagnosticDetails(
                 "estimated_cost_cny=${aggregate.estimatedCostCny}",
         )
         val records = detail.records.sortedBy { it.timestamp }.takeLast(MAX_DIAGNOSTIC_TOKEN_RECORDS)
-        appendLine("请求记录：导出 ${records.size}/${detail.records.size}")
+        val totalRecordCount = aggregate.requestCount + aggregate.unreportedRequestCount
+        appendLine("请求记录：导出 ${records.size}/$totalRecordCount")
         records.forEach { record ->
             val context = record.context
             val route = record.route
