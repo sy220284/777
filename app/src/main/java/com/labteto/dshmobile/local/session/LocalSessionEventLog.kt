@@ -35,6 +35,7 @@ class LocalSessionEventLog(
                 error,
             )
         },
+        onSegmentRotated = { LocalSessionArchiveMaintenance.request(file, json) },
     )
 
     fun append(type: String, data: JsonObject): Event =
