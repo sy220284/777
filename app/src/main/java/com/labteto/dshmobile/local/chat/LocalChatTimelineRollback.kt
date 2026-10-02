@@ -39,7 +39,9 @@ internal fun sourceEventSequenceForMessage(
     messageId: String,
 ): Long? = events
     .filter { event ->
-        event.type == "user/message" || event.type == LOCAL_AGENT_INBOX_EVENT_TYPE
+        event.type == "user/message" ||
+            event.type == LOCAL_AGENT_INBOX_EVENT_TYPE ||
+            (event.type == "chat/active-transcript" && isTimelineRewriteEditedMessage(event.data, messageId))
     }
     .filter { event ->
         decodeTranscriptMessages(event.data)
@@ -135,7 +137,11 @@ internal fun sourceEventSequenceForMessage(
         if (page.isEmpty()) return null
 
         page.asReversed().firstOrNull { event ->
-            (event.type == "user/message" || event.type == LOCAL_AGENT_INBOX_EVENT_TYPE) &&
+            (
+                event.type == "user/message" ||
+                    event.type == LOCAL_AGENT_INBOX_EVENT_TYPE ||
+                    (event.type == "chat/active-transcript" && isTimelineRewriteEditedMessage(event.data, messageId))
+                ) &&
                 decodeTranscriptMessages(event.data)
                     .orEmpty()
                     .any { message -> message.id == messageId }
