@@ -4436,6 +4436,8 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             historySnapshot = binding.modelHistory::snapshot,
+            executionBudget = binding.executionBudget,
+            routeCircuitBreaker = binding.routeCircuitBreaker,
         )
 
     private suspend fun runWorkflow(
