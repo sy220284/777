@@ -57,26 +57,32 @@ object AppLog {
     }
 
     fun debug(tag: String, message: String) {
-        record("D", tag, message, null)
-        runCatching { Log.d(tag, message) }
+        val safeMessage = sanitizeDiagnosticText(message)
+        record("D", tag, safeMessage, null)
+        runCatching { Log.d(tag, safeMessage) }
     }
 
     fun info(tag: String, message: String) {
-        record("I", tag, message, null)
-        runCatching { Log.i(tag, message) }
+        val safeMessage = sanitizeDiagnosticText(message)
+        record("I", tag, safeMessage, null)
+        runCatching { Log.i(tag, safeMessage) }
     }
 
     fun warn(tag: String, message: String, throwable: Throwable? = null) {
-        record("W", tag, message, throwable)
+        val safeMessage = sanitizeDiagnosticText(message)
+        val safeThrowable = throwable?.let(::sanitizeThrowableForLogging)
+        record("W", tag, safeMessage, safeThrowable)
         runCatching {
-            if (throwable == null) Log.w(tag, message) else Log.w(tag, message, throwable)
+            if (safeThrowable == null) Log.w(tag, safeMessage) else Log.w(tag, safeMessage, safeThrowable)
         }
     }
 
     fun error(tag: String, message: String, throwable: Throwable? = null) {
-        record("E", tag, message, throwable)
+        val safeMessage = sanitizeDiagnosticText(message)
+        val safeThrowable = throwable?.let(::sanitizeThrowableForLogging)
+        record("E", tag, safeMessage, safeThrowable)
         runCatching {
-            if (throwable == null) Log.e(tag, message) else Log.e(tag, message, throwable)
+            if (safeThrowable == null) Log.e(tag, safeMessage) else Log.e(tag, safeMessage, safeThrowable)
         }
     }
 
@@ -123,12 +129,7 @@ object AppLog {
             while (entries.size >= MAX_ENTRIES) entries.removeFirst()
             entries.addLast(entry)
         }
-        persistAsync(
-            entry.copy(
-                message = sanitizeDiagnosticText(entry.message),
-                throwableMessage = entry.throwableMessage?.let(::sanitizeDiagnosticText),
-            ),
-        )
+        persistAsync(entry)
     }
 
     private fun persistAsync(entry: AppLogEntry) {
@@ -191,6 +192,13 @@ object AppLog {
 
     private fun decode(value: String): String =
         String(Base64.getDecoder().decode(value), Charsets.UTF_8)
+}
+
+private fun sanitizeThrowableForLogging(throwable: Throwable): Throwable {
+    val safeMessage = sanitizeDiagnosticText(throwable.message.orEmpty()).ifBlank { null }
+    return RuntimeException(safeMessage).also { sanitized ->
+        sanitized.stackTrace = throwable.stackTrace
+    }
 }
 
 internal fun sanitizeDiagnosticText(value: String): String {
