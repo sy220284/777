@@ -111,6 +111,8 @@ class LocalSessionEventLog(
 
     fun clear() = delegate.clear()
 
+    fun close() = delegate.close()
+
     private fun com.labteto.dshmobile.harness.session.SessionEvent.toLocalEvent() = Event(
         sequence = sequence,
         type = type,
