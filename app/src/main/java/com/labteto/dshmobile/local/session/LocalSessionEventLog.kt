@@ -47,6 +47,10 @@ class LocalSessionEventLog(
 
     fun latestSequence(): Long = delegate.latestSequence()
 
+    fun diagnostics() = delegate.diagnostics()
+
+    fun close() = delegate.close()
+
     fun snapshotAfter(sequenceExclusive: Long): List<Event> = delegate.snapshotAfter(sequenceExclusive).map { event ->
         event.toLocalEvent()
     }
@@ -110,8 +114,6 @@ class LocalSessionEventLog(
         delegate.latestOf(types)?.toLocalEvent()
 
     fun clear() = delegate.clear()
-
-    fun close() = delegate.close()
 
     private fun com.labteto.dshmobile.harness.session.SessionEvent.toLocalEvent() = Event(
         sequence = sequence,
