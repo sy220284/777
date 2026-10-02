@@ -10,9 +10,7 @@ import java.security.MessageDigest
  * Agent has produced new evidence since the previous extension. Repeating the same tool/result does
  * not buy more steps.
  */
-internal class LocalAgentProgressTracker(
-    private val maxFingerprints: Int = 48,
-) {
+internal class LocalAgentProgressTracker {
     private val seen = LinkedHashSet<String>()
     private var progressVersion = 0L
     private var claimedVersion = 0L
@@ -30,10 +28,6 @@ internal class LocalAgentProgressTracker(
         }
         if (seen.add(sha256(normalized))) {
             progressVersion += 1
-            while (seen.size > maxFingerprints) {
-                val first = seen.iterator().next()
-                seen.remove(first)
-            }
         }
     }
 
@@ -44,10 +38,6 @@ internal class LocalAgentProgressTracker(
         val fingerprint = sha256("assistant\u0000" + content.take(2_048))
         if (seen.add(fingerprint)) {
             progressVersion += 1
-            while (seen.size > maxFingerprints) {
-                val first = seen.iterator().next()
-                seen.remove(first)
-            }
         }
     }
 
