@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.agent
 
 import com.labteto.dshmobile.harness.agent.*
-import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.local.*
 import com.labteto.dshmobile.local.model.LocalModelGateway
@@ -19,6 +18,10 @@ internal class LocalSubagentModelStepExecutor(
     private val historyCompactor: LocalHistoryCompactor,
     private val executionControl: LocalWorkExecutionControl? = null,
 ) {
+    private val requestBoundary = LocalSubagentModelRequestBoundary(
+        modelGateway, resourceScheduler, eventLog, executionControl,
+    )
+
     suspend fun complete(
         profile: LocalModelProfile,
         baseUrl: String,
@@ -86,26 +89,9 @@ internal class LocalSubagentModelStepExecutor(
         while (true) {
             try {
                 return executor.execute {
-                    executeWithModelAdmission(
-                        control = executionControl,
-                        profileId = profile.id,
-                        model = model,
-                        baseUrl = baseUrl,
-                        messages = activeHistory,
-                        tools = tools,
-                    ) {
-                        resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                            try {
-                                modelGateway.complete(
-                                    profile = profile, model = model, baseUrl = baseUrl,
-                                    messages = activeHistory, tools = tools,
-                                )
-                            } catch (error: LocalModelException) {
-                                logSubagentProviderError(eventLog(), subagentId, step, error)
-                                throw error
-                            }
-                        }
-                    }
+                    requestBoundary.complete(
+                        profile, model, baseUrl, activeHistory, tools, subagentId, step,
+                    )
                 }
             } catch (error: Throwable) {
                 if (!structureRecoveryAttempted) {
