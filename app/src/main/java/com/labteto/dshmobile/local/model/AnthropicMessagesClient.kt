@@ -87,7 +87,7 @@ internal class AnthropicMessagesClient @Inject constructor(
             .build()
         var admittedRequestId: String? = null
         try {
-            withCancellableModelResponse(client.newCall(request)) { response ->
+            withCancellableModelResponse(client.newCall(request), admissionTracker) { response ->
                 val requestId = response.header("request-id")
                     ?: response.header("anthropic-request-id")
                 val retryAfterMs = parseRetryAfterMillis(response.header("Retry-After"))

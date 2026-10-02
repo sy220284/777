@@ -30,7 +30,13 @@ data class LocalModelProfile(
 internal fun LocalModelProfile.usesResponsesTransport(): Boolean =
     authKind == LocalModelAuthKind.CHATGPT_PLAN || protocol == LocalModelProtocol.RESPONSES
 
-/** Stable identity shared by replay, cache and route-health state without containing credential secrets. */
+/**
+ * Stable physical-route identity for provider-side cache and route-health state.
+ *
+ * UI profile ids are deliberately excluded: two profiles pointing at the same physical route should
+ * share health, while changing account/credential, protocol, provider, endpoint or model must create
+ * a new identity. No credential secret is included.
+ */
 internal fun LocalModelProfile.routeFingerprint(): String {
     val effectiveProtocol = if (authKind == LocalModelAuthKind.CHATGPT_PLAN) {
         LocalModelProtocol.RESPONSES

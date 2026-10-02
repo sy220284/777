@@ -84,7 +84,7 @@ class DeepSeekClient @Inject constructor(
             .post(payload.toString().toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
             .build()
         try {
-            withCancellableModelResponse(modelHttp.newCall(request)) { response ->
+            withCancellableModelResponse(modelHttp.newCall(request), admissionTracker) { response ->
                 if (!response.isSuccessful) {
                     val body = response.readModelBodyBounded()
                     val detail = providerErrorDetail(body, json)
@@ -178,7 +178,7 @@ class DeepSeekClient @Inject constructor(
             .post(payload.toString().toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
             .build()
         try {
-            withCancellableModelResponse(modelHttp.newCall(request)) { response ->
+            withCancellableModelResponse(modelHttp.newCall(request), admissionTracker) { response ->
                 if (!response.isSuccessful) {
                     val body = response.readModelBodyBounded()
                     val detail = providerErrorDetail(body, json)

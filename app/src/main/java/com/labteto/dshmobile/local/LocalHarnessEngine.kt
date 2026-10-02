@@ -2043,7 +2043,15 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     internal suspend fun diagnosticReportForUi(): String = withContext(Dispatchers.IO) {
-        DiagnosticReport.build(AppLog.exportSnapshot(), environmentInfoCoordinator.build(null))
+        val appLogs = AppLog.exportSnapshot()
+        val baseReport = DiagnosticReport.build(appLogs, environmentInfoCoordinator.build(null))
+        appendLocalDiagnosticDetails(
+            baseReport = baseReport,
+            sessionId = currentSessionId,
+            eventLog = eventLogFor(currentSessionId),
+            usageTracker = usageTracker,
+            appLogs = appLogs,
+        )
     }
 
     internal suspend fun githubConnectorConfiguredForUi(): Boolean = githubCredentials.configured()
@@ -3320,6 +3328,7 @@ class LocalHarnessEngine @Inject constructor(
                             )
                             put("model_content", durableToolResultContent(modelOutput, event.retention))
                             put("is_error", event.isError)
+                            put("retention", event.retention.name.lowercase())
                             event.errorCode?.let { put("error_code", it) }
                             put("retryable", event.retryable)
                             put("side_effect", event.sideEffect.name.lowercase())
@@ -4798,10 +4807,15 @@ class LocalHarnessEngine @Inject constructor(
         extraTokens: Int = 0,
         binding: LocalWorkRunBinding? = null,
     ) {
-        val budget = currentHistoryBudget(binding)
+        val baseBudget = currentHistoryBudget(binding)
         val history = binding?.modelHistory ?: modelHistory
         val targetState = binding?.state ?: _state
         val log = binding?.eventLog ?: eventLog
+        val workMode = targetState.value.usageMode == LocalUsageMode.WORK
+        val budget = if (workMode) {
+            workSteadyStateHistoryBudget(baseBudget, history.estimatedTokens, extraTokens)
+        } else baseBudget
+        val workSteadyStateApplied = workMode && budget.maxHistoryTokens != baseBudget.maxHistoryTokens
         val compaction = history.compact(
             compactor = historyCompactor,
             budget = budget,
@@ -4827,6 +4841,9 @@ class LocalHarnessEngine @Inject constructor(
                 put("estimated_tokens_before", compaction.estimatedTokensBefore)
                 put("estimated_tokens_after", compaction.estimatedTokensAfter)
                 put("extra_request_tokens", extraTokens)
+                put("work_steady_state", workSteadyStateApplied)
+                budget.maxHistoryTokens?.let { put("history_budget_tokens", it) }
+                budget.tailTokens?.let { put("tail_budget_tokens", it) }
             },
         )
         checkpointModelHistory("session/compaction", binding)

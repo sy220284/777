@@ -33,6 +33,23 @@ class AppLogStressTest {
     }
 
     @Test
+    fun inMemoryLogIsSanitizedBeforeExportAndKeepsOriginalThrowableType() {
+        AppLog.clear()
+        AppLog.warn(
+            "security",
+            "Authorization: Bearer super-secret",
+            IllegalStateException("api_key=hidden"),
+        )
+
+        val entry = AppLog.snapshot().last()
+        assertTrue(entry.message.contains("<redacted>"))
+        assertTrue(!entry.message.contains("super-secret"))
+        assertEquals("IllegalStateException", entry.throwableType)
+        assertTrue(entry.throwableMessage.orEmpty().contains("<redacted>"))
+        assertTrue(!entry.throwableMessage.orEmpty().contains("hidden"))
+    }
+
+    @Test
     fun persistenceQueueRejectsInvalidCapacity() {
         assertThrows(IllegalArgumentException::class.java) {
             createAppLogPersistenceExecutor(0)
