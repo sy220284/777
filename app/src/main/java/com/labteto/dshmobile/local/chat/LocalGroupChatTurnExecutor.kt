@@ -433,6 +433,7 @@ internal class LocalGroupChatTurnExecutor(
             )
         }
         try {
+            recoverPendingGroupGalleryStateSync(eventLog, chatPersonaGalleryStore)
             val snapshot = _state.value
             require(snapshot.groupChat.members.size >= MIN_GROUP_CHAT_MEMBERS) {
                 "群聊至少需要添加 $MIN_GROUP_CHAT_MEMBERS 个角色"
