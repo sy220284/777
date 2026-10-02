@@ -2818,6 +2818,7 @@ class LocalHarnessEngine @Inject constructor(
                     expectedBaseState = _state.value.chatState,
                     profile = snapshot.modelSelection.activeProfile,
                     sourceUserMessageId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
+                    assistantEventSequence = assistantEvent.sequence,
                 )
             }
         } catch (cancelled: CancellationException) {
@@ -2900,6 +2901,7 @@ class LocalHarnessEngine @Inject constructor(
         runState.update { it.copy(running = true, error = null, deviceApprovalLease = false, workflowProgress = null) }
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var finalChatAssistant: LocalHarnessMessage? = null
+        var finalChatAssistantSequence: Long? = null
         var modelStep = 0
         var requestPrepared = false
         var ephemeralContext = ""
@@ -3226,6 +3228,7 @@ class LocalHarnessEngine @Inject constructor(
                             finalChatAssistant = transcriptMessages.lastOrNull { message ->
                                 message.role == "assistant" && message.content.isNotBlank()
                             }
+                            finalChatAssistantSequence = assistantEvent.sequence
                         }
                         if (
                             beforeAssistant.usageMode == LocalUsageMode.CHAT &&
@@ -3447,6 +3450,7 @@ class LocalHarnessEngine @Inject constructor(
                         expectedBaseState = postTurnSnapshot.chatState,
                         profile = runSnapshot.modelSelection.activeProfile,
                         sourceUserMessageId = sourceMessageId ?: runSnapshot.transcriptIndex.latestUserMessageId,
+                        assistantEventSequence = finalChatAssistantSequence,
                     )
                 }
             }
@@ -4633,6 +4637,7 @@ class LocalHarnessEngine @Inject constructor(
         expectedBaseState: ChatCharacterState,
         profile: LocalModelProfile?,
         sourceUserMessageId: String? = null,
+        assistantEventSequence: Long? = null,
     ) {
         if (profile == null) return
         chatContextRefreshCoordinator.schedule(
@@ -4645,6 +4650,7 @@ class LocalHarnessEngine @Inject constructor(
             boundEventLog = eventLogFor(expectedSessionId),
             profile = profile,
             sourceUserMessageId = sourceUserMessageId,
+            assistantEventSequence = assistantEventSequence,
         )
     }
 
