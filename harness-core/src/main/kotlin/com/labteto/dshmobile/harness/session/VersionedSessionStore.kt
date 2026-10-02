@@ -80,13 +80,18 @@ class VersionedSessionStore(
     @Synchronized
     fun read(id: String): SessionLoadResult? {
         val file = fileFor(id)
-        if (!file.isFile) return null
+        val backup = backupFor(id)
+        if (!file.isFile) {
+            if (!backup.isFile) return null
+            val recovered = readFromFile(id, backup)
+            atomicWrite(file, backup.readText())
+            return recovered.copy(recovered = true)
+        }
         return try {
             readFromFile(id, file)
         } catch (future: FutureSessionVersionException) {
             throw future
         } catch (primaryError: Exception) {
-            val backup = backupFor(id)
             if (!backup.isFile) throw primaryError
             val recovered = try {
                 readFromFile(id, backup)
@@ -114,7 +119,7 @@ class VersionedSessionStore(
             if (!checkpoint.exists()) source.copyTo(checkpoint, overwrite = false)
         }
         if (source.isFile) {
-            source.copyTo(backupFor(id), overwrite = true)
+            rotatePrimaryToBackup(source, backupFor(id))
         }
         val document = SessionDocument(
             formatVersion = migrations.currentVersion,
@@ -246,6 +251,24 @@ class VersionedSessionStore(
 
     private fun validateId(id: String) {
         require(id.matches(Regex("[A-Za-z0-9._-]{1,128}"))) { "非法会话编号：$id" }
+    }
+
+    private fun rotatePrimaryToBackup(source: File, backup: File) {
+        backup.parentFile?.mkdirs()
+        try {
+            Files.move(
+                source.toPath(),
+                backup.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(
+                source.toPath(),
+                backup.toPath(),
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        }
     }
 
     private fun atomicWrite(file: File, content: String) {
