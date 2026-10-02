@@ -85,6 +85,8 @@ import com.labteto.dshmobile.local.chat.LocalReplySuggestionCoordinator
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.compact
+import com.labteto.dshmobile.local.model.compactOverflow
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.model.LocalModelGateway
@@ -774,7 +776,7 @@ class LocalHarnessEngine @Inject constructor(
                 loadSession(id)
                 syncVisibleWorkRun(id)
             },
-            restartInterruptedSafeJobs = ::restartInterruptedSafeJobs,
+            restartInterruptedSafeJobs = persistentJobRecoveryCoordinator::schedule,
             startNextQueuedTurnIfIdle = ::startNextQueuedTurnIfIdle,
             sessionSummaries = ::sessionSummaries,
             beforeEventLogsDeleted = eventLogRegistry::clearAndEvict,
@@ -4071,7 +4073,7 @@ class LocalHarnessEngine @Inject constructor(
                 val maxSteps = args.int("max_steps", executionState.value.subagentMaxSteps).coerceIn(1, 128)
                 val virtualScreen = args.boolean("virtual_screen", false)
                 if (args.boolean("run_in_background", false)) {
-                    startPersistentReadonlySubagent(
+                    persistentJobRecoveryCoordinator.startReadonlySubagent(
                         task = task,
                         model = model,
                         maxSteps = maxSteps,
