@@ -4968,6 +4968,7 @@ class LocalHarnessEngine @Inject constructor(
         // A future-version session must remain completely untouched.
         val recovery = eventLog.repairInterruptedTail()
         recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
+        recoverPendingGroupGalleryStateSync(eventLog, chatPersonaGalleryStore)
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
             eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
