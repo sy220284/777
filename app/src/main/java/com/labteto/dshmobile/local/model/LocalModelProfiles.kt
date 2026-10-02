@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import java.net.URI
 import java.security.MessageDigest
 
 enum class LocalModelAuthKind {
