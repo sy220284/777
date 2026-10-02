@@ -81,7 +81,7 @@ internal class LocalToolExecutionCoordinator(
             appendLine("已为当前回合启用 " + matches.size + " 个扩展工具：")
             matches.forEach { tool ->
                 append("- ").append(tool.name)
-                LocalToolRouter.description(tool).takeIf(String::isNotBlank)?.let {
+                LocalToolRouter.conciseDescription(tool).takeIf(String::isNotBlank)?.let {
                     append("：").append(it)
                 }
                 appendLine()
