@@ -394,14 +394,7 @@ class McpToolBridgePlugin(
                                     append("MCP[").append(serverId).append("] ")
                                     append(definition.description?.takeIf(String::isNotBlank) ?: definition.name)
                                 },
-                                parameterSchema = if (definition.inputSchema.isEmpty()) {
-                                    buildJsonObject {
-                                        put("type", "object")
-                                        put("additionalProperties", true)
-                                    }
-                                } else {
-                                    definition.inputSchema
-                                },
+                                parameterSchema = normalizeRemoteParameterSchema(definition.inputSchema),
                             ),
                             access = ToolAccess.PRIVILEGED,
                             approvalPolicy = ToolApprovalPolicy.ALWAYS,
@@ -566,6 +559,24 @@ class McpToolBridgePlugin(
             null,
             null,
         ).toString()
+    }
+
+    private fun normalizeRemoteParameterSchema(schema: JsonObject): JsonObject {
+        if (schema.isEmpty()) {
+            return buildJsonObject {
+                put("type", "object")
+                put("additionalProperties", true)
+            }
+        }
+        val type = schema["type"]?.jsonPrimitive?.contentOrNull
+        require(type == null || type == "object") {
+            "MCP 工具参数根 schema 必须是 object"
+        }
+        return if (type == null) {
+            JsonObject(schema + ("type" to JsonPrimitive("object")))
+        } else {
+            schema
+        }
     }
 
     private fun localToolName(serverId: String, remoteName: String): String {
