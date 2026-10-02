@@ -140,6 +140,18 @@ android-17-instrumented
 
 新增能力必须在通用 CI 外补自己的专项测试。
 
+### 运行诊断与 Work 上下文
+
+- 分享诊断必须区分当前导出版本与持久日志真实来源版本/进程，旧版本日志不得被误包装成当前版本事实。
+- 当前 Session 的 run / turn / step / tool / request / retry / continuation / compaction 等持久事件应可按 sequence 串联；分享报告只输出结构化白名单字段和 payload 大小，不复制任意消息、工具结果或凭据正文。
+- Token 诊断复用 `TokenUsageAnalyticsStore` 请求级账本，至少保留 action、run/parent/agent/step、真实 route、input/cache/output/reasoning 与 Prompt 构成；禁止再建第二套 Token 事实源。
+- Work 大上下文在请求前派生“可信检查点 + 近期原文”的有界投影；SessionEventLog 和持久模型历史仍保留完整事实。Chat 不继承 Work 专属稳态投影阈值。
+- Work 请求投影必须保持工具调用/结果批次合法，投影后 Token 必须实质下降；小上下文不得无意义重写。
+- Work exposure 成功结算以供应商实报 input Token 为准；客户端估算用于准入与未知受理风险，并由实报样本校准。
+- 仅因并发 pending reservation 临时重叠造成的 exposure 超限应等待结算；当前请求在所有 pending 释放后仍无法容纳时才拒绝。
+- 本地 preflight 拒绝必须带稳定 code / failure_kind / admission_state / origin，禁止伪装成供应商模型故障。
+- Work 传输层路由健康必须按物理路由指纹跨 run 共享：连续 3 次可归因传输失败进入冷却；冷却结束只允许一个 half-open 探测；成功清零、探测失败指数延长且上限 15 分钟。用户取消、本地预算/上下文拒绝不得累计路由失败；进程级状态必须有容量和空闲淘汰边界。
+
 当前高风险领域：
 
 - Session 恢复和未知副作用。

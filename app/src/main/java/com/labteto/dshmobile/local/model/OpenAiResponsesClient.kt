@@ -83,7 +83,7 @@ class OpenAiResponsesClient @Inject constructor(
             .build()
         var admittedRequestId: String? = null
         try {
-            withCancellableModelResponse(modelHttp.newCall(request)) { response ->
+            withCancellableModelResponse(modelHttp.newCall(request), admissionTracker) { response ->
                 val requestId = response.header("x-request-id")
                     ?: response.header("openai-request-id")
                 val retryAfterMs = parseRetryAfterMillis(response.header("Retry-After"))

@@ -512,7 +512,12 @@ class TokenUsageAnalyticsStore @Inject constructor(
         accumulatorZone = zone
     }
 
-    fun groupDetail(kind: TokenUsageGroupKind, key: String): TokenUsageGroupDetail? {
+    fun groupDetail(
+        kind: TokenUsageGroupKind,
+        key: String,
+        recordLimit: Int = DETAIL_RECORDS,
+    ): TokenUsageGroupDetail? {
+        val detailLimit = recordLimit.coerceIn(1, MAX_DETAIL_RECORDS)
         val records = allRecords().distinctForAccounting().filter { record ->
             when (kind) {
                 TokenUsageGroupKind.SESSION -> record.context.sessionId == key
@@ -570,7 +575,7 @@ class TokenUsageAnalyticsStore @Inject constructor(
                     aggregate = value.aggregate.freeze(),
                 )
             }.sortedByDescending { it.aggregate.totalTokens },
-            records = records.sortedByDescending(TokenUsageRecord::timestamp).take(DETAIL_RECORDS),
+            records = records.sortedByDescending(TokenUsageRecord::timestamp).take(detailLimit),
         )
     }
 
@@ -584,7 +589,10 @@ class TokenUsageAnalyticsStore @Inject constructor(
         database.retainedRecords().asSequence()
     }
 
-    private companion object { const val DETAIL_RECORDS = 300 }
+    private companion object {
+        const val DETAIL_RECORDS = 300
+        const val MAX_DETAIL_RECORDS = 2_000
+    }
 }
 
 internal fun aggregateTokenUsageRecords(
