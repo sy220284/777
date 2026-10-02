@@ -110,6 +110,9 @@ data class LocalSessionSummary(
     val blank: Boolean = false,
     /** 最近一条用户消息的预览（截断到 72 字符），供侧边栏第二行展示。 */
     val summaryPreview: String? = null,
+    /** Lightweight authorization/search scope; avoids reopening the full Session document. */
+    val projectId: String? = null,
+    val lineageId: String? = null,
 )
 
 /** One real file currently present in the app-private local Harness workspace. */
