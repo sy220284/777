@@ -31,7 +31,7 @@ internal fun LocalModelProfile.usesResponsesTransport(): Boolean =
     authKind == LocalModelAuthKind.CHATGPT_PLAN || protocol == LocalModelProtocol.RESPONSES
 
 /**
- * Stable identity for provider-side replay/cache/health state.
+ * Stable physical-route identity for provider-side cache and route-health state.
  *
  * UI profile ids are deliberately excluded: two profiles pointing at the same physical route should
  * share health, while changing account/credential, protocol, provider, endpoint or model must create
