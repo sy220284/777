@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.LocalModelProtocol
 import com.labteto.dshmobile.local.LocalModelPresets
 import com.labteto.dshmobile.local.modelProfileId
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
+import com.labteto.dshmobile.local.model.chatgpt.chatGptPlanProfiles
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.contentOrNull
@@ -65,18 +66,7 @@ internal class LocalModelProfileStore(
         val retained = read().filterNot {
             it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
         }
-        val added = models.map { option ->
-            LocalModelProfile(
-                id = modelProfileId(option.slug, OPENAI_BASE_URL, LocalModelAuthKind.CHATGPT_PLAN, accountId),
-                model = option.slug,
-                baseUrl = OPENAI_BASE_URL,
-                provider = "ChatGPT",
-                authKind = LocalModelAuthKind.CHATGPT_PLAN,
-                protocol = LocalModelProtocol.RESPONSES,
-                credentialRef = accountId,
-                displayName = option.displayName,
-            )
-        }
+        val added = chatGptPlanProfiles(accountId, models)
         return (retained + added).distinctBy(LocalModelProfile::id).also(::write)
     }
 
@@ -138,6 +128,5 @@ internal class LocalModelProfileStore(
         private const val KEY_ACTIVE_PROFILE_ID = "model_profile_active_v3"
         private const val KEY_MODEL = "model"
         private const val KEY_BASE_URL = "base_url"
-        private const val OPENAI_BASE_URL = "https://api.openai.com/v1"
     }
 }
