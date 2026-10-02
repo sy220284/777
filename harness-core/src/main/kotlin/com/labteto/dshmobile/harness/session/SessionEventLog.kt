@@ -52,6 +52,7 @@ class SessionEventLog(
     private val maxEventBytes: Long = maxOf(maxBytes, DEFAULT_MAX_EVENT_BYTES),
     private val clock: () -> Long = System::currentTimeMillis,
     private val diagnosticSink: (String, Throwable?) -> Unit = { _, _ -> },
+    private val onSegmentRotated: () -> Unit = {},
 ) {
     init {
         require(maxBytes >= MIN_MAX_BYTES) { "事件日志分段上限至少为 $MIN_MAX_BYTES 字节" }
@@ -104,9 +105,6 @@ class SessionEventLog(
             throw error
         }
         nextSequence.incrementAndGet()
-        // Archive maintenance must not turn a committed append into an apparent failure.
-        runCatching { compressOneLegacySegmentUnsafe() }
-            .onFailure { error -> reportArchiveFailure("legacy-segment", error) }
         event
     }
 
@@ -778,13 +776,8 @@ class SessionEventLog(
         } catch (_: AtomicMoveNotSupportedException) {
             Files.move(file.toPath(), target.toPath())
         }
-        runCatching { compressSegmentUnsafe(target) }
-            .onFailure { error -> reportArchiveFailure(target.name, error) }
-    }
-
-    private fun compressOneLegacySegmentUnsafe() {
-        segmentFilesUnsafe().firstOrNull { !it.name.endsWith(COMPRESSED_SUFFIX) }
-            ?.let(::compressSegmentUnsafe)
+        runCatching(onSegmentRotated)
+            .onFailure { error -> reportArchiveFailure("archive-signal", error) }
     }
 
     /** Publish the archive before deleting the original; an interrupted migration keeps the raw segment. */
