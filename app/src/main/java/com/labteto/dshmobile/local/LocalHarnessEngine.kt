@@ -471,6 +471,7 @@ class LocalHarnessEngine @Inject constructor(
             ::persistChatBranchState,
             ::checkpointModelHistory,
             ::persist,
+            ::persistNow,
             { completedJob ->
                 synchronized(runStateLock) { if (activeJob === completedJob) activeJob = null }
                 startNextQueuedTurnIfIdle()?.start()
