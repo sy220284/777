@@ -63,6 +63,7 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 75,
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTaskRuntime.kt": 20,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 24,
+    "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolSchemaProjection.kt": 87,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 80,
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 46,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 19,
