@@ -175,7 +175,6 @@ class AgentLoop(
     private val isParallelTool: (AgentToolCall) -> Boolean = { false },
     private val eventSink: AgentEventSink = AgentEventSink { },
     private val maxSteps: Int = DEFAULT_MAX_STEPS,
-    private val rejectEmptyFinalReply: Boolean = false,
     private val stepLimitExtender: AgentStepLimitExtender? = null,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
 ) {
@@ -208,11 +207,6 @@ class AgentLoop(
                 eventSink.append(AgentEvent.StepStarted(turnId, step))
                 val reply = model.complete(messages.toList())
                 requireUniqueCallIds(reply.toolCalls)
-                if (rejectEmptyFinalReply) {
-                    require(reply.toolCalls.isNotEmpty() || reply.content.isNotBlank()) {
-                        "模型未返回正文或工具调用，本轮不能判定为完成"
-                    }
-                }
                 messages += AgentMessage(
                     role = "assistant",
                     content = reply.content,
