@@ -34,6 +34,13 @@ internal fun isExplicitDiaryRecall(query: String): Boolean {
     return ChatMemorySelector.shouldRecall(text) || DIARY_RECALL_HINTS.any(text::contains)
 }
 
+internal fun diaryRecallUsageInstruction(groupAudience: Boolean): String =
+    if (groupAudience) {
+        "群聊边界：事件锚点可按披露级别自然引用；感受、心理活动、关系意义和余波属于当前角色的内在记忆，只用于塑造本人反应，不代表其他成员知情，也不要主动逐条公开。"
+    } else {
+        "这些日记属于当前角色自己的经历与内在记忆，只用于自然延续，不要为了展示记忆而逐条复述。"
+    }
+
 internal fun takeWithinModelTokenBudget(text: String, maxTokens: Int): String {
     if (text.isBlank() || maxTokens <= 0) return ""
     if (estimateModelTokens(text) <= maxTokens) return text
