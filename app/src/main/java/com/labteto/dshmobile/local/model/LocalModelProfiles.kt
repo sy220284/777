@@ -494,6 +494,8 @@ object LocalModelPresets {
         val defaultMaxOutputTokens = preset?.defaultMaxOutputTokens
         val systemPromptUpdateMode = preset?.systemPromptUpdateMode ?: LocalModelPromptUpdateMode.REPLACE
         val toolUpdateMode = preset?.toolUpdateMode ?: LocalModelPromptUpdateMode.REPLACE
+        val promptCacheDiagnostics = protocol == LocalModelProtocol.RESPONSES &&
+            supportsResponsesPromptCacheDiagnostics(model)
         return when (protocol) {
             LocalModelProtocol.CHAT_COMPLETIONS -> LocalModelRuntimeCapabilities(
                 structuredOutput = false,
@@ -516,6 +518,7 @@ object LocalModelPresets {
                 defaultMaxOutputTokens = defaultMaxOutputTokens,
                 systemPromptUpdateMode = systemPromptUpdateMode,
                 toolUpdateMode = toolUpdateMode,
+                promptCacheDiagnostics = promptCacheDiagnostics,
             )
             LocalModelProtocol.ANTHROPIC_MESSAGES -> LocalModelRuntimeCapabilities(
                 structuredOutput = false,
@@ -530,6 +533,14 @@ object LocalModelPresets {
             )
         }
     }
+}
+
+internal fun supportsResponsesPromptCacheDiagnostics(model: String): Boolean {
+    val normalized = model.trim().lowercase()
+    val match = Regex("""^gpt-(\\d+)\\.(\\d+)(?:[.-].*)?$""").find(normalized) ?: return false
+    val major = match.groupValues[1].toIntOrNull() ?: return false
+    val minor = match.groupValues[2].toIntOrNull() ?: return false
+    return major > 5 || (major == 5 && minor >= 6)
 }
 
 /** Fix the retired official preset without changing proxy model aliases or credential identity. */
