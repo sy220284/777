@@ -274,12 +274,6 @@ internal fun normalizeAutomationTask(task: AutomationTask): AutomationTask {
     )
 }
 
-@Serializable
-private data class AutomationDocument(
-    val version: Int = 1,
-    val tasks: List<AutomationTask> = emptyList(),
-)
-
 @Singleton
 class AutomationStore internal constructor(
     private val file: File,
@@ -290,7 +284,7 @@ class AutomationStore internal constructor(
         json: Json,
     ) : this(File(context.filesDir, "local-harness/automations.json"), json)
 
-    private val backup = File(file.parentFile, file.name + ".bak")
+    private val documents = AutomationDocumentStore(file, json)
 
     @Synchronized
     fun list(): List<AutomationTask> = read().tasks.sortedBy { it.nextRunAt }
@@ -301,8 +295,7 @@ class AutomationStore internal constructor(
     @Synchronized
     fun upsert(task: AutomationTask) {
         val document = read()
-        AutomationStorePolicy.requireCapacity(document.tasks, task.id)
-        val current = document.tasks.filterNot { it.id == task.id } + task
+        val current = document.tasks.filterNot { it.id == task.id } + normalizeAutomationTask(task)
         write(AutomationDocument(tasks = current))
     }
 
@@ -324,68 +317,12 @@ class AutomationStore internal constructor(
         return updated
     }
 
-    private fun read(): AutomationDocument {
-        if (!file.isFile) {
-            return readValid(backup)?.also { restoreBackup() } ?: AutomationDocument()
+    private fun read(): AutomationDocument =
+        documents.read().let { document ->
+            document.copy(tasks = document.tasks.map(::normalizeAutomationTask))
         }
-        readValid(file)?.let { return it }
 
-        val corrupt = File(file.parentFile, "automations.corrupt-${System.currentTimeMillis()}.json")
-        runCatching { file.copyTo(corrupt, overwrite = true) }
-        val recovered = readValid(backup)
-        if (recovered == null) {
-            throw IllegalStateException(
-                "自动任务存储已损坏，主文件与备份均无法读取；损坏副本已保留：${corrupt.name}",
-            )
-        }
-        restoreBackup()
-        return recovered
-    }
+    private fun write(document: AutomationDocument) = documents.write(document)
 
-    private fun readValid(source: File): AutomationDocument? {
-        if (!source.isFile) return null
-        return runCatching {
-            val decoded = json.decodeFromString(AutomationDocument.serializer(), source.readText())
-            decoded.copy(tasks = decoded.tasks.map(::normalizeAutomationTask))
-        }.getOrNull()
-    }
-
-    private fun write(document: AutomationDocument) {
-        file.parentFile?.mkdirs()
-        val encoded = json.encodeToString(AutomationDocument.serializer(), document)
-        readValid(file)?.let { current ->
-            atomicWrite(backup, json.encodeToString(AutomationDocument.serializer(), current))
-        }
-        atomicWrite(file, encoded)
-        if (readValid(backup) == null) atomicWrite(backup, encoded)
-    }
-
-    private fun restoreBackup() {
-        if (!backup.isFile) return
-        atomicWrite(file, backup.readText())
-    }
-
-    private fun atomicWrite(target: File, content: String) {
-        target.parentFile?.mkdirs()
-        val temp = File(target.parentFile, target.name + ".tmp")
-        val bytes = content.toByteArray(StandardCharsets.UTF_8)
-        FileOutputStream(temp).use { output ->
-            output.write(bytes)
-            output.flush()
-            output.fd.sync()
-        }
-        try {
-            Files.move(
-                temp.toPath(),
-                target.toPath(),
-                StandardCopyOption.ATOMIC_MOVE,
-                StandardCopyOption.REPLACE_EXISTING,
-            )
-        } catch (_: AtomicMoveNotSupportedException) {
-            Files.move(temp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        } finally {
-            temp.delete()
-        }
-    }
 }
 

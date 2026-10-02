@@ -46,6 +46,7 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt": 404,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryController.kt": 143,
     "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt": 393,
+    "app/src/main/java/com/labteto/dshmobile/automation/AutomationDocumentStore.kt": 198,
     "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt": 603,
     "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationWorker.kt": 450,
     "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt": 217,

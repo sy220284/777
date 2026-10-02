@@ -22,7 +22,7 @@ class AutomationStoreRecoveryTest {
             file.writeText("{broken")
             val recovered = AutomationStore(file, json).list()
 
-            assertEquals(listOf("first"), recovered.map(AutomationTask::id))
+            assertEquals(listOf("first", "second"), recovered.map(AutomationTask::id))
             assertTrue(file.readText().contains("\"first\""))
             assertTrue(directory.listFiles().orEmpty().any { it.name.startsWith("automations.corrupt-") })
         } finally {
@@ -43,6 +43,29 @@ class AutomationStoreRecoveryTest {
 
             assertEquals(listOf("first"), recovered.map(AutomationTask::id))
             assertTrue(file.isFile)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun malformedWalTailKeepsEarlierDurableMutations() {
+        val directory = Files.createTempDirectory("automation-store-wal-tail").toFile()
+        val file = directory.resolve("automations.json")
+        val journal = directory.resolve("automations.json.wal.jsonl")
+        try {
+            val store = AutomationStore(file, json)
+            store.upsert(task("first", 1_000L))
+            store.upsert(task("second", 2_000L))
+            journal.appendText("{broken-tail")
+
+            val recovered = AutomationStore(file, json).list()
+
+            assertEquals(listOf("first", "second"), recovered.map(AutomationTask::id))
+            assertTrue(
+                directory.listFiles().orEmpty()
+                    .any { it.name.startsWith("automations.wal.corrupt-") },
+            )
         } finally {
             directory.deleteRecursively()
         }
