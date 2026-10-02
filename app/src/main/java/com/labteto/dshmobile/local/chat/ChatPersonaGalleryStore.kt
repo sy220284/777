@@ -22,6 +22,10 @@ class ChatPersonaGalleryStore internal constructor(
         this(File(context.filesDir, "local-harness/chat/persona-gallery.json"), json)
 
     private val durableFile = RecoveringChatDocumentFile(file)
+    private val historyStore = PersonaGalleryHistoryStore(
+        File(requireNotNull(file.parentFile), "persona-history"),
+        json,
+    )
 
     private val backupFile = File(file.parentFile, "${file.name}.bak")
     private var cachedDocument: GalleryDocument? = null
@@ -29,6 +33,18 @@ class ChatPersonaGalleryStore internal constructor(
 
     @Synchronized
     fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
+
+    @Synchronized
+    fun loadStoryHistory(
+        id: String,
+        storyId: String,
+        limit: Int,
+    ): PersonaGalleryHistoryPage {
+        val entry = readNormalized().entries.firstOrNull { it.id == id }
+            ?: error("人物档案不存在")
+        require(entry.stories.any { it.id == storyId }) { "人物故事不存在" }
+        return historyStore.tail(id, storyId, limit)
+    }
 
     @Synchronized
     fun exportPersona(id: String, compact: Boolean = false): String {
@@ -48,7 +64,15 @@ class ChatPersonaGalleryStore internal constructor(
     ): PersonaTransferDocument {
         val entry = readNormalized().entries.firstOrNull { it.id == id }
             ?: error("人物档案不存在")
-        return PersonaTransferDocuments.encode(json, entry, format)
+        val hydrated = entry.copy(
+            stories = entry.stories.map { story ->
+                story.copy(
+                    history = historyStore.all(entry.id, story.id),
+                    historyTotalCount = story.historyTotalCount,
+                )
+            },
+        )
+        return PersonaTransferDocuments.encode(json, hydrated, format)
     }
 
     @Synchronized
