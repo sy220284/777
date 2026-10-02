@@ -201,6 +201,7 @@ internal class LocalSubagentRunner(
             usageMode = LocalUsageMode.WORK,
             model = routeModel,
             baseUrl = snapshot.baseUrl,
+            routeProfile = runProfile,
             planMode = snapshot.planMode,
             policy = localAgentRunPolicy(LocalUsageMode.WORK),
             safeAutoApprovalEnabled = snapshot.safeAutoApprovalEnabled,
