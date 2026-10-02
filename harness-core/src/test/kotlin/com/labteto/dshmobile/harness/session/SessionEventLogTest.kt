@@ -56,10 +56,22 @@ class SessionEventLogTest {
             // Simulate a torn final write. Startup must skip it and recover from the newest
             // complete row without requiring a full historical replay.
             file.appendText("{\"sequence\":999")
-            val restarted = SessionEventLog(file, json, maxBytes = 700, clock = { 2L })
+            val diagnostics = mutableListOf<String>()
+            val restarted = SessionEventLog(
+                file,
+                json,
+                maxBytes = 700,
+                clock = { 2L },
+                diagnosticSink = { kind, _ -> diagnostics += kind },
+            )
             val appended = restarted.append("test/restarted", buildJsonObject { put("value", "ok") })
 
             assertEquals(expectedNext, appended.sequence)
+            assertEquals(expectedNext, restarted.latest("test/restarted")?.sequence)
+            file.readLines().filter(String::isNotBlank).forEach { line ->
+                json.decodeFromString(SessionEvent.serializer(), line)
+            }
+            assertTrue("torn tail should be repaired before append", "torn-tail-truncated" in diagnostics)
         } finally {
             directory.deleteRecursively()
         }
