@@ -40,6 +40,18 @@ internal class ChatDiaryStore(
             normalizedDisclosure(delta.disclosure, request.sourceMode)
         }
 
+        val candidateSources = diarySources(request)
+        val candidateRevision = ChatDiaryRevision(
+            event = delta.event,
+            feeling = delta.feeling,
+            innerThought = delta.innerThought,
+            relationshipMeaning = delta.relationshipMeaning,
+            unresolvedEcho = delta.unresolvedEcho,
+            importance = delta.importance,
+            disclosure = disclosure,
+            sources = candidateSources,
+            updatedAt = now,
+        )
         val candidate = ChatDiaryEntry(
             id = UUID.randomUUID().toString(),
             subjectKey = request.subjectKey.trim(),
@@ -52,7 +64,8 @@ internal class ChatDiaryStore(
             importance = delta.importance,
             sourceMode = request.sourceMode,
             disclosure = disclosure,
-            sources = diarySources(request),
+            sources = candidateSources,
+            revisions = listOf(candidateRevision),
             generation = request.generation,
             createdAt = now,
             updatedAt = now,
@@ -62,26 +75,15 @@ internal class ChatDiaryStore(
             existing.active &&
                 existing.subjectKey == candidate.subjectKey &&
                 existing.sourceMode == candidate.sourceMode &&
+                entryRevisions(existing).size < MAX_REFINEMENT_REVISIONS &&
                 now - existing.updatedAt <= DUPLICATE_WINDOW_MILLIS &&
                 diarySimilarity(existing.event, candidate.event) >= DUPLICATE_SIMILARITY
         }
         val saved = if (duplicateIndex >= 0) {
             val previous = entries[duplicateIndex]
-            previous.copy(
-                event = richer(previous.event, candidate.event, MAX_EVENT_CHARS),
-                feeling = richer(previous.feeling, candidate.feeling, MAX_FEELING_CHARS),
-                innerThought = richer(previous.innerThought, candidate.innerThought, MAX_THOUGHT_CHARS),
-                relationshipMeaning = richer(
-                    previous.relationshipMeaning,
-                    candidate.relationshipMeaning,
-                    MAX_RELATIONSHIP_CHARS,
-                ),
-                unresolvedEcho = richer(previous.unresolvedEcho, candidate.unresolvedEcho, MAX_ECHO_CHARS),
-                importance = maxOf(previous.importance, candidate.importance),
-                disclosure = stricterDisclosure(previous.disclosure, candidate.disclosure),
-                sources = (previous.sources + candidate.sources)
-                    .distinct()
-                    .takeLast(MAX_SOURCE_IDS),
+            rebuildFromRevisions(
+                entry = previous,
+                revisions = entryRevisions(previous) + candidateRevision,
                 updatedAt = now,
             ).also { entries[duplicateIndex] = it }
         } else {
@@ -165,21 +167,27 @@ internal class ChatDiaryStore(
         entries.indices.forEach { index ->
             val entry = entries[index]
             if (!entry.active || entry.sources.none { it.sessionId == sourceSessionId }) return@forEach
-            val remaining = entry.sources.filterNot { source ->
-                if (source.sessionId != sourceSessionId) {
-                    false
-                } else if (discardedMessageIds.isNotEmpty()) {
-                    source.userMessageId in discardedMessageIds ||
-                        source.assistantMessageId in discardedMessageIds
-                } else {
-                    entry.updatedAt >= createdAtInclusive
+            val revisions = entryRevisions(entry)
+            val remaining = revisions.filterNot { revision ->
+                revision.sources.any { source ->
+                    source.sessionId == sourceSessionId && if (discardedMessageIds.isNotEmpty()) {
+                        source.userMessageId in discardedMessageIds ||
+                            source.assistantMessageId in discardedMessageIds
+                    } else {
+                        revision.updatedAt >= createdAtInclusive
+                    }
                 }
             }
-            if (remaining.size != entry.sources.size) {
+            if (remaining.size != revisions.size) {
                 entries[index] = if (remaining.isEmpty()) {
-                    entry.copy(active = false, sources = emptyList(), updatedAt = now)
+                    entry.copy(
+                        active = false,
+                        sources = emptyList(),
+                        revisions = emptyList(),
+                        updatedAt = now,
+                    )
                 } else {
-                    entry.copy(sources = remaining, updatedAt = now)
+                    rebuildFromRevisions(entry, remaining, now)
                 }
                 changed++
             }
@@ -196,12 +204,21 @@ internal class ChatDiaryStore(
         var changed = 0
         entries.indices.forEach { index ->
             val entry = entries[index]
-            val remaining = entry.sources.filterNot { it.sessionId in sessionIds }
-            if (remaining.size != entry.sources.size) {
+            if (!entry.active || entry.sources.none { it.sessionId in sessionIds }) return@forEach
+            val revisions = entryRevisions(entry)
+            val remaining = revisions.filterNot { revision ->
+                revision.sources.any { it.sessionId in sessionIds }
+            }
+            if (remaining.size != revisions.size) {
                 entries[index] = if (remaining.isEmpty()) {
-                    entry.copy(active = false, sources = emptyList(), updatedAt = now)
+                    entry.copy(
+                        active = false,
+                        sources = emptyList(),
+                        revisions = emptyList(),
+                        updatedAt = now,
+                    )
                 } else {
-                    entry.copy(sources = remaining, updatedAt = now)
+                    rebuildFromRevisions(entry, remaining, now)
                 }
                 changed++
             }
@@ -408,12 +425,55 @@ internal class ChatDiaryStore(
         }
     }
 
-    private fun richer(left: String, right: String, limit: Int): String =
-        listOf(left.trim(), right.trim())
-            .filter(String::isNotBlank)
-            .maxByOrNull(String::length)
-            .orEmpty()
-            .take(limit)
+    private fun entryRevisions(entry: ChatDiaryEntry): List<ChatDiaryRevision> =
+        entry.revisions.takeIf(List<ChatDiaryRevision>::isNotEmpty)
+            ?: listOf(
+                ChatDiaryRevision(
+                    event = entry.event,
+                    feeling = entry.feeling,
+                    innerThought = entry.innerThought,
+                    relationshipMeaning = entry.relationshipMeaning,
+                    unresolvedEcho = entry.unresolvedEcho,
+                    importance = entry.importance,
+                    disclosure = entry.disclosure,
+                    sources = entry.sources,
+                    updatedAt = entry.updatedAt,
+                ),
+            )
+
+    private fun rebuildFromRevisions(
+        entry: ChatDiaryEntry,
+        revisions: List<ChatDiaryRevision>,
+        updatedAt: Long,
+    ): ChatDiaryEntry {
+        require(revisions.isNotEmpty())
+        fun latest(selector: (ChatDiaryRevision) -> String, limit: Int): String =
+            revisions.asReversed()
+                .map(selector)
+                .firstOrNull(String::isNotBlank)
+                .orEmpty()
+                .take(limit)
+
+        val disclosure = revisions
+            .map(ChatDiaryRevision::disclosure)
+            .reduce(::stricterDisclosure)
+        val sources = revisions.flatMap(ChatDiaryRevision::sources).distinct()
+        return entry.copy(
+            event = latest(ChatDiaryRevision::event, MAX_EVENT_CHARS),
+            feeling = latest(ChatDiaryRevision::feeling, MAX_FEELING_CHARS),
+            innerThought = latest(ChatDiaryRevision::innerThought, MAX_THOUGHT_CHARS),
+            relationshipMeaning = latest(
+                ChatDiaryRevision::relationshipMeaning,
+                MAX_RELATIONSHIP_CHARS,
+            ),
+            unresolvedEcho = latest(ChatDiaryRevision::unresolvedEcho, MAX_ECHO_CHARS),
+            importance = revisions.maxOf(ChatDiaryRevision::importance),
+            disclosure = disclosure,
+            sources = sources,
+            revisions = revisions,
+            updatedAt = updatedAt,
+        )
+    }
 
     private fun diarySimilarity(left: String, right: String): Double {
         val normalizedLeft = normalizeDiaryText(left)
@@ -462,6 +522,7 @@ internal class ChatDiaryStore(
     private companion object {
         const val MAX_ENTRIES = 4_000
         const val MAX_SOURCE_IDS = 16
+        const val MAX_REFINEMENT_REVISIONS = 8
         const val MAX_EVENT_CHARS = 320
         const val MAX_FEELING_CHARS = 220
         const val MAX_THOUGHT_CHARS = 260
