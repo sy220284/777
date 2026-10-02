@@ -233,6 +233,15 @@ class LocalHarnessEngine @Inject constructor(
             runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
         )
     }
+    private val sessionAccessCoordinator by lazy {
+        LocalSessionAccessCoordinator(
+            summaries = ::sessionSummaries,
+            currentSessionId = { currentSessionId },
+            currentState = { _state.value },
+            activeState = { id -> activeWorkRuns[id]?.state?.value },
+            eventLogFor = ::eventLogFor,
+        )
+    }
     private val agentRunCoordinator by lazy {
         LocalAgentRunCoordinator(eventLogFor = ::eventLogFor)
     }
@@ -4132,18 +4141,18 @@ class LocalHarnessEngine @Inject constructor(
                 args.optionalString("model"),
                 binding,
             )
-            "session_search" -> searchSessions(args.string("query"), boundSessionId)
+            "session_search" -> sessionAccessCoordinator.search(args.string("query"), boundSessionId)
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
                 memoryTools(binding).execute(call.name, args, allowMutation)
-            "session_event_search" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId).search(
+            "session_event_search" -> sessionAccessCoordinator.authorizedLog(args.optionalString("session_id"), boundSessionId).search(
                 query = args.string("query"),
                 limit = args.int("limit", 50),
                 afterSequence = args.long("after_sequence", -1L),
             )
-            "session_trace" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId).tail(args.int("limit", 40))
-            "session_event_trace" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId)
+            "session_trace" -> sessionAccessCoordinator.authorizedLog(args.optionalString("session_id"), boundSessionId).tail(args.int("limit", 40))
+            "session_event_trace" -> sessionAccessCoordinator.authorizedLog(args.optionalString("session_id"), boundSessionId)
                 .read(args.int("seq", -1).toLong(), before = 1, after = 1)
-            "session_event_read" -> eventLogForAuthorized(args.optionalString("session_id"), boundSessionId).read(
+            "session_event_read" -> sessionAccessCoordinator.authorizedLog(args.optionalString("session_id"), boundSessionId).read(
                 sequence = args.int("seq", -1).toLong(),
                 before = args.int("before", 0),
                 after = args.int("after", 0), offsetChars = args.int("offset_chars", 0),
@@ -4655,76 +4664,12 @@ class LocalHarnessEngine @Inject constructor(
         ).run(tasks, mode, requiredEvidence)
     }
 
-    private fun searchSessions(query: String, scopeSessionId: String = currentSessionId): String {
-        val hits = mutableListOf<String>()
-        val summaries = sessionSummaries()
-        val candidates = (summaries.map(LocalSessionSummary::id) + scopeSessionId).distinct()
-        var scanned = 0
-        for (id in candidates) {
-            if (hits.size >= MAX_SESSION_SEARCH_HITS || scanned >= MAX_SESSION_SEARCH_SCANNED) break
-            if (!canReadSessionFrom(scopeSessionId, id, summaries)) continue
-            scanned += 1
-            val result = eventLogFor(id).search(query, limit = 1)
-            result.takeUnless { it == "未找到会话事件" || it == "会话事件日志为空" }
-                ?.let { hits += "会话 $id\n$it" }
-        }
-        val suffix = if (scanned >= MAX_SESSION_SEARCH_SCANNED) {
-            "\n\n搜索已达到单次扫描预算 $MAX_SESSION_SEARCH_SCANNED 个会话；可缩小项目/关键词后继续。"
-        } else {
-            ""
-        }
-        return if (hits.isEmpty()) "未找到当前项目或会话链中的历史事件$suffix"
-        else hits.joinToString("\n\n") + suffix
-    }
-
-    private fun canReadSessionFrom(
-        scopeSessionId: String,
-        targetSessionId: String,
-        summaries: List<LocalSessionSummary> = sessionSummaries(),
-    ): Boolean {
-        if (scopeSessionId == targetSessionId) return true
-        val sourceScope = sessionAccessScope(scopeSessionId, summaries) ?: return false
-        val targetScope = sessionAccessScope(targetSessionId, summaries) ?: return false
-        val sameProject = sourceScope.first?.takeIf(String::isNotBlank)
-            ?.let { it == targetScope.first } == true
-        val sourceLineage = sourceScope.second
-        val targetLineage = targetScope.second
-        return sameProject || (!sourceLineage.isNullOrBlank() && sourceLineage == targetLineage)
-    }
-
-    private fun sessionAccessScope(
-        sessionId: String,
-        summaries: List<LocalSessionSummary>,
-    ): Pair<String?, String?>? {
-        if (sessionId == currentSessionId) {
-            val current = _state.value
-            return current.projectId to current.lineageId.ifBlank { current.sessionId }
-        }
-        activeWorkRuns[sessionId]?.state?.value?.let { active ->
-            return active.projectId to active.lineageId.ifBlank { active.sessionId }
-        }
-        return summaries.firstOrNull { it.id == sessionId }?.let { summary ->
-            summary.projectId to summary.lineageId?.ifBlank { summary.id }
-        }
-    }
-
-    private fun eventLogForAuthorized(
-        requestedId: String?,
-        defaultSessionId: String = currentSessionId,
-    ): LocalSessionEventLog {
-        val id = requestedId?.takeIf(String::isNotBlank) ?: defaultSessionId
-        require(canReadSessionFrom(defaultSessionId, id)) {
-            "会话不存在，或不属于当前项目/会话链：$id"
-        }
-        return eventLogFor(id)
-    }
-
     internal fun transcriptPageForUi(
         sessionId: String,
         cursor: LocalTranscriptPageCursor? = null,
         limit: Int = 200,
     ): LocalTranscriptPage = LocalSessionTranscriptPager(
-        eventLog = eventLogForAuthorized(sessionId),
+        eventLog = sessionAccessCoordinator.authorizedLog(sessionId),
     ).page(
         cursor = cursor,
         limit = limit,
@@ -4734,13 +4679,13 @@ class LocalHarnessEngine @Inject constructor(
         sessionId: String,
         limit: Int,
     ): List<LocalHarnessMessage> = LocalSessionTranscriptPager(
-        eventLog = eventLogForAuthorized(sessionId),
+        eventLog = sessionAccessCoordinator.authorizedLog(sessionId),
     ).page(limit = limit).messages
 
     internal fun completeTranscriptForUi(
         sessionId: String,
     ): List<LocalHarnessMessage> = LocalSessionTranscriptPager(
-        eventLog = eventLogForAuthorized(sessionId),
+        eventLog = sessionAccessCoordinator.authorizedLog(sessionId),
     ).all()
 
     private fun cancelChatPostTurn() {
