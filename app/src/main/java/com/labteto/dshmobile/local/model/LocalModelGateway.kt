@@ -178,7 +178,12 @@ class LocalModelGateway @Inject constructor(
             authKind = resolved.authKind,
             protocol = protocol,
             bearerToken = resolved.bearerToken,
-            capabilities = LocalModelPresets.runtimeCapabilitiesFor(model, baseUrl, protocol),
+            capabilities = LocalModelPresets.runtimeCapabilitiesFor(
+                model = model,
+                baseUrl = baseUrl,
+                protocol = protocol,
+                authKind = resolved.authKind,
+            ),
         )
     }
 
