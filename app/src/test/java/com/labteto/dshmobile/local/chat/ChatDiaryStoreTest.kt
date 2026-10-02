@@ -277,8 +277,41 @@ class ChatDiaryStoreTest {
         assertEquals(1, memory.rollbackSourceSessionFrom("s2", 0L, setOf("u2")))
         val remaining = memory.listActive("gallery:a").single()
         assertEquals(listOf("s"), remaining.sources.map { it.sessionId }.distinct())
+        assertEquals("我很期待", remaining.feeling)
+        assertTrue(remaining.innerThought.isBlank())
     }
 
+    @Test
+    fun rewritingLaterRefinementRestoresEarlierNarrativeFields() {
+        val memory = store()
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户答应周末和我去海边",
+                feeling = "我有点期待",
+                innerThought = "先别期待太多",
+                importance = 4,
+            ),
+        ))
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户再次确认周末和我一起去海边",
+                feeling = "第二次确认让我彻底放心下来",
+                innerThought = "这次我真的开始期待那天了",
+                relationshipMeaning = "这个计划让我觉得我们更靠近了一点",
+                importance = 5,
+            ),
+            userId = "u2",
+            assistantId = "a2",
+            evidence = "用户再次确认周末和我一起去海边",
+        ))
+
+        assertEquals(1, memory.rollbackSourceSessionFrom("s", 0L, setOf("u2")))
+        val restored = memory.listActive("gallery:a").single()
+        assertEquals("我有点期待", restored.feeling)
+        assertEquals("先别期待太多", restored.innerThought)
+        assertTrue(restored.relationshipMeaning.isBlank())
+        assertEquals(listOf("u1"), restored.sources.map { it.userMessageId })
+    }
 
     @Test
     fun deletingLastSourceSessionInvalidatesDiaryInsteadOfLeavingGhostEntry() {
