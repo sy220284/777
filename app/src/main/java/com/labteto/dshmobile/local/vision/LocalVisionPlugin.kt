@@ -98,7 +98,7 @@ class LocalVisionPlugin(
                 schema = functionToolSchema(
                     name = "vision_analyze_screen",
                     description = "截取当前主屏并交给当前使用模型分析；仅当前模型支持图片时可用",
-                    properties = simpleToolProperties(mapOf("prompt" to "string"),
+                    properties = simpleToolProperties(mapOf("prompt" to "string")),
                     required = setOf("prompt"),
                 ),
                 access = ToolAccess.NETWORK,
@@ -130,7 +130,7 @@ class LocalVisionPlugin(
                 schema = functionToolSchema(
                     name = "vision_analyze_vscreen",
                     description = "分析 Agent 虚拟屏画面并返回视觉判断和坐标；不把图片写入文字模型历史",
-                    properties = simpleToolProperties(mapOf("id" to "string", "prompt" to "string"),
+                    properties = simpleToolProperties(mapOf("id" to "string", "prompt" to "string")),
                     required = setOf("id", "prompt"),
                 ),
                 access = ToolAccess.NETWORK,
