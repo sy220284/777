@@ -171,10 +171,14 @@ internal class LocalHistoryCompactor(
         } == true
         if (source.size < 3 || (!charPressure && !tokenPressure)) return null
 
-        var start = 1
+        val leadingSystemCount = source.takeWhile { it["role"].asText() == "system" }.size
+        val firstBodyIndex = maxOf(1, leadingSystemCount)
+        if (firstBodyIndex >= source.lastIndex) return null
+
+        var start = firstBodyIndex
         var keptChars = 0
         var keptTokens = 0
-        for (index in source.lastIndex downTo 1) {
+        for (index in source.lastIndex downTo firstBodyIndex) {
             val encoded = source[index].toString()
             keptChars += encoded.length
             keptTokens += estimateModelTokens(encoded)
@@ -191,12 +195,17 @@ internal class LocalHistoryCompactor(
         // A tail can begin inside a large tool batch. Keep its assistant call and every result
         // together; cutting only by message size would manufacture an orphan tool result.
         if (source.getOrNull(start)?.get("role").asText() == "tool") {
-            while (start > 1 && source[start - 1]["role"].asText() == "tool") start -= 1
-            if (start > 1 && source[start - 1]["role"].asText() == "assistant") start -= 1
+            while (start > firstBodyIndex && source[start - 1]["role"].asText() == "tool") start -= 1
+            if (
+                start > firstBodyIndex &&
+                source[start - 1]["role"].asText() == "assistant"
+            ) {
+                start -= 1
+            }
         }
-        if (start <= 1 || start >= source.size) return null
+        if (start <= firstBodyIndex || start >= source.size) return null
 
-        val omitted = source.subList(1, start)
+        val omitted = source.subList(firstBodyIndex, start)
         val workCheckpoint = if (summaryMode == LocalHistorySummaryMode.WORK) {
             buildWorkCheckpoint(omitted, effectiveSummaryChars, structuredWorkState)
         } else {
@@ -204,7 +213,7 @@ internal class LocalHistoryCompactor(
         }
         val summary = buildSummary(omitted, effectiveSummaryChars, summaryMode, workCheckpoint)
         val compacted = buildList {
-            add(source.first())
+            addAll(source.take(firstBodyIndex))
             add(
                 buildTrustedWorkCheckpointModelMessage(
                     if (workCheckpoint != null) {
