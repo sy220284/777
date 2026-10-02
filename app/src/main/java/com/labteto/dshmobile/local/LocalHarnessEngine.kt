@@ -4000,6 +4000,7 @@ class LocalHarnessEngine @Inject constructor(
                 args["tasks"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
                 args.optionalString("mode") ?: "parallel",
                 args["required_evidence"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
+                args.optionalString("model"),
                 binding,
             )
             "session_search" -> searchSessions(args.string("query"))
@@ -4444,16 +4445,25 @@ class LocalHarnessEngine @Inject constructor(
         tasks: List<String>,
         mode: String,
         requiredEvidence: List<String>,
+        modelOverride: String? = null,
         binding: LocalWorkRunBinding? = null,
     ): String {
         val targetState = binding?.state ?: _state
         val runner = binding?.let(::workSubagents) ?: subagents
+        val parentProfile = targetState.value.modelSelection.activeProfile
+        val apiKeyWorkers = if (modelOverride.isNullOrBlank() && parentProfile?.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
+            modelGateway.availableProfiles().filter { it.authKind == LocalModelAuthKind.API_KEY }
+        } else {
+            emptyList()
+        }
+        val workerSelection = modelOverride ?: apiKeyWorkers.singleOrNull()?.id
         targetState.update { it.copy(workflowProgress = null) }
         return LocalWorkflowCoordinator(
             execute = { prompt -> runner.runResult(
                 task = prompt,
                 inheritHistory = false,
                 allowMutation = false,
+                modelOverride = workerSelection,
                 maxSteps = targetState.value.subagentMaxSteps,
             ).requireCompletedOutput() },
             pruneOutput = ::pruneToolResult,
