@@ -43,7 +43,7 @@ internal class LocalWorkRunBinding(
     @Volatile
     var turnsSinceModelHistoryCheckpoint: Int = 0
 
-    /** At most one automatic continuation is allowed for an admitted Responses stream interruption. */
+    /** Automatic continuation is bounded by the shared Work continuation policy. */
     @Volatile
     var automaticContinuationCount: Int = 0
 
