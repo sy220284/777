@@ -300,4 +300,43 @@ class LocalModelProfilesTest {
     }
 
 
+
+    @Test fun promptCacheDiagnosticsStayOnOfficialOpenAiGpt56PlusResponsesRoutes() {
+        assertTrue(
+            LocalModelPresets.runtimeCapabilitiesFor(
+                "gpt-5.6",
+                "https://api.openai.com/v1",
+                LocalModelProtocol.RESPONSES,
+            ).promptCacheDiagnostics,
+        )
+        assertTrue(
+            LocalModelPresets.runtimeCapabilitiesFor(
+                "gpt-6-astra",
+                "https://api.openai.com/v1",
+                LocalModelProtocol.RESPONSES,
+            ).promptCacheDiagnostics,
+        )
+        assertFalse(
+            LocalModelPresets.runtimeCapabilitiesFor(
+                "gpt-5.5",
+                "https://api.openai.com/v1",
+                LocalModelProtocol.RESPONSES,
+            ).promptCacheDiagnostics,
+        )
+        assertFalse(
+            LocalModelPresets.runtimeCapabilitiesFor(
+                "gpt-5.6",
+                "https://proxy.example/v1",
+                LocalModelProtocol.RESPONSES,
+            ).promptCacheDiagnostics,
+        )
+        assertFalse(
+            LocalModelPresets.runtimeCapabilitiesFor(
+                "gpt-5.6",
+                "https://api.openai.com/v1",
+                LocalModelProtocol.CHAT_COMPLETIONS,
+            ).promptCacheDiagnostics,
+        )
+    }
+
 }
