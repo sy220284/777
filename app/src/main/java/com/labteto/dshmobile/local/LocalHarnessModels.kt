@@ -244,6 +244,8 @@ data class LocalHarnessState(
     val mainMaxSteps: Int = 16,
     val subagentMaxSteps: Int = 20,
     val modelAttempts: Int = 3,
+    /** Optional persisted worker route. Explicit subagent/workflow model selection still wins. */
+    val workerProfileId: String? = null,
     val imageInputMode: LocalImageInputMode = LocalImageInputMode.AUTO,
     val workspacePath: String = "",
     val sessionId: String = "",
