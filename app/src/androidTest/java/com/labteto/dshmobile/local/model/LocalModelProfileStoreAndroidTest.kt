@@ -142,6 +142,22 @@ class LocalModelProfileStoreAndroidTest {
         assertEquals("legacy-key", draft.key)
     }
 
+
+    @Test
+    fun persistedPlanProfileAlwaysReloadsAsResponsesRegardlessOfLegacyProtocolValue() {
+        val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
+        val json = Json { ignoreUnknownKeys = true }
+        val store = LocalModelProfileStore(preferences, json)
+        val legacy = planProfile("account-a").copy(protocol = LocalModelProtocol.CHAT_COMPLETIONS)
+
+        store.write(listOf(legacy))
+
+        val reloaded = LocalModelProfileStore(preferences, json).read().single()
+        assertEquals(LocalModelAuthKind.CHATGPT_PLAN, reloaded.authKind)
+        assertEquals(LocalModelProtocol.RESPONSES, reloaded.protocol)
+        assertEquals(legacy.id, reloaded.id)
+    }
+
     private fun planProfile(accountId: String) = LocalModelProfile(
         id = modelProfileId(
             "gpt-test",
