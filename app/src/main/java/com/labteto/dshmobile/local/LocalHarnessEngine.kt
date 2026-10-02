@@ -562,6 +562,22 @@ class LocalHarnessEngine @Inject constructor(
             defaultSessionId = { currentSessionId },
         )
     }
+    private val persistentJobRecoveryCoordinator by lazy {
+        LocalPersistentJobRecoveryCoordinator(
+            scope = scope,
+            jobs = jobs,
+            json = json,
+            modelGateway = modelGateway,
+            webTools = webTools,
+            currentSessionId = { currentSessionId },
+            currentState = { _state.value },
+            defaultHistory = modelHistory::snapshot,
+            subagentRunner = { sessionId, boundState, history ->
+                persistentSubagentRunner(sessionId, boundState, history)
+            },
+            eventLogFor = ::eventLogFor,
+        )
+    }
 
     private val automationWorkCoordinator by lazy {
         LocalAutomationWorkCoordinator(
@@ -685,7 +701,6 @@ class LocalHarnessEngine @Inject constructor(
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
-    private var persistentRecoveryJob: Job? = null
     private val interactions = LocalInteractionCoordinator(_state)
     private val memoryCoordinator by lazy {
         LocalMemoryCoordinator(
@@ -772,7 +787,7 @@ class LocalHarnessEngine @Inject constructor(
                 pluginComposition.installStartup()
                 load()
                 startNextQueuedTurnIfIdle()?.start()
-                scheduleInterruptedSafeJobs()
+                persistentJobRecoveryCoordinator.schedule()
                 scope.launch { maybeCleanupUnreferencedLocalImages() }
                 scope.launch { LocalSessionArchiveMaintenance(sessionsRoot, json, { currentSessionId }).run() }
             }.onFailure { error ->
@@ -4187,213 +4202,6 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun startPersistentReadonlySubagent(
-        task: String,
-        model: String?,
-        maxSteps: Int,
-        virtualScreen: Boolean,
-        sessionId: String = currentSessionId,
-        boundState: LocalHarnessState = _state.value,
-        historySnapshot: () -> List<JsonObject> = modelHistory::snapshot,
-    ): String {
-        val runProfile = modelGateway.profileForRun(model)
-        val effectiveProtocol = if (runProfile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-            LocalModelProtocol.RESPONSES
-        } else {
-            runProfile.protocol
-        }
-        val boundSubagents = persistentSubagentRunner(sessionId, boundState, historySnapshot)
-        val payload = buildJsonObject {
-            put("version", PERSISTENT_SUBAGENT_RESUME_VERSION)
-            put("session_id", sessionId)
-            put("task", task)
-            put("profile_id", runProfile.id)
-            put("model", runProfile.model)
-            put("base_url", runProfile.baseUrl)
-            put("auth_kind", runProfile.authKind.name)
-            put("protocol", effectiveProtocol.name)
-            runProfile.credentialRef?.let { put("credential_ref", it) }
-            put("route_fingerprint", runProfile.routeFingerprint())
-            put("max_steps", maxSteps)
-            put("virtual_screen", virtualScreen)
-        }.toString()
-        return jobs.startPersistent(
-            label = "子代理：${task.take(100)}",
-            resumeKind = "subagent_readonly",
-            resumePayload = payload,
-            ownerSessionId = sessionId,
-        ) { jobId, _ ->
-            withContext(LocalModelRunContext(runProfile)) {
-                boundSubagents.runResult(
-                    task = task,
-                    inheritHistory = false,
-                    allowMutation = false,
-                    backgroundJobId = jobId,
-                    modelOverride = null,
-                    maxSteps = maxSteps,
-                    virtualScreen = virtualScreen,
-                ).requireCompletedOutput()
-            }
-        }
-    }
-
-    private fun restartInterruptedSafeJobs() {
-        synchronized(runStateLock) {
-            persistentRecoveryJob?.cancel()
-            persistentRecoveryJob = null
-        }
-        scheduleInterruptedSafeJobs()
-    }
-
-    private fun scheduleInterruptedSafeJobs() {
-        synchronized(runStateLock) {
-            if (persistentRecoveryJob?.isActive == true) return
-            persistentRecoveryJob = scope.launch {
-                try {
-                    while (true) {
-                        val targetSession = currentSessionId
-                        resumeInterruptedSafeJobsPass(targetSession)
-                        val remaining = jobs.interruptedSnapshots().any { snapshot ->
-                            interruptedJobSessionId(snapshot, targetSession) == targetSession
-                        }
-                        if (!remaining) break
-                        delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
-                    }
-                } finally {
-                    val completed = currentCoroutineContext()[Job]
-                    synchronized(runStateLock) {
-                        if (persistentRecoveryJob === completed) persistentRecoveryJob = null
-                    }
-                }
-            }
-        }
-    }
-
-    private fun resumeInterruptedSafeJobsPass(targetSession: String) {
-        jobs.interruptedSnapshots().forEach { snapshot ->
-            val payloadText = snapshot.resumePayload
-            if (payloadText.isNullOrBlank()) {
-                jobs.failInterrupted(snapshot.id, "任务恢复失败：缺少恢复元数据")
-                return@forEach
-            }
-            val payload = try {
-                json.parseToJsonElement(payloadText).jsonObject
-            } catch (error: Exception) {
-                jobs.failInterrupted(snapshot.id, "任务恢复失败：恢复元数据损坏")
-                recordJobResumeError(snapshot, targetSession, error)
-                return@forEach
-            }
-            val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
-            if (sessionId != targetSession) return@forEach
-            if (jobs.availableSlots() <= 0) return
-
-            try {
-                when (snapshot.resumeKind) {
-                    "web_fetch" -> {
-                        val url = payload["url"]?.jsonPrimitive?.contentOrNull
-                            ?: error("恢复任务缺少 url")
-                        val maxBytes = payload["max_bytes"]?.jsonPrimitive?.intOrNull
-                            ?: DEFAULT_WEB_FETCH_BYTES
-                        val format = payload["format"]?.jsonPrimitive?.contentOrNull ?: "text"
-                        val timeoutSeconds = payload["timeout_seconds"]?.jsonPrimitive?.contentOrNull
-                            ?.toLongOrNull() ?: BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
-                        jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { _, report ->
-                            report("正在恢复网页抓取：$url")
-                            webTools.fetch(
-                                url,
-                                maxBytes.coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES),
-                                format,
-                                timeoutSeconds.coerceIn(30L, BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS),
-                            )
-                        }
-                    }
-                    "subagent_readonly" -> {
-                        val version = payload["version"]?.jsonPrimitive?.intOrNull
-                            ?: error("旧版持久子代理缺少路由身份，已停止自动续跑")
-                        require(version == PERSISTENT_SUBAGENT_RESUME_VERSION) {
-                            "持久子代理恢复版本不受支持：$version"
-                        }
-                        val task = payload["task"]?.jsonPrimitive?.contentOrNull
-                            ?: error("恢复任务缺少 task")
-                        val profileId = payload["profile_id"]?.jsonPrimitive?.contentOrNull
-                            ?: error("恢复任务缺少 profile_id")
-                        val routeModel = payload["model"]?.jsonPrimitive?.contentOrNull
-                            ?: error("恢复任务缺少 model")
-                        val routeBaseUrl = payload["base_url"]?.jsonPrimitive?.contentOrNull
-                            ?: error("恢复任务缺少 base_url")
-                        val authKind = payload["auth_kind"]?.jsonPrimitive?.contentOrNull
-                            ?: error("恢复任务缺少 auth_kind")
-                        val protocol = payload["protocol"]?.jsonPrimitive?.contentOrNull
-                            ?: error("恢复任务缺少 protocol")
-                        val credentialRef = payload["credential_ref"]?.jsonPrimitive?.contentOrNull
-                        val routeFingerprint = payload["route_fingerprint"]?.jsonPrimitive?.contentOrNull
-                            ?: error("恢复任务缺少 route_fingerprint")
-                        val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
-                            ?.coerceIn(1, 128) ?: _state.value.subagentMaxSteps
-                        val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
-                        val boundSubagents = persistentSubagentRunner(sessionId, _state.value)
-                        jobs.resumePersistent(snapshot.id, ownerSessionId = sessionId) { jobId, _ ->
-                            val recoveredProfile = modelGateway.profileForRoute(
-                                profileId = profileId,
-                                model = routeModel,
-                                baseUrl = routeBaseUrl,
-                            )
-                            val effectiveProtocol = if (recoveredProfile.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-                                LocalModelProtocol.RESPONSES.name
-                            } else {
-                                recoveredProfile.protocol.name
-                            }
-                            require(
-                                recoveredProfile.authKind.name == authKind &&
-                                    effectiveProtocol == protocol &&
-                                    recoveredProfile.credentialRef == credentialRef &&
-                                    recoveredProfile.routeFingerprint() == routeFingerprint
-                            ) {
-                                "持久子代理原模型路由身份已变化，已停止自动续跑"
-                            }
-                            withContext(LocalModelRunContext(recoveredProfile)) {
-                                boundSubagents.runResult(
-                                    task = task,
-                                    inheritHistory = false,
-                                    allowMutation = false,
-                                    backgroundJobId = jobId,
-                                    modelOverride = null,
-                                    maxSteps = maxSteps,
-                                    virtualScreen = virtualScreen,
-                                ).requireCompletedOutput()
-                            }
-                        }
-                    }
-                    else -> {
-                        jobs.failInterrupted(
-                            snapshot.id,
-                            "任务恢复失败：不支持的恢复类型 ${snapshot.resumeKind.orEmpty()}",
-                        )
-                    }
-                }
-            } catch (error: Exception) {
-                // Persistence failures leave the record interrupted so the coordinator can retry.
-                recordJobResumeError(snapshot, sessionId, error)
-            }
-        }
-    }
-
-    private fun interruptedJobSessionId(snapshot: JobSnapshot, fallbackSessionId: String): String? {
-        val payloadText = snapshot.resumePayload ?: return null
-        return runCatching {
-            json.parseToJsonElement(payloadText).jsonObject["session_id"]
-                ?.jsonPrimitive?.contentOrNull
-                ?: fallbackSessionId
-        }.getOrNull()
-    }
-
-    private fun recordJobResumeError(snapshot: JobSnapshot, sessionId: String, error: Throwable) {
-        eventLogFor(sessionId).append("job/resume-error", buildJsonObject {
-            put("job_id", snapshot.id)
-            put("kind", snapshot.resumeKind.orEmpty())
-            put("detail", (error.message ?: error::class.java.simpleName).take(2_000))
-        })
-    }
     private suspend fun approve(
         call: LocalToolCall,
         summary: String,
