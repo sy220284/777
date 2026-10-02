@@ -137,7 +137,7 @@ internal class LocalModelRouteCircuitBreaker {
         throw LocalModelException(
             code = "MODEL_ROUTE_CIRCUIT_COOLDOWN",
             message = "当前模型路由连续 ${cooldown.failureStreak} 次传输失败（${cooldown.reason}），" +
-                "已暂停 ${cooldown.millis / 1_000} 秒，避免继续重放同一上下文；可切换到别亳模型档案后继续。",
+                "已暂停 ${cooldown.millis / 1_000} 秒，避免继续重放同一上下文；可切换到其它模型档案后继续。",
             retryable = false,
         )
     }
