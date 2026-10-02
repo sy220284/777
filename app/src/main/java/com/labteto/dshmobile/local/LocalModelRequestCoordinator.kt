@@ -80,8 +80,32 @@ internal class LocalModelRequestCoordinator(
         val operationalLimit = operationalInputLimitTokens(
             frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
         )
+        val workProjection = if (executionControl != null && snapshot.usageMode == LocalUsageMode.WORK) {
+            projectWorkRequestContext(
+                messages = messages,
+                tools = tools,
+                compactor = historyCompactor,
+                operationalLimitTokens = operationalLimit,
+            )
+        } else {
+            LocalWorkRequestProjection(
+                messages = messages,
+                projected = false,
+                estimatedTokensBefore = LocalPromptPressureMeter.measure(
+                    messages = messages,
+                    tools = tools,
+                    operationalLimitTokens = operationalLimit,
+                ).estimatedInputTokens,
+                estimatedTokensAfter = LocalPromptPressureMeter.measure(
+                    messages = messages,
+                    tools = tools,
+                    operationalLimitTokens = operationalLimit,
+                ).estimatedInputTokens,
+            )
+        }
+        val requestMessages = workProjection.messages
         val pressure = LocalPromptPressureMeter.measure(
-            messages = messages,
+            messages = requestMessages,
             tools = tools,
             operationalLimitTokens = operationalLimit,
             modelContextWindowTokens = documentedContextWindowTokens(
@@ -100,7 +124,19 @@ internal class LocalModelRequestCoordinator(
             null
         }
         val log = requestLog ?: defaultEventLog()
-        val logMessages = redactModelImages(messages)
+        if (workProjection.projected) {
+            log.append("request/history-projection", buildJsonObject {
+                put("step", step)
+                put("mode", snapshot.usageMode.name.lowercase())
+                put("source_message_count", messages.size)
+                put("projected_message_count", requestMessages.size)
+                put("estimated_tokens_before", workProjection.estimatedTokensBefore)
+                put("estimated_tokens_after", workProjection.estimatedTokensAfter)
+                put("omitted_messages", workProjection.omittedMessages)
+                put("strategy", "work_checkpoint_plus_recent_tail")
+            })
+        }
+        val logMessages = redactModelImages(requestMessages)
         val contextChars = logMessages.sumOf { it.toString().length }
         val toolNames = buildJsonArray {
             tools.forEach { element ->
@@ -125,7 +161,10 @@ internal class LocalModelRequestCoordinator(
             credentialDiagnostic.planScopeGranted?.let { put("plan_scope_granted", it) }
             credentialDiagnostic.resourceInvokeGranted?.let { put("resource_invoke_granted", it) }
             put("step", step)
+            put("source_message_count", messages.size)
             put("message_count", logMessages.size)
+            put("history_projected", workProjection.projected)
+            put("estimated_input_tokens_before_projection", workProjection.estimatedTokensBefore)
             put("context_chars", contextChars)
             put("estimated_input_tokens", pressure.estimatedInputTokens)
             put("operational_input_limit_tokens", pressure.operationalLimitTokens)
@@ -161,6 +200,7 @@ internal class LocalModelRequestCoordinator(
         val executor = AgentRequestExecutor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
+                (error as? LocalModelException)?.let { lastProviderError = it }
                 (error as? LocalModelException)?.retryable == true || error is java.io.IOException
             },
             backoffMillis = { failedAttempt, error ->
@@ -183,13 +223,22 @@ internal class LocalModelRequestCoordinator(
                         }
                         val durationMs = (System.nanoTime() - attemptStartedNanos) / 1_000_000
                         val providerError = lastProviderError
+                        val localPreflight = providerError?.code in setOf(
+                            "WORK_BUDGET_EXHAUSTED",
+                            "MODEL_CONTEXT_BUDGET_EXCEEDED",
+                            "MODEL_ROUTE_CIRCUIT_OPEN",
+                        )
                         AppLog.warn(
                             "LocalModelRequest",
                             buildString {
-                                append("模型请求失败 model=${snapshot.model} step=$step attempt=${event.attempt} ")
+                                append(if (localPreflight) "模型请求本地拒绝 " else "模型请求失败 ")
+                                append("model=${snapshot.model} step=$step attempt=${event.attempt} ")
                                 append("duration_ms=$durationMs session_id=${snapshot.sessionId} ")
                                 providerError?.code?.let { append("code=$it ") }
-                                providerError?.let { append("failure_kind=${modelFailureKind(it)} admission_state=${it.admissionState.name.lowercase()} ") }
+                                providerError?.let {
+                                    append("failure_kind=${modelFailureKind(it)} admission_state=${it.admissionState.name.lowercase()} ")
+                                }
+                                append("origin=${if (localPreflight) "local_preflight" else "provider_or_transport"} ")
                                 append("retryable=${event.retryable} profile_id=${frozenProfile.id} ")
                                 append("auth_kind=${frozenProfile.authKind.name} protocol=${frozenProfile.protocol.name} ")
                                 credentialDiagnostic.credentialRefTail?.let { append("credential_ref_tail=$it ") }
@@ -219,6 +268,17 @@ internal class LocalModelRequestCoordinator(
                             put("session_id", snapshot.sessionId)
                             put("step", step)
                             put("attempt", event.attempt)
+                            put("origin", if (localPreflight) "local_preflight" else "provider_or_transport")
+                            providerError?.let { error ->
+                                put("code", error.code)
+                                put("failure_kind", modelFailureKind(error))
+                                put("admission_state", error.admissionState.name.lowercase())
+                                put("continuation_eligible", error.continuationEligible)
+                                error.status?.let { put("status", it) }
+                                error.requestId?.let { put("request_id", it) }
+                                error.providerCode?.let { put("provider_code", it) }
+                                error.providerParam?.let { put("provider_param", it) }
+                            }
                             put("retryable", event.retryable)
                             put("will_retry", event.willRetry)
                             put("detail", event.reason.take(2_000))
@@ -254,7 +314,7 @@ internal class LocalModelRequestCoordinator(
             },
         )
 
-        var activeMessages = messages
+        var activeMessages = requestMessages
         var overflowRound = 0
         while (true) {
             try {
