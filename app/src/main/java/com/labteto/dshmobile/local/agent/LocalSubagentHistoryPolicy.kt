@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.agent
 import com.labteto.dshmobile.local.*
+import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -14,13 +15,13 @@ internal class LocalSubagentHistoryPolicy(
         callId: String,
         output: String,
         budget: LocalHistoryBudget?,
-        history: List<JsonObject>,
+        history: LocalModelHistoryBuffer,
     ): String {
         budget ?: return output
         val adaptiveBudget = adaptiveToolResultBudget(
             base = budget,
-            currentHistoryChars = history.sumOf { it.toString().length },
-            currentHistoryTokens = history.sumOf { estimateModelTokens(it.toString()) },
+            currentHistoryChars = history.encodedChars,
+            currentHistoryTokens = history.estimatedTokens,
         )
         val stored = spillToolOutput(callId, output)
         val retained = retainTextForModel(
@@ -39,14 +40,22 @@ internal class LocalSubagentHistoryPolicy(
     }
 
     fun compactHistory(
-        history: MutableList<JsonObject>,
+        history: LocalModelHistoryBuffer,
         subagentId: String,
         budget: LocalHistoryBudget?,
     ) {
-        projectStaleSubagentToolResults(history, budget, subagentId, eventLog())
-        val compaction = historyCompactor.compact(history, budget) ?: return
-        history.clear()
-        history += compaction.messages
+        val compaction = if (budget != null) {
+            history.compact(
+                compactor = historyCompactor,
+                budget = budget,
+                summaryMode = LocalHistorySummaryMode.WORK,
+            )
+        } else {
+            historyCompactor.compact(
+                history = history.snapshot(),
+                summaryMode = LocalHistorySummaryMode.WORK,
+            )?.also { history.reset(it.messages) }
+        } ?: return
         eventLog().append("subagent/compaction", buildJsonObject {
             put("agent_id", subagentId)
             put("omitted_messages", compaction.omittedMessages)
