@@ -5,8 +5,11 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.model.LocalModelRunContext
@@ -23,8 +26,14 @@ class LocalToolExecutionCoordinatorTest {
     fun toolContextInheritsFrozenRunProfileAndDoesNotLeakAfterScope() = runBlocking {
         val registry = ToolRegistry()
         val observed = mutableListOf<LocalModelProfile?>()
-        registry.register(HarnessTool("vision_status", buildJsonObject {}, ToolAccess.READ_ONLY,
-            ToolApprovalPolicy.NEVER, executor = HarnessToolExecutor { context, _, _ ->
+        registry.register(HarnessTool(
+            name = "vision_status",
+            schema = functionToolSchema("vision_status", "测试视觉状态"),
+            access = ToolAccess.READ_ONLY,
+            approvalPolicy = ToolApprovalPolicy.NEVER,
+            exposure = ToolExposure.CORE,
+            metadata = ToolMetadata("视觉"),
+            executor = HarnessToolExecutor { context, _, _ ->
                 observed += context.attributes["model_profile"] as? LocalModelProfile
                 ToolResult("ok")
             }))
@@ -214,6 +223,8 @@ class LocalToolExecutionCoordinatorTest {
                     },
                     access = ToolAccess.READ_ONLY,
                     approvalPolicy = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.CORE,
+                    metadata = ToolMetadata("测试"),
                     executor = HarnessToolExecutor { context, _, _ ->
                         observedSessionId = context.sessionId.orEmpty()
                         ToolResult("ok")
@@ -243,6 +254,9 @@ class LocalToolExecutionCoordinatorTest {
                     name = "github_status",
                     access = ToolAccess.NETWORK,
                     approval = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "GitHub",
+                    keywords = setOf("github", "pr"),
                 ) { ToolResult("ok") },
             )
             register(
@@ -250,6 +264,9 @@ class LocalToolExecutionCoordinatorTest {
                     name = "github_api_get",
                     access = ToolAccess.NETWORK,
                     approval = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "GitHub",
+                    keywords = setOf("github", "pr"),
                 ) { ToolResult("ok") },
             )
             register(
@@ -257,6 +274,9 @@ class LocalToolExecutionCoordinatorTest {
                     name = "github_api_request",
                     access = ToolAccess.PRIVILEGED,
                     approval = ToolApprovalPolicy.ALWAYS,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "GitHub",
+                    keywords = setOf("github", "pr"),
                 ) { ToolResult("ok") },
             )
             register(
@@ -264,6 +284,9 @@ class LocalToolExecutionCoordinatorTest {
                     name = "process_exec",
                     access = ToolAccess.PROCESS,
                     approval = ToolApprovalPolicy.ALWAYS,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "运行时",
+                    keywords = setOf("runtime", "process"),
                 ) { ToolResult("ok") },
             )
         }
@@ -289,6 +312,9 @@ class LocalToolExecutionCoordinatorTest {
                     name = "process_exec",
                     access = ToolAccess.PROCESS,
                     approval = ToolApprovalPolicy.ALWAYS,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "运行时",
+                    keywords = setOf("runtime", "process"),
                 ) { ToolResult("ok") },
             )
         }
@@ -320,19 +346,17 @@ class LocalToolExecutionCoordinatorTest {
         name: String,
         access: ToolAccess,
         approval: ToolApprovalPolicy,
+        exposure: ToolExposure = ToolExposure.CORE,
+        family: String = "测试",
+        keywords: Set<String> = emptySet(),
         execute: suspend () -> ToolResult,
     ) = HarnessTool(
         name = name,
-        schema = buildJsonObject {
-            put("type", "function")
-            put("function", buildJsonObject {
-                put("name", name)
-                put("description", "runtime process tool")
-                put("parameters", buildJsonObject { put("type", "object") })
-            })
-        },
+        schema = functionToolSchema(name, "runtime process tool"),
         access = access,
         approvalPolicy = approval,
+        exposure = exposure,
+        metadata = ToolMetadata(family = family, discoveryKeywords = keywords),
         executor = HarnessToolExecutor { _, _, _ -> execute() },
     )
 }
