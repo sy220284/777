@@ -21,6 +21,8 @@ class ChatDiaryPromptTest {
         assertTrue(prompt.contains("不写流水账"))
         assertTrue(prompt.contains("心理活动"))
         assertTrue(prompt.contains("关系意味着什么"))
+        assertTrue(prompt.contains("角色本人视角"))
+        assertTrue(prompt.contains("稳定性格与心理逻辑"))
         assertTrue(prompt.contains("禁止把对用户动机的猜测写成事实"))
         assertTrue(prompt.contains("diaryDelta"))
     }
