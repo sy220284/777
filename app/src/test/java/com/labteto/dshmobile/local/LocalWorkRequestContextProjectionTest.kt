@@ -37,6 +37,33 @@ class LocalWorkRequestContextProjectionTest {
     }
 
     @Test
+    fun requestProjectionPreservesLeadingRuntimeSystemContextVerbatim() {
+        val runtimeContext = "当前运行上下文：必须保留本轮约束与工作区状态"
+        val history = buildList {
+            add(message("system", "基础系统规则"))
+            add(message("system", runtimeContext))
+            repeat(20) { index ->
+                add(message("user", "旧任务-$index-" + "旧".repeat(2_500)))
+                add(message("assistant", "旧进展-$index-" + "进".repeat(2_500)))
+            }
+            add(message("user", "继续最新任务"))
+        }
+
+        val projected = projectWorkRequestContext(
+            messages = history,
+            tools = JsonArray(emptyList()),
+            compactor = LocalHistoryCompactor(),
+            operationalLimitTokens = 678_464,
+        )
+
+        assertTrue(projected.projected)
+        assertEquals(history[0], projected.messages[0])
+        assertEquals(history[1], projected.messages[1])
+        assertTrue(projected.messages[1]["content"].toString().contains(runtimeContext))
+        assertTrue(projected.messages.last()["content"].toString().contains("继续最新任务"))
+    }
+
+    @Test
     fun smallWorkHistoryStaysVerbatim() {
         val history = listOf(
             message("system", "系统规则"),
