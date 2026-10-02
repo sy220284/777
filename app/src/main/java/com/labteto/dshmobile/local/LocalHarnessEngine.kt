@@ -79,6 +79,7 @@ import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
 import com.labteto.dshmobile.local.chat.saveGroupChatAnnouncement
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
+import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.LocalReplySuggestionCoordinator
@@ -174,6 +175,7 @@ class LocalHarnessEngine @Inject constructor(
     private val chatInteractionPlanner: ChatInteractionPlanner,
 ) {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
+    private val chatDiaryStore = ChatDiaryStore(File(root, "chat-diary"), json)
     private val memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
     private val persistentJobStore = LocalPersistentJobStore(
         file = File(root, "jobs.json"),
@@ -383,6 +385,7 @@ class LocalHarnessEngine @Inject constructor(
             state = _state,
             scope = scope,
             chatTurnCoordinator = chatTurnCoordinator,
+            diaryStore = chatDiaryStore,
             requestPlanner = { snapshot, prompt, requestLog, profile ->
                 completeWithRetry(
                     key = profile.id,
@@ -444,7 +447,7 @@ class LocalHarnessEngine @Inject constructor(
     private val groupChatTurnExecutor by lazy {
         LocalGroupChatTurnExecutor(
             _state, modelGateway, chatPersonaStore, chatPersonaGalleryStore, chatReplyCoordinator,
-            chatTurnCoordinator, usageTracker, json, modelHistory, transcriptRuntime,
+            chatTurnCoordinator, chatDiaryStore, usageTracker, json, modelHistory, transcriptRuntime,
             imageCapabilities, imageRequestBudget, workspace.path, { eventLog },
             { key, snapshot, messages, step, tools, preview, attempts, overflow, temperature ->
                 completeWithRetry(
@@ -455,6 +458,9 @@ class LocalHarnessEngine @Inject constructor(
             },
             ::ensureSystemMessage,
             { text, sourceMessageId -> captureAutoMemoryDirective(text, sourceMessageId) },
+            { query, snapshot, subjectKey, viewerName ->
+                memoryCoordinator.chatMemoryContext(query, snapshot, subjectKey, viewerName, groupAudience = true)
+            },
             { extraTokens -> compactHistoryIfNeeded(extraTokens) },
             ::updateContextMetrics,
             ::persistChatBranchState,
@@ -681,6 +687,7 @@ class LocalHarnessEngine @Inject constructor(
             state = _state,
             memoryStore = memoryStore,
             memoryManager = memoryManager,
+            diaryStore = chatDiaryStore,
             currentSessionId = { currentSessionId },
             eventLog = { eventLog },
             persist = ::persist,
@@ -2327,6 +2334,7 @@ class LocalHarnessEngine @Inject constructor(
             state = binding.state,
             memoryStore = memoryStore,
             memoryManager = memoryManager,
+            diaryStore = chatDiaryStore,
             currentSessionId = { binding.sessionId },
             eventLog = { binding.eventLog },
             persist = { persist(binding) },
