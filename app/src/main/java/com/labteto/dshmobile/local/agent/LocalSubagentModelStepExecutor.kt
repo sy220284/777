@@ -17,6 +17,8 @@ internal class LocalSubagentModelStepExecutor(
     private val resourceScheduler: HarnessResourceScheduler,
     private val eventLog: () -> LocalSessionEventLog,
     private val historyCompactor: LocalHistoryCompactor,
+    private val executionBudget: LocalWorkExecutionBudget? = null,
+    private val routeCircuitBreaker: LocalModelRouteCircuitBreaker? = null,
 ) {
     suspend fun complete(
         profile: LocalModelProfile,
@@ -85,19 +87,32 @@ internal class LocalSubagentModelStepExecutor(
         while (true) {
             try {
                 return executor.execute {
-                    resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                        try {
-                            modelGateway.complete(
-                                profile = profile,
-                                model = model,
-                                baseUrl = baseUrl,
-                                messages = activeHistory,
-                                tools = tools,
-                            )
-                        } catch (error: LocalModelException) {
-                            logSubagentProviderError(eventLog(), subagentId, step, error)
-                            throw error
+                    val pressure = LocalPromptPressureMeter.measure(
+                        messages = activeHistory,
+                        tools = tools,
+                        operationalLimitTokens = operationalInputLimitTokens(model, baseUrl),
+                        modelContextWindowTokens = documentedContextWindowTokens(model, baseUrl),
+                    )
+                    routeCircuitBreaker?.requireClosed(profile.id)
+                    val budgetLease = executionBudget?.reserve(pressure.estimatedInputTokens)
+                    try {
+                        resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                            try {
+                                modelGateway.complete(
+                                    profile = profile,
+                                    model = model,
+                                    baseUrl = baseUrl,
+                                    messages = activeHistory,
+                                    tools = tools,
+                                )
+                            } catch (error: LocalModelException) {
+                                routeCircuitBreaker?.observeFailure(profile.id, error)
+                                logSubagentProviderError(eventLog(), subagentId, step, error)
+                                throw error
+                            }
                         }
+                    } finally {
+                        budgetLease?.settle()
                     }
                 }
             } catch (error: Throwable) {
