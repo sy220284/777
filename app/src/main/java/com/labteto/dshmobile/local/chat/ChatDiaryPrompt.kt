@@ -4,6 +4,7 @@ internal const val CHAT_DIARY_SYSTEM_INSTRUCTION = """日记增量 diaryDelta：
 字段：event, feeling, innerThought, relationshipMeaning, unresolvedEcho, importance(0-5), disclosure(PRIVATE|SHAREABLE|PUBLIC)。
 要求：
 - event 是精炼的记忆锚点，合并同一事件的关键动作、人物、时间/地点、物品和明确数值，不逐句复述，不写流水账。
+- diaryDelta 必须是可独立理解的精炼成稿；同一经历出现补充、确认或修正时，输出完整的当前版本，避免只写“又提到、继续、还是”这类依赖旧条目的碎片。
 - feeling 写真实情绪体验与变化，体现触发原因、强弱或矛盾感，避免只有“开心/难过”标签。
 - feeling、innerThought、relationshipMeaning 必须沿用角色稳定性格和心理逻辑，以角色本人视角表达，避免第三方总结腔和模板化感想。
 - innerThought 记录角色当时未直接说出口的心理活动，包括判断、期待、犹豫、自我拉扯和克制；角色对用户动机的猜测不能写成事实。
