@@ -179,8 +179,8 @@ internal fun LocalConversationSurface(
     val scope = rememberCoroutineScope()
     val drafts = rememberSaveable(
         saver = listSaver(
-            save = LocalSessionDraftCache::save,
-            restore = LocalSessionDraftCache::restore,
+            save = { cache -> cache.save() },
+            restore = { saved -> LocalSessionDraftCache.restore(saved) },
         ),
     ) { LocalSessionDraftCache() }
     val input = drafts[state.sessionId].orEmpty()
