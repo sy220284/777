@@ -7,6 +7,7 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.model.resolveLocalModelProtocol
 import java.util.UUID
@@ -188,7 +189,7 @@ internal class LocalModelRequestCoordinator(
                                 append("模型请求失败 model=${snapshot.model} step=$step attempt=${event.attempt} ")
                                 append("duration_ms=$durationMs session_id=${snapshot.sessionId} ")
                                 providerError?.code?.let { append("code=$it ") }
-                                providerError?.cause?.let { append("cause_type=${it::class.java.simpleName} ") }
+                                providerError?.let { append("failure_kind=${modelFailureKind(it)} admission_state=${it.admissionState.name.lowercase()} ") }
                                 append("retryable=${event.retryable} profile_id=${frozenProfile.id} ")
                                 append("auth_kind=${frozenProfile.authKind.name} protocol=${frozenProfile.protocol.name} ")
                                 credentialDiagnostic.credentialRefTail?.let { append("credential_ref_tail=$it ") }
@@ -313,11 +314,11 @@ internal class LocalModelRequestCoordinator(
                                         error.requestId?.let { put("request_id", it) }
                                         error.providerCode?.let { put("provider_code", it) }
                                         error.providerParam?.let { put("provider_param", it) }
-                                        error.cause?.let { cause ->
-                                            put("cause_type", cause::class.java.simpleName)
-                                            cause.message?.takeIf(String::isNotBlank)?.let {
-                                                put("cause_detail", it.take(800))
-                                            }
+                                        put("failure_kind", modelFailureKind(error))
+                                        put("admission_state", error.admissionState.name.lowercase())
+                                        put("continuation_eligible", error.continuationEligible)
+                                        error.cause?.message?.takeIf(String::isNotBlank)?.let {
+                                            put("cause_detail", it.take(800))
                                         }
                                     })
                                     throw error
