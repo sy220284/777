@@ -5,8 +5,6 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 internal const val LOCAL_MODEL_TOOL_CALLS_EVENT_KEY = "model_tool_calls"
@@ -22,8 +20,3 @@ internal fun modelToolCallEventData(calls: List<LocalToolCall>): JsonArray = bui
         })
     }
 }
-
-internal fun modelToolCallIdsFromEvent(data: JsonObject): List<String>? =
-    (data[LOCAL_MODEL_TOOL_CALLS_EVENT_KEY] as? JsonArray)?.mapNotNull { raw ->
-        (raw as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull
-    }

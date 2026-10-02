@@ -62,12 +62,72 @@ internal fun restoreLocalModelHistory(
     }
 
     val invalidCheckpointAfterRestore = latestCheckpointIndex > checkpointIndex
+    val (sanitizedHistory, repairedStructure) = sanitizeRestoredModelHistory(history)
     return LocalModelHistoryRestore(
-        messages = history,
+        messages = sanitizedHistory,
         replayedTail = replayed,
         usedLegacyFallback = usedLegacyFallback,
-        checkpointRecommended = usedLegacyFallback || replayed || invalidCheckpointAfterRestore,
+        checkpointRecommended = usedLegacyFallback || replayed || invalidCheckpointAfterRestore || repairedStructure,
     )
+}
+
+private fun sanitizeRestoredModelHistory(source: List<JsonObject>): Pair<List<JsonObject>, Boolean> {
+    val restored = mutableListOf<JsonObject>()
+    var pendingBatch = mutableListOf<JsonObject>()
+    var pendingCallIds = linkedSetOf<String>()
+    var changed = false
+
+    fun discardPendingBatch() {
+        if (pendingBatch.isNotEmpty()) changed = true
+        pendingBatch = mutableListOf()
+        pendingCallIds = linkedSetOf()
+    }
+
+    source.forEach { message ->
+        when (message["role"]?.jsonPrimitive?.contentOrNull) {
+            "assistant" -> {
+                if (pendingCallIds.isNotEmpty()) discardPendingBatch()
+                val callIds = modelToolCallIds(message)
+                if (callIds == null) {
+                    changed = true
+                } else if (callIds.isEmpty()) {
+                    restored += message
+                } else if (callIds.size != callIds.toSet().size) {
+                    changed = true
+                } else {
+                    pendingBatch += message
+                    pendingCallIds += callIds
+                }
+            }
+            "tool" -> {
+                val callId = message["tool_call_id"]?.jsonPrimitive?.contentOrNull
+                if (callId != null && pendingCallIds.remove(callId)) {
+                    pendingBatch += message
+                    if (pendingCallIds.isEmpty()) {
+                        restored += pendingBatch
+                        pendingBatch = mutableListOf()
+                    }
+                } else {
+                    changed = true
+                }
+            }
+            else -> {
+                if (pendingCallIds.isNotEmpty()) discardPendingBatch()
+                restored += message
+            }
+        }
+    }
+    if (pendingCallIds.isNotEmpty()) discardPendingBatch()
+    return restored to (changed || restored.size != source.size)
+}
+
+private fun modelToolCallIds(message: JsonObject): List<String>? {
+    val rawCalls = message["tool_calls"] ?: message["model_tool_calls"] ?: return emptyList()
+    val calls = rawCalls as? JsonArray ?: return null
+    return calls.map { raw ->
+        (raw as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+            ?: return null
+    }
 }
 
 private fun applyModelHistoryEvent(

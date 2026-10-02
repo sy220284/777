@@ -76,6 +76,8 @@ class ChatGptAccountStore @Inject constructor(
         val current = get(id) ?: return@withLock
         if (expected != null && current != expected) return@withLock
         val disconnected = current.copy(
+            email = null,
+            displayName = null,
             idToken = "",
             accessToken = "",
             refreshToken = "",
