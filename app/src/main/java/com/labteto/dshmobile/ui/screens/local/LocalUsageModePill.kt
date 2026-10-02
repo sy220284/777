@@ -97,7 +97,11 @@ internal fun LocalUsageModePill(
                         Text(
                             stringResource(labelRes),
                             style = (if (selected == mode) DsType.std14Strong else DsType.std14).withReadingWeight(),
-                            color = if (selected == mode) colors.labelPrimary else colors.labelSecondary,
+                            color = when {
+                                !enabled -> colors.labelTertiary
+                                selected == mode -> colors.labelPrimary
+                                else -> colors.labelSecondary
+                            },
                         )
                     }
                 }
