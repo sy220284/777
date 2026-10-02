@@ -419,6 +419,64 @@ subagent_factory = strip_comments(read(subagent_factory_path))
 if "HarnessVirtualDisplayProvider" not in subagent_factory:
     die("LocalSubagentRunnerFactory must depend on HarnessVirtualDisplayProvider")
 
+tool_registry_source = strip_comments(
+    read("harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/ToolRegistry.kt")
+)
+for required_contract in (
+    "val access: ToolAccess,",
+    "val approvalPolicy: ToolApprovalPolicy,",
+    "val exposure: ToolExposure,",
+    "val metadata: ToolMetadata,",
+    "validateToolRegistration(tool)",
+):
+    if required_contract not in tool_registry_source:
+        die(f"HarnessTool registration contract is missing: {required_contract}")
+
+deepseek_client = strip_comments(read("app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"))
+if "object LocalToolCatalog" in deepseek_client:
+    die("LocalToolCatalog must stay outside the model transport client")
+tool_catalog = strip_comments(read("app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolCatalog.kt"))
+if "functionToolSchema(" not in tool_catalog:
+    die("LocalToolCatalog must build model schemas through the shared functionToolSchema")
+
+tool_router = strip_comments(read("app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolRouter.kt"))
+for forbidden in (
+    "optionalExact",
+    "familyTags(",
+    'startsWith("android_")',
+    'startsWith("vision_")',
+    'startsWith("github_")',
+    'startsWith("mcp_")',
+    'startsWith("lsp_")',
+    'startsWith("webhook_")',
+):
+    if forbidden in tool_router:
+        die(f"LocalToolRouter must use ToolExposure/ToolMetadata instead of naming heuristics: {forbidden}")
+
+tool_registration_files = (
+    "app/src/main/java/com/labteto/dshmobile/local/tools/LocalBuiltinPlugin.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/vision/LocalVisionPlugin.kt",
+    "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt",
+    "app/src/main/java/com/labteto/dshmobile/automation/HarnessWebhook.kt",
+    "harness-device-android/src/main/java/com/labteto/dshmobile/device/AndroidDevicePlugin.kt",
+    "harness-runtime-android/src/main/kotlin/com/labteto/dshmobile/runtime/AndroidRuntimePlugin.kt",
+    "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/github/GitHubConnectorPlugin.kt",
+    "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/lsp/LspPlugin.kt",
+    "harness-interop/src/main/kotlin/com/labteto/dshmobile/interop/mcp/McpToolBridgePlugin.kt",
+)
+for relative in tool_registration_files:
+    source = strip_comments(read(relative))
+    if 'put("type", "function")' in source:
+        die(f"{relative} rebuilds function schema locally; use shared functionToolSchema")
+    for match in re.finditer(r"\bHarnessTool\s*\(", source):
+        executor = source.find("executor =", match.start())
+        if executor < 0:
+            die(f"{relative} has a HarnessTool without an executor")
+        declaration = source[match.start():executor]
+        for required_field in ("access =", "approvalPolicy =", "exposure =", "metadata ="):
+            if required_field not in declaration:
+                die(f"{relative} HarnessTool is missing explicit {required_field[:-2].strip()} declaration")
+
 print(
     "[architecture-guard] OK: "
     f"engine deps={dependency_count}, public methods={public_method_count}, "
