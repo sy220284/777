@@ -46,7 +46,15 @@ internal class LocalToolExecutionCoordinator(
         }
     }
 
-    fun enableGitHubConnectorTools() = enableOptionalTools(GITHUB_CONNECTOR_TOOL_NAMES)
+    fun enableGitHubConnectorTools() {
+        val githubTools = registry.names().mapNotNull(registry::get)
+            .filter { tool ->
+                LocalToolRouter.isOptional(tool) &&
+                    tool.metadata.family.equals(GITHUB_TOOL_FAMILY, ignoreCase = true)
+            }
+            .map(HarnessTool::name)
+        enableOptionalTools(githubTools)
+    }
 
     fun capabilitySummary(enabledOptional: Set<String> = enabledOptionalSnapshot()): String {
         val tools = registry.names().mapNotNull(registry::get)
@@ -224,7 +232,7 @@ internal class LocalToolExecutionCoordinator(
     }
 
     private companion object {
-        val GITHUB_CONNECTOR_TOOL_NAMES = setOf("github_status", "github_api_get", "github_api_request")
+        const val GITHUB_TOOL_FAMILY = "GitHub"
         val MUTATING_ACCESSES = setOf(
             ToolAccess.WORKSPACE_WRITE,
             ToolAccess.SESSION_WRITE,
