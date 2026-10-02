@@ -3,15 +3,18 @@ name: Capture README UI
 on:
   push:
     branches:
-      - docs/readme-user-flow
+      - docs/readme-screenshot-capture
     paths:
       - '.github/workflows/capture-readme-ui.yml'
-      - 'app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/ReadmeUiScreenshotCaptureTest.kt'
+      - '.github/scripts/capture-readme-ui.sh'
+      - 'app/src/main/**'
+      - 'app/src/debug/**'
       - 'README.md'
   workflow_dispatch:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   capture:
@@ -43,33 +46,36 @@ jobs:
           api-level: 36
           arch: x86_64
           disable-animations: true
-          script: |
-            set -eux
-            DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.ReadmeUiScreenshotCaptureTest --stacktrace
+          script: bash .github/scripts/capture-readme-ui.sh
 
-            mkdir -p docs/images/current
-            adb pull /sdcard/Download/readme-screenshots/navigation.png docs/images/current/navigation.png
-            adb pull /sdcard/Download/readme-screenshots/chat.png docs/images/current/chat.png
-            adb pull /sdcard/Download/readme-screenshots/work.png docs/images/current/work.png
-            adb pull /sdcard/Download/readme-screenshots/character-tuning.png docs/images/current/character-tuning.png
-            adb pull /sdcard/Download/readme-screenshots/usage.png docs/images/current/usage.png
-            test -s docs/images/current/navigation.png
-            test -s docs/images/current/chat.png
-            test -s docs/images/current/work.png
-            test -s docs/images/current/character-tuning.png
-            test -s docs/images/current/usage.png
-            python3 -c 'from pathlib import Path; import struct; files=sorted(Path("docs/images/current").glob("*.png")); assert {p.name for p in files}=={"navigation.png","chat.png","work.png","character-tuning.png","usage.png"}; [(lambda d,p: (d[:8]==bytes.fromhex("89504e470d0a1a0a") or (_ for _ in ()).throw(AssertionError(f"{p} invalid PNG")), struct.unpack(">II",d[16:24])[0]>=300 or (_ for _ in ()).throw(AssertionError(f"{p} width")), struct.unpack(">II",d[16:24])[1]>=500 or (_ for _ in ()).throw(AssertionError(f"{p} height"))))(p.read_bytes(),p) for p in files]'
+      - name: Upload captured screenshots
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: readme-current-ui
+          path: docs/images/current/*.png
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Commit captured screenshots
+        id: commit_screenshots
         run: |
           set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm -f docs/images/home.png docs/images/chat.png docs/images/trajectory.png docs/images/session-info.png docs/images/subagent.png
-          git add -A docs/images
+          git add -A docs/images/current
           if git diff --cached --quiet; then
             echo "界面截图没有变化"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "更新 README 当前界面截图"
           git push origin HEAD:"${GITHUB_REF_NAME}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Validate generated screenshot commit
+        if: steps.commit_screenshots.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          gh workflow run ci.yml --ref "${GITHUB_REF_NAME}"
