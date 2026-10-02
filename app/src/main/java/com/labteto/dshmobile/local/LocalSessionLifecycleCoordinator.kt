@@ -410,6 +410,8 @@ internal class LocalSessionLifecycleCoordinator(
                 }
                 conversationFilesCoordinator.invalidate(ids)
                 memoryStore.detachSourceSessions(ids)
+                // All run/job producers are drained and the storage lock deletion has completed.
+                sessionCoordinator.releaseDeletionBarrier(ids)
                 state.update { it.copy(sessions = sessionSummaries()) }
                 persist()
                 ids.size
