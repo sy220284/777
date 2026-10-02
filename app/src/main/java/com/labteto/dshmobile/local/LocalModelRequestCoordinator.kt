@@ -198,7 +198,7 @@ internal class LocalModelRequestCoordinator(
             put("tool_names", toolNames)
         })
 
-        var failureContextLogged = false
+        var failureContextDiagnosticLogged = false
         var lastProviderError: LocalModelException? = null
         var attemptStartedNanos = System.nanoTime()
         val executor = AgentRequestExecutor(
@@ -256,16 +256,25 @@ internal class LocalModelRequestCoordinator(
                                 append("detail=${event.reason.take(800)}")
                             },
                         )
-                        if (!failureContextLogged) {
+                        if (!failureContextDiagnosticLogged) {
                             runCatching {
-                                log.append("request/context-full", buildJsonObject {
+                                log.append("request/context-diagnostic", buildJsonObject {
                                     put("step", step)
-                                    put("model", snapshot.model)
-                                    put("messages", JsonArray(logMessages))
-                                    put("tools", tools)
+                                    put("model", frozenProfile.model)
+                                    put("profile_id", frozenProfile.id)
+                                    put("provider", frozenProfile.provider)
+                                    put("auth_kind", frozenProfile.authKind.name)
+                                    put("protocol", frozenProfile.protocol.name)
+                                    put("route_fingerprint", frozenProfile.routeFingerprint())
+                                    put("message_count", logMessages.size)
+                                    put("context_chars", contextChars)
+                                    put("estimated_input_tokens", pressure.estimatedInputTokens)
+                                    put("operational_input_limit_tokens", pressure.operationalLimitTokens)
+                                    put("tool_count", tools.size)
+                                    put("tool_names", toolNames)
                                 })
                             }
-                            failureContextLogged = true
+                            failureContextDiagnosticLogged = true
                         }
                         log.append("request/error", buildJsonObject {
                             put("duration_ms", durationMs)
