@@ -101,7 +101,7 @@ internal class ChatDiaryStore(
         if (cleanSubject.isBlank()) return emptyList()
         val queryCore = normalizeDiaryText(query)
         val queryTerms = diaryTerms(query)
-        val broad = shouldRecallDiary(query)
+        val broad = isExplicitDiaryRecall(query)
         val now = System.currentTimeMillis()
 
         return readDocument().entries.asSequence()
@@ -116,16 +116,17 @@ internal class ChatDiaryStore(
                 val phrase = if (queryCore.isBlank()) 0 else {
                     (diarySimilarity(queryCore, entry.searchText()) * 100).toInt()
                 }
+                val semantic = lexical * 24 + phrase
                 val ageDays = ((now - entry.updatedAt).coerceAtLeast(0L) / DAY_MILLIS).toInt()
                 val recency = (30 - ageDays).coerceIn(0, 30)
-                entry to (lexical * 24 + phrase + entry.importance * 12 + recency)
+                Triple(entry, semantic, semantic + entry.importance * 12 + recency)
             }
-            .filter { (entry, score) -> broad || score >= MIN_RECALL_SCORE || entry.importance >= 5 }
+            .filter { (_, semantic, _) -> broad || semantic >= MIN_RECALL_SEMANTIC_SCORE }
             .sortedWith(
-                compareByDescending<Pair<ChatDiaryEntry, Int>> { it.second }
+                compareByDescending<Triple<ChatDiaryEntry, Int, Int>> { it.third }
                     .thenByDescending { it.first.updatedAt },
             )
-            .map(Pair<ChatDiaryEntry, Int>::first)
+            .map(Triple<ChatDiaryEntry, Int, Int>::first)
             .take(maxItems.coerceIn(1, 6))
             .toList()
     }
@@ -346,7 +347,7 @@ internal class ChatDiaryStore(
         const val MIN_EVENT_CHARS = 6
         const val MIN_IMPORTANCE = 2
         const val MINOR_IMPORTANCE = 3
-        const val MIN_RECALL_SCORE = 36
+        const val MIN_RECALL_SEMANTIC_SCORE = 24
         const val DUPLICATE_WINDOW_MILLIS = 6 * 60 * 60 * 1_000L
         const val DAY_MILLIS = 24 * 60 * 60 * 1_000L
         const val DUPLICATE_SIMILARITY = 0.72
