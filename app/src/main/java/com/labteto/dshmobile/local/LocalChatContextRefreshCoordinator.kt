@@ -473,7 +473,7 @@ internal class LocalChatContextRefreshCoordinator(
             return
         }
 
-        chatRelationshipSubjectKey(before.galleryId, before.personaId)?.let { subjectKey ->
+        if (before.autoMemory) chatRelationshipSubjectKey(before.galleryId, before.personaId)?.let { subjectKey ->
             runCatching {
                 diaryStore.record(
                     ChatDiaryWriteRequest(
