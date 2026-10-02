@@ -4764,6 +4764,8 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun environmentInfo(): String {
+        val latestRequest = usageTracker.analyticsSnapshot().recentRecords
+            .firstOrNull { record -> record.reported && record.inputTokens > 0L }
         val commands = listOf(
             "sh", "ls", "cat", "cp", "mv", "rm", "mkdir", "sed", "grep", "find",
             "git", "curl", "wget", "python3", "python", "node",
@@ -4773,6 +4775,8 @@ class LocalHarnessEngine @Inject constructor(
             resources = resourceScheduler.snapshot(),
             contextChars = modelHistory.encodedChars,
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
+            latestRequest = latestRequest,
+            capabilitySummary = toolExecutionCoordinator.capabilitySummary(),
             pendingInputs = pendingInputs.size(),
             pendingInputLimit = MAX_PENDING_INPUTS,
             commands = commands,
