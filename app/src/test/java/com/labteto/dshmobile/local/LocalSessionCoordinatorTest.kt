@@ -83,7 +83,10 @@ class LocalSessionCoordinatorTest {
                 message("m2", "assistant", "二"),
                 message("m3", "user", "三"),
             ),
-            transcriptIndex = LocalTranscriptRuntimeIndex(totalMessageCount = 3L),
+            transcriptIndex = LocalTranscriptRuntimeIndex(
+                latestCreatedAt = 123_456L,
+                totalMessageCount = 3L,
+            ),
         )
 
         val snapshot = coordinator.snapshot(
@@ -96,6 +99,7 @@ class LocalSessionCoordinatorTest {
         assertTrue(snapshot.messages.isEmpty())
         assertEquals(listOf("m2", "m3"), snapshot.transcriptWindow.map { it.id })
         assertEquals(3L, snapshot.transcriptIndex.totalMessageCount)
+        assertEquals(123_456L, snapshot.updatedAt)
         assertEquals(8L, snapshot.controlProjectedThroughSequence)
         assertEquals(7L, snapshot.transcriptProjectedThroughSequence)
     }
