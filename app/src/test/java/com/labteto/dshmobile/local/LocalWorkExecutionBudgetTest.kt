@@ -57,7 +57,7 @@ class LocalWorkExecutionBudgetTest {
             val failure = runCatching {
                 executeWithModelAdmission(
                     control = control,
-                    profileId = "route",
+                    routeFingerprint = "route",
                     model = "unknown",
                     baseUrl = "https://example.test",
                     messages = messages,
@@ -100,7 +100,7 @@ class LocalWorkExecutionBudgetTest {
         val failure = runCatching {
             executeWithModelAdmission(
                 control = control,
-                profileId = "route",
+                routeFingerprint = "route",
                 model = "unknown",
                 baseUrl = "https://example.test",
                 messages = messages,
