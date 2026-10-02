@@ -113,10 +113,9 @@ internal object LocalToolPolicy {
     /**
      * Tools whose execution is gated by the approval pipeline.
      *
-     * `ALWAYS` means the call reaches the approval decision; it does not mean the user is prompted,
-     * because global auto-approval can resolve it. `bash` is listed here precisely so that its command
-     * policy is consulted: a shell call should never bypass the pipeline just because most commands
-     * are auto-approved.
+     * `ALWAYS` means the call reaches the approval decision. Safe auto-approval may resolve only
+     * tools whose [autoApprovalScope] is explicitly safe; process-level Shell stays outside that
+     * scope and therefore always requires an explicit approval.
      */
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "bash", "job_kill", "send_message", "interrupt_agent",
@@ -126,15 +125,12 @@ internal object LocalToolPolicy {
     }
 
     /**
-     * Low-risk classification follows the sandbox, not the tool category.
+     * Authoritative scope for safe auto-approval.
      *
-     * This no longer limits global auto-approval; it is retained for impact/display metadata and
-     * one-turn device policy decisions:
-     * - workspace-bounded writes and read-only tools are classified low risk;
-     * - firmware partitions and other apps' private directories stay out of reach regardless of
-     *   approval mode because the kernel boundary still applies;
-     * - categories that act outside the filesystem sandbox remain higher impact even though global
-     *   auto-approval may skip their prompt when the user enables it.
+     * - workspace-bounded writes and read-only tools may be approved by the safe mode;
+     * - process, network, privileged, agent-control and session mutation capabilities stay outside it;
+     * - Shell starts in the workspace but can leave cwd under the app UID, so it is never classified
+     *   as a workspace-bounded operation.
      */
     fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file" -> LocalAutoApprovalScope.WORKSPACE
