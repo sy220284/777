@@ -3,8 +3,13 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.session.SessionEventLog
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
 /** Gradually compress old rotated logs even if their session is never reopened. */
@@ -40,6 +45,45 @@ internal class LocalSessionArchiveMaintenance(
     }
 
     companion object {
+        private val archiveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val pendingPaths = ConcurrentHashMap.newKeySet<String>()
+
+        fun request(file: File, json: Json) {
+            val key = file.absolutePath
+            if (!pendingPaths.add(key)) return
+            archiveScope.launch {
+                var completed = false
+                try {
+                    val log = SessionEventLog(file, json)
+                    while (log.archiveLegacySegments(limit = 16) > 0) {
+                        delay(25)
+                    }
+                    completed = true
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    AppLog.error(
+                        "LocalSessionArchiveMaintenance",
+                        "session archive background compression failed",
+                        error,
+                    )
+                } finally {
+                    pendingPaths.remove(key)
+                    if (completed && hasRawSegments(file)) request(file, json)
+                }
+            }
+        }
+
+        private fun hasRawSegments(file: File): Boolean {
+            val parent = file.parentFile ?: return false
+            val prefix = "${file.name}.part-"
+            return parent.listFiles().orEmpty().any { candidate ->
+                candidate.isFile &&
+                    candidate.name.startsWith(prefix) &&
+                    candidate.name.removePrefix(prefix).all(Char::isDigit)
+            }
+        }
+
         fun storageStatus(root: File): String {
             val bytes = root.listFiles().orEmpty().filter { it.isFile }.sumOf(File::length)
             val free = root.usableSpace
