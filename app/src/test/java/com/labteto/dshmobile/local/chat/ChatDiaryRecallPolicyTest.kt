@@ -13,6 +13,15 @@ class ChatDiaryRecallPolicyTest {
         assertTrue(chatLongTermMemoryBudget(1_000_000).totalTokens <= 2_200)
     }
 
+
+    @Test
+    fun groupRecallKeepsInnerNarrativePrivateToCurrentCharacter() {
+        val instruction = diaryRecallUsageInstruction(groupAudience = true)
+        assertTrue(instruction.contains("不代表其他成员知情"))
+        assertTrue(instruction.contains("心理活动"))
+        assertTrue(instruction.contains("不要主动逐条公开"))
+    }
+
     @Test
     fun renderedMemoryIsHardClippedByEstimatedModelTokens() {
         val bounded = takeWithinModelTokenBudget("人物日记".repeat(2_000), 120)
