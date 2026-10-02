@@ -78,6 +78,8 @@ internal class LocalSubagentRunner(
     private val runCoordinator: LocalAgentRunCoordinator? = null,
     private val runSessionId: () -> String = { state.value.sessionId },
     private val runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
+    private val executionBudget: LocalWorkExecutionBudget? = null,
+    private val routeCircuitBreaker: LocalModelRouteCircuitBreaker? = null,
 ) {
     private val historyPolicy = com.labteto.dshmobile.local.agent.LocalSubagentHistoryPolicy(
         spillToolOutput = spillToolOutput,
@@ -91,6 +93,8 @@ internal class LocalSubagentRunner(
         resourceScheduler = resourceScheduler,
         eventLog = eventLog,
         historyCompactor = historyCompactor,
+        executionBudget = executionBudget,
+        routeCircuitBreaker = routeCircuitBreaker,
     )
 
     suspend fun run(
