@@ -1134,6 +1134,8 @@
     <string name="chat_diary_no_character_body">先从人物库选择人物并开始聊天；有跨会话价值的经历会出现在这里。</string>
     <string name="chat_diary_no_match_title">没有匹配的日记</string>
     <string name="chat_diary_no_match_body">换个关键词或筛选条件试试。</string>
+    <string name="chat_diary_load_failed_title">日记暂时读取失败</string>
+    <string name="chat_diary_load_failed_body">本机日记文件暂时无法读取。可以重试；原聊天与事件日志不会因此被删除。</string>
     <string name="chat_diary_feeling">当时的感受</string>
     <string name="chat_diary_inner_thought">未说出口的心理活动</string>
     <string name="chat_diary_relationship_meaning">这件事对关系意味着什么</string>
