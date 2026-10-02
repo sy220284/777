@@ -228,4 +228,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
     private fun JsonObject.requiredString(key: String): String =
         this[key]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
             ?: error("恢复任务缺少 $key")
+    private companion object {
+        const val PERSISTENT_SUBAGENT_RESUME_VERSION = 1
+    }
 }
