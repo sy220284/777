@@ -74,8 +74,9 @@ internal class LocalModelRequestCoordinator(
             ),
             authKind = frozenProfile.authKind,
         )
+        val routeFingerprint = routeFingerprint
         val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
-            promptCacheBaselines.get(snapshot.sessionId, frozenProfile.id)
+            promptCacheBaselines.get(snapshot.sessionId, routeFingerprint)
         } else {
             null
         }
@@ -265,7 +266,7 @@ internal class LocalModelRequestCoordinator(
                                     put("provider", frozenProfile.provider)
                                     put("auth_kind", frozenProfile.authKind.name)
                                     put("protocol", frozenProfile.protocol.name)
-                                    put("route_fingerprint", frozenProfile.routeFingerprint())
+                                    put("route_fingerprint", routeFingerprint)
                                     put("message_count", logMessages.size)
                                     put("context_chars", contextChars)
                                     put("estimated_input_tokens", pressure.estimatedInputTokens)
@@ -421,7 +422,7 @@ internal class LocalModelRequestCoordinator(
                                     pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
                                 }
                                 if (runtimeCapabilities.promptCacheDiagnostics && reply.requestId.isNotBlank()) {
-                                    promptCacheBaselines.put(snapshot.sessionId, frozenProfile.id, reply.requestId)
+                                    promptCacheBaselines.put(snapshot.sessionId, routeFingerprint, reply.requestId)
                                     reply.promptCacheDiagnostic?.let { diagnostic ->
                                         log.append("request/cache-diagnostic", buildJsonObject {
                                             put("step", step)
