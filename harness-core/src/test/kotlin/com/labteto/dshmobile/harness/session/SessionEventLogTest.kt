@@ -488,4 +488,25 @@ class SessionEventLogTest {
         }
     }
 
+    @Test
+    fun sharedPathStateLivesUntilLastAdapterClosesThenReinitializesFromDisk() {
+        val directory = Files.createTempDirectory("harness-event-shared-owner").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val first = SessionEventLog(file, json, clock = { 1L })
+            val second = SessionEventLog(file, json, clock = { 2L })
+            assertEquals(0L, first.append("test", buildJsonObject { put("value", "a") }).sequence)
+            first.close()
+            assertEquals(1L, second.append("test", buildJsonObject { put("value", "b") }).sequence)
+            second.close()
+
+            assertTrue(file.delete())
+            val recreated = SessionEventLog(file, json, clock = { 3L })
+            assertEquals(0L, recreated.append("test", buildJsonObject { put("value", "fresh") }).sequence)
+            recreated.close()
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
 }
