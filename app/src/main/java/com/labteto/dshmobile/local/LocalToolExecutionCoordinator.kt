@@ -48,9 +48,9 @@ internal class LocalToolExecutionCoordinator(
 
     fun enableGitHubConnectorTools() = enableOptionalTools(GITHUB_CONNECTOR_TOOL_NAMES)
 
-    fun capabilitySummary(): String {
+    fun capabilitySummary(enabledOptional: Set<String> = enabledOptionalSnapshot()): String {
         val tools = registry.names().mapNotNull(registry::get)
-        return LocalToolRouter.capabilitySummary(tools, enabledOptionalSnapshot())
+        return LocalToolRouter.capabilitySummary(tools, enabledOptional)
     }
 
     fun visibleSchemas(policy: LocalAgentRunPolicy): JsonArray {
