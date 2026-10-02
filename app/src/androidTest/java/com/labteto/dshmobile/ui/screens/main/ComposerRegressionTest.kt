@@ -174,7 +174,10 @@ class ComposerRegressionTest {
     }
 
     @Test fun composerRepositoryEvictsLeastRecentlyUsedDrafts() {
-        val repository = ComposerRepository(maxCachedDrafts = 2)
+        val repository = ComposerRepository(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            maxCachedDrafts = 2,
+        )
         val first = repository.get(ComposerKey("host", "first"))
         val second = repository.get(ComposerKey("host", "second"))
         first.text = "keep"
