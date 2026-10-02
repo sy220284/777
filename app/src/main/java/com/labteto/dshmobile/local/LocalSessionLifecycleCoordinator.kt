@@ -9,6 +9,7 @@ import com.labteto.dshmobile.harness.session.HandoffState
 import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.chat.continuePendingInSession
 import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
@@ -54,6 +55,7 @@ internal class LocalSessionLifecycleCoordinator(
     private val sessionsRoot: File,
     private val conversationFilesCoordinator: LocalConversationFilesCoordinator,
     private val memoryStore: MemoryStore,
+    private val diaryStore: ChatDiaryStore,
     private val currentSessionId: () -> String,
     private val activateSession: (String, Long?) -> Unit,
     private val beginTransition: () -> Boolean,
@@ -407,6 +409,7 @@ internal class LocalSessionLifecycleCoordinator(
                 }
                 conversationFilesCoordinator.invalidate(ids)
                 memoryStore.detachSourceSessions(ids)
+                diaryStore.detachSourceSessions(ids)
                 state.update { it.copy(sessions = sessionSummaries()) }
                 persist()
                 ids.size
