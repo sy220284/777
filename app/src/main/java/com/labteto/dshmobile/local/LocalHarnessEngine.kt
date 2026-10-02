@@ -787,7 +787,7 @@ class LocalHarnessEngine @Inject constructor(
                 configured = result.configured,
                 model = result.model,
                 baseUrl = result.baseUrl,
-                modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
+                modelSelection = it.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
                 error = null,
             )
         }
@@ -818,7 +818,7 @@ class LocalHarnessEngine @Inject constructor(
                                 configured = result.configured,
                                 model = result.model,
                                 baseUrl = result.baseUrl,
-                                modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
+                                modelSelection = state.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
                                 error = null,
                             )
                         }
@@ -841,7 +841,7 @@ class LocalHarnessEngine @Inject constructor(
                             configured = result.configured,
                             model = result.model,
                             baseUrl = result.baseUrl,
-                            modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
+                            modelSelection = it.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
                         )
                     }
                 }
@@ -2230,7 +2230,7 @@ class LocalHarnessEngine @Inject constructor(
                             configured = result.configured,
                             model = result.model,
                             baseUrl = result.baseUrl,
-                            modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
+                            modelSelection = it.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
                         )
                     }
                 } finally {
@@ -4991,13 +4991,16 @@ class LocalHarnessEngine @Inject constructor(
             configured = modelConfigured,
             model = model,
             baseUrl = baseUrl,
-            modelSelection = LocalModelSelectionState(modelProfiles, activeModelProfile?.id),
+            modelSelection = LocalModelSelectionState(
+                profiles = modelProfiles,
+                activeProfileId = activeModelProfile?.id,
+                workerProfileId = preferences
+                    .getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null)
+                    ?.takeIf { workerId -> modelProfiles.any { it.id == workerId } },
+            ),
             mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
             subagentMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
             modelAttempts = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
-            workerProfileId = preferences
-                .getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null)
-                ?.takeIf { workerId -> modelProfiles.any { it.id == workerId } },
             imageInputMode = runCatching {
                 LocalImageInputMode.valueOf(
                     preferences.getString(LocalHarnessSettingsCoordinator.KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)
