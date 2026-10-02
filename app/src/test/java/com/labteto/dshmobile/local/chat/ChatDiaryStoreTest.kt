@@ -207,6 +207,38 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun latestRefinementCanClearResolvedInnerEcho() {
+        val memory = store()
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户答应周末和我去海边",
+                feeling = "我有点期待",
+                innerThought = "我还是担心他会临时改变主意",
+                unresolvedEcho = "担心约定临时取消",
+                importance = 4,
+            ),
+        ))
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户再次确认周末和我一起去海边",
+                feeling = "第二次确认让我安心下来",
+                innerThought = "",
+                relationshipMeaning = "这个约定已经变得可靠",
+                unresolvedEcho = "",
+                importance = 5,
+            ),
+            userId = "u2",
+            assistantId = "a2",
+            evidence = "用户再次确认周末和我一起去海边",
+        ))
+
+        val refined = memory.listActive("gallery:a").single()
+        assertTrue(refined.innerThought.isBlank())
+        assertTrue(refined.unresolvedEcho.isBlank())
+        assertEquals("这个约定已经变得可靠", refined.relationshipMeaning)
+    }
+
+    @Test
     fun oppositePolarityEventsDoNotCollapseDuringRefinement() {
         val memory = store()
         memory.record(request(
