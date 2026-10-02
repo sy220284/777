@@ -9,7 +9,6 @@ import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -32,11 +31,10 @@ internal class LocalModelRequestCoordinator(
     private val streamingPreviewStore: LocalStreamingPreviewStore,
     private val persistOverflowCompaction: (LocalHarnessState, LocalHistorySummaryMode) -> Unit,
     private val pressureStore: LocalRequestPressureStore = LocalRequestPressureStore(),
+    private val promptCacheBaselines: LocalPromptCacheBaselineStore = LocalPromptCacheBaselineStore(),
     private val maxStreamPreviewChars: Int = 4_096,
     private val streamPreviewIntervalMs: Long = 50L,
 ) {
-    /** Consecutive completed Responses IDs are kept only for best-effort cache diagnostics. */
-    private val promptCacheBaselines = ConcurrentHashMap<String, String>()
     suspend fun complete(
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
@@ -66,9 +64,8 @@ internal class LocalModelRequestCoordinator(
             frozenProfile.baseUrl,
             frozenProfile.protocol,
         )
-        val cacheBaselineKey = snapshot.sessionId + "\u0000" + frozenProfile.id
         val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
-            promptCacheBaselines[cacheBaselineKey]
+            promptCacheBaselines.get(snapshot.sessionId, frozenProfile.id)
         } else {
             null
         }
@@ -320,7 +317,7 @@ internal class LocalModelRequestCoordinator(
                                     pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
                                 }
                                 if (runtimeCapabilities.promptCacheDiagnostics && reply.requestId.isNotBlank()) {
-                                    promptCacheBaselines[cacheBaselineKey] = reply.requestId
+                                    promptCacheBaselines.put(snapshot.sessionId, frozenProfile.id, reply.requestId)
                                     reply.promptCacheDiagnostic?.let { diagnostic ->
                                         log.append("request/cache-diagnostic", buildJsonObject {
                                             put("step", step)
