@@ -800,9 +800,9 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null) {
+    internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) {
         require(!isRunBusy()) { "请先结束当前任务再切换模型" }
-        val result = modelConfiguration.save(apiKey, model, baseUrl, protocol, profileId)
+        val result = modelConfiguration.save(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
         imageCapabilities.clearRoute(result.baseUrl, result.model)
         _state.update {
             it.copy(
@@ -4761,6 +4761,7 @@ class LocalHarnessEngine @Inject constructor(
             pressure = resourceScheduler.snapshot().pressure,
             model = snapshot.model,
             baseUrl = snapshot.baseUrl,
+            contextWindowTokensOverride = snapshot.modelSelection.activeProfile?.contextWindowTokensOverride,
         )
     }
 
