@@ -22,13 +22,13 @@ internal class LocalSubagentHistoryPolicy(
             currentHistoryChars = history.sumOf { it.toString().length },
             currentHistoryTokens = history.sumOf { estimateModelTokens(it.toString()) },
         )
+        val stored = spillToolOutput(callId, output)
         val retained = retainTextForModel(
             value = output,
             maxTokens = adaptiveBudget.maxToolResultTokens,
             maxChars = adaptiveBudget.maxToolResultChars,
         )
         if (!retained.truncated) return retained.text
-        val stored = spillToolOutput(callId, output)
         val recovery = if (stored) {
             "可调用 tool_output_read，并传入 call_id=$callId 分段读取完整结果。"
         } else {
@@ -43,6 +43,16 @@ internal class LocalSubagentHistoryPolicy(
         subagentId: String,
         budget: LocalHistoryBudget?,
     ) {
+        val projection = budget?.let { projectStaleToolResults(history, it) }
+        if (projection != null) {
+            history.clear()
+            history += projection.messages
+            eventLog().append("subagent/tool-history-projection", buildJsonObject {
+                put("agent_id", subagentId)
+                put("estimated_tokens_before", projection.estimatedTokensBefore)
+                put("estimated_tokens_after", projection.estimatedTokensAfter)
+            })
+        }
         val compaction = historyCompactor.compact(history, budget) ?: return
         history.clear()
         history += compaction.messages
