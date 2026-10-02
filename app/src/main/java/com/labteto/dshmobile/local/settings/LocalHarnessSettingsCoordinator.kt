@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import android.content.SharedPreferences
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.model.LOCAL_WORKER_PROFILE_ID_PREFERENCE
 import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
 import kotlinx.coroutines.CoroutineScope
