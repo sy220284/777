@@ -325,6 +325,47 @@ class LocalHistoryCompactorTest {
     }
 
     @Test
+    fun overflowRecoveryProjectsStaleToolPayloadsBeforeDroppingSemanticHistory() {
+        val calls = kotlinx.serialization.json.buildJsonObject {
+            put("role", "assistant")
+            put("tool_calls", kotlinx.serialization.json.buildJsonArray {
+                repeat(6) { index ->
+                    add(buildJsonObject {
+                        put("id", "call-$index")
+                        put("function", buildJsonObject {
+                            put("name", "read")
+                            put("arguments", "{}")
+                        })
+                    })
+                }
+            })
+        }
+        val results = (0 until 6).map { index ->
+            buildJsonObject {
+                put("role", "tool")
+                put("tool_call_id", "call-$index")
+                put("content", "tool-$index-" + "大".repeat(6_000))
+            }
+        }
+        val history = listOf(
+            message("system", "rules"),
+            message("user", "old semantic context " + "旧".repeat(8_000)),
+            calls,
+        ) + results
+
+        val compacted = LocalHistoryCompactor()
+            .compactForOverflow(history, LocalHistorySummaryMode.WORK)
+            ?: error("expected overflow recovery")
+
+        assertTrue(
+            compacted.messages.any {
+                it["content"].toString().contains("旧工具结果已从实时模型上下文衰减")
+            },
+        )
+        assertTrue(compacted.estimatedTokensAfter < compacted.estimatedTokensBefore)
+    }
+
+    @Test
     fun overflowCompactionKeepsTheWholeParallelToolBatchAtTheTailBoundary() {
         val calls = kotlinx.serialization.json.Json.parseToJsonElement(
             """{"role":"assistant","tool_calls":[{"id":"a","function":{"name":"read","arguments":"{}"}},{"id":"b","function":{"name":"read","arguments":"{}"}}]}""",
