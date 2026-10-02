@@ -217,6 +217,7 @@ class LocalHarnessEngine @Inject constructor(
         interactionPlanner = chatInteractionPlanner,
     )
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
+    private val eventLogRegistry by lazy { LocalSessionEventLogRegistry(sessionsRoot, json) }
     private val sessionStorageManager by lazy { LocalSessionStorageManager(sessionsRoot, json) }
     private val sessionRepository by lazy {
         LocalSessionRepository(sessionsRoot, json, scope,
@@ -731,6 +732,7 @@ class LocalHarnessEngine @Inject constructor(
             restartInterruptedSafeJobs = ::restartInterruptedSafeJobs,
             startNextQueuedTurnIfIdle = ::startNextQueuedTurnIfIdle,
             sessionSummaries = ::sessionSummaries,
+            beforeEventLogsDeleted = eventLogRegistry::clearAndEvict,
             localProjectId = LOCAL_PROJECT_ID,
         )
     }
@@ -5190,7 +5192,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun sessionFileFor(id: String) = File(sessionsRoot, "$id.json")
 
-    private fun eventLogFor(id: String) = LocalSessionEventLog(File(sessionsRoot, "$id.events.jsonl"), json)
+    private fun eventLogFor(id: String) = eventLogRegistry.get(id)
 
     private fun sessionSummaries(): List<LocalSessionSummary> = try {
         sessionCoordinator.summaries()
