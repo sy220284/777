@@ -1,5 +1,4 @@
 package com.labteto.dshmobile.ui.screens.settings
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -87,7 +86,6 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
-
 @Composable
 internal fun LocalModelSettingsCard(
     local: LocalHarnessSettingsState,
