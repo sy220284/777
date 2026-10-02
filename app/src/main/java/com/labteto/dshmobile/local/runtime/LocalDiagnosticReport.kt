@@ -48,14 +48,27 @@ internal fun appendLocalDiagnosticDetails(
     appendLine("session_id=$sessionId")
     appendLine("说明：完整事实仍保存在 SessionEventLog；本报告导出操作身份、状态、耗时、预算与安全字段，不复制任意消息/工具正文。")
 
-    var totalEvents = 0
+    val latestSequence = eventLog.latestSequence()
     val events = ArrayDeque<LocalSessionEventLog.Event>(MAX_DIAGNOSTIC_EVENTS)
-    eventLog.events().forEach { event ->
-        totalEvents += 1
-        if (events.size >= MAX_DIAGNOSTIC_EVENTS) events.removeFirst()
-        events.addLast(event)
+    var cursor = Long.MAX_VALUE
+    while (events.size < MAX_DIAGNOSTIC_EVENTS) {
+        val page = eventLog.pageBefore(
+            sequenceExclusive = cursor,
+            limit = minOf(EVENT_PAGE_SIZE, MAX_DIAGNOSTIC_EVENTS - events.size),
+        )
+        if (page.isEmpty()) break
+        page.asReversed().forEach { event -> events.addFirst(event) }
+        val nextCursor = page.first().sequence
+        if (nextCursor >= cursor) break
+        cursor = nextCursor
     }
-    appendLine("持久事件：导出 ${events.size}/$totalEvents")
+    val logDiagnostics = eventLog.diagnostics()
+    appendLine(
+        "持久事件：导出最近 ${events.size} 条；latest_sequence=$latestSequence；" +
+            "malformed_rows=${logDiagnostics.malformedRows} " +
+            "segment_read_failures=${logDiagnostics.segmentReadFailures} " +
+            "archive_failures=${logDiagnostics.archiveFailures}",
+    )
     events.forEach { event ->
         append("event seq=").append(event.sequence)
         append(" at=").append(event.createdAt)
@@ -220,6 +233,7 @@ private val DIAGNOSTIC_EVENT_TYPE_KEYS = mapOf(
     "turn/end" to listOf("steps", "messages"),
 )
 
+private const val EVENT_PAGE_SIZE = 200
 private const val MAX_DIAGNOSTIC_APP_LOGS = 800
 private const val MAX_DIAGNOSTIC_EVENTS = 3_000
 private const val MAX_DIAGNOSTIC_TOKEN_RECORDS = 2_000
