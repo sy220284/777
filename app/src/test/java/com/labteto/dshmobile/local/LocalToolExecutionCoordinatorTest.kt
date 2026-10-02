@@ -292,13 +292,22 @@ class LocalToolExecutionCoordinatorTest {
         }
         val coordinator = coordinator(registry)
 
-        coordinator.enableOptionalTools(
-            setOf("github_status", "github_api_get", "github_api_request", "missing_tool"),
+        registry.register(
+            tool(
+                name = "future_repo_tool",
+                access = ToolAccess.NETWORK,
+                approval = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL,
+                family = "GitHub",
+                keywords = setOf("github", "future"),
+            ) { ToolResult("ok") },
         )
+
+        coordinator.enableGitHubConnectorTools()
         val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
 
         assertEquals(
-            setOf("github_status", "github_api_get", "github_api_request"),
+            setOf("github_status", "github_api_get", "github_api_request", "future_repo_tool"),
             visible,
         )
         assertFalse("process_exec" in visible)
