@@ -215,7 +215,10 @@ internal class LocalSessionRepository(
     fun releaseDeletionBarrier(ids: Set<String>) {
         synchronized(lock) {
             ids.forEach { id ->
-                if (id !in pending && id !in latestSnapshots) deletedIds.remove(id)
+                if (id !in pending && id !in latestSnapshots) {
+                    deletedIds.remove(id)
+                    sessionStores.remove(id)
+                }
             }
         }
     }
