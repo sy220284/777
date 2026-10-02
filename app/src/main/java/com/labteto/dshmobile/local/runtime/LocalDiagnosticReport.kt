@@ -30,6 +30,18 @@ internal fun appendLocalDiagnosticDetails(
         .distinct()
     appendLine(if (logSources.isEmpty()) "暂无" else logSources.joinToString("；"))
     appendLine("说明：报告头的应用版本表示当前导出版本；每条持久日志的真实来源版本/进程以上述来源标识为准。")
+    appendLine("持久进程日志索引：")
+    appLogs.takeLast(MAX_DIAGNOSTIC_APP_LOGS).forEach { entry ->
+        append("app_log at=").append(entry.timestampMillis)
+        append(" level=").append(entry.level)
+        append(" tag=").append(entry.tag.take(64))
+        append(" build=").append(entry.appVersion ?: "legacy/unknown")
+        append(" version_code=").append(entry.appVersionCode ?: -1)
+        append(" process=").append(entry.processInstanceId ?: "legacy")
+        append(" process_started_at=").append(entry.processStartedAtMillis ?: -1L)
+        entry.throwableType?.takeIf(String::isNotBlank)?.let { append(" throwable=").append(it.take(64)) }
+        appendLine()
+    }
     appendLine()
     appendLine("当前会话结构化追踪：")
     appendLine("session_id=$sessionId")
@@ -169,6 +181,7 @@ private val DIAGNOSTIC_EVENT_KEYS = listOf(
     "generation",
 )
 
+private const val MAX_DIAGNOSTIC_APP_LOGS = 800
 private const val MAX_DIAGNOSTIC_EVENTS = 3_000
 private const val MAX_DIAGNOSTIC_TOKEN_RECORDS = 2_000
 private const val MAX_DIAGNOSTIC_FIELD_CHARS = 320
