@@ -14,6 +14,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 
 /** Durable model-profile metadata. Secrets remain in provider-specific credential stores. */
@@ -54,6 +55,7 @@ internal class LocalModelProfileStore(
                 },
                 credentialRef = credentialRef,
                 displayName = obj["displayName"]?.jsonPrimitive?.contentOrNull,
+                contextWindowTokensOverride = obj["contextWindowTokensOverride"]?.jsonPrimitive?.intOrNull,
             )
         }.distinctBy(LocalModelProfile::id)
     }.getOrDefault(emptyList())
@@ -117,6 +119,7 @@ internal class LocalModelProfileStore(
                 put("protocol", profile.protocol.name)
                 profile.credentialRef?.let { put("credentialRef", it) }
                 profile.displayName?.let { put("displayName", it) }
+                profile.contextWindowTokensOverride?.let { put("contextWindowTokensOverride", it) }
             })
         }
     }.toString()
