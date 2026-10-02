@@ -80,6 +80,7 @@ internal class LocalModelRequestCoordinator(
             modelContextWindowTokens = documentedContextWindowTokens(frozenProfile.model, frozenProfile.baseUrl),
         )
         pressureStore.record(snapshot.sessionId, pressure)
+        val contextWindow = pressureStore.window(snapshot.sessionId)
         val previewOwner = if (publishPreviewEnabled) {
             streamingPreviewStore.newOwner(
                 sessionId = snapshot.sessionId,
@@ -124,6 +125,11 @@ internal class LocalModelRequestCoordinator(
             put("history_tokens_estimate", pressure.historyTokens)
             put("current_user_tokens_estimate", pressure.currentUserTokens)
             put("tool_definition_tokens_estimate", pressure.toolDefinitionTokens)
+            contextWindow?.let { window ->
+                put("context_generation", window.generation)
+                put("context_prefill_tokens", window.prefillTokens)
+                put("context_prefill_source", window.prefillSource)
+            }
             put("tool_count", tools.size)
             put("tool_names", toolNames)
             put("plan_mode", snapshot.planMode)
@@ -310,6 +316,9 @@ internal class LocalModelRequestCoordinator(
                             }.also { reply ->
                                 streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
                                 streamPreview.flush()
+                                if (reply.usage.reported) {
+                                    pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
+                                }
                                 if (runtimeCapabilities.promptCacheDiagnostics && reply.requestId.isNotBlank()) {
                                     promptCacheBaselines[cacheBaselineKey] = reply.requestId
                                     reply.promptCacheDiagnostic?.let { diagnostic ->
