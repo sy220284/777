@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -48,6 +49,7 @@ internal fun ChatConversationSurface(
     currentSession: SessionRow?,
     composerKey: ComposerKey,
     tab: ChatTab,
+    transcriptModifier: Modifier = Modifier,
     approvalSessionId: String?,
     questionSessionId: String?,
     onOpenSubagent: (String) -> Unit,
@@ -62,6 +64,7 @@ internal fun ChatConversationSurface(
     val (scrollHint, scrollConnection) =
         rememberConversationScrollHint(chatListState, reverseLayout = true)
     val trajectoryListState = rememberLazyListState()
+    LaunchedEffect(currentSessionId, tab) { scrollHint.hide() }
 
     if (conversation?.gap == true) {
         ConnectionBanner(androidx.compose.ui.res.stringResource(com.labteto.dshmobile.R.string.common_reconnecting))
@@ -100,7 +103,7 @@ internal fun ChatConversationSurface(
     }
 
     Box(
-        Modifier.fillMaxWidth().then(
+        transcriptModifier.fillMaxWidth().then(
             if (tab == ChatTab.Chat) Modifier.nestedScroll(scrollConnection) else Modifier,
         ),
     ) {
