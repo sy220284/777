@@ -80,6 +80,15 @@ internal class LocalModelRequestCoordinator(
         val operationalLimit = operationalInputLimitTokens(
             frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
         )
+        val modelContextWindow = documentedContextWindowTokens(
+            frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
+        )
+        val baselinePressure = LocalPromptPressureMeter.measure(
+            messages = messages,
+            tools = tools,
+            operationalLimitTokens = operationalLimit,
+            modelContextWindowTokens = modelContextWindow,
+        )
         val workProjection = if (executionControl != null && snapshot.usageMode == LocalUsageMode.WORK) {
             projectWorkRequestContext(
                 messages = messages,
@@ -91,27 +100,19 @@ internal class LocalModelRequestCoordinator(
             LocalWorkRequestProjection(
                 messages = messages,
                 projected = false,
-                estimatedTokensBefore = LocalPromptPressureMeter.measure(
-                    messages = messages,
-                    tools = tools,
-                    operationalLimitTokens = operationalLimit,
-                ).estimatedInputTokens,
-                estimatedTokensAfter = LocalPromptPressureMeter.measure(
-                    messages = messages,
-                    tools = tools,
-                    operationalLimitTokens = operationalLimit,
-                ).estimatedInputTokens,
+                estimatedTokensBefore = baselinePressure.estimatedInputTokens,
+                estimatedTokensAfter = baselinePressure.estimatedInputTokens,
             )
         }
         val requestMessages = workProjection.messages
-        val pressure = LocalPromptPressureMeter.measure(
-            messages = requestMessages,
-            tools = tools,
-            operationalLimitTokens = operationalLimit,
-            modelContextWindowTokens = documentedContextWindowTokens(
-                frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
-            ),
-        )
+        val pressure = if (workProjection.projected) {
+            LocalPromptPressureMeter.measure(
+                messages = requestMessages,
+                tools = tools,
+                operationalLimitTokens = operationalLimit,
+                modelContextWindowTokens = modelContextWindow,
+            )
+        } else baselinePressure
         pressureStore.record(snapshot.sessionId, pressure)
         val contextWindow = pressureStore.window(snapshot.sessionId)
         val previewOwner = if (publishPreviewEnabled) {
