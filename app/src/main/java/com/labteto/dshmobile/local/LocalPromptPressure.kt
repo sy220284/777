@@ -70,17 +70,89 @@ internal object LocalPromptPressureMeter {
     }
 }
 
-/** Last real request projection per session; used by environment diagnostics instead of raw history size. */
+internal data class LocalContextWindowSnapshot(
+    val generation: Int,
+    val prefillTokens: Long,
+    val prefillSource: String,
+    val lastInputTokens: Int,
+    val peakInputTokens: Int,
+)
+
+/**
+ * Last real request projection plus context-window generations.
+ *
+ * A generation advances only when model-visible history is materially compacted. The first
+ * provider-reported input usage in a generation replaces the estimated prefill baseline.
+ */
 internal class LocalRequestPressureStore {
+    private data class MutableWindow(
+        var generation: Int = 1,
+        var prefillTokens: Long = 0L,
+        var prefillSource: String = "estimated",
+        var lastInputTokens: Int = 0,
+        var peakInputTokens: Int = 0,
+        var serverObserved: Boolean = false,
+    )
+
     private val latest = ConcurrentHashMap<String, LocalPromptPressure>()
+    private val windows = ConcurrentHashMap<String, MutableWindow>()
 
     fun record(sessionId: String, pressure: LocalPromptPressure) {
         latest[sessionId] = pressure
+        val window = windows.computeIfAbsent(sessionId) {
+            MutableWindow(
+                prefillTokens = pressure.estimatedInputTokens.toLong(),
+                lastInputTokens = pressure.estimatedInputTokens,
+                peakInputTokens = pressure.estimatedInputTokens,
+            )
+        }
+        synchronized(window) {
+            if (window.prefillTokens <= 0L) window.prefillTokens = pressure.estimatedInputTokens.toLong()
+            window.lastInputTokens = pressure.estimatedInputTokens
+            window.peakInputTokens = maxOf(window.peakInputTokens, pressure.estimatedInputTokens)
+        }
+    }
+
+    fun recordReportedUsage(sessionId: String, inputTokens: Long) {
+        if (inputTokens <= 0L) return
+        val window = windows.computeIfAbsent(sessionId) { MutableWindow() }
+        synchronized(window) {
+            if (!window.serverObserved) {
+                window.prefillTokens = inputTokens
+                window.prefillSource = "server"
+                window.serverObserved = true
+            }
+        }
+    }
+
+    fun advanceGeneration(sessionId: String, estimatedTokensAfter: Int) {
+        val window = windows.computeIfAbsent(sessionId) { MutableWindow() }
+        synchronized(window) {
+            window.generation += 1
+            window.prefillTokens = estimatedTokensAfter.coerceAtLeast(0).toLong()
+            window.prefillSource = "estimated"
+            window.lastInputTokens = estimatedTokensAfter.coerceAtLeast(0)
+            window.peakInputTokens = estimatedTokensAfter.coerceAtLeast(0)
+            window.serverObserved = false
+        }
     }
 
     fun latest(sessionId: String): LocalPromptPressure? = latest[sessionId]
 
+    fun window(sessionId: String): LocalContextWindowSnapshot? = windows[sessionId]?.let { value ->
+        synchronized(value) {
+            LocalContextWindowSnapshot(
+                generation = value.generation,
+                prefillTokens = value.prefillTokens,
+                prefillSource = value.prefillSource,
+                lastInputTokens = value.lastInputTokens,
+                peakInputTokens = value.peakInputTokens,
+            )
+        }
+    }
+
     fun clear(sessionId: String) {
         latest.remove(sessionId)
+        windows.remove(sessionId)
     }
 }
