@@ -20,7 +20,9 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/data/SessionSubagentRuntime.kt": 176,
     "app/src/main/java/com/labteto/dshmobile/data/SessionAttachmentTransfer.kt": 100,
     "app/src/main/java/com/labteto/dshmobile/data/SessionCatalogRuntime.kt": 151,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt": 1636,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt": 506,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt": 1011,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt": 351,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessConfigurationComponents.kt": 163,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt": 320,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksViewModel.kt": 315,
@@ -29,6 +31,10 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt": 240,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt": 340,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt": 1041,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/main/ChatListDrawer.kt": 590,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/main/ChatListDrawerComponents.kt": 571,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationPage.kt": 480,
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt": 593,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppearanceSettingsComponents.kt": 450,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AdvancedSettingsSections.kt": 496,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalModelSettingsSections.kt": 533,
@@ -263,9 +269,9 @@ screen_entry_boundary = re.search(
 screen_entry_end = (
     screen_entry_start + 1 + screen_entry_boundary.start()
     if screen_entry_boundary is not None
-    else -1
+    else len(screen_source)
 )
-if screen_entry_start < 0 or screen_entry_end < 0:
+if screen_entry_start < 0:
     die("unable to locate LocalHarnessScreen entry function")
 screen_entry = screen_source[screen_entry_start:screen_entry_end]
 if "viewModel.state.collectAsStateWithLifecycle()" in screen_entry:

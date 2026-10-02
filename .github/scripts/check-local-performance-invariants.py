@@ -8,6 +8,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
 LOCAL_SCREEN = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
+LOCAL_CONVERSATION_SURFACE = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
+LOCAL_CONVERSATION_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt"
 REMOTE_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/main/Composer.kt"
 SHARED_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/components/DsConversationComposer.kt"
 SESSION_STORE = ROOT / "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt"
@@ -48,6 +50,8 @@ if engine_lines > 6_500:
     )
 
 local_screen = LOCAL_SCREEN.read_text(encoding="utf-8")
+local_conversation_surface = LOCAL_CONVERSATION_SURFACE.read_text(encoding="utf-8")
+local_conversation_composer = LOCAL_CONVERSATION_COMPOSER.read_text(encoding="utf-8")
 remote_composer = REMOTE_COMPOSER.read_text(encoding="utf-8")
 shared_composer = SHARED_COMPOSER.read_text(encoding="utf-8")
 
@@ -57,22 +61,25 @@ if local_screen_lines > 2_450:
         f"LocalHarnessScreen.kt grew to {local_screen_lines} lines (budget: 2450); extract UI/state into focused components"
     )
 
-for name, source in (
-    ("LocalHarnessScreen.kt", local_screen),
-    ("Composer.kt", remote_composer),
-):
-    if "DsConversationComposer(" not in source:
-        violations.append(f"{name} must use the shared DsConversationComposer shell")
-    if "composerFocused" not in source or "composerExpanded" not in source:
-        violations.append(f"{name} must preserve focus-driven two-row composer expansion")
-    if "shape = DsShapes.composer" in source:
-        violations.append(f"{name} must not rebuild composer geometry outside DsConversationComposer")
+if "DsConversationComposer(" not in local_conversation_composer:
+    violations.append("LocalConversationComposer.kt must use the shared DsConversationComposer shell")
+if "var focused" not in local_conversation_composer or "val expanded =" not in local_conversation_composer:
+    violations.append("LocalConversationComposer.kt must preserve focus-driven two-row composer expansion")
+if "shape = DsShapes.composer" in local_conversation_composer:
+    violations.append("LocalConversationComposer.kt must not rebuild composer geometry outside DsConversationComposer")
+
+if "DsConversationComposer(" not in remote_composer:
+    violations.append("Composer.kt must use the shared DsConversationComposer shell")
+if "composerFocused" not in remote_composer or "composerExpanded" not in remote_composer:
+    violations.append("Composer.kt must preserve focus-driven two-row composer expansion")
+if "shape = DsShapes.composer" in remote_composer:
+    violations.append("Composer.kt must not rebuild composer geometry outside DsConversationComposer")
 
 if "object DsComposerMetrics" not in shared_composer or "fun DsComposerAction(" not in shared_composer:
     violations.append("Shared composer must own compact action geometry and sizing tokens")
-if "icon = FeatherIcons.CheckSquare" not in local_screen or "icon = Icons.Outlined.Shield" not in local_screen:
+if "icon = FeatherIcons.CheckSquare" not in local_conversation_composer or "icon = Icons.Outlined.Shield" not in local_conversation_composer:
     violations.append("Work composer must keep planning and auto-approve as compact in-composer actions")
-if "val result = onSend(input, selected)" not in local_screen or "if (!result.accepted) return" not in local_screen:
+if "val result = onSend(input, attachments.toList())" not in local_conversation_composer or "if (!result.accepted) return" not in local_conversation_composer:
     violations.append("Local Chat/Work composer must preserve the draft until runtime accepts the send")
 
 persona_gallery_lines = len(PERSONA_GALLERY.read_text(encoding="utf-8").splitlines())
