@@ -41,10 +41,13 @@ internal object LocalToolRouter {
         val core = tools
             .filterNot { tool -> isOptional(tool.name) }
             .sortedBy(HarnessTool::name)
-        val optional = tools
-            .filter { tool -> isOptional(tool.name) && tool.name in enabledOptional }
-            .sortedBy(HarnessTool::name)
-        // Keep the stable catalog prefix byte-for-byte ordered; discovered capabilities append only.
+        val optionalByName = tools
+            .asSequence()
+            .filter { tool -> isOptional(tool.name) }
+            .associateBy(HarnessTool::name)
+        val optional = enabledOptional.mapNotNull(optionalByName::get)
+        // Core stays byte-for-byte stable. LinkedHashSet activation order makes every newly
+        // discovered optional tool append after the existing optional prefix instead of reordering it.
         return JsonArray((core + optional).map(HarnessTool::schema))
     }
 
