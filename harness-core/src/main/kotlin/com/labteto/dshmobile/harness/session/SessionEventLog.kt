@@ -49,11 +49,13 @@ class SessionEventLog(
     private val file: File,
     private val json: Json,
     private val maxBytes: Long = DEFAULT_MAX_BYTES,
+    private val maxEventBytes: Long = maxOf(maxBytes, DEFAULT_MAX_EVENT_BYTES),
     private val clock: () -> Long = System::currentTimeMillis,
     private val diagnosticSink: (String, Throwable?) -> Unit = { _, _ -> },
 ) {
     init {
         require(maxBytes >= MIN_MAX_BYTES) { "事件日志分段上限至少为 $MIN_MAX_BYTES 字节" }
+        require(maxEventBytes >= maxBytes) { "单条事件上限不能小于日志分段目标" }
     }
 
     // Several Android adapters can open the same session while background maintenance is running.
@@ -90,9 +92,11 @@ class SessionEventLog(
         )
         val encoded = json.encodeToString(SessionEvent.serializer(), event) + "\n"
         val incomingBytes = encoded.toByteArray().size.toLong()
-        require(incomingBytes <= maxBytes) { "单条会话事件超过日志分段上限" }
+        require(incomingBytes <= maxEventBytes) { "单条会话事件超过事件硬上限" }
         file.parentFile?.mkdirs()
-        if (file.isFile && file.length() + incomingBytes > maxBytes) rotateActiveSegment()
+        if (file.isFile && file.length() > 0L && file.length() + incomingBytes > maxBytes) {
+            rotateActiveSegment()
+        }
         try {
             file.appendText(encoded)
         } catch (error: Exception) {
@@ -828,6 +832,7 @@ class SessionEventLog(
     private companion object {
         val PATH_LOCKS = Array(64) { Any() }
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
+        const val DEFAULT_MAX_EVENT_BYTES = 32L * 1024L * 1024L
         const val MIN_MAX_BYTES = 512L
         const val MAX_READ_LINES = 200
         const val MAX_SEARCH_RESULTS = 100
