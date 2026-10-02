@@ -239,6 +239,7 @@ internal fun WorkProcessRow(
                     visibleNodes.forEachIndexed { visibleIndex, node ->
                         WorkProcessOperationRow(
                             node = node,
+                            stepNumber = visibleStartIndex + visibleIndex + 1,
                             running = running && visibleStartIndex + visibleIndex == nodes.lastIndex,
                         )
                     }
@@ -264,6 +265,7 @@ internal fun WorkProcessRow(
 @Composable
 private fun WorkProcessOperationRow(
     node: LocalWorkProcessNode,
+    stepNumber: Int,
     running: Boolean,
 ) {
     val colors = DsTheme.colors
@@ -291,10 +293,15 @@ private fun WorkProcessOperationRow(
         else -> DsIconFamily.Neutral
     }
     val operationLabel = stringResource(agentOperationLabelRes(kind))
-    val detail = if (node.count > 1) {
-        stringResource(R.string.local_work_process_operation_detail, operationLabel, node.count)
-    } else {
-        operationLabel
+    val detail = when {
+        node.summary == null -> operationLabel
+        node.count > 0 -> stringResource(
+            R.string.local_work_process_step_operation_detail,
+            stepNumber,
+            operationLabel,
+            node.count,
+        )
+        else -> stringResource(R.string.local_work_process_step_number, stepNumber)
     }
     val rowRunning = running && !node.failed
 
