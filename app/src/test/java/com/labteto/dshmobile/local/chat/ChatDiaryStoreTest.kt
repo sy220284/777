@@ -139,7 +139,7 @@ class ChatDiaryStoreTest {
         assertEquals(1, entries.size)
         assertTrue(entries.single().feeling.contains("松了口气"))
         assertTrue(entries.single().relationshipMeaning.isNotBlank())
-        assertEquals(setOf("u1", "u2"), entries.single().sourceUserMessageIds.toSet())
+        assertEquals(setOf("u1", "u2"), entries.single().sources.map { it.userMessageId }.toSet())
     }
 
     @Test
@@ -200,6 +200,38 @@ class ChatDiaryStoreTest {
         ))
 
         assertTrue(memory.search("今晚吃什么比较好", "gallery:a", groupAudience = false, maxItems = 3).isEmpty())
+    }
+
+    @Test
+    fun mergedDiaryKeepsValidSourceWhenOnlyOneConversationIsRewritten() {
+        val memory = store()
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户答应周末和我去海边",
+                feeling = "我很期待",
+                importance = 4,
+            ),
+            evidence = "用户答应周末和我去海边",
+        ))
+        memory.record(
+            request(
+                delta = ChatDiaryDelta(
+                    event = "用户再次确认周末和我一起去海边",
+                    feeling = "第二次确认让我更放心",
+                    innerThought = "这次可以认真期待了",
+                    importance = 5,
+                ),
+                userId = "u2",
+                assistantId = "a2",
+                evidence = "用户再次确认周末和我一起去海边",
+            ).copy(sourceSessionId = "s2"),
+        )
+
+        val before = memory.listActive("gallery:a").single()
+        assertEquals(setOf("s", "s2"), before.sources.map { it.sessionId }.toSet())
+        assertEquals(1, memory.rollbackSourceSessionFrom("s2", 0L, setOf("u2")))
+        val remaining = memory.listActive("gallery:a").single()
+        assertEquals(listOf("s"), remaining.sources.map { it.sessionId }.distinct())
     }
 
     @Test
