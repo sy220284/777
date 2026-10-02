@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.LocalHistoryBudget
 import com.labteto.dshmobile.local.LocalHistoryCompaction
 import com.labteto.dshmobile.local.LocalHistoryCompactor
 import com.labteto.dshmobile.local.LocalHistorySummaryMode
+import com.labteto.dshmobile.local.LocalStructuredWorkState
 import com.labteto.dshmobile.local.applyOverflowCompaction
 import com.labteto.dshmobile.local.estimateModelTokens
 import com.labteto.dshmobile.local.compactHistoryWithStaleToolProjection
@@ -87,9 +88,17 @@ internal class LocalModelHistoryBuffer {
         budget: LocalHistoryBudget,
         extraTokens: Int = 0,
         summaryMode: LocalHistorySummaryMode,
+        structuredWorkState: LocalStructuredWorkState? = null,
     ): LocalHistoryCompaction? {
         val compaction = compactHistoryWithStaleToolProjection(
-            messages, compactor, budget, extraTokens, summaryMode, encodedChars, estimatedTokens,
+            messages,
+            compactor,
+            budget,
+            extraTokens,
+            summaryMode,
+            encodedChars,
+            estimatedTokens,
+            structuredWorkState,
         ) ?: return null
         reset(compaction.messages)
         return compaction
