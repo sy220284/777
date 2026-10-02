@@ -52,6 +52,9 @@ class SessionEventLogTest {
                 log.append("test/event", buildJsonObject { put("value", "row-$index-" + "x".repeat(48)) })
             }
             val expectedNext = log.snapshot().last().sequence + 1L
+            // A process restart drops the process-local shared path cursor. Closing the sole
+            // adapter reproduces that boundary inside this JVM before mutating durable bytes.
+            log.close()
 
             // Simulate a torn final write. Startup must skip it and recover from the newest
             // complete row without requiring a full historical replay.
@@ -99,6 +102,8 @@ class SessionEventLogTest {
                 .maxOrNull()
                 ?: error("expected a valid event in rotated segment")
 
+            // Drop the live process-local cursor before simulating the post-crash disk state.
+            log.close()
             file.writeText("{broken tail only")
 
             val restarted = SessionEventLog(file, json, maxBytes = 700, clock = { 2L })
