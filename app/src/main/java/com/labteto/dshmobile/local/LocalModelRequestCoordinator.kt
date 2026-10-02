@@ -74,7 +74,7 @@ internal class LocalModelRequestCoordinator(
             ),
             authKind = frozenProfile.authKind,
         )
-        val routeFingerprint = routeFingerprint
+        val routeFingerprint = frozenProfile.routeFingerprint()
         val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
             promptCacheBaselines.get(snapshot.sessionId, routeFingerprint)
         } else {
