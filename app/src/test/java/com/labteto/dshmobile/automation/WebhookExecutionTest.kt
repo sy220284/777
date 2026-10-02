@@ -4,7 +4,6 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -15,37 +14,38 @@ import org.junit.Test
 class WebhookExecutionTest {
     @Test fun cancellationWhileRunningIsRecordedAndPropagated() = runTest {
         val states = mutableListOf<String>()
-        val job = launch { executeWebhookRun(Mutex(), { state, _, _ -> states += state }) { awaitCancellation() } }
+        val job = launch { executeWebhookRun({ state, _, _ -> states += state }) { awaitCancellation() } }
         runCurrent()
         job.cancelAndJoin()
         assertTrue(job.isCancelled)
         assertEquals(listOf("running", "cancelled"), states)
     }
-    @Test fun queuedCancellationDoesNotRunPrompt() = runTest {
+    @Test fun cancellationBeforeWorkCompletesSettlesWithoutRetry() = runTest {
         val states = mutableListOf<String>()
-        val mutex = Mutex(locked = true)
-        val job = launch { executeWebhookRun(mutex, { state, _, _ -> states += state }) { error("must not run") } }
+        val job = launch {
+            executeWebhookRun({ state, _, _ -> states += state }) {
+                awaitCancellation()
+            }
+        }
         runCurrent()
         job.cancelAndJoin()
-        assertEquals(listOf("cancelled"), states)
+        assertEquals(listOf("running", "cancelled"), states)
     }
     @Test fun successfulRunStoresResult() = runTest {
         val states = mutableListOf<String>()
         var output: String? = null
-        executeWebhookRun(Mutex(), { state, result, _ -> states += state; output = result }) { "done" }
+        executeWebhookRun({ state, result, _ -> states += state; output = result }) { "done" }
         assertEquals(listOf("running", "completed"), states)
         assertEquals("done", output)
     }
 
-    @Test fun manyQueuedRunsNeverOverlapAndAllSettle() = runTest {
-        val mutex = Mutex()
+    @Test fun independentWebhookRunsMayOverlapAndAllSettle() = runTest {
         var active = 0
         var maxActive = 0
         val completed = mutableSetOf<Int>()
-        val jobs = (0 until 64).map { index ->
+        val jobs = (0 until 8).map { index ->
             launch {
                 executeWebhookRun(
-                    mutex,
                     update = { state, _, _ ->
                         if (state == "completed") completed += index
                     },
@@ -62,25 +62,25 @@ class WebhookExecutionTest {
             }
         }
 
+        runCurrent()
+        assertTrue(maxActive > 1)
         advanceUntilIdle()
         jobs.forEach { assertTrue(it.isCompleted) }
-        assertEquals(1, maxActive)
         assertEquals(0, active)
-        assertEquals((0 until 64).toSet(), completed)
+        assertEquals((0 until 8).toSet(), completed)
     }
 
     @Test fun failedRunDoesNotPoisonNextQueuedRun() = runTest {
-        val mutex = Mutex()
         val firstStates = mutableListOf<String>()
         val secondStates = mutableListOf<String>()
 
         val first = launch {
-            executeWebhookRun(mutex, { state, _, _ -> firstStates += state }) {
+            executeWebhookRun({ state, _, _ -> firstStates += state }) {
                 error("boom")
             }
         }
         val second = launch {
-            executeWebhookRun(mutex, { state, _, _ -> secondStates += state }) {
+            executeWebhookRun({ state, _, _ -> secondStates += state }) {
                 "ok"
             }
         }
