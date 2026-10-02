@@ -77,7 +77,6 @@ class HarnessAutomationWorker(
         val id = inputData.getString(HarnessAutomationScheduler.KEY_TASK_ID)
             ?: return Result.failure()
         val manualRun = inputData.getBoolean(HarnessAutomationScheduler.KEY_MANUAL_RUN, false)
-        val scheduleGeneration = inputData.getLong(HarnessAutomationScheduler.KEY_SCHEDULE_GENERATION, 0L)
         val entry = EntryPointAccessors.fromApplication(
             applicationContext,
             WorkerEntryPoint::class.java,
@@ -85,10 +84,8 @@ class HarnessAutomationWorker(
         val store = entry.automationStore()
         val scheduler = entry.automationScheduler()
         var task = store.get(id) ?: return Result.success()
-        if (!manualRun && task.scheduleGeneration != scheduleGeneration) return Result.success()
-        if (
-            task.status in setOf("paused", "waiting_user") &&
-            !manualRun
+        if ((!manualRun && task.scheduleGeneration != inputData.getLong(HarnessAutomationScheduler.KEY_SCHEDULE_GENERATION, 0L)) ||
+            (task.status in setOf("paused", "waiting_user") && !manualRun)
         ) return Result.success()
 
         val recovering = !manualRun && task.status == "running" && task.lastRunAt != null
