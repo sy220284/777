@@ -59,6 +59,29 @@ class LocalToolRouterTest {
 
 
     @Test
+    fun optionalToolActivationPreservesExistingPrefixAndOnlyAppends() {
+        val tools = listOf(
+            tool("read", "读取文件"),
+            tool("github_status", "GitHub 状态"),
+            tool("github_api_get", "读取 GitHub"),
+            tool("mcp_extra", "MCP 扩展"),
+        )
+        val enabled = linkedSetOf("github_status")
+        val first = names(LocalToolRouter.visibleSchemas(tools, enabled))
+
+        enabled += "mcp_extra"
+        val second = names(LocalToolRouter.visibleSchemas(tools.reversed(), enabled))
+
+        assertEquals(first, second.take(first.size))
+        assertEquals("mcp_extra", second.last())
+
+        enabled += "github_api_get"
+        val third = names(LocalToolRouter.visibleSchemas(tools, enabled))
+        assertEquals(second, third.take(second.size))
+        assertEquals("github_api_get", third.last())
+    }
+
+    @Test
     fun capabilitySearchHardCapsLargeOptionalCatalogDeterministically() {
         val tools = (0 until 1_000).map { index ->
             tool("mcp_tool_" + index.toString().padStart(4, '0'), "MCP 外部工具 批量测试")
