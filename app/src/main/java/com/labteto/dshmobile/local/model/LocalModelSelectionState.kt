@@ -6,9 +6,13 @@ import com.labteto.dshmobile.local.LocalModelProfile
 data class LocalModelSelectionState(
     val profiles: List<LocalModelProfile> = emptyList(),
     val activeProfileId: String? = null,
+    val workerProfileId: String? = null,
 ) {
     val activeProfile: LocalModelProfile?
         get() = profiles.firstOrNull { it.id == activeProfileId }
+
+    val workerProfile: LocalModelProfile?
+        get() = profiles.firstOrNull { it.id == workerProfileId }
 
     fun isActive(profile: LocalModelProfile): Boolean = profile.id == activeProfileId
 }
