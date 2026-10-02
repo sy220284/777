@@ -37,12 +37,16 @@ internal object LocalToolRouter {
             name.startsWith("lsp_") ||
             name.startsWith("webhook_")
 
-    fun visibleSchemas(tools: List<HarnessTool>, enabledOptional: Set<String>): JsonArray =
-        JsonArray(
-            tools
-                .filter { tool -> !isOptional(tool.name) || tool.name in enabledOptional }
-                .map(HarnessTool::schema),
-        )
+    fun visibleSchemas(tools: List<HarnessTool>, enabledOptional: Set<String>): JsonArray {
+        val core = tools
+            .filterNot { tool -> isOptional(tool.name) }
+            .sortedBy(HarnessTool::name)
+        val optional = tools
+            .filter { tool -> isOptional(tool.name) && tool.name in enabledOptional }
+            .sortedBy(HarnessTool::name)
+        // Keep the stable catalog prefix byte-for-byte ordered; discovered capabilities append only.
+        return JsonArray((core + optional).map(HarnessTool::schema))
+    }
 
     fun search(
         tools: List<HarnessTool>,
