@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.agent
 
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.LocalSessionEventLog
+import com.labteto.dshmobile.local.model.modelFailureKind
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -73,9 +74,9 @@ internal fun logSubagentProviderError(
         error.requestId?.let { put("request_id", it) }
         error.providerCode?.let { put("provider_code", it) }
         error.providerParam?.let { put("provider_param", it) }
-        error.cause?.let { cause ->
-            put("cause_type", cause::class.java.simpleName)
-            cause.message?.takeIf(String::isNotBlank)?.let { put("cause_detail", it.take(800)) }
-        }
+        put("failure_kind", modelFailureKind(error))
+        put("admission_state", error.admissionState.name.lowercase())
+        put("continuation_eligible", error.continuationEligible)
+        error.cause?.message?.takeIf(String::isNotBlank)?.let { put("cause_detail", it.take(800)) }
     })
 }
