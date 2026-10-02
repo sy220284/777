@@ -2267,7 +2267,9 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun isRunBusy(): Boolean = synchronized(runStateLock) {
-        sessionTransitioning || activeJob?.isCompleted == false
+        sessionTransitioning ||
+            activeJob?.isCompleted == false ||
+            activeWorkRuns.values.any { it.job?.isCompleted == false }
     }
 
     private fun beginSessionTransition(): Boolean {
@@ -2920,6 +2922,7 @@ class LocalHarnessEngine @Inject constructor(
             usageMode = runSnapshot.usageMode,
             model = runSnapshot.model,
             baseUrl = runSnapshot.baseUrl,
+            routeProfile = runSnapshot.modelSelection.activeProfile,
             planMode = runSnapshot.planMode,
             policy = runPolicy,
             safeAutoApprovalEnabled = runSnapshot.safeAutoApprovalEnabled,
