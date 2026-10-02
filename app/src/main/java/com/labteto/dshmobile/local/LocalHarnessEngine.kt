@@ -3845,10 +3845,49 @@ class LocalHarnessEngine @Inject constructor(
         runPolicy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding? = null,
     ): JsonArray {
-        if (binding == null) return toolExecutionCoordinator.visibleSchemas(runPolicy)
+        val runtimeState = binding?.state?.value ?: _state.value
+        val history = binding?.modelHistory?.snapshot() ?: modelHistory.snapshot()
+        val optionalPromptBudget = optionalToolPromptBudget(runtimeState, history)
+        if (binding == null) {
+            return toolExecutionCoordinator.visibleSchemas(
+                policy = runPolicy,
+                maxOptionalDefinitionTokens = optionalPromptBudget,
+            )
+        }
         if (!runPolicy.toolsEnabled) return JsonArray(emptyList())
         val tools = toolRegistry.names().mapNotNull(toolRegistry::get)
-        return LocalToolRouter.visibleSchemas(tools, binding.enabledOptionalTools.toSet())
+        return LocalToolRouter.visibleSchemas(
+            tools = tools,
+            enabledOptional = binding.enabledOptionalTools.toSet(),
+            maxOptionalDefinitionTokens = optionalPromptBudget,
+        )
+    }
+
+    private fun optionalToolPromptBudget(
+        state: LocalHarnessState,
+        history: List<JsonObject>,
+    ): Int {
+        val profile = state.modelSelection.activeProfile
+        val operationalLimit = operationalInputLimitTokens(
+            state.model,
+            state.baseUrl,
+            profile?.contextWindowTokensOverride,
+        )
+        val basePressure = LocalPromptPressureMeter.measure(
+            messages = history,
+            tools = JsonArray(emptyList()),
+            operationalLimitTokens = operationalLimit,
+            modelContextWindowTokens = documentedContextWindowTokens(
+                state.model,
+                state.baseUrl,
+                profile?.contextWindowTokensOverride,
+            ),
+        )
+        val remaining = basePressure.remainingOperationalTokens
+        return minOf(
+            LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
+            (remaining / 4).coerceAtLeast(0),
+        )
     }
 
     private fun runToolNames(
