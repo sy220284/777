@@ -143,6 +143,66 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun explicitPrivacyLanguageForcesDirectDiaryPrivate() {
+        val memory = store()
+        val saved = memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户只告诉我他准备辞职",
+                feeling = "我有点意外，也知道他把这件事交给我是出于信任",
+                innerThought = "在他自己说出来前，我不会替他公开",
+                importance = 5,
+                disclosure = "SHAREABLE",
+            ),
+            evidence = "用户说：这事只告诉你，我准备辞职，先别告诉别人。",
+        ))
+
+        assertEquals(ChatDiaryDisclosure.PRIVATE, saved?.disclosure)
+        assertTrue(memory.search("辞职", "gallery:a", groupAudience = true, maxItems = 3).isEmpty())
+        assertTrue(memory.search("辞职", "gallery:a", groupAudience = false, maxItems = 3).isNotEmpty())
+    }
+
+    @Test
+    fun oppositePolarityEventsDoNotCollapseDuringRefinement() {
+        val memory = store()
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户答应周末和我去海边",
+                feeling = "我开始期待这次见面",
+                importance = 4,
+            ),
+            evidence = "用户答应周末和我去海边",
+        ))
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户取消了周末和我去海边的约定",
+                feeling = "期待落空后我有点失望",
+                innerThought = "我需要重新判断这件事对他有多重要",
+                importance = 4,
+            ),
+            userId = "u2",
+            assistantId = "a2",
+            evidence = "用户说周末海边的约定取消了，这次去不了了",
+        ))
+
+        assertEquals(2, memory.listActive("gallery:a").size)
+    }
+
+    @Test
+    fun unrelatedHighImportanceDiaryDoesNotPolluteOrdinaryConversation() {
+        val memory = store()
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户确认周末和我去海边",
+                feeling = "我很期待",
+                innerThought = "这次终于定下来了",
+                importance = 5,
+            ),
+        ))
+
+        assertTrue(memory.search("今晚吃什么比较好", "gallery:a", groupAudience = false, maxItems = 3).isEmpty())
+    }
+
+    @Test
     fun timelineRewriteInvalidatesDiaryDerivedFromDiscardedMessage() {
         val memory = store()
         val saved = memory.record(request(
