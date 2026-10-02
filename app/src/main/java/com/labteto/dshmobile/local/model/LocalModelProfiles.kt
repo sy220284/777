@@ -24,6 +24,7 @@ data class LocalModelProfile(
     val protocol: LocalModelProtocol = LocalModelProtocol.CHAT_COMPLETIONS,
     val credentialRef: String? = null,
     val displayName: String? = null,
+    val contextWindowTokensOverride: Int? = null,
 )
 
 internal fun LocalModelProfile.usesResponsesTransport(): Boolean =
