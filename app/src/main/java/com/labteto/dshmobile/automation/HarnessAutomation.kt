@@ -213,6 +213,7 @@ data class AutomationTask(
     val recurringMinutes: Long? = null,
     val scheduleType: AutomationScheduleType = AutomationScheduleType.LEGACY,
     val scheduleAnchorAt: Long? = null,
+    val scheduleGeneration: Long = 0L,
     val silenceMinutes: Long? = null,
     val windowStartMinuteOfDay: Int? = null,
     val windowEndMinuteOfDay: Int? = null,
