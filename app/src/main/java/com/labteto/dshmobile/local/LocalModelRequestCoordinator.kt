@@ -95,6 +95,7 @@ internal class LocalModelRequestCoordinator(
                 tools = tools,
                 compactor = historyCompactor,
                 operationalLimitTokens = operationalLimit,
+                measuredPressure = baselinePressure,
             )
         } else {
             LocalWorkRequestProjection(
