@@ -8,6 +8,7 @@ import org.junit.Test
 class ChatDiaryRecallPolicyTest {
     @Test
     fun longTermMemoryBudgetStaysBoundedAcrossContextWindows() {
+        assertEquals(800, chatLongTermMemoryBudget(null).totalTokens)
         assertEquals(800, chatLongTermMemoryBudget(8_192).totalTokens)
         assertEquals(1_400, chatLongTermMemoryBudget(16_384).totalTokens)
         assertTrue(chatLongTermMemoryBudget(1_000_000).totalTokens <= 2_200)
