@@ -131,7 +131,9 @@ internal fun appendLocalDiagnosticDetails(
             route?.profileId?.takeIf(String::isNotBlank)?.let { append(" profile_id=").append(it.take(160)) }
             route?.authKind?.takeIf(String::isNotBlank)?.let { append(" auth_kind=").append(it.take(80)) }
             route?.protocol?.takeIf(String::isNotBlank)?.let { append(" protocol=").append(it.take(80)) }
-            route?.fingerprint?.takeIf(String::isNotBlank)?.let { append(" route_fingerprint=").append(it.take(160)) }
+            route?.fingerprint?.takeIf(String::isNotBlank)?.let {
+                append(" reply_route_fingerprint=").append(it.take(160))
+            }
             append(" reported=").append(record.reported)
             append(" input=").append(record.inputTokens)
             append(" cache_hit=").append(record.cacheHitTokens)
@@ -175,6 +177,7 @@ private val DIAGNOSTIC_EVENT_KEYS = listOf(
     "continuation_eligible",
     "request_id",
     "route_fingerprint",
+    "reply_route_fingerprint",
     "reported",
     "prompt_tokens",
     "cache_hit_tokens",
