@@ -111,7 +111,11 @@ internal class LocalSubagentModelStepExecutor(
                                     baseUrl = baseUrl,
                                     messages = activeHistory,
                                     tools = tools,
-                                )
+                                ).also { reply ->
+                                    budgetLease?.settle(
+                                        reply.usage.promptTokens.takeIf { reply.usage.reported },
+                                    )
+                                }
                             } catch (error: LocalModelException) {
                                 routeCircuitBreaker?.observeFailure(profile.id, error)
                                 logSubagentProviderError(eventLog(), subagentId, step, error)
