@@ -22,7 +22,7 @@ class ChatPersonaGalleryStore internal constructor(
         this(File(context.filesDir, "local-harness/chat/persona-gallery.json"), json)
 
     private val documentStore = PersonaGalleryDocumentStore(file, json)
-    private val historyStore = PersonaGalleryHistoryStore(
+    private val history = PersonaGalleryHistoryCoordinator(
         File(requireNotNull(file.parentFile), "persona-history"),
         json,
     )
@@ -39,7 +39,7 @@ class ChatPersonaGalleryStore internal constructor(
         val entry = readNormalized().entries.firstOrNull { it.id == id }
             ?: error("人物档案不存在")
         require(entry.stories.any { it.id == storyId }) { "人物故事不存在" }
-        return historyStore.tail(id, storyId, limit)
+        return history.page(entry, storyId, limit)
     }
 
     @Synchronized
@@ -60,15 +60,7 @@ class ChatPersonaGalleryStore internal constructor(
     ): PersonaTransferDocument {
         val entry = readNormalized().entries.firstOrNull { it.id == id }
             ?: error("人物档案不存在")
-        val hydrated = entry.copy(
-            stories = entry.stories.map { story ->
-                story.copy(
-                    history = historyStore.all(entry.id, story.id),
-                    historyTotalCount = story.historyTotalCount,
-                )
-            },
-        )
-        return PersonaTransferDocuments.encode(json, hydrated, format)
+        return PersonaTransferDocuments.encode(json, history.hydrate(entry), format)
     }
 
     @Synchronized
@@ -142,16 +134,7 @@ class ChatPersonaGalleryStore internal constructor(
                 updatedAt = now,
             )
         }
-        val entry = mergedEntry.copy(
-            stories = mergedEntry.stories.map { story ->
-                val archive = historyStore.merge(entryId, story.id, story.history)
-                story.copy(
-                    history = archive.messages,
-                    historyTotalCount = archive.totalCount,
-                    historyArchived = true,
-                )
-            },
-        )
+        val entry = history.archiveEntry(mergedEntry)
         documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return entry
     }
@@ -245,7 +228,7 @@ class ChatPersonaGalleryStore internal constructor(
         }
 
         val storyId = baseStory?.id ?: "story-${UUID.randomUUID()}"
-        val archivedHistory = historyStore.merge(entryId, storyId, incomingHistory)
+        val archivedHistory = history.merge(entryId, storyId, incomingHistory)
         val incomingStory = PersonaGalleryStory(
             id = storyId,
             title = baseStory?.title?.takeIf(String::isNotBlank)
@@ -324,23 +307,12 @@ class ChatPersonaGalleryStore internal constructor(
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return 0
         val story = current.stories.firstOrNull { it.id == storyId } ?: return 0
-        val removed = keys.count { key -> historyStore.deleteMessage(id, storyId, key) }
-        val refreshedHistory = historyStore.tail(
-            id,
-            storyId,
-            PersonaGalleryHistoryStore.HOT_GALLERY_HISTORY_MESSAGES,
-        )
         val now = System.currentTimeMillis()
-        val updatedStory = story.copy(
-            history = refreshedHistory.messages,
-            historyTotalCount = refreshedHistory.totalCount,
-            historyArchived = true,
-            excludedMessageKeys = mergePersonaLines(
-                story.excludedMessageKeys,
-                keys.toList(),
-                MAX_GALLERY_EXCLUDED_MESSAGE_KEYS,
-            ),
-            chatState = replacementChatState,
+        val (updatedStory, removed) = history.exclude(
+            entryId = id,
+            story = story,
+            keys = keys,
+            replacementChatState = replacementChatState,
             updatedAt = now,
         )
         val updated = current.copy(
@@ -418,7 +390,7 @@ class ChatPersonaGalleryStore internal constructor(
         val doc = readNormalized()
         if (doc.entries.none { it.id == id }) return false
         documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == id }))
-        historyStore.deleteEntry(id)
+        history.deleteEntry(id)
         return true
     }
 
@@ -432,7 +404,7 @@ class ChatPersonaGalleryStore internal constructor(
             updatedAt = System.currentTimeMillis(),
         )
         documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
-        historyStore.deleteStory(id, storyId)
+        history.deleteStory(id, storyId)
         return true
     }
 
@@ -441,23 +413,12 @@ class ChatPersonaGalleryStore internal constructor(
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return false
         val story = current.stories.firstOrNull { it.id == storyId } ?: return false
-        if (!historyStore.deleteMessage(id, storyId, messageKey)) return false
-        val refreshed = historyStore.tail(
-            id,
-            storyId,
-            PersonaGalleryHistoryStore.HOT_GALLERY_HISTORY_MESSAGES,
-        )
-        val updatedStory = story.copy(
-            history = refreshed.messages,
-            historyTotalCount = refreshed.totalCount,
-            historyArchived = true,
-            excludedMessageKeys = mergePersonaLines(
-                story.excludedMessageKeys,
-                listOf(messageKey),
-                MAX_GALLERY_EXCLUDED_MESSAGE_KEYS,
-            ),
+        val updatedStory = history.deleteMessage(
+            entryId = id,
+            story = story,
+            messageKey = messageKey,
             updatedAt = System.currentTimeMillis(),
-        )
+        ) ?: return false
         val updated = current.copy(
             stories = current.stories.map { if (it.id == storyId) updatedStory else it },
             updatedAt = updatedStory.updatedAt,
@@ -473,25 +434,7 @@ class ChatPersonaGalleryStore internal constructor(
         } else {
             raw.entries.map(::migrateLegacyEntry)
         }
-        val entries = migratedEntries.map { entry ->
-            entry.copy(
-                stories = entry.stories.map { story ->
-                    if (story.historyArchived) {
-                        story.copy(
-                            history = story.history.takeLast(PersonaGalleryHistoryStore.HOT_GALLERY_HISTORY_MESSAGES),
-                            historyTotalCount = maxOf(story.historyTotalCount, story.history.size),
-                        )
-                    } else {
-                        val archive = historyStore.migrateIfNeeded(entry.id, story.id, story.history)
-                        story.copy(
-                            history = archive.messages,
-                            historyTotalCount = archive.totalCount,
-                            historyArchived = true,
-                        )
-                    }
-                },
-            )
-        }
+        val entries = migratedEntries.map(history::migrate)
         val normalized = raw.copy(version = 4, entries = entries)
         if (normalized != raw) documentStore.write(normalized)
         return normalized
