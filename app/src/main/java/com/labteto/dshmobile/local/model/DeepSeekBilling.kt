@@ -390,7 +390,8 @@ class DeepSeekUsageTracker @Inject constructor(
     fun analyticsGroupDetail(
         kind: TokenUsageGroupKind,
         key: String,
-    ): TokenUsageGroupDetail? = analyticsStore.groupDetail(kind, key)
+        recordLimit: Int = 300,
+    ): TokenUsageGroupDetail? = analyticsStore.groupDetail(kind, key, recordLimit)
 
     fun analyticsRecord(requestId: String): TokenUsageRecord? =
         analyticsStore.recordById(requestId)

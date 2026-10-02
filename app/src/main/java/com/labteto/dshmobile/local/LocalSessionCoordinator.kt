@@ -37,6 +37,8 @@ internal class LocalSessionCoordinator(
 
     fun delete(id: String): Boolean = repository.delete(id)
 
+    fun releaseDeletionBarrier(ids: Set<String>) = repository.releaseDeletionBarrier(ids)
+
     fun summaries(): List<LocalSessionSummary> = repository.summaries()
 
     fun restoreTranscript(
@@ -122,7 +124,7 @@ internal class LocalSessionCoordinator(
     ): LocalHarnessSession = LocalHarnessSession(
         id = sessionId,
         title = state.transcriptIndex.firstUserTitle ?: "新会话",
-        updatedAt = System.currentTimeMillis(),
+        updatedAt = state.transcriptIndex.latestCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
         usageMode = state.usageMode,
         personaId = state.personaId,
         chatState = state.chatState,

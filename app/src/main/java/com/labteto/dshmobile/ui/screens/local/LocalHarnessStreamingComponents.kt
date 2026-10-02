@@ -92,12 +92,15 @@ internal fun LocalStreamingWorkPreview(
     sessionId: String,
     streamingState: StateFlow<LocalHarnessStreamingState>,
     surfaceColor: Color,
+    hasDurableProgress: Boolean,
 ) {
     val rawStream by streamingState.collectAsStateWithLifecycle()
     val stream = rawStream.forSurface(sessionId, LocalUsageMode.WORK)
     val preview = stream.assistant.let { text ->
         if (text.length > 480) "…" + takeLastWithoutSplittingSurrogatePair(text, 480) else text
     }
+
+    if (preview.isBlank() && hasDurableProgress) return
 
     Surface(
         modifier = Modifier.fillMaxWidth()
@@ -121,7 +124,7 @@ internal fun LocalStreamingWorkPreview(
                 )
             }
             Text(
-                preview.ifBlank { stringResource(R.string.local_work_process) },
+                preview.ifBlank { stringResource(R.string.local_work_process_preparing) },
                 style = DsType.std14.withReadingWeight(),
                 color = if (preview.isBlank()) {
                     DsTheme.colors.labelTertiary

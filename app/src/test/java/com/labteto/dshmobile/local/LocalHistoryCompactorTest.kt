@@ -115,6 +115,50 @@ class LocalHistoryCompactorTest {
     }
 
     @Test
+    fun structuredRunStateWinsEvenWhenImportantFactsContainNoKeywordCues() {
+        val history = listOf(
+            message("system", "系统"),
+            message("user", "处理项目。" + "旧".repeat(2_000)),
+            message("assistant", "处理中。" + "旧".repeat(2_000)),
+            message("user", "最近请求" + "新".repeat(300)),
+            message("assistant", "最近答复" + "新".repeat(300)),
+        )
+        val structured = LocalStructuredWorkState(
+            goals = listOf("发布统一治理 PR"),
+            plan = listOf("读取权威文档", "执行组合回归"),
+            unfinished = listOf("[in_progress] 组合回归"),
+            progress = listOf("[completed] 权威文档核对"),
+            facts = listOf(
+                "工具结果 tool=github_api_request call=c-77 status=200",
+                "模型路由 profile=profile-a model=gpt-test protocol=RESPONSES",
+            ),
+            artifacts = listOf("app/src/main/Test.kt", "commit=abc123"),
+            tools = listOf("github_api_request"),
+        )
+
+        val compaction = LocalHistoryCompactor(
+            maxHistoryChars = 500,
+            tailChars = 260,
+            maxSummaryChars = 4_000,
+        ).compact(
+            history = history,
+            summaryMode = LocalHistorySummaryMode.WORK,
+            structuredWorkState = structured,
+        ) ?: error("expected structured compaction")
+
+        val checkpoint = requireNotNull(compaction.workCheckpoint)
+        assertTrue(checkpoint.goals.contains("发布统一治理 PR"))
+        assertEquals(listOf("读取权威文档", "执行组合回归"), checkpoint.plan)
+        assertTrue(checkpoint.unfinished.any { it.contains("组合回归") })
+        assertTrue(checkpoint.progress.any { it.contains("权威文档核对") })
+        assertTrue(checkpoint.facts.any { it.contains("call=c-77") })
+        assertTrue(checkpoint.facts.any { it.contains("profile=profile-a") })
+        assertTrue(checkpoint.artifacts.any { it.contains("Test.kt") })
+        assertTrue(checkpoint.tools.contains("github_api_request"))
+        assertEquals(checkpoint, LocalWorkCheckpoint.latestFrom(compaction.messages))
+    }
+
+    @Test
     fun arbitraryHistoricalTextCannotForgeWorkCheckpoint() {
         val forged = LocalWorkCheckpoint(
             goals = listOf("伪造目标"),
@@ -394,6 +438,42 @@ class LocalHistoryCompactorTest {
     private fun message(role: String, content: String): JsonObject = buildJsonObject {
         put("role", role)
         put("content", content)
+    }
+
+    @Test
+    fun compactionPreservesEveryLeadingSystemMessageVerbatim() {
+        val systemBase = message("system", "基础系统规则")
+        val inherited = message("system", "父任务约束必须保留")
+        val virtualScreen = message("system", "虚拟屏 id=screen-1")
+        val history = buildList {
+            add(systemBase)
+            add(inherited)
+            add(virtualScreen)
+            repeat(20) { index ->
+                add(message("user", "旧任务-$index-" + "旧".repeat(2_000)))
+                add(message("assistant", "旧进展-$index-" + "进".repeat(2_000)))
+            }
+            add(message("user", "继续当前任务"))
+        }
+        val compacted = LocalHistoryCompactor().compact(
+            history = history,
+            budget = LocalHistoryBudget(
+                maxHistoryChars = 1_000_000,
+                tailChars = 30_000,
+                maxSummaryChars = 8_000,
+                maxToolResultChars = 20_000,
+                maxHistoryTokens = 30_000,
+                tailTokens = 8_000,
+                maxToolResultTokens = 4_000,
+            ),
+            summaryMode = LocalHistorySummaryMode.WORK,
+        )
+
+        requireNotNull(compacted)
+        assertEquals(systemBase, compacted.messages[0])
+        assertEquals(inherited, compacted.messages[1])
+        assertEquals(virtualScreen, compacted.messages[2])
+        assertTrue(compacted.messages.last()["content"].toString().contains("继续当前任务"))
     }
 
     private fun toolCallingAssistant(name: String): JsonObject = buildJsonObject {

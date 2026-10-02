@@ -201,6 +201,7 @@ internal class LocalSubagentRunner(
             usageMode = LocalUsageMode.WORK,
             model = routeModel,
             baseUrl = snapshot.baseUrl,
+            routeProfile = runProfile,
             planMode = snapshot.planMode,
             policy = localAgentRunPolicy(LocalUsageMode.WORK),
             safeAutoApprovalEnabled = snapshot.safeAutoApprovalEnabled,
@@ -273,7 +274,10 @@ internal class LocalSubagentRunner(
                             put("content", message)
                         })
                     }
-                    historyPolicy.compactHistory(history, subagentId, runHistoryBudget)
+                    historyPolicy.compactHistory(
+                        history, subagentId,
+                        runHistoryBudget?.let { workSteadyStateHistoryBudget(it, history.estimatedTokens) },
+                    )
                     modelStep += 1
                     val durableHistory = history.snapshot()
                     val selectedMode = resolveImageMode(snapshot.imageInputMode, snapshot.baseUrl, routeModel)

@@ -19,7 +19,7 @@ import kotlinx.serialization.json.put
 internal const val LOCAL_AGENT_RUN_CHECKPOINT_EVENT = "agent/run-checkpoint"
 internal const val LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT = "agent/subagent-run-checkpoint"
 internal const val LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT = "agent/automation-run-checkpoint"
-private const val LOCAL_AGENT_RUN_CHECKPOINT_VERSION = 1
+private const val LOCAL_AGENT_RUN_CHECKPOINT_VERSION = 2
 private const val MAX_RECOVERY_INPUT_CHARS = 8_000
 
 internal enum class LocalAgentRunKind {
@@ -63,6 +63,11 @@ internal data class LocalAgentRunContext(
     val usageMode: LocalUsageMode,
     val model: String,
     val baseUrl: String,
+    val profileId: String? = null,
+    val authKind: String? = null,
+    val protocol: String? = null,
+    val credentialRef: String? = null,
+    val routeFingerprint: String? = null,
     val planMode: Boolean,
     val policy: LocalAgentRunPolicy,
     val safeAutoApprovalEnabled: Boolean,
@@ -78,11 +83,22 @@ internal data class LocalAgentRunContext(
     val agentId: String? = null,
 )
 
+internal data class LocalAgentRunRouteIdentity(
+    val profileId: String?,
+    val authKind: String?,
+    val protocol: String?,
+    val credentialRef: String?,
+    val fingerprint: String?,
+    val model: String,
+    val baseUrl: String,
+)
+
 internal data class LocalAgentRunRecoveryDecision(
     val runId: String,
     val queuedInput: QueuedAgentInput? = null,
     val blockedReason: String? = null,
     val completedOutput: String? = null,
+    val route: LocalAgentRunRouteIdentity? = null,
 )
 
 /**
@@ -102,6 +118,7 @@ internal class LocalAgentRunCoordinator(
         usageMode: LocalUsageMode,
         model: String,
         baseUrl: String,
+        routeProfile: LocalModelProfile? = null,
         planMode: Boolean,
         policy: LocalAgentRunPolicy,
         safeAutoApprovalEnabled: Boolean,
@@ -123,6 +140,13 @@ internal class LocalAgentRunCoordinator(
             usageMode = usageMode,
             model = model,
             baseUrl = baseUrl,
+            profileId = routeProfile?.id,
+            authKind = routeProfile?.authKind?.name,
+            protocol = routeProfile?.let {
+                if (it.authKind == LocalModelAuthKind.CHATGPT_PLAN) LocalModelProtocol.RESPONSES.name else it.protocol.name
+            },
+            credentialRef = routeProfile?.credentialRef,
+            routeFingerprint = routeProfile?.routeFingerprint(),
             planMode = planMode,
             policy = policy,
             safeAutoApprovalEnabled = safeAutoApprovalEnabled,
@@ -224,15 +248,36 @@ internal class LocalAgentRunCoordinator(
         val checkpointType = eventType(kind)
         val event = log.latest(checkpointType) ?: return null
         val data = event.data
-        if (data["version"]?.jsonPrimitive?.intOrNull != LOCAL_AGENT_RUN_CHECKPOINT_VERSION) return null
+        val version = data["version"]?.jsonPrimitive?.intOrNull ?: return null
+        if (version !in 1..LOCAL_AGENT_RUN_CHECKPOINT_VERSION) return null
         val status = data["status"]?.jsonPrimitive?.contentOrNull ?: return null
         val runId = data["run_id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: return null
+        val route = LocalAgentRunRouteIdentity(
+            profileId = data["profile_id"]?.jsonPrimitive?.contentOrNull,
+            authKind = data["auth_kind"]?.jsonPrimitive?.contentOrNull,
+            protocol = data["protocol"]?.jsonPrimitive?.contentOrNull,
+            credentialRef = data["credential_ref"]?.jsonPrimitive?.contentOrNull,
+            fingerprint = data["route_fingerprint"]?.jsonPrimitive?.contentOrNull,
+            model = data["model"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            baseUrl = data["base_url"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+        ).takeIf { version >= 2 && !it.profileId.isNullOrBlank() }
+
+        val requiresExecutableRecovery =
+            status == LocalAgentRunCheckpointStatus.RUNNING.name.lowercase() ||
+                status == LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase()
+        if (version < 2 && requiresExecutableRecovery) {
+            return LocalAgentRunRecoveryDecision(
+                runId = runId,
+                blockedReason = "上次任务来自旧版检查点，缺少完整模型路由身份，已停止自动续跑。请手动确认后继续。",
+            )
+        }
 
         if (status == LocalAgentRunCheckpointStatus.COMPLETED.name.lowercase()) {
             if (kind == LocalAgentRunKind.FOREGROUND) return null
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 completedOutput = data["answer"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                route = route,
             )
         }
         if (status == LocalAgentRunCheckpointStatus.RECOVERY_BLOCKED.name.lowercase()) {
@@ -240,6 +285,7 @@ internal class LocalAgentRunCoordinator(
                 runId = runId,
                 blockedReason = data["reason"]?.jsonPrimitive?.contentOrNull
                     ?: "上次执行已被恢复保护阻断，请先检查外部状态后再继续。",
+                route = route,
             )
         }
         if (status == LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase()) {
@@ -251,6 +297,7 @@ internal class LocalAgentRunCoordinator(
                     content = continuation,
                     memoryInput = continuation,
                 ),
+                route = route,
             )
         }
         if (status != LocalAgentRunCheckpointStatus.RUNNING.name.lowercase()) return null
@@ -261,6 +308,7 @@ internal class LocalAgentRunCoordinator(
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 blockedReason = "上次执行在工具调用期间被系统中断，工具副作用状态未知。已停止自动续跑，请先检查外部状态后再继续。",
+                route = route,
             )
         }
 
@@ -271,6 +319,7 @@ internal class LocalAgentRunCoordinator(
                 return LocalAgentRunRecoveryDecision(
                     runId = runId,
                     blockedReason = "上次后台执行已经进入可能产生副作用的工具阶段。为避免系统重跑造成重复操作，已停止自动续跑，请先检查外部状态。",
+                    route = route,
                 )
             }
             val continuation = recoveryContinuationPrompt(log, data)
@@ -283,6 +332,7 @@ internal class LocalAgentRunCoordinator(
                         ?: data["input"]?.jsonPrimitive?.contentOrNull
                         ?: continuation,
                 ),
+                route = route,
             )
         }
 
@@ -321,7 +371,7 @@ internal class LocalAgentRunCoordinator(
             content = continuationPrompt,
             memoryInput = originalInput.ifBlank { continuationPrompt },
         )
-        return LocalAgentRunRecoveryDecision(runId = runId, queuedInput = continuation)
+        return LocalAgentRunRecoveryDecision(runId = runId, queuedInput = continuation, route = route)
     }
 
     private fun recoveryContinuationPrompt(
@@ -396,6 +446,11 @@ internal class LocalAgentRunCoordinator(
                 put("mode", context.usageMode.name.lowercase())
                 put("model", context.model)
                 put("base_url", context.baseUrl)
+                context.profileId?.let { put("profile_id", it) }
+                context.authKind?.let { put("auth_kind", it) }
+                context.protocol?.let { put("protocol", it) }
+                context.credentialRef?.let { put("credential_ref", it) }
+                context.routeFingerprint?.let { put("route_fingerprint", it) }
                 put("plan_mode", context.planMode)
                 put("safe_auto_approval", context.safeAutoApprovalEnabled)
                 put("tools_enabled", context.policy.toolsEnabled)

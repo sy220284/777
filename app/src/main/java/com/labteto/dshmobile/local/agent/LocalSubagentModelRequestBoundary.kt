@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.executeWithModelAdmission
+import com.labteto.dshmobile.local.routeFingerprint
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -29,7 +30,7 @@ internal class LocalSubagentModelRequestBoundary(
         step: Int,
     ): LocalModelReply = executeWithModelAdmission(
         control = executionControl,
-        profileId = profile.id,
+        routeFingerprint = profile.routeFingerprint(),
         model = model,
         baseUrl = baseUrl,
         contextWindowTokensOverride = profile.contextWindowTokensOverride,

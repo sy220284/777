@@ -7,6 +7,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.ArrayDeque
 import java.util.LinkedHashMap
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.async
@@ -174,15 +175,14 @@ class LocalWorkspace(
         val directory = resolve(relativePath)
         require(directory.isDirectory) { "目录不存在：$relativePath" }
         val baseDepth = directory.toPath().nameCount
-        val rows = safeWalk(directory)
+        val rows = safeWalk(directory, maxDepth = depth.coerceIn(1, 8))
             .filter {
-                it != directory && isInsideWorkspace(it) &&
-                    it.toPath().nameCount - baseDepth <= depth.coerceIn(1, 8)
+                it != directory && isInsideWorkspace(it)
             }
             .take(MAX_LIST_ROWS)
             .map { file ->
                 val suffix = if (file.isDirectory) "/" else " (${file.length()} B)"
-                file.relativeTo(canonicalRoot).invariantSeparatorsPath + suffix
+                displayPath(file) + suffix
             }
             .toList()
         return if (rows.isEmpty()) "目录为空" else rows.joinToString("\n")
@@ -196,26 +196,35 @@ class LocalWorkspace(
         else null
         val directory = resolve(relativePath)
         require(directory.exists()) { "路径不存在：$relativePath" }
-        val files = if (directory.isFile) sequenceOf(directory) else safeWalk(directory)
+        val files = if (directory.isFile) sequenceOf(directory) else safeWalk(
+            directory,
+            maxDepth = MAX_SCAN_DEPTH,
+            maxVisited = MAX_SCAN_ENTRIES,
+            maxMillis = MAX_SCAN_MILLIS,
+        )
         val matches = mutableListOf<String>()
         var outputChars = 0
-        files.filter { it.isFile && isInsideWorkspace(it) && it.length() <= MAX_TEXT_BYTES }.forEach { file ->
-            if (matches.size >= MAX_SEARCH_ROWS || outputChars >= MAX_SEARCH_CHARS) return@forEach
-            runCatching { file.useLines { lines ->
-                lines.forEachIndexed { index, line ->
-                    val matchStart = expression?.find(line)?.range?.first
-                        ?: if (expression == null) line.indexOf(query, ignoreCase = true) else -1
-                    if (matches.size < MAX_SEARCH_ROWS && outputChars < MAX_SEARCH_CHARS && matchStart >= 0) {
-                        val previewStart = (matchStart - 100).coerceAtLeast(0)
-                        val row = "${file.relativeTo(canonicalRoot).invariantSeparatorsPath}:${index + 1}: " +
-                            (if (previewStart > 0) "…" else "") +
-                            line.substring(previewStart, minOf(line.length, previewStart + MAX_SEARCH_PREVIEW_CHARS)) +
-                            if (line.length > previewStart + MAX_SEARCH_PREVIEW_CHARS) "…" else ""
-                        matches += row
-                        outputChars += row.length
+        for (file in files) {
+            if (matches.size >= MAX_SEARCH_ROWS || outputChars >= MAX_SEARCH_CHARS) break
+            if (!file.isFile || !isInsideWorkspace(file) || file.length() > MAX_TEXT_BYTES) continue
+            runCatching {
+                file.useLines { lines ->
+                    for ((index, line) in lines.withIndex()) {
+                        if (matches.size >= MAX_SEARCH_ROWS || outputChars >= MAX_SEARCH_CHARS) break
+                        val matchStart = expression?.find(line)?.range?.first
+                            ?: if (expression == null) line.indexOf(query, ignoreCase = true) else -1
+                        if (matchStart >= 0) {
+                            val previewStart = (matchStart - 100).coerceAtLeast(0)
+                            val row = "${displayPath(file)}:${index + 1}: " +
+                                (if (previewStart > 0) "…" else "") +
+                                line.substring(previewStart, minOf(line.length, previewStart + MAX_SEARCH_PREVIEW_CHARS)) +
+                                if (line.length > previewStart + MAX_SEARCH_PREVIEW_CHARS) "…" else ""
+                            matches += row
+                            outputChars += row.length
+                        }
                     }
                 }
-            } }
+            }
         }
         return if (matches.isEmpty()) "未找到匹配内容" else matches.joinToString("\n")
     }
@@ -254,7 +263,7 @@ class LocalWorkspace(
         val binary = bytes.take(8_192).any { it == 0.toByte() } ||
             relativePath.substringAfterLast('.', "").lowercase() in BINARY_PREVIEW_EXTENSIONS
         val info = LocalWorkspaceFile(
-            path = file.relativeTo(canonicalRoot).invariantSeparatorsPath,
+            path = displayPath(file),
             bytes = file.length(),
             modifiedAt = file.lastModified(),
         )
@@ -419,12 +428,38 @@ class LocalWorkspace(
     /** Resolve a path for writing. Writes are allowed wherever reads are. */
     private fun resolveForWrite(relativePath: String): File = resolve(relativePath)
 
-    private fun safeWalk(directory: File): Sequence<File> =
-        directory.walkTopDown()
-            .onEnter { candidate ->
-                boundary.isAllowed(candidate) && !Files.isSymbolicLink(candidate.toPath())
+    private fun safeWalk(
+        directory: File,
+        maxDepth: Int = MAX_SCAN_DEPTH,
+        maxVisited: Int = MAX_SCAN_ENTRIES,
+        maxMillis: Long = MAX_SCAN_MILLIS,
+    ): Sequence<File> = sequence {
+        val queue = ArrayDeque<Pair<File, Int>>()
+        queue.add(directory to 0)
+        val deadlineNanos = System.nanoTime() + maxMillis.coerceAtLeast(1L) * 1_000_000L
+        var visited = 0
+        while (queue.isNotEmpty() && visited < maxVisited && System.nanoTime() <= deadlineNanos) {
+            val (candidate, depth) = queue.removeFirst()
+            if (!boundary.isAllowed(candidate) || Files.isSymbolicLink(candidate.toPath())) continue
+            visited += 1
+            yield(candidate)
+            if (candidate.isDirectory && depth < maxDepth) {
+                candidate.listFiles()
+                    .orEmpty()
+                    .sortedBy(File::getName)
+                    .forEach { child ->
+                        if (queue.size < maxVisited) queue.addLast(child to (depth + 1))
+                    }
             }
-            .asSequence()
+        }
+    }
+
+    private fun displayPath(candidate: File): String =
+        if (boundary.isWorkspace(candidate)) {
+            candidate.canonicalFile.relativeTo(canonicalRoot).invariantSeparatorsPath
+        } else {
+            candidate.canonicalFile.invariantSeparatorsPath
+        }
 
     private fun isInsideWorkspace(candidate: File): Boolean = boundary.isAllowed(candidate)
 
@@ -485,6 +520,9 @@ class LocalWorkspace(
         const val MAX_SEARCH_ROWS = 200
         const val MAX_SEARCH_CHARS = 32_000
         const val MAX_SEARCH_PREVIEW_CHARS = 1_200
+        const val MAX_SCAN_DEPTH = 32
+        const val MAX_SCAN_ENTRIES = 5_000
+        const val MAX_SCAN_MILLIS = 2_000L
         const val MAX_SHELL_CHARS = 65_536
         const val MAX_SHELL_TIMEOUT_SECONDS = 900
     }

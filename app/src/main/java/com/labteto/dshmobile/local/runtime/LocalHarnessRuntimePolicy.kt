@@ -4,9 +4,6 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceBudget
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 class LocalHarnessBlockedException(
     message: String,
@@ -27,23 +24,6 @@ internal fun canAutoApprove(tool: HarnessTool): Boolean =
                 LocalAutoApprovalScope.READ_ONLY,
             )
         }.getOrDefault(false)
-
-/**
- * Parameter-aware variant of [canAutoApprove].
- *
- * Name-only classification cannot express two cases that matter for safety:
- * - bash is a process-level escape hatch, so only allowlisted, non-chained commands qualify;
- * - workspace writes are auto-approved, but an authorized external root may still opt out.
- */
-internal fun canAutoApprove(tool: HarnessTool, args: JsonObject): Boolean {
-    if (!canAutoApprove(tool)) return false
-    return when (LocalToolPolicy.canonical(tool.name)) {
-        "bash" -> LocalToolPolicy.canAutoApproveCommand(
-            args["command"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-        )
-        else -> true
-    }
-}
 
 internal fun approvalImpact(tool: HarnessTool): LocalApprovalImpact = when (tool.access) {
     ToolAccess.READ_ONLY -> LocalApprovalImpact.LOW
@@ -69,7 +49,7 @@ internal fun projectWorkResourceCount(
 ): Int = if (usageMode == LocalUsageMode.WORK) count else 0
 
 internal fun canResolvePendingByEnablingAutoApproval(approval: LocalApproval?): Boolean =
-    approval != null
+    approval?.canAutoApproveSafely == true
 
 internal fun localResourceBudgetForMemoryClass(memoryClassMb: Int): HarnessResourceBudget = when {
     memoryClassMb >= 512 -> HarnessResourceBudget(
