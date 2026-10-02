@@ -244,6 +244,9 @@ private fun findDurableUserModelMessage(
                 "user/message" -> {
                     (event.data["model_message"] as? JsonObject)?.let { return it }
                 }
+                "chat/active-transcript" -> {
+                    timelineRewriteEditedModelMessage(event.data, messageId)?.let { return it }
+                }
                 LOCAL_AGENT_INBOX_EVENT_TYPE -> {
                     decodeLocalAgentInboxPending(event.data)
                         ?.firstOrNull { input -> input.id == messageId }
@@ -290,6 +293,15 @@ private fun loadDurableUserModelMessages(
                         result[message.id] = structured
                         remaining.remove(message.id)
                     }
+                }
+                "chat/active-transcript" -> {
+                    val editedId = (event.data["edited_message_id"] as? JsonPrimitive)?.content
+                        ?.takeIf(remaining::contains)
+                        ?: return@forEach
+                    val structured = timelineRewriteEditedModelMessage(event.data, editedId)
+                        ?: return@forEach
+                    result[editedId] = structured
+                    remaining.remove(editedId)
                 }
                 LOCAL_AGENT_INBOX_EVENT_TYPE -> {
                     val queuedById = decodeLocalAgentInboxPending(event.data)
