@@ -1,0 +1,166 @@
+package com.labteto.dshmobile.local
+
+import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
+import com.labteto.dshmobile.local.memory.MemoryScope
+import com.labteto.dshmobile.local.memory.MemoryStore
+import java.io.File
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class LocalTimelineRewriteTransactionTest {
+    @Test
+    fun oneRewriteEventRestoresTranscriptModelHistoryAndControlState() {
+        withStores { log, _, _, _ ->
+            val edited = LocalHarnessMessage(
+                id = "edited",
+                role = "user",
+                content = "新问题",
+                createdAt = 10L,
+            )
+            val modelHistory = listOf(
+                buildJsonObject { put("role", "system"); put("content", "system") },
+                buildJsonObject { put("role", "user"); put("content", "新问题") },
+            )
+            val rewriteState = LocalTimelineRewriteState(
+                plan = listOf("新计划"),
+                todos = listOf(LocalTodoItem("继续修复", "in_progress")),
+                goal = LocalGoal("完成重写"),
+                planMode = true,
+                chatState = ChatCharacterState(mood = "稳定"),
+                chatContext = ChatContextState(generation = 7L),
+                chatBranches = LocalChatBranchState(),
+                groupChat = LocalGroupChatState(),
+            )
+            val event = appendTimelineRewriteCommit(
+                eventLog = log,
+                reason = "test",
+                activeTranscript = listOf(edited),
+                modelHistory = modelHistory,
+                state = rewriteState,
+                projection = LocalTimelineRewriteProjectionInput(
+                    sourceSessionId = "session",
+                    createdAtInclusive = 1L,
+                    discardedMessageIds = listOf("old"),
+                ),
+                editedMessageId = edited.id,
+                editedModelMessage = modelHistory.last(),
+            )
+
+            assertEquals(listOf("edited"), LocalSessionTranscriptPager(log).all().map { it.id })
+            assertEquals(
+                modelHistory,
+                restoreLocalModelHistory(
+                    events = listOf(event),
+                    legacyFallback = emptyList(),
+                    codec = ModelHistoryCheckpointCodec(),
+                ).messages,
+            )
+            val projected = projectSessionControlTail(
+                snapshot = LocalHarnessSession(id = "session"),
+                events = listOf(event),
+                sequenceExclusive = -1L,
+            )
+            assertEquals(listOf("新计划"), projected.plan)
+            assertEquals("完成重写", projected.goal?.description)
+            assertEquals("稳定", projected.chatState.mood)
+            assertEquals(7L, projected.chatContext.generation)
+        }
+    }
+
+    @Test
+    fun pendingExternalProjectionIsIdempotentlyCompletedAfterRewriteCommit() {
+        withStores { log, memory, gallery, _ ->
+            memory.remember(
+                content = "future-memory",
+                scope = MemoryScope.GLOBAL,
+                sourceSessionId = "session",
+                sourceMessageId = "discarded",
+            )
+            val edited = LocalHarnessMessage("edited", "user", "新问题", createdAt = 10L)
+            val modelMessage = buildJsonObject { put("role", "user"); put("content", "新问题") }
+            appendTimelineRewriteCommit(
+                eventLog = log,
+                reason = "test",
+                activeTranscript = listOf(edited),
+                modelHistory = listOf(modelMessage),
+                state = LocalTimelineRewriteState(
+                    plan = emptyList(),
+                    todos = emptyList(),
+                    goal = null,
+                    planMode = false,
+                    chatState = ChatCharacterState(),
+                    chatContext = ChatContextState(),
+                    chatBranches = LocalChatBranchState(),
+                    groupChat = LocalGroupChatState(),
+                ),
+                projection = LocalTimelineRewriteProjectionInput(
+                    sourceSessionId = "session",
+                    createdAtInclusive = 1L,
+                    discardedMessageIds = listOf("discarded"),
+                ),
+                editedMessageId = edited.id,
+                editedModelMessage = modelMessage,
+            )
+
+            assertTrue(recoverPendingTimelineRewriteProjection(log, memory, gallery))
+            assertTrue(memory.listActive(setOf(MemoryScope.GLOBAL), null, null).isEmpty())
+            assertFalse(recoverPendingTimelineRewriteProjection(log, memory, gallery))
+        }
+    }
+
+    @Test
+    fun editedMessageCanBeLocatedFromRewriteCommitForAnotherHistoricalEdit() {
+        withStores { log, _, _, _ ->
+            val edited = LocalHarnessMessage("edited", "user", "新问题", createdAt = 10L)
+            val modelMessage = buildJsonObject {
+                put("role", "user")
+                put("content", "新问题")
+                put("marker", "structured")
+            }
+            val event = appendTimelineRewriteCommit(
+                eventLog = log,
+                reason = "test",
+                activeTranscript = listOf(edited),
+                modelHistory = listOf(modelMessage),
+                state = LocalTimelineRewriteState(
+                    emptyList(), emptyList(), null, false,
+                    ChatCharacterState(), ChatContextState(), LocalChatBranchState(), LocalGroupChatState(),
+                ),
+                projection = LocalTimelineRewriteProjectionInput("session", 1L, listOf("old")),
+                editedMessageId = edited.id,
+                editedModelMessage = modelMessage,
+            )
+
+            assertEquals(event.sequence, sourceEventSequenceForMessage(log, edited.id))
+            assertEquals(
+                "structured",
+                editedChatUserModelMessage(log, edited.id, "再次修改")["marker"]?.toString()?.trim('"'),
+            )
+        }
+    }
+
+    private fun withStores(
+        block: (LocalSessionEventLog, MemoryStore, ChatPersonaGalleryStore, Json) -> Unit,
+    ) {
+        val root = createTempDir(prefix = "timeline-rewrite-")
+        val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        try {
+            block(
+                LocalSessionEventLog(File(root, "session.events.jsonl"), json),
+                MemoryStore(File(root, "memory"), json),
+                ChatPersonaGalleryStore(File(root, "gallery.json"), json),
+                json,
+            )
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+}
