@@ -4802,7 +4802,6 @@ class LocalHarnessEngine @Inject constructor(
         // A future-version session must remain completely untouched.
         val recovery = eventLog.repairInterruptedTail()
         recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
-        recoverPendingGroupGalleryStateSync(eventLog, chatPersonaGalleryStore)
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
             eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
@@ -4980,6 +4979,12 @@ class LocalHarnessEngine @Inject constructor(
         )
         var wroteHistoryCheckpoint = false
         if (_state.value.groupChat.enabled) {
+            projectGroupGalleryState(_state.value.groupChat, chatPersonaGalleryStore).failures.forEach { failure ->
+                AppLog.warn(
+                    "LocalHarnessEngine",
+                    "群聊人物库投影恢复失败 galleryId=${failure.galleryId} detail=${failure.detail}",
+                )
+            }
             // Group model history is already restored from its durable checkpoint/event tail.
             // Rebuilding it from the bounded UI transcript would silently discard older context.
             refreshGroupModelSystemPrompt()
@@ -5062,23 +5067,25 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun persist(binding: LocalWorkRunBinding? = null) {
+    private fun persistenceSnapshot(binding: LocalWorkRunBinding? = null): LocalHarnessSession {
         // Capture durable projection boundaries before reading mutable state. If a concurrent update
         // lands afterwards, replaying its event is safe and idempotent. Reading state first could
         // instead persist old state with a newer cursor and make recovery skip that event.
-        val sessionId = binding?.sessionId ?: currentSessionId
         val log = binding?.eventLog ?: eventLog
-        val controlProjectedThroughSequence = log.latestSequence()
-        val transcriptProjectedThroughSequence =
-            binding?.transcriptProjectionCursor ?: transcriptProjectionCursor
-        val state = binding?.state?.value ?: _state.value
-        val snapshot = sessionCoordinator.snapshot(
-            sessionId = sessionId,
-            state = state,
-            controlProjectedThroughSequence = controlProjectedThroughSequence,
-            transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
+        return sessionCoordinator.snapshot(
+            sessionId = binding?.sessionId ?: currentSessionId,
+            state = binding?.state?.value ?: _state.value,
+            controlProjectedThroughSequence = log.latestSequence(),
+            transcriptProjectedThroughSequence = binding?.transcriptProjectionCursor ?: transcriptProjectionCursor,
         )
-        sessionCoordinator.enqueue(snapshot)
+    }
+
+    private fun persist(binding: LocalWorkRunBinding? = null) {
+        sessionCoordinator.enqueue(persistenceSnapshot(binding))
+    }
+
+    private suspend fun persistNow() {
+        sessionCoordinator.writeNow(persistenceSnapshot())
     }
 
 
