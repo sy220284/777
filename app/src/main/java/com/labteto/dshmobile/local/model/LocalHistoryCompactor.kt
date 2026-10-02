@@ -10,6 +10,9 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+private const val WORK_CHECKPOINT_PROVENANCE_KEY = "_dsh_work_checkpoint_source"
+private const val WORK_CHECKPOINT_PROVENANCE_VALUE = "history_compactor_v1"
+
 internal data class LocalHistoryCompaction(
     val messages: List<JsonObject>,
     val omittedMessages: Int,
@@ -52,6 +55,11 @@ internal data class LocalWorkCheckpoint(
 
         fun latestFrom(messages: List<JsonObject>): LocalWorkCheckpoint? =
             messages.asReversed().firstNotNullOfOrNull { message ->
+                val role = (message["role"] as? JsonPrimitive)?.contentOrNull
+                val provenance = (message[WORK_CHECKPOINT_PROVENANCE_KEY] as? JsonPrimitive)?.contentOrNull
+                if (role != "user" || provenance != WORK_CHECKPOINT_PROVENANCE_VALUE) {
+                    return@firstNotNullOfOrNull null
+                }
                 val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return@firstNotNullOfOrNull null
                 val start = content.lastIndexOf("<work-checkpoint>")
                 val end = content.lastIndexOf("</work-checkpoint>")
@@ -172,6 +180,7 @@ internal class LocalHistoryCompactor(
             add(history.first())
             add(buildJsonObject {
                 put("role", "user")
+                put(WORK_CHECKPOINT_PROVENANCE_KEY, WORK_CHECKPOINT_PROVENANCE_VALUE)
                 put(
                     "content",
                     if (workCheckpoint != null) {
