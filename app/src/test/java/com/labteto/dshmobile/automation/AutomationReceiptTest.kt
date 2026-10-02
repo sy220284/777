@@ -7,6 +7,26 @@ import org.junit.Test
 
 class AutomationReceiptTest {
     @Test
+    fun scheduleGenerationGetsDistinctWorkIdentityAndKeepsLegacyGenerationZero() {
+        assertEquals("harness-automation-task", automationWorkName("task", 0L))
+        assertEquals("harness-automation-task-g1", automationWorkName("task", 1L))
+        assertEquals("harness-automation-task-g42", automationWorkName("task", 42L))
+    }
+
+    @Test
+    fun automationTaskPersistsScheduleGenerationWithoutNormalizationLoss() {
+        val task = AutomationTask(
+            id = "generation",
+            prompt = "task",
+            createdAt = 0L,
+            nextRunAt = 1L,
+            scheduleGeneration = 7L,
+        )
+
+        assertEquals(7L, normalizeAutomationTask(task).scheduleGeneration)
+    }
+
+    @Test
     fun keepsNewestTwoHundredReceipts() {
         var history = emptyList<AutomationRunReceipt>()
         repeat(250) { index ->
