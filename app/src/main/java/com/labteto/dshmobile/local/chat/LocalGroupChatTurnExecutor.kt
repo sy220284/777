@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContinuityState
+import com.labteto.dshmobile.local.chat.ChatDiarySourceMode
+import com.labteto.dshmobile.local.chat.ChatDiaryStore
+import com.labteto.dshmobile.local.chat.ChatDiaryWriteRequest
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
@@ -46,6 +49,7 @@ internal class LocalGroupChatTurnExecutor(
     private val chatPersonaGalleryStore: ChatPersonaGalleryStore,
     private val chatReplyCoordinator: LocalChatReplyCoordinator,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
+    private val diaryStore: ChatDiaryStore,
     private val usageTracker: DeepSeekUsageTracker,
     private val json: Json,
     private val modelHistory: LocalModelHistoryBuffer,
@@ -67,6 +71,7 @@ internal class LocalGroupChatTurnExecutor(
     ) -> LocalModelReply,
     private val ensureSystemMessageAction: () -> Unit,
     private val captureAutoMemoryAction: suspend (String, String?) -> Unit,
+    private val chatMemoryContextAction: (String, LocalHarnessState, String, String) -> String,
     private val compactHistoryAction: (Int) -> Unit,
     private val updateContextMetricsAction: () -> Unit,
     private val persistBranchStateAction: (String) -> Unit,
@@ -121,6 +126,7 @@ internal class LocalGroupChatTurnExecutor(
         input: String,
         allMembers: List<LocalGroupChatMember>,
         member: LocalGroupChatMember,
+        memoryContext: String,
         index: Int,
         turnId: String?,
     ): GroupGeneratedReply {
@@ -139,6 +145,7 @@ internal class LocalGroupChatTurnExecutor(
                 allMembers = allMembers,
                 handoffSummary = snapshot.handoffSummary,
                 sharedContext = snapshot.groupChat.context,
+                memoryContext = memoryContext,
                 announcement = snapshot.groupChat.announcement,
                 mayStaySilent = false,
                 silentToken = GROUP_CHAT_SILENT_TOKEN,
@@ -239,6 +246,54 @@ internal class LocalGroupChatTurnExecutor(
         }
     }
 
+    private fun recordGroupDiary(
+        member: LocalGroupChatMember,
+        persona: PersonaProfile,
+        plan: com.labteto.dshmobile.local.chat.ChatPostTurnPlan,
+        sharedPending: List<ChatPendingTurn>,
+        snapshot: LocalHarnessState,
+    ) {
+        val subjectKey = com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey(
+            member.galleryId,
+            member.personaId,
+        ) ?: return
+        runCatching {
+            diaryStore.record(
+                ChatDiaryWriteRequest(
+                    subjectKey = subjectKey,
+                    personaName = persona.name,
+                    delta = plan.diaryDelta,
+                    turnSignificance = plan.turnSignificance,
+                    sourceMode = ChatDiarySourceMode.GROUP,
+                    sourceSessionId = snapshot.sessionId,
+                    sourceUserMessageIds = sharedPending.map(ChatPendingTurn::userMessageId),
+                    sourceAssistantMessageIds = sharedPending.map(ChatPendingTurn::assistantMessageId),
+                    evidenceText = sharedPending.joinToString("\n") { turn ->
+                        listOf(turn.userMessage, turn.assistantMessage)
+                            .filter(String::isNotBlank)
+                            .joinToString(" ")
+                    },
+                    generation = snapshot.groupChat.context.generation,
+                ),
+            )
+        }.onSuccess { diary ->
+            if (diary != null) {
+                eventLog.append("group/diary", buildJsonObject {
+                    put("gallery_id", member.galleryId)
+                    put("diary_id", diary.id)
+                    put("importance", diary.importance)
+                    put("status", "recorded")
+                })
+            }
+        }.onFailure { error ->
+            eventLog.append("group/diary", buildJsonObject {
+                put("gallery_id", member.galleryId)
+                put("status", "failed")
+                put("detail", error.message.orEmpty().take(800))
+            })
+        }
+    }
+
     private suspend fun refreshGroupMemberState(
         member: LocalGroupChatMember,
         persona: PersonaProfile,
@@ -285,12 +340,14 @@ internal class LocalGroupChatTurnExecutor(
                 taskLabel = userMessage,
                 step = step,
             )
-            chatTurnCoordinator.parsePostTurn(
+            val plan = chatTurnCoordinator.parsePostTurn(
                 plannerReply.content.orEmpty(),
                 previous = plannerState,
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
-            )?.state
+            ) ?: return null
+            recordGroupDiary(member, persona, plan, sharedPending, snapshot)
+            plan.state
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -336,7 +393,7 @@ internal class LocalGroupChatTurnExecutor(
             appendLine(renderPendingTurnsForPlanner(sharedPending))
             appendLine("每个角色 plan 的 continuity 只能根据以上共享待归并回合更新；私有情绪、关系与互动状态只根据该角色自己的本轮对话更新。")
             appendLine("最终只输出一个 JSON 对象，格式为：")
-            appendLine("""{"plans":[{"galleryId":"人物ID","plan":{"state":{},"suggestions":[],"turnSignificance":"NONE|MINOR|MAJOR"}}]}""")
+            appendLine("""{"plans":[{"galleryId":"人物ID","plan":{"state":{},"suggestions":[],"turnSignificance":"NONE|MINOR|MAJOR","diaryDelta":null或日记对象}}]}""")
             appendLine("每个 plan 必须分别遵循对应角色下面的状态更新规则；suggestions 固定输出空数组，禁止附加解释。")
             replies.forEach { reply ->
                 val memberPrompt = chatTurnCoordinator.postTurnPrompt(
@@ -391,6 +448,7 @@ internal class LocalGroupChatTurnExecutor(
                     userMessage = userMessage,
                     assistantMessage = source.content,
                 ) ?: return@forEach
+                recordGroupDiary(source.member, source.persona, parsed, sharedPending, snapshot)
                 result[galleryId] = parsed.state
             }
             val complete = replies.all { reply -> reply.member.galleryId in result }
@@ -446,6 +504,19 @@ internal class LocalGroupChatTurnExecutor(
             val rotated = members.drop(cursor) + members.take(cursor)
             val responders = groupChatResponders(input, rotated)
             require(responders.isNotEmpty()) { "群聊里还没有可发言的角色" }
+            val groupMemoryContexts = responders.associate { member ->
+                val persona = member.persona.takeUnless {
+                    it.id == PersonaProfile.DEFAULT_PERSONA_ID &&
+                        member.personaId != PersonaProfile.DEFAULT_PERSONA_ID
+                } ?: chatPersonaStore.get(member.personaId)
+                val subjectKey = com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey(
+                    member.galleryId,
+                    member.personaId,
+                )
+                member.galleryId to subjectKey?.let {
+                    chatMemoryContextAction(input, snapshot, it, persona.name)
+                }.orEmpty()
+            }
             val groupPromptTokens = responders.maxOfOrNull { member ->
                 val persona = member.persona.takeUnless {
                     it.id == PersonaProfile.DEFAULT_PERSONA_ID &&
@@ -459,6 +530,7 @@ internal class LocalGroupChatTurnExecutor(
                         allMembers = members,
                         handoffSummary = snapshot.handoffSummary,
                         sharedContext = snapshot.groupChat.context,
+                        memoryContext = groupMemoryContexts[member.galleryId].orEmpty(),
                         announcement = snapshot.groupChat.announcement,
                         mayStaySilent = false,
                         silentToken = GROUP_CHAT_SILENT_TOKEN,
@@ -493,6 +565,7 @@ internal class LocalGroupChatTurnExecutor(
                             input = input,
                             allMembers = members,
                             member = member,
+                            memoryContext = groupMemoryContexts[member.galleryId].orEmpty(),
                             index = index,
                             turnId = turnId,
                         )
