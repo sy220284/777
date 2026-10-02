@@ -447,26 +447,17 @@ internal class ChatDiaryStore(
         updatedAt: Long,
     ): ChatDiaryEntry {
         require(revisions.isNotEmpty())
-        fun latest(selector: (ChatDiaryRevision) -> String, limit: Int): String =
-            revisions.asReversed()
-                .map(selector)
-                .firstOrNull(String::isNotBlank)
-                .orEmpty()
-                .take(limit)
-
+        val current = revisions.last()
         val disclosure = revisions
             .map(ChatDiaryRevision::disclosure)
             .reduce(::stricterDisclosure)
         val sources = revisions.flatMap(ChatDiaryRevision::sources).distinct()
         return entry.copy(
-            event = latest(ChatDiaryRevision::event, MAX_EVENT_CHARS),
-            feeling = latest(ChatDiaryRevision::feeling, MAX_FEELING_CHARS),
-            innerThought = latest(ChatDiaryRevision::innerThought, MAX_THOUGHT_CHARS),
-            relationshipMeaning = latest(
-                ChatDiaryRevision::relationshipMeaning,
-                MAX_RELATIONSHIP_CHARS,
-            ),
-            unresolvedEcho = latest(ChatDiaryRevision::unresolvedEcho, MAX_ECHO_CHARS),
+            event = current.event.take(MAX_EVENT_CHARS),
+            feeling = current.feeling.take(MAX_FEELING_CHARS),
+            innerThought = current.innerThought.take(MAX_THOUGHT_CHARS),
+            relationshipMeaning = current.relationshipMeaning.take(MAX_RELATIONSHIP_CHARS),
+            unresolvedEcho = current.unresolvedEcho.take(MAX_ECHO_CHARS),
             importance = revisions.maxOf(ChatDiaryRevision::importance),
             disclosure = disclosure,
             sources = sources,
