@@ -46,7 +46,11 @@ internal class LocalHarnessSettingsCoordinator(
         preferences.edit().apply {
             if (normalized == null) remove(KEY_WORKER_PROFILE_ID) else putString(KEY_WORKER_PROFILE_ID, normalized)
         }.apply()
-        updateState { it.copy(workerProfileId = normalized) }
+        updateState { current ->
+            current.copy(
+                modelSelection = current.modelSelection.copy(workerProfileId = normalized),
+            )
+        }
     }
 
     fun configurePersonalization(
