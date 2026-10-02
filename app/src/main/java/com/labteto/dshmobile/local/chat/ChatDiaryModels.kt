@@ -27,6 +27,13 @@ data class ChatDiaryDelta(
 )
 
 @Serializable
+data class ChatDiarySourceRef(
+    val sessionId: String,
+    val userMessageId: String = "",
+    val assistantMessageId: String = "",
+)
+
+@Serializable
 data class ChatDiaryEntry(
     val id: String,
     val subjectKey: String,
@@ -39,9 +46,7 @@ data class ChatDiaryEntry(
     val importance: Int = 3,
     val sourceMode: ChatDiarySourceMode = ChatDiarySourceMode.DIRECT,
     val disclosure: ChatDiaryDisclosure = ChatDiaryDisclosure.SHAREABLE,
-    val sourceSessionId: String,
-    val sourceUserMessageIds: List<String> = emptyList(),
-    val sourceAssistantMessageIds: List<String> = emptyList(),
+    val sources: List<ChatDiarySourceRef> = emptyList(),
     val generation: Long = 0L,
     val active: Boolean = true,
     val createdAt: Long,
