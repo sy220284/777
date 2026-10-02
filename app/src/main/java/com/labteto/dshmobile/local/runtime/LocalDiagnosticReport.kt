@@ -62,7 +62,9 @@ internal fun appendLocalDiagnosticDetails(
         append(" feature=").append(event.type.substringBefore('/'))
         append(" type=").append(event.type)
         append(" payload_chars=").append(event.data.toString().length)
-        DIAGNOSTIC_EVENT_KEYS.forEach { key ->
+        (DIAGNOSTIC_EVENT_KEYS + DIAGNOSTIC_EVENT_TYPE_KEYS[event.type].orEmpty())
+            .distinct()
+            .forEach { key ->
             event.data[key]?.toString()?.let { value ->
                 append(" ").append(key).append("=")
                 append(
@@ -181,9 +183,40 @@ private val DIAGNOSTIC_EVENT_KEYS = listOf(
     "omitted_messages",
     "strategy",
     "tool_count",
+    "model_context_window_tokens",
+    "context_generation",
+    "context_prefill_tokens",
+    "context_prefill_source",
+    "plan_mode",
+    "temperature",
+    "credential_binding_valid",
+    "matches_selected_account",
+    "plan_scope_granted",
+    "resource_invoke_granted",
+    "comparison_reusable_tokens",
+    "cache_missed_tokens",
+    "comparison_response_id",
+    "response_id",
+    "extra_request_tokens",
+    "work_steady_state",
+    "history_budget_tokens",
+    "tail_budget_tokens",
+    "round",
+    "trigger",
+    "access",
+    "impact",
     "next_attempt",
     "delay_ms",
     "generation",
+)
+
+private val DIAGNOSTIC_EVENT_TYPE_KEYS = mapOf(
+    "request/header" to listOf("tool_names"),
+    "tool/call" to listOf("id", "name"),
+    "tool/result" to listOf(
+        "id", "name", "is_error", "error_code", "runtime_settlement", "retention",
+    ),
+    "turn/end" to listOf("steps", "messages"),
 )
 
 private const val MAX_DIAGNOSTIC_APP_LOGS = 800
