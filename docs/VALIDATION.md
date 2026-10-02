@@ -150,6 +150,7 @@ android-17-instrumented
 - Work exposure 成功结算以供应商实报 input Token 为准；客户端估算用于准入与未知受理风险，并由实报样本校准。
 - 仅因并发 pending reservation 临时重叠造成的 exposure 超限应等待结算；当前请求在所有 pending 释放后仍无法容纳时才拒绝。
 - 本地 preflight 拒绝必须带稳定 code / failure_kind / admission_state / origin，禁止伪装成供应商模型故障。
+- Work 传输层路由健康必须按物理路由指纹跨 run 共享：连续 3 次可归因传输失败进入冷却；冷却结束只允许一个 half-open 探测；成功清零、探测失败指数延长且上限 15 分钟。用户取消、本地预算/上下文拒绝不得累计路由失败；进程级状态必须有容量和空闲淘汰边界。
 
 当前高风险领域：
 

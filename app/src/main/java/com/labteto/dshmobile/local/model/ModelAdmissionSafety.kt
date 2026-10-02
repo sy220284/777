@@ -134,6 +134,7 @@ internal fun LocalModelException.withoutReplayAfterAdmission(): LocalModelExcept
 internal fun modelFailureKind(error: LocalModelException): String = when {
     error.code == "WORK_BUDGET_EXHAUSTED" -> "local_budget"
     error.code == "MODEL_ROUTE_CIRCUIT_OPEN" -> "route_circuit_open"
+    error.code == "MODEL_ROUTE_CIRCUIT_COOLDOWN" -> "route_circuit_cooldown"
     error.code in setOf("MODEL_CREDENTIAL_MISSING", "NO_MODEL_CREDENTIAL") -> "credential_missing"
     error.code.startsWith("CHATGPT_PLAN_") && (
         error.code.contains("LIMIT") ||

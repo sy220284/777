@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
-import com.labteto.dshmobile.local.model.modelFailureKind
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -207,39 +206,6 @@ internal class LocalWorkExecutionBudget(
     }
 }
 
-/** Per-run route breaker. Only durable account/credential faults stop sibling workers. */
-internal class LocalModelRouteCircuitBreaker {
-    private val openRoutes = linkedMapOf<String, String>()
-
-    @Synchronized
-    fun requireClosed(fingerprint: String) {
-        val reason = openRoutes[fingerprint] ?: return
-        throw LocalModelException(
-            code = "MODEL_ROUTE_CIRCUIT_OPEN",
-            message = "当前模型路由已停止继续请求：$reason",
-            retryable = false,
-        )
-    }
-
-    @Synchronized
-    fun observeFailure(fingerprint: String, error: LocalModelException) {
-        if (isTerminalRouteFailure(error)) {
-            openRoutes.putIfAbsent(fingerprint, error.code)
-        }
-    }
-
-    @Synchronized
-    fun isOpen(fingerprint: String): Boolean = fingerprint in openRoutes
-}
-
-private fun isTerminalRouteFailure(error: LocalModelException): Boolean =
-    modelFailureKind(error) in setOf(
-        "credential_missing",
-        "auth_failed",
-        "auth_forbidden",
-        "account_limit",
-    )
-
 /**
  * Code-only form is kept for workflow-level delegated errors that no longer carry the original
  * exception. Local work budget/timeout errors are intentionally not route failures.
@@ -275,7 +241,7 @@ internal class LocalWorkExecutionControl(
 
 internal suspend fun executeWithModelAdmission(
     control: LocalWorkExecutionControl?,
-    profileId: String,
+    routeFingerprint: String,
     model: String,
     baseUrl: String,
     contextWindowTokensOverride: Int? = null,
@@ -296,10 +262,16 @@ internal suspend fun executeWithModelAdmission(
             retryable = false,
         )
     }
-    control?.circuitBreaker?.requireClosed(profileId)
-    val lease = control?.budget?.reserve(pressure.estimatedInputTokens, profileId)
+    val routePermit = control?.circuitBreaker?.acquire(routeFingerprint)
+    val lease = try {
+        control?.budget?.reserve(pressure.estimatedInputTokens, routeFingerprint)
+    } catch (error: Throwable) {
+        routePermit?.release()
+        throw error
+    }
     try {
         val reply = block()
+        routePermit?.success()
         lease?.commit(reply.usage.promptTokens.takeIf { reply.usage.reported })
         return reply
     } catch (cancelled: CancellationException) {
@@ -308,6 +280,7 @@ internal suspend fun executeWithModelAdmission(
             LocalModelAdmissionState.REJECTED -> lease?.release()
             else -> lease?.commit()
         }
+        routePermit?.release()
         throw cancelled
     } catch (error: LocalModelException) {
         when (error.admissionState) {
@@ -315,10 +288,11 @@ internal suspend fun executeWithModelAdmission(
             LocalModelAdmissionState.REJECTED -> lease?.release()
             else -> lease?.commit()
         }
-        control?.circuitBreaker?.observeFailure(profileId, error)
+        routePermit?.failure(error)
         throw error
     } catch (error: Throwable) {
         lease?.commit()
+        routePermit?.release()
         throw error
     }
 }

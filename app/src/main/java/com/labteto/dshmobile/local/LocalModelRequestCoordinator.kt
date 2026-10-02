@@ -234,6 +234,7 @@ internal class LocalModelRequestCoordinator(
                             "WORK_BUDGET_EXHAUSTED",
                             "MODEL_CONTEXT_BUDGET_EXCEEDED",
                             "MODEL_ROUTE_CIRCUIT_OPEN",
+                            "MODEL_ROUTE_CIRCUIT_COOLDOWN",
                         )
                         AppLog.warn(
                             "LocalModelRequest",
@@ -358,7 +359,7 @@ internal class LocalModelRequestCoordinator(
                         pressureStore.record(snapshot.sessionId, activePressure)
                         executeWithModelAdmission(
                             control = executionControl,
-                            profileId = frozenProfile.id,
+                            routeFingerprint = routeFingerprint,
                             model = frozenProfile.model,
                             baseUrl = frozenProfile.baseUrl,
                             contextWindowTokensOverride = frozenProfile.contextWindowTokensOverride,
