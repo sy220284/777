@@ -393,7 +393,7 @@ internal class LocalGroupChatTurnExecutor(
             appendLine(renderPendingTurnsForPlanner(sharedPending))
             appendLine("每个角色 plan 的 continuity 只能根据以上共享待归并回合更新；私有情绪、关系与互动状态只根据该角色自己的本轮对话更新。")
             appendLine("最终只输出一个 JSON 对象，格式为：")
-            appendLine("""{"plans":[{"galleryId":"人物ID","plan":{"state":{},"suggestions":[],"turnSignificance":"NONE|MINOR|MAJOR","diaryDelta":null或日记对象}}]}""")
+            appendLine("""{"plans":[{"galleryId":"人物ID","plan":{"state":{},"suggestions":[],"turnSignificance":"NONE|MINOR|MAJOR","diaryDelta":null}}]}""")
             appendLine("每个 plan 必须分别遵循对应角色下面的状态更新规则；suggestions 固定输出空数组，禁止附加解释。")
             replies.forEach { reply ->
                 val memberPrompt = chatTurnCoordinator.postTurnPrompt(
