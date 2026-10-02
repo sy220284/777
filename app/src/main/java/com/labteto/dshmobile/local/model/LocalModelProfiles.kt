@@ -495,7 +495,7 @@ object LocalModelPresets {
         val systemPromptUpdateMode = preset?.systemPromptUpdateMode ?: LocalModelPromptUpdateMode.REPLACE
         val toolUpdateMode = preset?.toolUpdateMode ?: LocalModelPromptUpdateMode.REPLACE
         val promptCacheDiagnostics = protocol == LocalModelProtocol.RESPONSES &&
-            supportsResponsesPromptCacheDiagnostics(model)
+            supportsResponsesPromptCacheDiagnostics(model, baseUrl)
         return when (protocol) {
             LocalModelProtocol.CHAT_COMPLETIONS -> LocalModelRuntimeCapabilities(
                 structuredOutput = false,
@@ -535,9 +535,14 @@ object LocalModelPresets {
     }
 }
 
-internal fun supportsResponsesPromptCacheDiagnostics(model: String): Boolean {
+internal fun supportsResponsesPromptCacheDiagnostics(model: String, baseUrl: String): Boolean {
+    val officialOpenAi = runCatching {
+        URI(normalizeModelBaseUrl(baseUrl)).host.equals("api.openai.com", ignoreCase = true)
+    }.getOrDefault(false)
+    if (!officialOpenAi) return false
+
     val normalized = model.trim().lowercase()
-    val match = Regex("""^gpt-(\\d+)\\.(\\d+)(?:[.-].*)?$""").find(normalized) ?: return false
+    val match = Regex("""^gpt-(\d+)\.(\d+)(?:[.-].*)?$""").find(normalized) ?: return false
     val major = match.groupValues[1].toIntOrNull() ?: return false
     val minor = match.groupValues[2].toIntOrNull() ?: return false
     return major > 5 || (major == 5 && minor >= 6)
