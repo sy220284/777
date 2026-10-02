@@ -654,6 +654,8 @@
     <string name="local_model_preset_hint">选预设后只需填写密钥，也可接入自定义兼容接口。</string>
     <string name="local_model_choose">选择模型</string>
     <string name="local_model_custom">自定义兼容接口</string>
+    <string name="local_model_context_window">上下文窗口 Token</string>
+    <string name="local_model_context_window_hint">仅用于未知自定义模型；留空使用安全默认值，允许 4096–16000000。</string>
     <string name="local_model_keep_key">留空会沿用此模型已保存的密钥。</string>
     <string name="local_model_test">检测连通性</string>
     <string name="local_model_testing">正在检测…</string>
