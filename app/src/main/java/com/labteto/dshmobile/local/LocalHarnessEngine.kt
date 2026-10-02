@@ -56,7 +56,6 @@ import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
-import com.labteto.dshmobile.local.chat.MAX_CHAT_DIARY_ENTRIES
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.chatPostTurnModelMessages
@@ -1206,8 +1205,7 @@ class LocalHarnessEngine @Inject constructor(
     /** Generate reply suggestions only on explicit user request. */
     internal suspend fun generateReplySuggestions(): Boolean =
         replySuggestionCoordinator.generate()
-    internal fun chatDiaryEntries(subjectKey: String, limit: Int = MAX_CHAT_DIARY_ENTRIES) =
-        chatDiaryStore.listActive(subjectKey, limit)
+    internal fun chatDiaryEntries(subjectKey: String, limit: Int) = chatDiaryStore.listActive(subjectKey, limit)
 
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult {
