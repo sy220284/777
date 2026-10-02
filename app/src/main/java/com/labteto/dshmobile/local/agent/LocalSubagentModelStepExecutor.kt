@@ -93,6 +93,13 @@ internal class LocalSubagentModelStepExecutor(
                         operationalLimitTokens = operationalInputLimitTokens(model, baseUrl),
                         modelContextWindowTokens = documentedContextWindowTokens(model, baseUrl),
                     )
+                    if (pressure.estimatedInputTokens > pressure.operationalLimitTokens) {
+                        throw LocalModelException(
+                            code = "MODEL_CONTEXT_BUDGET_EXCEEDED",
+                            message = "子代理预计输入 ${pressure.estimatedInputTokens} token，超过当前路由安全上限 ${pressure.operationalLimitTokens}",
+                            retryable = false,
+                        )
+                    }
                     routeCircuitBreaker?.requireClosed(profile.id)
                     val budgetLease = executionBudget?.reserve(pressure.estimatedInputTokens)
                     try {
