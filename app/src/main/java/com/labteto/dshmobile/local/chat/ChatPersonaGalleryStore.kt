@@ -328,10 +328,17 @@ class ChatPersonaGalleryStore internal constructor(
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return 0
         val story = current.stories.firstOrNull { it.id == storyId } ?: return 0
-        val removed = story.history.count { galleryMessageArchiveKey(it) in keys }
+        val removed = keys.count { key -> historyStore.deleteMessage(id, storyId, key) }
+        val refreshedHistory = historyStore.tail(
+            id,
+            storyId,
+            PersonaGalleryHistoryStore.HOT_GALLERY_HISTORY_MESSAGES,
+        )
         val now = System.currentTimeMillis()
         val updatedStory = story.copy(
-            history = story.history.filterNot { galleryMessageArchiveKey(it) in keys },
+            history = refreshedHistory.messages,
+            historyTotalCount = refreshedHistory.totalCount,
+            historyArchived = true,
             excludedMessageKeys = mergePersonaLines(
                 story.excludedMessageKeys,
                 keys.toList(),
@@ -415,6 +422,7 @@ class ChatPersonaGalleryStore internal constructor(
         val doc = readNormalized()
         if (doc.entries.none { it.id == id }) return false
         write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == id }))
+        historyStore.deleteEntry(id)
         return true
     }
 
@@ -428,6 +436,7 @@ class ChatPersonaGalleryStore internal constructor(
             updatedAt = System.currentTimeMillis(),
         )
         write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        historyStore.deleteStory(id, storyId)
         return true
     }
 
@@ -436,9 +445,23 @@ class ChatPersonaGalleryStore internal constructor(
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return false
         val story = current.stories.firstOrNull { it.id == storyId } ?: return false
-        val updatedStory = removeArchivedGalleryMessage(story, messageKey)
-            ?.copy(updatedAt = System.currentTimeMillis())
-            ?: return false
+        if (!historyStore.deleteMessage(id, storyId, messageKey)) return false
+        val refreshed = historyStore.tail(
+            id,
+            storyId,
+            PersonaGalleryHistoryStore.HOT_GALLERY_HISTORY_MESSAGES,
+        )
+        val updatedStory = story.copy(
+            history = refreshed.messages,
+            historyTotalCount = refreshed.totalCount,
+            historyArchived = true,
+            excludedMessageKeys = mergePersonaLines(
+                story.excludedMessageKeys,
+                listOf(messageKey),
+                MAX_GALLERY_EXCLUDED_MESSAGE_KEYS,
+            ),
+            updatedAt = System.currentTimeMillis(),
+        )
         val updated = current.copy(
             stories = current.stories.map { if (it.id == storyId) updatedStory else it },
             updatedAt = updatedStory.updatedAt,
@@ -526,10 +549,29 @@ class ChatPersonaGalleryStore internal constructor(
 
     private fun readNormalized(): GalleryDocument {
         val raw = read()
-        val entries = if (raw.version < 4) {
+        val migratedEntries = if (raw.version < 4) {
             compactLegacyDuplicateGalleryEntries(raw.entries)
         } else {
             raw.entries.map(::migrateLegacyEntry)
+        }
+        val entries = migratedEntries.map { entry ->
+            entry.copy(
+                stories = entry.stories.map { story ->
+                    if (story.historyArchived) {
+                        story.copy(
+                            history = story.history.takeLast(PersonaGalleryHistoryStore.HOT_GALLERY_HISTORY_MESSAGES),
+                            historyTotalCount = maxOf(story.historyTotalCount, story.history.size),
+                        )
+                    } else {
+                        val archive = historyStore.migrateIfNeeded(entry.id, story.id, story.history)
+                        story.copy(
+                            history = archive.messages,
+                            historyTotalCount = archive.totalCount,
+                            historyArchived = true,
+                        )
+                    }
+                },
+            )
         }
         val normalized = raw.copy(version = 4, entries = entries)
         if (normalized != raw) write(normalized)
@@ -549,13 +591,27 @@ class ChatPersonaGalleryStore internal constructor(
     }
 
     private fun write(doc: GalleryDocument) {
-        val encoded = json.encodeToString(GalleryDocument.serializer(), doc)
+        val hotDocument = doc.copy(
+            entries = doc.entries.map { entry ->
+                entry.copy(
+                    stories = entry.stories.map { story ->
+                        story.copy(
+                            history = story.history
+                                .filter { it.role == "user" || it.role == "assistant" }
+                                .takeLast(PersonaGalleryHistoryStore.HOT_GALLERY_HISTORY_MESSAGES),
+                            historyTotalCount = maxOf(story.historyTotalCount, story.history.size),
+                        )
+                    },
+                )
+            },
+        )
+        val encoded = json.encodeToString(GalleryDocument.serializer(), hotDocument)
         durableFile.write(encoded) { candidate ->
             runCatching {
                 json.decodeFromString(GalleryDocument.serializer(), candidate)
             }.isSuccess
         }
-        cachedDocument = doc
+        cachedDocument = hotDocument
         cachedStamp = documentStamp()
     }
 
