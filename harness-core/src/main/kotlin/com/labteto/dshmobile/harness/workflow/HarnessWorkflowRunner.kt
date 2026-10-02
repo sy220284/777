@@ -64,6 +64,7 @@ class HarnessWorkflowRunner(
             { _, _, output -> HarnessWorkflowAcceptance(output.isNotBlank(), "子任务没有产出") },
         maxAttempts: Int = 1,
         onProgress: (HarnessWorkflowProgress) -> Unit = {},
+        shouldRetryError: (Exception) -> Boolean = { true },
         execute: suspend (index: Int, task: String, previousOutput: String?) -> String,
     ): List<HarnessWorkflowTaskResult> {
         require(maxAttempts in 1..3) { "工作流尝试次数必须在 1..3 之间" }
@@ -73,8 +74,8 @@ class HarnessWorkflowRunner(
             .take(maxTasks)
         require(clean.isNotEmpty()) { "工作流至少需要一个子任务" }
         return when (mode) {
-            HarnessWorkflowMode.PARALLEL -> runParallel(clean, execute, accept, maxAttempts, onProgress)
-            HarnessWorkflowMode.PIPELINE -> runPipeline(clean, execute, accept, maxAttempts, onProgress)
+            HarnessWorkflowMode.PARALLEL -> runParallel(clean, execute, accept, maxAttempts, onProgress, shouldRetryError)
+            HarnessWorkflowMode.PIPELINE -> runPipeline(clean, execute, accept, maxAttempts, onProgress, shouldRetryError)
         }
     }
 
@@ -88,6 +89,7 @@ class HarnessWorkflowRunner(
         accept: suspend (Int, String, String) -> HarnessWorkflowAcceptance,
         maxAttempts: Int,
         onProgress: (HarnessWorkflowProgress) -> Unit,
+        shouldRetryError: (Exception) -> Boolean,
     ): HarnessWorkflowTaskResult {
         var feedback = ""
         for (attempt in 1..maxAttempts) {
@@ -105,6 +107,7 @@ class HarnessWorkflowRunner(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                if (!shouldRetryError(error)) throw error
                 feedback = (error.message ?: error::class.java.simpleName).take(500)
             }
         }
@@ -117,6 +120,7 @@ class HarnessWorkflowRunner(
         accept: suspend (Int, String, String) -> HarnessWorkflowAcceptance,
         maxAttempts: Int,
         onProgress: (HarnessWorkflowProgress) -> Unit,
+        shouldRetryError: (Exception) -> Boolean,
     ): List<HarnessWorkflowTaskResult> = coroutineScope {
         val semaphore = Semaphore(maxParallelism.coerceAtMost(tasks.size))
         val progressLock = Any()
@@ -124,7 +128,7 @@ class HarnessWorkflowRunner(
         tasks.mapIndexed { index, task ->
             async {
                 semaphore.withPermit {
-                    val result = runTask(index, task, null, tasks.size, { synchronized(progressLock) { completed } }, execute, accept, maxAttempts, onProgress)
+                    val result = runTask(index, task, null, tasks.size, { synchronized(progressLock) { completed } }, execute, accept, maxAttempts, onProgress, shouldRetryError)
                     synchronized(progressLock) {
                         completed++
                         onProgress(HarnessWorkflowProgress(index, task, if (result.succeeded) "已完成" else "受阻", completed, tasks.size, result.error.orEmpty()))
@@ -141,11 +145,12 @@ class HarnessWorkflowRunner(
         accept: suspend (Int, String, String) -> HarnessWorkflowAcceptance,
         maxAttempts: Int,
         onProgress: (HarnessWorkflowProgress) -> Unit,
+        shouldRetryError: (Exception) -> Boolean,
     ): List<HarnessWorkflowTaskResult> {
         val results = mutableListOf<HarnessWorkflowTaskResult>()
         var previous: String? = null
         for ((index, task) in tasks.withIndex()) {
-            val result = runTask(index, task, previous, tasks.size, { results.size }, execute, accept, maxAttempts, onProgress)
+            val result = runTask(index, task, previous, tasks.size, { results.size }, execute, accept, maxAttempts, onProgress, shouldRetryError)
             results += result
             onProgress(HarnessWorkflowProgress(index, task, if (result.succeeded) "已完成" else "受阻", results.size, tasks.size, result.error.orEmpty()))
             if (!result.succeeded) break
