@@ -57,6 +57,35 @@ class LocalWorkRequestContextProjectionTest {
     }
 
     @Test
+    fun steadyStateBudgetTightensExistingPersistentCompactionOnlyAfterTrigger() {
+        val base = LocalHistoryBudget(
+            maxHistoryChars = 500_000,
+            tailChars = 240_000,
+            maxSummaryChars = 16_000,
+            maxToolResultChars = 50_000,
+            maxHistoryTokens = 678_464,
+            tailTokens = 160_000,
+            maxToolResultTokens = 16_000,
+        )
+
+        val small = workSteadyStateHistoryBudget(
+            base = base,
+            currentHistoryTokens = 40_000,
+            extraTokens = 10_000,
+        )
+        assertEquals(base, small)
+
+        val large = workSteadyStateHistoryBudget(
+            base = base,
+            currentHistoryTokens = 70_000,
+            extraTokens = 20_000,
+        )
+        assertEquals(64_000, large.maxHistoryTokens)
+        assertTrue(requireNotNull(large.tailTokens) <= 24_000)
+        assertTrue(large.maxToolResultTokens <= 8_000)
+    }
+
+    @Test
     fun targetAndTriggerStayInsideSmallModelOperationalLimit() {
         val limit = 16_000
         val target = workRequestProjectionTargetTokens(limit)
