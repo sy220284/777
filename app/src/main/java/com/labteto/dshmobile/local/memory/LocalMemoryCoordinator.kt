@@ -111,7 +111,7 @@ internal class LocalMemoryCoordinator(
         if (subjectKey.isNullOrBlank()) return ""
         if (viewerSubjectKey == null && snapshot.chatPersona.isUnboundChatPersona()) return ""
 
-        val recallFacts = ChatMemorySelector.shouldRecall(query)
+        val recallFacts = !groupAudience && ChatMemorySelector.shouldRecall(query)
         val recallDiary = shouldRecallDiary(query)
         if (!recallFacts && !recallDiary) return ""
 
