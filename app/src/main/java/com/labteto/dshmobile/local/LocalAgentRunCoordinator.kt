@@ -262,6 +262,16 @@ internal class LocalAgentRunCoordinator(
             baseUrl = data["base_url"]?.jsonPrimitive?.contentOrNull.orEmpty(),
         ).takeIf { version >= 2 && !it.profileId.isNullOrBlank() }
 
+        val requiresExecutableRecovery =
+            status == LocalAgentRunCheckpointStatus.RUNNING.name.lowercase() ||
+                status == LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase()
+        if (version < 2 && requiresExecutableRecovery) {
+            return LocalAgentRunRecoveryDecision(
+                runId = runId,
+                blockedReason = "上次任务来自旧版检查点，缺少完整模型路由身份，已停止自动续跑。请手动确认后继续。",
+            )
+        }
+
         if (status == LocalAgentRunCheckpointStatus.COMPLETED.name.lowercase()) {
             if (kind == LocalAgentRunKind.FOREGROUND) return null
             return LocalAgentRunRecoveryDecision(
