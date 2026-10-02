@@ -5,9 +5,33 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import java.util.WeakHashMap
 
 private val pendingTurnJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 private const val PENDING_EVENT = "chat/pending-turn"
+
+private data class PendingBatchCacheKey(
+    val processedThroughSequence: Long,
+    val upper: Long,
+    val generation: Long,
+    val scope: String,
+    val wanted: Int,
+    val activeBranchIds: Set<String>?,
+)
+
+private object PendingBatchRetryCache {
+    private val entries = WeakHashMap<LocalSessionEventLog, Pair<PendingBatchCacheKey, List<ChatPendingTurn>>>()
+
+    @Synchronized
+    fun get(log: LocalSessionEventLog, key: PendingBatchCacheKey): List<ChatPendingTurn>? =
+        entries[log]?.takeIf { it.first == key }?.second
+
+    @Synchronized
+    fun put(log: LocalSessionEventLog, key: PendingBatchCacheKey, value: List<ChatPendingTurn>) {
+        entries[log] = key to value
+    }
+}
+
 
 /** Full facts stay durable; the context only carries a small request-time window. */
 internal fun ChatContextState.enqueuePendingDurably(
@@ -45,13 +69,23 @@ internal fun ChatContextState.loadPendingBatch(
 ): List<ChatPendingTurn> {
     val upper = maxOf(pendingThroughSequence, pendingTurns.maxOfOrNull { it.sequence } ?: -1L)
     if (upper <= processedThroughSequence) return emptyList()
+    val wanted = limit.coerceIn(1, 64)
+    val cacheKey = PendingBatchCacheKey(
+        processedThroughSequence = processedThroughSequence,
+        upper = upper,
+        generation = generation,
+        scope = scope,
+        wanted = wanted,
+        activeBranchIds = activeBranchMessageIds?.toSet(),
+    )
+    PendingBatchRetryCache.get(eventLog, cacheKey)?.let { return it }
+
     val candidates = linkedMapOf<Pair<Long, String>, ChatPendingTurn>()
     fun collect(turn: ChatPendingTurn) {
         if (turn.sequence <= processedThroughSequence || turn.sequence > upper) return
         if (activeBranchMessageIds != null && turn.branchHeadId.isNotBlank() && turn.assistantMessageId !in activeBranchMessageIds) return
         candidates.putIfAbsent(turn.sequence to turn.assistantMessageId, turn.copy(generation = generation))
     }
-    val wanted = limit.coerceIn(1, 64)
     val scanThrough = eventLog.latestSequence()
     var cursor = processedThroughSequence
     while (cursor < scanThrough) {
@@ -78,7 +112,9 @@ internal fun ChatContextState.loadPendingBatch(
         collect(turn)
         if (candidates.size > wanted) candidates.remove(candidates.keys.maxBy { it.first })
     }
-    return candidates.values.sortedBy(ChatPendingTurn::sequence).take(limit.coerceIn(1, 64))
+    return candidates.values.sortedBy(ChatPendingTurn::sequence).take(wanted).also { batch ->
+        PendingBatchRetryCache.put(eventLog, cacheKey, batch)
+    }
 }
 
 /** A continuation owns a new log and must import unfinished facts using that log's sequences. */
