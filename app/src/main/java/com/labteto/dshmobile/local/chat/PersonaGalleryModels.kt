@@ -18,7 +18,9 @@ data class PersonaGalleryStory(
     val id: String,
     val title: String = "",
     val notes: String = "",
+    /** Recent hot window only. Complete dialogue is stored in the per-story cold archive. */
     val history: List<LocalHarnessMessage> = emptyList(),
+    val historyTotalCount: Int = history.size,
     val chatState: ChatCharacterState = ChatCharacterState(),
     val sourceSessionIds: List<String> = emptyList(),
     val excludedMessageKeys: List<String> = emptyList(),
@@ -94,7 +96,10 @@ data class PersonaGalleryEntry(
         story(storyId)?.context(persona.name).orEmpty()
 
     fun totalDialogueCount(): Int = stories.sumOf { story ->
-        story.history.count { it.role == "user" || it.role == "assistant" }
+        maxOf(
+            story.historyTotalCount,
+            story.history.count { it.role == "user" || it.role == "assistant" },
+        )
     }
 }
 
