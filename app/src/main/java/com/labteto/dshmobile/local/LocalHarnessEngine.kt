@@ -4039,7 +4039,7 @@ class LocalHarnessEngine @Inject constructor(
                 query = args.optionalString("query").orEmpty(),
             )
             "network_diagnose" -> web.diagnose(args.string("url"))
-            "environment_info" -> environmentInfo(binding)
+            "environment_info" -> environmentInfoCoordinator.build(binding)
             "capability_search" -> if (binding == null) {
                 searchCapabilities(args.string("query"))
             } else {
@@ -4879,9 +4879,6 @@ class LocalHarnessEngine @Inject constructor(
             else -> chatSystemPrompt()
         }
     }
-
-    private fun environmentInfo(binding: LocalWorkRunBinding? = null): String =
-        environmentInfoCoordinator.build(binding)
 
     private suspend fun load() {
         val storedModel = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
