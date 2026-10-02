@@ -100,19 +100,12 @@ fun ChatScreen(
     val sessions by store.sessions.collectAsStateWithLifecycle()
     val models by store.models.collectAsStateWithLifecycle()
     val modelsLoading by store.modelsLoading.collectAsStateWithLifecycle()
-    val skills by store.skills.collectAsStateWithLifecycle()
-    val skillsLoading by store.skillsLoading.collectAsStateWithLifecycle()
     val commands by store.commands.collectAsStateWithLifecycle()
-    val commandsAvailable by store.commandsAvailable.collectAsStateWithLifecycle()
-    val subagents by store.subagents.collectAsStateWithLifecycle()
-    val subagentConversation by store.subagentConversation.collectAsStateWithLifecycle()
-    val subagentMode by store.subagentMode.collectAsStateWithLifecycle()
     val connectionError by store.connectionError.collectAsStateWithLifecycle()
     val pendingApproval by store.pendingApproval.collectAsStateWithLifecycle()
     val pendingQuestions by store.pendingQuestions.collectAsStateWithLifecycle()
     val permissions by store.permissions.collectAsStateWithLifecycle()
     val pendingPermission by store.pendingPermission.collectAsStateWithLifecycle()
-    val agentPresets by store.agentPresets.collectAsStateWithLifecycle()
     val contextBreakdown by store.contextBreakdown.collectAsStateWithLifecycle()
     val contextPressure by store.contextPressure.collectAsStateWithLifecycle()
     val imageLimits by store.imageLimits.collectAsStateWithLifecycle()
@@ -547,7 +540,12 @@ fun ChatScreen(
             },
             onDismiss = { sheet = null },
         )
-        ChatSheet.Commands -> CommandSheet(
+        ChatSheet.Commands -> {
+            val commandsAvailable by store.commandsAvailable.collectAsStateWithLifecycle()
+            val skills by store.skills.collectAsStateWithLifecycle()
+            val skillsLoading by store.skillsLoading.collectAsStateWithLifecycle()
+            val subagents by store.subagents.collectAsStateWithLifecycle()
+            CommandSheet(
             commands = commands,
             commandsAvailable = commandsAvailable,
             skills = skills,
@@ -582,22 +580,31 @@ fun ChatScreen(
             },
             onPrefillDraft = { prefix -> draft = prefix },
             onDismiss = { sheet = null },
-        )
+            )
+        }
         ChatSheet.Models -> ModelsSheet(models = models, store = store, onDismiss = { sheet = null })
-        ChatSheet.Presets -> PresetsSheet(
+        ChatSheet.Presets -> {
+            val agentPresets by store.agentPresets.collectAsStateWithLifecycle()
+            PresetsSheet(
             presets = agentPresets,
             currentPreset = currentSession?.agentPreset,
             sessionBlank = currentSession?.blank ?: false,
             store = store,
             onDismiss = { sheet = null },
-        )
-        ChatSheet.Subagents -> SubagentsSheet(
-            store = store,
-            entries = subagents,
-            conversation = subagentConversation,
-            mode = subagentMode,
-            onDismiss = { sheet = null },
-        )
+            )
+        }
+        ChatSheet.Subagents -> {
+            val subagents by store.subagents.collectAsStateWithLifecycle()
+            val subagentConversation by store.subagentConversation.collectAsStateWithLifecycle()
+            val subagentMode by store.subagentMode.collectAsStateWithLifecycle()
+            SubagentsSheet(
+                store = store,
+                entries = subagents,
+                conversation = subagentConversation,
+                mode = subagentMode,
+                onDismiss = { sheet = null },
+            )
+        }
         null -> Unit
     }
 }
