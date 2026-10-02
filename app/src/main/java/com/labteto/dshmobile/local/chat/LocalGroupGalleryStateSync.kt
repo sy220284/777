@@ -1,127 +1,49 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
-import java.util.UUID
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
+import com.labteto.dshmobile.local.chat.ChatSceneState
 
-private const val LOCAL_GROUP_GALLERY_STATE_SYNC_EVENT = "group/gallery-state-sync"
-
-@Serializable
-private data class LocalGroupGalleryStateSyncPlan(
-    val syncId: String,
+internal data class LocalGroupGalleryProjectionFailure(
     val galleryId: String,
-    val chatState: ChatCharacterState,
+    val detail: String,
 )
 
-private val groupGalleryStateSyncJson = Json {
-    ignoreUnknownKeys = true
-    encodeDefaults = true
-}
+internal data class LocalGroupGalleryProjectionResult(
+    val projected: Int,
+    val failures: List<LocalGroupGalleryProjectionFailure>,
+)
 
 /**
- * Cross-store compensation boundary for Session -> Persona Gallery group state.
+ * Project the durable Session member state into Persona Gallery.
  *
- * The pending event is durable before the Gallery write. Re-applying the same state is idempotent,
- * so a crash after the Gallery write but before the applied marker is safe to recover.
+ * Session is the source of truth. Gallery is a cross-session projection, so recovery simply
+ * re-applies the current Session state instead of replaying a second pending/applied state machine.
  */
-internal fun persistGroupGalleryStateWithCompensation(
-    eventLog: LocalSessionEventLog,
+internal fun projectGroupGalleryState(
+    groupChat: LocalGroupChatState,
     galleryStore: ChatPersonaGalleryStore,
-    galleryId: String,
-    chatState: ChatCharacterState,
-): Boolean {
-    val plan = LocalGroupGalleryStateSyncPlan(
-        syncId = UUID.randomUUID().toString(),
-        galleryId = galleryId,
-        chatState = chatState,
-    )
-    appendGroupGalleryStateSync(eventLog, plan, "pending")
-    return try {
-        galleryStore.updateGroupChatState(galleryId, chatState)
-        appendGroupGalleryStateSync(eventLog, plan, "applied")
-        true
-    } catch (error: Exception) {
-        appendGroupGalleryStateSync(
-            eventLog = eventLog,
-            plan = plan,
-            status = "failed",
-            detail = error.message,
+): LocalGroupGalleryProjectionResult {
+    if (!groupChat.enabled) return LocalGroupGalleryProjectionResult(0, emptyList())
+
+    var projected = 0
+    val failures = mutableListOf<LocalGroupGalleryProjectionFailure>()
+    groupChat.members.forEach { member ->
+        if (member.galleryId.isBlank() || member.chatState.updatedAt <= 0L) return@forEach
+        val privateState = member.chatState.copy(
+            scene = ChatSceneState(),
+            continuity = ChatContinuityState(),
         )
-        false
-    }
-}
-
-/** Replay every durable pending Gallery projection that has no later applied marker. */
-internal fun recoverPendingGroupGalleryStateSync(
-    eventLog: LocalSessionEventLog,
-    galleryStore: ChatPersonaGalleryStore,
-): Int {
-    val pending = linkedMapOf<String, Pair<Long, LocalGroupGalleryStateSyncPlan>>()
-    eventLog.events().forEach { event ->
-        if (event.type != LOCAL_GROUP_GALLERY_STATE_SYNC_EVENT) return@forEach
-        val syncId = event.data["sync_id"]?.jsonPrimitive?.contentOrNull ?: return@forEach
-        when (event.data["status"]?.jsonPrimitive?.contentOrNull) {
-            "pending" -> decodeGroupGalleryStateSync(event.data)?.let { plan ->
-                pending[syncId] = event.sequence to plan
-            }
-            "applied" -> pending.remove(syncId)
-        }
-    }
-
-    var recovered = 0
-    pending.values.sortedBy { it.first }.forEach { (_, plan) ->
         try {
-            galleryStore.updateGroupChatState(plan.galleryId, plan.chatState)
-            appendGroupGalleryStateSync(eventLog, plan, "applied")
-            recovered += 1
+            if (galleryStore.updateGroupChatState(member.galleryId, privateState) != null) {
+                projected += 1
+            }
         } catch (error: Exception) {
-            appendGroupGalleryStateSync(
-                eventLog = eventLog,
-                plan = plan,
-                status = "failed",
-                detail = error.message,
+            failures += LocalGroupGalleryProjectionFailure(
+                galleryId = member.galleryId,
+                detail = error.message.orEmpty().take(1_000),
             )
         }
     }
-    return recovered
-}
-
-private fun appendGroupGalleryStateSync(
-    eventLog: LocalSessionEventLog,
-    plan: LocalGroupGalleryStateSyncPlan,
-    status: String,
-    detail: String? = null,
-) {
-    eventLog.append(LOCAL_GROUP_GALLERY_STATE_SYNC_EVENT, buildJsonObject {
-        put("sync_id", plan.syncId)
-        put("gallery_id", plan.galleryId)
-        put("status", status)
-        if (status == "pending") {
-            put(
-                "plan",
-                groupGalleryStateSyncJson.encodeToJsonElement(
-                    LocalGroupGalleryStateSyncPlan.serializer(),
-                    plan,
-                ),
-            )
-        }
-        detail?.takeIf(String::isNotBlank)?.let { put("detail", it.take(1_000)) }
-    })
-}
-
-private fun decodeGroupGalleryStateSync(data: JsonObject): LocalGroupGalleryStateSyncPlan? {
-    val encoded = data["plan"] as? JsonObject ?: return null
-    return runCatching {
-        groupGalleryStateSyncJson.decodeFromJsonElement(
-            LocalGroupGalleryStateSyncPlan.serializer(),
-            encoded,
-        )
-    }.getOrNull()
+    return LocalGroupGalleryProjectionResult(projected, failures)
 }
