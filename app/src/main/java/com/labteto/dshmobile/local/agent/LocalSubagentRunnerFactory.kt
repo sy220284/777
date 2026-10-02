@@ -49,6 +49,7 @@ internal class LocalSubagentRunnerFactory(
             enabledOptionalTools: MutableSet<String>,
         ) -> AgentToolResult,
         historySnapshot: () -> List<kotlinx.serialization.json.JsonObject> = modelHistory::snapshot,
+        executionControl: LocalWorkExecutionControl? = null,
     ): LocalSubagentRunner {
         val boundEventLog = eventLogFor(sessionId)
         val boundMemoryTools = LocalMemoryTools(
@@ -81,6 +82,7 @@ internal class LocalSubagentRunnerFactory(
             runSessionId = { sessionId },
             runKind = runKind,
             historySnapshotProvider = historySnapshot,
+            executionControl = executionControl,
         )
     }
 
@@ -94,6 +96,7 @@ internal class LocalSubagentRunnerFactory(
         runSessionId: () -> String = defaultSessionId,
         runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
         historySnapshotProvider: () -> List<kotlinx.serialization.json.JsonObject> = modelHistory::snapshot,
+        executionControl: LocalWorkExecutionControl? = null,
     ): LocalSubagentRunner = LocalSubagentRunner(
         modelGateway = modelGateway,
         state = runnerState,
@@ -121,15 +124,11 @@ internal class LocalSubagentRunnerFactory(
         acquireVirtualScreen = { owner -> virtualDisplayProvider.acquireAgentVirtualDisplay(owner) },
         releaseVirtualScreen = virtualDisplayProvider::releaseAgentVirtualDisplay,
         historyBudget = { baseUrl, model ->
-            localHistoryBudgetFor(
-                memoryClassMb = memoryClassMb,
-                pressure = resourceScheduler.snapshot().pressure,
-                model = model,
-                baseUrl = baseUrl,
-            )
+            localHistoryBudgetFor(memoryClassMb, resourceScheduler.snapshot().pressure, model, baseUrl)
         },
         runCoordinator = agentRunCoordinator,
         runSessionId = runSessionId,
         runKind = runKind,
+        executionControl = executionControl,
     )
 }

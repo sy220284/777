@@ -583,6 +583,7 @@ class LocalModelException(
 
 internal fun contextWindowExceeded(error: Throwable): Boolean {
     val modelError = error as? LocalModelException ?: return false
+    if (modelError.code == "MODEL_CONTEXT_BUDGET_EXCEEDED") return true
     if (modelError.code !in setOf("MODEL_HTTP_400", "MODEL_HTTP_413", "MODEL_HTTP_422")) {
         return false
     }
@@ -785,6 +786,7 @@ object LocalToolCatalog {
                 put("description", "可选；与 tasks 逐项对应的产出中必须出现的可核对原文。不提供时仅检查产出非空。")
                 put("items", buildJsonObject { put("type", "string") })
             },
+            "model" to string("可选；子任务使用的模型档案编号或模型名。留空时按 Worker 路由策略选择。"),
         ), listOf("tasks")))
         add(tool("session_event_search", "分页搜索当前会话的追加式事件日志；单页结果受上下文安全上限约束", properties(
             "query" to string("搜索内容"),

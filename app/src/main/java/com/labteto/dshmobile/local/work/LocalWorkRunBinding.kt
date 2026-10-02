@@ -28,6 +28,8 @@ internal class LocalWorkRunBinding(
     val pendingInputs = AgentInputQueue(maxPendingInputs)
     val interactions = LocalInteractionCoordinator(state)
     val enabledOptionalTools = linkedSetOf<String>()
+    /** Main Agent and every child spawned by this Work run share one admission budget and breaker. */
+    val executionControl = LocalWorkExecutionControl()
 
     @Volatile
     var transcriptProjectionCursor: Long? = initialTranscriptProjectionCursor
@@ -40,6 +42,13 @@ internal class LocalWorkRunBinding(
 
     @Volatile
     var turnsSinceModelHistoryCheckpoint: Int = 0
+
+    /** At most one automatic continuation is allowed for an admitted Responses stream interruption. */
+    @Volatile
+    var automaticContinuationCount: Int = 0
+
+    @Volatile
+    var continuationParentRunId: String? = null
 
     val transcriptRuntime = LocalTranscriptRuntime(
         state = state,

@@ -39,6 +39,7 @@ internal data class LocalModelAdapterRequest(
     val messages: List<LocalCanonicalMessage>,
     val tools: List<LocalCanonicalToolDefinition>,
     val temperature: Double?,
+    val promptCacheComparisonResponseId: String? = null,
 )
 
 internal interface LocalModelAdapter {
@@ -120,6 +121,7 @@ internal class OpenAiResponsesAdapter @Inject constructor(
             tools = tools,
             temperature = request.temperature,
             planSharing = request.route.authKind == LocalModelAuthKind.CHATGPT_PLAN,
+            promptCacheComparisonResponseId = request.promptCacheComparisonResponseId,
             onDelta = if (streaming) onDelta else { _: LocalModelDelta -> },
         )
         return LocalCanonicalModelCodec.canonicalizeReply(reply, id, request.route.fingerprint)

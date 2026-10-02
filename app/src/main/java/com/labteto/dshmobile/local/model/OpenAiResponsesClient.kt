@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.DeepSeekTokenUsage
 import com.labteto.dshmobile.local.LocalModelDelta
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.LocalModelReply
+import com.labteto.dshmobile.local.LocalPromptCacheDiagnostic
 import com.labteto.dshmobile.local.LocalToolCall
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.estimatePromptBreakdown
@@ -57,6 +58,7 @@ class OpenAiResponsesClient @Inject constructor(
         tools: JsonArray,
         temperature: Double? = null,
         planSharing: Boolean,
+        promptCacheComparisonResponseId: String? = null,
         onDelta: (LocalModelDelta) -> Unit = {},
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
@@ -69,6 +71,7 @@ class OpenAiResponsesClient @Inject constructor(
             planSharing = planSharing,
             includeEncryptedReasoning = openAiContract,
             enforceOpenAiToolSchema = openAiContract,
+            promptCacheComparisonResponseId = promptCacheComparisonResponseId,
         )
         validateRequestPayload(payload)
         val request = Request.Builder()
@@ -243,12 +246,18 @@ class OpenAiResponsesClient @Inject constructor(
         planSharing: Boolean = true,
         includeEncryptedReasoning: Boolean = true,
         enforceOpenAiToolSchema: Boolean = planSharing,
+        promptCacheComparisonResponseId: String? = null,
     ): JsonObject = buildJsonObject {
         put("model", model)
         responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
         put("input", responseInput(messages))
         put("store", false)
         put("stream", true)
+        promptCacheComparisonResponseId?.trim()?.takeIf(String::isNotBlank)?.let { baseline ->
+            put("prompt_cache_options", buildJsonObject {
+                put("comparison_response_id", baseline.take(512))
+            })
+        }
         if (includeEncryptedReasoning) {
             put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
         }
@@ -473,7 +482,22 @@ class OpenAiResponsesClient @Inject constructor(
             usage = parseUsage(response["usage"] as? JsonObject),
             requestId = response["id"]?.jsonPrimitive?.contentOrNull ?: UUID.randomUUID().toString(),
             promptBreakdown = promptBreakdown,
+            promptCacheDiagnostic = parsePromptCacheDiagnostic(
+                response["prompt_cache_diagnostics"] as? JsonObject,
+            ),
         ).also(::validateUsableModelReply)
+    }
+
+    private fun parsePromptCacheDiagnostic(value: JsonObject?): LocalPromptCacheDiagnostic? {
+        value ?: return null
+        val type = value["type"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+            ?: return null
+        return LocalPromptCacheDiagnostic(
+            type = type,
+            reason = value["reason"]?.jsonPrimitive?.contentOrNull,
+            comparisonReusableTokens = value["comparison_reusable_tokens"]?.jsonPrimitive?.longOrNull,
+            cacheMissedTokens = value["cache_missed_tokens"]?.jsonPrimitive?.longOrNull,
+        )
     }
 
     private fun parseUsage(usage: JsonObject?): DeepSeekTokenUsage {

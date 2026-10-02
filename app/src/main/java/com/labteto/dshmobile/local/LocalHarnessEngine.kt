@@ -143,6 +143,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+private const val INTERNAL_WORK_CONTINUATION_PROMPT =
+    "继续当前工作任务。上一模型请求已进入服务端流后中断；基于已有历史、检查点和工具结果继续未完成部分。禁止重做已经完成并有结果的工具调用，先核对现有进度再行动。"
+
 /**
  * A native Android implementation of the DeepSeek Harness execution loop.
  *
@@ -268,6 +271,7 @@ class LocalHarnessEngine @Inject constructor(
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
+    private val requestPressureStore = LocalRequestPressureStore()
     private val streamingPreviewStore = LocalStreamingPreviewStore()
     private val modelRequestCoordinator by lazy {
         LocalModelRequestCoordinator(
@@ -278,6 +282,7 @@ class LocalHarnessEngine @Inject constructor(
             defaultEventLog = { eventLog },
             streamingPreviewStore = streamingPreviewStore,
             persistOverflowCompaction = ::persistForegroundOverflowCompaction,
+            pressureStore = requestPressureStore,
             maxStreamPreviewChars = MAX_STREAM_PREVIEW_CHARS,
             streamPreviewIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
         )
@@ -613,9 +618,8 @@ class LocalHarnessEngine @Inject constructor(
             )
         },
         historySnapshot = historySnapshot,
+        executionControl = activeWorkRuns[sessionId]?.executionControl ?: LocalWorkExecutionControl(),
     )
-
-
     /**
      * Detached work runner for scheduled/webhook work.
      *
@@ -643,6 +647,7 @@ class LocalHarnessEngine @Inject constructor(
                 onApprovalBlocked = onApprovalBlocked,
             )
         },
+        executionControl = LocalWorkExecutionControl(),
     )
 
     private val runStateLock = Any()
@@ -782,7 +787,7 @@ class LocalHarnessEngine @Inject constructor(
                 configured = result.configured,
                 model = result.model,
                 baseUrl = result.baseUrl,
-                modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
+                modelSelection = it.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
                 error = null,
             )
         }
@@ -813,7 +818,7 @@ class LocalHarnessEngine @Inject constructor(
                                 configured = result.configured,
                                 model = result.model,
                                 baseUrl = result.baseUrl,
-                                modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
+                                modelSelection = state.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
                                 error = null,
                             )
                         }
@@ -836,7 +841,7 @@ class LocalHarnessEngine @Inject constructor(
                             configured = result.configured,
                             model = result.model,
                             baseUrl = result.baseUrl,
-                            modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
+                            modelSelection = it.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
                         )
                     }
                 }
@@ -856,6 +861,9 @@ class LocalHarnessEngine @Inject constructor(
     /** Persist execution limits exposed from Settings. */
     internal fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) =
         settingsCoordinator.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
+
+    internal fun configureWorkerProfile(profileId: String?) =
+        settingsCoordinator.configureWorkerProfile(profileId)
 
     /** Persist user-authored behavioral rules and memory recall preference. */
     internal fun configurePersonalization(customRules: String, autoRecall: Boolean, autoMemory: Boolean) =
@@ -2221,7 +2229,7 @@ class LocalHarnessEngine @Inject constructor(
                             configured = result.configured,
                             model = result.model,
                             baseUrl = result.baseUrl,
-                            modelSelection = LocalModelSelectionState(result.profiles, result.activeProfileId),
+                            modelSelection = it.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
                         )
                     }
                 } finally {
@@ -2879,6 +2887,8 @@ class LocalHarnessEngine @Inject constructor(
                 kind = LocalAgentRunKind.FOREGROUND,
             )
         } else 1
+        val continuationParentRunId = binding?.continuationParentRunId
+        if (binding != null) binding.continuationParentRunId = null
         val runContext = agentRunCoordinator.start(
             sessionId = foregroundSessionId,
             usageMode = runSnapshot.usageMode,
@@ -2900,7 +2910,10 @@ class LocalHarnessEngine @Inject constructor(
             ),
             toolNames = runToolNames(runPolicy, binding),
             contextChars = runSnapshot.contextChars,
+            parentRunId = continuationParentRunId,
         )
+        var lastModelErrorCode: String? = null
+        val progressTracker = LocalAgentProgressTracker()
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
         val startedToolCallIds = linkedSetOf<String>()
@@ -2991,6 +3004,7 @@ class LocalHarnessEngine @Inject constructor(
                 }
                 compactHistoryIfNeeded(
                     extraTokens = productContextTokens + estimateModelTokens(tools.toString()),
+                    binding = binding,
                 )
                 val durableRequestMessages = if (snapshot.usageMode == LocalUsageMode.CHAT) {
                     withChatTurnContext(
@@ -3044,6 +3058,7 @@ class LocalHarnessEngine @Inject constructor(
                         }
                     }
                 } catch (error: Throwable) {
+                    if (error is LocalModelException) lastModelErrorCode = error.code
                     val nativeImageRejected =
                         nativeImagesSent &&
                             imageInputUnsupported(error)
@@ -3152,6 +3167,7 @@ class LocalHarnessEngine @Inject constructor(
                     is AgentEvent.AssistantObserved -> {
                         val reply = repliesByStep.remove(event.step)
                             ?: error("缺少第 ${event.step} 步模型响应")
+                        progressTracker.recordAssistant(reply.content.orEmpty(), reply.toolCalls.size)
                         val beforeAssistant = runState.value
                         val transcriptMessages = buildList {
                             reply.reasoning?.takeIf {
@@ -3245,6 +3261,7 @@ class LocalHarnessEngine @Inject constructor(
                         })
                     }
                     is AgentEvent.ToolFinished -> {
+                        progressTracker.recordToolResult(event.call, event.output, event.isError)
                         val boundedContent = retainToolResult(
                             sessionId = runSessionId,
                             callId = event.call.id,
@@ -3328,15 +3345,31 @@ class LocalHarnessEngine @Inject constructor(
                     is AgentEvent.TurnFailed -> {
                         settlePendingTools("failed")
                         val detail = event.reason.take(2_000)
-                        val transcriptMessage = runTranscript.newMessage("system", "执行失败：$detail")
-                        val turnEnd = runEventLog.append("turn/end", buildJsonObject {
-                            put("reason", "error")
-                            put("detail", detail)
-                            put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
-                            put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
-                        })
-                        runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
-                        checkpointModelHistoryAtTurnBoundary("turn/failed", binding)
+                        val continuationEligible =
+                            binding != null &&
+                                shouldAutoContinueWorkFailure(
+                                    errorCode = lastModelErrorCode,
+                                    automaticContinuationCount = binding.automaticContinuationCount,
+                                    pendingInputs = binding.pendingInputs.size(),
+                                )
+                        if (continuationEligible) {
+                            runEventLog.append("turn/end", buildJsonObject {
+                                put("reason", "stream_interrupted_continuation")
+                                put("detail", detail)
+                                put("messages", runState.value.transcriptIndex.totalMessageCount)
+                            })
+                            checkpointModelHistoryAtTurnBoundary("turn/stream-interrupted", binding)
+                        } else {
+                            val transcriptMessage = runTranscript.newMessage("system", "执行失败：$detail")
+                            val turnEnd = runEventLog.append("turn/end", buildJsonObject {
+                                put("reason", "error")
+                                put("detail", detail)
+                                put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
+                                put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
+                            })
+                            runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
+                            checkpointModelHistoryAtTurnBoundary("turn/failed", binding)
+                        }
                         persist(binding)
                     }
                     is AgentEvent.TurnCancelled -> {
@@ -3355,7 +3388,15 @@ class LocalHarnessEngine @Inject constructor(
                 agentRunCoordinator.recordEvent(runContext, event)
             },
             maxSteps = mainStepLimit,
-            stepLimitExtender = localForegroundStepLimitExtender(runPolicy.allowToolExecution, mainMaxSteps, input, { runState.value }, { resourceScheduler.snapshot().pressure }, { runEventLog.append("turn/budget-extended", it) }),
+            stepLimitExtender = localForegroundStepLimitExtender(
+                enabled = runPolicy.allowToolExecution,
+                configuredBase = mainMaxSteps,
+                task = input,
+                state = { runState.value },
+                pressure = { resourceScheduler.snapshot().pressure },
+                onExtended = { runEventLog.append("turn/budget-extended", it) },
+                canExtend = progressTracker::claimExtensionProgress,
+            ),
             idFactory = { runContext.runId },
         )
 
@@ -3390,8 +3431,50 @@ class LocalHarnessEngine @Inject constructor(
             // TurnCancelled durably records and projects the visible stop message.
         } catch (error: Exception) {
             foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
-            runState.update { it.copy(error = error.message ?: "本机执行失败") }
-            // TurnFailed durably records and projects the visible failure message.
+            val modelError = error as? LocalModelException
+            val continuationEligible =
+                binding != null &&
+                    shouldAutoContinueWorkFailure(
+                        errorCode = modelError?.code,
+                        automaticContinuationCount = binding.automaticContinuationCount,
+                        pendingInputs = binding.pendingInputs.size(),
+                    )
+            val queued = if (continuationEligible) {
+                val continuationId = "continuation-" + runContext.runId
+                binding!!.pendingInputs.offer(
+                    QueuedAgentInput(
+                        content = INTERNAL_WORK_CONTINUATION_PROMPT,
+                        memoryInput = "",
+                        modelMessage = buildJsonObject {
+                            put("role", "user")
+                            put("content", INTERNAL_WORK_CONTINUATION_PROMPT)
+                        },
+                        id = continuationId,
+                    ),
+                ).also { accepted ->
+                    if (accepted) {
+                        binding.automaticContinuationCount += 1
+                        binding.continuationParentRunId = runContext.runId
+                        runState.update {
+                            it.copy(
+                                error = null,
+                                queuedInputCount = binding.pendingInputs.size(),
+                            )
+                        }
+                        runEventLog.append("turn/continuation-queued", buildJsonObject {
+                            put("source_run_id", runContext.runId)
+                            put("reason", modelError?.code.orEmpty())
+                            put("continuation_id", continuationId)
+                        })
+                    }
+                }
+            } else {
+                false
+            }
+            if (!queued) {
+                runState.update { it.copy(error = error.message ?: "本机执行失败") }
+            }
+            // TurnFailed has already settled tool side effects and checkpointed model-visible state.
         } finally {
             if (binding != null) binding.interactions.cancelAll() else interactions.cancelAll()
             runState.update {
@@ -3958,7 +4041,7 @@ class LocalHarnessEngine @Inject constructor(
             "read_skill" -> workspace.readSkill(args.string("name"))
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
-                val model = args.optionalString("model")
+                val model = LocalWorkerModelRouter.resolve(args.optionalString("model"), executionState.value)
                 val maxSteps = args.int("max_steps", executionState.value.subagentMaxSteps).coerceIn(1, 128)
                 val virtualScreen = args.boolean("virtual_screen", false)
                 if (args.boolean("run_in_background", false)) {
@@ -3987,6 +4070,7 @@ class LocalHarnessEngine @Inject constructor(
                     inheritHistory = true,
                     allowMutation = allowMutation,
                     parentCallId = call.id,
+                    modelOverride = LocalWorkerModelRouter.resolve(null, executionState.value),
                     maxSteps = executionState.value.subagentMaxSteps,
                 )
             "list_subagent_models" -> modelGateway.availableProfiles().joinToString("\n") { "${it.id} | ${it.model} | ${it.provider} | ${it.authKind} | ${it.baseUrl}" }
@@ -3997,6 +4081,7 @@ class LocalHarnessEngine @Inject constructor(
                 args["tasks"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
                 args.optionalString("mode") ?: "parallel",
                 args["required_evidence"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
+                args.optionalString("model"),
                 binding,
             )
             "session_search" -> searchSessions(args.string("query"))
@@ -4433,22 +4518,26 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             historySnapshot = binding.modelHistory::snapshot,
+            executionControl = binding.executionControl,
         )
 
     private suspend fun runWorkflow(
         tasks: List<String>,
         mode: String,
         requiredEvidence: List<String>,
+        modelOverride: String? = null,
         binding: LocalWorkRunBinding? = null,
     ): String {
         val targetState = binding?.state ?: _state
         val runner = binding?.let(::workSubagents) ?: subagents
+        val workerSelection = LocalWorkerModelRouter.resolve(modelOverride, targetState.value)
         targetState.update { it.copy(workflowProgress = null) }
         return LocalWorkflowCoordinator(
             execute = { prompt -> runner.runResult(
                 task = prompt,
                 inheritHistory = false,
                 allowMutation = false,
+                modelOverride = workerSelection,
                 maxSteps = targetState.value.subagentMaxSteps,
             ).requireCompletedOutput() },
             pruneOutput = ::pruneToolResult,
@@ -4607,6 +4696,7 @@ class LocalHarnessEngine @Inject constructor(
         overflowPersister = binding?.let { runBinding ->
             { snapshot, mode -> persistOverflowCompaction(snapshot, mode, runBinding) }
         },
+        executionControl = binding?.executionControl,
     )
 
     private fun persistForegroundOverflowCompaction(
@@ -4633,6 +4723,7 @@ class LocalHarnessEngine @Inject constructor(
             compactor = historyCompactor,
             summaryMode = summaryMode,
         ) ?: return
+        requestPressureStore.advanceGeneration(snapshot.sessionId, compaction.estimatedTokensAfter)
         log.append("session/compaction", buildJsonObject {
             put("trigger", "context-overflow")
             put("omitted_messages", compaction.omittedMessages)
@@ -4686,13 +4777,13 @@ class LocalHarnessEngine @Inject constructor(
             currentHistoryChars = history.encodedChars,
             currentHistoryTokens = history.estimatedTokens,
         )
+        val stored = callId?.let { toolOutputStore.store(sessionId, it, result) } != null
         val retained = retainTextForModel(
             value = result,
             maxTokens = budget.maxToolResultTokens,
             maxChars = budget.maxToolResultChars,
         )
         if (!retained.truncated) return retained.text
-        val stored = callId?.let { toolOutputStore.store(sessionId, it, result) } != null
         val recovery = when {
             callId == null -> "请缩小查询范围后继续读取。"
             stored -> "可调用 tool_output_read，并传入 call_id=$callId 分段读取完整结果。"
@@ -4723,6 +4814,10 @@ class LocalHarnessEngine @Inject constructor(
             updateContextMetrics(binding)
             return
         }
+        requestPressureStore.advanceGeneration(
+            binding?.sessionId ?: targetState.value.sessionId,
+            compaction.estimatedTokensAfter,
+        )
         log.append(
             "session/compaction",
             buildJsonObject {
@@ -4773,6 +4868,9 @@ class LocalHarnessEngine @Inject constructor(
             resources = resourceScheduler.snapshot(),
             contextChars = modelHistory.encodedChars,
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
+            requestPressure = requestPressureStore.latest(currentSessionId),
+            contextWindow = requestPressureStore.window(currentSessionId),
+            workBudget = activeWorkRuns[currentSessionId]?.executionControl?.budget?.snapshot(),
             pendingInputs = pendingInputs.size(),
             pendingInputLimit = MAX_PENDING_INPUTS,
             commands = commands,
@@ -4892,7 +4990,10 @@ class LocalHarnessEngine @Inject constructor(
             configured = modelConfigured,
             model = model,
             baseUrl = baseUrl,
-            modelSelection = LocalModelSelectionState(modelProfiles, activeModelProfile?.id),
+            modelSelection = LocalModelSelectionState.restored(
+                modelProfiles, activeModelProfile?.id,
+                preferences.getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null),
+            ),
             mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
             subagentMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
             modelAttempts = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),

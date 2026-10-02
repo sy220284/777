@@ -39,6 +39,10 @@ internal class LocalWorkflowCoordinator(
             },
             maxAttempts = 2, // Delegates are read-only; do not apply this to mutating tools.
             onProgress = onProgress,
+            shouldRetryError = { error ->
+                val delegated = error as? LocalSubagentExecutionException
+                delegated == null || !isTerminalRouteFailure(delegated.errorCode.orEmpty())
+            },
         )
         return results.joinToString("\n\n") { result ->
             val label = if (workflowMode == HarnessWorkflowMode.PIPELINE) "阶段" else "子任务"
@@ -47,7 +51,7 @@ internal class LocalWorkflowCoordinator(
                 "$label ${result.index + 1}：${result.task}\n${result.output.orEmpty()}\n$check（尝试 ${result.attempts} 次）"
             } else {
                 val next = if (workflowMode == HarnessWorkflowMode.PARALLEL) "其他子任务不受影响。" else "后续阶段已停止。"
-                "$label ${result.index + 1} 受阻：${result.error.orEmpty()}；已重新指派一次，仍需用户检查。$next"
+                "$label ${result.index + 1} 受阻：${result.error.orEmpty()}；仅在可恢复或验收不足时允许重新指派。$next"
             }
         }
     }

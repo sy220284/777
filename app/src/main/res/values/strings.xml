@@ -633,6 +633,9 @@
     <string name="advanced_memory_settings">记忆设置</string>
     <string name="advanced_memory_updated">记忆已更新</string>
     <string name="advanced_model_attempts">模型失败重试次数</string>
+    <string name="advanced_worker_model">子代理工作模型</string>
+    <string name="advanced_worker_model_auto">自动选择</string>
+    <string name="advanced_worker_model_hint">显式指定模型优先；未指定时使用这里的 Worker 档案，再回退到安全自动路由。</string>
     <string name="advanced_model_configured">本机模型密钥已配置。留空密钥可只修改模型和接口地址。</string>
     <string name="advanced_model_key">模型密钥</string>
     <string name="advanced_model_key_cleared">本机模型密钥已清除</string>

@@ -22,13 +22,13 @@ internal class LocalSubagentHistoryPolicy(
             currentHistoryChars = history.sumOf { it.toString().length },
             currentHistoryTokens = history.sumOf { estimateModelTokens(it.toString()) },
         )
+        val stored = spillToolOutput(callId, output)
         val retained = retainTextForModel(
             value = output,
             maxTokens = adaptiveBudget.maxToolResultTokens,
             maxChars = adaptiveBudget.maxToolResultChars,
         )
         if (!retained.truncated) return retained.text
-        val stored = spillToolOutput(callId, output)
         val recovery = if (stored) {
             "可调用 tool_output_read，并传入 call_id=$callId 分段读取完整结果。"
         } else {
@@ -43,6 +43,7 @@ internal class LocalSubagentHistoryPolicy(
         subagentId: String,
         budget: LocalHistoryBudget?,
     ) {
+        projectStaleSubagentToolResults(history, budget, subagentId, eventLog())
         val compaction = historyCompactor.compact(history, budget) ?: return
         history.clear()
         history += compaction.messages
@@ -55,10 +56,8 @@ internal class LocalSubagentHistoryPolicy(
         })
     }
 
-    fun rememberProgress(progress: ArrayDeque<String>, item: String) {
-        progress.addLast(item)
-        while (progress.size > MAX_PROGRESS_ITEMS) progress.removeFirst()
-    }
+    fun rememberProgress(progress: ArrayDeque<String>, item: String) =
+        progress.addLast(item).also { while (progress.size > MAX_PROGRESS_ITEMS) progress.removeFirst() }
 
     private companion object {
         const val MAX_PROGRESS_ITEMS = 6

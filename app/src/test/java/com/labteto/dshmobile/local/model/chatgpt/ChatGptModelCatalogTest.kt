@@ -37,4 +37,20 @@ class ChatGptModelCatalogTest {
         val body = "{\"models\":[" + List(2_001) { "{\"slug\":\"gpt-test\",\"visibility\":\"list\"}" }.joinToString(",") + "]}"
         assertTrue(runCatching { parse(body) }.exceptionOrNull() is IOException)
     }
+
+    @Test fun futurePlanModelNamesComeDirectlyFromRefreshedCatalogWithoutLocalAllowlist() {
+        val models = parse("""{"models":[
+            {"slug":"future-plan-model-x","visibility":"list","display_name":"Future X"},
+            {"slug":"another-new-family","visibility":"list","display_name":"Another"}
+        ]}""")
+
+        assertEquals(
+            listOf(
+                ChatGptModelOption("future-plan-model-x", "Future X"),
+                ChatGptModelOption("another-new-family", "Another"),
+            ),
+            models,
+        )
+    }
+
 }

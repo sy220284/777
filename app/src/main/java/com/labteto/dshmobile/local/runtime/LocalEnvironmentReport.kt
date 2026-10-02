@@ -10,6 +10,9 @@ internal object LocalEnvironmentReport {
         resources: HarnessResourceSnapshot,
         contextChars: Int,
         contextBudgetChars: Int,
+        requestPressure: LocalPromptPressure? = null,
+        contextWindow: LocalContextWindowSnapshot? = null,
+        workBudget: LocalWorkExecutionBudget.Snapshot? = null,
         pendingInputs: Int,
         pendingInputLimit: Int,
         commands: List<String>,
@@ -19,14 +22,38 @@ internal object LocalEnvironmentReport {
         appendLine("安卓本机 Harness 环境")
         appendLine("工作区：$workspacePath")
         appendLine(
-            "执行预算：模型 ${resources.activeModelRequests}/${resources.budget.maxModelRequests}；" +
+            "并发槽位：模型 ${resources.activeModelRequests}/${resources.budget.maxModelRequests}；" +
                 "智能体 ${resources.activeAgents}/${resources.budget.maxAgents}；" +
                 "终端 ${resources.activeTerminals}/${resources.budget.maxTerminals}；" +
                 "虚拟屏 ${resources.activeVirtualDisplays}/${resources.budget.maxVirtualDisplays}；" +
                 "语言服务 ${resources.activeLanguageServers}/${resources.budget.maxLanguageServers}；" +
                 "压力 ${resources.pressure.name.lowercase()}",
         )
-        appendLine("上下文：$contextChars/$contextBudgetChars 字符")
+        appendLine("持久模型历史：$contextChars/$contextBudgetChars 字符")
+        contextWindow?.let { window ->
+            appendLine(
+                "上下文窗口代际：#${window.generation}；起始 ${window.prefillTokens} token" +
+                    "（${window.prefillSource}）；本代峰值 ${window.peakInputTokens} token",
+            )
+        }
+        requestPressure?.let { pressure ->
+            append("最近真实请求：")
+            append(pressure.contextChars).append(" 字符，预计 ")
+            append(pressure.estimatedInputTokens).append("/")
+            append(pressure.operationalLimitTokens).append(" 输入 token")
+            pressure.modelContextWindowTokens?.let { append("；模型窗口 ").append(it).append(" token") }
+            appendLine()
+            appendLine(
+                "请求构成：system=${pressure.systemTokens}，history=${pressure.historyTokens}，" +
+                    "current_user=${pressure.currentUserTokens}，tools=${pressure.toolDefinitionTokens}",
+            )
+        }
+        workBudget?.let { budget ->
+            appendLine(
+                "工作消费护栏：预计暴露 ${budget.committedExposureTokens} + 待发送 ${budget.pendingExposureTokens}" +
+                    " / ${budget.exposureLimitTokens} token；请求 ${budget.admittedRequests}/${budget.maxRequests}",
+            )
+        }
         appendLine("待处理补充消息：$pendingInputs/$pendingInputLimit")
         appendLine("可执行命令：${if (commands.isEmpty()) "未检测到" else commands.joinToString()}")
         appendLine("内置运行时：${runtimeStatuses.joinToString("；")}")

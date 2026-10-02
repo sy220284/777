@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import android.content.SharedPreferences
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.model.LOCAL_WORKER_PROFILE_ID_PREFERENCE
 import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +39,20 @@ internal class LocalHarnessSettingsCoordinator(
                 subagentMaxSteps = subagent,
                 modelAttempts = attempts,
             )
+        }
+    }
+
+    fun configureWorkerProfile(profileId: String?) {
+        val normalized = profileId?.trim()?.takeIf(String::isNotBlank)
+        val current = state()
+        require(normalized == null || current.modelSelection.profiles.any { it.id == normalized }) {
+            "子代理工作模型已不存在，请重新选择"
+        }
+        preferences.edit().apply {
+            if (normalized == null) remove(KEY_WORKER_PROFILE_ID) else putString(KEY_WORKER_PROFILE_ID, normalized)
+        }.apply()
+        updateState {
+            it.copy(modelSelection = it.modelSelection.copy(workerProfileId = normalized))
         }
     }
 
@@ -122,6 +137,7 @@ internal class LocalHarnessSettingsCoordinator(
         const val KEY_MAIN_MAX_STEPS = "main_max_steps"
         const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
         const val KEY_MODEL_ATTEMPTS = "model_attempts"
+        const val KEY_WORKER_PROFILE_ID = LOCAL_WORKER_PROFILE_ID_PREFERENCE
         const val KEY_IMAGE_INPUT_MODE = "image_input_mode"
         const val KEY_CHAT_STYLE_GUARD = "chat_style_guard_enabled"
         const val KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES = "chat_style_guard_custom_phrases"
