@@ -29,6 +29,7 @@ internal const val CHAT_RECENT_HISTORY_MESSAGES = 20
 internal const val CHAT_ROLEPLAY_TEMPERATURE = 0.85
 internal const val CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS = 3_000
 internal const val MAX_PENDING_INPUTS = 16
+internal const val MAX_SESSION_SEARCH_HITS = 50
 internal const val LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES = 200
 internal const val AUTOMATION_CHAT_HISTORY_MESSAGES = 48
 internal const val MAX_STREAM_PREVIEW_CHARS = 4_096
