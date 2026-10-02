@@ -33,3 +33,15 @@ internal fun chatGptPlanProfiles(
         displayName = option.displayName,
     )
 }.distinctBy(LocalModelProfile::id)
+
+internal fun refreshChatGptPlanProfiles(
+    existing: List<LocalModelProfile>,
+    accountId: String,
+    models: List<ChatGptModelOption>,
+): List<LocalModelProfile> {
+    val retained = existing.filterNot {
+        it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
+    }
+    return (retained + chatGptPlanProfiles(accountId, models))
+        .distinctBy(LocalModelProfile::id)
+}
