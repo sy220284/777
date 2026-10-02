@@ -28,7 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,7 +40,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -64,7 +63,6 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsMenu
-
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
@@ -107,11 +105,12 @@ internal fun LocalModelSettingsCard(
     var editingProfileId by remember { mutableStateOf<String?>(null) }
     var editorGeneration by remember { mutableStateOf(0L) }
     var apiKey by remember { mutableStateOf("") }
+    var contextWindowTokens by remember { mutableStateOf("") }
     var testStatus by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var pendingRemoveId by remember { mutableStateOf<String?>(null) }
-    val chatGpt by viewModel.chatGptState.collectAsState()
+    val chatGpt by viewModel.chatGptState.collectAsStateWithLifecycle()
     val matchingRoutes = local.modelProfiles.filter {
         it.authKind == LocalModelAuthKind.API_KEY &&
             it.model == model.trim() && it.baseUrl == baseUrl.trim().trimEnd('/')
@@ -132,6 +131,7 @@ internal fun LocalModelSettingsCard(
                     it.model == name && it.baseUrl == url
             }?.protocol
         } ?: LocalModelPresets.protocolFor(name, url)
+        contextWindowTokens = id?.let { profileId -> local.modelProfiles.firstOrNull { it.id == profileId }?.contextWindowTokensOverride?.toString() }.orEmpty()
         apiKey = ""
         testStatus = null
     }
@@ -257,6 +257,7 @@ internal fun LocalModelSettingsCard(
                     OutlinedTextField(baseUrl, onValueChange = { baseUrl = it.take(1000); editingProfileId = null; editorGeneration++; testStatus = null },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
                         label = { Text(stringResource(R.string.advanced_endpoint)) })
+                    LocalModelContextWindowField(contextWindowTokens) { contextWindowTokens = it; editorGeneration++; testStatus = null }
                 } else {
                     Text(baseUrl, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                     selectedPreset?.let { preset ->
@@ -326,9 +327,10 @@ internal fun LocalModelSettingsCard(
                         val savedUrl = baseUrl
                         val savedProtocol = protocol
                         val savedProfileId = editingProfileId
+                        val savedContextWindowOverride = contextWindowTokens.toIntOrNull() ?: 0
                         scope.launch {
                             try {
-                                viewModel.saveLocalModel(savedKey, savedModel, savedUrl, savedProtocol, savedProfileId)
+                                viewModel.saveLocalModel(savedKey, savedModel, savedUrl, savedProtocol, savedProfileId, savedContextWindowOverride)
                                 if (showEditor && editorGeneration == savedGeneration) {
                                     apiKey = ""
                                     showEditor = false
