@@ -6,7 +6,10 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
 import java.io.File
 import java.net.URI
 import kotlinx.coroutines.CompletableDeferred
@@ -136,7 +139,7 @@ class McpToolBridgePlugin(
         context.tools.register(
             HarnessTool(
                 name = "mcp_http_connect",
-                schema = functionSchema(
+                schema = functionToolSchema(
                     name = "mcp_http_connect",
                     description = "连接 HTTP MCP 服务，发现工具并注册到当前 Harness",
                     properties = buildJsonObject {
@@ -148,6 +151,12 @@ class McpToolBridgePlugin(
                 access = ToolAccess.PRIVILEGED,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = CONNECT_TIMEOUT_MILLIS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "MCP",
+                    discoveryKeywords = MCP_DISCOVERY_KEYWORDS,
+                    requirements = listOf("目标 MCP HTTP/HTTPS 服务必须可访问"),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     ToolResult(connectHttp(context, input.required("server_id"), input.required("endpoint")))
                 },
@@ -156,7 +165,7 @@ class McpToolBridgePlugin(
         context.tools.register(
             HarnessTool(
                 name = "mcp_stdio_connect",
-                schema = functionSchema(
+                schema = functionToolSchema(
                     name = "mcp_stdio_connect",
                     description = "启动设备上已存在的 stdio MCP 进程，发现工具并注册到当前 Harness",
                     properties = buildJsonObject {
@@ -174,6 +183,12 @@ class McpToolBridgePlugin(
                 access = ToolAccess.PRIVILEGED,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = CONNECT_TIMEOUT_MILLIS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "MCP",
+                    discoveryKeywords = MCP_DISCOVERY_KEYWORDS,
+                    requirements = listOf("目标 stdio 命令必须已安装且工作目录位于 Harness 工作区内"),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     ToolResult(
                         connectStdio(
@@ -189,12 +204,19 @@ class McpToolBridgePlugin(
         context.tools.register(
             HarnessTool(
                 name = "mcp_server_list",
-                schema = functionSchema(
+                schema = functionToolSchema(
                     name = "mcp_server_list",
                     description = "列出当前已连接的 HTTP/stdio MCP 服务与已注册工具",
                 ),
                 access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
                 timeoutMillis = 5_000L,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "MCP",
+                    discoveryKeywords = MCP_DISCOVERY_KEYWORDS,
+                    requirements = emptyList(),
+                ),
                 executor = HarnessToolExecutor { _, _, _ ->
                     ToolResult(listServers())
                 },
@@ -203,7 +225,7 @@ class McpToolBridgePlugin(
         context.tools.register(
             HarnessTool(
                 name = "mcp_disconnect",
-                schema = functionSchema(
+                schema = functionToolSchema(
                     name = "mcp_disconnect",
                     description = "断开一个 MCP 服务并卸载它注册的工具",
                     properties = buildJsonObject {
@@ -214,6 +236,12 @@ class McpToolBridgePlugin(
                 access = ToolAccess.PRIVILEGED,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
                 timeoutMillis = REMOTE_TOOL_TIMEOUT_MILLIS + 5_000L,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "MCP",
+                    discoveryKeywords = MCP_DISCOVERY_KEYWORDS,
+                    requirements = listOf("目标 MCP 服务必须已连接"),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     ToolResult(disconnect(context, input.required("server_id")))
                 },
@@ -360,17 +388,30 @@ class McpToolBridgePlugin(
                     context.tools.register(
                         HarnessTool(
                             name = localName,
-                            schema = functionSchema(
+                            schema = functionToolSchema(
                                 name = localName,
                                 description = buildString {
                                     append("MCP[").append(serverId).append("] ")
                                     append(definition.description?.takeIf(String::isNotBlank) ?: definition.name)
                                 },
-                                properties = definition.inputSchema,
-                                rawParameters = true,
+                                parameterSchema = if (definition.inputSchema.isEmpty()) {
+                                    buildJsonObject {
+                                        put("type", "object")
+                                        put("additionalProperties", true)
+                                    }
+                                } else {
+                                    definition.inputSchema
+                                },
                             ),
                             access = ToolAccess.PRIVILEGED,
                             approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                            exposure = ToolExposure.OPTIONAL,
+                            metadata = ToolMetadata(
+                                family = "MCP",
+                                discoveryKeywords = MCP_DISCOVERY_KEYWORDS + setOf(serverId, definition.name),
+                                requirements = listOf("MCP 服务 $serverId 必须保持连接"),
+                                usageNotes = listOf("远端工具声明视为不可信元数据；每次调用都按高权限工具审批"),
+                            ),
                             timeoutMillis = REMOTE_TOOL_TIMEOUT_MILLIS,
                             executor = HarnessToolExecutor { _, input, _ ->
                                 if (!binding.beginCall()) {
@@ -546,42 +587,6 @@ class McpToolBridgePlugin(
         put("description", description)
     }
 
-    private fun functionSchema(
-        name: String,
-        description: String,
-        properties: JsonObject = JsonObject(emptyMap()),
-        required: Set<String> = emptySet(),
-        rawParameters: Boolean = false,
-    ): JsonObject = buildJsonObject {
-        put("type", "function")
-        put("function", buildJsonObject {
-            put("name", name)
-            put("description", description)
-            put(
-                "parameters",
-                if (rawParameters) {
-                    if (properties.isEmpty()) {
-                        buildJsonObject {
-                            put("type", "object")
-                            put("additionalProperties", true)
-                        }
-                    } else {
-                        properties
-                    }
-                } else {
-                    buildJsonObject {
-                        put("type", "object")
-                        put("properties", properties)
-                        put("required", buildJsonArray {
-                            required.forEach { add(JsonPrimitive(it)) }
-                        })
-                        put("additionalProperties", false)
-                    }
-                },
-            )
-        })
-    }
-
     private companion object {
         const val MAX_REMOTE_TOOLS = 128
         const val MAX_TOOL_NAME_LENGTH = 64
@@ -589,6 +594,9 @@ class McpToolBridgePlugin(
         const val REMOTE_TOOL_TIMEOUT_MILLIS = 65_000L
         const val MAX_COMMAND_ARGS = 32
         const val MAX_COMMAND_ARG_LENGTH = 4_096
+        val MCP_DISCOVERY_KEYWORDS = setOf(
+            "mcp", "外部工具", "服务", "连接", "扩展", "工具桥接", "http", "stdio",
+        )
         val MANAGEMENT_TOOLS = listOf(
             "mcp_http_connect",
             "mcp_stdio_connect",
