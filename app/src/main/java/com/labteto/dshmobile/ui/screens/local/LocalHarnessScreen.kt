@@ -259,10 +259,10 @@ fun LocalHarnessScreen(
                 sessions = shell.sessions,
                 gallery = gallery,
                 usageMode = localHarnessDrawerUsageMode(shell.usageMode, pendingUsageMode),
-                modeSwitchEnabled = !shell.running,
+                modeSwitchEnabled = localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
-                onUsageModeChange = ::switchUsageMode,
+                onUsageModeChange = { target -> switchUsageMode(target); scope.launch { drawerState.close() } },
                 onNewSession = {
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true

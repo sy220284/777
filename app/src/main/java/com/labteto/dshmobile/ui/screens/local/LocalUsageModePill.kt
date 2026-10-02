@@ -34,6 +34,11 @@ import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
+internal fun localHarnessModeSwitchEnabled(
+    current: LocalUsageMode,
+    running: Boolean,
+): Boolean = !running || current == LocalUsageMode.WORK
+
 @Composable
 internal fun LocalUsageModePill(
     selected: LocalUsageMode,
@@ -97,7 +102,11 @@ internal fun LocalUsageModePill(
                         Text(
                             stringResource(labelRes),
                             style = (if (selected == mode) DsType.std14Strong else DsType.std14).withReadingWeight(),
-                            color = if (selected == mode) colors.labelPrimary else colors.labelSecondary,
+                            color = when {
+                                !enabled -> colors.labelTertiary
+                                selected == mode -> colors.labelPrimary
+                                else -> colors.labelSecondary
+                            },
                         )
                     }
                 }

@@ -26,6 +26,34 @@ class LocalHarnessModeTransitionTest {
     }
 
     @Test
+    fun runningWorkCanSwitchToChatWhileRunningChatKeepsItsGuard() {
+        assertTrue(
+            localHarnessModeSwitchEnabled(
+                current = LocalUsageMode.WORK,
+                running = true,
+            ),
+        )
+        assertFalse(
+            localHarnessModeSwitchEnabled(
+                current = LocalUsageMode.CHAT,
+                running = true,
+            ),
+        )
+        assertTrue(
+            localHarnessModeSwitchEnabled(
+                current = LocalUsageMode.WORK,
+                running = false,
+            ),
+        )
+        assertTrue(
+            localHarnessModeSwitchEnabled(
+                current = LocalUsageMode.CHAT,
+                running = false,
+            ),
+        )
+    }
+
+    @Test
     fun onlyInitialLoadReplacesWholeHarnessSurface() {
         assertTrue(
             localHarnessShowsBlockingLoading(
