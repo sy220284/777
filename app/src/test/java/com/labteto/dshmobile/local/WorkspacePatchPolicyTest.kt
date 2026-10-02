@@ -19,6 +19,20 @@ class WorkspacePatchPolicyTest {
     }
 
     @Test
+    fun acceptsTraditionalSpaceSeparatedTimestampsWithoutTreatingThemAsPathText() {
+        validateWorkspacePatchPaths(
+            """
+            diff --git a/src/file.txt b/src/file.txt
+            --- a/src/file.txt 2026-10-02 12:34:56.123456789 +0900
+            +++ b/src/file.txt 2026-10-02 12:35:01 +0900
+            @@ -1 +1 @@
+            -old
+            +new
+            """.trimIndent(),
+        )
+    }
+
+    @Test
     fun rejectsTraversalAbsoluteAndAmbiguousPaths() {
         for (patch in listOf(
             """
