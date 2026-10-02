@@ -1,7 +1,9 @@
 package com.labteto.dshmobile.local.chat
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -18,13 +20,19 @@ class ChatDiaryPromptTest {
             assistantMessage = "……行，别迟到。",
         )
 
-        assertTrue(prompt.contains("不写流水账"))
-        assertTrue(prompt.contains("心理活动"))
-        assertTrue(prompt.contains("关系意味着什么"))
-        assertTrue(prompt.contains("角色本人视角"))
-        assertTrue(prompt.contains("稳定性格与心理逻辑"))
-        assertTrue(prompt.contains("禁止把对用户动机的猜测写成事实"))
+        val system = chatPostTurnModelMessages(prompt)
+            .first()["content"]!!.jsonPrimitive.content
+        assertTrue(system.contains("不写流水账"))
+        assertTrue(system.contains("心理活动"))
+        assertTrue(system.contains("关系意味着什么"))
+        assertTrue(system.contains("角色本人视角"))
+        assertTrue(system.contains("稳定性格和心理逻辑"))
+        assertTrue(system.contains("角色对用户动机的猜测不能写成事实"))
         assertTrue(prompt.contains("diaryDelta"))
+
+        val suggestionSystem = chatReplySuggestionModelMessages("生成回复建议")
+            .first()["content"]!!.jsonPrimitive.content
+        assertFalse(suggestionSystem.contains("diaryDelta"))
     }
 
     @Test
