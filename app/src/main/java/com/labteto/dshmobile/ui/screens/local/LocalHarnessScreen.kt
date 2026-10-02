@@ -132,10 +132,6 @@ internal fun localHarnessDrawerUsageMode(
     current: LocalUsageMode,
     pending: LocalUsageMode?,
 ): LocalUsageMode = pending ?: current
-internal fun localHarnessModeSwitchEnabled(
-    current: LocalUsageMode,
-    running: Boolean,
-): Boolean = !running || current == LocalUsageMode.WORK
 internal fun localHarnessShowsBlockingLoading(
     loading: Boolean,
     hasRenderedSurface: Boolean,
@@ -266,10 +262,7 @@ fun LocalHarnessScreen(
                 modeSwitchEnabled = localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
-                onUsageModeChange = { target ->
-                    switchUsageMode(target)
-                    scope.launch { drawerState.close() }
-                },
+                onUsageModeChange = { target -> switchUsageMode(target); scope.launch { drawerState.close() } },
                 onNewSession = {
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
