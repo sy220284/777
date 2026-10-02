@@ -10,9 +10,15 @@ import java.nio.file.StandardCopyOption
  * A malformed primary is quarantined instead of being silently treated as an empty document.
  * Writes keep a last-known-good backup and replace the primary atomically when the platform allows.
  */
+internal enum class RecoveringDocumentFailurePolicy {
+    FAIL_CLOSED,
+    RECREATE_DEFAULT,
+}
+
 internal class RecoveringChatDocumentFile(
     private val file: File,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val failurePolicy: RecoveringDocumentFailurePolicy = RecoveringDocumentFailurePolicy.FAIL_CLOSED,
 ) {
     private val root: File = requireNotNull(file.parentFile) {
         "聊天数据文件必须位于目录中：${file.path}"
@@ -28,19 +34,32 @@ internal class RecoveringChatDocumentFile(
                 return recovered
             }
             if (backup.isFile) {
-                throw IllegalStateException("聊天数据备份已损坏，无法自动恢复：${backup.path}")
+                return when (failurePolicy) {
+                    RecoveringDocumentFailurePolicy.FAIL_CLOSED ->
+                        throw IllegalStateException("持久数据备份已损坏，无法自动恢复：${backup.path}")
+                    RecoveringDocumentFailurePolicy.RECREATE_DEFAULT -> {
+                        quarantineCorrupt(backup)
+                        defaultValue()
+                    }
+                }
             }
             return defaultValue()
         }
 
-        quarantineCorruptPrimary()
+        quarantineCorrupt(file)
         decodeFile(backup, decode)?.let { recovered ->
             restoreBackup()
             return recovered
         }
-        throw IllegalStateException(
-            "聊天数据主文件与备份均已损坏；损坏主文件已隔离，未用空数据覆盖原内容",
-        )
+        if (backup.isFile && failurePolicy == RecoveringDocumentFailurePolicy.RECREATE_DEFAULT) {
+            quarantineCorrupt(backup)
+        }
+        return when (failurePolicy) {
+            RecoveringDocumentFailurePolicy.FAIL_CLOSED -> throw IllegalStateException(
+                "持久数据主文件已损坏且备份不可用；损坏主文件已隔离，未用空数据覆盖原内容",
+            )
+            RecoveringDocumentFailurePolicy.RECREATE_DEFAULT -> defaultValue()
+        }
     }
 
     fun write(serialized: String, validate: (String) -> Boolean) {
@@ -67,16 +86,17 @@ internal class RecoveringChatDocumentFile(
         return runCatching { decode(source.readText()) }.getOrNull()
     }
 
-    private fun quarantineCorruptPrimary() {
-        val corrupt = File(root, "${file.name}.corrupt-${clock()}")
-        if (runCatching { file.renameTo(corrupt) }.getOrDefault(false)) return
+    private fun quarantineCorrupt(target: File) {
+        if (!target.isFile) return
+        val corrupt = File(root, "${target.name}.corrupt-${clock()}")
+        if (runCatching { target.renameTo(corrupt) }.getOrDefault(false)) return
 
         val copied = runCatching {
-            file.copyTo(corrupt, overwrite = false)
+            target.copyTo(corrupt, overwrite = false)
             true
         }.getOrDefault(false)
-        check(copied) { "人设数据损坏且无法隔离：${file.path}" }
-        check(file.delete()) { "人设数据已备份但无法移除损坏主文件：${file.path}" }
+        check(copied) { "持久数据损坏且无法隔离：${target.path}" }
+        check(target.delete()) { "持久数据已备份但无法移除损坏文件：${target.path}" }
     }
 
     private fun restoreBackup() {

@@ -363,6 +363,8 @@ class LocalToolExecutionCoordinatorTest {
                     ToolAccess.READ_ONLY,
                     ToolApprovalPolicy.NEVER,
                     exposure = ToolExposure.OPTIONAL,
+                    family = "Android",
+                    keywords = setOf("android", "virtual screen"),
                 ) { ToolResult("ok") },
             )
         }

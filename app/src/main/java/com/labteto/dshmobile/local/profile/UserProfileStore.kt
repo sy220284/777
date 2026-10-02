@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.profile
 
 import android.content.Context
 import com.labteto.dshmobile.local.chat.RecoveringChatDocumentFile
+import com.labteto.dshmobile.local.chat.RecoveringDocumentFailurePolicy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -24,7 +25,10 @@ class UserProfileStore internal constructor(
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
         this(File(context.filesDir, "local-harness/profile/user.json"), json)
 
-    private val durableFile = RecoveringChatDocumentFile(file)
+    private val durableFile = RecoveringChatDocumentFile(
+        file = file,
+        failurePolicy = RecoveringDocumentFailurePolicy.RECREATE_DEFAULT,
+    )
 
     @Synchronized
     fun read(): UserProfile =

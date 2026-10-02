@@ -10,7 +10,12 @@ import org.junit.rules.TemporaryFolder
 class MemoryStoreTest {
     @get:Rule val temporary = TemporaryFolder()
     private fun store() = MemoryStore(temporary.root, Json)
-    private fun all(store: MemoryStore) = store.listActive(MemoryScope.values().toSet(), "project", "lineage")
+    private fun all(store: MemoryStore) = store.listActive(
+        MemoryScope.values().toSet(),
+        "project",
+        "lineage",
+        limit = 2_000,
+    )
 
     @Test fun writesSurviveRestartAndLeaveNoTemporaryFile() {
         val record = store().remember("remember apples", MemoryScope.GLOBAL)

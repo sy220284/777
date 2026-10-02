@@ -425,6 +425,9 @@ internal class LocalHistoryCompactor(
         val constraints = select(cues = WORK_CONSTRAINT_CUES, maxItems = 3)
         val failures = select(cues = WORK_FAILURE_CUES, maxItems = 3)
         val decisions = select(role = "assistant", cues = WORK_DECISION_CUES, maxItems = 3)
+        // Reserve explicit unfinished work before the broad user-goal fallback. Otherwise a
+        // "下一步/继续" message is consumed as a generic goal by the shared de-dup set.
+        val unfinishedFallback = select(cues = WORK_UNFINISHED_CUES, maxItems = 4)
         val goals = mergeStructured(
             structuredWorkState?.goals.orEmpty(),
             select(role = "user", maxItems = 4),
@@ -433,7 +436,7 @@ internal class LocalHistoryCompactor(
         val plan = mergeStructured(structuredWorkState?.plan.orEmpty(), emptyList(), maxItems = 8)
         val unfinished = mergeStructured(
             structuredWorkState?.unfinished.orEmpty(),
-            select(cues = WORK_UNFINISHED_CUES, maxItems = 4),
+            unfinishedFallback,
             maxItems = 8,
         )
         val progress = mergeStructured(
