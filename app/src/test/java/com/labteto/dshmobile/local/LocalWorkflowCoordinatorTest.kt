@@ -21,6 +21,30 @@ class LocalWorkflowCoordinatorTest {
         assertTrue(result.contains("尝试 2 次"))
     }
 
+    @Test
+    fun nonRetryableSubagentFailureIsNotReassigned() = runTest {
+        var calls = 0
+        val coordinator = LocalWorkflowCoordinator(
+            execute = {
+                calls++
+                throw LocalSubagentExecutionException(
+                    errorCode = "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION",
+                    retryable = false,
+                    message = "模型服务已经受理，禁止整轮重放",
+                )
+            },
+            pruneOutput = { it },
+            onProgress = {},
+        )
+
+        val failure = runCatching {
+            coordinator.run(listOf("只读核对"), "parallel", emptyList())
+        }.exceptionOrNull()
+
+        assertTrue(failure is LocalSubagentExecutionException)
+        assertEquals(1, calls)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun mismatchedEvidenceCannotSilentlyPass() = runTest {
         LocalWorkflowCoordinator(execute = { "完成" }, pruneOutput = { it }, onProgress = {})
