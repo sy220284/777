@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
+import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.modelFailureKind
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
@@ -283,7 +284,7 @@ internal class LocalWorkExecutionControl(
 
 internal suspend fun executeWithModelAdmission(
     control: LocalWorkExecutionControl?,
-    profileId: String,
+    routeFingerprint: String,
     model: String,
     baseUrl: String,
     contextWindowTokensOverride: Int? = null,
@@ -304,15 +305,19 @@ internal suspend fun executeWithModelAdmission(
             retryable = false,
         )
     }
-    control?.circuitBreaker?.requireClosed(profileId)
+    control?.circuitBreaker?.requireClosed(routeFingerprint)
     val lease = control?.budget?.reserve(pressure.estimatedInputTokens)
     try {
         val reply = block()
-        control?.circuitBreaker?.observeSuccess(profileId)
+        control?.circuitBreaker?.observeSuccess(routeFingerprint)
         lease?.commit(reply.usage.promptTokens.takeIf { reply.usage.reported })
         return reply
     } catch (cancelled: CancellationException) {
-        lease?.commit()
+        when ((cancelled as? LocalModelCancellationException)?.admissionState) {
+            LocalModelAdmissionState.NOT_SENT,
+            LocalModelAdmissionState.REJECTED -> lease?.release()
+            else -> lease?.commit()
+        }
         throw cancelled
     } catch (error: LocalModelException) {
         when (error.admissionState) {
@@ -320,7 +325,7 @@ internal suspend fun executeWithModelAdmission(
             LocalModelAdmissionState.REJECTED -> lease?.release()
             else -> lease?.commit()
         }
-        control?.circuitBreaker?.observeFailure(profileId, error)
+        control?.circuitBreaker?.observeFailure(routeFingerprint, error)
         throw error
     } catch (error: Throwable) {
         lease?.commit()
