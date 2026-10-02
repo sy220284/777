@@ -2128,7 +2128,9 @@ class LocalHarnessEngine @Inject constructor(
                 put("mode", "global")
                 put("tool", pending.toolName)
             })
-            binding.interactions.answerApproval(callId, true)
+            if (pending.canAutoApproveSafely) {
+                binding.interactions.answerApproval(callId, true)
+            }
             return
         }
         approvalCoordinator.enableAutoApprovalForPending(callId)
@@ -3654,7 +3656,8 @@ class LocalHarnessEngine @Inject constructor(
             if (sessionId == currentSessionId) {
                 approve(call, summary, tool)
             } else {
-                approvalPreferences.isSafeAutoApprovalEnabled()
+                approvalPreferences.isSafeAutoApprovalEnabled() &&
+                    canAutoApprove(tool, call.arguments)
             }
         },
     )
@@ -3749,12 +3752,13 @@ class LocalHarnessEngine @Inject constructor(
             planModeEnabled = false,
             approval = { call, tool, _ ->
                 if (
-                    approvalPreferences.isSafeAutoApprovalEnabled()
+                    approvalPreferences.isSafeAutoApprovalEnabled() &&
+                    canAutoApprove(tool, call.arguments)
                 ) {
                     eventLogFor(sessionId).append("approval/auto", buildJsonObject {
                         put("tool", call.name)
                         put("access", tool.access.name.lowercase())
-                        put("mode", "automation-global")
+                        put("mode", "automation-safe")
                     })
                     true
                 } else {
@@ -4216,7 +4220,7 @@ class LocalHarnessEngine @Inject constructor(
             })
             return true
         }
-        if (_state.value.safeAutoApprovalEnabled) {
+        if (_state.value.safeAutoApprovalEnabled && canAutoApprove(tool, call.arguments)) {
             eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
@@ -4256,7 +4260,10 @@ class LocalHarnessEngine @Inject constructor(
             })
             return true
         }
-        if (snapshot.safeAutoApprovalEnabled || approvalPreferences.isSafeAutoApprovalEnabled()) {
+        if (
+            (snapshot.safeAutoApprovalEnabled || approvalPreferences.isSafeAutoApprovalEnabled()) &&
+            canAutoApprove(tool, call.arguments)
+        ) {
             binding.eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
