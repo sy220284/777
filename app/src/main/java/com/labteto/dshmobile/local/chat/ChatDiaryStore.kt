@@ -361,8 +361,8 @@ internal class ChatDiaryStore(
         val normalizedLeft = normalizeDiaryText(left)
         val normalizedRight = normalizeDiaryText(right)
         if (hasNegation(normalizedLeft) != hasNegation(normalizedRight)) return 0.0
-        val a = diaryBigrams(normalizedLeft)
-        val b = diaryBigrams(normalizedRight)
+        val a = diaryBigrams(canonicalDiaryEvent(normalizedLeft))
+        val b = diaryBigrams(canonicalDiaryEvent(normalizedRight))
         if (a.isEmpty() || b.isEmpty()) return 0.0
         val shared = a.count(b::contains).toDouble()
         val union = a.union(b).size.toDouble()
@@ -373,6 +373,11 @@ internal class ChatDiaryStore(
 
     private fun hasNegation(text: String): Boolean =
         NEGATION_SIGNAL.containsMatchIn(text)
+
+    private fun canonicalDiaryEvent(text: String): String =
+        text.replace(REPEATED_CONFIRMATION_NOISE, "")
+            .replace(AGREEMENT_VARIANTS, "确认")
+            .replace("一起", "")
 
     private fun diaryTerms(text: String): Set<String> {
         val normalized = normalizeDiaryText(text)
@@ -413,6 +418,8 @@ internal class ChatDiaryStore(
         const val DUPLICATE_SIMILARITY = 0.72
         const val MIN_EVIDENCE_COVERAGE = 0.18
         val NEGATION_SIGNAL = Regex("""(?:不再|不用|不要|别再|别|没有|没|未|不|取消|撤销|拒绝)""")
+        val REPEATED_CONFIRMATION_NOISE = Regex("""(?:再次|再一次|又一次|重新)""")
+        val AGREEMENT_VARIANTS = Regex("""(?:答应|确认|确定|说定|约定)""")
         val PRIVACY_SIGNAL = Regex("""(?:别告诉|不要告诉|别跟.+说|不要跟.+说|保密|秘密|只告诉你|只跟你说|别让.+知道)""")
     }
 }
