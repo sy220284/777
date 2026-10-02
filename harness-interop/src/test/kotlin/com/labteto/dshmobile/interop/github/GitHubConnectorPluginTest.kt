@@ -232,7 +232,24 @@ class GitHubConnectorPluginTest {
             context = ToolContext(approval = { true }),
         )
         assertTrue(deleteRepository.isError)
-        assertTrue(deleteRepository.content.contains("仓库本体"))
+
+        listOf(
+            "PUT" to "/repos/example/project/collaborators/other-user",
+            "DELETE" to "/repos/example/project/invitations/123",
+            "POST" to "/repos/example/project/transfer",
+            "PUT" to "/repos/example/project/rulesets/42",
+        ).forEach { (method, path) ->
+            val blocked = registry.context.tools.execute(
+                "github_api_request",
+                buildJsonObject {
+                    put("method", method)
+                    put("path", path)
+                },
+                context = ToolContext(approval = { true }),
+            )
+            assertTrue("administration path unexpectedly accepted: $path", blocked.isError)
+            assertTrue(blocked.content.contains("未向 Agent 开放"))
+        }
         assertEquals(0, calls)
     }
 
