@@ -135,3 +135,45 @@ internal fun shouldAutoContinueWorkFailure(
     errorCode == "CHATGPT_PLAN_STREAM_INTERRUPTED" &&
         automaticContinuationCount == 0 &&
         pendingInputs == 0
+
+
+internal class LocalWorkExecutionControl(
+    val budget: LocalWorkExecutionBudget = LocalWorkExecutionBudget(),
+    val circuitBreaker: LocalModelRouteCircuitBreaker = LocalModelRouteCircuitBreaker(),
+)
+
+internal suspend fun executeWithModelAdmission(
+    control: LocalWorkExecutionControl?,
+    profileId: String,
+    model: String,
+    baseUrl: String,
+    messages: List<kotlinx.serialization.json.JsonObject>,
+    tools: kotlinx.serialization.json.JsonArray,
+    block: suspend () -> LocalModelReply,
+): LocalModelReply {
+    val pressure = LocalPromptPressureMeter.measure(
+        messages = messages,
+        tools = tools,
+        operationalLimitTokens = operationalInputLimitTokens(model, baseUrl),
+        modelContextWindowTokens = documentedContextWindowTokens(model, baseUrl),
+    )
+    if (pressure.estimatedInputTokens > pressure.operationalLimitTokens) {
+        throw LocalModelException(
+            code = "MODEL_CONTEXT_BUDGET_EXCEEDED",
+            message = "预计输入 ${pressure.estimatedInputTokens} token，超过当前路由安全上限 ${pressure.operationalLimitTokens}",
+            retryable = false,
+        )
+    }
+    control?.circuitBreaker?.requireClosed(profileId)
+    val lease = control?.budget?.reserve(pressure.estimatedInputTokens)
+    return try {
+        block().also { reply ->
+            lease?.settle(reply.usage.promptTokens.takeIf { reply.usage.reported })
+        }
+    } catch (error: LocalModelException) {
+        control?.circuitBreaker?.observeFailure(profileId, error)
+        throw error
+    } finally {
+        lease?.settle()
+    }
+}
