@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -642,11 +644,11 @@ internal fun PersonaGalleryScreen(
                     )
                 }
             } else {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 720.dp),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                 ) {
-                    filtered.chunked(2).forEach { rowEntries ->
+                    items(filtered.chunked(2), key = { row -> row.joinToString("|") { it.id } }) { rowEntries ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
