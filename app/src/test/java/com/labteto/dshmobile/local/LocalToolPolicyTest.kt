@@ -12,6 +12,7 @@ class LocalToolPolicyTest {
             val name = it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
             LocalToolPolicy.access(name)
             LocalToolPolicy.approval(name)
+            LocalToolPolicy.metadata(name)
             LocalToolPolicy.autoApprovalScope(name)
         }
         assertTrue(runCatching { LocalToolPolicy.access("new_undeclared_tool") }.isFailure)
@@ -23,10 +24,17 @@ class LocalToolPolicyTest {
             var approvals = 0
             val registry = ToolRegistry()
             val canonical = LocalToolPolicy.canonical(name)
-            registry.register(HarnessTool(canonical, JsonObject(emptyMap()), LocalToolPolicy.access(name),
-                LocalToolPolicy.approval(name), executor = HarnessToolExecutor { _, _, _ ->
+            registry.register(HarnessTool(
+                name = canonical,
+                schema = functionToolSchema(canonical, "测试工具"),
+                access = LocalToolPolicy.access(name),
+                approvalPolicy = LocalToolPolicy.approval(name),
+                exposure = ToolExposure.CORE,
+                metadata = LocalToolPolicy.metadata(name),
+                executor = HarnessToolExecutor { _, _, _ ->
                     executed++; ToolResult("ok")
-                }))
+                },
+            ))
             assertTrue(registry.execute(canonical, JsonObject(emptyMap())).isError)
             assertEquals(0, executed)
             assertTrue(registry.execute(canonical, JsonObject(emptyMap()), context = ToolContext(
