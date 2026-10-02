@@ -85,9 +85,9 @@ internal fun structuredWorkState(
         plan = plan,
         unfinished = unfinished,
         progress = progress,
-        facts = facts.takeLast(MAX_STRUCTURED_FACTS),
-        artifacts = artifacts.takeLast(MAX_STRUCTURED_ARTIFACTS),
-        tools = tools.takeLast(MAX_STRUCTURED_TOOLS),
+        facts = facts.toList().takeLast(MAX_STRUCTURED_FACTS),
+        artifacts = artifacts.toList().takeLast(MAX_STRUCTURED_ARTIFACTS),
+        tools = tools.toList().takeLast(MAX_STRUCTURED_TOOLS),
     )
 }
 
