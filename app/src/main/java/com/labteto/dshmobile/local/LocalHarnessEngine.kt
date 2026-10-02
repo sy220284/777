@@ -3341,9 +3341,11 @@ class LocalHarnessEngine @Inject constructor(
                         val detail = event.reason.take(2_000)
                         val continuationEligible =
                             binding != null &&
-                                lastModelErrorCode == "CHATGPT_PLAN_STREAM_INTERRUPTED" &&
-                                binding.automaticContinuationCount == 0 &&
-                                binding.pendingInputs.size() == 0
+                                shouldAutoContinueWorkFailure(
+                                    errorCode = lastModelErrorCode,
+                                    automaticContinuationCount = binding.automaticContinuationCount,
+                                    pendingInputs = binding.pendingInputs.size(),
+                                )
                         if (continuationEligible) {
                             runEventLog.append("turn/end", buildJsonObject {
                                 put("reason", "stream_interrupted_continuation")
@@ -3418,9 +3420,11 @@ class LocalHarnessEngine @Inject constructor(
             val modelError = error as? LocalModelException
             val continuationEligible =
                 binding != null &&
-                    modelError?.code == "CHATGPT_PLAN_STREAM_INTERRUPTED" &&
-                    binding.automaticContinuationCount == 0 &&
-                    binding.pendingInputs.size() == 0
+                    shouldAutoContinueWorkFailure(
+                        errorCode = modelError?.code,
+                        automaticContinuationCount = binding.automaticContinuationCount,
+                        pendingInputs = binding.pendingInputs.size(),
+                    )
             val queued = if (continuationEligible) {
                 val continuationId = "continuation-" + runContext.runId
                 binding!!.pendingInputs.offer(
