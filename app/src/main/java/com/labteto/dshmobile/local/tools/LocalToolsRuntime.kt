@@ -15,8 +15,8 @@ class LocalToolsRuntime @Inject constructor(
     internal suspend fun configureGitHub(token: String) = engine.configureGitHubConnectorForUi(token)
     internal suspend fun clearGitHub() = engine.clearGitHubConnectorForUi()
     internal fun installedPluginIds(): List<String> = engine.installedPluginIdsForUi()
-    internal suspend fun connectHttp(serverId: String, endpoint: String): String =
-        engine.connectMcpHttpForUi(serverId, endpoint)
+    internal suspend fun connectHttp(serverId: String, endpoint: String): String = engine.connectMcpHttpForUi(serverId, endpoint)
+    internal suspend fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?): String = engine.connectMcpStdioForUi(serverId, command, workingDirectory)
     internal suspend fun disconnect(serverId: String): String =
         engine.disconnectMcpForUi(serverId)
 }

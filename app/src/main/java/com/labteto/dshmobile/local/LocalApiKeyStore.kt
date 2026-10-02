@@ -36,6 +36,7 @@ class LocalApiKeyStore @Inject constructor(
     suspend fun clearFor(id: String) = route(id).clear()
 
     suspend fun migrate(ids: List<String>) {
+        if (ids.isEmpty()) return
         val old = delegate.get() ?: return
         ids.forEach { id -> if (getFor(id) == null) putFor(id, old) }
         delegate.clear()
