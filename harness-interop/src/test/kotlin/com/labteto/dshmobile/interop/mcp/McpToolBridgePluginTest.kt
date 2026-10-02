@@ -25,6 +25,20 @@ import org.junit.Test
 
 class McpToolBridgePluginTest {
     @Test
+    fun oversizedToolResultIsBoundedBeforeEnteringHarnessHistory() {
+        val result = buildJsonObject {
+            put("content", "x".repeat(MAX_MCP_TOOL_RESULT_CHARS * 2))
+        }
+
+        val bounded = boundedMcpToolResult(result)
+
+        assertTrue(bounded.length <= MAX_MCP_TOOL_RESULT_CHARS)
+        assertTrue(bounded.contains("已在进入会话历史前截断"))
+        assertTrue(bounded.startsWith("{"))
+        assertTrue(bounded.endsWith("}"))
+    }
+
+    @Test
     fun connectDiscoversRegistersCallsAndDisconnectsRemoteTools() = runTest {
         val requests = mutableListOf<Pair<String, JsonObject>>()
         var closed = false
