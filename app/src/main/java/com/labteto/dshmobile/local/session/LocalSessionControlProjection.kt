@@ -12,6 +12,9 @@ internal data class LocalSessionControlProjection(
     val goal: LocalGoal?,
     val planMode: Boolean,
     val chatBranches: LocalChatBranchState,
+    val chatState: com.labteto.dshmobile.local.chat.ChatCharacterState,
+    val chatContext: com.labteto.dshmobile.local.chat.ChatContextState,
+    val groupChat: LocalGroupChatState,
 )
 
 /**
@@ -41,6 +44,9 @@ internal fun projectSessionControlTail(
     var goal = snapshot.goal
     var planMode = snapshot.planMode
     var chatBranches = snapshot.chatBranches
+    var chatState = snapshot.chatState
+    var chatContext = snapshot.chatContext
+    var groupChat = snapshot.groupChat
 
     events
         .asSequence()
@@ -48,6 +54,18 @@ internal fun projectSessionControlTail(
         .sortedBy { event -> event.sequence }
         .forEach { event ->
             when (event.type) {
+                "chat/active-transcript" -> {
+                    decodeTimelineRewriteState(event.data)?.let { rewrite ->
+                        plan = rewrite.plan
+                        todos = rewrite.todos
+                        goal = rewrite.goal
+                        planMode = rewrite.planMode
+                        chatBranches = rewrite.chatBranches
+                        chatState = rewrite.chatState
+                        chatContext = rewrite.chatContext
+                        groupChat = rewrite.groupChat
+                    }
+                }
                 "plan/state" -> decodePlanState(event.data)?.let { decoded -> plan = decoded }
                 "todo/state" -> decodeTodoState(event.data)?.let { decoded -> todos = decoded }
                 "goal/state" -> {
@@ -80,6 +98,9 @@ internal fun projectSessionControlTail(
         goal = goal,
         planMode = planMode,
         chatBranches = chatBranches,
+        chatState = chatState,
+        chatContext = chatContext,
+        groupChat = groupChat,
     )
 }
 
