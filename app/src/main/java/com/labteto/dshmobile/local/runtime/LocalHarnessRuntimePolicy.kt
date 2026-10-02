@@ -28,23 +28,6 @@ internal fun canAutoApprove(tool: HarnessTool): Boolean =
             )
         }.getOrDefault(false)
 
-/**
- * Parameter-aware variant of [canAutoApprove].
- *
- * Name-only classification cannot express two cases that matter for safety:
- * - bash is a process-level escape hatch, so only allowlisted, non-chained commands qualify;
- * - workspace writes are auto-approved, but an authorized external root may still opt out.
- */
-internal fun canAutoApprove(tool: HarnessTool, args: JsonObject): Boolean {
-    if (!canAutoApprove(tool)) return false
-    return when (LocalToolPolicy.canonical(tool.name)) {
-        "bash" -> LocalToolPolicy.canAutoApproveCommand(
-            args["command"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-        )
-        else -> true
-    }
-}
-
 internal fun approvalImpact(tool: HarnessTool): LocalApprovalImpact = when (tool.access) {
     ToolAccess.READ_ONLY -> LocalApprovalImpact.LOW
     ToolAccess.WORKSPACE_WRITE ->
