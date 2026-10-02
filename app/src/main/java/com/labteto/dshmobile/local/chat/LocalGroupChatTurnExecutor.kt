@@ -270,6 +270,7 @@ internal class LocalGroupChatTurnExecutor(
         sharedPending: List<ChatPendingTurn>,
         snapshot: LocalHarnessState,
     ) {
+        if (!snapshot.autoMemory) return
         val subjectKey = com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey(
             member.galleryId,
             member.personaId,
