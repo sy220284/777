@@ -32,6 +32,26 @@ class LocalAgentProgressTrackerTest {
     }
 
     @Test
+    fun oldEvidenceCannotBecomeNewAgainAfterManyUniqueSteps() {
+        val tracker = LocalAgentProgressTracker()
+        val base = AgentToolCall(
+            id = "seed",
+            name = "read",
+            arguments = buildJsonObject { put("path", "README.md") },
+        )
+        tracker.recordToolResult(base, "result-0", isError = false)
+        assertTrue(tracker.claimExtensionProgress())
+
+        repeat(80) { index ->
+            tracker.recordToolResult(base.copy(id = "call-$index"), "result-${index + 1}", isError = false)
+        }
+        assertTrue(tracker.claimExtensionProgress())
+
+        tracker.recordToolResult(base.copy(id = "replay"), "result-0", isError = false)
+        assertFalse(tracker.claimExtensionProgress())
+    }
+
+    @Test
     fun repeatedTextOnlyReplyCountsOnceAndToolCallingReplyDoesNotCount() {
         val tracker = LocalAgentProgressTracker()
 
