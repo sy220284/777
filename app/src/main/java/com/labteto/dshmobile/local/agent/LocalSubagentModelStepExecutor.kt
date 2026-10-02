@@ -17,8 +17,7 @@ internal class LocalSubagentModelStepExecutor(
     private val resourceScheduler: HarnessResourceScheduler,
     private val eventLog: () -> LocalSessionEventLog,
     private val historyCompactor: LocalHistoryCompactor,
-    private val executionBudget: LocalWorkExecutionBudget? = null,
-    private val routeCircuitBreaker: LocalModelRouteCircuitBreaker? = null,
+    private val executionControl: LocalWorkExecutionControl? = null,
 ) {
     suspend fun complete(
         profile: LocalModelProfile,
@@ -87,43 +86,25 @@ internal class LocalSubagentModelStepExecutor(
         while (true) {
             try {
                 return executor.execute {
-                    val pressure = LocalPromptPressureMeter.measure(
+                    executeWithModelAdmission(
+                        control = executionControl,
+                        profileId = profile.id,
+                        model = model,
+                        baseUrl = baseUrl,
                         messages = activeHistory,
                         tools = tools,
-                        operationalLimitTokens = operationalInputLimitTokens(model, baseUrl),
-                        modelContextWindowTokens = documentedContextWindowTokens(model, baseUrl),
-                    )
-                    if (pressure.estimatedInputTokens > pressure.operationalLimitTokens) {
-                        throw LocalModelException(
-                            code = "MODEL_CONTEXT_BUDGET_EXCEEDED",
-                            message = "子代理预计输入 ${pressure.estimatedInputTokens} token，超过当前路由安全上限 ${pressure.operationalLimitTokens}",
-                            retryable = false,
-                        )
-                    }
-                    routeCircuitBreaker?.requireClosed(profile.id)
-                    val budgetLease = executionBudget?.reserve(pressure.estimatedInputTokens)
-                    try {
+                    ) {
                         resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
                             try {
                                 modelGateway.complete(
-                                    profile = profile,
-                                    model = model,
-                                    baseUrl = baseUrl,
-                                    messages = activeHistory,
-                                    tools = tools,
-                                ).also { reply ->
-                                    budgetLease?.settle(
-                                        reply.usage.promptTokens.takeIf { reply.usage.reported },
-                                    )
-                                }
+                                    profile = profile, model = model, baseUrl = baseUrl,
+                                    messages = activeHistory, tools = tools,
+                                )
                             } catch (error: LocalModelException) {
-                                routeCircuitBreaker?.observeFailure(profile.id, error)
                                 logSubagentProviderError(eventLog(), subagentId, step, error)
                                 throw error
                             }
                         }
-                    } finally {
-                        budgetLease?.settle()
                     }
                 }
             } catch (error: Throwable) {
