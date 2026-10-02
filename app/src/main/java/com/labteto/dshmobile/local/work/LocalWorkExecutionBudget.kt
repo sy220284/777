@@ -1,14 +1,18 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelAdmissionState
+import com.labteto.dshmobile.local.model.modelFailureKind
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
 /**
- * Work-run-local admission budget.
+ * Work-run-local model exposure budget.
  *
- * estimated exposure is diagnostic/admission-only and must never be added to API-reported token
- * accounting. A reservation is committed even when a request fails because the provider may have
- * admitted work without returning usage.
+ * Reservations are provisional until the transport can classify the attempt. Only requests that
+ * may actually have reached provider inference become committed exposure. Explicit HTTP rejection
+ * and failures proven to occur before the full request body is sent release both exposure and the
+ * request slot. Estimated exposure is safety-only and never enters user token accounting.
  */
 internal class LocalWorkExecutionBudget(
     private val exposureLimitTokens: Long = DEFAULT_EXPOSURE_LIMIT_TOKENS,
@@ -17,13 +21,14 @@ internal class LocalWorkExecutionBudget(
 ) {
     private var committedExposureTokens: Long = 0L
     private var pendingExposureTokens: Long = 0L
+    private var reservedRequests: Int = 0
     private var admittedRequests: Int = 0
 
     suspend fun reserve(estimatedInputTokens: Int): Lease {
         val estimate = estimatedInputTokens.coerceAtLeast(1).toLong()
         while (true) {
-            val admitted = synchronized(this) {
-                if (admittedRequests >= maxRequests) {
+            val reserved = synchronized(this) {
+                if (admittedRequests + reservedRequests >= maxRequests) {
                     throw budgetExceeded("模型请求次数已达到 $maxRequests 次")
                 }
                 if (committedExposureTokens + pendingExposureTokens + estimate > exposureLimitTokens) {
@@ -31,13 +36,13 @@ internal class LocalWorkExecutionBudget(
                 }
                 if (pendingExposureTokens == 0L || pendingExposureTokens + estimate <= pendingLimitTokens) {
                     pendingExposureTokens += estimate
-                    admittedRequests += 1
+                    reservedRequests += 1
                     true
                 } else {
                     false
                 }
             }
-            if (admitted) return Lease(this, estimate)
+            if (reserved) return Lease(this, estimate)
             delay(PENDING_RECHECK_MILLIS)
         }
     }
@@ -48,14 +53,23 @@ internal class LocalWorkExecutionBudget(
         pendingExposureTokens = pendingExposureTokens,
         exposureLimitTokens = exposureLimitTokens,
         admittedRequests = admittedRequests,
+        reservedRequests = reservedRequests,
         maxRequests = maxRequests,
     )
 
     @Synchronized
-    private fun settle(estimate: Long, reportedInputTokens: Long?) {
+    private fun commit(estimate: Long, reportedInputTokens: Long?) {
         pendingExposureTokens = (pendingExposureTokens - estimate).coerceAtLeast(0L)
+        reservedRequests = (reservedRequests - 1).coerceAtLeast(0)
+        admittedRequests += 1
         val committed = reportedInputTokens?.takeIf { it > 0L } ?: estimate
         committedExposureTokens = (committedExposureTokens + committed).coerceAtMost(Long.MAX_VALUE)
+    }
+
+    @Synchronized
+    private fun release(estimate: Long) {
+        pendingExposureTokens = (pendingExposureTokens - estimate).coerceAtLeast(0L)
+        reservedRequests = (reservedRequests - 1).coerceAtLeast(0)
     }
 
     private fun budgetExceeded(detail: String) = LocalModelException(
@@ -70,8 +84,12 @@ internal class LocalWorkExecutionBudget(
     ) {
         private val settled = AtomicBoolean(false)
 
-        fun settle(reportedInputTokens: Long? = null) {
-            if (settled.compareAndSet(false, true)) owner.settle(estimate, reportedInputTokens)
+        fun commit(reportedInputTokens: Long? = null) {
+            if (settled.compareAndSet(false, true)) owner.commit(estimate, reportedInputTokens)
+        }
+
+        fun release() {
+            if (settled.compareAndSet(false, true)) owner.release(estimate)
         }
     }
 
@@ -80,6 +98,7 @@ internal class LocalWorkExecutionBudget(
         val pendingExposureTokens: Long,
         val exposureLimitTokens: Long,
         val admittedRequests: Int,
+        val reservedRequests: Int,
         val maxRequests: Int,
     )
 
@@ -91,7 +110,7 @@ internal class LocalWorkExecutionBudget(
     }
 }
 
-/** Per-run route breaker. Terminal account/quota failures stop sibling workers from hitting the same wall. */
+/** Per-run route breaker. Only durable account/credential faults stop sibling workers. */
 internal class LocalModelRouteCircuitBreaker {
     private val openRoutes = linkedMapOf<String, String>()
 
@@ -107,7 +126,7 @@ internal class LocalModelRouteCircuitBreaker {
 
     @Synchronized
     fun observeFailure(fingerprint: String, error: LocalModelException) {
-        if (isTerminalRouteFailure(error.code)) {
+        if (isTerminalRouteFailure(error)) {
             openRoutes.putIfAbsent(fingerprint, error.code)
         }
     }
@@ -116,26 +135,41 @@ internal class LocalModelRouteCircuitBreaker {
     fun isOpen(fingerprint: String): Boolean = fingerprint in openRoutes
 }
 
+private fun isTerminalRouteFailure(error: LocalModelException): Boolean =
+    modelFailureKind(error) in setOf(
+        "credential_missing",
+        "auth_failed",
+        "auth_forbidden",
+        "account_limit",
+    )
+
+/**
+ * Code-only form is kept for workflow-level delegated errors that no longer carry the original
+ * exception. Local work budget/timeout errors are intentionally not route failures.
+ */
 internal fun isTerminalRouteFailure(code: String): Boolean =
     code in setOf(
         "CHATGPT_PLAN_LIMIT_REACHED",
-        "MODEL_ROUTE_CIRCUIT_OPEN",
-        "WORK_BUDGET_EXHAUSTED",
-        "MODEL_AUTH_FAILED",
+        "CHATGPT_PLAN_USER_NOT_ELIGIBLE",
+        "CHATGPT_PLAN_INVALID_USER",
+        "CHATGPT_PLAN_PERMISSION_CONTEXT_INVALID",
         "MODEL_CREDENTIAL_MISSING",
         "NO_MODEL_CREDENTIAL",
+        "MODEL_HTTP_401",
+        "MODEL_HTTP_402",
+        "MODEL_HTTP_403",
     )
 
-
 internal fun shouldAutoContinueWorkFailure(
-    errorCode: String?,
+    error: LocalModelException?,
     automaticContinuationCount: Int,
     pendingInputs: Int,
 ): Boolean =
-    errorCode == "CHATGPT_PLAN_STREAM_INTERRUPTED" &&
-        automaticContinuationCount == 0 &&
+    error?.continuationEligible == true &&
+        automaticContinuationCount < MAX_AUTOMATIC_CONTINUATIONS &&
         pendingInputs == 0
 
+private const val MAX_AUTOMATIC_CONTINUATIONS = 2
 
 internal class LocalWorkExecutionControl(
     val budget: LocalWorkExecutionBudget = LocalWorkExecutionBudget(),
@@ -167,14 +201,23 @@ internal suspend fun executeWithModelAdmission(
     }
     control?.circuitBreaker?.requireClosed(profileId)
     val lease = control?.budget?.reserve(pressure.estimatedInputTokens)
-    return try {
-        block().also { reply ->
-            lease?.settle(reply.usage.promptTokens.takeIf { reply.usage.reported })
-        }
+    try {
+        val reply = block()
+        lease?.commit(reply.usage.promptTokens.takeIf { reply.usage.reported })
+        return reply
+    } catch (cancelled: CancellationException) {
+        lease?.commit()
+        throw cancelled
     } catch (error: LocalModelException) {
+        when (error.admissionState) {
+            LocalModelAdmissionState.NOT_SENT,
+            LocalModelAdmissionState.REJECTED -> lease?.release()
+            else -> lease?.commit()
+        }
         control?.circuitBreaker?.observeFailure(profileId, error)
         throw error
-    } finally {
-        lease?.settle()
+    } catch (error: Throwable) {
+        lease?.commit()
+        throw error
     }
 }
