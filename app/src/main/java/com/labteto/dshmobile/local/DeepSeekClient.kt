@@ -8,7 +8,11 @@ import kotlinx.coroutines.Dispatchers
 import com.labteto.dshmobile.local.model.withCancellableModelResponse
 import com.labteto.dshmobile.local.model.validatedModelToolCall
 import com.labteto.dshmobile.local.model.requireUniqueModelToolCallIds
+import com.labteto.dshmobile.local.model.LocalModelAdmissionState
+import com.labteto.dshmobile.local.model.LocalModelAdmissionTracker
 import com.labteto.dshmobile.local.model.modelPostAdmissionFailure
+import com.labteto.dshmobile.local.model.modelTransportFailure
+import com.labteto.dshmobile.local.model.withModelAdmissionTracking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -579,6 +583,8 @@ class LocalModelException(
     val requestId: String? = null,
     val providerCode: String? = null,
     val providerParam: String? = null,
+    val admissionState: LocalModelAdmissionState = LocalModelAdmissionState.NOT_APPLICABLE,
+    val continuationEligible: Boolean = false,
 ) : Exception(message, cause)
 
 internal fun contextWindowExceeded(error: Throwable): Boolean {
