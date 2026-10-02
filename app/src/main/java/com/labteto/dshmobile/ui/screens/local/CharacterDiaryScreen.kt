@@ -33,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -42,6 +44,7 @@ import com.labteto.dshmobile.local.chat.ChatDiarySourceMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
+import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
@@ -139,6 +142,8 @@ internal fun CharacterDiaryScreen(
     var selectedFilterIndex by rememberSaveable { mutableIntStateOf(0) }
     var entries by remember { mutableStateOf<List<ChatDiaryEntry>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
+    var loadFailed by remember { mutableStateOf(false) }
+    var reloadNonce by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(subjects, preferredKey) {
         if (selectedSubjectKey == null || subjects.none { it.key == selectedSubjectKey }) {
@@ -146,14 +151,21 @@ internal fun CharacterDiaryScreen(
                 ?: subjects.firstOrNull()?.key
         }
     }
-    LaunchedEffect(selectedSubjectKey) {
+    LaunchedEffect(selectedSubjectKey, reloadNonce) {
         val key = selectedSubjectKey
         if (key == null) {
             entries = emptyList()
+            loadFailed = false
             loading = false
         } else {
             loading = true
-            entries = runCatching { loadEntries(key) }.getOrDefault(emptyList())
+            loadFailed = false
+            runCatching { loadEntries(key) }
+                .onSuccess { entries = it }
+                .onFailure {
+                    entries = emptyList()
+                    loadFailed = true
+                }
             loading = false
         }
     }
@@ -195,9 +207,11 @@ internal fun CharacterDiaryScreen(
                     item(key = "diary-subjects") {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                             items(subjects, key = CharacterDiarySubject::key) { subject ->
+                                val selected = subject.key == selectedSubjectKey
                                 DsPill(
                                     text = subject.name,
-                                    selected = subject.key == selectedSubjectKey,
+                                    modifier = Modifier.semantics { this.selected = selected },
+                                    selected = selected,
                                     onClick = {
                                         selectedSubjectKey = subject.key
                                         query = ""
@@ -249,6 +263,18 @@ internal fun CharacterDiaryScreen(
                                 color = colors.accent,
                             )
                         }
+                    }
+                    loadFailed -> item(key = "diary-load-failed") {
+                        CharacterDiaryEmptyState(
+                            title = stringResource(R.string.chat_diary_load_failed_title),
+                            body = stringResource(R.string.chat_diary_load_failed_body),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.xlarge),
+                        )
+                        DsButton(
+                            text = stringResource(R.string.common_retry),
+                            onClick = { reloadNonce++ },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                     visibleEntries.isEmpty() -> item(key = "diary-empty") {
                         CharacterDiaryEmptyState(
