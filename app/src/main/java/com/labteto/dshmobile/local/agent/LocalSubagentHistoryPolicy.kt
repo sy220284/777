@@ -2,8 +2,6 @@ package com.labteto.dshmobile.local.agent
 import com.labteto.dshmobile.local.*
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /** Owns subagent history retention, compaction and bounded progress memory. */
 internal class LocalSubagentHistoryPolicy(
@@ -56,13 +54,7 @@ internal class LocalSubagentHistoryPolicy(
                 summaryMode = LocalHistorySummaryMode.WORK,
             )?.also { history.reset(it.messages) }
         } ?: return
-        eventLog().append("subagent/compaction", buildJsonObject {
-            put("agent_id", subagentId)
-            put("omitted_messages", compaction.omittedMessages)
-            put("summary", compaction.summary)
-            put("estimated_tokens_before", compaction.estimatedTokensBefore)
-            put("estimated_tokens_after", compaction.estimatedTokensAfter)
-        })
+        recordSubagentCompaction(eventLog(), subagentId, compaction)
     }
 
     fun rememberProgress(progress: ArrayDeque<String>, item: String) =
