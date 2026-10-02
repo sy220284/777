@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.observability.AppLogEntry
 import java.util.ArrayDeque
 
 /**
@@ -13,9 +14,22 @@ internal fun appendLocalDiagnosticDetails(
     sessionId: String,
     eventLog: LocalSessionEventLog,
     usageTracker: DeepSeekUsageTracker,
+    appLogs: List<AppLogEntry>,
 ): String = buildString {
     append(baseReport.trimEnd())
     appendLine()
+    appendLine()
+    appendLine("持久日志来源：")
+    val logSources = appLogs
+        .map { entry ->
+            val version = entry.appVersion?.takeIf(String::isNotBlank) ?: "legacy/unknown"
+            val code = entry.appVersionCode?.toString() ?: "?"
+            val process = entry.processInstanceId?.takeIf(String::isNotBlank) ?: "legacy"
+            "$version($code)@process:$process"
+        }
+        .distinct()
+    appendLine(if (logSources.isEmpty()) "暂无" else logSources.joinToString("；"))
+    appendLine("说明：报告头的应用版本表示当前导出版本；每条持久日志的真实来源版本/进程以上述来源标识为准。")
     appendLine()
     appendLine("当前会话结构化追踪：")
     appendLine("session_id=$sessionId")
