@@ -1228,6 +1228,7 @@ class LocalHarnessEngine @Inject constructor(
             requestedText,
             eventLog,
             memoryStore,
+            chatPersonaGalleryStore,
             modelHistory,
             modelHistoryCheckpointCodec,
             _state,
@@ -1235,8 +1236,11 @@ class LocalHarnessEngine @Inject constructor(
             { sequence -> transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, sequence) },
             { reason -> checkpointModelHistory(reason) },
             { persist() },
-        ) { content, memoryInput, modelMessage ->
-            queueTurnLocked(content, memoryInput, modelMessage).start()
+            { content -> transcriptRuntime.newMessage("user", content) },
+        ) { content, memoryInput, sourceMessageId ->
+            scope.launch(start = CoroutineStart.LAZY) {
+                runTurn(content, memoryInput, sourceMessageId)
+            }.also { activeJob = it; it.start() }
         }
         if (state.usageMode != LocalUsageMode.CHAT) {
             return@synchronized LocalChatUserEditResult.UNAVAILABLE
