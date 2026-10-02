@@ -34,6 +34,54 @@ class LocalModelProfilesTest {
     }
 
 
+    @Test fun routeFingerprintUsesTheEffectiveTransportIdentity() {
+        val apiProfile = LocalModelProfile(
+            id = "api-profile",
+            model = "claude-sonnet-5-5",
+            baseUrl = "https://api.anthropic.com/v1/",
+            authKind = LocalModelAuthKind.API_KEY,
+            protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
+        )
+        assertEquals(
+            localModelRouteFingerprint(
+                protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
+                authKind = LocalModelAuthKind.API_KEY,
+                profileId = apiProfile.id,
+                baseUrl = apiProfile.baseUrl,
+                model = apiProfile.model,
+            ),
+            apiProfile.routeFingerprint(),
+        )
+
+        val planProfile = LocalModelProfile(
+            id = "plan-profile",
+            model = "gpt-6-astra",
+            baseUrl = "https://api.openai.com/v1",
+            authKind = LocalModelAuthKind.CHATGPT_PLAN,
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+        )
+        assertEquals(
+            localModelRouteFingerprint(
+                protocol = LocalModelProtocol.RESPONSES,
+                authKind = LocalModelAuthKind.CHATGPT_PLAN,
+                profileId = planProfile.id,
+                baseUrl = planProfile.baseUrl,
+                model = planProfile.model,
+            ),
+            planProfile.routeFingerprint(),
+        )
+        assertNotEquals(
+            localModelRouteFingerprint(
+                protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+                authKind = LocalModelAuthKind.CHATGPT_PLAN,
+                profileId = planProfile.id,
+                baseUrl = planProfile.baseUrl,
+                model = planProfile.model,
+            ),
+            planProfile.routeFingerprint(),
+        )
+    }
+
     @Test fun migratedOfficialClaudeRouteReusesStableApiCredentialProfileId() {
         val officialBase = "https://api.anthropic.com/v1"
         val legacy = LocalModelProfile(
