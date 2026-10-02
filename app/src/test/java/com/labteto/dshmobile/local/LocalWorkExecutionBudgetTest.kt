@@ -4,6 +4,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -41,8 +42,8 @@ class LocalWorkExecutionBudgetTest {
         )
         val messages = listOf(
             kotlinx.serialization.json.buildJsonObject {
-                kotlinx.serialization.json.put("role", "user")
-                kotlinx.serialization.json.put("content", "test")
+                put("role", "user")
+                put("content", "test")
             },
         )
 
@@ -85,8 +86,8 @@ class LocalWorkExecutionBudgetTest {
         )
         val messages = listOf(
             kotlinx.serialization.json.buildJsonObject {
-                kotlinx.serialization.json.put("role", "user")
-                kotlinx.serialization.json.put("content", "test")
+                put("role", "user")
+                put("content", "test")
             },
         )
 
