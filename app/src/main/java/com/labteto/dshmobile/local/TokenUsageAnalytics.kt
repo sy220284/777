@@ -77,6 +77,25 @@ data class TokenPromptBreakdown(
         }
 }
 
+    fun calibratedToReportedInput(reportedInputTokens: Long): TokenPromptBreakdown {
+        if (reportedInputTokens <= 0L || estimatedInputTokens <= 0L) return this
+        val target = reportedInputTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val factor = target.toDouble() / estimatedInputTokens.toDouble()
+        fun scaled(value: Int): Int = (value.toDouble() * factor).toInt().coerceAtLeast(0)
+        val base = copy(
+            systemBaseTokens = scaled(systemBaseTokens),
+            personaStateTokens = scaled(personaStateTokens),
+            memoryRuleTokens = scaled(memoryRuleTokens),
+            historyTokens = scaled(historyTokens),
+            currentUserTokens = scaled(currentUserTokens),
+            toolDefinitionTokens = scaled(toolDefinitionTokens),
+            otherSystemTokens = scaled(otherSystemTokens),
+        )
+        val remainder = (target - base.estimatedInputTokens.toInt()).coerceAtLeast(0)
+        return base.copy(otherSystemTokens = base.otherSystemTokens + remainder)
+    }
+
+
 @Serializable
 data class TokenUsageContext(
     val mode: LocalUsageMode? = null,
@@ -289,7 +308,11 @@ internal fun DeepSeekUsageTracker.record(
         usage = reply.usage,
         requestId = reply.requestId,
         context = context,
-        promptBreakdown = reply.promptBreakdown,
+        promptBreakdown = if (reply.usage.reported) {
+            reply.promptBreakdown.calibratedToReportedInput(reply.usage.promptTokens)
+        } else {
+            reply.promptBreakdown
+        },
         route = reply.routeIdentity,
     )
 }
