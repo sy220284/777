@@ -1,46 +1,29 @@
 package com.labteto.dshmobile.local.chat
 
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.UUID
-import com.labteto.dshmobile.observability.AppLog
 import kotlinx.serialization.json.Json
 
 /**
  * Durable character diary projection.
  *
- * SessionEventLog remains the raw fact source. Diary entries are sparse narrative projections:
- * grounded event anchors plus the character's private interpretation. They are never a second
- * transcript and are safe to invalidate when their source branch is rewritten.
+ * SessionEventLog remains the raw fact source. This store owns diary-level orchestration only;
+ * persistence lives in [ChatDiaryDocumentStore] and entry semantics live in [ChatDiaryEntryPolicy].
  */
 internal class ChatDiaryStore(
-    private val root: File,
-    private val json: Json,
+    root: File,
+    json: Json,
 ) {
-    init { root.mkdirs() }
-
-    private val file = File(root, "diary.json")
-    private val backup = File(root, "diary.json.bak")
-    private var cached: ChatDiaryDocument? = null
-    private var cachedStamp: Pair<Long, Long>? = null
+    private val documents = ChatDiaryDocumentStore(root, json)
 
     @Synchronized
     fun record(request: ChatDiaryWriteRequest): ChatDiaryEntry? {
-        val delta = sanitizeDelta(request) ?: return null
+        val delta = ChatDiaryEntryPolicy.sanitizeDelta(request) ?: return null
         val now = System.currentTimeMillis()
-        val document = readDocument()
+        val document = documents.read()
         val entries = document.entries.toMutableList()
-        val disclosure = if (
-            request.sourceMode == ChatDiarySourceMode.DIRECT &&
-            PRIVACY_SIGNAL.containsMatchIn(request.evidenceText)
-        ) {
-            ChatDiaryDisclosure.PRIVATE
-        } else {
-            normalizedDisclosure(delta.disclosure, request.sourceMode)
-        }
-
-        val candidateSources = diarySources(request)
+        val disclosure = ChatDiaryEntryPolicy.disclosureFor(request, delta)
+        val candidateSources = ChatDiaryEntryPolicy.sourcesFor(request)
         val candidateRevision = ChatDiaryRevision(
             event = delta.event,
             feeling = delta.feeling,
@@ -72,27 +55,26 @@ internal class ChatDiaryStore(
         )
 
         val duplicateIndex = entries.indexOfLast { existing ->
-            existing.active &&
-                existing.subjectKey == candidate.subjectKey &&
-                existing.sourceMode == candidate.sourceMode &&
-                entryRevisions(existing).size < MAX_REFINEMENT_REVISIONS &&
-                now - existing.updatedAt <= DUPLICATE_WINDOW_MILLIS &&
-                diarySimilarity(existing.event, candidate.event) >= DUPLICATE_SIMILARITY
+            ChatDiaryEntryPolicy.isRefinementCandidate(existing, candidate, now)
         }
         val saved = if (duplicateIndex >= 0) {
             val previous = entries[duplicateIndex]
-            rebuildFromRevisions(
+            ChatDiaryEntryPolicy.rebuild(
                 entry = previous,
-                revisions = entryRevisions(previous) + candidateRevision,
+                revisions = ChatDiaryEntryPolicy.revisionsOf(previous) + candidateRevision,
                 updatedAt = now,
             ).also { entries[duplicateIndex] = it }
         } else {
             candidate.also(entries::add)
         }
 
-        writeDocument(
+        documents.write(
             ChatDiaryDocument(
-                entries = compact(entries, MAX_CHAT_DIARY_ENTRIES, protectedId = saved.id),
+                entries = ChatDiaryEntryPolicy.compact(
+                    entries = entries,
+                    maxEntries = MAX_CHAT_DIARY_ENTRIES,
+                    protectedId = saved.id,
+                ),
             ),
         )
         return saved
@@ -107,12 +89,12 @@ internal class ChatDiaryStore(
     ): List<ChatDiaryEntry> {
         val cleanSubject = subjectKey.trim()
         if (cleanSubject.isBlank()) return emptyList()
-        val queryCore = normalizeDiaryText(query)
-        val queryTerms = diaryTerms(query)
+        val queryCore = ChatDiaryEntryPolicy.normalizeQuery(query)
+        val queryTerms = ChatDiaryEntryPolicy.queryTerms(query)
         val broad = isExplicitDiaryRecall(query)
         val now = System.currentTimeMillis()
 
-        val eligible = readDocument().entries.asSequence()
+        val eligible = documents.read().entries.asSequence()
             .filter { entry ->
                 entry.active &&
                     entry.subjectKey == cleanSubject &&
@@ -134,22 +116,14 @@ internal class ChatDiaryStore(
 
         return candidates.asSequence()
             .map { entry ->
-                val lexical = diaryTerms(entry.event + " " + entry.relationshipMeaning + " " + entry.unresolvedEcho)
-                    .count(queryTerms::contains)
-                val phrase = if (queryCore.isBlank()) 0 else {
-                    (diarySimilarity(queryCore, entry.searchText()) * 100).toInt()
-                }
-                val semantic = lexical * 24 + phrase
-                val ageDays = ((now - entry.updatedAt).coerceAtLeast(0L) / DAY_MILLIS).toInt()
-                val recency = (30 - ageDays).coerceIn(0, 30)
-                Triple(entry, semantic, semantic + entry.importance * 12 + recency)
+                entry to ChatDiaryEntryPolicy.matchScore(entry, queryCore, queryTerms, now)
             }
-            .filter { (_, semantic, _) -> broad || semantic >= MIN_RECALL_SEMANTIC_SCORE }
+            .filter { (_, score) -> ChatDiaryEntryPolicy.isRecallMatch(score, broad) }
             .sortedWith(
-                compareByDescending<Triple<ChatDiaryEntry, Int, Int>> { it.third }
+                compareByDescending<Pair<ChatDiaryEntry, ChatDiaryMatchScore>> { it.second.total }
                     .thenByDescending { it.first.updatedAt },
             )
-            .map(Triple<ChatDiaryEntry, Int, Int>::first)
+            .map(Pair<ChatDiaryEntry, ChatDiaryMatchScore>::first)
             .take(maxItems.coerceIn(1, 6))
             .toList()
     }
@@ -161,13 +135,13 @@ internal class ChatDiaryStore(
         discardedMessageIds: Set<String> = emptySet(),
     ): Int {
         if (sourceSessionId.isBlank()) return 0
-        val entries = readDocument().entries.toMutableList()
+        val entries = documents.read().entries.toMutableList()
         val now = System.currentTimeMillis()
         var changed = 0
         entries.indices.forEach { index ->
             val entry = entries[index]
             if (!entry.active || entry.sources.none { it.sessionId == sourceSessionId }) return@forEach
-            val revisions = entryRevisions(entry)
+            val revisions = ChatDiaryEntryPolicy.revisionsOf(entry)
             val remaining = revisions.filterNot { revision ->
                 revision.sources.any { source ->
                     source.sessionId == sourceSessionId && if (discardedMessageIds.isNotEmpty()) {
@@ -187,25 +161,25 @@ internal class ChatDiaryStore(
                         updatedAt = now,
                     )
                 } else {
-                    rebuildFromRevisions(entry, remaining, now)
+                    ChatDiaryEntryPolicy.rebuild(entry, remaining, now)
                 }
                 changed++
             }
         }
-        if (changed > 0) writeDocument(ChatDiaryDocument(entries = entries))
+        if (changed > 0) documents.write(ChatDiaryDocument(entries = entries))
         return changed
     }
 
     @Synchronized
     fun detachSourceSessions(sessionIds: Set<String>): Int {
         if (sessionIds.isEmpty()) return 0
-        val entries = readDocument().entries.toMutableList()
+        val entries = documents.read().entries.toMutableList()
         val now = System.currentTimeMillis()
         var changed = 0
         entries.indices.forEach { index ->
             val entry = entries[index]
             if (!entry.active || entry.sources.none { it.sessionId in sessionIds }) return@forEach
-            val revisions = entryRevisions(entry)
+            val revisions = ChatDiaryEntryPolicy.revisionsOf(entry)
             val remaining = revisions.filterNot { revision ->
                 revision.sources.any { it.sessionId in sessionIds }
             }
@@ -218,320 +192,26 @@ internal class ChatDiaryStore(
                         updatedAt = now,
                     )
                 } else {
-                    rebuildFromRevisions(entry, remaining, now)
+                    ChatDiaryEntryPolicy.rebuild(entry, remaining, now)
                 }
                 changed++
             }
         }
-        if (changed > 0) writeDocument(ChatDiaryDocument(entries = entries))
+        if (changed > 0) documents.write(ChatDiaryDocument(entries = entries))
         return changed
     }
 
     @Synchronized
     fun listActive(subjectKey: String, limit: Int = 100): List<ChatDiaryEntry> =
-        readDocument().entries.asSequence()
+        documents.read().entries.asSequence()
             .filter { it.active && it.subjectKey == subjectKey }
             .sortedByDescending(ChatDiaryEntry::updatedAt)
             .take(limit.coerceIn(1, MAX_CHAT_DIARY_ENTRIES))
             .toList()
 
-    private fun sanitizeDelta(request: ChatDiaryWriteRequest): ChatDiaryDelta? {
-        val raw = request.delta ?: return null
-        if (request.subjectKey.isBlank() || request.sourceSessionId.isBlank()) return null
-        val significance = request.turnSignificance.trim().uppercase()
-        if (significance == "NONE") return null
-
-        val event = raw.event.trim().take(MAX_EVENT_CHARS)
-        val importance = raw.importance.coerceIn(0, 5)
-        if (event.length < MIN_EVENT_CHARS || importance < MIN_IMPORTANCE) return null
-        if (significance != "MAJOR" && importance < MINOR_IMPORTANCE) return null
-        if (!diaryEventGrounded(event, request.evidenceText)) return null
-
-        return ChatDiaryDelta(
-            event = event,
-            feeling = raw.feeling.trim().take(MAX_FEELING_CHARS),
-            innerThought = raw.innerThought.trim().take(MAX_THOUGHT_CHARS),
-            relationshipMeaning = raw.relationshipMeaning.trim().take(MAX_RELATIONSHIP_CHARS),
-            unresolvedEcho = raw.unresolvedEcho.trim().take(MAX_ECHO_CHARS),
-            importance = importance,
-            disclosure = raw.disclosure.trim().uppercase(),
-        ).takeIf { delta ->
-            significance == "MAJOR" ||
-                delta.feeling.isNotBlank() ||
-                delta.innerThought.isNotBlank() ||
-                delta.relationshipMeaning.isNotBlank() ||
-                delta.unresolvedEcho.isNotBlank()
-        }
-    }
-
-    private fun diaryEventGrounded(event: String, evidence: String): Boolean {
-        val a = normalizeDiaryText(event)
-        val b = normalizeDiaryText(evidence)
-        if (a.length < 2 || b.length < 2) return false
-        if (b.contains(a) || a.contains(b.take(120))) return true
-        val aa = diaryBigrams(a)
-        val bb = diaryBigrams(b)
-        if (aa.isEmpty() || bb.isEmpty()) return false
-        val shared = aa.count(bb::contains)
-        val coverage = shared.toDouble() / aa.size.toDouble()
-        return shared >= 2 && coverage >= MIN_EVIDENCE_COVERAGE
-    }
-
-    private fun normalizedDisclosure(raw: String, mode: ChatDiarySourceMode): ChatDiaryDisclosure {
-        val requested = runCatching { ChatDiaryDisclosure.valueOf(raw.trim().uppercase()) }.getOrNull()
-        return when (mode) {
-            ChatDiarySourceMode.DIRECT -> when (requested) {
-                ChatDiaryDisclosure.PRIVATE -> ChatDiaryDisclosure.PRIVATE
-                else -> ChatDiaryDisclosure.SHAREABLE
-            }
-            ChatDiarySourceMode.GROUP -> when (requested) {
-                ChatDiaryDisclosure.PRIVATE -> ChatDiaryDisclosure.PRIVATE
-                else -> ChatDiaryDisclosure.PUBLIC
-            }
-        }
-    }
-
-    private fun stricterDisclosure(
-        left: ChatDiaryDisclosure,
-        right: ChatDiaryDisclosure,
-    ): ChatDiaryDisclosure = when {
-        left == ChatDiaryDisclosure.PRIVATE || right == ChatDiaryDisclosure.PRIVATE ->
-            ChatDiaryDisclosure.PRIVATE
-        left == ChatDiaryDisclosure.SHAREABLE || right == ChatDiaryDisclosure.SHAREABLE ->
-            ChatDiaryDisclosure.SHAREABLE
-        else -> ChatDiaryDisclosure.PUBLIC
-    }
-
-    private fun compact(
-        entries: List<ChatDiaryEntry>,
-        maxEntries: Int,
-        protectedId: String,
-    ): List<ChatDiaryEntry> {
-        if (entries.size <= maxEntries) return entries
-        val retainedIds = entries.asSequence()
-            .filter(ChatDiaryEntry::active)
-            .sortedWith(
-                compareByDescending<ChatDiaryEntry> { if (it.id == protectedId) 1 else 0 }
-                    .thenByDescending(ChatDiaryEntry::importance)
-                    .thenByDescending(ChatDiaryEntry::updatedAt),
-            )
-            .take(maxEntries)
-            .mapTo(hashSetOf(), ChatDiaryEntry::id)
-        return entries.filter { it.id in retainedIds }
-    }
-
-    private fun readDocument(): ChatDiaryDocument {
-        val currentStamp = stamp()
-        cached?.takeIf { cachedStamp == currentStamp }?.let { return it }
-
-        decode(file)?.let { document ->
-            cached = document
-            cachedStamp = currentStamp
-            return document
-        }
-
-        val recovered = decode(backup)
-        if (recovered != null) {
-            if (file.isFile) quarantine(file, "primary")
-            runCatching { backup.copyTo(file, overwrite = true) }
-            cached = recovered
-            cachedStamp = stamp()
-            return recovered
-        }
-
-        if (file.isFile) quarantine(file, "primary")
-        if (backup.isFile) quarantine(backup, "backup")
-        if (currentStamp.first > 0L || currentStamp.second > 0L) {
-            AppLog.error("ChatDiaryStore", "人物日记主文件与备份均无法解析；损坏文件已隔离")
-        }
-        return ChatDiaryDocument().also { document ->
-            cached = document
-            cachedStamp = stamp()
-        }
-    }
-
-    private fun decode(target: File): ChatDiaryDocument? {
-        if (!target.isFile) return null
-        return runCatching {
-            json.decodeFromString(ChatDiaryDocument.serializer(), target.readText())
-        }.getOrNull()
-    }
-
-    private fun quarantine(target: File, label: String) {
-        if (!target.isFile) return
-        val corrupt = File(root, "diary.$label.corrupt-${System.currentTimeMillis()}.json")
-        val moved = runCatching { target.renameTo(corrupt) }.getOrDefault(false)
-        if (!moved) {
-            runCatching {
-                target.copyTo(corrupt, overwrite = false)
-                target.delete()
-            }
-        }
-    }
-
-    private fun writeDocument(document: ChatDiaryDocument) {
-        root.mkdirs()
-        val temp = File(root, "diary.json.tmp")
-        temp.writeText(json.encodeToString(ChatDiaryDocument.serializer(), document))
-        if (file.isFile && decode(file) != null) {
-            runCatching { file.copyTo(backup, overwrite = true) }
-        }
-        runCatching {
-            Files.move(
-                temp.toPath(),
-                file.toPath(),
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE,
-            )
-        }.getOrElse {
-            Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        }
-        if (!backup.isFile || decode(backup) == null) {
-            runCatching { file.copyTo(backup, overwrite = true) }
-        }
-        cached = document
-        cachedStamp = stamp()
-    }
-
-    private fun stamp(): Pair<Long, Long> =
-        (file.lastModified() to file.length())
-
-    private fun ChatDiaryEntry.searchText(): String =
-        listOf(event, feeling, innerThought, relationshipMeaning, unresolvedEcho)
-            .filter(String::isNotBlank)
-            .joinToString(" ")
-
-    private fun diarySources(request: ChatDiaryWriteRequest): List<ChatDiarySourceRef> {
-        val users = request.sourceUserMessageIds.map(String::trim)
-        val assistants = request.sourceAssistantMessageIds.map(String::trim)
-        val count = maxOf(users.size, assistants.size)
-        val sources = (0 until count).mapNotNull { index ->
-            val userId = users.getOrNull(index).orEmpty()
-            val assistantId = assistants.getOrNull(index).orEmpty()
-            if (userId.isBlank() && assistantId.isBlank()) {
-                null
-            } else {
-                ChatDiarySourceRef(
-                    sessionId = request.sourceSessionId,
-                    userMessageId = userId,
-                    assistantMessageId = assistantId,
-                )
-            }
-        }.distinct()
-        return if (sources.isNotEmpty()) {
-            sources.takeLast(MAX_SOURCE_IDS)
-        } else {
-            listOf(ChatDiarySourceRef(sessionId = request.sourceSessionId))
-        }
-    }
-
-    private fun entryRevisions(entry: ChatDiaryEntry): List<ChatDiaryRevision> =
-        entry.revisions.takeIf { it.isNotEmpty() }
-            ?: listOf(
-                ChatDiaryRevision(
-                    event = entry.event,
-                    feeling = entry.feeling,
-                    innerThought = entry.innerThought,
-                    relationshipMeaning = entry.relationshipMeaning,
-                    unresolvedEcho = entry.unresolvedEcho,
-                    importance = entry.importance,
-                    disclosure = entry.disclosure,
-                    sources = entry.sources,
-                    updatedAt = entry.updatedAt,
-                ),
-            )
-
-    private fun rebuildFromRevisions(
-        entry: ChatDiaryEntry,
-        revisions: List<ChatDiaryRevision>,
-        updatedAt: Long,
-    ): ChatDiaryEntry {
-        require(revisions.isNotEmpty())
-        val current = revisions.last()
-        val disclosure = revisions
-            .map(ChatDiaryRevision::disclosure)
-            .reduce(::stricterDisclosure)
-        val sources = revisions.flatMap(ChatDiaryRevision::sources).distinct()
-        return entry.copy(
-            event = current.event.take(MAX_EVENT_CHARS),
-            feeling = current.feeling.take(MAX_FEELING_CHARS),
-            innerThought = current.innerThought.take(MAX_THOUGHT_CHARS),
-            relationshipMeaning = current.relationshipMeaning.take(MAX_RELATIONSHIP_CHARS),
-            unresolvedEcho = current.unresolvedEcho.take(MAX_ECHO_CHARS),
-            importance = revisions.maxOf(ChatDiaryRevision::importance),
-            disclosure = disclosure,
-            sources = sources,
-            revisions = revisions,
-            updatedAt = updatedAt,
-        )
-    }
-
-    private fun diarySimilarity(left: String, right: String): Double {
-        val normalizedLeft = normalizeDiaryText(left)
-        val normalizedRight = normalizeDiaryText(right)
-        if (hasNegation(normalizedLeft) != hasNegation(normalizedRight)) return 0.0
-        val a = diaryBigrams(canonicalDiaryEvent(normalizedLeft))
-        val b = diaryBigrams(canonicalDiaryEvent(normalizedRight))
-        if (a.isEmpty() || b.isEmpty()) return 0.0
-        val shared = a.count(b::contains).toDouble()
-        val union = a.union(b).size.toDouble()
-        val containment = shared / minOf(a.size, b.size).toDouble()
-        val jaccard = if (union == 0.0) 0.0 else shared / union
-        return maxOf(containment, jaccard)
-    }
-
-    private fun hasNegation(text: String): Boolean =
-        NEGATION_SIGNAL.containsMatchIn(text)
-
-    private fun canonicalDiaryEvent(text: String): String =
-        text.replace(REPEATED_CONFIRMATION_NOISE, "")
-            .replace(AGREEMENT_VARIANTS, "确认")
-            .replace("一起", "")
-
-    private fun diaryTerms(text: String): Set<String> {
-        val normalized = normalizeDiaryText(text)
-        val terms = Regex("[\\p{L}\\p{N}_-]{2,}")
-            .findAll(normalized)
-            .map { it.value }
-            .take(48)
-            .toMutableSet()
-        Regex("[\\u4e00-\\u9fff]{2,}").findAll(normalized).forEach { match ->
-            match.value.windowed(2).take(24).forEach(terms::add)
-        }
-        return terms
-    }
-
-    private fun normalizeDiaryText(text: String): String =
-        text.lowercase()
-            .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】|｜=_-]+"""), "")
-            .take(1_200)
-
-    private fun diaryBigrams(text: String): Set<String> =
-        if (text.length < 2) emptySet()
-        else (0 until text.length - 1).mapTo(linkedSetOf()) { text.substring(it, it + 2) }
-
     private companion object {
-        const val MAX_SOURCE_IDS = 16
-        const val MAX_REFINEMENT_REVISIONS = 8
-        const val MAX_EVENT_CHARS = 320
-        const val MAX_FEELING_CHARS = 220
-        const val MAX_THOUGHT_CHARS = 260
-        const val MAX_RELATIONSHIP_CHARS = 220
-        const val MAX_ECHO_CHARS = 180
-        const val MIN_EVENT_CHARS = 6
-        const val MIN_IMPORTANCE = 2
-        const val MINOR_IMPORTANCE = 3
-        const val MIN_RECALL_SEMANTIC_SCORE = 24
         const val MAX_NORMAL_RECALL_CANDIDATES = 256
         const val MAX_IMPORTANT_RECALL_CANDIDATES = 64
         const val IMPORTANT_RECALL_THRESHOLD = 4
-        const val DUPLICATE_WINDOW_MILLIS = 6 * 60 * 60 * 1_000L
-        const val DAY_MILLIS = 24 * 60 * 60 * 1_000L
-        const val DUPLICATE_SIMILARITY = 0.72
-        const val MIN_EVIDENCE_COVERAGE = 0.18
-        val NEGATION_SIGNAL = Regex("""(?:不再|不用|不要|别再|别|没有|没|未|不|取消|撤销|拒绝)""")
-        val REPEATED_CONFIRMATION_NOISE = Regex("""(?:再次|再一次|又一次|重新)""")
-        val AGREEMENT_VARIANTS = Regex("""(?:答应|确认|确定|说定|约定)""")
-        val PRIVACY_SIGNAL = Regex("""(?:别告诉|不要告诉|别跟.+说|不要跟.+说|保密|秘密|只告诉你|只跟你说|别让.+知道)""")
     }
 }
