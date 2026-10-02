@@ -172,6 +172,7 @@ internal class LocalSubagentRunner(
             mutableListOf()
         }
         val progress = ArrayDeque<String>()
+        val progressTracker = LocalAgentProgressTracker()
         val runProfile = try { modelGateway.profileForRun(modelOverride) } catch (error: Exception) {
             if (error is kotlinx.coroutines.CancellationException) throw error
             return LocalSubagentResult(LocalSubagentStatus.FAILED,
@@ -408,6 +409,7 @@ internal class LocalSubagentRunner(
                         is AgentEvent.AssistantObserved -> {
                             val reply = repliesByStep.remove(event.step)
                                 ?: error("缺少子代理第 ${event.step} 步模型响应")
+                            progressTracker.recordAssistant(reply.content.orEmpty(), reply.toolCalls.size)
                             history += reply.message
                             reply.content?.takeIf(String::isNotBlank)?.let { content ->
                                 historyPolicy.rememberProgress(
@@ -426,6 +428,7 @@ internal class LocalSubagentRunner(
                             })
                         }
                         is AgentEvent.ToolFinished -> {
+                            progressTracker.recordToolResult(event.call, event.output, event.isError)
                             val boundedContent = historyPolicy.retainToolResult(
                                 event.call.id,
                                 event.output,
@@ -504,6 +507,14 @@ internal class LocalSubagentRunner(
                 stepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
                     val liveBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
                     if (currentLimit >= MAX_DYNAMIC_STEPS) return@AgentStepLimitExtender null
+                    if (!progressTracker.claimExtensionProgress()) {
+                        eventLog().append("subagent/budget-stopped", buildJsonObject {
+                            put("agent_id", subagentId)
+                            put("steps_used", stepsUsed)
+                            put("reason", "no-new-evidence")
+                        })
+                        return@AgentStepLimitExtender null
+                    }
                     val next = nextAdaptiveAgentStepLimit(
                         currentLimit = currentLimit,
                         configuredBase = maxSteps,
