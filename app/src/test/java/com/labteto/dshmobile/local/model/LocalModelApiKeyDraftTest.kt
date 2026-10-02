@@ -171,6 +171,7 @@ class LocalModelApiKeyDraftTest {
                 )
             }
         }
+        Unit
     }
 
 }
