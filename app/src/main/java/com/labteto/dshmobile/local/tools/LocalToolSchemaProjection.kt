@@ -1,0 +1,86 @@
+package com.labteto.dshmobile.local
+
+import com.labteto.dshmobile.harness.tools.ToolAccess
+import com.labteto.dshmobile.harness.tools.ToolRegistry
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+
+/** Pure model-visible projection of the registered tool catalog. */
+internal class LocalToolSchemaProjection(
+    private val registry: ToolRegistry,
+    private val executionCoordinator: LocalToolExecutionCoordinator,
+) {
+    fun subagentSchemas(
+        allowMutation: Boolean,
+        allowVirtualScreen: Boolean,
+        enabledOptional: Set<String>,
+    ): JsonArray {
+        val enabled = enabledOptional +
+            if (allowVirtualScreen) SUBAGENT_VIRTUAL_SCREEN_TOOLS else emptySet()
+        val tools = registry.names()
+            .mapNotNull(registry::get)
+            .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
+            .filter { tool -> tool.name !in SUBAGENT_VIRTUAL_SCREEN_TOOLS || allowVirtualScreen }
+            .filter { tool -> allowMutation || tool.name != "download_file" }
+            .filter { tool ->
+                allowMutation ||
+                    tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
+                    (allowVirtualScreen && tool.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS)
+            }
+        return LocalToolRouter.visibleSchemas(tools, enabled)
+    }
+
+    fun modelSchemas(
+        policy: LocalAgentRunPolicy,
+        state: LocalHarnessState,
+        history: List<JsonObject>,
+        enabledOptional: Set<String>? = null,
+    ): JsonArray {
+        val promptBudget = optionalPromptBudget(state, history)
+        if (enabledOptional == null) {
+            return executionCoordinator.visibleSchemas(
+                policy = policy,
+                maxOptionalDefinitionTokens = promptBudget,
+            )
+        }
+        if (!policy.toolsEnabled) return JsonArray(emptyList())
+        return LocalToolRouter.visibleSchemas(
+            tools = registry.names().mapNotNull(registry::get),
+            enabledOptional = enabledOptional,
+            maxOptionalDefinitionTokens = promptBudget,
+        )
+    }
+
+    fun names(schemas: JsonArray): List<String> = schemas.mapNotNull { element ->
+        val function = (element as? JsonObject)?.get("function") as? JsonObject
+        (function?.get("name") as? JsonPrimitive)?.contentOrNull
+    }
+
+    private fun optionalPromptBudget(
+        state: LocalHarnessState,
+        history: List<JsonObject>,
+    ): Int {
+        val profile = state.modelSelection.activeProfile
+        val operationalLimit = operationalInputLimitTokens(
+            state.model,
+            state.baseUrl,
+            profile?.contextWindowTokensOverride,
+        )
+        val pressure = LocalPromptPressureMeter.measure(
+            messages = history,
+            tools = JsonArray(emptyList()),
+            operationalLimitTokens = operationalLimit,
+            modelContextWindowTokens = documentedContextWindowTokens(
+                state.model,
+                state.baseUrl,
+                profile?.contextWindowTokensOverride,
+            ),
+        )
+        return minOf(
+            LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
+            (pressure.remainingOperationalTokens / 4).coerceAtLeast(0),
+        )
+    }
+}

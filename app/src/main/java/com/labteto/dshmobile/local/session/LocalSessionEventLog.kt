@@ -49,6 +49,8 @@ class LocalSessionEventLog(
 
     fun diagnostics() = delegate.diagnostics()
 
+    fun close() = delegate.close()
+
     fun snapshotAfter(sequenceExclusive: Long): List<Event> = delegate.snapshotAfter(sequenceExclusive).map { event ->
         event.toLocalEvent()
     }

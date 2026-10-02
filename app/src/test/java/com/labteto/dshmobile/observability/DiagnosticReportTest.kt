@@ -33,6 +33,22 @@ class DiagnosticReportTest {
     }
 
     @Test
+    fun appLogSanitizesBeforeKeepingTheInMemoryTail() {
+        AppLog.clear()
+        AppLog.warn(
+            "Security",
+            "Authorization: Bearer raw-token api_key=raw-key",
+            IllegalStateException("refresh_token=raw-refresh"),
+        )
+
+        val entry = AppLog.snapshot().last()
+        assertFalse(entry.message.contains("raw-token"))
+        assertFalse(entry.message.contains("raw-key"))
+        assertFalse(entry.throwableMessage.orEmpty().contains("raw-refresh"))
+        assertTrue(entry.message.contains("<redacted>"))
+    }
+
+    @Test
     fun diagnosticSanitizerRedactsCommonCredentialShapes() {
         val text = sanitizeDiagnosticText(
             "Authorization: Bearer abc api_key=xyz github_pat_123456789 secret='hidden'",

@@ -1,184 +1,22 @@
 package com.labteto.dshmobile.local.memory
 
 import android.content.Context
-import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 
-internal fun compactMemoryRecords(
-    records: List<MemoryRecord>,
-    maxRecords: Int,
-    protectedIds: Set<String> = emptySet(),
-): List<MemoryRecord> {
-    if (maxRecords <= 0 || records.isEmpty()) return emptyList()
-    if (records.size <= maxRecords) return records
-
-    val predecessors = records
-        .asSequence()
-        .filter { !it.supersededBy.isNullOrBlank() }
-        .groupBy { it.supersededBy!! }
-        .mapValues { (_, values) -> values.sortedByDescending(MemoryRecord::updatedAt) }
-    val activeRoots = records
-        .filter(MemoryRecord::active)
-        .sortedWith(
-            compareByDescending<MemoryRecord> { if (it.id in protectedIds) 1 else 0 }
-                .thenByDescending { if (it.pinned) 1 else 0 }
-                .thenByDescending(MemoryRecord::importance)
-                .thenByDescending(MemoryRecord::updatedAt),
-        )
-
-    val selected = linkedSetOf<String>()
-    val selectedRoots = mutableListOf<String>()
-    activeRoots.forEach { root ->
-        val nearestPredecessor = predecessors[root.id].orEmpty().firstOrNull()
-        val required = 1 + if (nearestPredecessor != null && nearestPredecessor.id !in selected) 1 else 0
-        if (selected.size + required > maxRecords) return@forEach
-        selected += root.id
-        selectedRoots += root.id
-        nearestPredecessor?.let { selected += it.id }
-    }
-    if (selected.isEmpty()) {
-        activeRoots.firstOrNull()?.let { selected += it.id }
-    }
-
-    // Fill deeper rollback history breadth-first. A retained active root that has a predecessor is
-    // admitted together with that nearest predecessor, so capacity pressure cannot leave a kept
-    // replacement without the state needed to roll it back.
-    var frontier = (selectedRoots + selected).distinct()
-    val traversed = mutableSetOf<String>()
-    while (frontier.isNotEmpty() && selected.size < maxRecords) {
-        val nextFrontier = mutableListOf<String>()
-        frontier.forEach { successorId ->
-            if (!traversed.add(successorId)) return@forEach
-            predecessors[successorId].orEmpty().forEach { predecessor ->
-                if (selected.size >= maxRecords) return@forEach
-                if (selected.add(predecessor.id)) {
-                    nextFrontier += predecessor.id
-                } else if (predecessor.id !in traversed) {
-                    nextFrontier += predecessor.id
-                }
-            }
-        }
-        frontier = nextFrontier
-    }
-    return records.filter { it.id in selected }
-}
-
-
-internal data class MemoryConsolidationResult(
-    val records: List<MemoryRecord>,
-    val mergedCount: Int,
-)
-
-/**
- * Merge formatting-only duplicates without weakening rollback provenance.
- *
- * Exact duplicates are already folded on write. This maintenance pass handles older records and
- * punctuation/spacing variants, merges all known source messages, and rewires predecessor links to
- * the surviving newest record.
- */
-internal fun consolidateMemoryRecords(
-    records: List<MemoryRecord>,
-    maxSourceMessages: Int = 16,
-): MemoryConsolidationResult {
-    if (records.size < 2) return MemoryConsolidationResult(records, 0)
-
-    data class Key(
-        val scope: MemoryScope,
-        val projectId: String?,
-        val lineageId: String?,
-        val subjectKey: String?,
-        val kind: MemoryKind,
-        val content: String,
-    )
-
-    val duplicateGroups = records.asSequence()
-        .filter(MemoryRecord::active)
-        .groupBy { record ->
-            Key(
-                scope = record.scope,
-                projectId = record.projectId,
-                lineageId = record.lineageId,
-                subjectKey = record.subjectKey,
-                kind = record.kind,
-                content = canonicalMemoryIdentity(record.content),
-            )
-        }
-        .values
-        .filter { group -> group.size > 1 && canonicalMemoryIdentity(group.first().content).isNotBlank() }
-        .toList()
-    if (duplicateGroups.isEmpty()) return MemoryConsolidationResult(records, 0)
-
-    val loserToWinner = mutableMapOf<String, String>()
-    val mergedWinners = mutableMapOf<String, MemoryRecord>()
-    duplicateGroups.forEach { group ->
-        val winner = group.maxWith(
-            compareBy<MemoryRecord> { it.updatedAt }
-                .thenBy { it.createdAt }
-                .thenBy { it.id },
-        )
-        group.filter { it.id != winner.id }.forEach { loser -> loserToWinner[loser.id] = winner.id }
-        val allMergedSources = group.asSequence()
-            .flatMap { it.sourceMessages.asSequence() }
-            .distinct()
-            .toList()
-        val boundedSourceLimit = maxSourceMessages.coerceAtLeast(1)
-        val sourcesTruncated = allMergedSources.size > boundedSourceLimit
-        val mergedSources = allMergedSources.takeLast(boundedSourceLimit)
-        mergedWinners[winner.id] = winner.copy(
-            sourceSessionId = winner.sourceSessionId
-                ?: group.asSequence().sortedByDescending(MemoryRecord::updatedAt)
-                    .mapNotNull(MemoryRecord::sourceSessionId)
-                    .firstOrNull(),
-            sourceMessages = mergedSources,
-            hasUnboundSource = group.any(MemoryRecord::hasUnboundSource) || sourcesTruncated,
-            importance = group.maxOf(MemoryRecord::importance),
-            pinned = group.any(MemoryRecord::pinned),
-            createdAt = group.minOf(MemoryRecord::createdAt),
-            updatedAt = group.maxOf(MemoryRecord::updatedAt),
-        )
-    }
-
-    val merged = records.mapNotNull { record ->
-        if (record.id in loserToWinner) {
-            null
-        } else {
-            val winner = mergedWinners[record.id] ?: record
-            val successor = winner.supersededBy?.let { loserToWinner[it] ?: it }
-            if (successor == winner.supersededBy) winner else winner.copy(supersededBy = successor)
-        }
-    }
-    return MemoryConsolidationResult(
-        records = merged,
-        mergedCount = loserToWinner.size,
-    )
-}
-
-private fun canonicalMemoryIdentity(text: String): String =
-    text.lowercase()
-        .replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】|｜=_-]+"""), "")
-        .take(2_000)
-
 @Singleton
 class MemoryStore internal constructor(
-    private val root: File,
-    private val json: Json,
+    root: File,
+    json: Json,
 ) {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
         this(File(context.filesDir, "local-harness/memory"), json)
 
-    init { root.mkdirs() }
-    private val file = File(root, "memories.json")
-    private val backup = File(root, "memories.json.bak")
-
-    private var cachedDocument: MemoryDocument? = null
-    private var cachedStamp: DocumentStamp? = null
+    private val documents = MemoryDocumentStore(root, json)
     private var lastConsolidatedAt: Long = 0L
 
     @Synchronized
@@ -201,7 +39,7 @@ class MemoryStore internal constructor(
         require(scope != MemoryScope.LINEAGE || !lineageId.isNullOrBlank()) { "对话链记忆缺少对话链编号" }
 
         val now = System.currentTimeMillis()
-        val records = readDocument().records.toMutableList()
+        val records = documents.read().records.toMutableList()
         val duplicateIndex = records.indexOfFirst {
             it.active &&
                 it.scope == scope &&
@@ -241,7 +79,7 @@ class MemoryStore internal constructor(
                         )
                     }
                 }
-            writeDocument(MemoryDocument(records = records))
+            documents.write(MemoryDocument(records = records))
             return refreshed
         }
 
@@ -272,7 +110,7 @@ class MemoryStore internal constructor(
             }
         }
         records += record
-        writeDocument(
+        documents.write(
             MemoryDocument(
                 records = compactMemoryRecords(
                     records = records,
@@ -292,7 +130,7 @@ class MemoryStore internal constructor(
         importance: Int? = null,
         pinned: Boolean? = null,
     ): MemoryRecord {
-        val records = readDocument().records.toMutableList()
+        val records = documents.read().records.toMutableList()
         val index = records.indexOfFirst { it.id == id && it.active }
         require(index >= 0) { "长期记忆不存在或已停用：$id" }
         val current = records[index]
@@ -306,13 +144,13 @@ class MemoryStore internal constructor(
             updatedAt = System.currentTimeMillis(),
         )
         records[index] = updated
-        writeDocument(MemoryDocument(records = records))
+        documents.write(MemoryDocument(records = records))
         return updated
     }
 
     @Synchronized
     fun forget(id: String): Boolean {
-        val records = readDocument().records.toMutableList()
+        val records = documents.read().records.toMutableList()
         val index = records.indexOfFirst { it.id == id && it.active }
         if (index < 0) return false
         records[index] = records[index].copy(
@@ -320,7 +158,7 @@ class MemoryStore internal constructor(
             supersededBy = null,
             updatedAt = System.currentTimeMillis(),
         )
-        writeDocument(MemoryDocument(records = records))
+        documents.write(MemoryDocument(records = records))
         return true
     }
 
@@ -337,7 +175,7 @@ class MemoryStore internal constructor(
         discardedMessageIds: Set<String> = emptySet(),
     ): Int {
         if (sourceSessionId.isBlank()) return 0
-        val records = readDocument().records.toMutableList()
+        val records = documents.read().records.toMutableList()
         val invalidIds = linkedSetOf<String>()
         val now = System.currentTimeMillis()
         var changed = false
@@ -376,7 +214,7 @@ class MemoryStore internal constructor(
             }
         }
         if (invalidIds.isEmpty()) {
-            if (changed) writeDocument(MemoryDocument(records = records))
+            if (changed) documents.write(MemoryDocument(records = records))
             return 0
         }
 
@@ -404,7 +242,7 @@ class MemoryStore internal constructor(
                 }
             }
         }
-        if (changed) writeDocument(MemoryDocument(records = records))
+        if (changed) documents.write(MemoryDocument(records = records))
         return invalidIds.size
     }
 
@@ -416,7 +254,7 @@ class MemoryStore internal constructor(
     @Synchronized
     fun detachSourceSessions(sessionIds: Set<String>): Int {
         if (sessionIds.isEmpty()) return 0
-        val records = readDocument().records.toMutableList()
+        val records = documents.read().records.toMutableList()
         val now = System.currentTimeMillis()
         var changed = 0
         records.indices.forEach { index ->
@@ -431,7 +269,7 @@ class MemoryStore internal constructor(
                 changed++
             }
         }
-        if (changed > 0) writeDocument(MemoryDocument(records = records))
+        if (changed > 0) documents.write(MemoryDocument(records = records))
         return changed
     }
 
@@ -458,7 +296,7 @@ class MemoryStore internal constructor(
 
         // Stage 1: cheap lexical/scope filtering. Explicit recall questions keep a bounded fallback
         // set so "第一次/上次那件事" can still reach a memory whose wording is very different.
-        val coarse = readDocument().records.asSequence()
+        val coarse = documents.read().records.asSequence()
             .filter { it.active && it.scope in allowedScopes && it.kind in allowedKinds }
             .filter(recordFilter)
             .filter {
@@ -522,11 +360,11 @@ class MemoryStore internal constructor(
         if (!force && lastConsolidatedAt > 0L && now - lastConsolidatedAt < CONSOLIDATION_INTERVAL_MILLIS) {
             return 0
         }
-        val current = readDocument().records
+        val current = documents.read().records
         val consolidated = consolidateMemoryRecords(current, MAX_SOURCE_MESSAGES)
         val compacted = compactMemoryRecords(consolidated.records, MAX_RECORDS)
         if (consolidated.mergedCount > 0 || compacted.size != current.size) {
-            writeDocument(MemoryDocument(records = compacted))
+            documents.write(MemoryDocument(records = compacted))
         }
         lastConsolidatedAt = now
         return consolidated.mergedCount
@@ -538,7 +376,7 @@ class MemoryStore internal constructor(
         projectId: String?,
         lineageId: String?,
         limit: Int = 50,
-    ): List<MemoryRecord> = readDocument().records.asSequence()
+    ): List<MemoryRecord> = documents.read().records.asSequence()
         .filter { it.active && it.scope in allowedScopes }
         .filter {
             when (it.scope) {
@@ -625,87 +463,6 @@ class MemoryStore internal constructor(
             truncated = all.size > MAX_SOURCE_MESSAGES,
         )
     }
-
-    private fun readDocument(): MemoryDocument {
-        val stamp = documentStamp()
-        cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
-
-        val document = decodeDocument(file) ?: if (!file.isFile) {
-            decodeDocument(backup) ?: MemoryDocument().also {
-                if (backup.isFile) {
-                    AppLog.error(
-                        "MemoryStore",
-                        "长期记忆主文件缺失且备份无法解析；本次以空文档启动，损坏备份保留在原位置",
-                    )
-                }
-            }
-        } else {
-            val corrupt = File(root, "memories.corrupt-${System.currentTimeMillis()}.json")
-            val moved = runCatching { file.renameTo(corrupt) }.getOrDefault(false)
-            if (!moved) runCatching { file.copyTo(corrupt, overwrite = false) }
-
-            val recovered = decodeDocument(backup)
-            if (recovered != null) {
-                runCatching { backup.copyTo(file, overwrite = true) }
-                recovered
-            } else {
-                AppLog.error(
-                    "MemoryStore",
-                    "长期记忆主文件损坏且备份不可用；已隔离主文件，本次以空文档启动",
-                )
-                MemoryDocument()
-            }
-        }
-        cachedDocument = document
-        cachedStamp = documentStamp()
-        return document
-    }
-
-    private fun decodeDocument(source: File): MemoryDocument? {
-        if (!source.isFile) return null
-        return runCatching {
-            json.decodeFromString(MemoryDocument.serializer(), source.readText())
-        }.getOrNull()
-    }
-
-    private fun writeDocument(document: MemoryDocument) {
-        file.parentFile?.mkdirs()
-        if (decodeDocument(file) != null) {
-            runCatching { file.copyTo(backup, overwrite = true) }
-        }
-
-        val temporary = File(file.parentFile, file.name + ".tmp")
-        temporary.writeText(json.encodeToString(MemoryDocument.serializer(), document))
-        runCatching {
-            Files.move(
-                temporary.toPath(),
-                file.toPath(),
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE,
-            )
-        }.getOrElse {
-            Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        }
-        if (decodeDocument(backup) == null && decodeDocument(file) != null) {
-            runCatching { file.copyTo(backup, overwrite = true) }
-        }
-        cachedDocument = document
-        cachedStamp = documentStamp()
-    }
-
-    private fun documentStamp(): DocumentStamp = DocumentStamp(
-        primaryModified = file.takeIf(File::isFile)?.lastModified() ?: -1L,
-        primaryLength = file.takeIf(File::isFile)?.length() ?: -1L,
-        backupModified = backup.takeIf(File::isFile)?.lastModified() ?: -1L,
-        backupLength = backup.takeIf(File::isFile)?.length() ?: -1L,
-    )
-
-    private data class DocumentStamp(
-        val primaryModified: Long,
-        val primaryLength: Long,
-        val backupModified: Long,
-        val backupLength: Long,
-    )
 
     private companion object {
         const val MAX_MEMORY_CONTENT_CHARS = 2_000

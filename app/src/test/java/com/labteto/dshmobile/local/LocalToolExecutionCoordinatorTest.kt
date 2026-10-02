@@ -305,11 +305,14 @@ class LocalToolExecutionCoordinatorTest {
 
         coordinator.enableGitHubConnectorTools()
         val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
+        val detachedEnabled = linkedSetOf<String>()
+        coordinator.enableGitHubConnectorTools(detachedEnabled)
 
         assertEquals(
             setOf("github_status", "github_api_get", "github_api_request", "future_repo_tool"),
             visible,
         )
+        assertEquals(visible, detachedEnabled)
         assertFalse("process_exec" in visible)
     }
 
@@ -338,6 +341,52 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(1, after.size)
         coordinator.clearTurnCapabilities()
         assertEquals(0, coordinator.visibleSchemas(localAgentRunPolicy(LocalUsageMode.WORK)).size)
+    }
+
+    @Test
+    fun subagentSchemaProjectionPreservesReadOnlyAndVirtualScreenBoundaries() {
+        val registry = ToolRegistry().apply {
+            register(
+                tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { ToolResult("ok") },
+            )
+            register(
+                tool("download_file", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
+                    ToolResult("ok")
+                },
+            )
+            register(
+                tool("workflow", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { ToolResult("ok") },
+            )
+            register(
+                tool(
+                    "android_vscreen_status",
+                    ToolAccess.READ_ONLY,
+                    ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "Android",
+                    keywords = setOf("android", "virtual screen"),
+                ) { ToolResult("ok") },
+            )
+        }
+        val projection = LocalToolSchemaProjection(registry, coordinator(registry))
+
+        val readOnly = projection.names(
+            projection.subagentSchemas(
+                allowMutation = false,
+                allowVirtualScreen = false,
+                enabledOptional = emptySet(),
+            ),
+        )
+        assertEquals(listOf("read"), readOnly)
+
+        val withVirtualScreen = projection.names(
+            projection.subagentSchemas(
+                allowMutation = false,
+                allowVirtualScreen = true,
+                enabledOptional = setOf("android_vscreen_status"),
+            ),
+        )
+        assertEquals(listOf("read", "android_vscreen_status"), withVirtualScreen)
     }
 
     private fun coordinator(

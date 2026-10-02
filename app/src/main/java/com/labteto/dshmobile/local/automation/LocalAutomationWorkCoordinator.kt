@@ -7,7 +7,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -64,41 +66,27 @@ internal class LocalAutomationWorkCoordinator(
         val sessionId = session.id
         val boundState = boundState(session)
         val boundEventLog = eventLogFor(sessionId)
-
-        if (recoverInterrupted) {
-            val repair = boundEventLog.repairInterruptedTail()
-            agentRunCoordinator.recoveryDecision(
+        val recovery = if (recoverInterrupted) {
+            prepareAutomationWorkRecovery(
+                prompt = prompt,
                 sessionId = sessionId,
-                repair = repair,
-                kind = LocalAgentRunKind.AUTOMATION,
-            )?.let { decision ->
-                decision.completedOutput?.let { recovered ->
-                    val output = recovered.ifBlank { "后台任务已完成" }
-                    ensureRecoveredTranscript(
-                        session = session,
-                        output = output,
-                        eventLog = boundEventLog,
-                    )
-                    return LocalAutomationRunResult(sessionId = sessionId, output = output)
-                }
-                decision.blockedReason?.let { blocked ->
-                    agentRunCoordinator.markRecoveryBlocked(
-                        sessionId = sessionId,
-                        runId = decision.runId,
-                        reason = blocked,
-                        kind = LocalAgentRunKind.AUTOMATION,
-                    )
-                    throw LocalHarnessBlockedException(blocked, sessionId)
-                }
-                if (decision.queuedInput != null) {
-                    agentRunCoordinator.markRecoveryQueued(
-                        sessionId = sessionId,
-                        runId = decision.runId,
-                        kind = LocalAgentRunKind.AUTOMATION,
-                    )
-                }
-            }
+                eventLog = boundEventLog,
+                profiles = state.value.modelProfiles,
+                agentRunCoordinator = agentRunCoordinator,
+            )
+        } else {
+            LocalAutomationWorkRecoveryPlan(prompt)
         }
+        recovery.completedOutput?.let { output ->
+            ensureRecoveredTranscript(
+                session = session,
+                output = output,
+                eventLog = boundEventLog,
+            )
+            return LocalAutomationRunResult(sessionId = sessionId, output = output)
+        }
+        val executionTask = recovery.executionTask
+        val recoveredProfile = recovery.profile
 
         val userMessage = LocalHarnessMessage(
             id = UUID.randomUUID().toString(),
@@ -124,12 +112,17 @@ internal class LocalAutomationWorkCoordinator(
 
         return try {
             val result = withTimeout(timeoutMillis.coerceIn(5_000L, 15 * 60_000L)) {
-                runner.runResult(
-                    task = prompt,
-                    inheritHistory = false,
-                    allowMutation = true,
-                    maxSteps = boundState.subagentMaxSteps,
-                )
+                val execute: suspend () -> LocalSubagentResult = {
+                    runner.runResult(
+                        task = executionTask,
+                        inheritHistory = false,
+                        allowMutation = true,
+                        maxSteps = boundState.subagentMaxSteps,
+                    )
+                }
+                recoveredProfile?.let { profile ->
+                    withContext(LocalModelRunContext(profile)) { execute() }
+                } ?: execute()
             }
             val output = result.requireCompletedOutput().ifBlank { "后台任务已完成" }
 

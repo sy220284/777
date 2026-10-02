@@ -168,6 +168,7 @@ internal class LocalChatContextRefreshCoordinator(
         boundEventLog: LocalSessionEventLog,
         profile: LocalModelProfile,
         sourceUserMessageId: String? = null,
+        assistantEventSequence: Long? = null,
     ) {
         cancelScheduledRefresh()
         val generation = enqueue(
@@ -177,6 +178,7 @@ internal class LocalChatContextRefreshCoordinator(
             expectedAssistantMessageId = expectedAssistantMessageId,
             boundEventLog = boundEventLog,
             sourceUserMessageId = sourceUserMessageId,
+            assistantEventSequence = assistantEventSequence,
         ) ?: return
 
         val job = scope.launch(start = CoroutineStart.LAZY) {
@@ -253,9 +255,10 @@ internal class LocalChatContextRefreshCoordinator(
         expectedAssistantMessageId: String,
         boundEventLog: LocalSessionEventLog,
         sourceUserMessageId: String? = null,
+        assistantEventSequence: Long? = null,
     ): Long? {
         if (state.value.sessionId != expectedSessionId) return null
-        val sequence = findTranscriptEventSequence(
+        val sequence = assistantEventSequence ?: findTranscriptEventSequence(
             eventLog = boundEventLog,
             type = "assistant/message",
             messageId = expectedAssistantMessageId,

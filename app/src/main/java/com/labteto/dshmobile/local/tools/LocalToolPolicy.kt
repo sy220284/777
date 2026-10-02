@@ -12,32 +12,12 @@ internal enum class LocalAutoApprovalScope {
 
 /** Explicit classifications: adding a built-in requires deciding its permissions and approval boundary. */
 internal object LocalToolPolicy {
-    /**
-     * Shell commands are auto-approved by default, because the sandbox boundary is defined by what a
-     * command can *reach*, not by what it is called.
-     *
-     * Everything the device already refused before this policy existed stays refused: firmware
-     * partitions are mounted read-only and other apps' private directories are unreachable under the
-     * untrusted-app SELinux domain. Auto-approval therefore does not create access the kernel does
-     * not already grant.
-     *
-     * These markers are a best-effort second line, not a guarantee. Shell text admits too many
-     * equivalent spellings — `cd / && cat system/x`, quoted splices, variable expansion — for static
-     * matching to be airtight, and the kernel is what actually holds. Their purpose is to keep the
-     * prompt in front of a command that visibly names firmware, so the user sees it before it runs.
-     */
-    // Reuse the boundary's canonical deny set so shell prompts and file enforcement cannot drift.
-    // This is intentionally conservative for shell text: a visible forbidden prefix keeps a prompt.
+    // Reuse the sandbox boundary's canonical deny set so shell approval and file enforcement cannot drift.
     private val FIRMWARE_PATH_MARKERS = LocalSandboxBoundary.DEFAULT_FORBIDDEN_PREFIXES
 
-    /**
-     * Operation names that rewrite history or discard work that cannot be restored from a remote.
-     *
-     * These are deliberate user-visible guardrails rather than sandbox enforcement: the user data a
-     * force-push destroys is exactly what the boundary is meant to leave reachable, so the prompt is
-     * the only thing standing between a mistake and an unrecoverable loss.
-     */
-    private val DESTRUCTIVE_GIT_OPERATIONS = listOf("reset --hard", "clean -fd", "clean -fdx", "filter-branch")
+    // Destructive Git operations remain explicit user-visible approval boundaries.
+    private val DESTRUCTIVE_GIT_OPERATIONS =
+        listOf("reset --hard", "clean -fd", "clean -fdx", "filter-branch")
 
     private val aliases = mapOf(
         "read_file" to "read", "write_file" to "write", "edit_file" to "edit",
@@ -140,10 +120,9 @@ internal object LocalToolPolicy {
     /**
      * Tools whose execution is gated by the approval pipeline.
      *
-     * `ALWAYS` means the call reaches the approval decision; it does not mean the user is prompted,
-     * because global auto-approval can resolve it. `bash` is listed here precisely so that its command
-     * policy is consulted: a shell call should never bypass the pipeline just because most commands
-     * are auto-approved.
+     * `ALWAYS` means the call reaches the approval decision. Safe auto-approval may resolve only
+     * tools whose [autoApprovalScope] is explicitly safe; process-level Shell stays outside that
+     * scope and therefore always requires an explicit approval.
      */
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "bash", "job_kill", "send_message", "interrupt_agent",
@@ -153,22 +132,17 @@ internal object LocalToolPolicy {
     }
 
     /**
-     * Low-risk classification follows the sandbox, not the tool category.
+     * Authoritative scope for safe auto-approval.
      *
-     * This no longer limits global auto-approval; it is retained for impact/display metadata and
-     * one-turn device policy decisions:
-     * - workspace-bounded writes and read-only tools are classified low risk;
-     * - firmware partitions and other apps' private directories stay out of reach regardless of
-     *   approval mode because the kernel boundary still applies;
-     * - categories that act outside the filesystem sandbox remain higher impact even though global
-     *   auto-approval may skip their prompt when the user enables it.
+     * - workspace-bounded writes and read-only tools may be approved by the safe mode;
+     * - process, network, privileged, agent-control and session mutation capabilities stay outside it;
+     * - Shell starts in the workspace but can leave cwd under the app UID, so it is never classified
+     *   as a workspace-bounded operation.
      */
     fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file" -> LocalAutoApprovalScope.WORKSPACE
-        // Shell execution is approved by the sandbox boundary. The per-command check in
-        // canAutoApproveCommand() still withholds firmware-targeting and history-rewriting commands,
-        // and it needs the command text, so it runs in the parameter-aware caller instead.
-        "bash" -> LocalAutoApprovalScope.WORKSPACE
+        // A shell can leave cwd and reach same-UID app-private state; require explicit approval.
+        "bash" -> LocalAutoApprovalScope.NONE
         else -> if (access(name) == ToolAccess.READ_ONLY) {
             LocalAutoApprovalScope.READ_ONLY
         } else {

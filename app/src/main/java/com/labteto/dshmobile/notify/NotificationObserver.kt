@@ -16,6 +16,7 @@ import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -78,15 +79,24 @@ class NotificationObserver @Inject constructor(
         started = true
         notifications.ensureChannels()
         trackAppForeground()
-        launchResilientCollector("settings") {
+        launchCollector(
+            name = "settings",
+            retryable = { it is IOException },
+        ) {
             hostsStore.settings.collect { settings = it }
         }
-        launchResilientCollector("event-frames") {
+        // ConnectionManager owns network reconnect/lifecycle. A failure escaping this hot flow is a
+        // decode/logic failure and must not be converted into a permanent retry loop here.
+        launchCollector(name = "event-frames") {
             connectionManager.eventFrames.collect { handleEventFrame(it) }
         }
     }
 
-    private fun launchResilientCollector(name: String, collect: suspend () -> Unit) {
+    private fun launchCollector(
+        name: String,
+        retryable: (Exception) -> Boolean = { false },
+        collect: suspend () -> Unit,
+    ) {
         scope.launch {
             var failures = 0
             while (true) {
@@ -97,14 +107,24 @@ class NotificationObserver @Inject constructor(
                     throw cancelled
                 } catch (error: Exception) {
                     failures += 1
-                    AppLog.error(
+                    val delayMillis = notificationCollectorRetryDelay(
+                        retryable = retryable(error),
+                        failureCount = failures,
+                    )
+                    if (delayMillis == null) {
+                        AppLog.error(
+                            "NotificationObserver",
+                            "$name collector stopped after non-recoverable failure (failure=$failures)",
+                            error,
+                        )
+                        return@launch
+                    }
+                    AppLog.warn(
                         "NotificationObserver",
-                        "$name collector failed; restarting (failure=$failures)",
+                        "$name collector transient failure; retrying (failure=$failures)",
                         error,
                     )
-                    val backoff = (250L * (1L shl (failures - 1).coerceIn(0, 4)))
-                        .coerceAtMost(4_000L)
-                    delay(backoff)
+                    delay(delayMillis)
                 }
             }
         }
@@ -265,3 +285,14 @@ class NotificationObserver @Inject constructor(
         const val MAX_DEDUP_KEYS = 1024
     }
 }
+
+
+internal fun notificationCollectorRetryDelay(
+    retryable: Boolean,
+    failureCount: Int,
+): Long? {
+    if (!retryable || failureCount !in 1..MAX_NOTIFICATION_COLLECTOR_RETRIES) return null
+    return (250L * (1L shl (failureCount - 1).coerceIn(0, 4))).coerceAtMost(4_000L)
+}
+
+private const val MAX_NOTIFICATION_COLLECTOR_RETRIES = 5

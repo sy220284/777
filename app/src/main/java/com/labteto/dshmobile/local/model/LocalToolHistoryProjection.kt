@@ -77,6 +77,7 @@ internal fun compactHistoryWithStaleToolProjection(
     summaryMode: LocalHistorySummaryMode,
     currentChars: Int,
     currentTokens: Int,
+    structuredWorkState: LocalStructuredWorkState? = null,
 ): LocalHistoryCompaction? {
     val projection = projectStaleToolResults(history, budget)
     val source = projection?.messages ?: history
@@ -87,6 +88,7 @@ internal fun compactHistoryWithStaleToolProjection(
         currentTokens = projection?.estimatedTokensAfter ?: currentTokens,
         extraTokens = extraTokens,
         summaryMode = summaryMode,
+        structuredWorkState = structuredWorkState,
     ) ?: return projection
     return compaction.copy(
         estimatedTokensBefore = projection?.estimatedTokensBefore ?: compaction.estimatedTokensBefore,

@@ -53,34 +53,78 @@ class EventFold(private val sessionId: String) {
      * Streaming callers keep the previous snapshot and re-render on change.
      */
     class Incremental(initial: ConversationSnapshot, private val sessionId: String) {
-        private val state = FoldState(sessionId)
+        private var state = FoldState(sessionId)
         private var folded: Long = initial.lastSeq.coerceAtLeast(-1)
         private val journal = initial.journal.toMutableList()
+        private var effectiveSurface = initial.effectiveSurface.toMutableList()
         private var current = initial
 
         init {
-            // Seed the fold from the snapshot's nodes (rebuild buffers from scratch). A provisional
-            // streaming node is not durable and would otherwise be re-added as though it were.
-            state.blank = initial.blank
-            state.nodes.addAll(initial.nodes.filterNot { it is AssistantMessageNode && it.streaming })
-            state.running = initial.running
-            state.hasMore = initial.hasMore
+            resetFoldState(initial)
         }
 
         fun apply(event: SessionEventEnvelope): ConversationSnapshot? {
             if (event.seq <= folded) return null // duplicate or already-folded
             journal.add(event)
-            if (initialJournalAvailable) current = EventFold(sessionId).fold(journal)
-            else {
-                if (!event.isSurfaceReplacement()) state.apply(event)
-                current = state.snapshot().copy(journal = journal.toList(), effectiveSurface = effectiveSurfaceEvents(journal), lastSeq = event.seq)
+            if (event.isSurfaceReplacement()) {
+                current = EventFold(sessionId).fold(journal)
+                effectiveSurface = current.effectiveSurface.toMutableList()
+                resetFoldState(current)
+            } else {
+                state.apply(event)
+                effectiveSurface.add(event)
+                current = state.snapshot().copy(
+                    journal = journal.toList(),
+                    effectiveSurface = effectiveSurface.toList(),
+                    lastSeq = event.seq,
+                    gap = current.gap || (folded >= 0 && event.seq > folded + 1),
+                )
             }
             folded = event.seq
             return current
         }
 
-        private val initialJournalAvailable = initial.journal.isNotEmpty()
+        private fun resetFoldState(snapshot: ConversationSnapshot) {
+            state = FoldState(sessionId)
+            if (snapshot.journal.isNotEmpty()) {
+                snapshot.journal.filterNot { it.isSurfaceReplacement() }.forEach(state::apply)
+            } else {
+                state.blank = snapshot.blank
+                state.nodes.addAll(snapshot.nodes.filterNot { it is AssistantMessageNode && it.streaming })
+                state.running = snapshot.running
+                state.hasMore = snapshot.hasMore
+                state.lastSeq = snapshot.lastSeq
+                state.gap = snapshot.gap
+            }
+        }
+
         fun snapshot(): ConversationSnapshot = current
+    }
+
+    /**
+     * Apply transient assistant chunks on top of an already-folded durable snapshot.
+     * This keeps token-by-token streaming proportional to the live attempt, not durable history.
+     */
+    fun overlayTransient(
+        durable: ConversationSnapshot,
+        transient: List<SessionEventEnvelope>,
+    ): ConversationSnapshot {
+        if (transient.isEmpty()) return durable
+        val state = FoldState(sessionId).apply {
+            blank = durable.blank
+            nodes.addAll(durable.nodes.filterNot { it is AssistantMessageNode && it.streaming })
+            running = durable.running
+            hasMore = durable.hasMore
+            lastSeq = durable.lastSeq
+            gap = durable.gap
+        }
+        transient.forEach(state::applyTransient)
+        return state.snapshot().copy(
+            journal = durable.journal,
+            effectiveSurface = durable.effectiveSurface,
+            lastSeq = durable.lastSeq,
+            gap = durable.gap,
+        )
     }
 }
 

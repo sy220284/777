@@ -9,6 +9,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 data class JobInfo(
     val id: String,
@@ -271,7 +273,9 @@ class HarnessJobManager(
                         record.output = output.takeLast(MAX_OUTPUT)
                         record.updatedAt = System.currentTimeMillis()
                     }
-                    publish()
+                    // Progress is a volatile UI signal. Heartbeats persist a bounded running
+                    // snapshot; writing the whole durable store for every output chunk amplifies IO.
+                    notifyChanged()
                 }
                 val result = block(record.id, report).takeLast(MAX_OUTPUT)
                 synchronized(lock) {
@@ -294,7 +298,8 @@ class HarnessJobManager(
                 }
             } finally {
                 heartbeat.cancel()
-                publish()
+                persistTerminalState(record)
+                notifyChanged()
             }
         }
         val shouldStart = synchronized(lock) {
@@ -484,6 +489,32 @@ class HarnessJobManager(
         updatedAt = record.updatedAt,
     )
 
+    private suspend fun persistTerminalState(record: Record) = withContext(NonCancellable) {
+        var lastFailure: Exception? = null
+        repeat(TERMINAL_PERSIST_ATTEMPTS) { attempt ->
+            try {
+                persistCurrentSnapshots()
+                return@withContext
+            } catch (error: Exception) {
+                lastFailure = error
+                if (attempt < TERMINAL_PERSIST_ATTEMPTS - 1) {
+                    delay(TERMINAL_PERSIST_RETRY_MILLIS * (attempt + 1L))
+                }
+            }
+        }
+        synchronized(lock) {
+            record.status = "failed"
+            record.output = (
+                record.output.takeLast(MAX_OUTPUT / 2) +
+                    "\n任务终态持久化失败：" +
+                    (lastFailure?.message ?: lastFailure?.javaClass?.simpleName ?: "unknown")
+                ).takeLast(MAX_OUTPUT)
+            record.updatedAt = System.currentTimeMillis()
+        }
+        notifyChanged()
+        throw IllegalStateException("后台任务终态持久化失败", lastFailure)
+    }
+
     private fun publish() {
         val infos: List<JobInfo>
         val snapshots: List<JobSnapshot>
@@ -535,6 +566,8 @@ class HarnessJobManager(
         const val DEFAULT_MAX_RETAINED_JOBS = 64
         const val MAX_EXPECTED_DURATION_MILLIS = 24L * 60L * 60L * 1000L
         const val RUNNING_HEARTBEAT_MILLIS = 30_000L
+        const val TERMINAL_PERSIST_ATTEMPTS = 3
+        const val TERMINAL_PERSIST_RETRY_MILLIS = 100L
         const val MAX_ID_FACTORY_ATTEMPTS = 16
         const val MAX_FALLBACK_ID_ATTEMPTS = 16
     }
