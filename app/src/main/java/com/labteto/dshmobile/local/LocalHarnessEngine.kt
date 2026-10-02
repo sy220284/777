@@ -4745,6 +4745,7 @@ class LocalHarnessEngine @Inject constructor(
             compactor = historyCompactor,
             summaryMode = summaryMode,
         ) ?: return
+        requestPressureStore.advanceGeneration(snapshot.sessionId, compaction.estimatedTokensAfter)
         log.append("session/compaction", buildJsonObject {
             put("trigger", "context-overflow")
             put("omitted_messages", compaction.omittedMessages)
@@ -4835,6 +4836,10 @@ class LocalHarnessEngine @Inject constructor(
             updateContextMetrics(binding)
             return
         }
+        requestPressureStore.advanceGeneration(
+            binding?.sessionId ?: targetState.value.sessionId,
+            compaction.estimatedTokensAfter,
+        )
         log.append(
             "session/compaction",
             buildJsonObject {
@@ -4886,6 +4891,7 @@ class LocalHarnessEngine @Inject constructor(
             contextChars = modelHistory.encodedChars,
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
             requestPressure = requestPressureStore.latest(currentSessionId),
+            contextWindow = requestPressureStore.window(currentSessionId),
             workBudget = activeWorkRuns[currentSessionId]?.executionControl?.budget?.snapshot(),
             pendingInputs = pendingInputs.size(),
             pendingInputLimit = MAX_PENDING_INPUTS,
