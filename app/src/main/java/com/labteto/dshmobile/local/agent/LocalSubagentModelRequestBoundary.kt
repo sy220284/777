@@ -32,6 +32,7 @@ internal class LocalSubagentModelRequestBoundary(
         profileId = profile.id,
         model = model,
         baseUrl = baseUrl,
+        contextWindowTokensOverride = profile.contextWindowTokensOverride,
         messages = messages,
         tools = tools,
     ) {
