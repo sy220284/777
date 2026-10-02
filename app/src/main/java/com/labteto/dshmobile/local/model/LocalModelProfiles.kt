@@ -30,6 +30,37 @@ data class LocalModelProfile(
 internal fun LocalModelProfile.usesResponsesTransport(): Boolean =
     authKind == LocalModelAuthKind.CHATGPT_PLAN || protocol == LocalModelProtocol.RESPONSES
 
+internal fun localModelRouteFingerprint(
+    protocol: LocalModelProtocol,
+    authKind: LocalModelAuthKind,
+    profileId: String?,
+    baseUrl: String,
+    model: String,
+): String {
+    val raw = listOf(
+        protocol.name,
+        authKind.name,
+        profileId.orEmpty(),
+        normalizeModelBaseUrl(baseUrl),
+        model.trim(),
+    ).joinToString("\u0000")
+    return MessageDigest.getInstance("SHA-256").digest(raw.toByteArray())
+        .joinToString("") { "%02x".format(it) }
+}
+
+internal fun LocalModelProfile.routeFingerprint(): String =
+    localModelRouteFingerprint(
+        protocol = if (authKind == LocalModelAuthKind.CHATGPT_PLAN) {
+            LocalModelProtocol.RESPONSES
+        } else {
+            protocol
+        },
+        authKind = authKind,
+        profileId = id,
+        baseUrl = baseUrl,
+        model = model,
+    )
+
 /**
  * Stable identity for provider-side replay/cache/health state.
  *
