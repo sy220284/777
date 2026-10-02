@@ -93,3 +93,18 @@ internal fun compactHistoryWithStaleToolProjection(
     )
 }
 
+internal fun projectStaleSubagentToolResults(
+    history: MutableList<JsonObject>,
+    budget: LocalHistoryBudget?,
+    subagentId: String,
+    eventLog: LocalSessionEventLog,
+) {
+    val projection = budget?.let { projectStaleToolResults(history, it) } ?: return
+    history.clear()
+    history += projection.messages
+    eventLog.append("subagent/tool-history-projection", buildJsonObject {
+        put("agent_id", subagentId)
+        put("estimated_tokens_before", projection.estimatedTokensBefore)
+        put("estimated_tokens_after", projection.estimatedTokensAfter)
+    })
+}
