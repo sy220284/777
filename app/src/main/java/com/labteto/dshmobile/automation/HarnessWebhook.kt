@@ -22,7 +22,11 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.functionToolSchema
+import com.labteto.dshmobile.harness.tools.simpleToolProperties
 import com.labteto.dshmobile.local.automation.LocalAutomationRuntime
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -506,18 +510,24 @@ class WebhookPlugin(
         context.tools.register(
             HarnessTool(
                 name = "webhook_start",
-                schema = schema(
+                schema = functionToolSchema(
                     "webhook_start",
                     "启动受令牌保护的 Harness Webhook；默认仅监听 127.0.0.1",
-                    mapOf("port" to "integer"),
+                    simpleToolProperties(mapOf("port" to "integer")),
                 ),
                 access = ToolAccess.NETWORK,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "Webhook",
+                    discoveryKeywords = WEBHOOK_DISCOVERY_KEYWORDS,
+                    requirements = listOf("Webhook 仅支持本机 127.0.0.1 回环监听；远程访问需使用独立加密中继"),
+                ),
                 executor = HarnessToolExecutor { _, input, _ ->
                     ToolResult(
                         controller.start(
                             port = input["port"]?.jsonPrimitive?.content?.toIntOrNull() ?: 8765,
-                            allowLan = input["allow_lan"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false,
+                            allowLan = false,
                         ),
                     )
                 },
@@ -526,8 +536,15 @@ class WebhookPlugin(
         context.tools.register(
             HarnessTool(
                 name = "webhook_status",
-                schema = schema("webhook_status", "读取 Harness Webhook 状态"),
+                schema = functionToolSchema("webhook_status", "读取 Harness Webhook 状态"),
                 access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "Webhook",
+                    discoveryKeywords = WEBHOOK_DISCOVERY_KEYWORDS,
+                    requirements = listOf("Webhook 仅支持本机 127.0.0.1 回环监听；远程访问需使用独立加密中继"),
+                ),
                 executor = HarnessToolExecutor { _, _, _ ->
                     val state = controller.status()
                     ToolResult(
@@ -539,9 +556,15 @@ class WebhookPlugin(
         context.tools.register(
             HarnessTool(
                 name = "webhook_stop",
-                schema = schema("webhook_stop", "停止 Harness Webhook"),
+                schema = functionToolSchema("webhook_stop", "停止 Harness Webhook"),
                 access = ToolAccess.NETWORK,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "Webhook",
+                    discoveryKeywords = WEBHOOK_DISCOVERY_KEYWORDS,
+                    requirements = listOf("Webhook 仅支持本机 127.0.0.1 回环监听；远程访问需使用独立加密中继"),
+                ),
                 executor = HarnessToolExecutor { _, _, _ ->
                     ToolResult(controller.stop().toString())
                 },
@@ -550,12 +573,18 @@ class WebhookPlugin(
         context.tools.register(
             HarnessTool(
                 name = "webhook_copy_token",
-                schema = schema(
+                schema = functionToolSchema(
                     "webhook_copy_token",
                     "将 Harness Webhook 完整访问令牌复制到系统敏感剪贴板；令牌不会返回给模型",
                 ),
                 access = ToolAccess.PRIVILEGED,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "Webhook",
+                    discoveryKeywords = WEBHOOK_DISCOVERY_KEYWORDS,
+                    requirements = listOf("Webhook 仅支持本机 127.0.0.1 回环监听；远程访问需使用独立加密中继"),
+                ),
                 executor = HarnessToolExecutor { _, _, _ ->
                     ToolResult(controller.copyTokenToClipboard())
                 },
@@ -564,9 +593,15 @@ class WebhookPlugin(
         context.tools.register(
             HarnessTool(
                 name = "webhook_rotate_token",
-                schema = schema("webhook_rotate_token", "轮换 Harness Webhook 访问令牌"),
+                schema = functionToolSchema("webhook_rotate_token", "轮换 Harness Webhook 访问令牌"),
                 access = ToolAccess.PRIVILEGED,
                 approvalPolicy = ToolApprovalPolicy.ALWAYS,
+                exposure = ToolExposure.OPTIONAL,
+                metadata = ToolMetadata(
+                    family = "Webhook",
+                    discoveryKeywords = WEBHOOK_DISCOVERY_KEYWORDS,
+                    requirements = listOf("Webhook 仅支持本机 127.0.0.1 回环监听；远程访问需使用独立加密中继"),
+                ),
                 executor = HarnessToolExecutor { _, _, _ ->
                     ToolResult(controller.rotateToken())
                 },
@@ -588,24 +623,10 @@ class WebhookPlugin(
         }
     }
 
-    private fun schema(
-        name: String,
-        description: String,
-        properties: Map<String, String> = emptyMap(),
-    ) = buildJsonObject {
-        put("type", "function")
-        put("function", buildJsonObject {
-            put("name", name)
-            put("description", description)
-            put("parameters", buildJsonObject {
-                put("type", "object")
-                put("properties", buildJsonObject {
-                    properties.forEach { (key, type) ->
-                        put(key, buildJsonObject { put("type", type) })
-                    }
-                })
-                put("additionalProperties", false)
-            })
-        })
+    private companion object {
+        val WEBHOOK_DISCOVERY_KEYWORDS = setOf(
+            "webhook", "回调", "外部触发", "监听", "自动化", "令牌", "loopback", "本机",
+        )
     }
+
 }
