@@ -92,7 +92,11 @@ internal fun appendLocalDiagnosticDetails(
 
     appendLine()
     appendLine("当前会话 Token 请求账本：")
-    val detail = usageTracker.analyticsGroupDetail(TokenUsageGroupKind.SESSION, sessionId)
+    val detail = usageTracker.analyticsGroupDetail(
+        TokenUsageGroupKind.SESSION,
+        sessionId,
+        recordLimit = MAX_DIAGNOSTIC_TOKEN_RECORDS,
+    )
     if (detail == null) {
         appendLine("暂无已记录模型/工具 Token 请求。")
     } else {
