@@ -148,6 +148,12 @@ private fun applyModelHistoryEvent(
             }
             true
         }
+        "chat/active-transcript" -> {
+            val rewritten = timelineRewriteModelHistory(event.data) ?: return false
+            history.clear()
+            history += rewritten
+            true
+        }
         "user/message" -> {
             // queued=true records the human-visible transcript immediately. It becomes model-visible
             // only when a later user/queue consumed or resumed event carries model_messages.
