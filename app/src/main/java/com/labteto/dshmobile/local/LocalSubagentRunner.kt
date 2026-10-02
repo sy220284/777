@@ -46,12 +46,19 @@ internal data class LocalSubagentResult(
     val status: LocalSubagentStatus,
     val output: String,
     val errorCode: String? = null,
+    val retryable: Boolean = false,
 ) {
     val succeeded: Boolean get() = status == LocalSubagentStatus.COMPLETED
 }
 
+internal class LocalSubagentExecutionException(
+    val errorCode: String?,
+    val retryable: Boolean,
+    message: String,
+) : IllegalStateException(message)
+
 internal fun LocalSubagentResult.requireCompletedOutput(): String {
-    if (!succeeded) throw IllegalStateException(output)
+    if (!succeeded) throw LocalSubagentExecutionException(errorCode, retryable, output)
     return output
 }
 
@@ -562,7 +569,7 @@ internal class LocalSubagentRunner(
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
                 append("\n建议：模型超时可重试；网页/工具超时请查看对应工具错误码。")
             }
-            return LocalSubagentResult(LocalSubagentStatus.FAILED, output, error.code)
+            return LocalSubagentResult(LocalSubagentStatus.FAILED, output, error.code, error.retryable)
         } catch (error: Exception) {
             val partial = progress.joinToString("\n")
             val output = buildString {
