@@ -68,3 +68,28 @@ internal fun projectStaleToolResults(
         estimatedTokensAfter = after,
     )
 }
+
+internal fun compactHistoryWithStaleToolProjection(
+    history: List<JsonObject>,
+    compactor: LocalHistoryCompactor,
+    budget: LocalHistoryBudget,
+    extraTokens: Int,
+    summaryMode: LocalHistorySummaryMode,
+    currentChars: Int,
+    currentTokens: Int,
+): LocalHistoryCompaction? {
+    val projection = projectStaleToolResults(history, budget)
+    val source = projection?.messages ?: history
+    val compaction = compactor.compact(
+        history = source,
+        budget = budget,
+        currentChars = if (projection == null) currentChars else source.sumOf { it.toString().length },
+        currentTokens = projection?.estimatedTokensAfter ?: currentTokens,
+        extraTokens = extraTokens,
+        summaryMode = summaryMode,
+    ) ?: return projection
+    return compaction.copy(
+        estimatedTokensBefore = projection?.estimatedTokensBefore ?: compaction.estimatedTokensBefore,
+    )
+}
+
