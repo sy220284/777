@@ -460,8 +460,10 @@ class HarnessAutomationScheduler @Inject constructor(
             lastError = null,
             failureStreak = 0,
         )
-        workManager.cancelUniqueWork(workName(id))
+        // Persist the new source of truth before touching the currently runnable schedule.
+        // A storage failure must leave the old WorkManager entry intact.
         store.upsert(updated)
+        workManager.cancelUniqueWork(workName(id))
         if (!wasPaused) {
             if (usesChainedChatScheduling(updated) || updated.recurringMinutes == null) {
                 enqueueOneTime(id, nextRun)
