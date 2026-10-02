@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
@@ -253,13 +254,14 @@ fun DsPopupMenu(
     onDismiss: () -> Unit,
     items: List<MenuItem>,
     focusable: Boolean = true,
+    containerColor: Color? = null,
 ) {
     val colors = DsTheme.colors
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
         shape = DsShapes.menu,
-        containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
+        containerColor = containerColor ?: colors.wallpaperSurface(WallpaperSurfaceLevel.MENU),
         tonalElevation = 0.dp,
         border = BorderStroke(1.dp, colors.borderL1),
         properties = PopupProperties(
