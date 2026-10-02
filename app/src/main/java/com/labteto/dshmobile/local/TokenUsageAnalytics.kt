@@ -294,7 +294,11 @@ internal fun DeepSeekUsageTracker.record(
     usage = reply.usage,
     requestId = reply.requestId,
     context = context,
-    promptBreakdown = reply.promptBreakdown,
+    promptBreakdown = if (reply.usage.reported) {
+        reply.promptBreakdown.calibratedToReportedInput(reply.usage.promptTokens)
+    } else {
+        reply.promptBreakdown
+    },
     route = reply.routeIdentity,
 )
 
