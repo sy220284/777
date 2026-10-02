@@ -55,7 +55,8 @@ internal object LocalEnvironmentReport {
                 "工作消费护栏：已确认 ${budget.reportedExposureTokens} + 不确定 ${budget.uncertainExposureTokens}" +
                     " + 待发送 ${budget.pendingExposureTokens} / ${budget.exposureLimitTokens} token；" +
                     "请求 ${budget.admittedRequests}/${budget.maxRequests}；" +
-                    "估算校准 ${budget.estimateCalibrationPermille / 10.0}%（${budget.calibrationSamples} 次实报样本）",
+                    "估算校准 ${budget.estimateCalibrationPermille / 10.0}%（${budget.calibrationSamples} 次实报样本 / " +
+                    "${budget.calibrationRoutes} 路由）",
             )
         }
         if (latestRequest == null) {
