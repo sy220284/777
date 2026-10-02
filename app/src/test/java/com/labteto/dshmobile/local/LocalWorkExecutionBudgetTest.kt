@@ -137,6 +137,22 @@ class LocalWorkExecutionBudgetTest {
     }
 
     @Test
+    fun calibrationIsIsolatedByModelRoute() = runTest {
+        val budget = LocalWorkExecutionBudget(
+            exposureLimitTokens = 500_000,
+            pendingLimitTokens = 500_000,
+            maxRequests = 10,
+        )
+        budget.reserve(100_000, "route-a").commit(reportedInputTokens = 50_000)
+        val routeB = budget.reserve(100_000, "route-b")
+
+        val snapshot = budget.snapshot()
+        assertEquals(100_000L, snapshot.pendingExposureTokens)
+        assertEquals(1, snapshot.calibrationRoutes)
+        routeB.release()
+    }
+
+    @Test
     fun exposureOverlapWaitsWhenOnlyPendingReservationCausesTheLimit() = runTest {
         val budget = LocalWorkExecutionBudget(
             exposureLimitTokens = 200_000,
