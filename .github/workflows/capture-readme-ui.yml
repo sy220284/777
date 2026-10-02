@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/capture-readme-ui.yml'
       - '.github/scripts/capture-readme-ui.sh'
+      - 'app/src/main/**'
       - 'app/src/debug/**'
       - 'README.md'
   workflow_dispatch:
