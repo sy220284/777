@@ -12,10 +12,7 @@ import kotlinx.serialization.json.Json
  * Business rules stay in [ChatDiaryStore]; this class owns only cache, backup, corruption recovery
  * and atomic replacement.
  */
-internal class ChatDiaryDocumentStore(
-    private val root: File,
-    private val json: Json,
-) {
+internal class ChatDiaryDocumentStore(private val root: File, private val json: Json) {
     init {
         root.mkdirs()
     }
