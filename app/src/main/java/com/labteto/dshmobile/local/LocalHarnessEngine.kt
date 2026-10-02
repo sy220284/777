@@ -3288,7 +3288,7 @@ class LocalHarnessEngine @Inject constructor(
                             sessionId = runSessionId,
                             callId = event.call.id,
                             result = event.output,
-                            binding = binding,
+                            binding = binding, retention = event.retention,
                         )
                         val modelOutput = AgentToolResult(
                             content = boundedContent,
@@ -3300,7 +3300,7 @@ class LocalHarnessEngine @Inject constructor(
                         ).modelVisibleContent()
                         val transcriptMessage = runTranscript.newMessage(
                             role = "tool",
-                            content = boundedContent,
+                            content = durableToolResultContent(boundedContent, event.retention),
                             toolName = event.call.name,
                             contentAlreadyBounded = true,
                         )
@@ -3310,9 +3310,11 @@ class LocalHarnessEngine @Inject constructor(
                             put("name", event.call.name)
                             put(
                                 "content",
-                                truncateWithoutSplittingSurrogatePair(event.output, MAX_EVENT_CHARS),
+                                truncateWithoutSplittingSurrogatePair(
+                                    durableToolResultContent(event.output, event.retention), MAX_EVENT_CHARS,
+                                ),
                             )
-                            put("model_content", modelOutput)
+                            put("model_content", durableToolResultContent(modelOutput, event.retention))
                             put("is_error", event.isError)
                             event.errorCode?.let { put("error_code", it) }
                             put("retryable", event.retryable)
@@ -3320,13 +3322,7 @@ class LocalHarnessEngine @Inject constructor(
                             event.recoveryHint?.let { put("recovery_hint", it) }
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
-                        runHistory.append(
-                            buildJsonObject {
-                                put("role", "tool")
-                                put("tool_call_id", event.call.id)
-                                put("content", modelOutput)
-                            },
-                        )
+                        runHistory.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
                         completedToolCallIds += event.call.id
                         updateContextMetrics(binding)
                         runTranscript.applyMessages(listOf(transcriptMessage), toolEvent.sequence)
@@ -4791,7 +4787,7 @@ class LocalHarnessEngine @Inject constructor(
         sessionId: String,
         callId: String?,
         result: String,
-        binding: LocalWorkRunBinding? = null,
+        binding: LocalWorkRunBinding? = null, retention: com.labteto.dshmobile.harness.tools.ToolResultRetention = com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE,
     ): String {
         val history = binding?.modelHistory ?: modelHistory
         val budget = adaptiveToolResultBudget(
@@ -4799,7 +4795,8 @@ class LocalHarnessEngine @Inject constructor(
             currentHistoryChars = history.encodedChars,
             currentHistoryTokens = history.estimatedTokens,
         )
-        val stored = callId?.let { toolOutputStore.store(sessionId, it, result) } != null
+        val stored = retention == com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE &&
+            callId?.let { toolOutputStore.store(sessionId, it, result) } != null
         val retained = retainTextForModel(
             value = result,
             maxTokens = budget.maxToolResultTokens,
@@ -5113,7 +5110,7 @@ class LocalHarnessEngine @Inject constructor(
         val history = binding?.modelHistory ?: modelHistory
         log.append(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
-            modelHistoryCheckpointCodec.encode(history.snapshot(), reason),
+            modelHistoryCheckpointCodec.encode(durableModelHistorySnapshot(history.snapshot()), reason),
         )
         if (binding != null) {
             binding.turnsSinceModelHistoryCheckpoint = 0
