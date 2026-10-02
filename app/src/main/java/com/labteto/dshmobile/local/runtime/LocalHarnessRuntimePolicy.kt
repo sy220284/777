@@ -69,7 +69,7 @@ internal fun projectWorkResourceCount(
 ): Int = if (usageMode == LocalUsageMode.WORK) count else 0
 
 internal fun canResolvePendingByEnablingAutoApproval(approval: LocalApproval?): Boolean =
-    approval != null
+    approval?.canAutoApproveSafely == true
 
 internal fun localResourceBudgetForMemoryClass(memoryClassMb: Int): HarnessResourceBudget = when {
     memoryClassMb >= 512 -> HarnessResourceBudget(
