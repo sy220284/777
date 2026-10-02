@@ -4949,14 +4949,20 @@ class LocalHarnessEngine @Inject constructor(
         val history = binding?.modelHistory ?: modelHistory
         val targetState = binding?.state ?: _state
         val log = binding?.eventLog ?: eventLog
+        val summaryMode = if (targetState.value.usageMode == LocalUsageMode.CHAT) {
+            LocalHistorySummaryMode.CHAT
+        } else {
+            LocalHistorySummaryMode.WORK
+        }
         val compaction = history.compact(
             compactor = historyCompactor,
             budget = budget,
             extraTokens = extraTokens,
-            summaryMode = if (targetState.value.usageMode == LocalUsageMode.CHAT) {
-                LocalHistorySummaryMode.CHAT
+            summaryMode = summaryMode,
+            structuredWorkState = if (summaryMode == LocalHistorySummaryMode.WORK) {
+                structuredWorkState(targetState.value, log)
             } else {
-                LocalHistorySummaryMode.WORK
+                null
             },
         ) ?: run {
             updateContextMetrics(binding)
