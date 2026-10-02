@@ -440,6 +440,42 @@ class LocalHistoryCompactorTest {
         put("content", content)
     }
 
+    @Test
+    fun compactionPreservesEveryLeadingSystemMessageVerbatim() {
+        val systemBase = message("system", "基础系统规则")
+        val inherited = message("system", "父任务约束必须保留")
+        val virtualScreen = message("system", "虚拟屏 id=screen-1")
+        val history = buildList {
+            add(systemBase)
+            add(inherited)
+            add(virtualScreen)
+            repeat(20) { index ->
+                add(message("user", "旧任务-$index-" + "旧".repeat(2_000)))
+                add(message("assistant", "旧进展-$index-" + "进".repeat(2_000)))
+            }
+            add(message("user", "继续当前任务"))
+        }
+        val compacted = LocalHistoryCompactor().compact(
+            history = history,
+            budget = LocalHistoryBudget(
+                maxHistoryChars = 1_000_000,
+                tailChars = 30_000,
+                maxSummaryChars = 8_000,
+                maxToolResultChars = 20_000,
+                maxHistoryTokens = 30_000,
+                tailTokens = 8_000,
+                maxToolResultTokens = 4_000,
+            ),
+            summaryMode = LocalHistorySummaryMode.WORK,
+        )
+
+        requireNotNull(compacted)
+        assertEquals(systemBase, compacted.messages[0])
+        assertEquals(inherited, compacted.messages[1])
+        assertEquals(virtualScreen, compacted.messages[2])
+        assertTrue(compacted.messages.last()["content"].toString().contains("继续当前任务"))
+    }
+
     private fun toolCallingAssistant(name: String): JsonObject = buildJsonObject {
         put("role", "assistant")
         put("content", "准备调用工具")
