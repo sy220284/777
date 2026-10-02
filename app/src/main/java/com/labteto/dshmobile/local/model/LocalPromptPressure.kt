@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local
 
-import java.util.concurrent.ConcurrentHashMap
+import java.util.LinkedHashMap
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -84,7 +84,9 @@ internal data class LocalContextWindowSnapshot(
  * A generation advances only when model-visible history is materially compacted. The first
  * provider-reported input usage in a generation replaces the estimated prefill baseline.
  */
-internal class LocalRequestPressureStore {
+internal class LocalRequestPressureStore(
+    maxSessions: Int = 128,
+) {
     private data class MutableWindow(
         var generation: Int = 1,
         var prefillTokens: Long = 0L,
@@ -94,65 +96,69 @@ internal class LocalRequestPressureStore {
         var serverObserved: Boolean = false,
     )
 
-    private val latest = ConcurrentHashMap<String, LocalPromptPressure>()
-    private val windows = ConcurrentHashMap<String, MutableWindow>()
+    private data class SessionEntry(
+        var latest: LocalPromptPressure? = null,
+        val window: MutableWindow = MutableWindow(),
+    )
 
-    fun record(sessionId: String, pressure: LocalPromptPressure) {
-        latest[sessionId] = pressure
-        val window = windows.computeIfAbsent(sessionId) {
-            MutableWindow(
-                prefillTokens = pressure.estimatedInputTokens.toLong(),
-                lastInputTokens = pressure.estimatedInputTokens,
-                peakInputTokens = pressure.estimatedInputTokens,
-            )
-        }
-        synchronized(window) {
-            if (window.prefillTokens <= 0L) window.prefillTokens = pressure.estimatedInputTokens.toLong()
-            window.lastInputTokens = pressure.estimatedInputTokens
-            window.peakInputTokens = maxOf(window.peakInputTokens, pressure.estimatedInputTokens)
-        }
+    private val capacity = maxSessions.coerceAtLeast(1)
+    private val sessions = object : LinkedHashMap<String, SessionEntry>(16, 0.75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, SessionEntry>?,
+        ): Boolean = size > capacity
     }
 
+    @Synchronized
+    fun record(sessionId: String, pressure: LocalPromptPressure) {
+        val entry = sessions.getOrPut(sessionId) { SessionEntry() }
+        entry.latest = pressure
+        val window = entry.window
+        if (window.prefillTokens <= 0L) window.prefillTokens = pressure.estimatedInputTokens.toLong()
+        window.lastInputTokens = pressure.estimatedInputTokens
+        window.peakInputTokens = maxOf(window.peakInputTokens, pressure.estimatedInputTokens)
+    }
+
+    @Synchronized
     fun recordReportedUsage(sessionId: String, inputTokens: Long) {
         if (inputTokens <= 0L) return
-        val window = windows.computeIfAbsent(sessionId) { MutableWindow() }
-        synchronized(window) {
-            if (!window.serverObserved) {
-                window.prefillTokens = inputTokens
-                window.prefillSource = "server"
-                window.serverObserved = true
-            }
+        val window = sessions.getOrPut(sessionId) { SessionEntry() }.window
+        if (!window.serverObserved) {
+            window.prefillTokens = inputTokens
+            window.prefillSource = "server"
+            window.serverObserved = true
         }
     }
 
+    @Synchronized
     fun advanceGeneration(sessionId: String, estimatedTokensAfter: Int) {
-        val window = windows.computeIfAbsent(sessionId) { MutableWindow() }
-        synchronized(window) {
-            window.generation += 1
-            window.prefillTokens = estimatedTokensAfter.coerceAtLeast(0).toLong()
-            window.prefillSource = "estimated"
-            window.lastInputTokens = estimatedTokensAfter.coerceAtLeast(0)
-            window.peakInputTokens = estimatedTokensAfter.coerceAtLeast(0)
-            window.serverObserved = false
-        }
+        val window = sessions.getOrPut(sessionId) { SessionEntry() }.window
+        window.generation += 1
+        window.prefillTokens = estimatedTokensAfter.coerceAtLeast(0).toLong()
+        window.prefillSource = "estimated"
+        window.lastInputTokens = estimatedTokensAfter.coerceAtLeast(0)
+        window.peakInputTokens = estimatedTokensAfter.coerceAtLeast(0)
+        window.serverObserved = false
     }
 
-    fun latest(sessionId: String): LocalPromptPressure? = latest[sessionId]
+    @Synchronized
+    fun latest(sessionId: String): LocalPromptPressure? = sessions[sessionId]?.latest
 
-    fun window(sessionId: String): LocalContextWindowSnapshot? = windows[sessionId]?.let { value ->
-        synchronized(value) {
-            LocalContextWindowSnapshot(
-                generation = value.generation,
-                prefillTokens = value.prefillTokens,
-                prefillSource = value.prefillSource,
-                lastInputTokens = value.lastInputTokens,
-                peakInputTokens = value.peakInputTokens,
-            )
-        }
+    @Synchronized
+    fun window(sessionId: String): LocalContextWindowSnapshot? = sessions[sessionId]?.window?.let { value ->
+        LocalContextWindowSnapshot(
+            generation = value.generation,
+            prefillTokens = value.prefillTokens,
+            prefillSource = value.prefillSource,
+            lastInputTokens = value.lastInputTokens,
+            peakInputTokens = value.peakInputTokens,
+        )
     }
 
+    @Synchronized
     fun clear(sessionId: String) {
-        latest.remove(sessionId)
-        windows.remove(sessionId)
+        sessions.remove(sessionId)
     }
+
+    @Synchronized
+    internal fun trackedSessionCount(): Int = sessions.size
 }
