@@ -5,8 +5,6 @@ import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.LocalModelProtocol
 import com.labteto.dshmobile.local.modelProfileId
 
-internal const val CHATGPT_PLAN_MODEL_BASE_URL = "https://api.openai.com/v1"
-
 /**
  * The authenticated ChatGPT plan catalog is the model allow-list.
  *
@@ -20,12 +18,12 @@ internal fun chatGptPlanProfiles(
     LocalModelProfile(
         id = modelProfileId(
             option.slug,
-            CHATGPT_PLAN_MODEL_BASE_URL,
+            CHATGPT_RESOURCE,
             LocalModelAuthKind.CHATGPT_PLAN,
             accountId,
         ),
         model = option.slug,
-        baseUrl = CHATGPT_PLAN_MODEL_BASE_URL,
+        baseUrl = CHATGPT_RESOURCE,
         provider = "ChatGPT",
         authKind = LocalModelAuthKind.CHATGPT_PLAN,
         protocol = LocalModelProtocol.RESPONSES,
