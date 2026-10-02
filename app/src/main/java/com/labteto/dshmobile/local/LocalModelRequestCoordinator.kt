@@ -76,12 +76,16 @@ internal class LocalModelRequestCoordinator(
         } else {
             null
         }
-        val operationalLimit = operationalInputLimitTokens(frozenProfile.model, frozenProfile.baseUrl)
+        val operationalLimit = operationalInputLimitTokens(
+            frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
+        )
         val pressure = LocalPromptPressureMeter.measure(
             messages = messages,
             tools = tools,
             operationalLimitTokens = operationalLimit,
-            modelContextWindowTokens = documentedContextWindowTokens(frozenProfile.model, frozenProfile.baseUrl),
+            modelContextWindowTokens = documentedContextWindowTokens(
+                frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
+            ),
         )
         pressureStore.record(snapshot.sessionId, pressure)
         val contextWindow = pressureStore.window(snapshot.sessionId)
@@ -280,6 +284,7 @@ internal class LocalModelRequestCoordinator(
                             profileId = frozenProfile.id,
                             model = frozenProfile.model,
                             baseUrl = frozenProfile.baseUrl,
+                            contextWindowTokensOverride = frozenProfile.contextWindowTokensOverride,
                             messages = activeMessages,
                             tools = tools,
                         ) {
