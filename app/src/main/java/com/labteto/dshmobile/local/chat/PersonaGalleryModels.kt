@@ -1,17 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
-import android.content.Context
 import com.labteto.dshmobile.local.LocalHarnessMessage
-import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.File
-import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class PersonaGalleryStory(
