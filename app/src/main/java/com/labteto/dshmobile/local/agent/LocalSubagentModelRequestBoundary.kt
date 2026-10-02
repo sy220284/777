@@ -8,7 +8,6 @@ import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.executeWithModelAdmission
-import com.labteto.dshmobile.local.logSubagentProviderError
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
