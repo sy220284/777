@@ -123,8 +123,8 @@ internal class LocalSubagentRunnerFactory(
         resourceScheduler = resourceScheduler,
         acquireVirtualScreen = { owner -> virtualDisplayProvider.acquireAgentVirtualDisplay(owner) },
         releaseVirtualScreen = virtualDisplayProvider::releaseAgentVirtualDisplay,
-        historyBudget = { baseUrl, model ->
-            localHistoryBudgetFor(memoryClassMb, resourceScheduler.snapshot().pressure, model, baseUrl)
+        historyBudget = { profile ->
+            localHistoryBudgetFor(memoryClassMb, resourceScheduler.snapshot().pressure, profile.model, profile.baseUrl, profile.contextWindowTokensOverride)
         },
         runCoordinator = agentRunCoordinator,
         runSessionId = runSessionId,

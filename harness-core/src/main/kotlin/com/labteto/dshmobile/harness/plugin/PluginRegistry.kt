@@ -56,6 +56,11 @@ data class PluginLifecycleSnapshot(
     val lastError: String? = null,
 )
 
+private data class PendingPluginCleanup(
+    val plugin: HarnessPlugin,
+    val context: HarnessContext,
+)
+
 private data class HarnessRegistrySnapshot(
     val tools: Map<String, HarnessTool>,
     val capabilities: Map<String, Pair<CapabilityDescriptor, Any>>,
@@ -100,7 +105,7 @@ class PluginRegistry(
     private val installed = linkedMapOf<String, HarnessPlugin>()
     private val lifecycle = linkedMapOf<String, PluginLifecycleSnapshot>()
     private val lifecycleMutex = Mutex()
-    private val pendingCleanup = linkedMapOf<String, HarnessPlugin>()
+    private val pendingCleanup = linkedMapOf<String, PendingPluginCleanup>()
 
     suspend fun install(plugin: HarnessPlugin) = lifecycleMutex.withLock {
         context.tools.lifecycleTransition {
@@ -182,8 +187,7 @@ class PluginRegistry(
                 lifecycle[id] = PluginLifecycleSnapshot(id, PluginLifecycleState.UNINSTALLING)
             }
             try {
-                pendingCleanup[id]?.uninstall(staged)
-                pendingCleanup.remove(id)
+                retryPendingCleanupLocked(id)
                 plugin.uninstall(staged)
                 staged.publishTo(context)
                 synchronized(this) {
@@ -229,6 +233,7 @@ class PluginRegistry(
             ?: error("插件未安装：${plugin.id}")
         if (previous === plugin) return
 
+        retryPendingCleanupLocked(plugin.id)
         val staged = context.fork()
         var removedPrevious = false
         var replacementStarted = false
@@ -254,14 +259,20 @@ class PluginRegistry(
                     id = plugin.id,
                     state = PluginLifecycleState.ACTIVE,
                 )
+                context.tools.markLifecycleSafe(installed.keys.none {
+                    lifecycle[it]?.state == PluginLifecycleState.FAILED
+                })
             }
         } catch (error: Throwable) {
             var cleanupFailure: Throwable? = null
             var restoreFailure: Throwable? = null
             withContext(NonCancellable) {
                 if (replacementStarted) {
-                    cleanupFailure = runCatching { plugin.uninstall(staged) }.exceptionOrNull()
-                    if (cleanupFailure != null) pendingCleanup[plugin.id] = plugin
+                    val cleanupContext = staged.fork()
+                    cleanupFailure = runCatching { plugin.uninstall(cleanupContext) }.exceptionOrNull()
+                    if (cleanupFailure != null) {
+                        pendingCleanup[plugin.id] = PendingPluginCleanup(plugin, cleanupContext)
+                    }
                 }
                 if (removedPrevious) {
                     staged.restoreRegistries(checkNotNull(registryWithoutPrevious))
@@ -297,6 +308,28 @@ class PluginRegistry(
                 )
             }
             throw error
+        }
+    }
+
+    private suspend fun retryPendingCleanupLocked(id: String) {
+        val pending = synchronized(this) { pendingCleanup[id] } ?: return
+        try {
+            withContext(NonCancellable) {
+                pending.plugin.uninstall(pending.context)
+            }
+        } catch (error: Throwable) {
+            context.tools.markLifecycleSafe(false)
+            synchronized(this) {
+                lifecycle[id] = PluginLifecycleSnapshot(
+                    id = id,
+                    state = PluginLifecycleState.FAILED,
+                    lastError = "遗留插件资源清理失败：" + (error.message ?: error::class.java.simpleName),
+                )
+            }
+            throw error
+        }
+        synchronized(this) {
+            pendingCleanup.remove(id)
         }
     }
 

@@ -166,6 +166,7 @@ internal class LocalToolExecutionCoordinator(
         if (!result.isError) {
             return AgentToolResult(
                 content = result.content,
+                retention = result.retention,
                 sideEffect = if (registered.access in MUTATING_ACCESSES) {
                     AgentToolSideEffect.POSSIBLE
                 } else {
@@ -218,6 +219,7 @@ internal class LocalToolExecutionCoordinator(
                 AgentToolSideEffect.NONE
             },
             recoveryHint = recoveryHint,
+            retention = result.retention,
         )
     }
 

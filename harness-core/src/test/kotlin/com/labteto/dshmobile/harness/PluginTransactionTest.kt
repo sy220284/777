@@ -171,6 +171,54 @@ class PluginTransactionTest {
         assertFalse(registry.context.tools.execute("slow", buildJsonObject {}).isError)
     }
 
+    @Test fun staleReplacementCleanupNeverMutatesLaterSuccessfulGeneration() = runTest {
+        val registry = PluginRegistry()
+        var staleCleanupAttempts = 0
+        var activeGeneration = "previous"
+
+        fun ownerPlugin(label: String) = object : HarnessPlugin {
+            override val id = "owner"
+            override suspend fun install(context: HarnessContext) {
+                activeGeneration = label
+                context.events.register("generation", label, replace = true)
+            }
+            override suspend fun uninstall(context: HarnessContext) {
+                context.events.unregister("generation")
+            }
+        }
+
+        val previous = ownerPlugin("previous")
+        registry.install(previous)
+
+        val broken = object : HarnessPlugin {
+            override val id = "owner"
+            override suspend fun install(context: HarnessContext) {
+                context.events.register("candidate-only", "stale")
+                error("candidate install failed")
+            }
+            override suspend fun uninstall(context: HarnessContext) {
+                staleCleanupAttempts++
+                context.events.unregister("candidate-only")
+                if (staleCleanupAttempts == 1) error("first cleanup failed")
+            }
+        }
+
+        assertTrue(runCatching { registry.replace(broken) }.isFailure)
+        assertEquals(PluginLifecycleState.FAILED, registry.lifecycleSnapshot("owner")?.state)
+        assertEquals("previous", registry.context.events.get("generation"))
+
+        val replacement = ownerPlugin("replacement")
+        registry.replace(replacement)
+
+        assertEquals(2, staleCleanupAttempts)
+        assertEquals("replacement", activeGeneration)
+        assertEquals("replacement", registry.context.events.get("generation"))
+        assertEquals(PluginLifecycleState.ACTIVE, registry.lifecycleSnapshot("owner")?.state)
+
+        assertTrue(registry.uninstall("owner"))
+        assertEquals(2, staleCleanupAttempts)
+    }
+
     @Test fun failedRestorationBlocksClosedToolsUntilFailedPluginIsDisabled() = runTest {
         val registry = PluginRegistry()
         var installs = 0

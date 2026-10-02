@@ -5,7 +5,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 private val pendingTurnJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 private const val PENDING_EVENT = "chat/pending-turn"
@@ -60,7 +59,10 @@ internal fun ChatContextState.loadPendingBatch(
         if (page.isEmpty()) break
         for (event in page) {
             if (event.sequence > scanThrough) break
-            if (event.type == PENDING_EVENT && event.data["scope"]?.jsonPrimitive?.contentOrNull == scope) {
+            if (
+                event.type == PENDING_EVENT &&
+                (event.data["scope"] as? JsonPrimitive)?.contentOrNull == scope
+            ) {
                 collect(pendingTurnJson.decodeFromJsonElement(ChatPendingTurn.serializer(), event.data))
                 if (candidates.size > wanted) {
                     val newest = candidates.keys.maxBy { it.first }

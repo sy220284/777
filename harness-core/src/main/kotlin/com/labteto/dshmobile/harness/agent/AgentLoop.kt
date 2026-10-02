@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.harness.agent
 
+import com.labteto.dshmobile.harness.tools.ToolResultRetention
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -40,6 +41,7 @@ data class AgentToolResult(
     val retryable: Boolean = false,
     val sideEffect: AgentToolSideEffect = AgentToolSideEffect.NONE,
     val recoveryHint: String? = null,
+    val retention: ToolResultRetention = ToolResultRetention.DURABLE,
 )
 
 fun AgentToolResult.modelVisibleContent(): String {
@@ -103,6 +105,7 @@ sealed interface AgentEvent {
         val retryable: Boolean = false,
         val sideEffect: AgentToolSideEffect = AgentToolSideEffect.NONE,
         val recoveryHint: String? = null,
+        val retention: ToolResultRetention = ToolResultRetention.DURABLE,
     ) : AgentEvent
 
     data class StepFinished(
@@ -250,6 +253,7 @@ class AgentLoop(
                                 retryable = result.retryable,
                                 sideEffect = result.sideEffect,
                                 recoveryHint = result.recoveryHint,
+                                retention = result.retention,
                             ),
                         )
                         messages += AgentMessage(
@@ -284,6 +288,7 @@ class AgentLoop(
                                 retryable = result.retryable,
                                 sideEffect = result.sideEffect,
                                 recoveryHint = result.recoveryHint,
+                                retention = result.retention,
                             ),
                         )
                         messages += AgentMessage(

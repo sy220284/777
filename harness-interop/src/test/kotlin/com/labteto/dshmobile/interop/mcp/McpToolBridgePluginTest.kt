@@ -25,6 +25,20 @@ import org.junit.Test
 
 class McpToolBridgePluginTest {
     @Test
+    fun oversizedToolResultIsBoundedBeforeEnteringHarnessHistory() {
+        val result = buildJsonObject {
+            put("content", "x".repeat(MAX_MCP_TOOL_RESULT_CHARS * 2))
+        }
+
+        val bounded = boundedMcpToolResult(result)
+
+        assertTrue(bounded.length <= MAX_MCP_TOOL_RESULT_CHARS)
+        assertTrue(bounded.contains("已在进入会话历史前截断"))
+        assertTrue(bounded.startsWith("{"))
+        assertTrue(bounded.endsWith("}"))
+    }
+
+    @Test
     fun connectDiscoversRegistersCallsAndDisconnectsRemoteTools() = runTest {
         val requests = mutableListOf<Pair<String, JsonObject>>()
         var closed = false
@@ -412,6 +426,47 @@ class McpToolBridgePluginTest {
             root.deleteRecursively()
             outside.deleteRecursively()
         }
+    }
+
+    @Test
+    fun aggregateToolBudgetIsReleasedWhenServerDisconnects() = runTest {
+        fun transport() = object : McpTransport {
+            override suspend fun request(method: String, params: JsonObject): JsonObject {
+                require(method == "tools/list")
+                return buildJsonObject {
+                    put("result", buildJsonObject {
+                        put("tools", buildJsonArray {
+                            repeat(100) { index ->
+                                add(buildJsonObject {
+                                    put("name", "tool_$index")
+                                    put("inputSchema", buildJsonObject { put("type", "object") })
+                                })
+                            }
+                        })
+                    })
+                }
+            }
+
+            override fun close() = Unit
+        }
+
+        val plugin = McpToolBridgePlugin(
+            http = OkHttpClient(),
+            json = Json,
+            transportFactory = { transport() },
+        )
+        val registry = PluginRegistry()
+        registry.install(plugin)
+
+        assertTrue(plugin.connectHttpFromUi(registry.context, "first", "https://example.com/first").contains("已连接"))
+        val overBudget = runCatching {
+            plugin.connectHttpFromUi(registry.context, "second", "https://example.com/second")
+        }
+        assertTrue(overBudget.isFailure)
+        assertTrue(overBudget.exceptionOrNull()?.message.orEmpty().contains("工具总数"))
+
+        plugin.disconnectFromUi(registry.context, "first")
+        assertTrue(plugin.connectHttpFromUi(registry.context, "second", "https://example.com/second").contains("已连接"))
     }
 
 }

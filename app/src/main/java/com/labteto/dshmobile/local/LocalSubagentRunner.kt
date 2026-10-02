@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.LocalModelRunContext
+import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
 import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.model.LocalModelGateway
@@ -53,7 +54,7 @@ internal class LocalSubagentRunner(
     private val resourceScheduler: HarnessResourceScheduler,
     private val acquireVirtualScreen: suspend (String) -> String? = { null },
     private val releaseVirtualScreen: (String) -> Unit = { },
-    private val historyBudget: ((String, String) -> LocalHistoryBudget)? = null,
+    private val historyBudget: ((LocalModelProfile) -> LocalHistoryBudget)? = null,
     private val historyCompactor: LocalHistoryCompactor = LocalHistoryCompactor(),
     private val runCoordinator: LocalAgentRunCoordinator? = null,
     private val runSessionId: () -> String = { state.value.sessionId },
@@ -139,10 +140,11 @@ internal class LocalSubagentRunner(
         virtualScreenId: String?,
     ): LocalSubagentResult {
         val subagentId = "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
-        val history = if (inheritHistory) {
-            inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
-        } else {
-            mutableListOf()
+        val history = LocalModelHistoryBuffer().apply {
+            reset(
+                if (inheritHistory) inheritedHistoryBeforeToolCall(historySnapshot(), parentCallId)
+                else emptyList(),
+            )
         }
         val progress = ArrayDeque<String>()
         val progressTracker = LocalAgentProgressTracker()
@@ -153,11 +155,11 @@ internal class LocalSubagentRunner(
         }
         val snapshot = state.value.copy(model = runProfile.model, baseUrl = runProfile.baseUrl)
         val routeModel = runProfile.model
-        val runHistoryBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
+        val runHistoryBudget = historyBudget?.invoke(runProfile)
         val stepLimit = adaptiveAgentStepLimit(
             configuredBase = maxSteps,
             task = task,
-            contextChars = history.sumOf { it.toString().length } + task.length,
+            contextChars = history.encodedChars + task.length,
             contextBudgetChars = runHistoryBudget?.maxHistoryChars ?: snapshot.contextBudgetChars,
             pressure = resourceScheduler.snapshot().pressure,
             kind = runKind,
@@ -222,13 +224,13 @@ internal class LocalSubagentRunner(
                 val function = (element as? JsonObject)?.get("function") as? JsonObject
                 (function?.get("name") as? JsonPrimitive)?.content
             },
-            contextChars = history.sumOf { it.toString().length } + task.length,
+            contextChars = history.encodedChars + task.length,
             parentRunId = parentRunId,
             agentId = subagentId,
         )
 
         try {
-            if (!inheritHistory) history += buildJsonObject {
+            if (!inheritHistory) history.append(buildJsonObject {
                 put("role", "system")
                 put(
                     "content",
@@ -238,7 +240,7 @@ internal class LocalSubagentRunner(
                         "你是只读子代理。完成指定子任务；仅允许读取、搜索和分析，不修改状态。"
                     },
                 )
-            }
+            })
             boundedSubagentContext(contextSnapshot(task))?.let { inherited ->
                 val insertion = buildJsonObject {
                     put("role", "system")
@@ -250,30 +252,30 @@ internal class LocalSubagentRunner(
                 val index = if (
                     history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
                 ) 1 else 0
-                history.add(index, insertion)
+                history.insert(index, insertion)
             }
             virtualScreenId?.let { id ->
-                history += buildJsonObject {
+                history.append(buildJsonObject {
                     put("role", "system")
                     put(
                         "content",
                         "【独立虚拟屏】id=$id；界面操作仅用 android_vscreen_* 并传入该 id，禁止操作主屏。",
                     )
-                }
+                })
             }
-            history += buildJsonObject { put("role", "user"); put("content", task) }
+            history.append(buildJsonObject { put("role", "user"); put("content", task) })
 
             val loop = AgentLoop(
                 model = AgentModel {
                     backgroundJobId?.let(jobs::drainMessages).orEmpty().forEach { message ->
-                        history += buildJsonObject {
+                        history.append(buildJsonObject {
                             put("role", "user")
                             put("content", message)
-                        }
+                        })
                     }
                     historyPolicy.compactHistory(history, subagentId, runHistoryBudget)
                     modelStep += 1
-                    val durableHistory = history.toList()
+                    val durableHistory = history.snapshot()
                     val selectedMode = resolveImageMode(snapshot.imageInputMode, snapshot.baseUrl, routeModel)
                     if (hasLocalImageRefs(durableHistory) &&
                         resolveImageMode(LocalImageInputMode.AUTO, snapshot.baseUrl, routeModel) == LocalImageInputMode.TOOL) {
@@ -383,7 +385,7 @@ internal class LocalSubagentRunner(
                             val reply = repliesByStep.remove(event.step)
                                 ?: error("缺少子代理第 ${event.step} 步模型响应")
                             progressTracker.recordAssistant(reply.content.orEmpty(), reply.toolCalls.size)
-                            history += reply.message
+                            history.append(reply.message)
                             reply.content?.takeIf(String::isNotBlank)?.let { content ->
                                 historyPolicy.rememberProgress(
                                     progress,
@@ -406,7 +408,7 @@ internal class LocalSubagentRunner(
                                 event.call.id,
                                 event.output,
                                 runHistoryBudget,
-                                history,
+                                history, event.retention,
                             )
                             val modelOutput = AgentToolResult(
                                 content = boundedContent,
@@ -419,7 +421,9 @@ internal class LocalSubagentRunner(
                             historyPolicy.rememberProgress(
                                 progress,
                                 "第 ${event.step} 步 · ${event.call.name}：" +
-                                    truncateWithoutSplittingSurrogatePair(event.output, 1_500),
+                                    truncateWithoutSplittingSurrogatePair(
+                                        durableToolResultContent(event.output, event.retention), 1_500,
+                                    ),
                             )
                             eventLog().append("subagent/tool-result", buildJsonObject {
                                 put("agent_id", subagentId)
@@ -428,20 +432,18 @@ internal class LocalSubagentRunner(
                                 put("name", event.call.name)
                                 put(
                                     "content",
-                                    truncateWithoutSplittingSurrogatePair(event.output, SUBAGENT_EVENT_CHARS),
+                                    truncateWithoutSplittingSurrogatePair(
+                                        durableToolResultContent(event.output, event.retention), SUBAGENT_EVENT_CHARS,
+                                    ),
                                 )
-                                put("model_content", modelOutput)
+                                put("model_content", durableToolResultContent(modelOutput, event.retention))
                                 put("is_error", event.isError)
                                 event.errorCode?.let { put("error_code", it) }
                                 put("retryable", event.retryable)
                                 put("side_effect", event.sideEffect.name.lowercase())
                                 event.recoveryHint?.let { put("recovery_hint", it) }
                             })
-                            history += buildJsonObject {
-                                put("role", "tool")
-                                put("tool_call_id", event.call.id)
-                                put("content", modelOutput)
-                            }
+                            history.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
                         }
                         is AgentEvent.TurnCompleted -> {
                             eventLog().append("subagent/end", buildJsonObject {
@@ -478,7 +480,7 @@ internal class LocalSubagentRunner(
                 },
                 maxSteps = stepLimit,
                 stepLimitExtender = AgentStepLimitExtender { currentLimit, stepsUsed ->
-                    val liveBudget = historyBudget?.invoke(snapshot.baseUrl, routeModel)
+                    val liveBudget = historyBudget?.invoke(runProfile)
                     if (currentLimit >= MAX_DYNAMIC_STEPS) return@AgentStepLimitExtender null
                     if (!progressTracker.claimExtensionProgress()) {
                         eventLog().append("subagent/budget-stopped", buildJsonObject {
@@ -492,7 +494,7 @@ internal class LocalSubagentRunner(
                         currentLimit = currentLimit,
                         configuredBase = maxSteps,
                         task = task,
-                        contextChars = history.sumOf { it.toString().length },
+                        contextChars = history.encodedChars,
                         contextBudgetChars = liveBudget?.maxHistoryChars ?: state.value.contextBudgetChars,
                         pressure = resourceScheduler.snapshot().pressure,
                         kind = runKind,
@@ -504,7 +506,7 @@ internal class LocalSubagentRunner(
                             put("steps_used", stepsUsed)
                             put("previous_limit", currentLimit)
                             put("next_limit", boundedNext)
-                            put("context_chars", history.sumOf { it.toString().length })
+                            put("context_chars", history.encodedChars)
                             put("resource_pressure", resourceScheduler.snapshot().pressure.name.lowercase())
                         })
                     }

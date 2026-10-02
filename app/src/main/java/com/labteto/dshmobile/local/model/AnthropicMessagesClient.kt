@@ -76,15 +76,15 @@ internal class AnthropicMessagesClient @Inject constructor(
         if (wirePayload.size > 32_000_000) {
             throw LocalModelException("MODEL_REQUEST_TOO_LARGE", "Anthropic 请求超过 32 MB，请减少图片或历史内容", false)
         }
+        val admissionTracker = LocalModelAdmissionTracker()
         val request = Request.Builder()
             .url(endpoint(route.baseUrl))
             .header("x-api-key", route.bearerToken)
             .header("anthropic-version", ANTHROPIC_VERSION)
             .header("accept", "text/event-stream")
             .header("content-type", "application/json")
-            .post(wirePayload.toRequestBody(JSON_MEDIA))
+            .post(wirePayload.toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
             .build()
-        var responseAdmitted = false
         var admittedRequestId: String? = null
         try {
             withCancellableModelResponse(client.newCall(request)) { response ->
@@ -95,7 +95,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                     val body = response.readBoundedModelError(ERROR_BODY_LIMIT)
                     throw httpFailure(response.code, body, requestId, retryAfterMs)
                 }
-                responseAdmitted = true
+                admissionTracker.markAdmitted()
                 admittedRequestId = requestId
                 val body = response.body ?: throw modelPostAdmissionFailure(
                     code = "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
@@ -112,9 +112,12 @@ internal class AnthropicMessagesClient @Inject constructor(
                 )
             }
         } catch (error: LocalModelException) {
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED && error.retryable) {
+                throw error.withoutReplayAfterAdmission()
+            }
             throw error
         } catch (error: SocketTimeoutException) {
-            if (responseAdmitted) {
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
                 throw modelPostAdmissionFailure(
                     code = "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
                     detail = "Anthropic 模型流式响应超时",
@@ -122,14 +125,15 @@ internal class AnthropicMessagesClient @Inject constructor(
                     cause = error,
                 )
             }
-            throw LocalModelException(
+            throw modelTransportFailure(
                 code = "MODEL_TIMEOUT",
-                message = "Anthropic 模型请求超时：${error.message ?: "请求未在时限内完成"}",
-                retryable = true,
+                detail = "Anthropic 模型请求超时：${error.message ?: "请求未在时限内完成"}",
+                tracker = admissionTracker,
+                requestId = admittedRequestId,
                 cause = error,
             )
         } catch (error: IOException) {
-            if (responseAdmitted) {
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
                 throw modelPostAdmissionFailure(
                     code = "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
                     detail = "Anthropic 模型流式连接中断",
@@ -137,10 +141,11 @@ internal class AnthropicMessagesClient @Inject constructor(
                     cause = error,
                 )
             }
-            throw LocalModelException(
+            throw modelTransportFailure(
                 code = "MODEL_NETWORK",
-                message = "Anthropic 模型网络请求失败：${error.message ?: "网络异常"}",
-                retryable = true,
+                detail = "Anthropic 模型网络请求失败：${error.message ?: "网络异常"}",
+                tracker = admissionTracker,
+                requestId = admittedRequestId,
                 cause = error,
             )
         }
@@ -612,6 +617,7 @@ internal class AnthropicMessagesClient @Inject constructor(
             providerRetryAfterMs = retryAfterMs,
             requestId = requestId,
             providerCode = type,
+            admissionState = LocalModelAdmissionState.REJECTED,
         )
     }
 

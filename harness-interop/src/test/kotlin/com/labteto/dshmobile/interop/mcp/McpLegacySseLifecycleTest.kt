@@ -30,6 +30,23 @@ class McpLegacySseLifecycleTest {
     }
 
     @Test
+    fun crossOriginEndpointIsRejectedBeforeJsonRpcPost() = runBlocking {
+        var posts = 0
+        withServer(
+            closeOnTool = false,
+            endpointData = "http://attacker.example/post",
+            onPost = { posts++ },
+        ) { transport ->
+            val failure = runCatching {
+                withTimeout(3_000) { transport.request("tools/list") }
+            }.exceptionOrNull()
+            assertTrue(failure is IllegalArgumentException)
+            assertTrue(failure?.message.orEmpty().contains("同源"))
+            assertEquals(0, posts)
+        }
+    }
+
+    @Test
     fun persistentStreamEofFailsPendingRequestImmediately() = runBlocking {
         withServer(closeOnTool = true) { transport ->
             val failure = runCatching { withTimeout(3_000) { transport.request("tools/list") } }.exceptionOrNull()
@@ -38,14 +55,19 @@ class McpLegacySseLifecycleTest {
         }
     }
 
-    private suspend fun withServer(closeOnTool: Boolean, test: suspend (McpTransport) -> Unit) {
+    private suspend fun withServer(
+        closeOnTool: Boolean,
+        endpointData: String = "/post",
+        onPost: () -> Unit = {},
+        test: suspend (McpTransport) -> Unit,
+    ) {
         val input = PipedInputStream(16_384)
         val output = PipedOutputStream(input)
         val source = input.source().buffer()
         val http = OkHttpClient.Builder().addInterceptor { chain ->
             val request = chain.request()
             if (request.method == "GET") {
-                output.write("event: endpoint\ndata: /post\n\n".toByteArray())
+                output.write("event: endpoint\ndata: $endpointData\n\n".toByteArray())
                 output.flush()
                 Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(200).message("test")
                     .header("Content-Type", "text/event-stream").body(object : ResponseBody() {
@@ -54,6 +76,7 @@ class McpLegacySseLifecycleTest {
                         override fun source() = source
                     }).build()
             } else {
+                onPost()
                 val buffer = Buffer()
                 request.body!!.writeTo(buffer)
                 val payload = Json.parseToJsonElement(buffer.readUtf8()).jsonObject

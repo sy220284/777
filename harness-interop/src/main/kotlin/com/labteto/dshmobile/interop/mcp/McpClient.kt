@@ -189,8 +189,14 @@ internal class McpLineProcess(
 ) : Closeable {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var process: Process? = null
+    private data class QueuedLine(val value: String, val utf8Bytes: Int)
+    private data class LineQueue(
+        val channel: Channel<QueuedLine>,
+        val queuedBytes: AtomicLong = AtomicLong(),
+    )
+
     private var writer: java.io.BufferedWriter? = null
-    private var lines: Channel<String>? = null
+    private var lines: LineQueue? = null
     private var readerJob: Job? = null
     private var closed = false
 
@@ -212,21 +218,32 @@ internal class McpLineProcess(
             .redirectError(ProcessBuilder.Redirect.INHERIT)
             .apply { environment().putAll(environmentProvider()) }
             .start()
-        val channel = Channel<String>(STDIO_QUEUE_CAPACITY)
+        val queue = LineQueue(Channel(STDIO_QUEUE_CAPACITY))
         process = next
         writer = next.outputStream.bufferedWriter()
-        lines = channel
+        lines = queue
         readerJob = scope.launch {
             try {
                 next.inputStream.bufferedReader().use { input ->
                     while (true) {
                         val line = readLineBounded(input, MAX_STDIO_LINE_CHARS) ?: break
-                        channel.send(line)
+                        val bytes = line.toByteArray(Charsets.UTF_8).size
+                        val total = queue.queuedBytes.addAndGet(bytes.toLong())
+                        if (total > MAX_STDIO_QUEUE_BYTES) {
+                            queue.queuedBytes.addAndGet(-bytes.toLong())
+                            error("MCP stdio 待处理响应超过总字节预算")
+                        }
+                        try {
+                            queue.channel.send(QueuedLine(line, bytes))
+                        } catch (error: Throwable) {
+                            queue.queuedBytes.addAndGet(-bytes.toLong())
+                            throw error
+                        }
                     }
                 }
-                channel.close(IllegalStateException("MCP stdio 进程已结束"))
+                queue.channel.close(IllegalStateException("MCP stdio 进程已结束"))
             } catch (error: Throwable) {
-                channel.close(error)
+                queue.channel.close(error)
             }
         }
         return true
@@ -240,9 +257,12 @@ internal class McpLineProcess(
     }
 
     suspend fun readLine(): String {
-        val channel = lines ?: error("MCP stdio 进程未启动")
-        val result = channel.receiveCatching()
-        result.getOrNull()?.let { return it }
+        val queue = lines ?: error("MCP stdio 进程未启动")
+        val result = queue.channel.receiveCatching()
+        result.getOrNull()?.let { queued ->
+            queue.queuedBytes.addAndGet(-queued.utf8Bytes.toLong())
+            return queued.value
+        }
         val error = result.exceptionOrNull() ?: IllegalStateException("MCP stdio 进程已结束")
         abort()
         throw error
@@ -257,7 +277,7 @@ internal class McpLineProcess(
         readerJob = null
         runCatching { writer?.close() }
         writer = null
-        lines?.cancel()
+        lines?.channel?.cancel()
         lines = null
         process?.let { child ->
             runCatching { child.inputStream.close() }
@@ -290,8 +310,9 @@ internal class McpLineProcess(
     }
 
     private companion object {
-        const val STDIO_QUEUE_CAPACITY = 64
+        const val STDIO_QUEUE_CAPACITY = 8
         const val MAX_STDIO_LINE_CHARS = 2 * 1024 * 1024
+        const val MAX_STDIO_QUEUE_BYTES = 4L * 1024L * 1024L
     }
 }
 

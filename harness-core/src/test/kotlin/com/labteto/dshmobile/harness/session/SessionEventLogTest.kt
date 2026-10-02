@@ -56,10 +56,22 @@ class SessionEventLogTest {
             // Simulate a torn final write. Startup must skip it and recover from the newest
             // complete row without requiring a full historical replay.
             file.appendText("{\"sequence\":999")
-            val restarted = SessionEventLog(file, json, maxBytes = 700, clock = { 2L })
+            val diagnostics = mutableListOf<String>()
+            val restarted = SessionEventLog(
+                file,
+                json,
+                maxBytes = 700,
+                clock = { 2L },
+                diagnosticSink = { kind, _ -> diagnostics += kind },
+            )
             val appended = restarted.append("test/restarted", buildJsonObject { put("value", "ok") })
 
             assertEquals(expectedNext, appended.sequence)
+            assertEquals(expectedNext, restarted.latest("test/restarted")?.sequence)
+            file.readLines().filter(String::isNotBlank).forEach { line ->
+                json.decodeFromString(SessionEvent.serializer(), line)
+            }
+            assertTrue("torn tail should be repaired before append", "torn-tail-truncated" in diagnostics)
         } finally {
             directory.deleteRecursively()
         }
@@ -102,12 +114,47 @@ class SessionEventLogTest {
         val directory = Files.createTempDirectory("harness-event-sequence").toFile()
         val file = directory.resolve("session.events.jsonl")
         try {
-            val log = SessionEventLog(file, json, maxBytes = 512, clock = { 1L })
+            val log = SessionEventLog(
+                file,
+                json,
+                maxBytes = 512,
+                maxEventBytes = 512,
+                clock = { 1L },
+            )
             runCatching {
                 log.append("too-large", buildJsonObject { put("value", "x".repeat(2_000)) })
             }
             val accepted = log.append("accepted", buildJsonObject { put("value", "ok") })
             assertEquals(0L, accepted.sequence)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun eventLargerThanSegmentTargetGetsItsOwnSegmentWithoutLosingSequence() {
+        val directory = Files.createTempDirectory("harness-event-oversized-segment").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = SessionEventLog(
+                file = file,
+                json = json,
+                maxBytes = 512,
+                maxEventBytes = 4_096,
+                clock = { 1L },
+            )
+            val large = log.append(
+                "test/large",
+                buildJsonObject { put("value", "x".repeat(1_500)) },
+            )
+            val next = log.append("test/next", buildJsonObject { put("value", "ok") })
+
+            assertEquals(0L, large.sequence)
+            assertEquals(1L, next.sequence)
+            assertEquals(listOf(0L, 1L), log.snapshot().map(SessionEvent::sequence))
+            assertTrue(directory.listFiles().orEmpty().any {
+                it.name.startsWith("session.events.jsonl.part-")
+            })
         } finally {
             directory.deleteRecursively()
         }
@@ -122,6 +169,7 @@ class SessionEventLogTest {
             repeat(28) { index ->
                 log.append("test", buildJsonObject { put("value", "repeat-me-".repeat(6) + index) })
             }
+            while (log.archiveLegacySegments(limit = 16) > 0) Unit
             val archive = directory.listFiles().orEmpty().first { it.name.endsWith(".gz") }
             val raw = File(archive.path.removeSuffix(".gz"))
             GZIPInputStream(archive.inputStream()).use { input -> raw.writeBytes(input.readBytes()) }
@@ -130,6 +178,7 @@ class SessionEventLogTest {
             val restarted = SessionEventLog(file, json, maxBytes = 700)
             assertEquals(28, restarted.snapshot().size)
             restarted.append("test", buildJsonObject { put("value", "new") })
+            while (restarted.archiveLegacySegments(limit = 16) > 0) Unit
             assertTrue(!raw.exists())
             assertTrue(File(raw.path + ".gz").isFile)
             assertEquals((0L..28L).toList(), restarted.snapshot().map(SessionEvent::sequence))
@@ -148,6 +197,7 @@ class SessionEventLogTest {
             repeat(36) { index ->
                 log.append("test", buildJsonObject { put("value", "repeat-me-".repeat(5) + index) })
             }
+            while (log.archiveLegacySegments(limit = 16) > 0) Unit
             val archives = directory.listFiles().orEmpty().filter { it.name.endsWith(".gz") }
             assertTrue(archives.size >= 2)
             archives.take(2).forEach { archive ->
@@ -206,6 +256,7 @@ class SessionEventLogTest {
                     put("value", "row-$index-" + "x".repeat(48))
                 })
             }
+            while (log.archiveLegacySegments(limit = 16) > 0) Unit
             file.appendText("{broken-row\n")
             log.snapshot()
             assertTrue(log.diagnostics().malformedRows > 0)
@@ -416,6 +467,7 @@ class SessionEventLogTest {
                     buildJsonObject { put("value", "row-$index-" + "x".repeat(44)) },
                 )
             }
+            while (log.archiveLegacySegments(limit = 16) > 0) Unit
             val archived = directory.listFiles().orEmpty()
                 .filter { it.name.startsWith("session.events.jsonl.part-") && it.name.endsWith(".gz") }
                 .minByOrNull(File::getName)

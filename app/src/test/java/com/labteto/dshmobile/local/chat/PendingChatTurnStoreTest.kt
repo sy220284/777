@@ -5,6 +5,7 @@ import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -70,6 +71,23 @@ class PendingChatTurnStoreTest {
             val before = log.latestSequence()
             restored.boundDurablePending(log)
             assertEquals(before, log.latestSequence())
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun malformedScopeTypeDoesNotAbortPendingTurnRecovery() {
+        val directory = createTempDirectory().toFile()
+        try {
+            val log = LocalSessionEventLog(File(directory, "events.jsonl"), Json)
+            log.append("chat/pending-turn", buildJsonObject {
+                put("scope", buildJsonObject { put("unexpected", true) })
+            })
+            val assistant = log.append("assistant/message", buildJsonObject {})
+            val context = ChatContextState().enqueuePendingDurably(
+                ChatPendingTurn(assistant.sequence, assistantMessageId = "valid"),
+                log,
+            )
+
+            assertEquals(listOf("valid"), context.loadPendingBatch(log, 8).map { it.assistantMessageId })
         } finally { directory.deleteRecursively() }
     }
 

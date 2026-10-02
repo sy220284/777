@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +16,7 @@ internal fun editAndResendWorkUserMessage(
     requestedText: String,
     eventLog: LocalSessionEventLog,
     memoryStore: MemoryStore,
+    galleryStore: ChatPersonaGalleryStore,
     modelHistory: LocalModelHistoryBuffer,
     modelHistoryCheckpointCodec: ModelHistoryCheckpointCodec,
     stateFlow: MutableStateFlow<LocalHarnessState>,
@@ -22,7 +24,8 @@ internal fun editAndResendWorkUserMessage(
     updateTranscriptProjectionCursor: (Long) -> Unit,
     checkpointModelHistory: (String) -> Unit,
     persist: () -> Unit,
-    queueTurn: (String, String, JsonObject) -> Unit,
+    newUserMessage: (String) -> LocalHarnessMessage,
+    startTurn: (String, String, String) -> Unit,
 ): LocalChatUserEditResult {
     val state = stateFlow.value
     val activeTranscript = LocalSessionTranscriptPager(eventLog).all()
@@ -50,18 +53,41 @@ internal fun editAndResendWorkUserMessage(
     )
     val retainedPrefix = activeTranscript.take(originalIndex)
     val discarded = activeTranscript.drop(originalIndex)
-    memoryStore.rollbackSourceSessionFrom(
-        sourceSessionId = state.sessionId,
-        createdAtInclusive = original.createdAt,
-        discardedMessageIds = discarded.mapTo(linkedSetOf(), LocalHarnessMessage::id),
+    val editedModelMessage = editedChatUserModelMessage(eventLog, messageId, content)
+    val edited = newUserMessage(content)
+    val rewritten = retainedPrefix + edited
+    val rewrittenHistory = restoredHistory + editedModelMessage
+    val rewrite = appendTimelineRewriteCommit(
+        eventLog = eventLog,
+        reason = "work-user-edited",
+        activeTranscript = rewritten,
+        modelHistory = rewrittenHistory,
+        state = LocalTimelineRewriteState(
+            plan = restoredControls.plan,
+            todos = restoredControls.todos,
+            goal = restoredControls.goal,
+            planMode = restoredControls.planMode,
+            chatState = state.chatState,
+            chatContext = state.chatContext,
+            chatBranches = LocalChatBranchState(),
+            groupChat = state.groupChat,
+        ),
+        projection = LocalTimelineRewriteProjectionInput(
+            sourceSessionId = state.sessionId,
+            createdAtInclusive = original.createdAt,
+            discardedMessageIds = discarded.map(LocalHarnessMessage::id),
+        ),
+        editedMessageId = edited.id,
+        editedModelMessage = editedModelMessage,
     )
+    updateTranscriptProjectionCursor(rewrite.sequence)
 
-    modelHistory.reset(restoredHistory)
+    modelHistory.reset(rewrittenHistory)
     updateContextMetrics()
     stateFlow.update { current ->
         current.copy(
-            messages = retainedPrefix.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
-            transcriptIndex = buildLocalTranscriptRuntimeIndex(retainedPrefix),
+            messages = rewritten.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
+            transcriptIndex = buildLocalTranscriptRuntimeIndex(rewritten),
             plan = restoredControls.plan,
             todos = restoredControls.todos,
             goal = restoredControls.goal,
@@ -69,17 +95,10 @@ internal fun editAndResendWorkUserMessage(
             error = null,
         )
     }
-    val baselineSequence = persistActiveChatTranscript(
-        eventLog = eventLog,
-        reason = "work-user-edited",
-        activeTranscript = retainedPrefix,
-    )
-    updateTranscriptProjectionCursor(baselineSequence)
-    checkpointModelHistory("work/user-edit-baseline")
+    recoverPendingTimelineRewriteProjection(eventLog, memoryStore, galleryStore)
+    checkpointModelHistory("work/user-edit-commit")
     persist()
-
-    val editedModelMessage = editedChatUserModelMessage(eventLog, messageId, content)
-    queueTurn(content, requestedText, editedModelMessage)
+    startTurn(content, requestedText, edited.id)
     return LocalChatUserEditResult.SENT
 }
 
@@ -225,6 +244,9 @@ private fun findDurableUserModelMessage(
                 "user/message" -> {
                     (event.data["model_message"] as? JsonObject)?.let { return it }
                 }
+                "chat/active-transcript" -> {
+                    timelineRewriteEditedModelMessage(event.data, messageId)?.let { return it }
+                }
                 LOCAL_AGENT_INBOX_EVENT_TYPE -> {
                     decodeLocalAgentInboxPending(event.data)
                         ?.firstOrNull { input -> input.id == messageId }
@@ -271,6 +293,15 @@ private fun loadDurableUserModelMessages(
                         result[message.id] = structured
                         remaining.remove(message.id)
                     }
+                }
+                "chat/active-transcript" -> {
+                    val editedId = (event.data["edited_message_id"] as? JsonPrimitive)?.content
+                        ?.takeIf(remaining::contains)
+                        ?: return@forEach
+                    val structured = timelineRewriteEditedModelMessage(event.data, editedId)
+                        ?: return@forEach
+                    result[editedId] = structured
+                    remaining.remove(editedId)
                 }
                 LOCAL_AGENT_INBOX_EVENT_TYPE -> {
                     val queuedById = decodeLocalAgentInboxPending(event.data)

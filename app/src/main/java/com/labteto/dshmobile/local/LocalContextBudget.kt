@@ -36,6 +36,7 @@ internal fun localHistoryBudgetFor(
     pressure: HarnessResourcePressure,
     model: String?,
     baseUrl: String? = null,
+    contextWindowTokensOverride: Int? = null,
 ): LocalHistoryBudget {
     val base = when {
         memoryClassMb >= 512 -> LocalHistoryBudget(
@@ -63,7 +64,7 @@ internal fun localHistoryBudgetFor(
         HarnessResourcePressure.HIGH -> 0.65
     }
 
-    val routed = routedContextBudget(model, baseUrl)
+    val routed = routedContextBudget(model, baseUrl, contextWindowTokensOverride)
     return LocalHistoryBudget(
         maxHistoryChars = (base.maxHistoryChars * scale).toInt().coerceAtLeast(180_000),
         tailChars = (base.tailChars * scale).toInt().coerceAtLeast(80_000),
@@ -84,13 +85,13 @@ private data class RoutedContextBudget(
     val headroomTokens: Int,
 )
 
-private fun routedContextBudget(model: String?, baseUrl: String?): RoutedContextBudget {
+private fun routedContextBudget(model: String?, baseUrl: String?, contextWindowTokensOverride: Int? = null): RoutedContextBudget {
     val capabilities = if (model.isNullOrBlank() || baseUrl.isNullOrBlank()) {
         LocalModelRuntimeCapabilities()
     } else {
         LocalModelPresets.runtimeCapabilitiesFor(model, baseUrl)
     }
-    val window = capabilities.contextWindowTokens
+    val window = capabilities.contextWindowTokens ?: contextWindowTokensOverride?.takeIf { it in 4_096..16_000_000 }
     if (window == null) {
         return RoutedContextBudget(
             messageBudgetTokens = UNKNOWN_ROUTE_OPERATIONAL_INPUT_TOKENS,
@@ -120,12 +121,13 @@ private fun routedContextBudget(model: String?, baseUrl: String?): RoutedContext
  * Unknown model capacity must never mean unlimited input. This is an operational exposure ceiling,
  * not a claim about the provider's real context window.
  */
-internal fun operationalInputLimitTokens(model: String?, baseUrl: String?): Int =
-    routedContextBudget(model, baseUrl).messageBudgetTokens
+internal fun operationalInputLimitTokens(model: String?, baseUrl: String?, contextWindowTokensOverride: Int? = null): Int =
+    routedContextBudget(model, baseUrl, contextWindowTokensOverride).messageBudgetTokens
 
-internal fun documentedContextWindowTokens(model: String?, baseUrl: String?): Int? =
-    if (model.isNullOrBlank() || baseUrl.isNullOrBlank()) null
+internal fun documentedContextWindowTokens(model: String?, baseUrl: String?, contextWindowTokensOverride: Int? = null): Int? =
+    if (model.isNullOrBlank() || baseUrl.isNullOrBlank()) contextWindowTokensOverride
     else LocalModelPresets.runtimeCapabilitiesFor(model, baseUrl).contextWindowTokens
+        ?: contextWindowTokensOverride?.takeIf { it in 4_096..16_000_000 }
 
 private const val UNKNOWN_ROUTE_OPERATIONAL_INPUT_TOKENS = 192_000
 private const val UNKNOWN_ROUTE_TAIL_TOKENS = 48_000

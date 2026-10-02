@@ -11,6 +11,7 @@ import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.harness.tools.ToolResultRetention
 import com.labteto.dshmobile.harness.tools.functionToolSchema
 import com.labteto.dshmobile.harness.tools.simpleToolProperties
 import kotlinx.serialization.json.JsonObject
@@ -34,6 +35,7 @@ class AndroidDevicePlugin(
         val required: Set<String> = emptySet(),
         val access: ToolAccess,
         val approval: ToolApprovalPolicy,
+        val retention: ToolResultRetention = ToolResultRetention.DURABLE,
     )
 
     private val specs = listOf(
@@ -55,7 +57,7 @@ class AndroidDevicePlugin(
         Spec("android_swipe", "accessibility_swipe", "按坐标执行滑动", mapOf("start_x" to "number", "start_y" to "number", "end_x" to "number", "end_y" to "number", "duration_ms" to "integer"), setOf("start_x", "start_y", "end_x", "end_y"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_back", "android_back", "执行系统返回", access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_home", "android_home", "执行系统主页", access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
-        Spec("android_screenshot", "android_screenshot", "通过无障碍服务截取当前屏幕", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
+        Spec("android_screenshot", "android_screenshot", "通过无障碍服务截取当前屏幕", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS, retention = ToolResultRetention.EPHEMERAL),
         Spec("android_notification_status", "notification_status", "检查通知读取服务是否已授权并连接", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_notification_list", "notification_list", "读取已授权的当前通知；结果会进入会话历史，已限长并脱敏常见验证码/密码；未授权时先调用 android_notification_status", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_clipboard_get", "clipboard_get", "读取当前剪贴板", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
@@ -66,7 +68,7 @@ class AndroidDevicePlugin(
         Spec("android_vscreen_launch", "vscreen_launch", "在虚拟显示中启动应用", mapOf("id" to "string", "package" to "string"), setOf("id", "package"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_tap", "vscreen_tap", "在虚拟显示指定坐标点击", mapOf("id" to "string", "x" to "number", "y" to "number", "duration_ms" to "integer"), setOf("id", "x", "y"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_vscreen_swipe", "vscreen_swipe", "在虚拟显示执行滑动", mapOf("id" to "string", "start_x" to "number", "start_y" to "number", "end_x" to "number", "end_y" to "number", "duration_ms" to "integer"), setOf("id", "start_x", "start_y", "end_x", "end_y"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
-        Spec("android_vscreen_screenshot", "vscreen_screenshot", "截取虚拟显示画面", mapOf("id" to "string"), setOf("id"), ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
+        Spec("android_vscreen_screenshot", "vscreen_screenshot", "截取虚拟显示画面", mapOf("id" to "string"), setOf("id"), ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS, retention = ToolResultRetention.EPHEMERAL),
         Spec("android_vscreen_close", "vscreen_close", "关闭虚拟显示", mapOf("id" to "string"), setOf("id"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
     )
 
@@ -91,7 +93,10 @@ class AndroidDevicePlugin(
                     ),
                     executor = HarnessToolExecutor { _, input, _ ->
                         val arguments = input.mapValues { (_, value) -> value.jsonPrimitive.content }
-                        ToolResult(provider.invoke(spec.capability, arguments))
+                        ToolResult(
+                            provider.invoke(spec.capability, arguments),
+                            retention = spec.retention,
+                        )
                     },
                 ),
             )

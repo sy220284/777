@@ -197,8 +197,8 @@ class SettingsViewModel @Inject constructor(
     fun discoverModels(provider: LlmConfigurableProvider) =
         remoteSettingsController.discoverModels(provider)
 
-    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null) =
-        withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol, profileId) }
+    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) =
+        withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride) }
 
     fun selectLocalModel(id: String) = localHarness.selectModel(id)
 

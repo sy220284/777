@@ -61,6 +61,7 @@ import com.labteto.dshmobile.core.wire.dto.SessionStatsView
 import com.labteto.dshmobile.core.wire.dto.SubagentListEntry
 import com.labteto.dshmobile.core.wire.dto.TokenUsageView
 import com.labteto.dshmobile.data.SessionRow
+import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.ContextMeterDetail
@@ -114,21 +115,13 @@ fun DetailsPanel(
     val toast = rememberDsToast()
     val clipboard = LocalClipboardManager.current
 
-    val conversation by store.currentConversation.collectAsState()
-    val jobs by store.jobs.collectAsState()
     val hostInfo by store.hostInfo.collectAsState()
-    val subagents by store.subagents.collectAsState()
     val sessions by store.sessions.collectAsState()
     val currentSessionId by store.currentSessionId.collectAsState()
-    val stats by store.sessionStats.collectAsState()
-    val usage by store.tokenUsage.collectAsState()
-    val breakdown by store.contextBreakdown.collectAsState()
-    val pressure by store.contextPressure.collectAsState()
     val models by store.models.collectAsState()
     val modelsLoading by store.modelsLoading.collectAsState()
     val agentPresets by store.agentPresets.collectAsState()
     val current = sessions.firstOrNull { it.sessionId == currentSessionId }
-    val conversationLoading = currentSessionId != null && conversation == null
 
     // This panel owns its own sheets rather than reaching back into ChatScreen's: it is reachable
     // on its own on a phone, where the chat surface is not even composed behind it.
@@ -211,25 +204,7 @@ fun DetailsPanel(
                     )
                 }
 
-                val conv = conversation
-                ContextCard(
-                    breakdown = breakdown,
-                    pressure = pressure,
-                    usage = usage,
-                    stats = stats,
-                    loading = conversationLoading,
-                )
-                GoalCard(conv, store, loading = conversationLoading)
-                PlanCard(conv, loading = conversationLoading) { next ->
-                    scope.launch { store.runCommand(if (next) "/plan" else "/plan off") }
-                }
-                JobsCard(jobs, loading = conversationLoading)
-                QueueCard(conv?.queue.orEmpty(), store, loading = conversationLoading)
-                SubagentsCard(subagents, loading = conversationLoading) { id ->
-                    scope.launch { store.openSubagentTranscript(id) }
-                }
-                WorkflowCard(conv?.nodes.orEmpty(), loading = conversationLoading)
-
+                DetailsRuntimeCards(store = store, currentSessionId = currentSessionId)
                 HostCard(hostInfo)
             }
             DsToastHost(toast, modifier = Modifier.fillMaxWidth())
@@ -247,6 +222,35 @@ fun DetailsPanel(
         )
         null -> Unit
     }
+}
+
+@Composable
+private fun DetailsRuntimeCards(
+    store: SessionStore,
+    currentSessionId: String?,
+) {
+    val scope = rememberCoroutineScope()
+    val conversation by store.currentConversation.collectAsState()
+    val jobs by store.jobs.collectAsState()
+    val subagents by store.subagents.collectAsState()
+    val stats by store.sessionStats.collectAsState()
+    val usage by store.tokenUsage.collectAsState()
+    val breakdown by store.contextBreakdown.collectAsState()
+    val pressure by store.contextPressure.collectAsState()
+    val loading = currentSessionId != null && conversation == null
+    val conv = conversation
+
+    ContextCard(breakdown = breakdown, pressure = pressure, usage = usage, stats = stats, loading = loading)
+    GoalCard(conv, store, loading = loading)
+    PlanCard(conv, loading = loading) { next ->
+        scope.launch { store.runCommand(if (next) "/plan" else "/plan off") }
+    }
+    JobsCard(jobs, loading = loading)
+    QueueCard(conv?.queue.orEmpty(), store, loading = loading)
+    SubagentsCard(subagents, loading = loading) { id ->
+        scope.launch { store.openSubagentTranscript(id) }
+    }
+    WorkflowCard(conv?.nodes.orEmpty(), loading = loading)
 }
 
 /** Which picker, if any, is open over the details panel. */

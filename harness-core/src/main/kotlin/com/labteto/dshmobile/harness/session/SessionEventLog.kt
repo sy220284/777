@@ -49,11 +49,14 @@ class SessionEventLog(
     private val file: File,
     private val json: Json,
     private val maxBytes: Long = DEFAULT_MAX_BYTES,
+    private val maxEventBytes: Long = maxOf(maxBytes, DEFAULT_MAX_EVENT_BYTES),
     private val clock: () -> Long = System::currentTimeMillis,
     private val diagnosticSink: (String, Throwable?) -> Unit = { _, _ -> },
+    private val onSegmentRotated: () -> Unit = {},
 ) {
     init {
         require(maxBytes >= MIN_MAX_BYTES) { "事件日志分段上限至少为 $MIN_MAX_BYTES 字节" }
+        require(maxEventBytes >= maxBytes) { "单条事件上限不能小于日志分段目标" }
     }
 
     // Several Android adapters can open the same session while background maintenance is running.
@@ -61,7 +64,10 @@ class SessionEventLog(
     private val malformedRows = AtomicLong()
     private val segmentReadFailures = AtomicLong()
     private val archiveFailures = AtomicLong()
-    private val nextSequence = AtomicLong(synchronized(lock) { readNextSequence() })
+    private val nextSequence = AtomicLong(synchronized(lock) {
+        repairTornActiveTailUnsafe()
+        readNextSequence()
+    })
 
     fun diagnostics(): SessionEventLogDiagnostics = SessionEventLogDiagnostics(
         malformedRows = malformedRows.get(),
@@ -87,14 +93,18 @@ class SessionEventLog(
         )
         val encoded = json.encodeToString(SessionEvent.serializer(), event) + "\n"
         val incomingBytes = encoded.toByteArray().size.toLong()
-        require(incomingBytes <= maxBytes) { "单条会话事件超过日志分段上限" }
+        require(incomingBytes <= maxEventBytes) { "单条会话事件超过事件硬上限" }
         file.parentFile?.mkdirs()
-        if (file.isFile && file.length() + incomingBytes > maxBytes) rotateActiveSegment()
-        file.appendText(encoded)
+        if (file.isFile && file.length() > 0L && file.length() + incomingBytes > maxBytes) {
+            rotateActiveSegment()
+        }
+        try {
+            file.appendText(encoded)
+        } catch (error: Exception) {
+            runCatching { repairTornActiveTailUnsafe() }
+            throw error
+        }
         nextSequence.incrementAndGet()
-        // Archive maintenance must not turn a committed append into an apparent failure.
-        runCatching { compressOneLegacySegmentUnsafe() }
-            .onFailure { error -> reportArchiveFailure("legacy-segment", error) }
         event
     }
 
@@ -441,6 +451,37 @@ class SessionEventLog(
      * backwards keeps restart cost bounded by one segment in the normal case while still
      * tolerating a torn/corrupt tail.
      */
+    /**
+     * Remove an incomplete active JSONL tail before another event is appended.
+     *
+     * Readers deliberately tolerate malformed rows, but blindly appending after a crash-torn row
+     * would concatenate the next valid event to that fragment and lose both rows. Repair only the
+     * mutable active segment while holding the shared path lock; immutable rotated segments remain
+     * untouched and are still handled by tolerant readers.
+     */
+    private fun repairTornActiveTailUnsafe() {
+        if (!file.isFile || file.length() == 0L) return
+        RandomAccessFile(file, "rw").use { active ->
+            val length = active.length()
+            active.seek(length - 1L)
+            if (active.readByte().toInt() == '\n'.code) return
+
+            var cursor = length - 1L
+            var truncateTo = 0L
+            while (cursor >= 0L) {
+                active.seek(cursor)
+                if (active.readByte().toInt() == '\n'.code) {
+                    truncateTo = cursor + 1L
+                    break
+                }
+                cursor--
+            }
+            active.setLength(truncateTo)
+        }
+        malformedRows.incrementAndGet()
+        diagnosticSink("torn-tail-truncated", null)
+    }
+
     private fun readNextSequence(): Long {
         for (source in orderedFilesUnsafe().asReversed()) {
             val latest = readLastValidEventUnsafe(source) ?: continue
@@ -735,13 +776,8 @@ class SessionEventLog(
         } catch (_: AtomicMoveNotSupportedException) {
             Files.move(file.toPath(), target.toPath())
         }
-        runCatching { compressSegmentUnsafe(target) }
-            .onFailure { error -> reportArchiveFailure(target.name, error) }
-    }
-
-    private fun compressOneLegacySegmentUnsafe() {
-        segmentFilesUnsafe().firstOrNull { !it.name.endsWith(COMPRESSED_SUFFIX) }
-            ?.let(::compressSegmentUnsafe)
+        runCatching(onSegmentRotated)
+            .onFailure { error -> reportArchiveFailure("archive-signal", error) }
     }
 
     /** Publish the archive before deleting the original; an interrupted migration keeps the raw segment. */
@@ -789,6 +825,7 @@ class SessionEventLog(
     private companion object {
         val PATH_LOCKS = Array(64) { Any() }
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
+        const val DEFAULT_MAX_EVENT_BYTES = 32L * 1024L * 1024L
         const val MIN_MAX_BYTES = 512L
         const val MAX_READ_LINES = 200
         const val MAX_SEARCH_RESULTS = 100

@@ -43,7 +43,11 @@ internal class LocalModelHistoryBuffer {
     }
 
     fun prepend(message: JsonObject) {
-        messages.add(0, message)
+        insert(0, message)
+    }
+
+    fun insert(index: Int, message: JsonObject) {
+        messages.add(index, message)
         encodedChars += measureChars(message)
         estimatedTokens += measureTokens(message)
     }

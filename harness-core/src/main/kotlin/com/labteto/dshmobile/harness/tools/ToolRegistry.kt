@@ -37,12 +37,18 @@ data class ToolContext(
     val approval: (suspend (HarnessTool) -> Boolean)? = null,
 )
 
+enum class ToolResultRetention {
+    DURABLE,
+    EPHEMERAL,
+}
+
 data class ToolResult(
     val content: String,
     val isError: Boolean = false,
     val errorCode: String? = null,
     val retryable: Boolean = false,
     val recoveryHint: String? = null,
+    val retention: ToolResultRetention = ToolResultRetention.DURABLE,
 )
 
 data class ToolInvocationResult internal constructor(

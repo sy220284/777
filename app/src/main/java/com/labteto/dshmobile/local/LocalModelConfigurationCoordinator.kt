@@ -25,12 +25,12 @@ internal class LocalModelConfigurationCoordinator(
 ) {
     private val profiles = LocalModelProfileStore(preferences, json)
     private val startup = LocalModelStartupMigrator(preferences, profiles, apiKeys, gateway)
-    suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): LocalModelConfigurationResult =
+    suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null): LocalModelConfigurationResult =
         LocalModelMutationGate.run {
             require(model.isNotBlank()) { "模型名称不能为空" }
             val existingProfiles = profiles.read()
             val draft = resolveLocalModelApiKeyDraft(apiKey, normalizeModel(model), baseUrl, protocol,
-                existingProfiles, apiKeys::getFor, profileId)
+                existingProfiles, apiKeys::getFor, profileId, contextWindowTokensOverride)
             val profile = draft.profile
             if (apiKey.isNotBlank()) apiKeys.putFor(profile.id, draft.key)
             val all = existingProfiles.filterNot { it.id == profile.id } + profile

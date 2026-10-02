@@ -179,16 +179,10 @@ internal fun LocalConversationSurface(
     val scope = rememberCoroutineScope()
     val drafts = rememberSaveable(
         saver = listSaver(
-            save = { map -> map.entries.flatMap { listOf(it.key, it.value) } },
-            restore = { values ->
-                mutableStateMapOf<String, String>().apply {
-                    values.chunked(2).forEach { pair ->
-                        if (pair.size == 2) this[pair[0]] = pair[1]
-                    }
-                }
-            },
+            save = { cache -> cache.save() },
+            restore = { saved -> LocalSessionDraftCache.restore(saved) },
         ),
-    ) { mutableStateMapOf<String, String>() }
+    ) { LocalSessionDraftCache() }
     val input = drafts[state.sessionId].orEmpty()
     var attachmentError by remember { mutableStateOf<String?>(null) }
     var showAttachmentPicker by rememberSaveable { mutableStateOf(false) }
@@ -203,7 +197,7 @@ internal fun LocalConversationSurface(
     var showReplySuggestions by rememberSaveable { mutableStateOf(false) }
     var editingUserMessage by remember { mutableStateOf<LocalHarnessMessage?>(null) }
     var renameSessionOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
-    val attachments = remember { mutableStateListOf<LocalImportedAttachment>() }
+    val attachments = remember(state.sessionId) { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
     var transcriptWindowSize by rememberSaveable(state.sessionId) {
@@ -555,7 +549,7 @@ internal fun LocalConversationSurface(
                     item {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                             EmptyLocalHarness { suggestion ->
-                                drafts[state.sessionId] = suggestion
+                                drafts.putBoundedLocalDraft(state.sessionId, suggestion)
                             }
                         }
                     }
@@ -686,7 +680,7 @@ internal fun LocalConversationSurface(
             sendRejectMessage = sendRejectMessage,
             stateError = state.error,
             restoreRequest = state.messages.lastOrNull { it.role == "user" }?.content,
-            onRestoreRequest = { drafts[state.sessionId] = it },
+            onRestoreRequest = { drafts.putBoundedLocalDraft(state.sessionId, it) },
             onSwitchModelSource = {
                 if (state.modelProfiles.isNotEmpty()) showModelPicker = true else onConfigure()
             },
@@ -716,7 +710,7 @@ internal fun LocalConversationSurface(
                     key = { suggestion -> suggestion.label + "|" + suggestion.text },
                 ) { suggestion ->
                     Surface(
-                        onClick = { drafts[state.sessionId] = suggestion.text },
+                        onClick = { drafts.putBoundedLocalDraft(state.sessionId, suggestion.text) },
                         shape = DsShapes.pillFull,
                         color = colors.wallpaperSurface(
                             WallpaperSurfaceLevel.FLOATING,
@@ -746,7 +740,7 @@ internal fun LocalConversationSurface(
             activeModelProfile = activeModelProfile,
             input = input,
             attachments = attachments,
-            onInputChange = { drafts[state.sessionId] = it },
+            onInputChange = { drafts.putBoundedLocalDraft(state.sessionId, it) },
             onRemoveAttachment = { index -> attachments.removeAt(index) },
             onClearAttachments = attachments::clear,
             onOpenAttachmentPicker = { showAttachmentPicker = true },
@@ -886,7 +880,7 @@ internal fun LocalConversationSurface(
             state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
                 Surface(
                     onClick = {
-                        drafts[state.sessionId] = suggestion.text
+                        drafts.putBoundedLocalDraft(state.sessionId, suggestion.text)
                         showReplySuggestions = false
                     },
                     modifier = Modifier.fillMaxWidth(),

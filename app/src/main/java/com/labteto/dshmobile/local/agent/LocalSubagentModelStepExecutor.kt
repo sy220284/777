@@ -4,6 +4,7 @@ import com.labteto.dshmobile.harness.agent.*
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.local.*
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -30,7 +31,7 @@ internal class LocalSubagentModelStepExecutor(
         tools: JsonArray,
         subagentId: String,
         step: Int,
-        durableHistory: MutableList<JsonObject>? = null,
+        durableHistory: LocalModelHistoryBuffer? = null,
         allowContextOverflowRecovery: Boolean = true,
     ): LocalModelReply {
         val executor = AgentRequestExecutor(
@@ -86,6 +87,7 @@ internal class LocalSubagentModelStepExecutor(
         var activeHistory = history
         var overflowRound = 0
         var structureRecoveryAttempted = false
+        var continuationRound = 0
         while (true) {
             try {
                 return executor.execute {
@@ -94,6 +96,18 @@ internal class LocalSubagentModelStepExecutor(
                     )
                 }
             } catch (error: Throwable) {
+                val modelError = error as? LocalModelException
+                val continuation = modelError?.let {
+                    subagentContinuationMessage(it, continuationRound)
+                }
+                if (continuation != null) {
+                    continuationRound += 1
+                    activeHistory = activeHistory + continuation
+                    recordSubagentContinuation(
+                        continuation, modelError, continuationRound, durableHistory, eventLog(), subagentId, step,
+                    )
+                    continue
+                }
                 if (!structureRecoveryAttempted) {
                     LocalSubagentStructureRecovery.recover(
                         error, activeHistory, subagentId, step, eventLog(),
@@ -113,22 +127,11 @@ internal class LocalSubagentModelStepExecutor(
                 if (!madeProgress) throw error
 
                 overflowRound += 1
-                durableHistory?.let { durable ->
-                    applyOverflowCompaction(
-                        history = durable,
-                        compactor = historyCompactor,
-                        summaryMode = LocalHistorySummaryMode.WORK,
-                    )?.let { durableCompaction ->
-                        eventLog().append("subagent/compaction", buildJsonObject {
-                            put("agent_id", subagentId)
-                            put("trigger", "context-overflow")
-                            put("round", overflowRound)
-                            put("omitted_messages", durableCompaction.omittedMessages)
-                            put("summary", durableCompaction.summary)
-                            put("estimated_tokens_before", durableCompaction.estimatedTokensBefore)
-                            put("estimated_tokens_after", durableCompaction.estimatedTokensAfter)
-                        })
-                    }
+                durableHistory?.compactOverflow(
+                    compactor = historyCompactor,
+                    summaryMode = LocalHistorySummaryMode.WORK,
+                )?.let { durableCompaction ->
+                    recordSubagentCompaction(durableCompaction, eventLog(), subagentId, overflowRound)
                 }
                 eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
                     put("agent_id", subagentId)

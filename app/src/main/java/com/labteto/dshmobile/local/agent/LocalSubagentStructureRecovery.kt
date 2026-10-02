@@ -57,25 +57,3 @@ internal object LocalSubagentStructureRecovery {
         return recovered
     }
 }
-
-internal fun logSubagentProviderError(
-    eventLog: LocalSessionEventLog,
-    subagentId: String,
-    step: Int,
-    error: LocalModelException,
-) {
-    eventLog.append("subagent/provider-error", buildJsonObject {
-        put("agent_id", subagentId)
-        put("step", step)
-        put("code", error.code)
-        error.status?.let { put("status", it) }
-        error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
-        error.requestId?.let { put("request_id", it) }
-        error.providerCode?.let { put("provider_code", it) }
-        error.providerParam?.let { put("provider_param", it) }
-        error.cause?.let { cause ->
-            put("cause_type", cause::class.java.simpleName)
-            cause.message?.takeIf(String::isNotBlank)?.let { put("cause_detail", it.take(800)) }
-        }
-    })
-}

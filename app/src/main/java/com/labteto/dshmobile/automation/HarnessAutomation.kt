@@ -94,16 +94,6 @@ private const val AUTOMATION_HISTORY_RECORDS = 200
 internal fun Int.saturatingIncrement(): Int =
     if (this >= Int.MAX_VALUE) Int.MAX_VALUE else (this + 1).coerceAtLeast(0)
 
-internal fun usesChainedChatScheduling(task: AutomationTask): Boolean =
-    task.mode == AutomationMode.CHAT &&
-        task.scheduleType in setOf(
-            AutomationScheduleType.INTERVAL,
-            AutomationScheduleType.DAILY,
-            AutomationScheduleType.WEEKLY,
-            AutomationScheduleType.SILENCE,
-            AutomationScheduleType.WINDOW,
-        )
-
 internal fun firstDailyWindowRun(
     afterMillis: Long,
     startMinuteOfDay: Int,
@@ -213,6 +203,7 @@ data class AutomationTask(
     val recurringMinutes: Long? = null,
     val scheduleType: AutomationScheduleType = AutomationScheduleType.LEGACY,
     val scheduleAnchorAt: Long? = null,
+    val scheduleGeneration: Long = 0L,
     val silenceMinutes: Long? = null,
     val windowStartMinuteOfDay: Int? = null,
     val windowEndMinuteOfDay: Int? = null,

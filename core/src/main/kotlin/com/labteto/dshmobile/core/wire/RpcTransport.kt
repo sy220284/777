@@ -402,6 +402,16 @@ private fun refusalReason(body: String?): String? {
     return reason?.trim()?.takeIf { it.isNotEmpty() && it.length <= 200 }
 }
 
+internal fun webSocketTextWithinBudget(
+    text: String,
+    maxBytes: Int = MAX_WS_TEXT_MESSAGE_BYTES,
+): Boolean {
+    if (maxBytes <= 0 || text.length > maxBytes) return false
+    return text.toByteArray(Charsets.UTF_8).size <= maxBytes
+}
+
+internal const val MAX_WS_TEXT_MESSAGE_BYTES = 2 * 1024 * 1024
+
 /** Receives WebSocket carrier events; all callbacks may run on OkHttp's socket threads. */
 interface WsChannelSink {
     /**
@@ -460,6 +470,16 @@ open class WsChannel(
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
+            if (!webSocketTextWithinBudget(text)) {
+                webSocket.cancel()
+                sink.onClosed(
+                    RpcTransportException(
+                        0,
+                        "websocket message exceeds ${MAX_WS_TEXT_MESSAGE_BYTES} byte limit",
+                    ),
+                )
+                return
+            }
             sink.onMessage(text)
         }
 

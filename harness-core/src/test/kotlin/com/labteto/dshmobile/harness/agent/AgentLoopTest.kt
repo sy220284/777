@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.harness.agent
 
+import com.labteto.dshmobile.harness.tools.ToolResultRetention
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -121,6 +122,35 @@ class AgentLoopTest {
         assertEquals(
             listOf("call-a", "call-b"),
             events.filterIsInstance<AgentEvent.ToolFinished>().map { it.call.id },
+        )
+    }
+
+    @Test
+    fun toolResultRetentionPropagatesToFinishedEvent() = runTest {
+        val events = mutableListOf<AgentEvent>()
+        var request = 0
+        val loop = AgentLoop(
+            model = AgentModel {
+                request += 1
+                if (request == 1) {
+                    AgentModelReply(
+                        toolCalls = listOf(AgentToolCall("shot", "screenshot", buildJsonObject { })),
+                    )
+                } else {
+                    AgentModelReply(content = "完成")
+                }
+            },
+            tools = AgentToolExecutor {
+                AgentToolResult("pixels", retention = ToolResultRetention.EPHEMERAL)
+            },
+            eventSink = AgentEventSink { events += it },
+        )
+
+        loop.run("截图")
+
+        assertEquals(
+            ToolResultRetention.EPHEMERAL,
+            events.filterIsInstance<AgentEvent.ToolFinished>().single().retention,
         )
     }
 

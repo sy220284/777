@@ -5,6 +5,7 @@ import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
+import com.labteto.dshmobile.harness.tools.ToolResultRetention
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -73,6 +74,23 @@ class AndroidDevicePluginTest {
         assertFalse(registry.isInstalled("android-device"))
         assertTrue(registry.context.tools.names().isEmpty())
         assertTrue(provider.closed)
+    }
+
+    @Test
+    fun screenshotsAreExplicitlyEphemeralWhileOrdinaryReadsStayDurable() = runTest {
+        val provider = RecordingProvider()
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(provider))
+
+        val info = registry.context.tools.execute("android_device_info", buildJsonObject { })
+        val screenshot = registry.context.tools.execute(
+            "android_screenshot",
+            buildJsonObject { },
+            context = ToolContext(approval = { true }),
+        )
+
+        assertEquals(ToolResultRetention.DURABLE, info.retention)
+        assertEquals(ToolResultRetention.EPHEMERAL, screenshot.retention)
     }
 
     @Test

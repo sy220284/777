@@ -143,9 +143,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-private const val INTERNAL_WORK_CONTINUATION_PROMPT =
-    "继续当前工作任务。上一模型请求已进入服务端流后中断；基于已有历史、检查点和工具结果继续未完成部分。禁止重做已经完成并有结果的工具调用，先核对现有进度再行动。"
-
 /**
  * A native Android implementation of the DeepSeek Harness execution loop.
  *
@@ -800,9 +797,9 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null) {
+    internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) {
         require(!isRunBusy()) { "请先结束当前任务再切换模型" }
-        val result = modelConfiguration.save(apiKey, model, baseUrl, protocol, profileId)
+        val result = modelConfiguration.save(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
         imageCapabilities.clearRoute(result.baseUrl, result.model)
         _state.update {
             it.copy(
@@ -1226,11 +1223,13 @@ class LocalHarnessEngine @Inject constructor(
             activeWorkRuns[state.sessionId]?.job?.isCompleted == false ||
             pendingInputs.size() != 0
         ) return@synchronized LocalChatUserEditResult.BUSY
+        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
         if (state.usageMode == LocalUsageMode.WORK) return@synchronized editAndResendWorkUserMessage(
             messageId,
             requestedText,
             eventLog,
             memoryStore,
+            chatPersonaGalleryStore,
             modelHistory,
             modelHistoryCheckpointCodec,
             _state,
@@ -1238,8 +1237,11 @@ class LocalHarnessEngine @Inject constructor(
             { sequence -> transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, sequence) },
             { reason -> checkpointModelHistory(reason) },
             { persist() },
-        ) { content, memoryInput, modelMessage ->
-            queueTurnLocked(content, memoryInput, modelMessage).start()
+            { content -> transcriptRuntime.newMessage("user", content) },
+        ) { content, memoryInput, sourceMessageId ->
+            scope.launch(start = CoroutineStart.LAZY) {
+                runTurn(content, memoryInput, sourceMessageId)
+            }.also { activeJob = it; it.start() }
         }
         if (state.usageMode != LocalUsageMode.CHAT) {
             return@synchronized LocalChatUserEditResult.UNAVAILABLE
@@ -1286,28 +1288,6 @@ class LocalHarnessEngine @Inject constructor(
         }
 
         val discarded = activeTranscript.drop(originalIndex)
-        memoryStore.rollbackSourceSessionFrom(
-            sourceSessionId = state.sessionId,
-            createdAtInclusive = original.createdAt,
-            discardedMessageIds = discarded.mapTo(linkedSetOf(), LocalHarnessMessage::id),
-        )
-        if (!state.groupChat.enabled) {
-            val galleryId = state.galleryId
-            val storyId = state.galleryStoryId
-            if (galleryId != null && storyId != null) {
-                chatPersonaGalleryStore.excludeHistoryMessages(
-                    id = galleryId,
-                    storyId = storyId,
-                    messageKeys = discarded.map { com.labteto.dshmobile.local.chat.galleryMessageArchiveKey(it) },
-                    replacementChatState = baseState,
-                )
-            }
-        } else {
-            baseGroupState.members.forEach { member ->
-                chatPersonaGalleryStore.replaceGroupChatState(member.galleryId, member.chatState)
-            }
-        }
-
         val edited = transcriptRuntime.newMessage("user", content)
         val rewritten = rewriteChatTranscriptFromUserEdit(
             activeMessages = activeTranscript,
@@ -1336,48 +1316,80 @@ class LocalHarnessEngine @Inject constructor(
             originalMessageId = messageId,
             content = content,
         )
-        modelHistory.reset(
-            buildEditedChatModelHistory(
-                eventLog = eventLog,
-                messages = rewritten,
-                groupMode = state.groupChat.enabled,
-                editedMessageId = edited.id,
-                editedModelMessage = editedModelMessage,
-                systemPrompt = if (state.groupChat.enabled) groupChatSystemPrompt() else chatSystemPrompt(),
-            ),
+        val rewrittenHistory = buildEditedChatModelHistory(
+            eventLog = eventLog,
+            messages = rewritten,
+            groupMode = state.groupChat.enabled,
+            editedMessageId = edited.id,
+            editedModelMessage = editedModelMessage,
+            systemPrompt = if (state.groupChat.enabled) groupChatSystemPrompt() else chatSystemPrompt(),
         )
-        updateContextMetrics()
 
         val restoredGroupState = if (state.groupChat.enabled) {
             baseGroupState.copy(context = baseContext)
         } else {
             baseGroupState
         }
+        val committedChatState = baseState.withoutLegacyConversationContext()
+        val committedChatContext = if (state.groupChat.enabled) state.chatContext else baseContext
         persistChatTimelineBaseline(
             eventLog,
             json,
             state.copy(
-                chatState = baseState.withoutLegacyConversationContext(),
-                chatContext = baseContext,
+                chatState = committedChatState,
+                chatContext = committedChatContext,
                 groupChat = restoredGroupState,
             ),
         )
-
-        val userEvent = eventLog.append("user/message", buildJsonObject {
-            put("content", content)
-            put("model_message", editedModelMessage)
-            put("edited_from", messageId)
-            put("queued", false)
-            put("transcript", encodeTranscriptMessages(listOf(edited)))
-        })
-        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, userEvent.sequence)
-
+        val rewrite = appendTimelineRewriteCommit(
+            eventLog = eventLog,
+            reason = "user-edited",
+            activeTranscript = rewritten,
+            modelHistory = rewrittenHistory,
+            state = LocalTimelineRewriteState(
+                plan = state.plan,
+                todos = state.todos,
+                goal = state.goal,
+                planMode = state.planMode,
+                chatState = committedChatState,
+                chatContext = committedChatContext,
+                chatBranches = LocalChatBranchState(),
+                groupChat = restoredGroupState,
+            ),
+            projection = LocalTimelineRewriteProjectionInput(
+                sourceSessionId = state.sessionId,
+                createdAtInclusive = original.createdAt,
+                discardedMessageIds = discarded.map(LocalHarnessMessage::id),
+                directGalleryId = state.galleryId.takeIf {
+                    !state.groupChat.enabled && state.galleryStoryId != null
+                },
+                directStoryId = state.galleryStoryId.takeIf {
+                    !state.groupChat.enabled && state.galleryId != null
+                },
+                directMessageKeys = if (state.groupChat.enabled) emptyList() else discarded.map {
+                    com.labteto.dshmobile.local.chat.galleryMessageArchiveKey(it)
+                },
+                directReplacementChatState = committedChatState.takeIf {
+                    !state.groupChat.enabled && state.galleryId != null && state.galleryStoryId != null
+                },
+                groupGalleryStates = if (state.groupChat.enabled) {
+                    baseGroupState.members.map { it.galleryId to it.chatState }
+                } else {
+                    emptyList()
+                },
+            ),
+            editedMessageId = edited.id,
+            editedModelMessage = editedModelMessage,
+        )
+        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, rewrite.sequence)
+        modelHistory.reset(rewrittenHistory)
+        updateContextMetrics()
         _state.update { current ->
             current.copy(
                 messages = rewritten.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                 transcriptIndex = buildLocalTranscriptRuntimeIndex(rewritten),
-                chatState = baseState.withoutLegacyConversationContext(),
-                chatContext = if (current.groupChat.enabled) current.chatContext else baseContext,
+                chatState = committedChatState,
+                chatContext = committedChatContext,
                 groupChat = restoredGroupState,
                 replySuggestions = emptyList(),
                 chatBranches = LocalChatBranchState(),
@@ -1386,15 +1398,7 @@ class LocalHarnessEngine @Inject constructor(
                 error = null,
             )
         }
-        val rewrittenTranscriptSequence = persistRewrittenChatTranscript(
-            eventLog = eventLog,
-            reason = "user-edited",
-            activeTranscript = rewritten,
-        )
-        transcriptProjectionCursor = maxOf(
-            transcriptProjectionCursor ?: -1L,
-            rewrittenTranscriptSequence,
-        )
+        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
         checkpointModelHistory(if (state.groupChat.enabled) "group/user-edited" else "chat/user-edited")
         persist()
         automationScheduler.onChatUserActivity(
@@ -2934,7 +2938,7 @@ class LocalHarnessEngine @Inject constructor(
             contextChars = runSnapshot.contextChars,
             parentRunId = continuationParentRunId,
         )
-        var lastModelErrorCode: String? = null
+        var lastModelError: LocalModelException? = null
         val progressTracker = LocalAgentProgressTracker()
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
@@ -3080,7 +3084,7 @@ class LocalHarnessEngine @Inject constructor(
                         }
                     }
                 } catch (error: Throwable) {
-                    if (error is LocalModelException) lastModelErrorCode = error.code
+                    if (error is LocalModelException) lastModelError = error
                     val nativeImageRejected =
                         nativeImagesSent &&
                             imageInputUnsupported(error)
@@ -3288,7 +3292,7 @@ class LocalHarnessEngine @Inject constructor(
                             sessionId = runSessionId,
                             callId = event.call.id,
                             result = event.output,
-                            binding = binding,
+                            binding = binding, retention = event.retention,
                         )
                         val modelOutput = AgentToolResult(
                             content = boundedContent,
@@ -3300,7 +3304,7 @@ class LocalHarnessEngine @Inject constructor(
                         ).modelVisibleContent()
                         val transcriptMessage = runTranscript.newMessage(
                             role = "tool",
-                            content = boundedContent,
+                            content = durableToolResultContent(boundedContent, event.retention),
                             toolName = event.call.name,
                             contentAlreadyBounded = true,
                         )
@@ -3310,9 +3314,11 @@ class LocalHarnessEngine @Inject constructor(
                             put("name", event.call.name)
                             put(
                                 "content",
-                                truncateWithoutSplittingSurrogatePair(event.output, MAX_EVENT_CHARS),
+                                truncateWithoutSplittingSurrogatePair(
+                                    durableToolResultContent(event.output, event.retention), MAX_EVENT_CHARS,
+                                ),
                             )
-                            put("model_content", modelOutput)
+                            put("model_content", durableToolResultContent(modelOutput, event.retention))
                             put("is_error", event.isError)
                             event.errorCode?.let { put("error_code", it) }
                             put("retryable", event.retryable)
@@ -3320,13 +3326,7 @@ class LocalHarnessEngine @Inject constructor(
                             event.recoveryHint?.let { put("recovery_hint", it) }
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
-                        runHistory.append(
-                            buildJsonObject {
-                                put("role", "tool")
-                                put("tool_call_id", event.call.id)
-                                put("content", modelOutput)
-                            },
-                        )
+                        runHistory.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
                         completedToolCallIds += event.call.id
                         updateContextMetrics(binding)
                         runTranscript.applyMessages(listOf(transcriptMessage), toolEvent.sequence)
@@ -3370,7 +3370,7 @@ class LocalHarnessEngine @Inject constructor(
                         val continuationEligible =
                             binding != null &&
                                 shouldAutoContinueWorkFailure(
-                                    errorCode = lastModelErrorCode,
+                                    error = lastModelError,
                                     automaticContinuationCount = binding.automaticContinuationCount,
                                     pendingInputs = binding.pendingInputs.size(),
                                 )
@@ -3447,49 +3447,26 @@ class LocalHarnessEngine @Inject constructor(
             }
         } catch (_: TimeoutCancellationException) {
             foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
-            runState.update { it.copy(error = "本轮执行超过 15 分钟，已暂停并保留已有进度") }
+            val timeoutError = LocalModelException(
+                code = "WORK_SLICE_TIMEOUT",
+                message = "本轮执行达到 15 分钟切片上限",
+                retryable = false,
+                continuationEligible = binding != null,
+            )
+            val queued = binding?.let {
+                queueAutomaticWorkContinuation(it, runContext.runId, timeoutError)
+            } == true
+            if (!queued) {
+                runState.update { it.copy(error = "本轮执行超过 15 分钟，已暂停并保留已有进度") }
+            }
         } catch (_: CancellationException) {
             foregroundOutcome = LocalExecutionService.OUTCOME_CANCELLED
             // TurnCancelled durably records and projects the visible stop message.
         } catch (error: Exception) {
             foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
             val modelError = error as? LocalModelException
-            val continuationEligible =
-                binding != null &&
-                    shouldAutoContinueWorkFailure(
-                        errorCode = modelError?.code,
-                        automaticContinuationCount = binding.automaticContinuationCount,
-                        pendingInputs = binding.pendingInputs.size(),
-                    )
-            val queued = if (continuationEligible) {
-                val continuationId = "continuation-" + runContext.runId
-                binding!!.pendingInputs.offer(
-                    QueuedAgentInput(
-                        content = INTERNAL_WORK_CONTINUATION_PROMPT,
-                        memoryInput = "",
-                        modelMessage = buildJsonObject {
-                            put("role", "user")
-                            put("content", INTERNAL_WORK_CONTINUATION_PROMPT)
-                        },
-                        id = continuationId,
-                    ),
-                ).also { accepted ->
-                    if (accepted) {
-                        binding.automaticContinuationCount += 1
-                        binding.continuationParentRunId = runContext.runId
-                        runState.update {
-                            it.copy(
-                                error = null,
-                                queuedInputCount = binding.pendingInputs.size(),
-                            )
-                        }
-                        runEventLog.append("turn/continuation-queued", buildJsonObject {
-                            put("source_run_id", runContext.runId)
-                            put("reason", modelError?.code.orEmpty())
-                            put("continuation_id", continuationId)
-                        })
-                    }
-                }
+            val queued = if (binding != null && modelError != null) {
+                queueAutomaticWorkContinuation(binding, runContext.runId, modelError)
             } else {
                 false
             }
@@ -4765,6 +4742,7 @@ class LocalHarnessEngine @Inject constructor(
             pressure = resourceScheduler.snapshot().pressure,
             model = snapshot.model,
             baseUrl = snapshot.baseUrl,
+            contextWindowTokensOverride = snapshot.modelSelection.activeProfile?.contextWindowTokensOverride,
         )
     }
 
@@ -4791,7 +4769,7 @@ class LocalHarnessEngine @Inject constructor(
         sessionId: String,
         callId: String?,
         result: String,
-        binding: LocalWorkRunBinding? = null,
+        binding: LocalWorkRunBinding? = null, retention: com.labteto.dshmobile.harness.tools.ToolResultRetention = com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE,
     ): String {
         val history = binding?.modelHistory ?: modelHistory
         val budget = adaptiveToolResultBudget(
@@ -4799,7 +4777,8 @@ class LocalHarnessEngine @Inject constructor(
             currentHistoryChars = history.encodedChars,
             currentHistoryTokens = history.estimatedTokens,
         )
-        val stored = callId?.let { toolOutputStore.store(sessionId, it, result) } != null
+        val stored = retention == com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE &&
+            callId?.let { toolOutputStore.store(sessionId, it, result) } != null
         val retained = retainTextForModel(
             value = result,
             maxTokens = budget.maxToolResultTokens,
@@ -4909,6 +4888,7 @@ class LocalHarnessEngine @Inject constructor(
         // Only mutate the durable event tail after the persisted session format is accepted.
         // A future-version session must remain completely untouched.
         val recovery = eventLog.repairInterruptedTail()
+        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
             eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
@@ -5011,21 +4991,23 @@ class LocalHarnessEngine @Inject constructor(
             galleryStoryId = stored.galleryStoryId,
             gallerySaveSuppressedThrough = stored.gallerySaveSuppressedThrough,
             chatPersona = chatPersonaStore.get(stored.personaId),
-            chatState = stored.chatState,
-            chatContext = stored.chatContext.boundDurablePending(eventLog),
+            chatState = projectedControls.chatState,
+            chatContext = projectedControls.chatContext.boundDurablePending(eventLog),
             replySuggestions = stored.replySuggestions,
             chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !stored.groupChat.enabled) {
                 restoreMaterializedChatBranchState(
                     current = projectedControls.chatBranches,
                     activeMessages = restoredTranscript.messages,
-                    chatState = stored.chatState,
+                    chatState = projectedControls.chatState,
                     replySuggestions = stored.replySuggestions,
                 )
             } else {
                 LocalChatBranchState()
             },
             groupChat = if (stored.usageMode == LocalUsageMode.CHAT) {
-                stored.groupChat.copy(context = stored.groupChat.context.boundDurablePending(eventLog, "group"))
+                projectedControls.groupChat.copy(
+                    context = projectedControls.groupChat.context.boundDurablePending(eventLog, "group"),
+                )
             } else {
                 LocalGroupChatState()
             },
@@ -5113,7 +5095,7 @@ class LocalHarnessEngine @Inject constructor(
         val history = binding?.modelHistory ?: modelHistory
         log.append(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
-            modelHistoryCheckpointCodec.encode(history.snapshot(), reason),
+            modelHistoryCheckpointCodec.encode(durableModelHistorySnapshot(history.snapshot()), reason),
         )
         if (binding != null) {
             binding.turnsSinceModelHistoryCheckpoint = 0

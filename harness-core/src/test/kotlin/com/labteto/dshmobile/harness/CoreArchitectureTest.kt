@@ -499,6 +499,25 @@ executor = HarnessToolExecutor { _, _, _ ->
     }
 
     @Test
+    fun missingPrimaryRecoversFromRotatedBackup() {
+        val root = createTempDir(prefix = "missing-session-primary-")
+        try {
+            val store = VersionedSessionStore(root, json)
+            store.write("s1", buildJsonObject { put("value", 1) }, updatedAt = 1L)
+            store.write("s1", buildJsonObject { put("value", 2) }, updatedAt = 2L)
+
+            assertTrue(File(root, "s1.json").delete())
+            val recovered = requireNotNull(store.read("s1"))
+
+            assertTrue(recovered.recovered)
+            assertEquals("1", recovered.document.payload["value"]?.jsonPrimitive?.content)
+            assertTrue(File(root, "s1.json").isFile)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun corruptPrimaryRecoversFromLastGoodBackup() {
         val root = createTempDir(prefix = "recover-session-")
         try {

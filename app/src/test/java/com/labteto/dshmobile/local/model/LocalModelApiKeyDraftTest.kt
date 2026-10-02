@@ -147,4 +147,31 @@ class LocalModelApiKeyDraftTest {
         assertEquals(LocalModelProtocol.RESPONSES, created.profile.protocol)
     }
 
+    @Test fun customContextOverrideIsValidatedAndOfficialPresetIgnoresIt() = runBlocking {
+        val custom = resolveLocalModelApiKeyDraft(
+            "key", "custom-model", "https://proxy.example/v1", null, emptyList(), { null },
+            contextWindowTokensOverride = 500_000,
+            newProfileId = { "custom" },
+        )
+        assertEquals(500_000, custom.profile.contextWindowTokensOverride)
+
+        val official = resolveLocalModelApiKeyDraft(
+            "key", "deepseek-flash", "https://api.deepseek.com", null, emptyList(), { null },
+            contextWindowTokensOverride = 8_000,
+            newProfileId = { "official" },
+        )
+        assertNull(official.profile.contextWindowTokensOverride)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking {
+                resolveLocalModelApiKeyDraft(
+                    "key", "custom-model", "https://proxy.example/v1", null, emptyList(), { null },
+                    contextWindowTokensOverride = 1_000,
+                    newProfileId = { "bad" },
+                )
+            }
+        }
+        Unit
+    }
+
 }

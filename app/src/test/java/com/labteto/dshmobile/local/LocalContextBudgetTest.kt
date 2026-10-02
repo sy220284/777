@@ -39,6 +39,29 @@ class LocalContextBudgetTest {
     }
 
     @Test
+    fun unknownRouteCanUseExplicitContextWindowWithoutOverridingOfficialPreset() {
+        val custom = localHistoryBudgetFor(
+            memoryClassMb = 512,
+            pressure = HarnessResourcePressure.LOW,
+            model = "custom-model",
+            baseUrl = "https://proxy.example/v1",
+            contextWindowTokensOverride = 1_000_000,
+        )
+        val official = localHistoryBudgetFor(
+            memoryClassMb = 512,
+            pressure = HarnessResourcePressure.LOW,
+            model = "deepseek-flash",
+            baseUrl = "https://api.deepseek.com",
+            contextWindowTokensOverride = 16_000,
+        )
+
+        assertEquals(1_000_000, documentedContextWindowTokens("custom-model", "https://proxy.example/v1", 1_000_000))
+        assertTrue(custom.maxHistoryTokens!! > 192_000)
+        assertEquals(1_000_000, documentedContextWindowTokens("deepseek-flash", "https://api.deepseek.com", 16_000))
+        assertTrue(official.maxHistoryTokens!! > 16_000)
+    }
+
+    @Test
     fun toolResultBudgetIsSharedByEveryProductSurface() {
         val budget = localHistoryBudgetFor(
             memoryClassMb = 512,

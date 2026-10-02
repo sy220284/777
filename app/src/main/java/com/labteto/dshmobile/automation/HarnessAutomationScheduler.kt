@@ -7,10 +7,8 @@ import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.notify.DshNotifications
 import androidx.work.CoroutineWorker
 import androidx.work.Data
-import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.labteto.dshmobile.harness.capability.HarnessScheduler
@@ -37,7 +35,6 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.charset.StandardCharsets
 import java.io.FileOutputStream
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -59,7 +56,7 @@ class HarnessAutomationScheduler @Inject constructor(
     private val workManager get() = WorkManager.getInstance(context)
 
     init {
-        reconcileChainedTasks()
+        reconcileAutomationSchedules(store, workManager)
     }
 
     override suspend fun schedule(id: String, triggerAtMillis: Long, payload: String) {
@@ -67,8 +64,9 @@ class HarnessAutomationScheduler @Inject constructor(
     }
 
     override suspend fun cancel(id: String) {
-        workManager.cancelUniqueWork(workName(id))
+        val task = store.get(id)
         store.remove(id)
+        workManager.cancelUniqueWork(workName(id, task?.scheduleGeneration ?: 0L))
     }
 
     fun scheduleOnce(
@@ -311,8 +309,8 @@ class HarnessAutomationScheduler @Inject constructor(
     fun pauseTask(id: String): Boolean {
         val task = store.get(id) ?: return false
         if (task.status == "paused") return true
-        workManager.cancelUniqueWork(workName(id))
-        store.update(id) { it.copy(status = "paused") }
+        store.update(id) { it.copy(status = "paused") } ?: return false
+        workManager.cancelUniqueWork(workName(id, task.scheduleGeneration))
         return true
     }
 
@@ -436,12 +434,14 @@ class HarnessAutomationScheduler @Inject constructor(
             else -> firstRunAtMillis.coerceAtLeast(now)
         }
         val wasPaused = current.status == "paused"
+        require(current.scheduleGeneration < Long.MAX_VALUE) { "自动任务排程 generation 已耗尽" }
         val updated = current.copy(
             prompt = prompt.trim(),
             nextRunAt = nextRun,
             recurringMinutes = recurring,
             scheduleType = scheduleType,
             scheduleAnchorAt = if (scheduleType == AutomationScheduleType.SILENCE) now else nextRun,
+            scheduleGeneration = current.scheduleGeneration + 1L,
             silenceMinutes = if (scheduleType == AutomationScheduleType.SILENCE) silenceMinutes else null,
             windowStartMinuteOfDay = if (scheduleType == AutomationScheduleType.WINDOW) {
                 windowStartMinuteOfDay
@@ -460,7 +460,6 @@ class HarnessAutomationScheduler @Inject constructor(
             lastError = null,
             failureStreak = 0,
         )
-        workManager.cancelUniqueWork(workName(id))
         store.upsert(updated)
         if (!wasPaused) {
             if (usesChainedChatScheduling(updated) || updated.recurringMinutes == null) {
@@ -469,6 +468,7 @@ class HarnessAutomationScheduler @Inject constructor(
                 enqueuePeriodic(id, requireNotNull(updated.recurringMinutes), nextRun)
             }
         }
+        workManager.cancelUniqueWork(workName(id, current.scheduleGeneration))
         return true
     }
 
@@ -520,25 +520,15 @@ class HarnessAutomationScheduler @Inject constructor(
     }
 
     fun cancelTask(id: String): Boolean {
-        workManager.cancelUniqueWork(workName(id))
+        val task = store.get(id) ?: return false
+        if (!store.remove(id)) return false
+        workManager.cancelUniqueWork(workName(id, task.scheduleGeneration))
         workManager.cancelUniqueWork(manualWorkName(id))
-        return store.remove(id)
+        return true
     }
 
     internal fun enqueueNextChained(id: String, runAt: Long) {
         enqueueOneTime(id, runAt)
-    }
-
-    private fun reconcileChainedTasks() {
-        store.list()
-            .filter { it.status == "scheduled" && usesChainedChatScheduling(it) }
-            .forEach { task ->
-                enqueueOneTime(
-                    id = task.id,
-                    runAt = task.nextRunAt.coerceAtLeast(System.currentTimeMillis()),
-                    policy = ExistingWorkPolicy.KEEP,
-                )
-            }
     }
 
     private fun enqueueOneTime(
@@ -546,30 +536,13 @@ class HarnessAutomationScheduler @Inject constructor(
         runAt: Long,
         policy: ExistingWorkPolicy = ExistingWorkPolicy.REPLACE,
     ) {
-        val now = System.currentTimeMillis()
-        val request = OneTimeWorkRequestBuilder<HarnessAutomationWorker>()
-            .setInitialDelay((runAt - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
-            .setInputData(Data.Builder().putString(KEY_TASK_ID, id).build())
-            .addTag(WORK_TAG)
-            .build()
-        workManager.enqueueUniqueWork(workName(id), policy, request)
+        val generation = store.get(id)?.scheduleGeneration ?: return
+        enqueueAutomationOneTime(workManager, id, generation, runAt, policy)
     }
 
     private fun enqueuePeriodic(id: String, intervalMinutes: Long, firstRunAt: Long) {
-        val now = System.currentTimeMillis()
-        val request = PeriodicWorkRequestBuilder<HarnessAutomationWorker>(
-            intervalMinutes,
-            TimeUnit.MINUTES,
-        )
-            .setInitialDelay((firstRunAt - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
-            .setInputData(Data.Builder().putString(KEY_TASK_ID, id).build())
-            .addTag(WORK_TAG)
-            .build()
-        workManager.enqueueUniquePeriodicWork(
-            workName(id),
-            ExistingPeriodicWorkPolicy.UPDATE,
-            request,
-        )
+        val generation = store.get(id)?.scheduleGeneration ?: return
+        enqueueAutomationPeriodic(workManager, id, generation, intervalMinutes, firstRunAt)
     }
 
     private fun validateChatPolicy(
@@ -595,8 +568,9 @@ class HarnessAutomationScheduler @Inject constructor(
     companion object {
         const val KEY_TASK_ID = "task_id"
         const val KEY_MANUAL_RUN = "manual_run"
+        const val KEY_SCHEDULE_GENERATION = "schedule_generation"
         const val WORK_TAG = "harness-automation"
-        fun workName(id: String) = "harness-automation-$id"
+        fun workName(id: String, generation: Long = 0L) = automationWorkName(id, generation)
         fun manualWorkName(id: String) = "harness-automation-manual-$id"
     }
 }

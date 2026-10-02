@@ -302,8 +302,16 @@ class McpLegacyHttpSseTransport(
         if (data.isBlank()) return
         if (event == "endpoint") {
             if (!endpoint.isCompleted) {
-                val resolved = sseUrl.toHttpUrl().resolve(data)
+                val origin = sseUrl.toHttpUrl()
+                val resolved = origin.resolve(data)
                     ?: error("MCP SSE endpoint 无法解析：$data")
+                require(
+                    resolved.scheme == origin.scheme &&
+                        resolved.host == origin.host &&
+                        resolved.port == origin.port
+                ) {
+                    "MCP SSE endpoint 必须与原始 SSE 地址同源"
+                }
                 endpoint.complete(resolved.toString())
             }
             return

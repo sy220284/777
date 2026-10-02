@@ -11,15 +11,15 @@ internal fun validateWorkspacePatchPaths(patch: String) {
     patch.lineSequence().forEach { line ->
         when {
             line.startsWith("diff --git ") -> {
-                val paths = line.removePrefix("diff --git ").trim().split(Regex("\\s+"))
+                val paths = line.removePrefix("diff --git ").trim().split(PATCH_HEADER_WHITESPACE)
                 require(paths.size == 2) { "补丁 diff 路径格式不受支持" }
                 validatePatchPath(paths[0], stripGitPrefix = true)
                 validatePatchPath(paths[1], stripGitPrefix = true)
             }
             line.startsWith("--- ") ->
-                validatePatchPath(line.removePrefix("--- ").substringBefore('\t'), stripGitPrefix = true)
+                validatePatchPath(unifiedHeaderPath(line.removePrefix("--- ")), stripGitPrefix = true)
             line.startsWith("+++ ") ->
-                validatePatchPath(line.removePrefix("+++ ").substringBefore('\t'), stripGitPrefix = true)
+                validatePatchPath(unifiedHeaderPath(line.removePrefix("+++ ")), stripGitPrefix = true)
             line.startsWith("rename from ") ->
                 validatePatchPath(line.removePrefix("rename from "), stripGitPrefix = false)
             line.startsWith("rename to ") ->
@@ -31,6 +31,14 @@ internal fun validateWorkspacePatchPaths(patch: String) {
         }
     }
 }
+
+private fun unifiedHeaderPath(raw: String): String =
+    raw.replace(UNIFIED_DIFF_TIMESTAMP_SUFFIX, "").trimEnd()
+
+private val PATCH_HEADER_WHITESPACE = Regex("\\s+")
+private val UNIFIED_DIFF_TIMESTAMP_SUFFIX = Regex(
+    """(?:\t| +)\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)? [+-]\d{4}$""",
+)
 
 private fun validatePatchPath(raw: String, stripGitPrefix: Boolean) {
     var path = raw.trim()
