@@ -77,7 +77,7 @@ data class TokenPromptBreakdown(
         }
 }
 
-    fun calibratedToReportedInput(reportedInputTokens: Long): TokenPromptBreakdown {
+internal fun TokenPromptBreakdown.calibratedToReportedInput(reportedInputTokens: Long): TokenPromptBreakdown {
         if (reportedInputTokens <= 0L || estimatedInputTokens <= 0L) return this
         val target = reportedInputTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         val factor = target.toDouble() / estimatedInputTokens.toDouble()
