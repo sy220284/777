@@ -18,7 +18,7 @@ private data class MemoryJournalMutation(
  * Durable storage boundary for Memory.
  *
  * Owns snapshot/WAL/cache/recovery only. Memory selection, provenance and recall semantics remain in
- * [MemoryStore] and [MemoryRecordMaintenance].
+ * [MemoryStore] and `MemoryRecordMaintenance.kt`.
  */
 internal class MemoryDocumentStore(
     private val root: File,
