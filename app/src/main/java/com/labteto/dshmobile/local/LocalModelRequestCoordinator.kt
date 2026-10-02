@@ -9,6 +9,7 @@ import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -34,6 +35,8 @@ internal class LocalModelRequestCoordinator(
     private val maxStreamPreviewChars: Int = 4_096,
     private val streamPreviewIntervalMs: Long = 50L,
 ) {
+    /** Consecutive completed Responses IDs are kept only for best-effort cache diagnostics. */
+    private val promptCacheBaselines = ConcurrentHashMap<String, String>()
     suspend fun complete(
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
@@ -58,6 +61,17 @@ internal class LocalModelRequestCoordinator(
             snapshot.baseUrl,
         )
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
+        val runtimeCapabilities = LocalModelPresets.runtimeCapabilitiesFor(
+            frozenProfile.model,
+            frozenProfile.baseUrl,
+            frozenProfile.protocol,
+        )
+        val cacheBaselineKey = snapshot.sessionId + "\u0000" + frozenProfile.id
+        val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
+            promptCacheBaselines[cacheBaselineKey]
+        } else {
+            null
+        }
         val operationalLimit = operationalInputLimitTokens(frozenProfile.model, frozenProfile.baseUrl)
         val pressure = LocalPromptPressureMeter.measure(
             messages = messages,
@@ -268,6 +282,7 @@ internal class LocalModelRequestCoordinator(
                                         tools = tools,
                                         temperature = temperature,
                                         profile = frozenProfile,
+                                        promptCacheComparisonResponseId = cacheComparisonResponseId,
                                         onDelta = { delta ->
                                             val visible = streamFilter?.append(delta.content)?.text ?: delta.content
                                             streamPreview.append(visible)
@@ -292,9 +307,23 @@ internal class LocalModelRequestCoordinator(
                                     })
                                     throw error
                                 }
-                            }.also {
+                            }.also { reply ->
                                 streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
                                 streamPreview.flush()
+                                if (runtimeCapabilities.promptCacheDiagnostics && reply.requestId.isNotBlank()) {
+                                    promptCacheBaselines[cacheBaselineKey] = reply.requestId
+                                    reply.promptCacheDiagnostic?.let { diagnostic ->
+                                        log.append("request/cache-diagnostic", buildJsonObject {
+                                            put("step", step)
+                                            put("type", diagnostic.type)
+                                            diagnostic.reason?.let { put("reason", it) }
+                                            diagnostic.comparisonReusableTokens?.let { put("comparison_reusable_tokens", it) }
+                                            diagnostic.cacheMissedTokens?.let { put("cache_missed_tokens", it) }
+                                            cacheComparisonResponseId?.let { put("comparison_response_id", it) }
+                                            put("response_id", reply.requestId)
+                                        })
+                                    }
+                                }
                             }
                         }
                     }
