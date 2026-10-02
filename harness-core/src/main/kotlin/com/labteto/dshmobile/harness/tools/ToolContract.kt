@@ -21,9 +21,24 @@ data class ToolMetadata(
 ) {
     init {
         require(family.isNotBlank()) { "工具能力族不能为空" }
+        require(family.length <= MAX_FAMILY_CHARS) { "工具能力族过长" }
+        require(discoveryKeywords.size <= MAX_DISCOVERY_KEYWORDS) { "工具发现关键词过多" }
         require(discoveryKeywords.none(String::isBlank)) { "工具发现关键词不能为空字符串" }
+        require(discoveryKeywords.all { it.length <= MAX_DISCOVERY_KEYWORD_CHARS }) { "工具发现关键词过长" }
+        require(requirements.size <= MAX_METADATA_ITEMS) { "工具前置条件过多" }
         require(requirements.none(String::isBlank)) { "工具前置条件不能为空字符串" }
+        require(requirements.all { it.length <= MAX_METADATA_ITEM_CHARS }) { "工具前置条件过长" }
+        require(usageNotes.size <= MAX_METADATA_ITEMS) { "工具使用说明过多" }
         require(usageNotes.none(String::isBlank)) { "工具使用说明不能为空字符串" }
+        require(usageNotes.all { it.length <= MAX_METADATA_ITEM_CHARS }) { "工具使用说明过长" }
+    }
+
+    private companion object {
+        const val MAX_FAMILY_CHARS = 64
+        const val MAX_DISCOVERY_KEYWORDS = 32
+        const val MAX_DISCOVERY_KEYWORD_CHARS = 128
+        const val MAX_METADATA_ITEMS = 16
+        const val MAX_METADATA_ITEM_CHARS = 512
     }
 }
 
