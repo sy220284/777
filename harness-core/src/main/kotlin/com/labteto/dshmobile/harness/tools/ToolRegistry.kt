@@ -72,8 +72,8 @@ class ToolRegistry private constructor(
 ) {
     constructor() : this(RegistryEntries(), ToolLifecycleAdmission())
     fun register(tool: HarnessTool, replace: Boolean = false) {
+        validateToolRegistration(tool)
         val normalized = tool.withContractDescription()
-        validateToolRegistration(normalized)
         tools.register(normalized.name, normalized, replace)
     }
     fun unregister(name: String): HarnessTool? = tools.remove(name)
@@ -252,8 +252,13 @@ class ToolRegistry private constructor(
         require(!description.isNullOrEmpty()) {
             "工具 description 不能为空：${tool.name}"
         }
-        require(function["parameters"] is JsonObject) {
-            "工具 parameters 必须是对象 schema：${tool.name}"
+        val parameters = function["parameters"] as? JsonObject
+            ?: error("工具 parameters 必须是对象 schema：${tool.name}")
+        val parameterType = (parameters["type"] as? JsonPrimitive)
+            ?.takeIf { it.isString }
+            ?.content
+        require(parameterType == "object") {
+            "工具 parameters 根类型必须是 object：${tool.name}"
         }
     }
 
