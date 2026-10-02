@@ -305,11 +305,14 @@ class LocalToolExecutionCoordinatorTest {
 
         coordinator.enableGitHubConnectorTools()
         val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
+        val detachedEnabled = linkedSetOf<String>()
+        coordinator.enableGitHubConnectorTools(detachedEnabled)
 
         assertEquals(
             setOf("github_status", "github_api_get", "github_api_request", "future_repo_tool"),
             visible,
         )
+        assertEquals(visible, detachedEnabled)
         assertFalse("process_exec" in visible)
     }
 
