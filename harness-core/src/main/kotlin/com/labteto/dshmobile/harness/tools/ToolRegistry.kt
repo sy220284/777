@@ -58,8 +58,10 @@ fun interface HarnessToolExecutor {
 data class HarnessTool(
     val name: String,
     val schema: JsonObject,
-    val access: ToolAccess = ToolAccess.READ_ONLY,
-    val approvalPolicy: ToolApprovalPolicy = ToolApprovalPolicy.NEVER,
+    val access: ToolAccess,
+    val approvalPolicy: ToolApprovalPolicy,
+    val exposure: ToolExposure,
+    val metadata: ToolMetadata,
     val timeoutMillis: Long? = null,
     val executor: HarnessToolExecutor,
 )
@@ -69,11 +71,19 @@ class ToolRegistry private constructor(
     private val admission: ToolLifecycleAdmission,
 ) {
     constructor() : this(RegistryEntries(), ToolLifecycleAdmission())
-    fun register(tool: HarnessTool, replace: Boolean = false) = tools.register(tool.name, tool, replace)
+    fun register(tool: HarnessTool, replace: Boolean = false) {
+        val normalized = tool.withContractDescription()
+        validateToolRegistration(normalized)
+        tools.register(normalized.name, normalized, replace)
+    }
     fun unregister(name: String): HarnessTool? = tools.remove(name)
     fun get(name: String): HarnessTool? = tools.get(name)
     fun names(): List<String> = tools.snapshot().keys.toList()
-    fun schemas(): JsonArray = JsonArray(tools.snapshot().values.map(HarnessTool::schema))
+    internal fun schemas(): JsonArray = JsonArray(
+        tools.snapshot().values
+            .filter { it.exposure == ToolExposure.CORE }
+            .map(HarnessTool::schema),
+    )
     internal fun snapshot(): Map<String, HarnessTool> = tools.snapshot()
     internal fun restore(snapshot: Map<String, HarnessTool>) = tools.restore(snapshot)
     internal fun fork(): ToolRegistry = ToolRegistry(tools.fork(), admission)
@@ -207,6 +217,46 @@ class ToolRegistry private constructor(
         )
     }
 
+    private fun validateToolRegistration(tool: HarnessTool) {
+        require(TOOL_NAME.matches(tool.name)) {
+            "工具名称非法：${tool.name}"
+        }
+        require(tool.timeoutMillis == null || tool.timeoutMillis > 0L) {
+            "工具超时必须大于 0：${tool.name}"
+        }
+        if (tool.exposure == ToolExposure.OPTIONAL) {
+            require(tool.metadata.discoveryKeywords.isNotEmpty()) {
+                "可选工具必须声明发现关键词：${tool.name}"
+            }
+        }
+
+        val rootType = (tool.schema["type"] as? JsonPrimitive)
+            ?.takeIf { it.isString }
+            ?.content
+        require(rootType == "function") {
+            "工具 schema 根类型必须是 function：${tool.name}"
+        }
+        val function = tool.schema["function"] as? JsonObject
+            ?: error("工具 schema 缺少 function：${tool.name}")
+        val schemaName = (function["name"] as? JsonPrimitive)
+            ?.takeIf { it.isString }
+            ?.content
+            ?.trim()
+        require(schemaName == tool.name) {
+            "工具名称与 schema 不一致：registry=${tool.name}, schema=${schemaName.orEmpty()}"
+        }
+        val description = (function["description"] as? JsonPrimitive)
+            ?.takeIf { it.isString }
+            ?.content
+            ?.trim()
+        require(!description.isNullOrEmpty()) {
+            "工具 description 不能为空：${tool.name}"
+        }
+        require(function["parameters"] is JsonObject) {
+            "工具 parameters 必须是对象 schema：${tool.name}"
+        }
+    }
+
     private fun validateToolInput(tool: HarnessTool, input: JsonObject): String? {
         val function = tool.schema["function"] as? JsonObject ?: return null
         val parameters = function["parameters"] as? JsonObject ?: return null
@@ -305,4 +355,8 @@ class ToolRegistry private constructor(
         return null
     }
 
+
+    private companion object {
+        val TOOL_NAME = Regex("[A-Za-z0-9_-]{1,128}")
+    }
 }
