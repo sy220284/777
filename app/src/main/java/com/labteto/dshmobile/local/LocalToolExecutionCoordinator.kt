@@ -49,6 +49,17 @@ internal class LocalToolExecutionCoordinator(
         }
     }
 
+    fun enableTaskRelevantOptionalTools(
+        taskContext: String,
+        target: MutableSet<String> = enabledOptionalTools,
+    ) {
+        val tools = registry.names().mapNotNull(registry::get)
+        enableOptionalTools(
+            LocalToolRouter.relevantOptionalToolNames(tools, taskContext),
+            target,
+        )
+    }
+
     fun enableGitHubConnectorTools(target: MutableSet<String> = enabledOptionalTools) {
         val githubTools = registry.names().mapNotNull(registry::get)
             .filter { tool ->
@@ -90,7 +101,7 @@ internal class LocalToolExecutionCoordinator(
         val tools = registry.names().mapNotNull(registry::get)
         val matches = LocalToolRouter.search(tools, query)
         if (matches.isEmpty()) {
-            return "未找到匹配的扩展能力；可换用 GitHub、Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
+            return "未找到匹配的扩展能力；可换用联网、下载、记忆、会话、GitHub、Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
         }
         synchronized(target) {
             target += matches.map(HarnessTool::name)
