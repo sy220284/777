@@ -104,6 +104,32 @@ class LocalSessionEventLogTest {
     }
 
     @Test
+    fun scopedStreamSurvivesSegmentCompressionBetweenRows() {
+        val directory = Files.createTempDirectory("local-event-archive-snapshot").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        val writer = com.labteto.dshmobile.harness.session.SessionEventLog(file, json, maxBytes = 700)
+        repeat(20) { index ->
+            writer.append("test/event", buildJsonObject { put("value", "$index-" + "x".repeat(60)) })
+        }
+        writer.close()
+        val log = LocalSessionEventLog(file, json, maxBytes = 700)
+        val archiver = com.labteto.dshmobile.harness.session.SessionEventLog(file, json, maxBytes = 700)
+        try {
+            val observed = log.withEvents { events ->
+                val iterator = events.iterator()
+                val first = iterator.next()
+                assertTrue(archiver.archiveLegacySegments(limit = 16) > 0)
+                listOf(first.sequence) + iterator.asSequence().map { it.sequence }.toList()
+            }
+            assertEquals((0L until 20L).toList(), observed)
+        } finally {
+            archiver.close()
+            log.close()
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun scopedStreamClosesSnapshotsAfterEarlyReturnAndConsumerFailure() {
         val directory = Files.createTempDirectory("local-event-scoped").toFile()
         val log = LocalSessionEventLog(directory.resolve("session.events.jsonl"), json, maxBytes = 1_048_576)
