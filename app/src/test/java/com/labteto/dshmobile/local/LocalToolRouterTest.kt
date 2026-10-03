@@ -105,11 +105,14 @@ class LocalToolRouterTest {
         val coreTokens = coreSchemas.sumOf { schema -> estimateModelTokens(schema.toString()) }
         val coreNames = names(coreSchemas)
 
-        assertTrue(coreTokens * 100 <= fullTokens * 70)
+        assertTrue(coreTokens * 100 <= fullTokens * 55)
         assertTrue("read" in coreNames)
         assertTrue("bash" in coreNames)
         assertTrue("subagent" in coreNames)
-        assertTrue("workflow" in coreNames)
+        assertTrue("session_event_search" in coreNames)
+        assertTrue("workflow" !in coreNames)
+        assertTrue("environment_info" !in coreNames)
+        assertTrue("memory_search" !in coreNames)
         assertTrue("web_search" !in coreNames)
         assertTrue("memory_update" !in coreNames)
         assertEquals(LocalToolCatalog.specs.size, tools.size)
