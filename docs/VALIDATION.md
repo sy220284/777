@@ -150,6 +150,8 @@ android-17-instrumented
 - Work 压力增长必须用 source→source 比较，不能把上一请求的投影后压力与当前完整历史比较；DeepSeek/OpenAI 缓存敏感路由在绝对阈值前不得因该错位触发提前压缩。
 - Work 工具结果超过 2 KiB 时必须先持久 spill，模型可见副本保持约 1 KiB 且可按 `call_id` 恢复；`tool_output_read` 默认分页 4 KiB，禁止默认一次重新灌回 24 KiB。
 - DeepSeek 官方路由保持共享前缀与工具 schema 顺序稳定，并以供应商实报 hit/miss 验证；OpenAI 官方 GPT-5.6+ API Key Responses 的缓存键/30m TTL 只在能力快照允许时发送，自定义兼容地址不得继承。
+- 缓存成本诊断必须保留供应商实报的 cache write Token；cache write 属于 miss 子集，只作为成本细分，不能再次增加 input/total Token。
+- 缓存敏感路由必须记录成功请求的前缀连续性：消息只允许尾部追加且工具面保持一致时 generation 不变；历史重写或工具面变化必须开启新 generation；失败请求不得更新成功基线。
 - Work exposure 成功结算以供应商实报 input Token 为准；客户端估算用于准入与未知受理风险，并由实报样本校准。
 - 仅因并发 pending reservation 临时重叠造成的 exposure 超限应等待结算；当前请求在所有 pending 释放后仍无法容纳时才拒绝。
 - 本地 preflight 拒绝必须带稳定 code / failure_kind / admission_state / origin，禁止伪装成供应商模型故障。
