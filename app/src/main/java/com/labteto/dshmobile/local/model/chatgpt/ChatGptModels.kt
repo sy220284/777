@@ -70,9 +70,11 @@ data class ChatGptUiState(
         get() = selectedAccount?.signedIn == true && phase != ChatGptAuthPhase.DISCONNECTED
 
     val connected: Boolean
-        get() = selectedAccount?.signedIn == true &&
-            selectedAccount.sharingEnabled &&
-            phase == ChatGptAuthPhase.CONNECTED
+        get() = selectedAccount?.let { account ->
+            account.signedIn &&
+                account.sharingEnabled &&
+                phase == ChatGptAuthPhase.CONNECTED
+        } == true
 }
 
 internal class ChatGptOAuthTokenException(
