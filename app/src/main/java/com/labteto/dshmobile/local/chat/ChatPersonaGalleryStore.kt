@@ -19,11 +19,11 @@ class ChatPersonaGalleryStore internal constructor(
     private val json: Json,
 ) {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
-        this(File(context.filesDir, "local-harness/chat/persona-gallery.json"), json)
+        this(File(context.filesDir, "local-harness/chat/persona-gallery-v5.json"), json)
 
     private val documentStore = PersonaGalleryDocumentStore(file, json)
     private val history = PersonaGalleryHistoryCoordinator(
-        File(requireNotNull(file.parentFile), "persona-history"),
+        File(requireNotNull(file.parentFile), "persona-history-v5"),
         json,
     )
 
@@ -83,11 +83,11 @@ class ChatPersonaGalleryStore internal constructor(
             throw IllegalArgumentException("人物迁移数据格式不正确", error)
         }
         return when (schema) {
-            2 -> importArchivedEntry(
+            3 -> importArchivedEntry(
                 PersonaTransferDocuments.decodeArchive(json, canonicalJson).entry,
             )
-            1, null -> importPersona(canonicalJson)
-            else -> throw IllegalArgumentException("暂不支持这个人物迁移版本")
+            2 -> importPersona(canonicalJson)
+            else -> throw IllegalArgumentException("人物文件版本不受支持，请使用新版人物生命档案")
         }
     }
 
@@ -122,7 +122,7 @@ class ChatPersonaGalleryStore internal constructor(
                 persona = mergePersonaProfiles(matched.persona, importedPersona)
                     .copy(id = entryId, updatedAt = now),
                 groupChatState = mergeChatState(matched.groupChatState, source.groupChatState),
-                stories = mergeLegacyStoryLists(matched.stories, importedStories),
+                stories = mergeGalleryStoryLists(matched.stories, importedStories),
                 updatedAt = now,
             )
         } else {
@@ -135,7 +135,7 @@ class ChatPersonaGalleryStore internal constructor(
             )
         }
         val entry = history.archiveEntry(mergedEntry)
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return entry
     }
 
@@ -150,7 +150,7 @@ class ChatPersonaGalleryStore internal constructor(
         }.getOrElse { error ->
             throw IllegalArgumentException("人物分享数据格式不正确", error)
         }
-        require(envelope.schema == 1) { "暂不支持这个人物分享版本" }
+        require(envelope.schema == 2) { "人物文件版本不受支持，请使用新版人物生命档案" }
 
         val now = System.currentTimeMillis()
         val imported = fullSharePersona(envelope.persona).copy(updatedAt = now)
@@ -172,7 +172,7 @@ class ChatPersonaGalleryStore internal constructor(
                 updatedAt = now,
             )
         }
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return entry
     }
 
@@ -223,7 +223,7 @@ class ChatPersonaGalleryStore internal constructor(
                     .copy(id = entryId, updatedAt = now),
                 updatedAt = now,
             )
-            documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+            documentStore.write(doc.copy(version = 5, entries = doc.entries.filterNot { it.id == entryId } + entry))
             return PersonaGallerySaveOutcome(entry = entry, storyId = null)
         }
 
@@ -253,7 +253,7 @@ class ChatPersonaGalleryStore internal constructor(
             stories = baseEntry.stories.filterNot { it.id == storyId } + savedStory,
             updatedAt = now,
         )
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == entryId } + entry))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return PersonaGallerySaveOutcome(entry = entry, storyId = storyId)
     }
 
@@ -268,7 +268,7 @@ class ChatPersonaGalleryStore internal constructor(
                 .copy(id = current.id, updatedAt = now),
             updatedAt = now,
         )
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) merged else it }))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) merged else it }))
         return merged
     }
 
@@ -282,7 +282,7 @@ class ChatPersonaGalleryStore internal constructor(
             portraitPath = clean,
             updatedAt = now,
         )
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated
     }
 
@@ -319,7 +319,7 @@ class ChatPersonaGalleryStore internal constructor(
             stories = current.stories.map { if (it.id == storyId) updatedStory else it },
             updatedAt = now,
         )
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
         return removed
     }
 
@@ -333,7 +333,7 @@ class ChatPersonaGalleryStore internal constructor(
             groupChatState = chatState,
             updatedAt = maxOf(current.updatedAt, now),
         )
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated
     }
 
@@ -347,7 +347,7 @@ class ChatPersonaGalleryStore internal constructor(
             groupChatState = mergedState,
             updatedAt = maxOf(current.updatedAt, now),
         )
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
         return updated
     }
 
@@ -363,7 +363,7 @@ class ChatPersonaGalleryStore internal constructor(
             },
             updatedAt = now,
         )
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
         return true
     }
 
@@ -381,7 +381,7 @@ class ChatPersonaGalleryStore internal constructor(
             },
             updatedAt = now,
         )
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
         return true
     }
 
@@ -389,7 +389,7 @@ class ChatPersonaGalleryStore internal constructor(
     fun delete(id: String): Boolean {
         val doc = readNormalized()
         if (doc.entries.none { it.id == id }) return false
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.filterNot { it.id == id }))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.filterNot { it.id == id }))
         history.deleteEntry(id)
         return true
     }
@@ -403,7 +403,7 @@ class ChatPersonaGalleryStore internal constructor(
             stories = current.stories.filterNot { it.id == storyId },
             updatedAt = System.currentTimeMillis(),
         )
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
         history.deleteStory(id, storyId)
         return true
     }
@@ -423,20 +423,18 @@ class ChatPersonaGalleryStore internal constructor(
             stories = current.stories.map { if (it.id == storyId) updatedStory else it },
             updatedAt = updatedStory.updatedAt,
         )
-        documentStore.write(doc.copy(version = 4, entries = doc.entries.map { if (it.id == id) updated else it }))
+        documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
         return true
     }
 
     private fun readNormalized(): GalleryDocument {
-        val raw = documentStore.read()
-        val migratedEntries = if (raw.version < 4) {
-            compactLegacyDuplicateGalleryEntries(raw.entries)
-        } else {
-            raw.entries.map(::migrateLegacyEntry)
+        val document = documentStore.read()
+        require(document.version == 5) {
+            "人物图集版本不受支持；新版角色系统不读取旧人物数据"
         }
-        val entries = migratedEntries.map(history::migrate)
-        val normalized = raw.copy(version = 4, entries = entries)
-        if (normalized != raw) documentStore.write(normalized)
+        val entries = document.entries.map(history::migrate)
+        val normalized = document.copy(entries = entries)
+        if (normalized != document) documentStore.write(normalized)
         return normalized
     }
 
