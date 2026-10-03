@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.LocalModelConfigurationCoordinator
 import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 
 internal fun canStartChatGptAccountSelection(isBusy: Boolean): Boolean = !isBusy
@@ -26,7 +27,11 @@ internal class LocalModelAccountStateCoordinator(
         models: List<ChatGptModelOption>,
         selectFirst: Boolean,
     ) {
-        // 已开始的账户操作允许完整提交；正在运行的请求使用冻结路由，不会被这里改写。
+        // 启动恢复期间目录刷新等待统一就绪边界，避免与模型迁移并发写；运行中请求使用冻结路由。
+        if (!selectFirst && state.value.loading) {
+            state.first { !it.loading }
+        }
+        // 已开始的显式账户操作允许完整提交，避免授权状态已写入后再留下半完成状态。
         val before = state.value
         val beforeActiveProfile = gateway.activeProfile()
         val profiles = configuration.saveChatGptModels(accountId, models)

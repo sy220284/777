@@ -52,26 +52,4 @@ class LocalHarnessModeTransitionTest {
             ),
         )
     }
-
-    @Test
-    fun onlyInitialLoadReplacesWholeHarnessSurface() {
-        assertTrue(
-            localHarnessShowsBlockingLoading(
-                loading = true,
-                hasRenderedSurface = false,
-            ),
-        )
-        assertFalse(
-            localHarnessShowsBlockingLoading(
-                loading = true,
-                hasRenderedSurface = true,
-            ),
-        )
-        assertFalse(
-            localHarnessShowsBlockingLoading(
-                loading = false,
-                hasRenderedSurface = true,
-            ),
-        )
-    }
 }

@@ -32,7 +32,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
@@ -132,11 +131,6 @@ internal fun localHarnessDrawerUsageMode(
     current: LocalUsageMode,
     pending: LocalUsageMode?,
 ): LocalUsageMode = pending ?: current
-internal fun localHarnessShowsBlockingLoading(
-    loading: Boolean,
-    hasRenderedSurface: Boolean,
-): Boolean = loading && !hasRenderedSurface
-
 @Composable
 internal fun localSendRejectMessage(reason: LocalSendRejectReason, limit: Int?): String = when (reason) {
     LocalSendRejectReason.EMPTY -> stringResource(R.string.local_send_rejected_empty)
@@ -182,11 +176,9 @@ fun LocalHarnessScreen(
     var showNewPersona by rememberSaveable { mutableStateOf(false) }
     var showRunCenter by rememberSaveable { mutableStateOf(false) }
     var modeIntro by remember { mutableStateOf<LocalUsageMode?>(null) }
-    var hasRenderedHarnessSurface by rememberSaveable { mutableStateOf(false) }
     var pendingUsageMode by remember { mutableStateOf<LocalUsageMode?>(null) }
 
     LaunchedEffect(modeIntro) { if (modeIntro != null) { delay(6_000); modeIntro = null } }
-    LaunchedEffect(shell.loading) { if (!shell.loading) hasRenderedHarnessSurface = true }
 
     LaunchedEffect(pendingUsageMode, shell.loading, shell.usageMode) {
         val pending = pendingUsageMode ?: return@LaunchedEffect
@@ -250,7 +242,8 @@ fun LocalHarnessScreen(
                 sessions = shell.sessions,
                 gallery = gallery,
                 usageMode = localHarnessDrawerUsageMode(shell.usageMode, pendingUsageMode),
-                modeSwitchEnabled = localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
+                modeSwitchEnabled = !shell.loading &&
+                    localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
                 onUsageModeChange = { showDiary = false; switchUsageMode(it) },
@@ -308,7 +301,6 @@ fun LocalHarnessScreen(
         LocalConversationStateContent(viewModel, shell.usageMode) { state ->
             Box(Modifier.fillMaxSize()) {
                 when {
-                    localHarnessShowsBlockingLoading(state.loading, hasRenderedHarnessSurface) -> LoadingScreen()
                     showDiary && state.usageMode == LocalUsageMode.CHAT -> CharacterDiaryScreen(
                         gallery = gallery,
                         currentPersona = state.chatPersona,
@@ -390,26 +382,6 @@ fun LocalHarnessScreen(
                     onAnswerQuestion = viewModel::answerQuestion,
                     onCancelQuestion = viewModel::cancelQuestion,
                 )
-                }
-                if (state.loading && hasRenderedHarnessSurface) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = {},
-                            ),
-                        contentAlignment = Alignment.TopCenter,
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .padding(top = DsSpacing.large)
-                                .size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = DsTheme.colors.accent,
-                        )
-                    }
                 }
             }
         }

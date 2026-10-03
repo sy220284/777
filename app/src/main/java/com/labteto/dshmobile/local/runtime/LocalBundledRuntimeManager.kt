@@ -16,9 +16,7 @@ class LocalBundledRuntimeManager @Inject internal constructor(
     private val prepareMutex = Mutex()
 
     suspend fun prepare() = prepareMutex.withLock {
-        node.prepare()
-        python.prepare()
-        git.prepare()
+        prepareBundledRuntimes(node, python, git)
     }
 
     fun searchPaths(): List<File> =

@@ -306,7 +306,9 @@ internal class LocalSessionLifecycleCoordinator(
 
     fun switchUsageMode(mode: LocalUsageMode) {
         val snapshot = state.value
-        if (snapshot.loading || runBusy()) {
+        val busy = runBusy()
+        if (snapshot.loading && !busy) return
+        if (snapshot.loading || busy) {
             queuedUsageMode.set(mode)
             return
         }
