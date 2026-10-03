@@ -303,6 +303,14 @@ internal object FeatherIcons {
         }
     }
 
+    /** `arrow-left` — page back navigation. */
+    val ArrowLeft: ImageVector by lazy {
+        feather("ArrowLeft") {
+            moveTo(19f, 12f); lineTo(5f, 12f)
+            moveTo(12f, 19f); lineTo(5f, 12f); lineTo(12f, 5f)
+        }
+    }
+
     /** `chevron-right` — disclosure affordance; rotates to 90° when open. */
     val ChevronRight: ImageVector by lazy {
         feather("ChevronRight") {
