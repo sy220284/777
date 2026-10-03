@@ -28,6 +28,23 @@ class TokenUsageDatabaseAndroidTest {
         id, time, "test", TokenUsageContext(mode = LocalUsageMode.CHAT),
         inputTokens = 2L, outputTokens = 3L, reported = true,
     )
+    @Test fun cacheWriteTokensPersistAndAggregateWithoutInflatingTotalTokens() {
+        database.migrate(legacy)
+        val value = record("cache-write").copy(
+            inputTokens = 100L,
+            cacheHitTokens = 60L,
+            cacheMissTokens = 40L,
+            cacheWriteTokens = 15L,
+            outputTokens = 20L,
+        )
+
+        assertTrue(database.append(value).inserted)
+        assertEquals(15L, database.recordById("cache-write")?.cacheWriteTokens)
+        val aggregate = database.lifetimeTotals().tracked
+        assertEquals(15L, aggregate.cacheWriteTokens)
+        assertEquals(120L, aggregate.totalTokens)
+    }
+
     @Test fun failedTotalsWriteRollsBackRequestAndAllowsSameIdRetry() {
         database.migrate(legacy)
         database.writableDatabase.execSQL("CREATE TRIGGER fail_totals BEFORE INSERT ON metadata WHEN NEW.id = 'totals' BEGIN SELECT RAISE(ABORT, 'injected failure'); END")
