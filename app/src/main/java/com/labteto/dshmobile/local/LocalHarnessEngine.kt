@@ -785,9 +785,14 @@ class LocalHarnessEngine @Inject constructor(
                 // Migration may have copied an event log after the field was first constructed.
                 // Reopen it before any session load or tool can append to the migrated log.
                 eventLog = eventLogFor(currentSessionId)
-                bundledRuntimeManager.prepare()
-                pluginComposition.installStartup()
-                load()
+                prepareLocalHarnessStartup(
+                    prepareRuntime = bundledRuntimeManager::prepare,
+                    installPlugins = { pluginComposition.installStartup() },
+                    restoreSession = { load(deferReady = true) },
+                )
+                _state.update { current ->
+                    if (current.loading) current.copy(loading = false) else current
+                }
                 startNextQueuedTurnIfIdle()?.start()
                 persistentJobRecoveryCoordinator.schedule()
                 scope.launch { maybeCleanupUnreferencedLocalImages() }
@@ -4725,26 +4730,27 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun load() {
+    private suspend fun load(deferReady: Boolean = false) {
         val storedModel = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
         val baseUrl = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
         val model = migrateOfficialClaudeModel(modelConfiguration.normalizeModel(storedModel), baseUrl)
         if (model != storedModel) preferences.edit().putString(KEY_MODEL, model).apply()
         modelConfiguration.prepareStartup(model, baseUrl)
-        loadSession(currentSessionId, model, baseUrl)
+        loadSession(currentSessionId, model, baseUrl, deferReady = deferReady)
     }
 
     private suspend fun loadSession(
         sessionId: String,
         model: String = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL,
         baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
+        deferReady: Boolean = false,
     ) {
         val loaded = try {
             sessionCoordinator.readWithLegacyApproval(sessionId)
         } catch (future: FutureSessionVersionException) {
             _state.update {
                 it.copy(
-                    loading = false,
+                    loading = deferReady,
                     sessionId = sessionId,
                     error = future.message,
                 )
@@ -4847,7 +4853,7 @@ class LocalHarnessEngine @Inject constructor(
         val restoredModel = activeModelProfile?.model ?: model
         val restoredBaseUrl = activeModelProfile?.baseUrl ?: baseUrl
         _state.value = LocalHarnessState(
-            loading = false,
+            loading = deferReady,
             configured = modelConfigured,
             model = restoredModel,
             baseUrl = restoredBaseUrl,
