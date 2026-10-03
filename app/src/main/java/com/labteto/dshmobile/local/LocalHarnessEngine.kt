@@ -2930,7 +2930,7 @@ class LocalHarnessEngine @Inject constructor(
         val runTranscript = binding?.transcriptRuntime ?: transcriptRuntime
         val runSessionId = binding?.sessionId ?: currentSessionId
         val runPolicy = localAgentRunPolicy(runState.value.usageMode)
-        toolExecutionCoordinator.clearTurnCapabilities(binding?.enabledOptionalTools)
+        clearRunCapabilities(binding)
         if (runState.value.usageMode == LocalUsageMode.WORK) {
             toolExecutionCoordinator.prepareWorkTurnCapabilities(
                 input, runHistory.snapshot(), githubCredentials::configured, binding?.enabledOptionalTools,
@@ -3875,6 +3875,11 @@ class LocalHarnessEngine @Inject constructor(
         runPolicy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding?,
     ): List<String> = toolSchemaProjection.names(modelToolSchemas(runPolicy, binding))
+
+    private fun clearRunCapabilities(binding: LocalWorkRunBinding?) {
+        binding?.enabledOptionalTools?.let(toolExecutionCoordinator::clearTurnCapabilities)
+            ?: toolExecutionCoordinator.clearTurnCapabilities()
+    }
 
     private fun searchCapabilities(query: String): String =
         toolExecutionCoordinator.searchCapabilities(query)
