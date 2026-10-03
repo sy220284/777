@@ -65,7 +65,7 @@ if "DsConversationComposer(" not in local_conversation_composer:
     violations.append("LocalConversationComposer.kt must use the shared DsConversationComposer shell")
 if "var focused" not in local_conversation_composer or "val expanded =" not in local_conversation_composer:
     violations.append("LocalConversationComposer.kt must preserve focus-driven two-row composer expansion")
-if "remember(state.sessionId) { mutableStateOf(false) }" in local_conversation_composer:
+if "var focused by remember(state.sessionId)" in local_conversation_composer:
     violations.append("LocalConversationComposer focus must not reset on session changes while IME remains visible")
 if "DsAnimations.composerReveal" not in local_conversation_composer or "animateSize = false" not in local_conversation_composer:
     violations.append("LocalConversationComposer must use targeted row reveal without nested shell size animation")
