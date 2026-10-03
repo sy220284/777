@@ -1,10 +1,14 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -13,7 +17,6 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,8 +49,8 @@ import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
 import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -83,7 +86,9 @@ internal fun LocalConversationComposer(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     var menuOpen by remember(state.sessionId) { mutableStateOf(false) }
-    var focused by remember(state.sessionId) { mutableStateOf(false) }
+    // Keep real TextField focus across session projection changes. Otherwise the IME can remain
+    // visible while the composer is incorrectly reset to its idle one-row state.
+    var focused by remember { mutableStateOf(false) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
 
     LaunchedEffect(state.running) {
@@ -209,6 +214,9 @@ internal fun LocalConversationComposer(
     DsConversationComposer(
         surfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard,
         shadowElevation = if (backgroundState.hasImage) 0.dp else 1.dp,
+        // This composer owns a targeted row reveal. Avoid a second parent size animation while
+        // the IME is already animating the whole surface.
+        animateSize = false,
     ) {
         ChatGptPlanUsageBar(activeModelProfile)
         attachments.forEachIndexed { index, attachment ->
@@ -224,9 +232,15 @@ internal fun LocalConversationComposer(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
-            if (!expanded) {
-                MenuControl()
-                ReplySuggestionsControl()
+            AnimatedVisibility(
+                visible = !expanded,
+                enter = expandHorizontally(DsAnimations.composerReveal) + fadeIn(DsAnimations.composerFade),
+                exit = shrinkHorizontally(DsAnimations.composerReveal) + fadeOut(DsAnimations.composerFade),
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    MenuControl()
+                    ReplySuggestionsControl()
+                }
             }
             DsComposerField(
                 value = input,
@@ -245,49 +259,26 @@ internal fun LocalConversationComposer(
                 maxLines = 5,
                 onFocusedChange = { focused = it },
             )
-            if (!expanded) {
+            AnimatedVisibility(
+                visible = !expanded,
+                enter = expandHorizontally(DsAnimations.composerReveal) + fadeIn(DsAnimations.composerFade),
+                exit = shrinkHorizontally(DsAnimations.composerReveal) + fadeOut(DsAnimations.composerFade),
+            ) {
                 if (state.running) StopControl() else SendControl()
             }
         }
 
-        if (expanded) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-            ) {
-                MenuControl()
-                ReplySuggestionsControl()
-                if (state.usageMode == LocalUsageMode.WORK) {
-                    DsComposerAction(
-                        icon = FeatherIcons.CheckSquare,
-                        contentDescription = stringResource(
-                            if (state.planMode) R.string.local_plan_button_on
-                            else R.string.local_plan_button_off,
-                        ),
-                        onClick = { onPlanModeChange(!state.planMode) },
-                        enabled = !state.running,
-                        tint = if (state.planMode) colors.accent else colors.labelSecondary,
-                        containerColor = if (state.planMode) colors.accentTertiary else Color.Transparent,
-                    )
-                    DsComposerAction(
-                        icon = Icons.Outlined.Shield,
-                        contentDescription = stringResource(R.string.local_auto_approve_short),
-                        onClick = if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
-                        tint = if (state.safeAutoApprovalEnabled) colors.accent else colors.labelSecondary,
-                        containerColor =
-                            if (state.safeAutoApprovalEnabled) colors.accentTertiary else Color.Transparent,
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-                if (state.running) {
-                    StopControl()
-                    if (state.usageMode == LocalUsageMode.WORK) SendControl(queue = true)
-                } else {
-                    SendControl()
-                }
-            }
-        }
+        LocalConversationComposerExpandedRow(
+            visible = expanded,
+            state = state,
+            menuControl = { MenuControl() },
+            replySuggestionsControl = { ReplySuggestionsControl() },
+            stopControl = { StopControl() },
+            sendControl = { queue -> SendControl(queue) },
+            onPlanModeChange = onPlanModeChange,
+            onAutoApprove = onAutoApprove,
+            onDisableAutoApprove = onDisableAutoApprove,
+        )
     }
 }
 

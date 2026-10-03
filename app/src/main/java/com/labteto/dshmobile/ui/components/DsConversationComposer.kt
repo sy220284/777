@@ -63,6 +63,7 @@ fun DsConversationComposer(
         DsTheme.colors.composerCard,
     ),
     shadowElevation: Dp = 1.dp,
+    animateSize: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = DsTheme.colors
@@ -71,7 +72,10 @@ fun DsConversationComposer(
             .testTag(DS_CONVERSATION_COMPOSER_TAG)
             .fillMaxWidth()
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small)
-            .animateContentSize(DsAnimations.expand),
+            .then(
+                if (animateSize) Modifier.animateContentSize(DsAnimations.expand)
+                else Modifier,
+            ),
         shape = DsShapes.composer,
         color = surfaceColor,
         border = BorderStroke(1.dp, colors.borderL1),

@@ -10,6 +10,7 @@ ENGINE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngin
 LOCAL_SCREEN = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
 LOCAL_CONVERSATION_SURFACE = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
 LOCAL_CONVERSATION_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt"
+LOCAL_CONVERSATION_COMPOSER_ACTIONS = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposerActions.kt"
 REMOTE_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/main/Composer.kt"
 SHARED_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/components/DsConversationComposer.kt"
 SESSION_STORE = ROOT / "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt"
@@ -52,6 +53,7 @@ if engine_lines > 6_500:
 local_screen = LOCAL_SCREEN.read_text(encoding="utf-8")
 local_conversation_surface = LOCAL_CONVERSATION_SURFACE.read_text(encoding="utf-8")
 local_conversation_composer = LOCAL_CONVERSATION_COMPOSER.read_text(encoding="utf-8")
+local_conversation_composer_actions = LOCAL_CONVERSATION_COMPOSER_ACTIONS.read_text(encoding="utf-8")
 remote_composer = REMOTE_COMPOSER.read_text(encoding="utf-8")
 shared_composer = SHARED_COMPOSER.read_text(encoding="utf-8")
 
@@ -65,6 +67,10 @@ if "DsConversationComposer(" not in local_conversation_composer:
     violations.append("LocalConversationComposer.kt must use the shared DsConversationComposer shell")
 if "var focused" not in local_conversation_composer or "val expanded =" not in local_conversation_composer:
     violations.append("LocalConversationComposer.kt must preserve focus-driven two-row composer expansion")
+if "var focused by remember(state.sessionId)" in local_conversation_composer:
+    violations.append("LocalConversationComposer focus must not reset on session changes while IME remains visible")
+if "DsAnimations.composerReveal" not in local_conversation_composer or "animateSize = false" not in local_conversation_composer:
+    violations.append("LocalConversationComposer must use targeted row reveal without nested shell size animation")
 if "shape = DsShapes.composer" in local_conversation_composer:
     violations.append("LocalConversationComposer.kt must not rebuild composer geometry outside DsConversationComposer")
 
@@ -77,8 +83,13 @@ if "shape = DsShapes.composer" in remote_composer:
 
 if "object DsComposerMetrics" not in shared_composer or "fun DsComposerAction(" not in shared_composer:
     violations.append("Shared composer must own compact action geometry and sizing tokens")
-if "icon = FeatherIcons.CheckSquare" not in local_conversation_composer or "icon = Icons.Outlined.Shield" not in local_conversation_composer:
-    violations.append("Work composer must keep planning and auto-approve as compact in-composer actions")
+if "LocalConversationComposerExpandedRow(" not in local_conversation_composer:
+    violations.append("LocalConversationComposer must delegate expanded actions to its focused component")
+if "icon = Icons.Outlined.ListAlt" not in local_conversation_composer_actions or "icon = Icons.Outlined.VerifiedUser" not in local_conversation_composer_actions:
+    violations.append("Work composer must keep clear planning and auto-approve actions in the expanded row")
+mode_pill = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalUsageModePill.kt").read_text(encoding="utf-8")
+if "graphicsLayer { translationX = indicatorOffsetPx }" not in mode_pill:
+    violations.append("Usage-mode indicator animation must stay on the render layer instead of relayout on every frame")
 if "val result = onSend(input, attachments.toList())" not in local_conversation_composer or "if (!result.accepted) return" not in local_conversation_composer:
     violations.append("Local Chat/Work composer must preserve the draft until runtime accepts the send")
 

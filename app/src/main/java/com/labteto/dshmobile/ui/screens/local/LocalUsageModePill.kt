@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Box
@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -19,6 +18,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -47,6 +48,7 @@ internal fun LocalUsageModePill(
 ) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
+    val density = LocalDensity.current
     val containerColor = colors.wallpaperSurface(
         level = WallpaperSurfaceLevel.FLOATING,
         region = BackgroundRegion.TOP,
@@ -63,14 +65,17 @@ internal fun LocalUsageModePill(
     ) {
         BoxWithConstraints(Modifier.padding(4.dp)) {
             val segmentWidth = maxWidth / 2
-            val indicatorOffset by animateDpAsState(
-                targetValue = if (selected == LocalUsageMode.CHAT) 0.dp else segmentWidth,
-                animationSpec = DsAnimations.segmentSlide,
+            val indicatorTargetPx = with(density) {
+                if (selected == LocalUsageMode.CHAT) 0f else segmentWidth.toPx()
+            }
+            val indicatorOffsetPx by animateFloatAsState(
+                targetValue = indicatorTargetPx,
+                animationSpec = DsAnimations.fastSpring,
                 label = "usage mode indicator",
             )
             Surface(
                 modifier = Modifier
-                    .offset(x = indicatorOffset)
+                    .graphicsLayer { translationX = indicatorOffsetPx }
                     .width(segmentWidth)
                     .height(48.dp),
                 shape = DsShapes.pillFull,

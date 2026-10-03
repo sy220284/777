@@ -44,8 +44,17 @@ object DsAnimations {
      */
     val expand: FiniteAnimationSpec<IntSize> = spring(
         dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessMediumLow,
+        stiffness = Spring.StiffnessMedium,
     )
+
+    /**
+     * Composer single-row ↔ two-row reveal. Short and unbouncy so it follows the platform IME
+     * instead of finishing with a delayed spring settle.
+     */
+    val composerReveal: FiniteAnimationSpec<IntSize> = tween(220, easing = FastOutSlowInEasing)
+
+    /** Controls fade slightly faster than the geometry changes. */
+    val composerFade: FiniteAnimationSpec<Float> = tween(120, easing = FastOutSlowInEasing)
 
     /** Chevron rotation on a disclosure row. */
     val chevron: AnimationSpec<Float> = tween(160, easing = FastOutSlowInEasing)
