@@ -143,6 +143,13 @@ class LocalHarnessViewModel @Inject constructor(
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
         withContext(Dispatchers.IO) { runtime.chat.diaryEntries(subjectKey) }
     fun createGroupChatSession() = runtime.chat.createGroupChatSession()
+    fun createGroupChatSession(ids: List<String>): Boolean {
+        val distinctIds = ids.distinct()
+        val entriesById = gallery.value.associateBy(PersonaGalleryEntry::id)
+        val entries = distinctIds.mapNotNull(entriesById::get)
+        if (entries.size != distinctIds.size) return false
+        return runtime.chat.createGroupChatSession(entries)
+    }
     fun createSingleChatSession() = runtime.chat.createSingleChatSession()
     fun openGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.GROUP)
     fun leaveGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.SINGLE)
