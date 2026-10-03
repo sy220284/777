@@ -104,6 +104,14 @@ internal fun retainTextForModel(
  * payload. The full durable result is spilled by the caller; this returns only a sub-1 KiB-ish
  * recoverable preview so cache-friendly history can keep growing by append instead of compaction.
  */
+internal fun retainToolResultForModel(
+    value: String,
+    usageMode: LocalUsageMode,
+    budget: LocalHistoryBudget,
+): LocalRetainedText =
+    if (usageMode == LocalUsageMode.WORK) retainWorkToolResultForModel(value)
+    else retainTextForModel(value, budget.maxToolResultTokens, budget.maxToolResultChars)
+
 internal fun retainWorkToolResultForModel(value: String): LocalRetainedText {
     val bytes = value.toByteArray(Charsets.UTF_8)
     if (bytes.size <= WORK_TOOL_INLINE_BYTES) {
