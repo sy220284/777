@@ -22,7 +22,7 @@ import javax.inject.Inject
 class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var hostsStore: HostsStore
-    @Inject lateinit var chatGptAuth: com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
+    @Inject lateinit var localSettingsRuntime: com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
     @Inject lateinit var notifications: DshNotifications
 
     private val requestedSession = mutableStateOf<String?>(null)
@@ -76,7 +76,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        lifecycleScope.launch { chatGptAuth.refresh() }
+        lifecycleScope.launch { localSettingsRuntime.refreshChatGpt() }
     }
 
     private fun notificationSession(intent: Intent): String? {
