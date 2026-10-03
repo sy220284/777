@@ -133,6 +133,7 @@ private fun eventText(data: JsonObject): String? {
                 }.trim()
                 if (text.isNotBlank()) return text
             }
+            else -> Unit
         }
     }
     return null
