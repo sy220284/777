@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.core.wire.dto.SessionModelsValue
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -180,7 +181,7 @@ private fun ModelChip(
             Text(it.name, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary, maxLines = 1)
         }
         Icon(
-            Icons.Filled.KeyboardArrowDown,
+            FeatherIcons.ChevronDown,
             contentDescription = null,
             tint = colors.labelTertiary,
             modifier = Modifier.size(12.dp),
