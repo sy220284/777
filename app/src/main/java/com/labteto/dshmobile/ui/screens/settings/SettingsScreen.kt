@@ -89,6 +89,7 @@ import com.labteto.dshmobile.ui.components.DsSegment
 import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ToggleRow
@@ -331,7 +332,7 @@ fun SettingsScreen(
                     onBack = ::navigateBack,
                     backContentDescription = stringResource(R.string.common_back),
                     modifier = Modifier.padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
-                    actionIcon = Icons.Outlined.History.takeIf { page == SettingsDestination.USAGE },
+                    actionIcon = FeatherIcons.Clock.takeIf { page == SettingsDestination.USAGE },
                     actionContentDescription = stringResource(R.string.usage_log_open)
                         .takeIf { page == SettingsDestination.USAGE },
                     onAction = if (page == SettingsDestination.USAGE) {
