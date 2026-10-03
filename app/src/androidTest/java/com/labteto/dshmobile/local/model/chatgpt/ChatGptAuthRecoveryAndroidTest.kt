@@ -79,6 +79,64 @@ class ChatGptAuthRecoveryAndroidTest {
     }
 
     @Test
+    fun refreshScopeDowngradeImmediatelyBecomesSignedInPlanDisabledState() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val file = context.cacheDir.resolve("auth-downgrade-${UUID.randomUUID()}.preferences_pb")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val preferences = PreferenceDataStoreFactory.create(scope = scope, produceFile = { file })
+        val accounts = ChatGptAccountStore(preferences, Json)
+        var modelCalls = 0
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            if (chain.request().url.encodedPath.endsWith("/oauth/token")) {
+                Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                    .message("OK").body(
+                        """{"access_token":"signed-in-only","refresh_token":"rotated","expires_in":3600,"scope":"openid profile email offline_access resource.invoke"}""".toResponseBody(),
+                    ).build()
+            } else {
+                modelCalls += 1
+                error("套餐 scope 已失效后不应继续访问模型目录")
+            }
+        }.build()
+        val auth = ChatGptAuthCoordinator(
+            context,
+            accounts,
+            ChatGptHostIdentityStore(preferences),
+            ChatGptOAuthCallbackServer(),
+            ChatGptSessionManager(accounts, http, Json),
+            ChatGptIdTokenVerifier(http, Json),
+        )
+        val record = ChatGptAccountRecord(
+            id = "test-downgrade-${UUID.randomUUID()}",
+            clientId = "client",
+            issuer = CHATGPT_ISSUER,
+            subject = "subject",
+            hostId = "host",
+            idToken = "id",
+            accessToken = "expired",
+            refreshToken = "refresh",
+            scopes = setOf(CHATGPT_PLAN_SCOPE, CHATGPT_RESOURCE_INVOKE_SCOPE),
+            accessTokenExpiresAtEpochSeconds = 0,
+            savedAtEpochSeconds = 1,
+        )
+        try {
+            accounts.put(record)
+            auth.refresh()
+
+            assertEquals(ChatGptAuthPhase.CONNECTED, auth.state.value.phase)
+            assertTrue(auth.state.value.signedIn)
+            assertFalse(auth.state.value.connected)
+            assertTrue(auth.state.value.models.isEmpty())
+            assertEquals(0, modelCalls)
+            val stored = accounts.get(record.id)!!
+            assertEquals("rotated", stored.refreshToken)
+            assertFalse(stored.sharingEnabled)
+        } finally {
+            scope.coroutineContext[Job]!!.cancelAndJoin()
+            file.delete()
+        }
+    }
+
+    @Test
     fun failedModelProbeKeepsAuthorizationAndRecoversWithoutLogin() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val file = context.cacheDir.resolve("auth-${UUID.randomUUID()}.preferences_pb")

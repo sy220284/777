@@ -413,7 +413,11 @@ class ChatGptAuthCoordinator @Inject constructor(
         val latest = accounts.list()
         val selected = latest.firstOrNull { it.id == selectedId }
         _state.value = ChatGptUiState(
-            phase = if (hasSignedInCredentials(selected)) ChatGptAuthPhase.UNVERIFIED else ChatGptAuthPhase.DISCONNECTED,
+            phase = when {
+                !hasSignedInCredentials(selected) -> ChatGptAuthPhase.DISCONNECTED
+                selected?.sharingEnabled == false -> ChatGptAuthPhase.CONNECTED
+                else -> ChatGptAuthPhase.UNVERIFIED
+            },
             accounts = latest.map(::summary),
             selectedAccountId = selectedId,
             models = if (
@@ -441,10 +445,20 @@ class ChatGptAuthCoordinator @Inject constructor(
         val selected = selectedId?.let { id -> stored.firstOrNull { it.id == id } }
         val signedIn = hasSignedInCredentials(selected)
         _state.value = ChatGptUiState(
-            phase = if (signedIn) ChatGptAuthPhase.UNVERIFIED else ChatGptAuthPhase.DISCONNECTED,
+            phase = when {
+                !signedIn -> ChatGptAuthPhase.DISCONNECTED
+                selected?.sharingEnabled == false -> ChatGptAuthPhase.CONNECTED
+                else -> ChatGptAuthPhase.UNVERIFIED
+            },
             accounts = stored.map(::summary),
             selectedAccountId = selectedId,
-            models = if (selectedId == _state.value.selectedAccountId) _state.value.models else emptyList(),
+            models = if (
+                selected?.sharingEnabled == true && selectedId == _state.value.selectedAccountId
+            ) {
+                _state.value.models
+            } else {
+                emptyList()
+            },
         )
     }
 
