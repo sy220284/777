@@ -382,26 +382,6 @@ fun LocalHarnessScreen(
                     onCancelQuestion = viewModel::cancelQuestion,
                 )
                 }
-                if (state.loading && hasRenderedHarnessSurface) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = {},
-                            ),
-                        contentAlignment = Alignment.TopCenter,
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .padding(top = DsSpacing.large)
-                                .size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = DsTheme.colors.accent,
-                        )
-                    }
-                }
             }
         }
     }
