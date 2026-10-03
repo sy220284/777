@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.webkit.MimeTypeMap
+import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.ChatCharacterState
@@ -250,7 +251,7 @@ suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry
             ?.takeIf { it in setOf("jpg", "jpeg", "png", "webp", "heic", "heif") }
             ?: "jpg"
         val portraitDir = File(appContext.filesDir, "local-harness/chat/persona-portraits").apply {
-            check(exists() || mkdirs()) { "无法创建人物立绘目录" }
+            check(exists() || mkdirs()) { appContext.getString(R.string.persona_gallery_portrait_dir_failed) }
         }
         val safeId = id.replace(Regex("""[^A-Za-z0-9._-]"""), "_").take(80)
         val target = File(portraitDir, "$safeId-${System.currentTimeMillis()}.$extension")
@@ -359,7 +360,7 @@ suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runC
                     saved
                 }
                 else -> galleryStore.updatePortraitPath(saved.id, stagedPortrait.absolutePath)
-                    ?: error("图集条目已不存在")
+                    ?: error(appContext.getString(R.string.persona_gallery_entry_missing))
             }
             _gallery.value = galleryStore.list()
             installed
@@ -383,7 +384,7 @@ private fun stagePresetArtwork(preset: PersonaPreset): File? {
             !assetPath.contains("..") &&
             assetPath.substringAfterLast('.', "").lowercase() in setOf("jpg", "jpeg", "png", "webp"),
     ) {
-        "人物预置形象图路径无效"
+        appContext.getString(R.string.persona_gallery_preset_artwork_invalid_path)
     }
 
     val portraitDir = File(appContext.filesDir, "local-harness/chat/persona-portraits").apply {
@@ -406,7 +407,7 @@ private fun stagePresetArtwork(preset: PersonaPreset): File? {
                     if (count < 0) break
                     total += count
                     require(total <= MAX_PERSONA_PORTRAIT_BYTES) {
-                        "人物预置形象图过大"
+                        appContext.getString(R.string.persona_gallery_preset_artwork_too_large)
                     }
                     output.write(buffer, 0, count)
                 }
@@ -415,7 +416,7 @@ private fun stagePresetArtwork(preset: PersonaPreset): File? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(target.absolutePath, bounds)
         require(bounds.outWidth > 0 && bounds.outHeight > 0) {
-            "人物预置形象图无法识别"
+            appContext.getString(R.string.persona_gallery_preset_artwork_unreadable)
         }
         return target
     } catch (error: Throwable) {
