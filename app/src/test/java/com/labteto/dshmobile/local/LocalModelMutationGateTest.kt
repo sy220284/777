@@ -4,10 +4,12 @@ import com.labteto.dshmobile.local.model.LocalModelMutationGate
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalModelMutationGateTest {
@@ -37,6 +39,46 @@ class LocalModelMutationGateTest {
         first.await()
         second.await()
         assertEquals(true, secondEntered)
+    }
+
+    @Test
+    fun cancelledWaiterDoesNotPoisonFollowingMutation() = runTest {
+        val gate = LocalModelMutationGate
+        val firstEntered = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        var cancelledWaiterEntered = false
+        var followingEntered = false
+
+        val first = async {
+            gate.run {
+                firstEntered.complete(Unit)
+                releaseFirst.await()
+            }
+        }
+        firstEntered.await()
+
+        val cancelled = async {
+            gate.run {
+                cancelledWaiterEntered = true
+            }
+        }
+        runCurrent()
+        cancelled.cancel()
+        cancelled.join()
+
+        val following = async {
+            gate.run {
+                followingEntered = true
+            }
+        }
+        runCurrent()
+        assertFalse(followingEntered)
+
+        releaseFirst.complete(Unit)
+        joinAll(first, following)
+
+        assertFalse(cancelledWaiterEntered)
+        assertTrue(followingEntered)
     }
 
     @Test
