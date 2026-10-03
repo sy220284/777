@@ -257,8 +257,12 @@ fun LocalHarnessScreen(
 
     LaunchedEffect(requestedSessionId, shell.sessions, shell.loading, shell.sessionId) {
         val target = requestedSessionId?.takeIf(String::isNotBlank) ?: return@LaunchedEffect
-        val accepted = target == shell.sessionId ||
-            (shell.sessions.any { it.id == target } && viewModel.switchSession(target))
+        val accepted = acceptLocalSessionNavigation(
+            currentSessionId = shell.sessionId,
+            targetSessionId = target,
+            sessions = shell.sessions,
+            switchSession = viewModel::switchSession,
+        )
         if (accepted) {
             resetFeatureNavigation()
             onSessionRequestConsumed()
