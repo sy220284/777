@@ -40,8 +40,8 @@ class LocalWorkRequestContextProjectionTest {
         assertTrue(projected.estimatedTokensAfter < projected.estimatedTokensBefore)
         assertTrue(projected.messages.size < history.size)
         val checkpoint = projected.messages
-            .first { it["content"].toString().contains("<work-checkpoint>") }
-            ["content"].toString()
+            .first { it["content"].toString().contains("<work-checkpoint>") }["content"]
+            .toString()
         assertTrue(checkpoint.contains("完成 Token 优化并保持任务效果"))
         assertTrue(checkpoint.contains("必须保留长任务关键约束"))
         assertTrue(checkpoint.contains("采用状态驱动的热上下文投影"))
@@ -202,8 +202,8 @@ class LocalWorkRequestContextProjectionTest {
         var projectedPeak = 0
 
         repeat(100) { step ->
-            history += message("user", "第$step步继续当前任务：" + "需求".repeat(160))
-            history += message("assistant", "第$step步分析并推进：" + "分析".repeat(220))
+            history += message("user", "第${step}步继续当前任务：" + "需求".repeat(160))
+            history += message("assistant", "第${step}步分析并推进：" + "分析".repeat(220))
             history += buildJsonObject {
                 put("role", "tool")
                 put("tool_call_id", "call-$step")
