@@ -15,18 +15,10 @@ internal class LocalSubagentHistoryPolicy(
         budget: LocalHistoryBudget?,
         history: LocalModelHistoryBuffer, retention: com.labteto.dshmobile.harness.tools.ToolResultRetention,
     ): String {
-        budget ?: return output
-        val adaptiveBudget = adaptiveToolResultBudget(
-            base = budget,
-            currentHistoryChars = history.encodedChars,
-            currentHistoryTokens = history.estimatedTokens,
-        )
-        val stored = retention == com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE && spillToolOutput(callId, output)
-        val retained = retainTextForModel(
-            value = output,
-            maxTokens = adaptiveBudget.maxToolResultTokens,
-            maxChars = adaptiveBudget.maxToolResultChars,
-        )
+        val stored = retention == com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE &&
+            spillToolOutput(callId, output)
+        // Subagents are Work execution: large outputs spill before they can inflate the hot prompt.
+        val retained = retainWorkToolResultForModel(output)
         if (!retained.truncated) return retained.text
         val recovery = if (stored) {
             "可调用 tool_output_read，并传入 call_id=$callId 分段读取完整结果。"
