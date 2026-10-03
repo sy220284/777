@@ -71,17 +71,22 @@ class LocalSessionEventLog(
      * UI projections such as conversation files only keep their compact projection state.
      */
     fun events(): Sequence<Event> = sequence {
-        for (source in orderedFiles()) {
-            (if (source.name.endsWith(".gz")) GZIPInputStream(source.inputStream().buffered()).bufferedReader()
-            else source.bufferedReader()).use { reader ->
-                while (true) {
-                    val line = reader.readLine() ?: break
-                    val event = runCatching {
-                        json.decodeFromString(Event.serializer(), line)
-                    }.getOrNull() ?: continue
-                    yield(event)
+        val snapshots = delegate.openDurableFileSnapshot()
+        try {
+            for (source in snapshots) {
+                (if (source.name.endsWith(".gz")) GZIPInputStream(source.input).bufferedReader()
+                else source.input.bufferedReader()).use { reader ->
+                    while (true) {
+                        val line = reader.readLine() ?: break
+                        val event = runCatching {
+                            json.decodeFromString(Event.serializer(), line)
+                        }.getOrNull() ?: continue
+                        yield(event)
+                    }
                 }
             }
+        } finally {
+            snapshots.forEach { runCatching { it.close() } }
         }
     }
 
