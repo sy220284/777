@@ -18,6 +18,7 @@ internal data class CharacterModeVector(
     val disclosure: Int = 45,
     val repair: Int = 45,
     val coverage: Int = 42,
+    val freedom: Int = 68,
 ) {
     fun normalized(): CharacterModeVector = copy(
         association = association.coerceIn(0, 100),
@@ -31,6 +32,7 @@ internal data class CharacterModeVector(
         disclosure = disclosure.coerceIn(0, 100),
         repair = repair.coerceIn(0, 100),
         coverage = coverage.coerceIn(0, 100),
+        freedom = freedom.coerceIn(0, 100),
     )
 }
 
@@ -63,6 +65,7 @@ internal fun resolveCharacterMode(
     var disclosure = 45
     var repair = 45
     var coverage = 42
+    var freedom = 68
 
     val tuning = state.behaviorTuning.normalized()
     association += tuningDelta(tuning.novelty, 16)
@@ -71,6 +74,9 @@ internal fun resolveCharacterMode(
     disclosure += tuningDelta(tuning.openness, 18)
     disclosure += tuningDelta(tuning.intimacy, 8)
     affect += tuningDelta(tuning.intimacy, 6)
+    freedom += tuningDelta(tuning.novelty, 12)
+    initiative += tuningDelta(state.initiative, 14)
+    disclosure += tuningDelta(state.shareDesire, 14)
 
     val personaText = modePersonaText(persona)
     if (personaText.containsAnyMode("灵动", "跳脱", "脑洞", "联想", "发散", "天马行空", "古灵精怪", "思路快")) {
@@ -79,6 +85,7 @@ internal fun resolveCharacterMode(
     if (personaText.containsAnyMode("理性", "逻辑", "谨慎", "较真", "推理", "分析", "冷静", "认真")) {
         analysis += 16
         repair += 8
+        freedom += 8
     }
     if (personaText.containsAnyMode("感性", "敏感", "心软", "冲动", "共情", "情绪")) affect += 15
     if (personaText.containsAnyMode("细腻", "观察", "敏锐", "细节", "画面", "声音", "气味", "动作")) sensory += 15
@@ -92,8 +99,9 @@ internal fun resolveCharacterMode(
         compression -= 10
         disclosure += 10
     }
-    if (personaText.containsAnyMode("主动", "爱带话题", "强势", "自来熟")) initiative += 12
-    if (personaText.containsAnyMode("被动", "慢热", "戒备", "不主动")) initiative -= 10
+    val passiveInitiative = personaText.containsAnyMode("被动", "慢热", "戒备", "不主动")
+    if (passiveInitiative) initiative -= 10
+    else if (personaText.containsAnyMode("主动", "爱带话题", "强势", "自来熟")) initiative += 12
 
     val criticalInput = isHighPriorityUserInput(userInput)
     val physicalLoad = resolveCharacterPhysicalLoad(state.physicalState)
@@ -117,10 +125,12 @@ internal fun resolveCharacterMode(
         association -= 12
         playfulness -= 18
         repair += 10
+        freedom -= 34
     } else {
         if (clauseCount >= 3) {
             association += 8
             coverage -= 14
+            freedom += 8
         }
         if (userInput.length <= 24) compression += 4
     }
@@ -133,6 +143,7 @@ internal fun resolveCharacterMode(
         compression += 20
         coverage -= 16
         initiative -= 10
+        freedom -= 6
     }
     if (emotionalLoad == CharacterEmotionalLoad.HEAVY) {
         affect += 24
@@ -189,6 +200,7 @@ internal fun resolveCharacterMode(
             disclosure = disclosure,
             repair = repair,
             coverage = coverage,
+            freedom = freedom,
         ).normalized(),
         focus = attention.noticed.take(2),
         relevantPersonaCues = cues,
@@ -202,7 +214,7 @@ internal fun renderCharacterModePrompt(projection: CharacterModeProjection): Str
     val mode = projection.vector
     return buildString {
         appendLine("【本轮模式】")
-        appendLine("这些是本轮脑回路、互动和表达的倾向，不是台词模板，也不是逐项任务；自然选择一两种最合适的表现即可。")
+        appendLine("这些只是概率倾向，不是台词模板、候选菜单或逐项任务；不必显式选择模式，也允许出现未列出的自然脑回路，只要确实由人物和当前语境牵出。")
         if (projection.focus.isNotEmpty()) appendLine("注意力落点：${projection.focus.joinToString("；")}")
         if (projection.relevantPersonaCues.isNotEmpty()) {
             appendLine("本轮相关人物底色：${projection.relevantPersonaCues.joinToString("；")}")
@@ -212,7 +224,8 @@ internal fun renderCharacterModePrompt(projection: CharacterModeProjection): Str
                 "推演${modeLabel(mode.analysis, "直觉先行", "平衡", "较强")}｜" +
                 "情绪驱动${modeLabel(mode.affect, "低", "自然", "高")}｜" +
                 "感官具体${modeLabel(mode.sensory, "低", "自然", "高")}｜" +
-                "言外敏感${modeLabel(mode.subtext, "低", "自然", "高")}",
+                "言外敏感${modeLabel(mode.subtext, "低", "自然", "高")}｜" +
+                "自由度${modeLabel(mode.freedom, "收束", "自然", "开放")}",
         )
         appendLine(
             "互动：主动${modeLabel(mode.initiative, "跟随", "自然", "带话题")}｜" +

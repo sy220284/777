@@ -189,6 +189,7 @@ class CharacterLifeRuntimeV3Test {
 
         assertTrue(casual.vector.association > factual.vector.association)
         assertTrue(casual.vector.playfulness > factual.vector.playfulness)
+        assertTrue(casual.vector.freedom > factual.vector.freedom)
         assertTrue(factual.vector.coverage > casual.vector.coverage)
     }
 
