@@ -10,6 +10,7 @@ ENGINE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngin
 LOCAL_SCREEN = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
 LOCAL_CONVERSATION_SURFACE = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
 LOCAL_CONVERSATION_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt"
+LOCAL_CONVERSATION_COMPOSER_ACTIONS = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposerActions.kt"
 REMOTE_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/main/Composer.kt"
 SHARED_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/components/DsConversationComposer.kt"
 SESSION_STORE = ROOT / "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt"
@@ -52,6 +53,7 @@ if engine_lines > 6_500:
 local_screen = LOCAL_SCREEN.read_text(encoding="utf-8")
 local_conversation_surface = LOCAL_CONVERSATION_SURFACE.read_text(encoding="utf-8")
 local_conversation_composer = LOCAL_CONVERSATION_COMPOSER.read_text(encoding="utf-8")
+local_conversation_composer_actions = LOCAL_CONVERSATION_COMPOSER_ACTIONS.read_text(encoding="utf-8")
 remote_composer = REMOTE_COMPOSER.read_text(encoding="utf-8")
 shared_composer = SHARED_COMPOSER.read_text(encoding="utf-8")
 
@@ -81,7 +83,9 @@ if "shape = DsShapes.composer" in remote_composer:
 
 if "object DsComposerMetrics" not in shared_composer or "fun DsComposerAction(" not in shared_composer:
     violations.append("Shared composer must own compact action geometry and sizing tokens")
-if "icon = Icons.Outlined.ListAlt" not in local_conversation_composer or "icon = Icons.Outlined.VerifiedUser" not in local_conversation_composer:
+if "LocalConversationComposerExpandedRow(" not in local_conversation_composer:
+    violations.append("LocalConversationComposer must delegate expanded actions to its focused component")
+if "icon = Icons.Outlined.ListAlt" not in local_conversation_composer_actions or "icon = Icons.Outlined.VerifiedUser" not in local_conversation_composer_actions:
     violations.append("Work composer must keep clear planning and auto-approve actions in the expanded row")
 mode_pill = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalUsageModePill.kt").read_text(encoding="utf-8")
 if "graphicsLayer { translationX = indicatorOffsetPx }" not in mode_pill:
