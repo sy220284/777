@@ -19,6 +19,11 @@ internal fun buildTrustedWorkCheckpointModelMessage(content: String): JsonObject
     put("content", content)
 }
 
+private fun isTrustedWorkCheckpointModelMessage(message: JsonObject): Boolean =
+    (message["role"] as? JsonPrimitive)?.contentOrNull == "user" &&
+        (message[WORK_CHECKPOINT_PROVENANCE_KEY] as? JsonPrimitive)?.contentOrNull ==
+            WORK_CHECKPOINT_PROVENANCE_VALUE
+
 internal data class LocalHistoryCompaction(
     val messages: List<JsonObject>,
     val omittedMessages: Int,
@@ -152,6 +157,11 @@ internal class LocalHistoryCompactor(
         structuredWorkState: LocalStructuredWorkState? = null,
     ): LocalHistoryCompaction? {
         val source = durableModelHistorySnapshot(history)
+        val previousWorkCheckpoint = if (summaryMode == LocalHistorySummaryMode.WORK) {
+            LocalWorkCheckpoint.latestFrom(source)
+        } else {
+            null
+        }
         val sourceChanged = source !== history
         val effectiveMaxHistoryChars = budget?.maxHistoryChars ?: maxHistoryChars
         val effectiveTailChars = budget?.tailChars ?: tailChars
@@ -210,7 +220,12 @@ internal class LocalHistoryCompactor(
 
         val omitted = source.subList(firstBodyIndex, start)
         val workCheckpoint = if (summaryMode == LocalHistorySummaryMode.WORK) {
-            buildWorkCheckpoint(omitted, effectiveSummaryChars, structuredWorkState)
+            buildWorkCheckpoint(
+                omitted,
+                effectiveSummaryChars,
+                structuredWorkState,
+                previousWorkCheckpoint,
+            )
         } else {
             null
         }
@@ -231,7 +246,7 @@ internal class LocalHistoryCompactor(
                     },
                 ),
             )
-            addAll(source.drop(start))
+            addAll(source.drop(start).filterNot(::isTrustedWorkCheckpointModelMessage))
         }
         val estimatedTokensBefore = encodedTokens + extraTokens
         val estimatedTokensAfter = compacted.sumOf { estimateModelTokens(it.toString()) } + extraTokens
@@ -391,10 +406,10 @@ internal class LocalHistoryCompactor(
         messages: List<JsonObject>,
         summaryLimit: Int,
         structuredWorkState: LocalStructuredWorkState?,
+        previousCheckpoint: LocalWorkCheckpoint?,
     ): LocalWorkCheckpoint {
         val used = linkedSetOf<String>()
         val maxPerItem = (summaryLimit / 48).coerceIn(100, 360)
-        val previousCheckpoint = LocalWorkCheckpoint.latestFrom(messages)
 
         fun select(
             role: String? = null,
