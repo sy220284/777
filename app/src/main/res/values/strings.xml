@@ -1385,4 +1385,10 @@
     <string name="chatgpt_cancel">取消</string>
     <string name="local_model_media_not_connected">当前支持文字和图片；音视频理解暂未开放。</string>
     <string name="chatgpt_authorized_unverified">已授权，待验证</string>
+
+    <string name="persona_gallery_preset_artwork_invalid_path">人物预置形象图路径无效</string>
+    <string name="persona_gallery_portrait_dir_failed">无法创建人物立绘目录</string>
+    <string name="persona_gallery_preset_artwork_too_large">人物预置形象图过大</string>
+    <string name="persona_gallery_preset_artwork_unreadable">人物预置形象图无法识别</string>
+    <string name="persona_gallery_entry_missing">图集条目已不存在</string>
 </resources>
