@@ -6,6 +6,7 @@ import android.graphics.Matrix
 import android.graphics.drawable.AnimatedImageDrawable
 import android.graphics.drawable.Drawable
 import android.widget.ImageView
+import androidx.appcompat.widget.AppCompatImageView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -343,7 +344,7 @@ private fun SidebarAvatarImage(source: SidebarAvatarSource, contentDescription: 
     }
 }
 
-private class SidebarAvatarImageView(context: Context) : ImageView(context) {
+private class SidebarAvatarImageView(context: Context) : AppCompatImageView(context) {
     var focusY: Float = CENTERED_AVATAR_FOCUS_Y
         set(value) {
             val normalized = value.coerceIn(0f, 1f)
