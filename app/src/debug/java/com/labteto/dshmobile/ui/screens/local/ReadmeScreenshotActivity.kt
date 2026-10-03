@@ -131,6 +131,7 @@ private fun NavigationScreenshot() {
             currentPersonaName = "神里绫华",
             currentPersonaIdentity = "白鹭公主",
             workModelLabel = "GPT-5.6 Sol",
+            groupChatEnabled = false,
             running = false,
             onUsageModeChange = {},
             onNewSession = {},
