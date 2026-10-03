@@ -14,6 +14,7 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaInspectionService
 import com.labteto.dshmobile.local.chat.PersonaPreset
+import com.labteto.dshmobile.local.chat.PersonaPresetArtworkSource
 import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
@@ -340,15 +341,91 @@ internal suspend fun importGalleryPersona(
 suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runCatching {
     val preset = PersonaPresetCatalog.find(id) ?: error("人物预置不存在")
     val entry = withContext(Dispatchers.IO) {
-        galleryStore.save(
-            persona = preset.persona,
-            sourceSessionId = "",
-            history = emptyList(),
-            chatState = ChatCharacterState(),
-            notes = "",
-        ).entry.also { _gallery.value = galleryStore.list() }
+        val existingIds = galleryStore.list().mapTo(hashSetOf(), PersonaGalleryEntry::id)
+        val stagedPortrait = stagePresetArtwork(preset)
+        var savedId: String? = null
+        try {
+            val saved = galleryStore.save(
+                persona = preset.persona,
+                sourceSessionId = "",
+                history = emptyList(),
+                chatState = ChatCharacterState(),
+                notes = "",
+            ).entry
+            savedId = saved.id
+            val installed = when {
+                stagedPortrait == null -> saved
+                saved.portraitPath.isNotBlank() -> {
+                    stagedPortrait.delete()
+                    saved
+                }
+                else -> galleryStore.updatePortraitPath(saved.id, stagedPortrait.absolutePath)
+                    ?: error("图集条目已不存在")
+            }
+            _gallery.value = galleryStore.list()
+            installed
+        } catch (error: Throwable) {
+            stagedPortrait?.delete()
+            savedId
+                ?.takeIf { it !in existingIds }
+                ?.let(galleryStore::delete)
+            _gallery.value = runCatching { galleryStore.list() }.getOrDefault(_gallery.value)
+            throw error
+        }
     }
     entry
+}
+
+private fun stagePresetArtwork(preset: PersonaPreset): File? {
+    val artwork = preset.artwork ?: return null
+    require(artwork.source == PersonaPresetArtworkSource.AI_FAN_ART) {
+        "人物预置仅允许内置 AI 二创形象图"
+    }
+    val assetPath = artwork.assetPath.trim()
+    require(
+        assetPath.startsWith("persona-presets/") &&
+            !assetPath.contains("..") &&
+            assetPath.substringAfterLast('.', "").lowercase() in setOf("jpg", "jpeg", "png", "webp"),
+    ) {
+        "人物预置形象图路径无效"
+    }
+
+    val portraitDir = File(appContext.filesDir, "local-harness/chat/persona-portraits").apply {
+        check(exists() || mkdirs()) { "无法创建人物立绘目录" }
+    }
+    val safeId = preset.id.replace(Regex("""[^A-Za-z0-9._-]"""), "_").take(80)
+    val extension = assetPath.substringAfterLast('.').lowercase()
+    val target = File(
+        portraitDir,
+        safeId + "-" + System.currentTimeMillis() + "." + extension,
+    )
+
+    try {
+        appContext.assets.open(assetPath).use { input ->
+            target.outputStream().buffered().use { output ->
+                val buffer = ByteArray(16 * 1024)
+                var total = 0L
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    total += count
+                    require(total <= MAX_PERSONA_PORTRAIT_BYTES) {
+                        "人物预置形象图过大"
+                    }
+                    output.write(buffer, 0, count)
+                }
+            }
+        }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(target.absolutePath, bounds)
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) {
+            "人物预置形象图无法识别"
+        }
+        return target
+    } catch (error: Throwable) {
+        target.delete()
+        throw error
+    }
 }
 
 suspend fun deleteGalleryEntry(id: String): Result<Unit> = runCatching {
