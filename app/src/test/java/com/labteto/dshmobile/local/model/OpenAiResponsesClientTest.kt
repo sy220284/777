@@ -492,6 +492,63 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun apiKeyResponsesCanUseStablePromptCacheKeyAndThirtyMinuteTtl() {
+        val payload = client.buildPayload(
+            model = "gpt-5.6",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "继续")
+            }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = false,
+            promptCacheKey = "stable-session-key",
+            promptCacheTtl = "30m",
+        )
+
+        assertEquals("stable-session-key", payload["prompt_cache_key"]?.jsonPrimitive?.content)
+        val options = payload["prompt_cache_options"]?.jsonObject
+            ?: error("missing prompt cache options")
+        assertEquals("30m", options["ttl"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun promptCacheOptionsMergeDiagnosticsAndTtlWithoutLeakingPlanOnlyFields() {
+        val apiPayload = client.buildPayload(
+            model = "gpt-5.6",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "继续")
+            }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = false,
+            promptCacheComparisonResponseId = "resp-before",
+            promptCacheKey = "stable-session-key",
+            promptCacheTtl = "30m",
+        )
+        val apiOptions = apiPayload["prompt_cache_options"]?.jsonObject
+            ?: error("missing prompt cache options")
+        assertEquals("resp-before", apiOptions["comparison_response_id"]?.jsonPrimitive?.content)
+        assertEquals("30m", apiOptions["ttl"]?.jsonPrimitive?.content)
+
+        val planPayload = client.buildPayload(
+            model = "gpt-5.6",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "继续")
+            }),
+            tools = JsonArray(emptyList()),
+            temperature = null,
+            planSharing = true,
+            promptCacheKey = "must-not-leak",
+            promptCacheTtl = "30m",
+        )
+        assertFalse("prompt_cache_key" in planPayload)
+        assertFalse("prompt_cache_options" in planPayload)
+    }
+
+    @Test
     fun planUsageLimitDoesNotClaimTheWholePlanIsEmpty() {
         val error = client.httpError(
             status = 429,
