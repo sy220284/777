@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -27,6 +29,9 @@ internal fun structuredWorkState(
         .map { todo -> "[completed] ${todo.content}" }
         .takeLast(MAX_STRUCTURED_TODO_ITEMS)
 
+    val constraints = linkedSetOf<String>()
+    val decisions = linkedSetOf<String>()
+    val failures = linkedSetOf<String>()
     val facts = linkedSetOf<String>()
     val tools = linkedSetOf<String>()
     val artifacts = linkedSetOf<String>()
@@ -34,6 +39,21 @@ internal fun structuredWorkState(
         .asReversed()
         .forEach { event ->
             when (event.type) {
+                "user/message" -> {
+                    eventText(event.data)
+                        ?.takeIf { text -> WORK_CONSTRAINT_CUES.any(text.lowercase()::contains) }
+                        ?.take(MAX_STRUCTURED_WORK_TEXT_CHARS)
+                        ?.let(constraints::add)
+                }
+                "assistant/message" -> {
+                    val text = eventText(event.data)?.take(MAX_STRUCTURED_WORK_TEXT_CHARS)
+                    if (text != null && WORK_DECISION_CUES.any(text.lowercase()::contains)) {
+                        decisions += text
+                    }
+                    if (text != null && WORK_FAILURE_CUES.any(text.lowercase()::contains)) {
+                        failures += text
+                    }
+                }
                 "tool/call", "subagent/tool-call" -> {
                     val name = event.data.stringValue("name") ?: event.data.stringValue("tool_name")
                     val callId = event.data.stringValue("id") ?: event.data.stringValue("call_id")
@@ -61,7 +81,10 @@ internal fun structuredWorkState(
                         isError?.let { append(" is_error=").append(it) }
                         safeIdentifiers(event.data).takeIf(String::isNotEmpty)
                             ?.let { append(" ").append(it) }
-                    }.let(facts::add)
+                    }.let { fact ->
+                        facts += fact
+                        if (errorCode != null || isError == "true") failures += fact
+                    }
                     collectArtifacts(event.data, artifacts)
                 }
                 "request/header" -> {
@@ -83,6 +106,9 @@ internal fun structuredWorkState(
     return LocalStructuredWorkState(
         goals = goals,
         plan = plan,
+        constraints = constraints.toList().takeLast(MAX_STRUCTURED_CONSTRAINTS),
+        decisions = decisions.toList().takeLast(MAX_STRUCTURED_DECISIONS),
+        failures = failures.toList().takeLast(MAX_STRUCTURED_FAILURES),
         unfinished = unfinished,
         progress = progress,
         facts = facts.toList().takeLast(MAX_STRUCTURED_FACTS),
@@ -93,6 +119,27 @@ internal fun structuredWorkState(
 
 private fun JsonObject.stringValue(key: String): String? =
     this[key]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+
+private fun eventText(data: JsonObject): String? {
+    data.stringValue("content")?.let { return it }
+    for (key in listOf("model_message", "message")) {
+        val message = data[key] as? JsonObject ?: continue
+        when (val content = message["content"]) {
+            is JsonPrimitive -> content.contentOrNull?.takeIf(String::isNotBlank)?.let { return it }
+            is JsonArray -> {
+                val text = content.joinToString("\n") { part ->
+                    when (part) {
+                        is JsonPrimitive -> part.contentOrNull.orEmpty()
+                        is JsonObject -> part.stringValue("text").orEmpty()
+                        else -> ""
+                    }
+                }.trim()
+                if (text.isNotBlank()) return text
+            }
+        }
+    }
+    return null
+}
 
 private fun safeIdentifiers(data: JsonObject): String = SAFE_FACT_KEYS
     .mapNotNull { key ->
@@ -128,10 +175,27 @@ private val ARTIFACT_FACT_KEYS = listOf(
     "commit_sha",
 )
 
-private const val MAX_STRUCTURED_EVENT_SCAN = 80
+private val WORK_CONSTRAINT_CUES = listOf(
+    "必须", "禁止", "不能", "不要", "只允许", "仅限", "限制", "约束", "要求", "保持", "兼容",
+    "must", "must not", "never", "only", "constraint",
+)
+private val WORK_DECISION_CUES = listOf(
+    "决定", "确认", "采用", "改为", "保留", "结论", "方案", "选择",
+    "decide", "confirmed", "adopt", "keep", "conclusion",
+)
+private val WORK_FAILURE_CUES = listOf(
+    "失败", "报错", "错误", "异常", "超时", "冲突", "回退", "无法", "风险", "未通过",
+    "failure", "failed", "error", "timeout", "conflict", "rollback", "risk",
+)
+
+private const val MAX_STRUCTURED_EVENT_SCAN = 160
 private const val MAX_STRUCTURED_PLAN_ITEMS = 12
 private const val MAX_STRUCTURED_TODO_ITEMS = 12
+private const val MAX_STRUCTURED_CONSTRAINTS = 8
+private const val MAX_STRUCTURED_DECISIONS = 6
+private const val MAX_STRUCTURED_FAILURES = 6
 private const val MAX_STRUCTURED_FACTS = 12
 private const val MAX_STRUCTURED_ARTIFACTS = 8
 private const val MAX_STRUCTURED_TOOLS = 12
 private const val MAX_STRUCTURED_IDENTIFIER_CHARS = 240
+private const val MAX_STRUCTURED_WORK_TEXT_CHARS = 360
