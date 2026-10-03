@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
