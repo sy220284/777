@@ -18,6 +18,7 @@ internal data class LocalWorkRequestProjection(
     val estimatedTokensBefore: Int,
     val estimatedTokensAfter: Int,
     val omittedMessages: Int = 0,
+    val preProjectionAssessment: LocalWorkStepContextAssessment? = null,
 )
 
 internal fun workSteadyStateHistoryBudget(
@@ -50,6 +51,7 @@ internal fun projectWorkRequestContext(
     compactor: LocalHistoryCompactor,
     operationalLimitTokens: Int,
     measuredPressure: LocalPromptPressure? = null,
+    previousPressure: LocalPromptPressure? = null,
     structuredWorkState: LocalStructuredWorkState? = null,
 ): LocalWorkRequestProjection {
     val limit = operationalLimitTokens.coerceAtLeast(1)
@@ -79,13 +81,21 @@ internal fun projectWorkRequestContext(
         beforePressure
     }
 
-    val trigger = workRequestProjectionTriggerTokens(limit)
-    if (toolProjectedPressure.estimatedInputTokens <= trigger) {
+    val baseTrigger = workRequestProjectionTriggerTokens(limit)
+    val assessment = assessWorkStepContext(
+        current = toolProjectedPressure,
+        previous = previousPressure,
+        targetTokens = workRequestProjectionTargetTokens(limit),
+        baseTriggerTokens = baseTrigger,
+    )
+    val trigger = assessment.effectiveProjectionTriggerTokens
+    if (!assessment.recommendsCompaction && toolProjectedPressure.estimatedInputTokens < trigger) {
         return LocalWorkRequestProjection(
             messages = toolProjectedMessages,
             projected = staleToolProjection != null,
             estimatedTokensBefore = beforePressure.estimatedInputTokens,
             estimatedTokensAfter = toolProjectedPressure.estimatedInputTokens,
+            preProjectionAssessment = assessment,
         )
     }
 
@@ -116,6 +126,7 @@ internal fun projectWorkRequestContext(
         projected = staleToolProjection != null,
         estimatedTokensBefore = beforePressure.estimatedInputTokens,
         estimatedTokensAfter = toolProjectedPressure.estimatedInputTokens,
+        preProjectionAssessment = assessment,
     )
 
     val projectedMessages = if (leadingSystemCount > 1) {
@@ -134,6 +145,7 @@ internal fun projectWorkRequestContext(
             projected = staleToolProjection != null,
             estimatedTokensBefore = beforePressure.estimatedInputTokens,
             estimatedTokensAfter = toolProjectedPressure.estimatedInputTokens,
+            preProjectionAssessment = assessment,
         )
     }
     return LocalWorkRequestProjection(
@@ -142,6 +154,7 @@ internal fun projectWorkRequestContext(
         estimatedTokensBefore = beforePressure.estimatedInputTokens,
         estimatedTokensAfter = afterPressure.estimatedInputTokens,
         omittedMessages = compacted.omittedMessages,
+        preProjectionAssessment = assessment,
     )
 }
 
