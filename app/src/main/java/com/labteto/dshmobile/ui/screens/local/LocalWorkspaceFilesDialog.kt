@@ -156,7 +156,7 @@ internal fun LocalWorkspaceFilesDialog(
                     subtitle = headerSubtitle,
                     onBack = ::navigateBack,
                     backContentDescription = stringResource(
-                        if (preview != null || directory.isNotEmpty()) {
+                        if (preview != null || previewPath != null || directory.isNotEmpty()) {
                             R.string.local_files_back_to_files
                         } else {
                             R.string.local_files_back
@@ -218,7 +218,6 @@ internal fun LocalWorkspaceFilesDialog(
                         if (files == null) {
                             LocalFileList(workspace, directory, onDirectory = { directory = it }) { file ->
                                 openPreview(file.path)
-
                             }
                         } else if (files.isEmpty()) {
                             LocalFilesEmpty(
@@ -234,7 +233,6 @@ internal fun LocalWorkspaceFilesDialog(
                         } else {
                             LocalFlatFileList(files) { file ->
                                 openPreview(file.path)
-
                             }
                         }
                     }
@@ -244,7 +242,6 @@ internal fun LocalWorkspaceFilesDialog(
                     )
                     else -> ConversationLocalFileList(conversation) { file ->
                                 openPreview(file.path)
-
                     }
                 }
 
