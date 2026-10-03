@@ -5,6 +5,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.data.SessionStore
+import com.labteto.dshmobile.ui.sidebar.SidebarAvatarStore
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -23,6 +24,7 @@ import dagger.hilt.components.SingletonComponent
 interface SessionStoreEntryPoint {
     fun sessionStore(): SessionStore
     fun hostsStore(): HostsStore
+    fun sidebarAvatarStore(): SidebarAvatarStore
 }
 
 /** Resolves the process-scoped [SessionStore] once per composition. */
@@ -47,3 +49,12 @@ internal fun rememberHostsStore(): HostsStore {
         EntryPointAccessors.fromApplication(context, SessionStoreEntryPoint::class.java).hostsStore()
     }
 }
+
+@Composable
+internal fun rememberSidebarAvatarStore(): SidebarAvatarStore {
+    val context = LocalContext.current.applicationContext
+    return remember {
+        EntryPointAccessors.fromApplication(context, SessionStoreEntryPoint::class.java).sidebarAvatarStore()
+    }
+}
+

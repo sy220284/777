@@ -71,6 +71,7 @@ import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.rememberHostsStore
 import com.labteto.dshmobile.ui.rememberSessionStore
+import com.labteto.dshmobile.ui.sidebar.SidebarAvatarPicker
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -83,13 +84,10 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
-
 internal data class DrawerSessionSections(
     val current: SessionRow?,
     val history: List<SessionRow>,
 )
-
 /**
  * Split the harness's existing session-list records for the drawer.
  *
@@ -118,7 +116,6 @@ internal fun drawerSessionSections(
     }
     return DrawerSessionSections(current = current, history = history)
 }
-
 /** [com.labteto.dshmobile.connection.HostsStore.sessionSort]: the workspace's own row order. */
 private const val SORT_MANUAL = "manual"
 
@@ -241,6 +238,8 @@ fun ChatListDrawer(
             modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.medium, bottom = DsSpacing.medium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            SidebarAvatarPicker()
+            Spacer(Modifier.width(DsSpacing.small))
             Text(stringResource(R.string.app_name), style = DsType.large20.withReadingWeight(), color = colors.labelPrimary, modifier = Modifier.weight(1f))
             DsIconButton(
                 icon = Icons.Filled.Add,
@@ -588,3 +587,4 @@ fun ChatListDrawer(
         )
     }
 }
+
