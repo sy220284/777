@@ -36,6 +36,59 @@ class LocalFeatureNavigationTest {
     }
 
     @Test
+    fun consecutiveDrawerSelectionsReplaceCurrentFeatureAndReturnToOriginalPage() {
+        var stack = localFeatureHome()
+        var originStack: List<String>? = null
+
+        listOf(
+            LocalFeaturePage.PERSONA_GALLERY,
+            LocalFeaturePage.DIARY,
+            LocalFeaturePage.TASKS,
+        ).forEach { page ->
+            val navigation = localFeatureOpenFromDrawer(
+                stack = stack,
+                originStack = originStack,
+                page = page,
+            )
+            originStack = navigation.originStack
+            stack = navigation.stack
+        }
+
+        assertEquals(
+            listOf(LocalFeaturePage.HOME.name, LocalFeaturePage.TASKS.name),
+            stack,
+        )
+        stack = localFeaturePop(stack)
+        assertEquals(LocalFeaturePage.HOME, localFeatureCurrent(stack))
+    }
+
+    @Test
+    fun drawerSelectionsPreserveThePageThatOpenedTheDrawerAsReturnOrigin() {
+        var stack = localFeatureHome()
+        stack = localFeaturePush(stack, LocalFeaturePage.RUN_CENTER)
+        stack = localFeaturePush(stack, LocalFeaturePage.WORKSPACE)
+        val expectedOrigin = stack
+
+        var originStack: List<String>? = null
+        var navigation = localFeatureOpenFromDrawer(
+            stack = stack,
+            originStack = originStack,
+            page = LocalFeaturePage.TOOLS,
+        )
+        originStack = navigation.originStack
+        stack = navigation.stack
+
+        navigation = localFeatureOpenFromDrawer(
+            stack = stack,
+            originStack = originStack,
+            page = LocalFeaturePage.SETTINGS,
+        )
+        stack = navigation.stack
+
+        assertEquals(expectedOrigin, localFeaturePop(stack))
+    }
+
+    @Test
     fun onlyGroupWithConfiguredMembersCountsAsEstablished() {
         val emptyGroup = LocalSessionSummary(
             id = "group-empty",
