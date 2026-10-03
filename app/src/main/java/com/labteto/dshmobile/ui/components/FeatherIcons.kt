@@ -323,6 +323,13 @@ internal object FeatherIcons {
         }
     }
 
+    /** `chevron-down` — compact selector disclosure. */
+    val ChevronDown: ImageVector by lazy {
+        feather("ChevronDown") {
+            moveTo(6f, 9f); lineTo(12f, 15f); lineTo(18f, 9f)
+        }
+    }
+
     /** `chevron-right` — disclosure affordance; rotates to 90° when open. */
     val ChevronRight: ImageVector by lazy {
         feather("ChevronRight") {
