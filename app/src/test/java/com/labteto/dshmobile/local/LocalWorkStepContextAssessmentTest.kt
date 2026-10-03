@@ -102,6 +102,69 @@ class LocalWorkStepContextAssessmentTest {
     }
 
     @Test
+    fun sourcePressureGrowthDoesNotCompareAgainstProjectedRequestSize() {
+        val previousSource = pressure(
+            total = 39_000,
+            history = 30_000,
+            tools = 3_000,
+            currentUser = 2_000,
+        )
+        val currentRequest = pressure(
+            total = 31_000,
+            history = 23_000,
+            tools = 3_000,
+            currentUser = 2_000,
+        )
+        val currentSource = pressure(
+            total = 40_000,
+            history = 31_000,
+            tools = 3_000,
+            currentUser = 2_000,
+        )
+
+        val assessment = assessWorkStepContext(
+            current = currentRequest,
+            previous = previousSource,
+            targetTokens = 28_000,
+            baseTriggerTokens = 36_000,
+            growthCurrent = currentSource,
+        )
+
+        assertEquals(1_000, assessment.inputGrowthTokens)
+        assertEquals(1_000, assessment.historyGrowthTokens)
+        assertFalse(assessment.recommendsCompaction)
+        assertFalse("history_growing_fast" in assessment.reasons)
+    }
+
+    @Test
+    fun cacheSensitiveRouteWaitsForAbsoluteTriggerEvenDuringRapidGrowth() {
+        val previous = pressure(
+            total = 29_000,
+            history = 21_000,
+            tools = 3_000,
+            currentUser = 2_000,
+        )
+        val current = pressure(
+            total = 33_500,
+            history = 25_500,
+            tools = 3_000,
+            currentUser = 2_000,
+        )
+
+        val assessment = assessWorkStepContext(
+            current = current,
+            previous = previous,
+            targetTokens = 28_000,
+            baseTriggerTokens = 36_000,
+            allowAdaptiveEarlyCompaction = false,
+        )
+
+        assertFalse(assessment.recommendsCompaction)
+        assertEquals(LocalWorkStepContextStatus.WATCH, assessment.status)
+        assertFalse("adaptive_history_pressure" in assessment.reasons)
+    }
+
+    @Test
     fun absolutePressureStillCompactsWithoutPreviousStep() {
         val current = pressure(
             total = 37_000,
