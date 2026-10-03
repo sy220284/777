@@ -547,6 +547,7 @@
     <string name="local_files_refresh">刷新</string>
     <string name="local_files_workspace_empty">工作区暂无文件</string>
     <string name="local_files_loading">正在读取文件…</string>
+    <string name="chat_diary_loading">正在整理角色日记…</string>
     <string name="local_files_binary_hint">该文件为二进制文件，当前显示文件信息；可在工作区列表中确认其路径和大小。</string>
     <string name="local_files_truncated_hint">文件较大，以下为前 512 KB 预览。</string>
 
