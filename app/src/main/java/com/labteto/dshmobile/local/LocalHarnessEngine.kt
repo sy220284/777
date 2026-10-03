@@ -4506,6 +4506,8 @@ class LocalHarnessEngine @Inject constructor(
         binding: LocalWorkRunBinding? = null, retention: com.labteto.dshmobile.harness.tools.ToolResultRetention = com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE,
     ): String {
         val history = binding?.modelHistory ?: modelHistory
+        val targetState = binding?.state ?: _state
+        val workMode = targetState.value.usageMode == LocalUsageMode.WORK
         val budget = adaptiveToolResultBudget(
             base = currentHistoryBudget(binding),
             currentHistoryChars = history.encodedChars,
@@ -4513,11 +4515,15 @@ class LocalHarnessEngine @Inject constructor(
         )
         val stored = retention == com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE &&
             callId?.let { toolOutputStore.store(sessionId, it, result) } != null
-        val retained = retainTextForModel(
-            value = result,
-            maxTokens = budget.maxToolResultTokens,
-            maxChars = budget.maxToolResultChars,
-        )
+        val retained = if (workMode) {
+            retainWorkToolResultForModel(result)
+        } else {
+            retainTextForModel(
+                value = result,
+                maxTokens = budget.maxToolResultTokens,
+                maxChars = budget.maxToolResultChars,
+            )
+        }
         if (!retained.truncated) return retained.text
         val recovery = when {
             callId == null -> "请缩小查询范围后继续读取。"
@@ -4537,8 +4543,23 @@ class LocalHarnessEngine @Inject constructor(
         val targetState = binding?.state ?: _state
         val log = binding?.eventLog ?: eventLog
         val workMode = targetState.value.usageMode == LocalUsageMode.WORK
+        val profile = targetState.value.modelSelection.activeProfile
+        val cachePolicy = LocalModelPresets.promptCachePolicyFor(
+            model = targetState.value.model,
+            baseUrl = targetState.value.baseUrl,
+            protocol = profile?.protocol ?: LocalModelPresets.protocolFor(
+                targetState.value.model,
+                targetState.value.baseUrl,
+            ),
+            authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
+        )
         val budget = if (workMode) {
-            workSteadyStateHistoryBudget(baseBudget, history.estimatedTokens, extraTokens)
+            workSteadyStateHistoryBudget(
+                base = baseBudget,
+                currentHistoryTokens = history.estimatedTokens,
+                extraTokens = extraTokens,
+                cachePolicy = cachePolicy,
+            )
         } else {
             baseBudget
         }
