@@ -71,7 +71,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 fun DsDialog(
     title: String?,
     onDismiss: () -> Unit,
-    dismissOnScrimTap: Boolean = false,
+    dismissOnScrimTap: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = DsTheme.colors
