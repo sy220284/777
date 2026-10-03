@@ -39,8 +39,8 @@ import com.labteto.dshmobile.ui.theme.wallpaperSurface
 fun DsCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    elevated: Boolean = false,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(DsSpacing.tiny),
+    elevated: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = DsTheme.colors
