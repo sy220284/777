@@ -68,6 +68,7 @@ internal class ChatInteractionStateReducer {
         fun shouldClear(key: String, value: String): Boolean =
             rawState.containsKey(key) && value.isBlank()
 
+        val clearPhysicalState = shouldClear("physicalState", value.physicalState)
         val clearCurrentFocus = shouldClear("currentFocus", value.currentFocus)
         val clearRecentImpression = shouldClear("recentImpression", value.recentImpression)
         val clearActiveGoal = shouldClear("activeGoal", value.activeGoal)
@@ -77,6 +78,7 @@ internal class ChatInteractionStateReducer {
         val clearThreads = rawState.containsKey("unresolvedThreads") && value.unresolvedThreads.isEmpty()
 
         listOf(
+            "physicalState" to clearPhysicalState,
             "currentFocus" to clearCurrentFocus,
             "recentImpression" to clearRecentImpression,
             "activeGoal" to clearActiveGoal,
@@ -93,6 +95,7 @@ internal class ChatInteractionStateReducer {
         if (!changed) return previous
 
         return previous.copy(
+            physicalState = if (clearPhysicalState) "" else previous.physicalState,
             currentFocus = if (clearCurrentFocus) "" else previous.currentFocus,
             recentImpression = if (clearRecentImpression) "" else previous.recentImpression,
             activeGoal = if (clearActiveGoal) "" else previous.activeGoal,
@@ -245,6 +248,9 @@ internal class ChatInteractionStateReducer {
         }
         val merged = value.copy(
             behaviorTuning = previous.behaviorTuning.normalized(),
+            physicalState = if (rawState?.containsKey("physicalState") == true) {
+                value.physicalState.trim().take(120)
+            } else previous.physicalState,
             mood = if (rawState?.containsKey("mood") == true) {
                 value.mood.trim().take(80).ifBlank { previous.mood }
             } else previous.mood,
@@ -396,6 +402,12 @@ internal class ChatInteractionStateReducer {
         }
 
         return previous.copy(
+            physicalState = age(
+                "physicalState",
+                previous.physicalState,
+                previous.behaviorTuning.transientTtl(3),
+                clearOnTopicReset = false,
+            ),
             mood = age("mood", previous.mood.takeUnless { it == "自然" }.orEmpty(), previous.behaviorTuning.moodTtl()).ifBlank { "自然" },
             currentFocus = age("currentFocus", previous.currentFocus, previous.behaviorTuning.transientTtl(3), clearOnTopicReset = true),
             recentImpression = age("recentImpression", previous.recentImpression, previous.behaviorTuning.transientTtl(5)),
@@ -421,6 +433,7 @@ internal class ChatInteractionStateReducer {
             if (value.isBlank()) ages.remove(key) else ages[key] = 0
         }
 
+        reset("physicalState", state.physicalState)
         reset("mood", state.mood.takeUnless { it == "自然" }.orEmpty())
         reset("currentFocus", state.currentFocus)
         reset("recentImpression", state.recentImpression)
@@ -491,9 +504,22 @@ internal class ChatInteractionStateReducer {
             } else previous.unknowns,
             sharedMoments = if (raw.containsKey("sharedMoments")) {
                 mergeStrings(previous.sharedMoments, value.sharedMoments.filter { moment ->
-                    evidenceGrounded(RelationshipEvidence(text = moment, confidence = 100, source = "dialogue"), userMessage, assistantMessage)
+                    evidenceGrounded(
+                        RelationshipEvidence(text = moment, confidence = 100, source = "dialogue"),
+                        userMessage,
+                        assistantMessage,
+                    )
                 }, 8, 180)
             } else previous.sharedMoments,
+            sharedObjects = if (raw.containsKey("sharedObjects")) {
+                mergeStrings(previous.sharedObjects, value.sharedObjects.filter { item ->
+                    evidenceGrounded(
+                        RelationshipEvidence(text = item, confidence = 100, source = "dialogue"),
+                        userMessage,
+                        assistantMessage,
+                    )
+                }, 8, 160)
+            } else previous.sharedObjects,
         )
     }
 
