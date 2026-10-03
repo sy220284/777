@@ -107,9 +107,77 @@ class LocalWorkRequestContextProjectionTest {
             currentHistoryTokens = 70_000,
             extraTokens = 20_000,
         )
-        assertEquals(64_000, large.maxHistoryTokens)
-        assertTrue(requireNotNull(large.tailTokens) <= 24_000)
-        assertTrue(large.maxToolResultTokens <= 8_000)
+        assertEquals(28_000, large.maxHistoryTokens)
+        assertTrue(requireNotNull(large.tailTokens) <= 10_000)
+        assertTrue(large.maxToolResultTokens <= 2_400)
+    }
+
+
+    @Test
+    fun staleToolPayloadsLeaveHotRequestBeforeHistoryNeedsFullCompaction() {
+        val history = buildList {
+            add(message("system", "系统规则"))
+            add(message("user", "检查几个文件"))
+            repeat(5) { index ->
+                add(message("assistant", "调用工具$index"))
+                add(buildJsonObject {
+                    put("role", "tool")
+                    put("tool_call_id", "call-$index")
+                    put("content", "结果-$index-" + "大".repeat(4_000))
+                })
+            }
+            add(message("user", "继续处理当前结果"))
+        }
+        val before = history.sumOf { estimateModelTokens(it.toString()) }
+
+        val projected = projectWorkRequestContext(
+            messages = history,
+            tools = JsonArray(emptyList()),
+            compactor = LocalHistoryCompactor(),
+            operationalLimitTokens = 678_464,
+        )
+
+        assertTrue(projected.projected)
+        assertEquals(0, projected.omittedMessages)
+        assertTrue(projected.estimatedTokensAfter < before)
+        val toolContents = projected.messages
+            .filter { it["role"].toString().trim('"') == "tool" }
+            .map { it["content"].toString() }
+        assertTrue(toolContents.take(3).all { it.contains("旧工具结果已从实时模型上下文衰减") })
+        assertTrue(toolContents.takeLast(2).none { it.contains("旧工具结果已从实时模型上下文衰减") })
+    }
+
+    @Test
+    fun workProjectionCarriesStructuredConstraintsIntoCheckpoint() {
+        val history = buildList {
+            add(message("system", "系统规则"))
+            repeat(18) { index ->
+                add(message("user", "阶段任务-$index-" + "旧".repeat(2_000)))
+                add(message("assistant", "阶段进展-$index-" + "进".repeat(2_000)))
+            }
+            add(message("user", "继续当前实现"))
+        }
+        val structured = LocalStructuredWorkState(
+            goals = listOf("降低 Work Token 消耗"),
+            constraints = listOf("必须保持任务执行能力", "禁止通过删减功能换取 Token"),
+            decisions = listOf("采用当前工作状态加近期因果链"),
+            failures = listOf("全量历史每步重发导致输入二次增长"),
+            unfinished = listOf("完成回归测试"),
+        )
+
+        val projected = projectWorkRequestContext(
+            messages = history,
+            tools = JsonArray(emptyList()),
+            compactor = LocalHistoryCompactor(),
+            operationalLimitTokens = 678_464,
+            structuredWorkState = structured,
+        )
+
+        val checkpoint = requireNotNull(LocalWorkCheckpoint.latestFrom(projected.messages))
+        assertTrue(checkpoint.constraints.contains("必须保持任务执行能力"))
+        assertTrue(checkpoint.constraints.contains("禁止通过删减功能换取 Token"))
+        assertTrue(checkpoint.decisions.any { it.contains("当前工作状态") })
+        assertTrue(checkpoint.failures.any { it.contains("二次增长") })
     }
 
     @Test
