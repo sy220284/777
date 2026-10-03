@@ -34,10 +34,12 @@ internal fun DeepSeekTokenUsage.normalizedForAccounting(): DeepSeekTokenUsage {
     val miss = cacheMissTokens.coerceAtLeast(0L)
         .takeIf { it > 0L }
         ?: nonNegativeUsageDifference(prompt, hit)
+    val write = cacheWriteTokens.coerceAtLeast(0L).coerceAtMost(miss)
     return copy(
         promptTokens = prompt,
         cacheHitTokens = hit,
         cacheMissTokens = miss,
+        cacheWriteTokens = write,
         completionTokens = completionTokens.coerceAtLeast(0L),
         reasoningTokens = reasoningTokens.coerceAtLeast(0L),
     )
@@ -47,6 +49,8 @@ internal fun TokenUsageRecord.normalizedForAccounting(): TokenUsageRecord = copy
     inputTokens = inputTokens.coerceAtLeast(0L),
     cacheHitTokens = cacheHitTokens.coerceAtLeast(0L),
     cacheMissTokens = cacheMissTokens.coerceAtLeast(0L),
+    cacheWriteTokens = cacheWriteTokens.coerceAtLeast(0L)
+        .coerceAtMost(cacheMissTokens.coerceAtLeast(0L)),
     outputTokens = outputTokens.coerceAtLeast(0L),
     reasoningTokens = reasoningTokens.coerceAtLeast(0L),
     estimatedCostCny = estimatedCostCny.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0,
