@@ -214,13 +214,17 @@ internal fun renderCharacterModePrompt(projection: CharacterModeProjection): Str
     val mode = projection.vector
     return buildString {
         appendLine("【本轮模式】")
-        appendLine("这些只是概率倾向，不是台词模板、候选菜单或逐项任务；不必显式选择模式，也允许出现未列出的自然脑回路，只要确实由人物和当前语境牵出。")
+        appendLine("这些只是概率倾向，不是台词模板或候选菜单；允许出现未列出的自然脑回路，只要确实由人物和当前语境牵出。")
         if (projection.criticalInput) {
-            appendLine("硬约束：本轮含信息问题、明确拒绝/边界、承诺或重要事实，必须准确接住；模式自由不得造成漏答或误读。")
+            appendLine("硬约束：信息问题、明确拒绝/边界、承诺或重要事实必须准确接住；模式自由不得造成漏答或误读。")
         }
         if (projection.corrections.isNotEmpty()) {
             appendLine("用户明确纠正（硬约束）：${projection.corrections.joinToString("；")}")
         }
+        appendLine(
+            "脑内推理可以比说出口完整；允许有根据的联想、短暂跳题、回想、改口、补一句、留白或只接部分，" +
+                "无需逐点服务式回应，也不必每轮安慰、总结、建议、追问或推进关系。",
+        )
         if (projection.focus.isNotEmpty()) appendLine("注意力落点：${projection.focus.joinToString("；")}")
         if (projection.relevantPersonaCues.isNotEmpty()) {
             appendLine("本轮相关人物底色：${projection.relevantPersonaCues.joinToString("；")}")
@@ -228,30 +232,23 @@ internal fun renderCharacterModePrompt(projection: CharacterModeProjection): Str
         appendLine(
             "思维：联想${modeLabel(mode.association, "收束", "自然", "开放")}｜" +
                 "推演${modeLabel(mode.analysis, "直觉先行", "平衡", "较强")}｜" +
-                "情绪驱动${modeLabel(mode.affect, "低", "自然", "高")}｜" +
-                "感官具体${modeLabel(mode.sensory, "低", "自然", "高")}｜" +
-                "言外敏感${modeLabel(mode.subtext, "低", "自然", "高")}｜" +
+                "情绪${modeLabel(mode.affect, "低", "自然", "高")}｜" +
+                "感官${modeLabel(mode.sensory, "低", "自然", "高")}｜" +
+                "言外${modeLabel(mode.subtext, "低", "自然", "高")}｜" +
                 "自由度${modeLabel(mode.freedom, "收束", "自然", "开放")}",
         )
         appendLine(
-            "互动：主动${modeLabel(mode.initiative, "跟随", "自然", "带话题")}｜" +
-                "自我分享${modeLabel(mode.disclosure, "保留", "自然", "更开放")}｜" +
-                "回应覆盖${modeLabel(mode.coverage, "选择性", "自然", "完整")}",
-        )
-        appendLine(
-            "表达：压缩${modeLabel(mode.compression, "展开", "自然", "高")}｜" +
+            "互动表达：主动${modeLabel(mode.initiative, "跟随", "自然", "带话题")}｜" +
+                "分享${modeLabel(mode.disclosure, "保留", "自然", "开放")}｜" +
+                "覆盖${modeLabel(mode.coverage, "选择性", "自然", "完整")}｜" +
+                "压缩${modeLabel(mode.compression, "展开", "自然", "高")}｜" +
                 "玩心${modeLabel(mode.playfulness, "低", "自然", "高")}｜" +
-                "改口/补充${modeLabel(mode.repair, "少", "自然", "容易出现")}",
+                "改口${modeLabel(mode.repair, "少", "自然", "易出现")}",
         )
-        if (projection.repeatedRhythm) appendLine("近期节拍有重复：允许自然换一种节奏，但不要为了新鲜而表演反常。")
-        appendLine(
-            "内部思考可以比说出口完整。允许有根据的联想、跳一下话题、回想、改口、补一句、留白或只接一部分；" +
-                "这些都必须从当前话题、人物经历、记忆或状态自然牵出，不能随机制造怪癖。",
-        )
-        if (projection.criticalInput) {
-            append("准确回应硬约束后，其余部分仍可保持人物自己的节奏。")
-        } else {
-            append("无需把每个信息点都服务式答完，也无需每轮安慰、总结、建议、追问或推进关系；说到人物自然会停的位置就停。")
+        if (projection.repeatedRhythm) {
+            append("近期节拍有重复，可自然换一种节奏；不要为了新鲜而表演反常。")
+        } else if (!projection.criticalInput) {
+            append("说到人物自然会停的位置就停。")
         }
     }.trim()
 }

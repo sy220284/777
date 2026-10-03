@@ -84,7 +84,7 @@ class ChatInteractionPlannerTest {
     private val planner = ChatInteractionPlanner(Json { ignoreUnknownKeys = true })
 
     @Test
-    fun plannerAndSuggestionsHonorPersonaCorrectionsForIndirectExpression() {
+    fun plannerAndSuggestionsHonorCorrectionsWithoutFixedExpressionRecipe() {
         val persona = PersonaProfile(
             name = "阿青",
             portrait = "嘴硬心软",
@@ -113,10 +113,10 @@ class ChatInteractionPlannerTest {
 
         assertTrue(plannerPrompt.contains("用户纠正（最高优先）"))
         assertTrue(plannerPrompt.contains("不善于拒绝，会服软"))
-        assertTrue(plannerPrompt.contains("表达解释：角色存在嘴硬"))
-        assertTrue(plannerPrompt.contains("模糊或习惯性推辞不得单独触发关系降温"))
+        assertTrue(!plannerPrompt.contains("表达解释：角色存在嘴硬"))
+        assertTrue(plannerPrompt.contains("角色台词的模糊或习惯性推辞不得单独触发关系降温"))
         assertTrue(suggestionsPrompt.contains("用户纠正（最高优先）"))
-        assertTrue(suggestionsPrompt.contains("不把模糊或习惯性推辞自动解释为关系拒绝"))
+        assertTrue(suggestionsPrompt.contains("不把单个模糊推辞自动解释为关系拒绝"))
         assertTrue(suggestionsPrompt.contains("清晰明确停止、退出或拒绝继续一次即生效"))
     }
 
