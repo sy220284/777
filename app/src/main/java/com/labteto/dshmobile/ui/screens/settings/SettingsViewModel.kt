@@ -280,7 +280,7 @@ class SettingsViewModel @Inject constructor(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                AppLog.warn("SettingsViewModel", "ChatGPT 后台刷新失败", error)
+                AppLog.warn("SettingsViewModel", "ChatGPT background refresh failed", error)
             }
         }
     }
