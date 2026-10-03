@@ -89,7 +89,10 @@ internal data class LocalWorkCheckpoint(
                     return@firstNotNullOfOrNull null
                 }
                 val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return@firstNotNullOfOrNull null
-                val start = content.lastIndexOf("<work-checkpoint>")
+                // Trusted checkpoint messages always have one outer wrapper emitted by us.
+                // Payload fields may legitimately contain the same literal text, so the outer
+                // opening tag must be the first occurrence while the closing tag stays the last.
+                val start = content.indexOf("<work-checkpoint>")
                 val end = content.lastIndexOf("</work-checkpoint>")
                 if (start < 0 || end <= start) return@firstNotNullOfOrNull null
                 val payload = content
@@ -410,12 +413,17 @@ internal class LocalHistoryCompactor(
     ): LocalWorkCheckpoint {
         val used = linkedSetOf<String>()
         val maxPerItem = (summaryLimit / 48).coerceIn(100, 360)
+        // A previous trusted checkpoint is already carried forward structurally through
+        // previousCheckpoint. Re-extracting its serialized model block as ordinary user text
+        // nests <work-checkpoint> markers inside the next checkpoint and corrupts subsequent
+        // parsing while also wasting context.
+        val extractionMessages = messages.filterNot(::isTrustedWorkCheckpointModelMessage)
 
         fun select(
             role: String? = null,
             cues: Set<String>? = null,
             maxItems: Int,
-        ): List<String> = messages.asReversed()
+        ): List<String> = extractionMessages.asReversed()
             .asSequence()
             .filter { role == null || it["role"].asText() == role }
             .mapNotNull(::messageText)
@@ -486,7 +494,7 @@ internal class LocalHistoryCompactor(
             emptyList(),
             maxItems = 10,
         )
-        val extractedArtifacts = messages.asReversed()
+        val extractedArtifacts = extractionMessages.asReversed()
             .asSequence()
             .mapNotNull(::messageText)
             .flatMap { text -> WORK_ARTIFACT_PATTERN.findAll(text).map { match ->
@@ -507,7 +515,7 @@ internal class LocalHistoryCompactor(
         )
         val tools = mergeStructured(
             structuredWorkState?.tools.orEmpty() + previousCheckpoint?.tools.orEmpty(),
-            recentTools(messages, maxItems = 8),
+            recentTools(extractionMessages, maxItems = 8),
             maxItems = 12,
         )
 
