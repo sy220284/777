@@ -25,6 +25,7 @@ class LocalBundledRuntimeManager @Inject internal constructor(
                 async { python.prepare() },
                 async { git.prepare() },
             )
+            Unit
         }
     }
 
