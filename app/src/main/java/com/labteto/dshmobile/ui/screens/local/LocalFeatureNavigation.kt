@@ -36,6 +36,5 @@ internal fun localFeatureHome(): List<String> = listOf(LocalFeaturePage.HOME.nam
 internal fun hasEstablishedGroupChat(sessions: List<LocalSessionSummary>): Boolean =
     sessions.any {
         it.usageMode == LocalUsageMode.CHAT &&
-            it.chatMode == LocalChatMode.GROUP &&
-            !it.blank
+            it.chatMode == LocalChatMode.GROUP
     }
