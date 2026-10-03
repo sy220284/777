@@ -448,7 +448,7 @@ internal fun GalleryOverviewHeader(
 }
 
 @Composable
-private fun PersonaPresetArtwork(
+private fun PersonaPresetArtworkPreview(
     preset: PersonaPreset,
 ) {
     val context = LocalContext.current
@@ -479,11 +479,12 @@ private fun PersonaPresetArtwork(
         }
     }
 
-    if (artwork == null) {
+    val resolvedArtwork = artwork
+    if (resolvedArtwork == null) {
         PersonaAvatar(preset.persona.name)
     } else {
         Image(
-            bitmap = artwork!!,
+            bitmap = resolvedArtwork,
             contentDescription = preset.persona.name,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -518,7 +519,7 @@ internal fun PersonaPresetCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
         ) {
-            PersonaPresetArtwork(preset)
+            PersonaPresetArtworkPreview(preset)
             Text(
                 preset.persona.name,
                 style = DsType.std14Strong.withReadingWeight(),
