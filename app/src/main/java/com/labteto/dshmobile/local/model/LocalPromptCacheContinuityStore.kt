@@ -1,8 +1,6 @@
 package com.labteto.dshmobile.local
 
 import java.security.MessageDigest
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -28,8 +26,7 @@ internal data class LocalPromptPrefixAssessment(
  * successful message sequence is an exact prefix of the current sequence. This mirrors the
  * property provider prefix caches actually need while keeping diagnostics content-free.
  */
-@Singleton
-internal class LocalPromptCacheContinuityStore @Inject constructor() {
+internal class LocalPromptCacheContinuityStore {
     private data class Entry(
         val generation: Int,
         val messageCount: Int,
