@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +62,7 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 private data class TuningPreset(
     @StringRes val labelRes: Int,
@@ -73,7 +75,7 @@ internal fun CharacterBehaviorTuningDialogHost(
     persona: PersonaProfile,
     portraitPath: String,
     state: ChatCharacterState,
-    onConfigurePersona: (PersonaProfile) -> Unit,
+    onConfigurePersona: suspend (PersonaProfile) -> Result<Unit>,
     onDismiss: () -> Unit,
 ) {
     if (!visible) return
@@ -86,7 +88,6 @@ internal fun CharacterBehaviorTuningDialogHost(
         initial = state.behaviorTuning,
         onSave = { tuning ->
             onConfigurePersona(persona.copy(behaviorTuning = tuning))
-            onDismiss()
         },
         onDismiss = onDismiss,
     )
@@ -101,12 +102,16 @@ internal fun CharacterBehaviorTuningDialog(
     mood: String,
     evolution: CharacterEvolutionState,
     initial: CharacterBehaviorTuning,
-    onSave: (CharacterBehaviorTuning) -> Unit,
+    onSave: suspend (CharacterBehaviorTuning) -> Result<Unit>,
     onDismiss: () -> Unit,
 ) {
     val colors = DsTheme.colors
     var draft by remember(initial) { mutableStateOf(initial.normalized()) }
     var advanced by remember { mutableStateOf(false) }
+    var saving by remember(initial) { mutableStateOf(false) }
+    var saveError by remember(initial) { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+    val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
     val presets = remember {
         listOf(
             TuningPreset(R.string.local_character_tuning_preset_natural, CharacterBehaviorTuning()),
@@ -437,11 +442,21 @@ internal fun CharacterBehaviorTuningDialog(
             DsButton(
                 text = stringResource(R.string.local_character_tuning_done),
                 onClick = {
-                    onSave(
-                        draft.normalized().copy(updatedAt = System.currentTimeMillis()),
-                    )
+                    if (saving) return@DsButton
+                    saving = true
+                    saveError = null
+                    coroutineScope.launch {
+                        onSave(draft.normalized().copy(updatedAt = System.currentTimeMillis()))
+                            .onSuccess { onDismiss() }
+                            .onFailure { saveError = it.message ?: saveFailedText }
+                        saving = false
+                    }
                 },
+                enabled = !saving,
             )
+        }
+        saveError?.let {
+            Text(it, style = DsType.caption11.withReadingWeight(), color = colors.error)
         }
     }
 }

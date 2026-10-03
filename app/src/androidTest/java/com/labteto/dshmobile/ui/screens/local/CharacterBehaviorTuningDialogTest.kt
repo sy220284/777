@@ -28,7 +28,7 @@ class CharacterBehaviorTuningDialogTest {
                     mood = "平静",
                     evolution = CharacterEvolutionState(),
                     initial = CharacterBehaviorTuning(),
-                    onSave = {},
+                    onSave = { Result.success(Unit) },
                     onDismiss = {},
                 )
             }

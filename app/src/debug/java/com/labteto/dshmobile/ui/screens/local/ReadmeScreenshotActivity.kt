@@ -354,7 +354,7 @@ private fun CharacterTuningScreenshot() {
             mood = "放松",
             evolution = CharacterEvolutionState(),
             initial = CharacterBehaviorTuning(),
-            onSave = {},
+            onSave = { Result.success(Unit) },
             onDismiss = {},
         )
     }

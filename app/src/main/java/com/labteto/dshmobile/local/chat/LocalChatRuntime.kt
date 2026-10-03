@@ -11,7 +11,7 @@ import javax.inject.Singleton
 class LocalChatRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
 ) {
-    internal fun configureChatPersona(profile: PersonaProfile) = engine.configureChatPersona(profile)
+    internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = engine.configureChatPersona(profile)
     internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) =
         engine.selectChatPersona(profile, galleryId)
     internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) =
