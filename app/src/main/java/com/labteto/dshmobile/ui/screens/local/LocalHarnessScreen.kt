@@ -89,7 +89,6 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.isUnboundChatPersona
-import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
@@ -444,21 +443,16 @@ fun LocalHarnessScreen(
 
     if (showRunCenter && shell.usageMode == LocalUsageMode.WORK) {
         LocalWorkStateContent(viewModel) { workState ->
-            DsBottomSheet(
-                title = stringResource(R.string.local_run_center),
+            LocalRunCenterScreen(
+                state = workState,
+                onJobOutput = viewModel::backgroundJobOutput,
+                onStopJob = viewModel::stopBackgroundJob,
+                onOpenResults = {
+                    showRunCenter = false
+                    filesMode = LocalFilesMode.CONVERSATION
+                },
                 onDismiss = { showRunCenter = false },
-            ) {
-                ExecutionStatusCard(
-                    state = workState,
-                    onJobOutput = viewModel::backgroundJobOutput,
-                    onStopJob = viewModel::stopBackgroundJob,
-                    onOpenResults = {
-                        showRunCenter = false
-                        filesMode = LocalFilesMode.CONVERSATION
-                    },
-                    showHeader = false,
-                )
-            }
+            )
         }
     }
 
