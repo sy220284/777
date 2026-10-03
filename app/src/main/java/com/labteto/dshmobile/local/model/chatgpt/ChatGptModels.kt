@@ -32,7 +32,7 @@ data class ChatGptAccountRecord(
     val savedAtEpochSeconds: Long,
 ) {
     val sharingEnabled: Boolean
-        get() = CHATGPT_PLAN_SCOPE in scopes
+        get() = CHATGPT_PLAN_SCOPE in scopes && CHATGPT_RESOURCE_INVOKE_SCOPE in scopes
 
     override fun toString(): String =
         "ChatGptAccountRecord(id=$id, clientId=$clientId, issuer=$issuer, subject=$subject, " +
@@ -46,6 +46,7 @@ data class ChatGptAccountSummary(
     val clientId: String,
     val email: String?,
     val displayName: String?,
+    val signedIn: Boolean,
     val sharingEnabled: Boolean,
 )
 
@@ -65,8 +66,15 @@ data class ChatGptUiState(
     val selectedAccount: ChatGptAccountSummary?
         get() = accounts.firstOrNull { it.id == selectedAccountId }
 
+    val signedIn: Boolean
+        get() = selectedAccount?.signedIn == true && phase != ChatGptAuthPhase.DISCONNECTED
+
     val connected: Boolean
-        get() = selectedAccount?.sharingEnabled == true && phase == ChatGptAuthPhase.CONNECTED
+        get() = selectedAccount?.let { account ->
+            account.signedIn &&
+                account.sharingEnabled &&
+                phase == ChatGptAuthPhase.CONNECTED
+        } == true
 }
 
 internal class ChatGptOAuthTokenException(
@@ -76,6 +84,12 @@ internal class ChatGptOAuthTokenException(
 
 internal fun shouldRetryChatGptAuthorization(oauthCode: String?, allowed: Boolean): Boolean =
     allowed && oauthCode == "invalid_grant"
+
+internal fun chatGptAuthorizationPrompt(requestPlanConsent: Boolean): String? =
+    if (requestPlanConsent) "consent" else null
+
+internal fun shouldRequestChatGptPlanConsent(account: ChatGptAccountSummary): Boolean =
+    account.signedIn && !account.sharingEnabled
 
 internal fun shouldInvalidateChatGptRefreshToken(oauthCode: String?): Boolean =
     oauthCode in setOf(

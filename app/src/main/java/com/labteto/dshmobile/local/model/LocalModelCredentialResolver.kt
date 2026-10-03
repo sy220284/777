@@ -6,11 +6,13 @@ import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountRecord
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountStore
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptSessionManager
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanAuthorizationEvents
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_PLAN_SCOPE
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_RESOURCE_INVOKE_SCOPE
 import com.labteto.dshmobile.local.model.chatgpt.isUsableChatGptPlanBinding
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -34,9 +36,11 @@ class LocalModelCredentialResolver @Inject constructor(
     private val apiKeys: LocalApiKeyStore,
     private val chatGptAccounts: ChatGptAccountStore,
     private val chatGptSessions: ChatGptSessionManager,
+    private val planAuthorizationEvents: ChatGptPlanAuthorizationEvents,
 ) {
     private val _activeProfile = MutableStateFlow<LocalModelProfile?>(null)
     val activeProfile = _activeProfile.asStateFlow()
+    val invalidatedChatGptAccounts = planAuthorizationEvents.invalidatedAccounts
 
     fun activate(profile: LocalModelProfile) {
         _activeProfile.value = profile
@@ -105,17 +109,38 @@ class LocalModelCredentialResolver @Inject constructor(
             LocalModelAuthKind.CHATGPT_PLAN -> {
                 val account = chatGptAccount(selected)
                     ?: error("ChatGPT 模型绑定的账户授权不可用或身份不一致，请重新选择账户或重新授权")
+                val bearerToken = try {
+                    chatGptSessions.accessToken(account.id)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    reportInvalidChatGptBinding(account.id)
+                    throw error
+                }
                 LocalResolvedCredential(
-                    bearerToken = chatGptSessions.accessToken(account.id),
+                    bearerToken = bearerToken,
                     authKind = LocalModelAuthKind.CHATGPT_PLAN,
                 )
             }
         }
     }
 
+    suspend fun hasChatGptPlanAuthorization(accountId: String): Boolean =
+        isUsableChatGptPlanBinding(accountId, chatGptAccounts.get(accountId))
+
     private suspend fun chatGptAccount(profile: LocalModelProfile): ChatGptAccountRecord? {
         val accountId = profile.credentialRef?.takeIf(String::isNotBlank) ?: return null
         val account = chatGptAccounts.get(accountId)
-        return account?.takeIf { isUsableChatGptPlanBinding(accountId, it) }
+        if (!isUsableChatGptPlanBinding(accountId, account)) {
+            planAuthorizationEvents.invalidate(accountId)
+            return null
+        }
+        return account
+    }
+
+    private suspend fun reportInvalidChatGptBinding(accountId: String) {
+        if (!isUsableChatGptPlanBinding(accountId, chatGptAccounts.get(accountId))) {
+            planAuthorizationEvents.invalidate(accountId)
+        }
     }
 }

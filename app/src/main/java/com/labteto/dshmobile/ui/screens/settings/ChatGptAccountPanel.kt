@@ -26,6 +26,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_USAGE_URL
+import com.labteto.dshmobile.local.model.chatgpt.shouldRequestChatGptPlanConsent
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -63,6 +64,7 @@ internal fun ChatGptAccountPanel(
     val accountFallbackLabel = stringResource(R.string.chatgpt_account_fallback)
     val useAccountLabel = stringResource(R.string.chatgpt_use_account)
     val reauthorizeLabel = stringResource(R.string.chatgpt_reauthorize)
+    val enablePlanLabel = stringResource(R.string.chatgpt_enable_plan_usage)
     val removeRegistrationLabel = stringResource(R.string.chatgpt_remove_registration)
     val accountActionsLabel = stringResource(R.string.chatgpt_account_actions)
     val selected = state.selectedAccount
@@ -116,13 +118,21 @@ internal fun ChatGptAccountPanel(
                 }
                 DsStatusPill(
                     state = when {
-                        selected?.sharingEnabled == true && state.phase == ChatGptAuthPhase.CONNECTED -> DsStatus.Done
+                        selected?.signedIn == true &&
+                            selected.sharingEnabled &&
+                            state.phase == ChatGptAuthPhase.CONNECTED -> DsStatus.Done
                         state.phase == ChatGptAuthPhase.ERROR -> DsStatus.Failed
                         else -> DsStatus.Neutral
                     },
                     label = when {
-                        selected?.sharingEnabled == true && state.phase == ChatGptAuthPhase.CONNECTED ->
+                        selected?.signedIn == true &&
+                            selected.sharingEnabled &&
+                            state.phase == ChatGptAuthPhase.CONNECTED ->
                             stringResource(R.string.chatgpt_connected)
+                        selected?.signedIn == true &&
+                            !selected.sharingEnabled &&
+                            state.phase == ChatGptAuthPhase.CONNECTED ->
+                            stringResource(R.string.chatgpt_signed_in_plan_disabled)
                         state.phase == ChatGptAuthPhase.UNVERIFIED -> stringResource(R.string.chatgpt_authorized_unverified)
                         busy -> stringResource(R.string.chatgpt_connecting)
                         else -> stringResource(R.string.chatgpt_not_connected)
@@ -185,8 +195,30 @@ internal fun ChatGptAccountPanel(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    DsPill(text = stringResource(R.string.chatgpt_plan_usage))
-                    DsPill(text = stringResource(R.string.chatgpt_model_count, state.models.size))
+                    if (selected.sharingEnabled) {
+                        DsPill(text = stringResource(R.string.chatgpt_plan_usage))
+                        DsPill(text = stringResource(R.string.chatgpt_model_count, state.models.size))
+                    } else if (selected.signedIn) {
+                        DsPill(text = stringResource(R.string.chatgpt_signed_in_plan_disabled))
+                    } else {
+                        DsPill(text = stringResource(R.string.chatgpt_not_connected))
+                    }
+                }
+                if (!selected.sharingEnabled && selected.signedIn) {
+                    Text(
+                        stringResource(R.string.chatgpt_plan_disabled_hint),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = colors.labelSecondary,
+                    )
+                    DsButton(
+                        text = enablePlanLabel,
+                        onClick = {
+                            viewModel.connectChatGpt(selected.id, requestPlanConsent = true) { error -> error?.let(report) }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                        size = DsButtonSize.Small,
+                    )
                 }
                 Text(
                     stringResource(R.string.chatgpt_session_persistence_hint),
@@ -222,12 +254,19 @@ internal fun ChatGptAccountPanel(
                                 modifier = Modifier.weight(1f),
                             )
                             DsButton(
-                                text = if (account.sharingEnabled) useAccountLabel else reauthorizeLabel,
+                                text = when {
+                                    account.sharingEnabled -> useAccountLabel
+                                    account.signedIn -> enablePlanLabel
+                                    else -> reauthorizeLabel
+                                },
                                 onClick = {
-                                    if (account.sharingEnabled) {
-                                        viewModel.selectChatGptAccount(account.id) { error -> error?.let(report) }
-                                    } else {
-                                        viewModel.connectChatGpt(account.id) { error -> error?.let(report) }
+                                    when {
+                                        account.sharingEnabled ->
+                                            viewModel.selectChatGptAccount(account.id) { error -> error?.let(report) }
+                                        else -> viewModel.connectChatGpt(
+                                            account.id,
+                                            requestPlanConsent = shouldRequestChatGptPlanConsent(account),
+                                        ) { error -> error?.let(report) }
                                     }
                                 },
                                 enabled = !busy,
@@ -299,8 +338,13 @@ internal fun ChatGptAccountPanel(
                     horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                 ) {
                     DsButton(
-                        text = reauthorizeLabel,
-                        onClick = { viewModel.connectChatGpt(selected.id) { error -> error?.let(report) } },
+                        text = if (selected.signedIn && !selected.sharingEnabled) enablePlanLabel else reauthorizeLabel,
+                        onClick = {
+                            viewModel.connectChatGpt(
+                                selected.id,
+                                requestPlanConsent = shouldRequestChatGptPlanConsent(selected),
+                            ) { error -> error?.let(report) }
+                        },
                         enabled = !busy,
                         modifier = Modifier.weight(1f),
                         size = DsButtonSize.Small,

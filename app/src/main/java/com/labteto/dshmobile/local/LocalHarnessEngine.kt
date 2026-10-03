@@ -770,6 +770,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     init {
+        modelAccountStateCoordinator.observeInvalidations(scope)
         preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
         val initialResources = resourceScheduler.snapshot()
         _state.update {
@@ -850,14 +851,15 @@ class LocalHarnessEngine @Inject constructor(
             )
         }
     }
-    internal fun requireChatGptAccountSelectionAllowed() =
-        modelAccountStateCoordinator.requireAccountSelectionAllowed()
+    internal fun requireChatGptAccountSelectionAllowed() = modelAccountStateCoordinator.requireAccountSelectionAllowed()
 
     internal suspend fun syncChatGptModels(
         accountId: String,
         models: List<ChatGptModelOption>,
         selectFirst: Boolean = true,
     ) = modelAccountStateCoordinator.syncChatGptModels(accountId, models, selectFirst)
+
+    internal suspend fun retireChatGptAccountProfiles(accountId: String) = modelAccountStateCoordinator.retireChatGptAccountProfiles(accountId)
 
     internal suspend fun removeChatGptAccountProfiles(accountId: String) =
         modelAccountStateCoordinator.removeChatGptAccountProfiles(accountId)

@@ -1369,9 +1369,12 @@
 <string name="usage_show_recent">只看最近项目</string>
 
     <string name="chatgpt_account_title">ChatGPT 账户</string>
-    <string name="chatgpt_account_hint">使用 ChatGPT 套餐调用符合条件的模型，无需配置 OpenAI API Key。</string>
+    <string name="chatgpt_account_hint">登录 ChatGPT 后，可授权使用套餐调用符合条件的模型，无需配置 OpenAI API Key。</string>
     <string name="chatgpt_privacy_hint">登录不会向本应用共享你的 ChatGPT 对话记录或 Memory。</string>
     <string name="chatgpt_connected">已连接</string>
+    <string name="chatgpt_signed_in_plan_disabled">已登录，套餐未启用</string>
+    <string name="chatgpt_enable_plan_usage">启用套餐</string>
+    <string name="chatgpt_plan_disabled_hint">ChatGPT 账户已登录；启用套餐授权后，777 才能使用此账户调用模型。</string>
     <string name="chatgpt_connecting">连接中</string>
     <string name="chatgpt_not_connected">未连接</string>
     <string name="chatgpt_account_fallback">ChatGPT 账户</string>

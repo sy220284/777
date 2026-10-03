@@ -202,10 +202,10 @@ class SettingsViewModel @Inject constructor(
 
     fun selectLocalModel(id: String) = localHarness.selectModel(id)
 
-    fun connectChatGpt(existingAccountId: String? = null, onDone: (String?) -> Unit = {}) {
+    fun connectChatGpt(existingAccountId: String? = null, requestPlanConsent: Boolean = false, onDone: (String?) -> Unit = {}) {
         viewModelScope.launch {
             try {
-                localHarness.connectChatGpt(existingAccountId)
+                localHarness.connectChatGpt(existingAccountId, requestPlanConsent)
                 onDone(null)
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled

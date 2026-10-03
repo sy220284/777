@@ -12,6 +12,7 @@ internal class ChatGptSettingsController(
     private val auth: ChatGptAuthCoordinator,
     private val requireAccountSelectionAllowed: () -> Unit,
     private val syncModels: suspend (String, List<ChatGptModelOption>, Boolean) -> Unit,
+    private val retireProfiles: suspend (String) -> Unit,
     private val removeProfiles: suspend (String) -> Unit,
     private val testAccount: suspend (String) -> String,
 ) {
@@ -20,7 +21,7 @@ internal class ChatGptSettingsController(
     suspend fun refresh() {
         try {
             auth.refresh()
-            syncSelectedIfConnected()
+            reconcilePlanProfiles()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -28,16 +29,16 @@ internal class ChatGptSettingsController(
         }
     }
 
-    suspend fun connect(existingAccountId: String? = null) {
+    suspend fun connect(existingAccountId: String? = null, requestPlanConsent: Boolean = false) {
         requireAccountSelectionAllowed()
-        val account = auth.connect(existingAccountId)
-        if (auth.state.value.connected) syncModels(account.id, auth.state.value.models, true)
+        val account = auth.connect(existingAccountId, requestPlanConsent)
+        reconcilePlanProfiles(selectFirstAccountId = account.id)
     }
 
     suspend fun restart(existingAccountId: String? = null) {
         requireAccountSelectionAllowed()
         val account = auth.restartAuthorization(existingAccountId)
-        if (auth.state.value.connected) syncModels(account.id, auth.state.value.models, true)
+        reconcilePlanProfiles(selectFirstAccountId = account.id)
     }
 
     suspend fun cancelAuthorization() = auth.cancelPendingAuthorization()
@@ -47,6 +48,7 @@ internal class ChatGptSettingsController(
         val result = testAccount(id)
         if (state.value.selectedAccountId == id) {
             auth.refresh()
+            reconcilePlanProfiles()
         }
         return result
     }
@@ -55,30 +57,36 @@ internal class ChatGptSettingsController(
         requireAccountSelectionAllowed()
         auth.selectAccount(id)
         val snapshot = auth.state.value
-        require(
-            snapshot.phase == com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.CONNECTED,
-        ) { snapshot.error ?: "ChatGPT 账户不可用，请重新授权" }
+        if (!snapshot.connected) retireProfiles(id)
+        require(snapshot.connected) {
+            snapshot.error ?: "ChatGPT 账户已登录，但套餐用量尚未启用"
+        }
         syncModels(id, snapshot.models, true)
     }
 
     suspend fun disconnect(id: String): String? {
         removeProfiles(id)
         val warning = auth.disconnect(id)
-        syncSelectedIfConnected()
+        reconcilePlanProfiles()
         return warning
     }
 
     suspend fun remove(id: String): String? {
         removeProfiles(id)
         val warning = auth.remove(id)
-        syncSelectedIfConnected()
+        reconcilePlanProfiles()
         return warning
     }
 
-    private suspend fun syncSelectedIfConnected() {
+    private suspend fun reconcilePlanProfiles(selectFirstAccountId: String? = null) {
         val snapshot = auth.state.value
-        if (snapshot.phase == com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.CONNECTED) {
-            snapshot.selectedAccountId?.let { syncModels(it, snapshot.models, false) }
+        snapshot.accounts.filterNot { it.sharingEnabled }.forEach { account ->
+            retireProfiles(account.id)
+        }
+        if (snapshot.connected) {
+            snapshot.selectedAccountId?.let { accountId ->
+                syncModels(accountId, snapshot.models, accountId == selectFirstAccountId)
+            }
         }
     }
 }

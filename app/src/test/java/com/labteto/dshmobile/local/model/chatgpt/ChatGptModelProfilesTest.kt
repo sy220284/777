@@ -41,6 +41,33 @@ class ChatGptModelProfilesTest {
     }
 
     @Test
+    fun retiringPlanAccessRemovesOnlyThatAccountsProfiles() {
+        val accountA = chatGptPlanProfiles(
+            "account-a",
+            listOf(ChatGptModelOption("shared-model", "Shared")),
+        )
+        val accountB = chatGptPlanProfiles(
+            "account-b",
+            listOf(ChatGptModelOption("shared-model", "Shared")),
+        )
+        val apiProfile = com.labteto.dshmobile.local.LocalModelProfile(
+            id = "api",
+            model = "shared-model",
+            baseUrl = "https://example.test/v1",
+        )
+
+        val retired = refreshChatGptPlanProfiles(
+            existing = accountA + accountB + apiProfile,
+            accountId = "account-a",
+            models = emptyList(),
+        )
+
+        assertTrue(retired.none { it.credentialRef == "account-a" })
+        assertTrue(retired.any { it.credentialRef == "account-b" })
+        assertTrue(retired.any { it.id == apiProfile.id })
+    }
+
+    @Test
     fun refreshedCatalogReplacesOnlyTheSelectedAccountsPlanModels() {
         val accountAOld = chatGptPlanProfiles(
             "account-a",
