@@ -78,30 +78,6 @@ internal fun resolveCharacterMode(
     initiative += tuningDelta(state.initiative, 14)
     disclosure += tuningDelta(state.shareDesire, 14)
 
-    val personaText = modePersonaText(persona)
-    if (personaText.containsAnyMode("灵动", "跳脱", "脑洞", "联想", "发散", "天马行空", "古灵精怪", "思路快")) {
-        association += 18
-    }
-    if (personaText.containsAnyMode("理性", "逻辑", "谨慎", "较真", "推理", "分析", "冷静", "认真")) {
-        analysis += 16
-        repair += 8
-    }
-    if (personaText.containsAnyMode("感性", "敏感", "心软", "冲动", "共情", "情绪")) affect += 15
-    if (personaText.containsAnyMode("细腻", "观察", "敏锐", "细节", "画面", "声音", "气味", "动作")) sensory += 15
-    if (personaText.containsAnyMode("察言观色", "言外之意", "看气氛", "懂暗示", "敏感", "细腻")) subtext += 14
-    if (personaText.containsAnyMode("幽默", "嘴贫", "爱开玩笑", "俏皮", "调侃", "古灵精怪", "灵动")) playfulness += 18
-    if (personaText.containsAnyMode("寡言", "克制", "含蓄", "嘴硬", "别扭", "害羞", "惜字")) {
-        compression += 13
-        disclosure -= 10
-    }
-    if (personaText.containsAnyMode("直率", "直球", "坦率", "爽快", "健谈", "话多")) {
-        compression -= 10
-        disclosure += 10
-    }
-    val passiveInitiative = personaText.containsAnyMode("被动", "慢热", "戒备", "不主动")
-    if (passiveInitiative) initiative -= 10
-    else if (personaText.containsAnyMode("主动", "爱带话题", "强势", "自来熟")) initiative += 12
-
     val criticalInput = isHighPriorityUserInput(userInput)
     val physicalLoad = resolveCharacterPhysicalLoad(state.physicalState)
     val emotionalLoad = resolveCharacterEmotionalLoad(state.mood)
@@ -164,10 +140,6 @@ internal fun resolveCharacterMode(
         playfulness += 7
         repair += 8
         freedom += 8
-    }
-    if (state.mood.containsAnyMode("开心", "兴奋", "期待", "雀跃")) {
-        association += 10
-        playfulness += 12
     }
     if (state.currentUserImpression.isNotBlank() || state.recentImpression.isNotBlank()) subtext += 5
 
@@ -271,18 +243,6 @@ internal fun resolveCharacterEmotionalLoad(text: String): CharacterEmotionalLoad
     ) CharacterEmotionalLoad.HEAVY else CharacterEmotionalLoad.NEUTRAL
 }
 
-private fun modePersonaText(persona: PersonaProfile): String = buildString {
-    append(persona.portrait); append(' ')
-    append(persona.coreTension); append(' ')
-    append(persona.stableTraits.joinToString(" ")); append(' ')
-    append(persona.mutableTraits.joinToString(" ")); append(' ')
-    append(persona.attentionBiases.joinToString(" ")); append(' ')
-    append(persona.quirks.joinToString(" ")); append(' ')
-    append(persona.limitations.joinToString(" ")); append(' ')
-    append(persona.voiceSamples.take(6).joinToString(" ")); append(' ')
-    append(persona.corrections.joinToString(" "))
-}
-
 private fun tuningDelta(value: Int, maximum: Int): Int =
     ((value.coerceIn(0, 100) - 50) * maximum) / 50
 
@@ -303,9 +263,6 @@ private fun hasRecentPatternRepetition(tags: List<String>): Boolean {
     val recent = tags.takeLast(4).map(String::trim).filter(String::isNotBlank)
     return recent.size >= 3 && recent.distinct().size <= 2
 }
-
-private fun String.containsAnyMode(vararg values: String): Boolean =
-    values.any { contains(it, ignoreCase = true) }
 
 private val ACTIVE_PHYSICAL_LOAD = listOf(
     "困", "刚醒", "头疼", "头痛", "忙", "走路", "开车", "骑车", "没电", "很累", "疲惫",
