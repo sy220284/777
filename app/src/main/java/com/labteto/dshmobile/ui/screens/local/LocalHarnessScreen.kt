@@ -388,6 +388,7 @@ fun LocalHarnessScreen(
                 },
                 onNewSingle = {
                     showNewSessionMode = false
+                    resetFeatureNavigation()
                     viewModel.createSingleChatSession()
                 },
             )
