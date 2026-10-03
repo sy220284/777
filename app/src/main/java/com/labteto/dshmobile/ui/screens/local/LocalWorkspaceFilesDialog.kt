@@ -41,6 +41,7 @@ import com.labteto.dshmobile.local.LocalWorkspaceFile
 import com.labteto.dshmobile.local.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
 import com.labteto.dshmobile.ui.components.DsPageEmptyState
+import com.labteto.dshmobile.ui.components.DsPageLoadingState
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -163,7 +164,7 @@ internal fun LocalWorkspaceFilesDialog(
                         },
                     ),
                     modifier = Modifier.padding(horizontal = DsSpacing.medium),
-                    actionIcon = Icons.Outlined.Refresh,
+                    actionIcon = FeatherIcons.RefreshCw,
                     actionContentDescription = stringResource(R.string.local_files_refresh),
                     actionEnabled = !loading && preview == null,
                     onAction = { scope.launch { reload() } },
@@ -190,13 +191,11 @@ internal fun LocalWorkspaceFilesDialog(
 
                 when {
                     loading -> {
-                        Column(
-                            Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            CircularProgressIndicator()
-                        }
+                        DsPageLoadingState(
+                            icon = FeatherIcons.Folder,
+                            label = stringResource(R.string.local_files_loading),
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     }
                     error != null -> {
                         DsPageEmptyState(
