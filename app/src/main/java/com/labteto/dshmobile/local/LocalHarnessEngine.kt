@@ -1101,13 +1101,11 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    internal fun createSingleChatSession() {
-        createSession(
-            mode = LocalConversationMode.INDEPENDENT,
-            usageMode = LocalUsageMode.CHAT,
-            chatMode = LocalChatMode.SINGLE,
-        )
-    }
+    internal fun createSingleChatSession(): Boolean = createSession(
+        mode = LocalConversationMode.INDEPENDENT,
+        usageMode = LocalUsageMode.CHAT,
+        chatMode = LocalChatMode.SINGLE,
+    )
 
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean {
         val snapshot = _state.value
