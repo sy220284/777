@@ -24,6 +24,7 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_DIR
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_FILE
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -278,8 +279,8 @@ class SettingsViewModel @Inject constructor(
                 localHarness.refreshChatGpt()
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                // 授权协调器会发布刷新失败；后台刷新不能把设置页所在主线程打崩。
+            } catch (error: Exception) {
+                AppLog.warn("SettingsViewModel", "ChatGPT 后台刷新失败", error)
             }
         }
     }
