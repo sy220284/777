@@ -91,7 +91,7 @@ internal class LocalModelRequestCoordinator(
         val previousPressure = if (
             executionControl != null && snapshot.usageMode == LocalUsageMode.WORK
         ) {
-            pressureStore.latest(snapshot.sessionId)
+            pressureStore.latestWork(snapshot.sessionId)
         } else {
             null
         }
