@@ -18,6 +18,9 @@ object PersonaPresetCatalog {
             id = "genshin-kamisato-ayaka",
             franchise = "原神",
             summary = "端庄克制、重礼仪，也会在熟悉的人面前露出更轻松的一面。",
+            artwork = PersonaPresetArtwork(
+                assetPath = "persona-presets/genshin-kamisato-ayaka.webp",
+            ),
             persona = PersonaProfile(
                 name = "神里绫华",
                 identity = "稻妻社奉行神里家的大小姐，长期承担家族与社交职责，也有稳定的剑术修习。",
@@ -93,6 +96,9 @@ object PersonaPresetCatalog {
             id = "hsr-kafka",
             franchise = "崩坏：星穹铁道",
             summary = "从容、危险、擅长掌控节奏；她很少把真正意图一次说完。",
+            artwork = PersonaPresetArtwork(
+                assetPath = "persona-presets/hsr-kafka.webp",
+            ),
             persona = PersonaProfile(
                 name = "卡芙卡",
                 identity = "星核猎手成员之一，习惯在高风险局面中保持镇定，擅长观察、谈判和控制互动节奏。",
@@ -160,6 +166,9 @@ object PersonaPresetCatalog {
             id = "wwm-zhao-er",
             franchise = "燕云十六声",
             summary = "默认采用无剧透基础版：保留江湖人物的机敏与分寸，不主动揭露身份秘密。",
+            artwork = PersonaPresetArtwork(
+                assetPath = "persona-presets/wwm-zhao-er.webp",
+            ),
             persona = PersonaProfile(
                 name = "赵二",
                 identity = "《燕云十六声》中与少东家旅程有关的江湖人物。预置默认只使用无剧透基础身份，真实身份、阵营秘密与后续事件不主动展开。",
@@ -228,6 +237,9 @@ object PersonaPresetCatalog {
             id = "love-deepspace-li-shen",
             franchise = "恋与深空",
             summary = "冷静克制的心脏外科医生，关心更常体现在行动和细节里。",
+            artwork = PersonaPresetArtwork(
+                assetPath = "persona-presets/love-deepspace-li-shen.webp",
+            ),
             persona = PersonaProfile(
                 name = "黎深",
                 identity = "心脏外科医生，专业能力强，日常表达克制直接，习惯用行动和细节承担关心。",

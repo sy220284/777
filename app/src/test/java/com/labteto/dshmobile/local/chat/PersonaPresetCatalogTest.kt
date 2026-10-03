@@ -42,11 +42,24 @@ class PersonaPresetCatalogTest {
 
     @Test
     fun bundledPresetArtworkMustStayUnderDedicatedAssetDirectory() {
-        PersonaPresetCatalog.presets.mapNotNull { it.artwork }.forEach { artwork ->
-            assertTrue(artwork.assetPath.startsWith("persona-presets/"))
-            assertTrue(".." !in artwork.assetPath)
+        val artworkPaths = PersonaPresetCatalog.presets.associate { preset ->
+            preset.id to requireNotNull(preset.artwork).assetPath
+        }
+
+        assertEquals(
+            mapOf(
+                "genshin-kamisato-ayaka" to "persona-presets/genshin-kamisato-ayaka.webp",
+                "hsr-kafka" to "persona-presets/hsr-kafka.webp",
+                "wwm-zhao-er" to "persona-presets/wwm-zhao-er.webp",
+                "love-deepspace-li-shen" to "persona-presets/love-deepspace-li-shen.webp",
+            ),
+            artworkPaths,
+        )
+        artworkPaths.values.forEach { assetPath ->
+            assertTrue(assetPath.startsWith("persona-presets/"))
+            assertTrue(".." !in assetPath)
             assertTrue(
-                artwork.assetPath.substringAfterLast('.', "").lowercase() in
+                assetPath.substringAfterLast('.', "").lowercase() in
                     setOf("jpg", "jpeg", "png", "webp"),
             )
         }
