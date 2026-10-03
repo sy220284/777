@@ -170,7 +170,7 @@ internal fun CharacterBehaviorTuningDialog(
         if (advanced) R.string.common_state_expanded else R.string.common_state_collapsed,
     )
 
-    DsDialog(title = null, onDismiss = onDismiss) {
+    DsDialog(title = null, onDismiss = { if (!saving) onDismiss() }) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
@@ -234,6 +234,7 @@ internal fun CharacterBehaviorTuningDialog(
                     },
                     variant = if (selected) DsButtonVariant.Info else DsButtonVariant.Outline,
                     size = DsButtonSize.Small,
+                    enabled = !saving,
                 )
             }
         }
@@ -244,6 +245,7 @@ internal fun CharacterBehaviorTuningDialog(
             high = stringResource(R.string.local_character_tuning_intimacy_high),
             value = draft.intimacy,
             onValueChange = { draft = draft.copy(intimacy = it) },
+        enabled = !saving,
         )
         BehaviorSlider(
             title = stringResource(R.string.local_character_tuning_persistence),
@@ -251,6 +253,7 @@ internal fun CharacterBehaviorTuningDialog(
             high = stringResource(R.string.local_character_tuning_persistence_high),
             value = draft.persistence,
             onValueChange = { draft = draft.copy(persistence = it) },
+        enabled = !saving,
         )
         BehaviorSlider(
             title = stringResource(R.string.local_character_tuning_initiative),
@@ -258,6 +261,7 @@ internal fun CharacterBehaviorTuningDialog(
             high = stringResource(R.string.local_character_tuning_initiative_high),
             value = draft.initiative,
             onValueChange = { draft = draft.copy(initiative = it) },
+        enabled = !saving,
         )
         BehaviorSlider(
             title = stringResource(R.string.local_character_tuning_openness),
@@ -265,6 +269,7 @@ internal fun CharacterBehaviorTuningDialog(
             high = stringResource(R.string.local_character_tuning_openness_high),
             value = draft.openness,
             onValueChange = { draft = draft.copy(openness = it) },
+        enabled = !saving,
         )
         SectionLabel(stringResource(R.string.local_character_tuning_current_state))
         Surface(
@@ -318,7 +323,7 @@ internal fun CharacterBehaviorTuningDialog(
                 .fillMaxWidth()
                 .heightIn(min = DsSpacing.touchTarget)
                 .semantics { stateDescription = advancedStateDescription }
-                .clickable(role = Role.Button) { advanced = !advanced },
+                .clickable(enabled = !saving, role = Role.Button) { advanced = !advanced },
             shape = DsShapes.row,
             color = Color.Transparent,
         ) {
@@ -358,6 +363,7 @@ internal fun CharacterBehaviorTuningDialog(
                     high = stringResource(R.string.local_character_tuning_evolution_high),
                     value = draft.evolution,
                     onValueChange = { draft = draft.copy(evolution = it) },
+                enabled = !saving,
                 )
                 BehaviorSlider(
                     title = stringResource(R.string.local_character_tuning_afterglow),
@@ -365,6 +371,7 @@ internal fun CharacterBehaviorTuningDialog(
                     high = stringResource(R.string.local_character_tuning_afterglow_high),
                     value = draft.emotionalAfterglow,
                     onValueChange = { draft = draft.copy(emotionalAfterglow = it) },
+                enabled = !saving,
                 )
                 BehaviorSlider(
                     title = stringResource(R.string.local_character_tuning_novelty),
@@ -372,6 +379,7 @@ internal fun CharacterBehaviorTuningDialog(
                     high = stringResource(R.string.local_character_tuning_novelty_high),
                     value = draft.novelty,
                     onValueChange = { draft = draft.copy(novelty = it) },
+                enabled = !saving,
                 )
                 BehaviorSlider(
                     title = stringResource(R.string.local_character_tuning_lore),
@@ -379,6 +387,7 @@ internal fun CharacterBehaviorTuningDialog(
                     high = stringResource(R.string.local_character_tuning_lore_high),
                     value = draft.loreAdherence,
                     onValueChange = { draft = draft.copy(loreAdherence = it) },
+                enabled = !saving,
                 )
                 BehaviorSlider(
                     title = stringResource(R.string.local_character_tuning_pace),
@@ -386,6 +395,7 @@ internal fun CharacterBehaviorTuningDialog(
                     high = stringResource(R.string.local_character_tuning_pace_high),
                     value = draft.relationshipPace,
                     onValueChange = { draft = draft.copy(relationshipPace = it) },
+                enabled = !saving,
                 )
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -416,6 +426,7 @@ internal fun CharacterBehaviorTuningDialog(
                         Switch(
                             checked = draft.lockRelationshipStage,
                             onCheckedChange = { draft = draft.copy(lockRelationshipStage = it) },
+                            enabled = !saving,
                             colors = SwitchDefaults.colors(
                                 checkedTrackColor = colors.characterAccent,
                                 checkedThumbColor = colors.bgLayer1,
@@ -437,16 +448,18 @@ internal fun CharacterBehaviorTuningDialog(
                 text = stringResource(R.string.local_character_tuning_restore),
                 onClick = { draft = CharacterBehaviorTuning(updatedAt = draft.updatedAt) },
                 variant = DsButtonVariant.Ghost,
+                enabled = !saving,
             )
             Spacer(Modifier.width(DsSpacing.small))
             DsButton(
                 text = stringResource(R.string.local_character_tuning_done),
                 onClick = {
                     if (saving) return@DsButton
+                    val submitted = draft.normalized().copy(updatedAt = System.currentTimeMillis())
                     saving = true
                     saveError = null
                     coroutineScope.launch {
-                        onSave(draft.normalized().copy(updatedAt = System.currentTimeMillis()))
+                        onSave(submitted)
                             .onSuccess { onDismiss() }
                             .onFailure { saveError = it.message ?: saveFailedText }
                         saving = false
@@ -468,6 +481,7 @@ private fun BehaviorSlider(
     high: String,
     value: Int,
     onValueChange: (Int) -> Unit,
+    enabled: Boolean = true,
 ) {
     val colors = DsTheme.colors
     val clean = value.coerceIn(0, 100)
@@ -496,6 +510,7 @@ private fun BehaviorSlider(
         Slider(
             value = clean.toFloat(),
             onValueChange = { onValueChange((it / 25f).roundToInt().coerceIn(0, 4) * 25) },
+            enabled = enabled,
             valueRange = 0f..100f,
             steps = 3,
             modifier = Modifier
