@@ -330,6 +330,7 @@ fun SettingsScreen(
                     title = title,
                     onBack = ::navigateBack,
                     backContentDescription = stringResource(R.string.common_back),
+                    largeTitle = page == SettingsDestination.ROOT,
                     modifier = Modifier.padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
                     actionIcon = FeatherIcons.Clock.takeIf { page == SettingsDestination.USAGE },
                     actionContentDescription = stringResource(R.string.usage_log_open)
