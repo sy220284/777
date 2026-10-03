@@ -129,7 +129,7 @@ internal fun PersonaGalleryDetailHeaderV3(
 }
 
 @Composable
-private fun PersonaGalleryAddPanel(
+internal fun PersonaGalleryAddPanel(
     presets: List<PersonaPreset>,
     busy: Boolean,
     onBack: () -> Unit,
@@ -239,7 +239,7 @@ private fun PersonaGalleryAddPanel(
 }
 
 @Composable
-private fun PersonaGallerySectionLabel(title: String) {
+internal fun PersonaGallerySectionLabel(title: String) {
     Text(
         title,
         style = DsType.caption11.withReadingWeight(),
@@ -249,7 +249,7 @@ private fun PersonaGallerySectionLabel(title: String) {
 }
 
 @Composable
-private fun PersonaGalleryEmptyState(
+internal fun PersonaGalleryEmptyState(
     title: String,
     body: String,
     primary: String,
@@ -299,7 +299,7 @@ private fun PersonaGalleryEmptyState(
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
-private fun CompactPersonaRow(
+internal fun CompactPersonaRow(
     entry: PersonaGalleryEntry,
     pinned: Boolean,
     managing: Boolean,
