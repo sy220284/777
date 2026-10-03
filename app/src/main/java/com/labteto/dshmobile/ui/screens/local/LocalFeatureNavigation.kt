@@ -27,6 +27,23 @@ internal fun localFeaturePush(
     return (stack.ifEmpty { listOf(LocalFeaturePage.HOME.name) } + page.name).takeLast(12)
 }
 
+internal data class LocalFeatureDrawerOpenResult(
+    val originStack: List<String>,
+    val stack: List<String>,
+)
+
+internal fun localFeatureOpenFromDrawer(
+    stack: List<String>,
+    originStack: List<String>?,
+    page: LocalFeaturePage,
+): LocalFeatureDrawerOpenResult {
+    val origin = (originStack ?: stack).ifEmpty { localFeatureHome() }
+    return LocalFeatureDrawerOpenResult(
+        originStack = origin,
+        stack = localFeaturePush(origin, page),
+    )
+}
+
 internal fun localFeaturePop(stack: List<String>): List<String> =
     if (stack.size <= 1) listOf(LocalFeaturePage.HOME.name) else stack.dropLast(1)
 

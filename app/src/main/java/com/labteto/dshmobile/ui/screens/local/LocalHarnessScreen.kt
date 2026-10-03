@@ -171,6 +171,7 @@ fun LocalHarnessScreen(
     val modeIntroPreferences = remember(context) { context.getSharedPreferences("local_mode_intro", android.content.Context.MODE_PRIVATE) }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
     var featureStack by rememberSaveable { mutableStateOf(localFeatureHome()) }
+    var drawerFeatureOriginStack by rememberSaveable { mutableStateOf<List<String>?>(null) }
     var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
     var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
     var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
@@ -183,14 +184,27 @@ fun LocalHarnessScreen(
     val featureStateHolder = rememberSaveableStateHolder()
 
     fun pushFeature(page: LocalFeaturePage) {
+        drawerFeatureOriginStack = null
         featureStack = localFeaturePush(featureStack, page)
     }
 
+    fun openFeatureFromDrawer(page: LocalFeaturePage) {
+        val navigation = localFeatureOpenFromDrawer(
+            stack = featureStack,
+            originStack = drawerFeatureOriginStack,
+            page = page,
+        )
+        drawerFeatureOriginStack = navigation.originStack
+        featureStack = navigation.stack
+    }
+
     fun popFeature() {
+        drawerFeatureOriginStack = null
         featureStack = localFeaturePop(featureStack)
     }
 
     fun resetFeatureNavigation() {
+        drawerFeatureOriginStack = null
         LocalFeaturePage.entries
             .filterNot { it == LocalFeaturePage.HOME }
             .forEach { featureStateHolder.removeState(it.name) }
@@ -300,11 +314,11 @@ fun LocalHarnessScreen(
                 onDeleteSessions = { ids -> scope.launch { viewModel.deleteSessions(ids) } },
                 onWorkspaceFiles = {
                     filesMode = LocalFilesMode.WORKSPACE
-                    pushFeature(LocalFeaturePage.WORKSPACE)
+                    openFeatureFromDrawer(LocalFeaturePage.WORKSPACE)
                     scope.launch { drawerState.close() }
                 },
                 onOpenRunCenter = {
-                    pushFeature(LocalFeaturePage.RUN_CENTER)
+                    openFeatureFromDrawer(LocalFeaturePage.RUN_CENTER)
                     scope.launch { drawerState.close() }
                 },
                 groupMemberCount = shell.groupChat.members.size,
@@ -323,25 +337,25 @@ fun LocalHarnessScreen(
                     if (viewModel.hasUnsavedCurrentPersona()) {
                         showPersonaGallerySavePrompt = true
                     } else {
-                        pushFeature(LocalFeaturePage.PERSONA_GALLERY)
+                        openFeatureFromDrawer(LocalFeaturePage.PERSONA_GALLERY)
                     }
                 },
                 onOpenDiary = {
-                    pushFeature(LocalFeaturePage.DIARY)
+                    openFeatureFromDrawer(LocalFeaturePage.DIARY)
                     scope.launch { drawerState.close() }
                 },
                 onTasks = {
                     taskMode = null
-                    pushFeature(LocalFeaturePage.TASKS)
+                    openFeatureFromDrawer(LocalFeaturePage.TASKS)
                     scope.launch { drawerState.close() }
                 },
                 onTools = {
-                    pushFeature(LocalFeaturePage.TOOLS)
+                    openFeatureFromDrawer(LocalFeaturePage.TOOLS)
                     scope.launch { drawerState.close() }
                 },
                 onSettings = {
                     settingsDestination = SettingsDestination.ROOT
-                    pushFeature(LocalFeaturePage.SETTINGS)
+                    openFeatureFromDrawer(LocalFeaturePage.SETTINGS)
                     scope.launch { drawerState.close() }
                 },
             )
@@ -452,7 +466,7 @@ fun LocalHarnessScreen(
             },
             onContinue = {
                 showPersonaGallerySavePrompt = false
-                pushFeature(LocalFeaturePage.PERSONA_GALLERY)
+                openFeatureFromDrawer(LocalFeaturePage.PERSONA_GALLERY)
             },
             onDismiss = { showPersonaGallerySavePrompt = false },
         )
