@@ -24,6 +24,52 @@ class ChatGptAuthorizationRecoveryTest {
     }
 
     @Test
+    fun normalSignInDoesNotForceConsentButExplicitPlanEnableDoes() {
+        assertEquals(null, chatGptAuthorizationPrompt(requestPlanConsent = false))
+        assertEquals("consent", chatGptAuthorizationPrompt(requestPlanConsent = true))
+    }
+
+    @Test
+    fun signedInIdentityWithoutPlanScopeIsPreservedButCannotRoutePlanModels() {
+        val summary = ChatGptAccountSummary(
+            id = "account",
+            clientId = "oaiapp_account",
+            email = "user@example.com",
+            displayName = "User",
+            signedIn = true,
+            sharingEnabled = false,
+        )
+        val state = ChatGptUiState(
+            phase = ChatGptAuthPhase.CONNECTED,
+            accounts = listOf(summary),
+            selectedAccountId = summary.id,
+        )
+
+        assertTrue(state.signedIn)
+        assertFalse(state.connected)
+    }
+
+    @Test
+    fun signedInIdentityWithPlanScopeIsConnectedForModelRouting() {
+        val summary = ChatGptAccountSummary(
+            id = "account",
+            clientId = "oaiapp_account",
+            email = "user@example.com",
+            displayName = "User",
+            signedIn = true,
+            sharingEnabled = true,
+        )
+        val state = ChatGptUiState(
+            phase = ChatGptAuthPhase.CONNECTED,
+            accounts = listOf(summary),
+            selectedAccountId = summary.id,
+        )
+
+        assertTrue(state.signedIn)
+        assertTrue(state.connected)
+    }
+
+    @Test
     fun terminalRefreshFailuresInvalidateOnlyTheRenewableSession() {
         listOf(
             "invalid_grant",

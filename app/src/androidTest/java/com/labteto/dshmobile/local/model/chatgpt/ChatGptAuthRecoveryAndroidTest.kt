@@ -30,6 +30,55 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ChatGptAuthRecoveryAndroidTest {
     @Test
+    fun signedInWithoutPlanScopeStaysSavedAndSkipsModelDiscovery() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val file = context.cacheDir.resolve("auth-no-plan-${UUID.randomUUID()}.preferences_pb")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val preferences = PreferenceDataStoreFactory.create(scope = scope, produceFile = { file })
+        val accounts = ChatGptAccountStore(preferences, Json)
+        var networkCalls = 0
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            networkCalls += 1
+            error("未启用套餐的登录账户不应访问模型目录：${chain.request().url}")
+        }.build()
+        val auth = ChatGptAuthCoordinator(
+            context,
+            accounts,
+            ChatGptHostIdentityStore(preferences),
+            ChatGptOAuthCallbackServer(),
+            ChatGptSessionManager(accounts, http, Json),
+            ChatGptIdTokenVerifier(http, Json),
+        )
+        val record = ChatGptAccountRecord(
+            id = "test-no-plan-${UUID.randomUUID()}",
+            clientId = "client",
+            issuer = CHATGPT_ISSUER,
+            subject = "subject",
+            hostId = "host",
+            idToken = "id",
+            accessToken = "access",
+            refreshToken = "refresh",
+            scopes = setOf(CHATGPT_RESOURCE_INVOKE_SCOPE),
+            accessTokenExpiresAtEpochSeconds = Long.MAX_VALUE,
+            savedAtEpochSeconds = 1,
+        )
+        try {
+            accounts.put(record)
+            auth.refresh()
+
+            assertEquals(ChatGptAuthPhase.CONNECTED, auth.state.value.phase)
+            assertTrue(auth.state.value.signedIn)
+            assertFalse(auth.state.value.connected)
+            assertTrue(auth.state.value.models.isEmpty())
+            assertEquals(0, networkCalls)
+            assertEquals(record, accounts.get(record.id))
+        } finally {
+            scope.coroutineContext[Job]!!.cancelAndJoin()
+            file.delete()
+        }
+    }
+
+    @Test
     fun failedModelProbeKeepsAuthorizationAndRecoversWithoutLogin() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val file = context.cacheDir.resolve("auth-${UUID.randomUUID()}.preferences_pb")

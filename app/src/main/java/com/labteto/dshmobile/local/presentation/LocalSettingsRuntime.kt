@@ -42,7 +42,8 @@ class LocalSettingsRuntime @Inject constructor(
         LocalSettingsMemoryContext(it.conversationMode, it.projectId, it.lineageId)
     }
     suspend fun refreshChatGpt() = chatGpt.refresh()
-    suspend fun connectChatGpt(existingAccountId: String? = null) = chatGpt.connect(existingAccountId)
+    suspend fun connectChatGpt(existingAccountId: String? = null, requestPlanConsent: Boolean = false) =
+        chatGpt.connect(existingAccountId, requestPlanConsent)
     suspend fun restartChatGptAuthorization(existingAccountId: String? = null) = chatGpt.restart(existingAccountId)
     suspend fun cancelChatGptAuthorization() = chatGpt.cancelAuthorization()
     suspend fun testChatGptAccount(id: String): String = chatGpt.test(id)

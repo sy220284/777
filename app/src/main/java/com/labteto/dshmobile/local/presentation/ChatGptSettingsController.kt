@@ -28,9 +28,9 @@ internal class ChatGptSettingsController(
         }
     }
 
-    suspend fun connect(existingAccountId: String? = null) {
+    suspend fun connect(existingAccountId: String? = null, requestPlanConsent: Boolean = false) {
         requireAccountSelectionAllowed()
-        val account = auth.connect(existingAccountId)
+        val account = auth.connect(existingAccountId, requestPlanConsent)
         if (auth.state.value.connected) syncModels(account.id, auth.state.value.models, true)
     }
 
@@ -55,9 +55,9 @@ internal class ChatGptSettingsController(
         requireAccountSelectionAllowed()
         auth.selectAccount(id)
         val snapshot = auth.state.value
-        require(
-            snapshot.phase == com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.CONNECTED,
-        ) { snapshot.error ?: "ChatGPT 账户不可用，请重新授权" }
+        require(snapshot.connected) {
+            snapshot.error ?: "ChatGPT 账户已登录，但套餐用量尚未启用"
+        }
         syncModels(id, snapshot.models, true)
     }
 
@@ -77,7 +77,7 @@ internal class ChatGptSettingsController(
 
     private suspend fun syncSelectedIfConnected() {
         val snapshot = auth.state.value
-        if (snapshot.phase == com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthPhase.CONNECTED) {
+        if (snapshot.connected) {
             snapshot.selectedAccountId?.let { syncModels(it, snapshot.models, false) }
         }
     }
