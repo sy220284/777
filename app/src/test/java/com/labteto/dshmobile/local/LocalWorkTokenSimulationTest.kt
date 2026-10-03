@@ -37,7 +37,8 @@ class LocalWorkTokenSimulationTest {
         val hundred = simulate(100)
         val twoHundred = simulate(200)
 
-        assertTrue(twenty.projectedCumulative < twenty.rawCumulative)
+        assertEquals(twenty.rawCumulative, twenty.projectedCumulative)
+        assertTrue(twenty.projectedPeak < workRequestProjectionTriggerTokens(678_464))
         assertTrue(fifty.projectedCumulative * 100 < fifty.rawCumulative * 85)
         assertTrue(hundred.projectedCumulative * 100 < hundred.rawCumulative * 75)
         assertTrue(twoHundred.projectedCumulative * 100 < twoHundred.rawCumulative * 65)
