@@ -349,7 +349,7 @@ class LocalHarnessEngine @Inject constructor(
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
 
     private val modelAccountStateCoordinator by lazy {
-        LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isRunBusy)
+        LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isModelIdentityLocked)
     }
     private val transcriptRuntime by lazy {
         LocalTranscriptRuntime(
@@ -785,9 +785,14 @@ class LocalHarnessEngine @Inject constructor(
                 // Migration may have copied an event log after the field was first constructed.
                 // Reopen it before any session load or tool can append to the migrated log.
                 eventLog = eventLogFor(currentSessionId)
-                bundledRuntimeManager.prepare()
-                pluginComposition.installStartup()
-                load()
+                prepareLocalHarnessStartup(
+                    prepareRuntime = bundledRuntimeManager::prepare,
+                    installPlugins = { pluginComposition.installStartup() },
+                    restoreSession = { load(deferReady = true) },
+                )
+                _state.update { current ->
+                    if (current.loading) current.copy(loading = false) else current
+                }
                 startNextQueuedTurnIfIdle()?.start()
                 persistentJobRecoveryCoordinator.schedule()
                 scope.launch { maybeCleanupUnreferencedLocalImages() }
@@ -827,7 +832,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) {
-        require(!isRunBusy()) { "请先结束当前任务再切换模型" }
+        check(!isModelIdentityLocked()) { "请等待初始化完成或结束当前任务后再切换模型" }
         val result = modelConfiguration.save(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
         imageCapabilities.clearRoute(result.baseUrl, result.model)
         _state.update {
@@ -858,7 +863,7 @@ class LocalHarnessEngine @Inject constructor(
             val current = _state.value
             val selected = current.modelProfiles.firstOrNull { it.id == id } ?: return@launch
             if (
-                current.loading || current.running || isRunBusy() ||
+                isModelIdentityLocked() ||
                 selected.id == modelGateway.activeProfile()?.id
             ) return@launch
             runCatching { modelConfiguration.select(id, current.modelProfiles) }
@@ -880,7 +885,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     internal fun removeModelProfile(id: String) {
-        if (isRunBusy() || _state.value.loading) return
+        if (isModelIdentityLocked()) return
         scope.launch {
             val current = _state.value
             runCatching {
@@ -2309,6 +2314,9 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    private fun isModelIdentityLocked(): Boolean =
+        _state.value.let { it.loading || it.running } || isRunBusy()
+
     private fun isRunBusy(): Boolean = synchronized(runStateLock) {
         sessionTransitioning ||
             activeJob?.isCompleted == false ||
@@ -2317,7 +2325,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun beginSessionTransition(): Boolean {
         val started = synchronized(runStateLock) {
-            if (sessionTransitioning) return@synchronized false
+            if (_state.value.loading || sessionTransitioning) return@synchronized false
             sessionTransitioning = true
             true
         }
@@ -4725,19 +4733,20 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private suspend fun load() {
+    private suspend fun load(deferReady: Boolean = false) {
         val storedModel = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
         val baseUrl = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
         val model = migrateOfficialClaudeModel(modelConfiguration.normalizeModel(storedModel), baseUrl)
         if (model != storedModel) preferences.edit().putString(KEY_MODEL, model).apply()
         modelConfiguration.prepareStartup(model, baseUrl)
-        loadSession(currentSessionId, model, baseUrl)
+        loadSession(currentSessionId, model, baseUrl, deferReady = deferReady)
     }
 
     private suspend fun loadSession(
         sessionId: String,
         model: String = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL,
         baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
+        deferReady: Boolean = false,
     ) {
         val loaded = try {
             sessionCoordinator.readWithLegacyApproval(sessionId)
@@ -4847,7 +4856,7 @@ class LocalHarnessEngine @Inject constructor(
         val restoredModel = activeModelProfile?.model ?: model
         val restoredBaseUrl = activeModelProfile?.baseUrl ?: baseUrl
         _state.value = LocalHarnessState(
-            loading = false,
+            loading = deferReady,
             configured = modelConfigured,
             model = restoredModel,
             baseUrl = restoredBaseUrl,
