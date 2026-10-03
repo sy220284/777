@@ -177,7 +177,6 @@ internal fun parseDeepSeekAnthropicUsage(root: JsonObject): DeepSeekTokenUsage {
         promptTokens = promptTokens,
         cacheHitTokens = cacheRead,
         cacheMissTokens = saturatingUsageAdd(uncachedInput, cacheCreation),
-        cacheWriteTokens = cacheCreation,
         completionTokens = (usage["output_tokens"]?.jsonPrimitive?.longOrNull ?: 0L).coerceAtLeast(0L),
         reported = true,
     )
