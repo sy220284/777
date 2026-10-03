@@ -1,5 +1,12 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,7 +20,8 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.ListAlt
+import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,8 +54,8 @@ import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
 import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -83,7 +91,9 @@ internal fun LocalConversationComposer(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     var menuOpen by remember(state.sessionId) { mutableStateOf(false) }
-    var focused by remember(state.sessionId) { mutableStateOf(false) }
+    // Keep real TextField focus across session projection changes. Otherwise the IME can remain
+    // visible while the composer is incorrectly reset to its idle one-row state.
+    var focused by remember { mutableStateOf(false) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
 
     LaunchedEffect(state.running) {
@@ -209,6 +219,9 @@ internal fun LocalConversationComposer(
     DsConversationComposer(
         surfaceColor = if (backgroundState.hasImage) Color.Transparent else colors.composerCard,
         shadowElevation = if (backgroundState.hasImage) 0.dp else 1.dp,
+        // This composer owns a targeted row reveal. Avoid a second parent size animation while
+        // the IME is already animating the whole surface.
+        animateSize = false,
     ) {
         ChatGptPlanUsageBar(activeModelProfile)
         attachments.forEachIndexed { index, attachment ->
@@ -224,9 +237,15 @@ internal fun LocalConversationComposer(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
         ) {
-            if (!expanded) {
-                MenuControl()
-                ReplySuggestionsControl()
+            AnimatedVisibility(
+                visible = !expanded,
+                enter = expandHorizontally(DsAnimations.composerReveal) + fadeIn(DsAnimations.composerFade),
+                exit = shrinkHorizontally(DsAnimations.composerReveal) + fadeOut(DsAnimations.composerFade),
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
+                    MenuControl()
+                    ReplySuggestionsControl()
+                }
             }
             DsComposerField(
                 value = input,
@@ -245,12 +264,26 @@ internal fun LocalConversationComposer(
                 maxLines = 5,
                 onFocusedChange = { focused = it },
             )
-            if (!expanded) {
+            AnimatedVisibility(
+                visible = !expanded,
+                enter = expandHorizontally(DsAnimations.composerReveal) + fadeIn(DsAnimations.composerFade),
+                exit = shrinkHorizontally(DsAnimations.composerReveal) + fadeOut(DsAnimations.composerFade),
+            ) {
                 if (state.running) StopControl() else SendControl()
             }
         }
 
-        if (expanded) {
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(
+                animationSpec = DsAnimations.composerReveal,
+                expandFrom = Alignment.Top,
+            ) + fadeIn(DsAnimations.composerFade),
+            exit = shrinkVertically(
+                animationSpec = DsAnimations.composerReveal,
+                shrinkTowards = Alignment.Top,
+            ) + fadeOut(DsAnimations.composerFade),
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -260,7 +293,7 @@ internal fun LocalConversationComposer(
                 ReplySuggestionsControl()
                 if (state.usageMode == LocalUsageMode.WORK) {
                     DsComposerAction(
-                        icon = FeatherIcons.CheckSquare,
+                        icon = Icons.Outlined.ListAlt,
                         contentDescription = stringResource(
                             if (state.planMode) R.string.local_plan_button_on
                             else R.string.local_plan_button_off,
@@ -271,7 +304,7 @@ internal fun LocalConversationComposer(
                         containerColor = if (state.planMode) colors.accentTertiary else Color.Transparent,
                     )
                     DsComposerAction(
-                        icon = Icons.Outlined.Shield,
+                        icon = Icons.Outlined.VerifiedUser,
                         contentDescription = stringResource(R.string.local_auto_approve_short),
                         onClick = if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
                         tint = if (state.safeAutoApprovalEnabled) colors.accent else colors.labelSecondary,
