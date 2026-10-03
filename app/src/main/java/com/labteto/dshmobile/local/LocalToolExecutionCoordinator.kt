@@ -60,6 +60,16 @@ internal class LocalToolExecutionCoordinator(
         )
     }
 
+    fun prepareWorkTurnCapabilities(
+        taskContext: String,
+        enableGitHub: Boolean,
+        target: MutableSet<String>? = null,
+    ) {
+        val resolvedTarget = target ?: enabledOptionalTools
+        enableTaskRelevantOptionalTools(taskContext, resolvedTarget)
+        if (enableGitHub) enableGitHubConnectorTools(resolvedTarget)
+    }
+
     fun enableGitHubConnectorTools(target: MutableSet<String> = enabledOptionalTools) {
         val githubTools = registry.names().mapNotNull(registry::get)
             .filter { tool ->
