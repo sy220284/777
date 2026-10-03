@@ -18,7 +18,7 @@ import com.labteto.dshmobile.ui.theme.DsAnimations
  */
 @Composable
 internal fun LocalFeatureAnimatedHost(
-    stack: List<LocalFeaturePage>,
+    stack: List<String>,
     modifier: Modifier = Modifier,
     content: @Composable (LocalFeaturePage) -> Unit,
 ) {
