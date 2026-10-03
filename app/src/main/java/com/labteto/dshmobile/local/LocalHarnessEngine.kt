@@ -2928,11 +2928,8 @@ class LocalHarnessEngine @Inject constructor(
         val runPolicy = localAgentRunPolicy(runState.value.usageMode)
         clearRunCapabilities(binding)
         if (runState.value.usageMode == LocalUsageMode.WORK) {
-            val capabilityIntent = LocalToolCapabilityIntent.from(input, runHistory.snapshot())
             toolExecutionCoordinator.prepareWorkTurnCapabilities(
-                capabilityIntent.context,
-                capabilityIntent.requestsGitHub && runCatching { githubCredentials.configured() }.getOrDefault(false),
-                binding?.enabledOptionalTools,
+                input, runHistory.snapshot(), githubCredentials::configured, binding?.enabledOptionalTools,
             )
         }
         if (runState.value.usageMode == LocalUsageMode.CHAT) {

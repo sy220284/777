@@ -39,7 +39,7 @@ internal class LocalConversationFilesCoordinator(
                 ?.value
         }?.let { return it }
 
-        val projected = localConversationFiles(log.events(), files)
+        val projected = log.withEvents { localConversationFiles(it, files) }
         synchronized(lock) {
             cache[sessionId] = CacheEntry(
                 eventStamp = eventStamp,

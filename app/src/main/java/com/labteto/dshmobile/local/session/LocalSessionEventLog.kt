@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
-/** Android-facing adapter kept source-compatible while storage lives in the native core module. */
+/** Android-facing event adapter; durable storage lives in the native core module. */
 class LocalSessionEventLog(
     private val file: File,
     private val json: Json,
@@ -69,16 +69,20 @@ class LocalSessionEventLog(
         delegate.pageAfter(sequenceExclusive, limit).map { it.toLocalEvent() }
 
     /**
-     * Stream durable events in sequence order without materializing the whole session in memory.
-     * UI projections such as conversation files only keep their compact projection state.
+     * Consume a frozen durable stream within [block], without materializing the whole session.
+     * The sequence must not escape the block. Early return, failure and full traversal all close
+     * every snapshot and decompressor; suspended sequence builders cannot own these resources.
      */
-    fun events(): Sequence<Event> = sequence {
+    fun <T> withEvents(block: (Sequence<Event>) -> T): T {
         val snapshots = delegate.openDurableFileSnapshot()
+        var activeReader: java.io.BufferedReader? = null
         try {
-            for (source in snapshots) {
-                val frozenInput = SnapshotBoundedInputStream(source.input, source.length)
-                (if (source.name.endsWith(".gz")) GZIPInputStream(frozenInput).bufferedReader()
-                else frozenInput.bufferedReader()).use { reader ->
+            return block(sequence {
+                for (source in snapshots) {
+                    val frozenInput = SnapshotBoundedInputStream(source.input, source.length)
+                    val reader = (if (source.name.endsWith(".gz")) GZIPInputStream(frozenInput)
+                    else frozenInput).bufferedReader()
+                    activeReader = reader
                     while (true) {
                         val line = reader.readLine() ?: break
                         val event = runCatching {
@@ -86,9 +90,12 @@ class LocalSessionEventLog(
                         }.getOrNull() ?: continue
                         yield(event)
                     }
+                    reader.close()
+                    activeReader = null
                 }
-            }
+            })
         } finally {
+            runCatching { activeReader?.close() }
             snapshots.forEach { runCatching { it.close() } }
         }
     }

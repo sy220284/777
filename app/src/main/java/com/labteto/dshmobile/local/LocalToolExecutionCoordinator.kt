@@ -7,6 +7,7 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.observability.AppLog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.JsonArray
@@ -58,6 +59,25 @@ internal class LocalToolExecutionCoordinator(
             LocalToolRouter.relevantOptionalToolNames(tools, taskContext),
             target,
         )
+    }
+
+    suspend fun prepareWorkTurnCapabilities(
+        input: String,
+        history: List<JsonObject>,
+        gitHubConfigured: suspend () -> Boolean,
+        target: MutableSet<String>? = null,
+    ) {
+        val intent = LocalToolCapabilityIntent.from(input, history)
+        val enableGitHub = if (intent.requestsGitHub) {
+            try {
+                gitHubConfigured()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                false
+            }
+        } else false
+        prepareWorkTurnCapabilities(intent.context, enableGitHub, target)
     }
 
     fun prepareWorkTurnCapabilities(

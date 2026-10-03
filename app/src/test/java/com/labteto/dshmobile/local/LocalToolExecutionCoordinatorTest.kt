@@ -23,6 +23,20 @@ import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
     @Test
+    fun workIntentDoesNotReadGitHubCredentialsForUnrelatedTaskAndPropagatesCancellation() = runBlocking {
+        val coordinator = coordinator(ToolRegistry())
+        var reads = 0
+        coordinator.prepareWorkTurnCapabilities("整理本地文件", emptyList(), { reads++; true })
+        assertEquals(0, reads)
+        val cancelled = kotlinx.coroutines.CancellationException("cancelled credential read")
+        val failure = runCatching {
+            coordinator.prepareWorkTurnCapabilities("检查 GitHub PR", emptyList(), { throw cancelled })
+        }.exceptionOrNull()
+        org.junit.Assert.assertSame(cancelled, failure)
+        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
+    }
+
+    @Test
     fun toolContextInheritsFrozenRunProfileAndDoesNotLeakAfterScope() = runBlocking {
         val registry = ToolRegistry()
         val observed = mutableListOf<LocalModelProfile?>()
