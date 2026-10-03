@@ -228,7 +228,7 @@ internal class LocalToolOutputStore(
     }
 
     companion object {
-        const val DEFAULT_READ_BYTES = 24 * 1024
+        const val DEFAULT_READ_BYTES = 4 * 1024
         const val MAX_READ_BYTES = 48 * 1024
         private const val MIN_READ_BYTES = 1_024
         private const val DEFAULT_MAX_OUTPUT_BYTES = 16 * 1024 * 1024
