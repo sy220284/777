@@ -27,12 +27,18 @@ internal fun resolveCharacterBehavior(
     val lifeRelated = !highPriority &&
         state.lifeState.currentBeat.isNotBlank() &&
         relatedAttentionText(state.lifeState.currentBeat, userInput)
-
+    val characterEngaged = persona.attentionBiases.any { bias ->
+        attention.noticed.any { noticed -> attentionBiasMatches(bias, noticed) }
+    }
 
     return when {
         highPriority -> CharacterBehaviorProjection(
             CharacterBehaviorMode.NORMAL,
             "先准确回应真正的信息型问题、拒绝、边界或承诺；身体和情绪仍可以影响语气与长度，但不能拿来漏答关键内容。",
+        )
+        characterEngaged -> CharacterBehaviorProjection(
+            CharacterBehaviorMode.NORMAL,
+            "当前话题正好落在人物天然会注意和在意的内容上；即使有些累，也优先自然接住，不机械压成极简回复。",
         )
         physicalLoad == CharacterPhysicalLoad.CONSTRAINED -> CharacterBehaviorProjection(
             CharacterBehaviorMode.BRIEF,
