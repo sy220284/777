@@ -68,14 +68,102 @@ class LocalSessionEventLogTest {
             val firstSequence = log.latestSequence()
             assertEquals(
                 log.snapshot().map { it.sequence to it.type },
-                log.events().map { it.sequence to it.type }.toList(),
+                log.withEvents { events -> events.map { it.sequence to it.type }.toList() },
             )
 
             log.append("test/next", buildJsonObject { put("value", "next") })
 
             assertTrue(log.latestSequence() > firstSequence)
-            assertEquals("test/next", log.events().last().type)
+            assertEquals("test/next", log.withEvents { it.last().type })
         } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun streamedEventsDoNotReadRowsAppendedAfterIterationSnapshotOpens() {
+        val directory = Files.createTempDirectory("local-event-stream-snapshot").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = LocalSessionEventLog(file, json, maxBytes = 4_096)
+            log.append("test/first", buildJsonObject { put("value", "first") })
+
+            log.withEvents { events ->
+                val iterator = events.iterator()
+                assertTrue(iterator.hasNext())
+                val first = iterator.next()
+                log.append("test/late", buildJsonObject { put("value", "late") })
+
+                assertEquals("test/first", first.type)
+                assertTrue(!iterator.hasNext())
+            }
+            assertEquals("test/late", log.withEvents { it.last().type })
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun scopedStreamSurvivesSegmentCompressionBetweenRows() {
+        val directory = Files.createTempDirectory("local-event-archive-snapshot").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        val writer = com.labteto.dshmobile.harness.session.SessionEventLog(file, json, maxBytes = 700)
+        repeat(20) { index ->
+            writer.append("test/event", buildJsonObject { put("value", "$index-" + "x".repeat(60)) })
+        }
+        writer.close()
+        val log = LocalSessionEventLog(file, json, maxBytes = 700)
+        val archiver = com.labteto.dshmobile.harness.session.SessionEventLog(file, json, maxBytes = 700)
+        try {
+            val observed = log.withEvents { events ->
+                val iterator = events.iterator()
+                val first = iterator.next()
+                assertTrue(archiver.archiveLegacySegments(limit = 16) > 0)
+                listOf(first.sequence) + iterator.asSequence().map { it.sequence }.toList()
+            }
+            assertEquals((0L until 20L).toList(), observed)
+        } finally {
+            archiver.close()
+            log.close()
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun scopedStreamClosesSnapshotsAfterEarlyReturnAndConsumerFailure() {
+        val directory = Files.createTempDirectory("local-event-scoped").toFile()
+        val log = LocalSessionEventLog(directory.resolve("session.events.jsonl"), json, maxBytes = 1_048_576)
+        try {
+            repeat(20) { index ->
+                log.append("test/event", buildJsonObject { put("value", "$index-" + "x".repeat(60)) })
+            }
+            // Fixed raw and compressed segments exercise unread snapshots without racing the
+            // asynchronous rotation archiver. Their contents are valid durable event rows.
+            val bytes = directory.resolve("session.events.jsonl").readBytes()
+            directory.resolve("session.events.jsonl.part-0").writeBytes(bytes)
+            java.util.zip.GZIPOutputStream(
+                directory.resolve("session.events.jsonl.part-1.gz").outputStream(),
+            ).use { it.write(bytes) }
+            val descriptors = java.io.File("/proc/self/fd")
+            org.junit.Assume.assumeTrue(descriptors.isDirectory)
+            fun openSnapshots() = descriptors.listFiles().orEmpty().count { descriptor ->
+                runCatching { Files.readSymbolicLink(descriptor.toPath()).toString() }
+                    .getOrNull()?.startsWith(directory.absolutePath) == true
+            }
+            val before = openSnapshots()
+            repeat(20) {
+                assertEquals("test/event", log.withEvents { it.first().type })
+                val failure = runCatching {
+                    log.withEvents { events ->
+                        events.first()
+                        error("consumer failed")
+                    }
+                }.exceptionOrNull()
+                assertEquals("consumer failed", failure?.message)
+            }
+            assertEquals(before, openSnapshots())
+        } finally {
+            log.close()
             directory.deleteRecursively()
         }
     }

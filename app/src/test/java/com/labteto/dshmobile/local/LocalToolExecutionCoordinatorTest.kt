@@ -23,6 +23,51 @@ import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
     @Test
+    fun githubKeywordPreactivationCannotBypassNegationOrCredentialGate() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool(
+                name = "github_status",
+                access = ToolAccess.NETWORK,
+                approval = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL,
+                family = "GitHub",
+                keywords = setOf("github", "pr"),
+            ) { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        val history = listOf(buildJsonObject {
+            put("role", "user")
+            put("content", "检查 GitHub PR")
+        })
+        var credentialReads = 0
+        coordinator.prepareWorkTurnCapabilities("不使用github，继续本地工作", history, { credentialReads++; true })
+        assertEquals(0, credentialReads)
+        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
+        coordinator.prepareWorkTurnCapabilities("检查 GitHub PR", emptyList(), { false })
+        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
+        val detached = linkedSetOf<String>()
+        coordinator.prepareWorkTurnCapabilities("检查 GitHub PR", emptyList(), { true }, detached)
+        assertEquals(setOf("github_status"), detached)
+        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
+        // Explicit discovery remains available even without automatic pre-activation.
+        assertTrue(coordinator.searchCapabilities("github").contains("github_status"))
+    }
+
+    @Test
+    fun workIntentDoesNotReadGitHubCredentialsForUnrelatedTaskAndPropagatesCancellation() = runBlocking {
+        val coordinator = coordinator(ToolRegistry())
+        var reads = 0
+        coordinator.prepareWorkTurnCapabilities("整理本地文件", emptyList(), { reads++; true })
+        assertEquals(0, reads)
+        val cancelled = kotlinx.coroutines.CancellationException("cancelled credential read")
+        val failure = runCatching {
+            coordinator.prepareWorkTurnCapabilities("检查 GitHub PR", emptyList(), { throw cancelled })
+        }.exceptionOrNull()
+        org.junit.Assert.assertSame(cancelled, failure)
+        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
+    }
+
+    @Test
     fun toolContextInheritsFrozenRunProfileAndDoesNotLeakAfterScope() = runBlocking {
         val registry = ToolRegistry()
         val observed = mutableListOf<LocalModelProfile?>()
@@ -344,6 +389,44 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun explicitTaskIntentPreEnablesMatchingCapabilityWithoutInflatingUnrelatedTurns() {
+        val registry = ToolRegistry().apply {
+            register(
+                tool(
+                    name = "web_search",
+                    access = ToolAccess.NETWORK,
+                    approval = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "网络",
+                    keywords = setOf("联网", "网页搜索"),
+                ) { ToolResult("ok") },
+            )
+            register(
+                tool(
+                    name = "memory_update",
+                    access = ToolAccess.SESSION_WRITE,
+                    approval = ToolApprovalPolicy.ALWAYS,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "记忆",
+                    keywords = setOf("更新记忆"),
+                ) { ToolResult("ok") },
+            )
+        }
+        val coordinator = coordinator(registry)
+
+        coordinator.enableTaskRelevantOptionalTools("继续修改本地代码")
+        assertEquals(0, coordinator.visibleSchemas(localAgentRunPolicy(LocalUsageMode.WORK)).size)
+
+        coordinator.enableTaskRelevantOptionalTools("联网搜索最新文档")
+        assertEquals(
+            listOf("web_search"),
+            LocalToolSchemaProjection(registry, coordinator).names(
+                coordinator.visibleSchemas(localAgentRunPolicy(LocalUsageMode.WORK)),
+            ),
+        )
+    }
+
+    @Test
     fun subagentSchemaProjectionPreservesReadOnlyAndVirtualScreenBoundaries() {
         val registry = ToolRegistry().apply {
             register(
@@ -387,6 +470,33 @@ class LocalToolExecutionCoordinatorTest {
             ),
         )
         assertEquals(listOf("read", "android_vscreen_status"), withVirtualScreen)
+    }
+
+    @Test
+    fun planModeSchemaProjectionOmitsToolsThatExecutionWouldReject() {
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { ToolResult("ok") })
+            register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) { ToolResult("ok") })
+            register(
+                tool(
+                    name = "remote_lookup",
+                    access = ToolAccess.NETWORK,
+                    approval = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "网络",
+                    keywords = setOf("联网"),
+                ) { ToolResult("ok") },
+            )
+        }
+        val projection = LocalToolSchemaProjection(registry, coordinator(registry))
+        val schemas = projection.modelSchemas(
+            policy = localAgentRunPolicy(LocalUsageMode.WORK),
+            state = LocalHarnessState(planMode = true),
+            history = emptyList(),
+            enabledOptional = setOf("remote_lookup"),
+        )
+
+        assertEquals(listOf("read", "remote_lookup"), projection.names(schemas))
     }
 
     private fun coordinator(

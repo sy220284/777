@@ -36,6 +36,38 @@ class LocalPromptPressureTest {
     }
 
     @Test
+    fun pressureStoreKeepsLatestWorkAssessmentAlongsidePressure() {
+        val store = LocalRequestPressureStore()
+        val pressure = LocalPromptPressure(
+            contextChars = 100,
+            estimatedInputTokens = 30_000,
+            systemTokens = 3_000,
+            historyTokens = 22_000,
+            currentUserTokens = 2_000,
+            toolDefinitionTokens = 3_000,
+            operationalLimitTokens = 678_464,
+        )
+        val assessment = assessWorkStepContext(
+            current = pressure,
+            previous = null,
+            targetTokens = 28_000,
+            baseTriggerTokens = 36_000,
+        )
+
+        store.record("work", pressure, assessment)
+        val laterChatPressure = pressure.copy(
+            estimatedInputTokens = 9_000,
+            historyTokens = 3_000,
+            currentUserTokens = 2_000,
+        )
+        store.record("work", laterChatPressure)
+
+        assertEquals(laterChatPressure, store.latest("work"))
+        assertEquals(pressure, store.latestWork("work"))
+        assertEquals(assessment, store.workAssessment("work"))
+    }
+
+    @Test
     fun pressureStoreBoundsSessionsAndResetsGenerationPrefillAfterCompaction() {
         val store = LocalRequestPressureStore(maxSessions = 2)
         val pressure = LocalPromptPressure(

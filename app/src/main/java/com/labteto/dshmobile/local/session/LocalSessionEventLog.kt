@@ -5,12 +5,14 @@ import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
+import java.io.FilterInputStream
+import java.io.InputStream
 import java.util.zip.GZIPInputStream
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
-/** Android-facing adapter kept source-compatible while storage lives in the native core module. */
+/** Android-facing event adapter; durable storage lives in the native core module. */
 class LocalSessionEventLog(
     private val file: File,
     private val json: Json,
@@ -67,21 +69,34 @@ class LocalSessionEventLog(
         delegate.pageAfter(sequenceExclusive, limit).map { it.toLocalEvent() }
 
     /**
-     * Stream durable events in sequence order without materializing the whole session in memory.
-     * UI projections such as conversation files only keep their compact projection state.
+     * Consume a frozen durable stream within [block], without materializing the whole session.
+     * The sequence must not escape the block. Early return, failure and full traversal all close
+     * every snapshot and decompressor; suspended sequence builders cannot own these resources.
      */
-    fun events(): Sequence<Event> = sequence {
-        for (source in orderedFiles()) {
-            (if (source.name.endsWith(".gz")) GZIPInputStream(source.inputStream().buffered()).bufferedReader()
-            else source.bufferedReader()).use { reader ->
-                while (true) {
-                    val line = reader.readLine() ?: break
-                    val event = runCatching {
-                        json.decodeFromString(Event.serializer(), line)
-                    }.getOrNull() ?: continue
-                    yield(event)
+    fun <T> withEvents(block: (Sequence<Event>) -> T): T {
+        val snapshots = delegate.openDurableFileSnapshot()
+        var activeReader: java.io.BufferedReader? = null
+        try {
+            return block(sequence {
+                for (source in snapshots) {
+                    val frozenInput = SnapshotBoundedInputStream(source.input, source.length)
+                    val reader = (if (source.name.endsWith(".gz")) GZIPInputStream(frozenInput)
+                    else frozenInput).bufferedReader()
+                    activeReader = reader
+                    while (true) {
+                        val line = reader.readLine() ?: break
+                        val event = runCatching {
+                            json.decodeFromString(Event.serializer(), line)
+                        }.getOrNull() ?: continue
+                        yield(event)
+                    }
+                    reader.close()
+                    activeReader = null
                 }
-            }
+            })
+        } finally {
+            runCatching { activeReader?.close() }
+            snapshots.forEach { runCatching { it.close() } }
         }
     }
 
@@ -122,20 +137,33 @@ class LocalSessionEventLog(
         data = data,
     )
 
-    private fun orderedFiles(): List<File> {
-        val parent = file.parentFile ?: return listOfNotNull(file.takeIf(File::isFile))
-        val prefix = "${file.name}.part-"
-        val segments = parent.listFiles().orEmpty()
-            .filter { it.isFile && it.name.startsWith(prefix) &&
-                Regex("[0-9]+(?:\\.gz)?").matches(it.name.removePrefix(prefix)) }
-            .mapNotNull { candidate ->
-                candidate.name.removePrefix(prefix).removeSuffix(".gz").toIntOrNull()
-                    ?.let { it to candidate }
-            }
-            .groupBy({ it.first }, { it.second })
-            .toSortedMap()
-            .values.map { copies -> copies.firstOrNull { !it.name.endsWith(".gz") } ?: copies.first() }
-        return segments + listOfNotNull(file.takeIf(File::isFile))
+    private class SnapshotBoundedInputStream(
+        input: InputStream,
+        length: Long,
+    ) : FilterInputStream(input) {
+        private var remaining = length.coerceAtLeast(0L)
+
+        override fun read(): Int {
+            if (remaining <= 0L) return -1
+            val value = super.read()
+            if (value >= 0) remaining--
+            return value
+        }
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+            if (remaining <= 0L) return -1
+            val allowed = minOf(length.toLong(), remaining).toInt()
+            val count = super.read(buffer, offset, allowed)
+            if (count > 0) remaining -= count
+            return count
+        }
+
+        override fun skip(count: Long): Long {
+            if (remaining <= 0L) return 0L
+            val skipped = super.skip(minOf(count, remaining))
+            remaining -= skipped
+            return skipped
+        }
     }
 
     private companion object {

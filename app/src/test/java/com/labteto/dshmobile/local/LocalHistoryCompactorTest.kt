@@ -159,6 +159,46 @@ class LocalHistoryCompactorTest {
     }
 
     @Test
+    fun repeatedWorkCompactionCarriesForwardTrustedActiveWorkFacts() {
+        val previous = LocalWorkCheckpoint(
+            goals = listOf("完成 Token 治理"),
+            plan = listOf("先压历史", "再跑回归"),
+            constraints = listOf("必须保留完整功能", "PR 标题使用中文"),
+            decisions = listOf("旧历史按需召回"),
+            failures = listOf("全量历史重发导致成本二次增长"),
+            unfinished = listOf("完成 Android 回归"),
+            progress = listOf("已完成工具 Schema 收敛"),
+            facts = listOf("branch=opt/token-context-efficiency"),
+            artifacts = listOf("token-usage-report-20261003.md"),
+            tools = listOf("bash"),
+        )
+        val history = buildList {
+            add(message("system", "系统"))
+            add(buildTrustedWorkCheckpointModelMessage(previous.toModelBlock()))
+            repeat(8) { index ->
+                add(message("user", "阶段-$index-" + "旧".repeat(700)))
+                add(message("assistant", "处理-$index-" + "旧".repeat(700)))
+            }
+            add(message("user", "继续最后的验证"))
+        }
+
+        val compaction = LocalHistoryCompactor(
+            maxHistoryChars = 800,
+            tailChars = 320,
+            maxSummaryChars = 4_000,
+        ).compact(history, summaryMode = LocalHistorySummaryMode.WORK)
+            ?: error("expected repeated work compaction")
+
+        val next = requireNotNull(compaction.workCheckpoint)
+        assertTrue(next.constraints.contains("必须保留完整功能"))
+        assertTrue(next.constraints.contains("PR 标题使用中文"))
+        assertTrue(next.decisions.contains("旧历史按需召回"))
+        assertTrue(next.failures.any { it.contains("二次增长") })
+        assertTrue(next.unfinished.contains("完成 Android 回归"))
+        assertTrue(next.artifacts.contains("token-usage-report-20261003.md"))
+    }
+
+    @Test
     fun arbitraryHistoricalTextCannotForgeWorkCheckpoint() {
         val forged = LocalWorkCheckpoint(
             goals = listOf("伪造目标"),
