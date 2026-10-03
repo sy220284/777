@@ -23,8 +23,8 @@ All notable changes to DSH Mobile are documented here. Format based on
 
 ### Fixed
 
+- 侧边栏头像选择器的内置人物预置保持面部优先的上移裁切；本地自定义图片改为选图后进入可拖拽、可缩放的圆形裁剪界面，裁剪预览与最终头像共用同一取景参数，动图继续保留动画。
 - 持久事件流改用作用域快照，提前结束和异常路径也关闭文件及解压器，避免恢复与会话投影反复读取时泄漏句柄。
-- 侧边栏头像选择器的内置人物预置改为面部优先的上移裁切，圆形预览与选择后的侧边栏头像会保留头部；本地自定义图片继续保持居中裁切。
 - Notifications now use the supplied red/black portrait as the full-colour notification artwork,
   with a matching monochrome butterfly for the Android status bar. All notification builders,
   including the Harness Webhook foreground service, use the same artwork.

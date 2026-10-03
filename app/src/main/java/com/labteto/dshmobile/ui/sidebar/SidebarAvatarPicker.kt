@@ -76,16 +76,23 @@ internal fun SidebarAvatarPicker(modifier: Modifier = Modifier) {
     var sheetOpen by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var pendingCustom by remember { mutableStateOf<PreparedSidebarAvatar?>(null) }
     val saveFailedText = stringResource(R.string.sidebar_avatar_save_failed)
     val setFailedText = stringResource(R.string.sidebar_avatar_set_failed)
     val resetFailedText = stringResource(R.string.sidebar_avatar_reset_failed)
 
     val customPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
+        if (uri == null) {
+            sheetOpen = true
+            return@rememberLauncherForActivityResult
+        }
         busy = true
         scope.launch {
-            runCatching { store.importCustom(uri) }
-                .onSuccess { error = null }
+            runCatching { store.prepareCustom(uri) }
+                .onSuccess { prepared ->
+                    pendingCustom = prepared
+                    error = null
+                }
                 .onFailure {
                     error = it.message ?: saveFailedText
                     sheetOpen = true
@@ -159,6 +166,32 @@ internal fun SidebarAvatarPicker(modifier: Modifier = Modifier) {
                             sheetOpen = false
                         }
                         .onFailure { error = it.message ?: resetFailedText }
+                    busy = false
+                }
+            },
+        )
+    }
+
+    pendingCustom?.let { prepared ->
+        SidebarAvatarCropper(
+            prepared = prepared,
+            busy = busy,
+            error = error,
+            onCancel = {
+                pendingCustom = null
+                error = null
+                sheetOpen = true
+                scope.launch { store.discardCustom(prepared) }
+            },
+            onConfirm = { crop ->
+                busy = true
+                scope.launch {
+                    runCatching { store.saveCustom(prepared, crop) }
+                        .onSuccess {
+                            pendingCustom = null
+                            error = null
+                        }
+                        .onFailure { error = it.message ?: saveFailedText }
                     busy = false
                 }
             },
@@ -270,9 +303,18 @@ private fun SidebarAvatarSheet(
 }
 
 @Composable
-private fun SidebarAvatarImage(source: SidebarAvatarSource, contentDescription: String) {
+internal fun SidebarAvatarImage(
+    source: SidebarAvatarSource,
+    contentDescription: String,
+    decodeEdge: Float = AVATAR_DECODE_EDGE,
+) {
     val context = LocalContext.current
-    val drawable by produceState<Drawable?>(initialValue = null, source) {
+    val mediaKey = when (source) {
+        SidebarAvatarSource.Default -> "default"
+        is SidebarAvatarSource.Bundled -> "asset:${source.assetPath}"
+        is SidebarAvatarSource.Custom -> "file:${source.file.absolutePath}"
+    }
+    val drawable by produceState<Drawable?>(initialValue = null, mediaKey, decodeEdge) {
         value = withContext(Dispatchers.IO) {
             if (source is SidebarAvatarSource.Default) return@withContext null
             runCatching {
@@ -291,7 +333,7 @@ private fun SidebarAvatarImage(source: SidebarAvatarSource, contentDescription: 
                 ImageDecoder.decodeDrawable(imageSource) { decoder, info, _ ->
                     val width = info.size.width
                     val height = info.size.height
-                    val scale = maxOf(width, height).toFloat() / AVATAR_DECODE_EDGE
+                    val scale = maxOf(width, height).toFloat() / decodeEdge.coerceAtLeast(AVATAR_DECODE_EDGE)
                     if (scale > 1f) {
                         decoder.setTargetSize(
                             (width / scale).toInt().coerceAtLeast(1),
@@ -332,6 +374,7 @@ private fun SidebarAvatarImage(source: SidebarAvatarSource, contentDescription: 
             factory = { viewContext -> SidebarAvatarImageView(viewContext) },
             update = { imageView ->
                 imageView.contentDescription = contentDescription
+                imageView.customCrop = (source as? SidebarAvatarSource.Custom)?.crop
                 imageView.focusY = when (source) {
                     is SidebarAvatarSource.Bundled -> BUNDLED_AVATAR_FOCUS_Y
                     else -> CENTERED_AVATAR_FOCUS_Y
@@ -345,6 +388,13 @@ private fun SidebarAvatarImage(source: SidebarAvatarSource, contentDescription: 
 }
 
 private class SidebarAvatarImageView(context: Context) : AppCompatImageView(context) {
+    var customCrop: SidebarAvatarCrop? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            updateCropMatrix()
+        }
+
     var focusY: Float = CENTERED_AVATAR_FOCUS_Y
         set(value) {
             val normalized = value.coerceIn(0f, 1f)
@@ -369,7 +419,15 @@ private class SidebarAvatarImageView(context: Context) : AppCompatImageView(cont
 
     private fun updateCropMatrix() {
         val currentDrawable = drawable ?: return
-        val transform = calculateSidebarAvatarCrop(
+        val transform = customCrop?.let { crop ->
+            calculateSidebarAvatarCustomCrop(
+                sourceWidth = currentDrawable.intrinsicWidth,
+                sourceHeight = currentDrawable.intrinsicHeight,
+                targetWidth = width,
+                targetHeight = height,
+                crop = crop,
+            )
+        } ?: calculateSidebarAvatarCrop(
             sourceWidth = currentDrawable.intrinsicWidth,
             sourceHeight = currentDrawable.intrinsicHeight,
             targetWidth = width,
