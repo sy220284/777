@@ -509,6 +509,7 @@ class OpenAiResponsesClientTest {
         assertEquals("stable-session-key", payload["prompt_cache_key"]?.jsonPrimitive?.content)
         val options = payload["prompt_cache_options"]?.jsonObject
             ?: error("missing prompt cache options")
+        assertEquals("implicit", options["mode"]?.jsonPrimitive?.content)
         assertEquals("30m", options["ttl"]?.jsonPrimitive?.content)
     }
 
@@ -530,6 +531,7 @@ class OpenAiResponsesClientTest {
         val apiOptions = apiPayload["prompt_cache_options"]?.jsonObject
             ?: error("missing prompt cache options")
         assertEquals("resp-before", apiOptions["comparison_response_id"]?.jsonPrimitive?.content)
+        assertEquals("implicit", apiOptions["mode"]?.jsonPrimitive?.content)
         assertEquals("30m", apiOptions["ttl"]?.jsonPrimitive?.content)
 
         val planPayload = client.buildPayload(
