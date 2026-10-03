@@ -47,6 +47,7 @@ internal fun GroupChatMemberAvatar(member: LocalGroupChatMember, active: Boolean
                     contentDescription = member.displayName,
                     modifier = Modifier.fillMaxSize().clip(CircleShape),
                     contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
                 )
             } else {
                 Text(
@@ -79,6 +80,7 @@ internal fun LocalPersonaHeaderAvatar(name: String, portraitPath: String) {
                     contentDescription = name,
                     modifier = Modifier.fillMaxSize().clip(CircleShape),
                     contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
                 )
             } else {
                 Text(

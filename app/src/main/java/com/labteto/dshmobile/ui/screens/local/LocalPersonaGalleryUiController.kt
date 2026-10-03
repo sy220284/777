@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.webkit.MimeTypeMap
+import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.ChatCharacterState
@@ -250,7 +251,7 @@ suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry
             ?.takeIf { it in setOf("jpg", "jpeg", "png", "webp", "heic", "heif") }
             ?: "jpg"
         val portraitDir = File(appContext.filesDir, "local-harness/chat/persona-portraits").apply {
-            check(exists() || mkdirs()) { "无法创建人物立绘目录" }
+            check(exists() || mkdirs()) { appContext.getString(R.string.persona_gallery_portrait_dir_failed) }
         }
         val safeId = id.replace(Regex("""[^A-Za-z0-9._-]"""), "_").take(80)
         val target = File(portraitDir, "$safeId-${System.currentTimeMillis()}.$extension")
@@ -340,13 +341,9 @@ internal suspend fun importGalleryPersona(
 suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runCatching {
     val preset = PersonaPresetCatalog.find(id) ?: error("人物预置不存在")
     val entry = withContext(Dispatchers.IO) {
-        galleryStore.save(
-            persona = preset.persona,
-            sourceSessionId = "",
-            history = emptyList(),
-            chatState = ChatCharacterState(),
-            notes = "",
-        ).entry.also { _gallery.value = galleryStore.list() }
+        PersonaPresetArtworkInstaller(appContext, galleryStore).install(preset).also {
+            _gallery.value = runCatching { galleryStore.list() }.getOrDefault(_gallery.value)
+        }
     }
     entry
 }

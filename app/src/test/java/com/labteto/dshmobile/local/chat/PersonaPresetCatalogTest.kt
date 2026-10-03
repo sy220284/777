@@ -9,9 +9,32 @@ class PersonaPresetCatalogTest {
     @Test
     fun starterPresetsCoverFourFranchisesAndUseStableIds() {
         val presets = PersonaPresetCatalog.presets
+        val expectedIds = setOf(
+            "genshin-kamisato-ayaka",
+            "genshin-xiao",
+            "genshin-yoimiya",
+            "genshin-klee",
+            "genshin-sayu",
+            "genshin-furina",
+            "hsr-kafka",
+            "hsr-dan-heng",
+            "hsr-sparkle",
+            "hsr-sparxie",
+            "hsr-evernight",
+            "hsr-firefly",
+            "hsr-march-7th",
+            "wwm-zhao-er",
+            "wwm-hongxian",
+            "wwm-jiang-yan",
+            "wwm-chen-zixi",
+            "wwm-chen-shen",
+            "love-deepspace-li-shen",
+            "love-deepspace-shen-xinghui",
+            "love-deepspace-xia-yizhou",
+        )
 
-        assertEquals(4, presets.size)
-        assertEquals(presets.size, presets.map { it.id }.distinct().size)
+        assertEquals(expectedIds, presets.map { it.id }.toSet())
+        assertEquals(expectedIds.size, presets.size)
         assertEquals(
             setOf("原神", "崩坏：星穹铁道", "燕云十六声", "恋与深空"),
             presets.map { it.franchise }.toSet(),
@@ -37,6 +60,28 @@ class PersonaPresetCatalogTest {
             assertTrue(preset.persona.behaviorPatterns.isNotEmpty())
             assertTrue(preset.persona.hardConstraints.isNotEmpty())
             assertTrue(preset.persona.speechStyle.isNotBlank())
+        }
+    }
+
+    @Test
+    fun bundledPresetArtworkMustStayUnderDedicatedAssetDirectory() {
+        val artworkPaths = PersonaPresetCatalog.presets.associate { preset ->
+            preset.id to requireNotNull(preset.artwork).assetPath
+        }.toMap()
+
+        assertEquals(
+            PersonaPresetCatalog.presets.associate { preset ->
+                preset.id to "persona-presets/${preset.id}.webp"
+            },
+            artworkPaths,
+        )
+        artworkPaths.values.forEach { assetPath ->
+            assertTrue(assetPath.startsWith("persona-presets/"))
+            assertTrue(".." !in assetPath)
+            assertTrue(
+                assetPath.substringAfterLast('.', "").lowercase() in
+                    setOf("jpg", "jpeg", "png", "webp"),
+            )
         }
     }
 }
