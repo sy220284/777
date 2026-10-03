@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.BuildConfig
@@ -24,6 +26,9 @@ import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsIconBox
+import com.labteto.dshmobile.ui.components.DsIconFamily
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessScreen
 import com.labteto.dshmobile.ui.screens.main.MainScreen
 import com.labteto.dshmobile.ui.screens.pair.PairScreen
@@ -37,6 +42,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.ThemePreference
+import com.labteto.dshmobile.ui.theme.rootSurface
 
 private enum class RootSurface { LOCAL, REMOTE }
 private enum class RootOverlay { TASKS, TOOLS, SETTINGS, PAIR }
@@ -248,18 +254,27 @@ private fun RemoteRelayStatus(
     onBack: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.fillMaxSize().background(colors.rootSurface()),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
         ) {
-            if (!failed) CircularProgressIndicator(color = colors.accent)
+            DsIconBox(
+                icon = if (failed) FeatherIcons.AlertTriangle else FeatherIcons.Device,
+                family = if (failed) DsIconFamily.Amber else DsIconFamily.Accent,
+                active = !failed,
+            )
             Text(
                 stringResource(
                     if (failed) R.string.relay_status_failed_title else R.string.relay_status_connecting_title,
                 ),
                 style = DsType.large20.withReadingWeight(),
                 color = colors.labelPrimary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = DsSpacing.xlarge),
             )
             Text(
                 stringResource(
@@ -267,6 +282,8 @@ private fun RemoteRelayStatus(
                 ),
                 style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = DsSpacing.xlarge),
             )
             if (failed) {
                 DsButton(
