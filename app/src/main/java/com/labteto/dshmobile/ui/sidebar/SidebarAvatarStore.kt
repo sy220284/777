@@ -21,6 +21,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+internal data class PreparedSidebarAvatar(
+    val file: File,
+    val width: Int,
+    val height: Int,
+)
+
 @Singleton
 class SidebarAvatarStore @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -40,13 +46,31 @@ class SidebarAvatarStore @Inject constructor(
         replaceSource(bundledSidebarAvatarSource(normalized))
     }
 
-    suspend fun importCustom(uri: Uri) = mutationMutex.withLock {
-        val staged = withContext(Dispatchers.IO) { stageCustomAvatar(uri) }
-        try {
-            replaceSource(staged.absolutePath)
-        } catch (error: Throwable) {
-            staged.delete()
-            throw error
+    internal suspend fun prepareCustom(uri: Uri): PreparedSidebarAvatar = mutationMutex.withLock {
+        val current = hostsStore.settingsOnce().sidebarAvatarSource
+        withContext(Dispatchers.IO) {
+            cleanupUnusedCustomAvatars(current)
+            stageCustomAvatar(uri)
+        }
+    }
+
+    internal suspend fun saveCustom(
+        prepared: PreparedSidebarAvatar,
+        crop: SidebarAvatarCrop,
+    ) = mutationMutex.withLock {
+        val managed = requireManagedCustomFile(prepared.file)
+        replaceSource(customSidebarAvatarSource(managed, crop))
+    }
+
+    internal suspend fun discardCustom(prepared: PreparedSidebarAvatar) = mutationMutex.withLock {
+        val current = hostsStore.settingsOnce().sidebarAvatarSource
+        withContext(Dispatchers.IO) {
+            val active = (parseSidebarAvatarSource(current) as? SidebarAvatarSource.Custom)
+                ?.file
+                ?.runCatchingCanonical()
+            val candidate = prepared.file.runCatchingCanonical() ?: return@withContext
+            if (active?.path == candidate.path) return@withContext
+            deleteManagedCustomAvatarFile(candidate)
         }
     }
 
@@ -61,7 +85,7 @@ class SidebarAvatarStore @Inject constructor(
         withContext(Dispatchers.IO) { deleteManagedCustomAvatar(previous, keep = next) }
     }
 
-    private fun stageCustomAvatar(uri: Uri): File {
+    private fun stageCustomAvatar(uri: Uri): PreparedSidebarAvatar {
         val resolver = context.contentResolver
         val mimeType = resolver.getType(uri).orEmpty()
         require(mimeType.isBlank() || mimeType.startsWith("image/")) {
@@ -89,8 +113,12 @@ class SidebarAvatarStore @Inject constructor(
                     }
                 }
             } ?: error(context.getString(R.string.sidebar_avatar_read_failed))
-            validatePlatformImage(target)
-            return target
+            val dimensions = validatePlatformImage(target)
+            return PreparedSidebarAvatar(
+                file = target,
+                width = dimensions.first,
+                height = dimensions.second,
+            )
         } catch (error: Throwable) {
             target.delete()
             throw error
@@ -112,8 +140,8 @@ class SidebarAvatarStore @Inject constructor(
             }.orEmpty()
     }.getOrDefault("")
 
-    private fun validatePlatformImage(file: File) {
-        ImageDecoder.decodeDrawable(ImageDecoder.createSource(file)) { decoder, info, _ ->
+    private fun validatePlatformImage(file: File): Pair<Int, Int> {
+        val drawable = ImageDecoder.decodeDrawable(ImageDecoder.createSource(file)) { decoder, info, _ ->
             val width = info.size.width
             val height = info.size.height
             require(width in 1..MAX_SIDEBAR_AVATAR_EDGE && height in 1..MAX_SIDEBAR_AVATAR_EDGE) {
@@ -127,16 +155,58 @@ class SidebarAvatarStore @Inject constructor(
                 )
             }
         }
+        val displayedWidth = drawable.intrinsicWidth
+        val displayedHeight = drawable.intrinsicHeight
+        require(displayedWidth > 0 && displayedHeight > 0) {
+            context.getString(R.string.sidebar_avatar_dimensions_invalid)
+        }
+        return displayedWidth to displayedHeight
+    }
+
+    private fun requireManagedCustomFile(file: File): File {
+        val root = File(context.filesDir, SIDEBAR_AVATAR_DIRECTORY).canonicalFile
+        val candidate = file.canonicalFile
+        require(candidate.isFile && candidate.path.startsWith(root.path + File.separator)) {
+            context.getString(R.string.sidebar_avatar_read_failed)
+        }
+        return candidate
+    }
+
+    private fun cleanupUnusedCustomAvatars(current: String?) {
+        val root = File(context.filesDir, SIDEBAR_AVATAR_DIRECTORY).canonicalFile
+        if (!root.isDirectory) return
+        val active = (parseSidebarAvatarSource(current) as? SidebarAvatarSource.Custom)
+            ?.file
+            ?.runCatchingCanonical()
+            ?.path
+        root.listFiles().orEmpty().forEach { file ->
+            val candidate = file.runCatchingCanonical() ?: return@forEach
+            if (candidate.isFile && candidate.path != active) {
+                candidate.delete()
+            }
+        }
     }
 
     private fun deleteManagedCustomAvatar(raw: String?, keep: String?) {
-        if (raw.isNullOrBlank() || raw == keep || raw.startsWith(SIDEBAR_AVATAR_ASSET_PREFIX)) return
+        val candidate = (parseSidebarAvatarSource(raw) as? SidebarAvatarSource.Custom)
+            ?.file
+            ?.runCatchingCanonical()
+            ?: return
+        val kept = (parseSidebarAvatarSource(keep) as? SidebarAvatarSource.Custom)
+            ?.file
+            ?.runCatchingCanonical()
+        if (candidate.path == kept?.path) return
+        deleteManagedCustomAvatarFile(candidate)
+    }
+
+    private fun deleteManagedCustomAvatarFile(candidate: File) {
         runCatching {
             val root = File(context.filesDir, SIDEBAR_AVATAR_DIRECTORY).canonicalFile
-            val candidate = File(raw).canonicalFile
             if (candidate.path.startsWith(root.path + File.separator)) candidate.delete()
         }
     }
+
+    private fun File.runCatchingCanonical(): File? = runCatching { canonicalFile }.getOrNull()
 
     private companion object {
         const val SIDEBAR_AVATAR_DIRECTORY = "ui/sidebar-avatars"
@@ -145,4 +215,3 @@ class SidebarAvatarStore @Inject constructor(
         const val VALIDATION_TARGET_EDGE = 512f
     }
 }
-

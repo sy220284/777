@@ -75,7 +75,7 @@
       <rect width="720" height="544" rx="30" fill="#FFFDF9"/>
       <rect x="324" y="13" width="72" height="5" rx="3" fill="#D7DDD8"/>
       <text x="28" y="62" class="h2">选择头像</text>
-      <text x="28" y="86" class="small">使用人物预置或本地图片；动图会保留播放效果</text>
+      <text x="28" y="86" class="small">使用人物预置或本地图片；本地图可拖动缩放裁剪，动图保留播放效果</text>
       <g transform="translate(28 110)">
         <rect width="150" height="42" rx="21" fill="#6D9C86"/>
         <path d="M19 13h22v16H19z" fill="none" stroke="#fff" stroke-width="1.6"/>
@@ -140,7 +140,7 @@
         <text x="574" y="43" class="label">选择文件</text>
       </g>
       <g transform="translate(28 414)">
-        <text x="0" y="18" class="small">头像始终按顶部居中裁切；动画仅在头像可见时播放，离屏自动停止。</text>
+        <text x="0" y="18" class="small">内置人物图优先保留面部；本地图片按用户裁剪取景；动画仅在头像可见时播放。</text>
       </g>
     </g>
   </g>

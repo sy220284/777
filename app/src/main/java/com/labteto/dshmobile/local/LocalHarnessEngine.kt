@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.work.LocalWorkProgressCoordinator
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendResult
@@ -4038,12 +4039,12 @@ class LocalHarnessEngine @Inject constructor(
             } else {
                 searchCapabilities(args.string("query"), binding.enabledOptionalTools)
             }
-            "update_plan" -> updatePlan(args, binding)
+            "update_plan" -> workProgress(binding).updatePlan(args)
             "exit_plan_mode" -> exitPlanMode(call, args.string("plan"), binding)
-            "todo_write" -> updateTodos(args, binding)
-            "create_goal" -> createGoal(args.string("description"), binding)
-            "get_goal" -> getGoal(binding)
-            "update_goal" -> updateGoal(args.string("status"), args.optionalString("note"), binding)
+            "todo_write" -> workProgress(binding).updateTodos(args)
+            "create_goal" -> workProgress(binding).createGoal(args.string("description"))
+            "get_goal" -> workProgress(binding).getGoal()
+            "update_goal" -> workProgress(binding).updateGoal(args.string("status"), args.optionalString("note"))
             "ask_user_question" -> askUser(
                 call,
                 args.string("question"),
@@ -4223,91 +4224,11 @@ class LocalHarnessEngine @Inject constructor(
         )
     }
 
-    private fun updatePlan(
-        args: JsonObject,
-        binding: LocalWorkRunBinding? = null,
-    ): String {
-        val targetState = binding?.state ?: _state
-        val log = binding?.eventLog ?: eventLog
-        val items = args["items"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }
-            ?: args.optionalString("plan")?.lines()?.filter { it.isNotBlank() }
-            ?: emptyList()
-        val normalized = items.take(20)
-        targetState.update { it.copy(plan = normalized) }
-        log.append("plan/state", buildJsonObject {
-            put("items", JsonArray(normalized.map { item -> JsonPrimitive(item) }))
-        })
-        persist(binding)
-        return if (normalized.isEmpty()) "计划已清空" else "计划已更新，共 ${normalized.size} 项"
-    }
-
-    private fun updateTodos(
-        args: JsonObject,
-        binding: LocalWorkRunBinding? = null,
-    ): String {
-        val targetState = binding?.state ?: _state
-        val log = binding?.eventLog ?: eventLog
-        val allowed = setOf("pending", "in_progress", "completed")
-        val items = args["items"]?.jsonArray.orEmpty().mapNotNull { element ->
-            val item = element.jsonObject
-            val content = item["content"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
-            val status = item["status"]?.jsonPrimitive?.contentOrNull.orEmpty()
-            if (content.isEmpty() || status !in allowed) null else LocalTodoItem(content.take(500), status)
-        }.take(50)
-        targetState.update { it.copy(todos = items) }
-        log.append("todo/state", buildJsonObject {
-            put("items", JsonArray(items.map { item ->
-                buildJsonObject {
-                    put("content", item.content)
-                    put("status", item.status)
-                }
-            }))
-        })
-        persist(binding)
-        return if (items.isEmpty()) "任务清单已清空" else "任务清单已更新，共 ${items.size} 项"
-    }
-
-    private fun createGoal(
-        description: String,
-        binding: LocalWorkRunBinding? = null,
-    ): String {
-        val targetState = binding?.state ?: _state
-        val log = binding?.eventLog ?: eventLog
-        val goal = LocalGoal(description.trim().take(2_000))
-        targetState.update { it.copy(goal = goal) }
-        log.append("goal/state", buildJsonObject {
-            put("description", goal.description)
-            put("status", goal.status)
-            goal.note?.let { put("note", it) }
-        })
-        persist(binding)
-        return "目标已创建：${goal.description}"
-    }
-
-    private fun getGoal(binding: LocalWorkRunBinding? = null): String {
-        val goal = (binding?.state ?: _state).value.goal ?: return "当前会话没有目标"
-        return "目标：[${goal.status}] ${goal.description}${goal.note?.let { "\n说明：$it" }.orEmpty()}"
-    }
-
-    private fun updateGoal(
-        status: String,
-        note: String?,
-        binding: LocalWorkRunBinding? = null,
-    ): String {
-        require(status in setOf("active", "paused", "completed", "blocked")) { "目标状态无效" }
-        val targetState = binding?.state ?: _state
-        val log = binding?.eventLog ?: eventLog
-        val current = targetState.value.goal ?: error("当前会话没有目标")
-        val updated = current.copy(status = status, note = note?.take(2_000))
-        targetState.update { it.copy(goal = updated) }
-        log.append("goal/state", buildJsonObject {
-            put("description", updated.description)
-            put("status", updated.status)
-            updated.note?.let { put("note", it) }
-        })
-        persist(binding)
-        return "目标状态已更新为 $status"
-    }
+    private fun workProgress(binding: LocalWorkRunBinding?) = LocalWorkProgressCoordinator(
+        state = binding?.state ?: _state,
+        eventLog = binding?.eventLog ?: eventLog,
+        persist = { persist(binding) },
+    )
 
     private suspend fun askUser(
         call: LocalToolCall,
