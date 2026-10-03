@@ -81,6 +81,27 @@ class LocalSessionEventLogTest {
     }
 
     @Test
+    fun streamedEventsDoNotReadRowsAppendedAfterIterationSnapshotOpens() {
+        val directory = Files.createTempDirectory("local-event-stream-snapshot").toFile()
+        val file = directory.resolve("session.events.jsonl")
+        try {
+            val log = LocalSessionEventLog(file, json, maxBytes = 4_096)
+            log.append("test/first", buildJsonObject { put("value", "first") })
+
+            val iterator = log.events().iterator()
+            assertTrue(iterator.hasNext())
+            val first = iterator.next()
+            log.append("test/late", buildJsonObject { put("value", "late") })
+
+            assertEquals("test/first", first.type)
+            assertTrue(!iterator.hasNext())
+            assertEquals("test/late", log.events().last().type)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun exposesBoundedReversePagesForInfiniteSessionHistory() {
         val directory = Files.createTempDirectory("local-event-page-before").toFile()
         val file = directory.resolve("session.events.jsonl")
