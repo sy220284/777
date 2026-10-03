@@ -92,6 +92,7 @@ internal class ChatDiaryStore(
         val queryCore = ChatDiaryEntryPolicy.normalizeQuery(query)
         val queryTerms = ChatDiaryEntryPolicy.queryTerms(query)
         val broad = isExplicitDiaryRecall(query)
+        val hasSpecificAnchor = broad && ChatDiaryEntryPolicy.hasSpecificRecallAnchor(query)
         val now = System.currentTimeMillis()
 
         val eligible = documents.read().entries.asSequence()
@@ -118,7 +119,9 @@ internal class ChatDiaryStore(
             .map { entry ->
                 entry to ChatDiaryEntryPolicy.matchScore(entry, queryCore, queryTerms, now)
             }
-            .filter { (_, score) -> ChatDiaryEntryPolicy.isRecallMatch(score, broad) }
+            .filter { (_, score) ->
+                ChatDiaryEntryPolicy.isRecallMatch(score, broad, hasSpecificAnchor)
+            }
             .sortedWith(
                 compareByDescending<Pair<ChatDiaryEntry, ChatDiaryMatchScore>> { it.second.total }
                     .thenByDescending { it.first.updatedAt },
