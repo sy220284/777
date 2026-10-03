@@ -10,17 +10,24 @@ class ChatDiaryRecallPolicyTest {
     fun longTermMemoryBudgetStaysBoundedAcrossContextWindows() {
         assertEquals(800, chatLongTermMemoryBudget(null).totalTokens)
         assertEquals(800, chatLongTermMemoryBudget(8_192).totalTokens)
-        assertEquals(1_400, chatLongTermMemoryBudget(16_384).totalTokens)
-        assertTrue(chatLongTermMemoryBudget(1_000_000).totalTokens <= 2_200)
+        assertEquals(1_000, chatLongTermMemoryBudget(16_384).totalTokens)
+        assertTrue(chatLongTermMemoryBudget(1_000_000).totalTokens <= 1_300)
     }
 
 
     @Test
-    fun groupRecallKeepsInnerNarrativePrivateToCurrentCharacter() {
+    fun groupRecallKeepsPrivateDiaryOutOfPromptAndInnerNarrativeBounded() {
         val instruction = diaryRecallUsageInstruction(groupAudience = true)
+        assertTrue(instruction.contains("PRIVATE 不进入群聊 Prompt"))
         assertTrue(instruction.contains("不代表其他成员知情"))
-        assertTrue(instruction.contains("心理活动"))
-        assertTrue(instruction.contains("不要主动逐条公开"))
+        assertTrue(instruction.contains("不得回潮"))
+    }
+
+    @Test
+    fun historicalRecallIsExplicitAndOrdinaryRecallStaysCurrent() {
+        assertTrue(isHistoricalDiaryRecall("最开始我们原来约的几点"))
+        assertTrue(isHistoricalDiaryRecall("改之前是什么安排"))
+        assertTrue(!isHistoricalDiaryRecall("我们最后约定几点"))
     }
 
     @Test

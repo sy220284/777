@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
-import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.hasUsefulFacts
 import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
@@ -20,7 +19,6 @@ data class LocalGroupChatMember(
     val personaId: String,
     val displayName: String,
     val portraitPath: String = "",
-    val persona: PersonaProfile = PersonaProfile(),
     val chatState: ChatCharacterState = ChatCharacterState(),
 )
 

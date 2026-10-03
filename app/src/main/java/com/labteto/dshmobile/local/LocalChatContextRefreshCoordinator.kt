@@ -406,6 +406,7 @@ internal class LocalChatContextRefreshCoordinator(
             previous = plannerState,
             userMessage = userEvidenceBatch,
             assistantMessage = assistantEvidenceBatch,
+            persona = persona,
         )
         if (plan == null) {
             boundEventLog.append("chat/post-turn", buildJsonObject {

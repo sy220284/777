@@ -19,6 +19,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.resolveCharacterBehaviorTuning
 import com.labteto.dshmobile.local.chat.findEstablishedGroupChatSession
 import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
+import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 import com.labteto.dshmobile.local.memory.MemoryStore
 import java.io.File
 import java.util.UUID
@@ -182,22 +183,28 @@ internal class LocalSessionLifecycleCoordinator(
                     } else {
                         null
                     }
+                    val continuedPersona = if (
+                        continueSingleChatBinding &&
+                        sourceState.personaId != PersonaProfile.DEFAULT_PERSONA_ID
+                    ) {
+                        chatPersonaStore.get(sourceState.personaId)
+                            .takeUnless(PersonaProfile::isUnboundChatPersona)
+                    } else {
+                        null
+                    }
                     val personaId = if (resolvedChatMode == LocalChatMode.GROUP) {
                         PersonaProfile.DEFAULT_PERSONA_ID
                     } else if (galleryEntry != null) {
                         chatPersonaStore.upsert(
                             galleryEntry.persona.copy(id = "persona-${UUID.randomUUID()}"),
                         ).id
-                    } else if (continueSingleChatBinding) {
-                        sourceState.personaId
                     } else {
-                        PersonaProfile.DEFAULT_PERSONA_ID
+                        continuedPersona?.id ?: PersonaProfile.DEFAULT_PERSONA_ID
                     }
                     val chatPersona = when {
                         resolvedChatMode == LocalChatMode.GROUP -> PersonaProfile()
                         galleryEntry != null -> chatPersonaStore.get(personaId)
-                        continueSingleChatBinding -> sourceState.chatPersona
-                        else -> PersonaProfile()
+                        else -> continuedPersona ?: PersonaProfile()
                     }
                     val chatState = if (resolvedChatMode == LocalChatMode.GROUP) {
                         ChatCharacterState()

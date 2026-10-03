@@ -190,7 +190,9 @@ Relationship memory uses a stable subject key; Gallery identity wins over copied
 
 日记复用现有 post-turn 状态整理请求生成稀疏的 `diaryDelta`，不为普通回合增加额外模型请求。只有具备跨会话价值的经历才允许落盘；条目区分客观事件锚点、角色感受、未说出口的心理活动、关系意义和仍会影响后续的余波。每条落盘日记必须至少包含感受或未说出口的心理活动之一，重大事件也不能退化成只有 event 的事件清单；缺少主观层时由事实/连续性层继续承载客观信息。日记优先使用角色第一人称内在表述，禁止逐句复述和流水账式时间串联，也禁止把角色对用户动机的推测升格为客观事实。
 
-单聊与群聊使用同一稳定角色 `subjectKey` 形成连续的人物经历。群聊状态整理为实际发言角色更新隐藏状态并生成主观日记，同时在同一次模型请求中为在场未发言角色生成只含日记的观察投影；同一公开事件可以形成不同角色视角，且不增加额外模型调用。单聊经历可在后续群聊召回，群聊经历也可在后续单聊召回。披露边界与“角色是否记得”分离：`PRIVATE` 日记仅能进入该角色的私密上下文，`SHAREABLE` 可在该角色参与的群聊中使用，群聊公开经历记为 `PUBLIC`。
+单聊与群聊使用同一稳定角色 `subjectKey` 形成连续的人物经历。群聊状态整理为实际发言角色更新隐藏状态并生成主观日记，同时在同一次模型请求中为在场未发言角色生成只含日记的观察投影；同一公开事件可以形成不同角色视角，且不增加额外模型调用。只有已取得明确公开授权并落为 `PUBLIC` 的单聊经历可在后续群聊召回；群聊公开经历仍可在后续单聊召回。披露边界与“角色是否记得”分离：`PRIVATE` 只允许留在该角色自己的单聊记忆；`SHAREABLE` 仅代表普通单聊经历，也不得进入群聊 Prompt；只有 `PUBLIC` 可以进入群聊。单聊条目只有出现明确公开授权证据时才能升级为 `PUBLIC`，保密证据始终优先并强制保持 `PRIVATE`。禁止以后通过“隐私余波”“态度提示”或其他旁路把 PRIVATE/SHAREABLE 重新注入群聊。
+
+精确事实与人物日记使用不同边界：用户明确陈述并经 MemoryPolicy 落盘的精确事实（关系状态、关系对象、稳定偏好/稳定信息等）允许在单聊和群聊双向召回，仍按当前人物 subjectKey、lineage 与语义门控筛选；群聊不得因为 `groupAudience` 关闭事实召回。人物日记继续单独受披露级别约束，群聊只接受 `PUBLIC`。
 
 召回统一受模型上下文窗口预算约束。长期事实与日记共享有上限的 Chat 长期记忆预算，日记不会全量常驻 Prompt；普通输入只召回语义相关条目，显式“以前/上次/那天”等回忆请求才放宽候选。所有最终注入文本再次按模型 Token 估算硬裁剪。 Chat→Chat 继续会话不再复制旧对话生成叙事 handoff；当前场景、待续和未归并事实由迁移后的 `ChatContextState` 承接，长期经历按需从日记召回。Work 的任务 handoff 保持不变。
 
@@ -271,3 +273,19 @@ See [AGENTS.md](../AGENTS.md) for repository-wide engineering and merge rules.
 ### Pending chat continuity
 
 The request-time pending window retains at most 64 turns with 4,000 characters per message. Full pending facts are persisted as `chat/pending-turn` events before eviction; consolidation reads paged events after the processed cursor and selects the oldest unfinished batch with bounded memory. Direct, proactive and group chat use the same store with separate scopes. Legacy active queues are archived before bounding. Continuations copy unfinished facts in bounded batches into the new session log and assign its sequences; old processed cursors are reset. Imported prefix facts remain available across branches in the new conversation. Branch restoration filters archived facts by active message ids when alternatives exist. A consolidation commit preserves newer pending turns and deterministic scene updates and rejects competing cursor changes.
+
+
+### 人物生命运行时 V3
+
+Chat 人物运行时采用“稳定人物资料 → 独立生活流 → 本轮注意力 → 行为倾向 → 当前状态 → 长期经历/成长”的单一路径。`PersonaProfile` 只保存稳定人物资料；`ChatCharacterState` 保存会话内状态和可持续演变；请求时由 `CharacterRuntimeProjector` 统一投影给单聊、群聊和主动互动，禁止各入口维护平行人物 Prompt。
+
+独立生活由 `CharacterLifeRuntime` 基于 `lifeContext`、当前日程、挂念与未完事项推进。时间推进采用请求时 catch-up：即使用户一段时间没有打开聊天，下一次人物被调用时也会按真实时间推进生活节拍；只允许从既有人物生活资料或已发生事件延展低风险日常状态，禁止凭空生成重大人生事件、关系事实或不可逆变化。生活事件有来源、类型、开始/更新时间和过期边界，并可为主动互动提供自然理由。
+
+人物对用户的主观认识使用持久 `currentUserImpression`。它只在出现新证据时修正，不参与短期 TTL；旧 `recentImpression` 仅作为历史数据兼容镜像。人物注意力由 `CharacterAttentionResolver` 每轮从输入中选择最多两个优先关注点，并结合人物盲点形成软倾向；明确问题、边界和重要事实始终优先。`CharacterBehaviorResolver` 再综合身体、情绪、手头活动、注意力与近期重复节拍生成本轮行为倾向，普通回应保持默认多数，不通过随机骰子强造“不完美”。
+
+
+长期成长继续保留主动、开放、安全感三个粗粒度基线，同时为 `mutableTraits` 维护独立证据计数、动量、反证和权重。单轮不能改写人格；只有多次真实经历才能缓慢改变可变倾向，稳定特质与硬约束不参与关系热度漂移。关系数值仅作为派生诊断，阶段、共同经历、共同物、真实行为证据优先。
+
+Token 预算在投影层硬限制：稳定人物前缀最多 600 Token，本轮“此刻”最多 250 Token；长期事实单独封顶 500 Token，人物日记封顶 800 Token。普通闲聊默认不召回日记，轻相关最多 1 条，明确回忆请求最多 3 条。人物日记与生活流均复用现有 post-turn/记忆链，不增加独立模型调用。
+
+角色回复最终仍经过已有字面风格过滤与重复守卫，并增加 `CharacterReplyAnomalyGuard`。异常守卫只对绑定人物启用，只做高置信度、最小结构修复（解释式标题、过度罗列、连续重复等）；正常文本不重写，检测到但无法安全自动修复的结构只记录诊断。

@@ -14,7 +14,7 @@ class ChatDiaryPromptTest {
     @Test
     fun diaryPromptDemandsNarrativePsychologyInsteadOfChronologyList() {
         val prompt = planner.prompt(
-            persona = PersonaProfile(name = "阿青", personality = "嘴硬心软"),
+            persona = PersonaProfile(name = "阿青", portrait = "嘴硬心软，但不会为了证明这一点每轮都表演出来。"),
             state = ChatCharacterState(),
             userMessage = "周末一起去海边吧",
             assistantMessage = "……行，别迟到。",
@@ -33,6 +33,12 @@ class ChatDiaryPromptTest {
         assertTrue(system.contains("MAJOR 也不能只写 event"))
         assertTrue(system.contains("稳定性格和心理逻辑"))
         assertTrue(system.contains("角色对用户动机的猜测不能写成事实"))
+        assertTrue(system.contains("PRIVATE"))
+        assertTrue(system.contains("禁止进入群聊 Prompt"))
+        assertTrue(system.contains("SHAREABLE"))
+        assertTrue(system.contains("不代表已经获准在群聊公开"))
+        assertTrue(system.contains("PUBLIC"))
+        assertTrue(system.contains("明确说"))
         assertTrue(prompt.contains("diaryDelta"))
 
         val suggestionSystem = chatReplySuggestionModelMessages("生成回复建议")

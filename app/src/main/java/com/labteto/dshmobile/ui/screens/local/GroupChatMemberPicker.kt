@@ -60,7 +60,8 @@ internal fun GroupChatMemberPickerSheet(
         } else {
             entries.filter { entry ->
                 entry.persona.name.contains(needle, ignoreCase = true) ||
-                    entry.persona.identity.contains(needle, ignoreCase = true)
+                    entry.persona.portrait.contains(needle, ignoreCase = true) ||
+                    entry.persona.lifeContext.contains(needle, ignoreCase = true)
             }
         }
     }
@@ -160,7 +161,7 @@ internal fun GroupChatMemberPickerSheet(
                                         style = DsType.std14Strong.withReadingWeight(),
                                         color = DsTheme.colors.labelPrimary,
                                     )
-                                    entry.persona.identity.takeIf(String::isNotBlank)?.let {
+                                    entry.persona.portrait.takeIf(String::isNotBlank)?.let {
                                         Text(
                                             it,
                                             style = DsType.caption11.withReadingWeight(),

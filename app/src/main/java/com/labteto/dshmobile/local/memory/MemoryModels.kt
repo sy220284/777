@@ -10,6 +10,13 @@ enum class MemoryScope {
 }
 
 @Serializable
+enum class MemoryDisclosure {
+    PRIVATE,
+    SHAREABLE,
+    PUBLIC,
+}
+
+@Serializable
 enum class MemoryKind {
     RULE,
     PREFERENCE,
@@ -50,6 +57,10 @@ data class MemoryRecord(
     val hasUnboundSource: Boolean = true,
     /** Stable owner for character-specific relationship memory, e.g. gallery:<id> or persona:<id>. */
     val subjectKey: String? = null,
+    /** Disclosure metadata. Exact facts for their owning character remain recallable in group chat; this must not gate factual recall. */
+    val disclosure: MemoryDisclosure = MemoryDisclosure.SHAREABLE,
+    /** True only when the user explicitly granted or revoked public disclosure. */
+    val disclosureExplicit: Boolean = false,
     val importance: Int = 50,
     val pinned: Boolean = false,
     val active: Boolean = true,
@@ -60,6 +71,6 @@ data class MemoryRecord(
 
 @Serializable
 internal data class MemoryDocument(
-    val formatVersion: Int = 1,
+    val formatVersion: Int = 2,
     val records: List<MemoryRecord> = emptyList(),
 )

@@ -26,8 +26,7 @@ class ChatTurnRunnerPromptPartitionTest {
         )
         val persona = PersonaProfile(
             name = "阿青",
-            identity = "剑客",
-            personality = "嘴硬心软",
+            portrait = "剑客，嘴硬心软",
             hardConstraints = listOf("不替用户做决定"),
             bannedPhrases = listOf("作为AI"),
             corrections = listOf(
@@ -36,9 +35,11 @@ class ChatTurnRunnerPromptPartitionTest {
             ),
         )
         val state = ChatCharacterState(
+            physicalState = "刚下班，有点累",
             mood = "不高兴",
             relationshipState = "亲近",
             recentImpression = "还记得刚才的争执",
+            currentAgenda = "在收拾桌上的东西",
         )
         val shared = ChatContextState(
             scene = ChatSceneState(
@@ -61,14 +62,19 @@ class ChatTurnRunnerPromptPartitionTest {
             userInput = "你还生气吗",
         )
 
-        assertTrue(context.stablePrompt.contains("身份：剑客"))
-        assertTrue(context.stablePrompt.contains("性格：嘴硬心软"))
+        assertTrue(context.stablePrompt.contains("剑客"))
+        assertTrue(context.stablePrompt.contains("嘴硬心软"))
         assertFalse(context.stablePrompt.contains("禁用表达"))
         assertFalse(context.stablePrompt.contains("对白参考"))
         assertFalse(context.stablePrompt.contains("【当前状态】"))
         assertFalse(context.stablePrompt.contains("用户纠正"))
         assertFalse(context.stablePrompt.contains("地点=院子"))
+        assertFalse(context.stablePrompt.contains("刚下班，有点累"))
+        assertFalse(context.stablePrompt.contains("在收拾桌上的东西"))
 
+        assertTrue(context.dynamicPrompt.contains("【此刻】"))
+        assertTrue(context.dynamicPrompt.contains("身体：刚下班，有点累"))
+        assertTrue(context.dynamicPrompt.contains("正在做：在收拾桌上的东西"))
         assertTrue(context.dynamicPrompt.contains("【用户纠正｜最高优先】"))
         assertTrue(context.dynamicPrompt.contains("【角色表达解释】"))
         assertTrue(context.dynamicPrompt.contains("不得仅凭脱离语境的单个"))
@@ -118,8 +124,7 @@ class ChatTurnRunnerPromptPartitionTest {
         val context = runner.prepareProfile(
             persona = PersonaProfile(
                 name = "阿青",
-                personality = "克制谨慎",
-                speechStyle = "表达含蓄",
+                portrait = "克制谨慎，表达含蓄",
             ),
             state = ChatCharacterState(),
             context = ChatContextState(),

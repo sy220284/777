@@ -56,6 +56,7 @@ class ChatInteractionPlannerTest {
             mood = "平静",
             currentFocus = "旧话题",
             recentImpression = "还在介意",
+            currentUserImpression = "还在介意",
             activeGoal = "继续追问",
             currentAgenda = "把旧事说完",
             internalConflict = "想问又不想问",
@@ -71,7 +72,8 @@ class ChatInteractionPlannerTest {
 
         assertEquals("平静", state.mood)
         assertTrue(state.currentFocus.isBlank())
-        assertTrue(state.recentImpression.isBlank())
+        assertEquals("还在介意", state.currentUserImpression)
+        assertEquals("还在介意", state.recentImpression)
         assertTrue(state.activeGoal.isBlank())
         assertTrue(state.currentAgenda.isBlank())
         assertTrue(state.internalConflict.isBlank())
@@ -85,7 +87,7 @@ class ChatInteractionPlannerTest {
     fun plannerAndSuggestionsHonorPersonaCorrectionsForIndirectExpression() {
         val persona = PersonaProfile(
             name = "阿青",
-            personality = "嘴硬心软",
+            portrait = "嘴硬心软",
             corrections = listOf("不善于拒绝，会服软，很多推辞只是她自己的表达方式"),
         )
         val state = ChatCharacterState(
@@ -122,8 +124,7 @@ class ChatInteractionPlannerTest {
     fun genericRestraintAloneDoesNotEnableIndirectRefusalSemantics() {
         val persona = PersonaProfile(
             name = "阿青",
-            personality = "克制谨慎",
-            speechStyle = "表达含蓄",
+            portrait = "克制谨慎，表达含蓄",
         )
         val prompt = planner.prompt(
             persona = persona,
@@ -139,7 +140,7 @@ class ChatInteractionPlannerTest {
     fun explicitCurrentBoundaryIsOneShotAndDoesNotRequireRepetition() {
         val persona = PersonaProfile(
             name = "阿青",
-            personality = "嘴硬心软",
+            portrait = "嘴硬心软",
         )
         val plannerPrompt = planner.prompt(
             persona = persona,

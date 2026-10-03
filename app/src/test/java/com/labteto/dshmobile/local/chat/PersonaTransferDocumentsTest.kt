@@ -31,7 +31,7 @@ class PersonaTransferDocumentsTest {
 
         val markdown = String(document.bytes, StandardCharsets.UTF_8)
         assertTrue(markdown.contains("# 人物档案：小岚"))
-        assertTrue(markdown.contains("## 人物设定"))
+        assertTrue(markdown.contains("## 人物生命资料"))
         assertTrue(markdown.contains("## 记忆摘要"))
         assertTrue(markdown.contains("剧情提要：第一次一起去海边"))
         assertTrue(markdown.contains("## 对话记录"))
@@ -162,7 +162,7 @@ class PersonaTransferDocumentsTest {
     }
 
     @Test
-    fun legacyPersonaJsonStillImports() {
+    fun currentPersonaShareJsonImportsWithoutStories() {
         val source = ChatPersonaGalleryStore(
             File(temporary.root, "legacy-source.json"),
             json,
@@ -170,8 +170,7 @@ class PersonaTransferDocumentsTest {
         val saved = source.save(
             persona = PersonaProfile(
                 name = "阿青",
-                identity = "剑客",
-                personality = "直接",
+                portrait = "剑客，直接",
             ),
             sourceSessionId = "",
             history = emptyList(),
@@ -191,7 +190,7 @@ class PersonaTransferDocumentsTest {
         )
 
         assertEquals("阿青", imported.persona.name)
-        assertEquals("剑客", imported.persona.identity)
+        assertTrue(imported.persona.portrait.contains("剑客"))
         assertTrue(imported.stories.isEmpty())
     }
 
@@ -207,7 +206,7 @@ class PersonaTransferDocumentsTest {
             format = PersonaTransferFormat.JSON,
         )
         val future = String(document.bytes, StandardCharsets.UTF_8)
-            .replace("\"schema\":2", "\"schema\":3")
+            .replace("\"schema\":3", "\"schema\":4")
 
         val result = runCatching {
             target.importPersonaDocument(
@@ -218,7 +217,7 @@ class PersonaTransferDocumentsTest {
         }
 
         assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull()?.message?.contains("暂不支持") == true)
+        assertTrue(result.exceptionOrNull()?.message?.contains("版本不受支持") == true)
     }
 
     @Test
@@ -239,14 +238,12 @@ class PersonaTransferDocumentsTest {
         persona = PersonaProfile(
             id = "gallery-lan",
             name = "小岚",
-            identity = "旅行摄影师",
-            background = "常年在沿海城市旅行。",
-            personality = "爽快、细心",
-            speechStyle = "简短自然",
-            relationship = "和用户是多年朋友",
+            portrait = "旅行摄影师，爽快、细心，说话简短自然。",
+            lifeContext = "常年在沿海城市旅行。",
+            initialUserImpression = "和用户是多年朋友",
             worldSetting = "现代城市",
-            coreMotivations = listOf("记录真实生活"),
-            behaviorPatterns = listOf("答应的事会做到"),
+            coreValues = listOf("记录真实生活"),
+            stableTraits = listOf("答应的事会做到"),
             hardConstraints = listOf("不故意撒谎"),
         ),
         stories = listOf(

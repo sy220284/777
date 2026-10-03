@@ -5,9 +5,7 @@ import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 
 @Singleton
-class ChatInteractionPlanner @Inject constructor(
-    private val json: Json,
-) {
+class ChatInteractionPlanner @Inject constructor(json: Json) {
     private val promptBuilder = ChatInteractionPromptBuilder()
     private val parser = ChatInteractionPlanParser(json)
     private val reducer = ChatInteractionStateReducer()
@@ -20,37 +18,20 @@ class ChatInteractionPlanner @Inject constructor(
     ): String = promptBuilder.prompt(persona, state, userMessage, assistantMessage)
 
     fun suggestionsPrompt(
-        persona: PersonaProfile,
-        state: ChatCharacterState,
-        userMessage: String,
-        assistantMessage: String,
-        recentDialogue: List<Pair<String, String>> = emptyList(),
-    ): String = promptBuilder.suggestionsPrompt(
-        persona = persona,
-        state = state,
-        userMessage = userMessage,
-        assistantMessage = assistantMessage,
-        recentDialogue = recentDialogue,
-    )
+        persona: PersonaProfile, state: ChatCharacterState, userMessage: String,
+        assistantMessage: String, recentDialogue: List<Pair<String, String>> = emptyList(),
+    ): String = promptBuilder.suggestionsPrompt(persona, state, userMessage, assistantMessage, recentDialogue)
 
-    fun parseSuggestions(text: String): List<ChatReplySuggestion>? =
-        parser.parseSuggestions(text)
-
+    fun parseSuggestions(text: String): List<ChatReplySuggestion>? = parser.parseSuggestions(text)
     fun parse(
         text: String,
         previous: ChatCharacterState,
         userMessage: String = "",
         assistantMessage: String = "",
-    ): ChatPostTurnPlan? {
-        val parsed = parser.parsePlan(text) ?: return null
-        return reducer.reduce(
-            parsed = parsed,
-            previous = previous,
-            userMessage = userMessage,
-            assistantMessage = assistantMessage,
-        )
+        persona: PersonaProfile = PersonaProfile(),
+    ): ChatPostTurnPlan? = parser.parsePlan(text)?.let {
+        reducer.reduce(it, previous, userMessage, assistantMessage, persona)
     }
-
     fun applyDeterministicInteractionState(
         previous: ChatCharacterState,
         userMessage: String,

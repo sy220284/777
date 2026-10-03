@@ -9,6 +9,7 @@ internal class ChatInteractionStateReducer {
         previous: ChatCharacterState,
         userMessage: String,
         assistantMessage: String,
+        persona: PersonaProfile = PersonaProfile(),
     ): ChatPostTurnPlan {
         val decoded = parsed.plan
         val rawState = parsed.rawState
@@ -37,8 +38,9 @@ internal class ChatInteractionStateReducer {
             userMessage = userMessage,
             assistantMessage = assistantMessage,
         )
-        val evolvedState = continuityState.copy(
-            evolution = evolveCharacterEvolution(agedPrevious, continuityState, significance),
+        val evolvedState = applyCharacterPostTurnRuntime(
+            persona, agedPrevious, continuityState, decoded.state, rawState,
+            significance, userMessage, assistantMessage,
         )
         return decoded.copy(
             state = applyInteractionPerformance(
@@ -68,8 +70,8 @@ internal class ChatInteractionStateReducer {
         fun shouldClear(key: String, value: String): Boolean =
             rawState.containsKey(key) && value.isBlank()
 
+        val clearPhysicalState = shouldClear("physicalState", value.physicalState)
         val clearCurrentFocus = shouldClear("currentFocus", value.currentFocus)
-        val clearRecentImpression = shouldClear("recentImpression", value.recentImpression)
         val clearActiveGoal = shouldClear("activeGoal", value.activeGoal)
         val clearCurrentAgenda = shouldClear("currentAgenda", value.currentAgenda)
         val clearInternalConflict = shouldClear("internalConflict", value.internalConflict)
@@ -77,8 +79,8 @@ internal class ChatInteractionStateReducer {
         val clearThreads = rawState.containsKey("unresolvedThreads") && value.unresolvedThreads.isEmpty()
 
         listOf(
+            "physicalState" to clearPhysicalState,
             "currentFocus" to clearCurrentFocus,
-            "recentImpression" to clearRecentImpression,
             "activeGoal" to clearActiveGoal,
             "currentAgenda" to clearCurrentAgenda,
             "internalConflict" to clearInternalConflict,
@@ -93,8 +95,8 @@ internal class ChatInteractionStateReducer {
         if (!changed) return previous
 
         return previous.copy(
+            physicalState = if (clearPhysicalState) "" else previous.physicalState,
             currentFocus = if (clearCurrentFocus) "" else previous.currentFocus,
-            recentImpression = if (clearRecentImpression) "" else previous.recentImpression,
             activeGoal = if (clearActiveGoal) "" else previous.activeGoal,
             currentAgenda = if (clearCurrentAgenda) "" else previous.currentAgenda,
             internalConflict = if (clearInternalConflict) "" else previous.internalConflict,
@@ -245,6 +247,9 @@ internal class ChatInteractionStateReducer {
         }
         val merged = value.copy(
             behaviorTuning = previous.behaviorTuning.normalized(),
+            physicalState = if (rawState?.containsKey("physicalState") == true) {
+                value.physicalState.trim().take(120)
+            } else previous.physicalState,
             mood = if (rawState?.containsKey("mood") == true) {
                 value.mood.trim().take(80).ifBlank { previous.mood }
             } else previous.mood,
@@ -252,9 +257,6 @@ internal class ChatInteractionStateReducer {
             currentFocus = if (rawState?.containsKey("currentFocus") == true) {
                 value.currentFocus.trim().take(240)
             } else previous.currentFocus,
-            recentImpression = if (rawState?.containsKey("recentImpression") == true) {
-                value.recentImpression.trim().take(320)
-            } else previous.recentImpression,
             activeGoal = if (rawState?.containsKey("activeGoal") == true) {
                 value.activeGoal.trim().take(240)
             } else previous.activeGoal,
@@ -313,7 +315,7 @@ internal class ChatInteractionStateReducer {
         val rawContinuity = rawState["continuity"]?.let { runCatching { it.jsonObject }.getOrNull() }
         if (rawContinuity == null) return previous
 
-        val continuity = sanitizeContinuity(value.continuity, previous.continuity, rawContinuity)
+        val continuity = sanitizeChatContinuity(value.continuity, previous.continuity, rawContinuity)
         return previous.copy(
             // Hard scene state is advanced only by ChatSceneRuntime from transcript events.
             scene = previous.scene,
@@ -321,35 +323,6 @@ internal class ChatInteractionStateReducer {
             updatedAt = System.currentTimeMillis(),
         )
     }
-    private fun sanitizeContinuity(
-        value: ChatContinuityState,
-        previous: ChatContinuityState,
-        raw: JsonObject,
-    ): ChatContinuityState = ChatContinuityState(
-        recentEvents = if (raw.containsKey("recentEvents")) {
-            sanitizeCurrentStrings(value.recentEvents, limit = 5, maxChars = 180)
-        } else previous.recentEvents.takeLast(5),
-        recurringEvents = emptyList(),
-        decisions = if (raw.containsKey("decisions")) {
-            sanitizeCurrentStrings(value.decisions, limit = 4, maxChars = 180)
-        } else previous.decisions.takeLast(4),
-        unfinished = if (raw.containsKey("unfinished")) {
-            sanitizeCurrentStrings(value.unfinished, limit = 4, maxChars = 180)
-        } else previous.unfinished.takeLast(4),
-        // Provenance is derived from durable Pending turns after parsing; the model never owns it.
-        evidence = previous.evidence,
-    )
-    private fun sanitizeCurrentStrings(
-        values: List<String>,
-        limit: Int,
-        maxChars: Int,
-    ): List<String> = values.asSequence()
-        .map(String::trim)
-        .filter(String::isNotBlank)
-        .map { it.take(maxChars) }
-        .distinctBy(::normalizeChatInteractionText)
-        .toList()
-        .takeLast(limit)
 
     private fun ageTransientState(
         previous: ChatCharacterState,
@@ -396,9 +369,16 @@ internal class ChatInteractionStateReducer {
         }
 
         return previous.copy(
+            physicalState = age(
+                "physicalState",
+                previous.physicalState,
+                previous.behaviorTuning.transientTtl(3),
+                clearOnTopicReset = false,
+            ),
             mood = age("mood", previous.mood.takeUnless { it == "自然" }.orEmpty(), previous.behaviorTuning.moodTtl()).ifBlank { "自然" },
             currentFocus = age("currentFocus", previous.currentFocus, previous.behaviorTuning.transientTtl(3), clearOnTopicReset = true),
-            recentImpression = age("recentImpression", previous.recentImpression, previous.behaviorTuning.transientTtl(5)),
+            currentUserImpression = previous.currentUserImpression.ifBlank { previous.recentImpression },
+            recentImpression = previous.currentUserImpression.ifBlank { previous.recentImpression },
             activeGoal = age("activeGoal", previous.activeGoal, previous.behaviorTuning.transientTtl(12)),
             currentAgenda = age("currentAgenda", previous.currentAgenda, previous.behaviorTuning.transientTtl(3), clearOnTopicReset = true),
             internalConflict = age("internalConflict", previous.internalConflict, previous.behaviorTuning.transientTtl(6)),
@@ -421,9 +401,9 @@ internal class ChatInteractionStateReducer {
             if (value.isBlank()) ages.remove(key) else ages[key] = 0
         }
 
+        reset("physicalState", state.physicalState)
         reset("mood", state.mood.takeUnless { it == "自然" }.orEmpty())
         reset("currentFocus", state.currentFocus)
-        reset("recentImpression", state.recentImpression)
         reset("activeGoal", state.activeGoal)
         reset("currentAgenda", state.currentAgenda)
         reset("internalConflict", state.internalConflict)
@@ -491,9 +471,22 @@ internal class ChatInteractionStateReducer {
             } else previous.unknowns,
             sharedMoments = if (raw.containsKey("sharedMoments")) {
                 mergeStrings(previous.sharedMoments, value.sharedMoments.filter { moment ->
-                    evidenceGrounded(RelationshipEvidence(text = moment, confidence = 100, source = "dialogue"), userMessage, assistantMessage)
+                    evidenceGrounded(
+                        RelationshipEvidence(text = moment, confidence = 100, source = "dialogue"),
+                        userMessage,
+                        assistantMessage,
+                    )
                 }, 8, 180)
             } else previous.sharedMoments,
+            sharedObjects = if (raw.containsKey("sharedObjects")) {
+                mergeStrings(previous.sharedObjects, value.sharedObjects.filter { item ->
+                    evidenceGrounded(
+                        RelationshipEvidence(text = item, confidence = 100, source = "dialogue"),
+                        userMessage,
+                        assistantMessage,
+                    )
+                }, 8, 160)
+            } else previous.sharedObjects,
         )
     }
 

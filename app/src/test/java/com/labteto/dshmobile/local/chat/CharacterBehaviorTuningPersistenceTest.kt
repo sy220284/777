@@ -53,14 +53,12 @@ class CharacterBehaviorTuningPersistenceTest {
                     galleryId = entry.id,
                     personaId = entry.id,
                     displayName = "阿青",
-                    persona = entry.persona.copy(behaviorTuning = stale),
                     chatState = ChatCharacterState(behaviorTuning = stale),
                 ),
             ),
         )
 
         val restored = reconcileGroupCharacterBehaviorTuning(group, personaStore, galleryStore)
-        assertEquals(latest, restored.members.single().persona.behaviorTuning)
         assertEquals(latest, restored.members.single().chatState.behaviorTuning)
         assertEquals(latest, personaStore.get(entry.id).behaviorTuning)
         assertEquals(entry.id, personaStore.get(entry.id).id)

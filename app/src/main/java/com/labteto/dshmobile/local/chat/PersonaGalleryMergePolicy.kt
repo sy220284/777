@@ -16,14 +16,12 @@ import kotlinx.serialization.json.jsonPrimitive
 internal fun isMeaningfulGalleryPersona(persona: PersonaProfile): Boolean {
     val name = normalizePersonaText(persona.name)
     if (name.isBlank() || name in DEFAULT_PERSONA_NAMES) return false
-    return persona.identity.isNotBlank() ||
-        persona.background.isNotBlank() ||
-        persona.personality.isNotBlank() ||
-        persona.speechStyle.isNotBlank() ||
-        persona.relationship.isNotBlank() ||
+    return persona.portrait.isNotBlank() ||
+        persona.lifeContext.isNotBlank() ||
+        persona.attentionBiases.isNotEmpty() ||
+        persona.coreValues.isNotEmpty() ||
+        persona.stableTraits.isNotEmpty() ||
         persona.worldSetting.isNotBlank() ||
-        persona.coreMotivations.isNotEmpty() ||
-        persona.behaviorPatterns.isNotEmpty() ||
         persona.knowledgeBoundary.isNotEmpty() ||
         persona.loreEntries.isNotEmpty() ||
         persona.hardConstraints.isNotEmpty() ||
@@ -54,25 +52,27 @@ private fun compatibleIdentityField(left: String, right: String): Boolean {
 internal fun mergePersonaProfiles(base: PersonaProfile, incoming: PersonaProfile): PersonaProfile =
     base.copy(
         name = chooseDisplayName(base.name, incoming.name),
-        identity = mergePersonaText(base.identity, incoming.identity, 2_000),
-        background = mergePersonaText(base.background, incoming.background, 4_000),
-        personality = mergePersonaText(base.personality, incoming.personality, 2_000),
-        speechStyle = mergePersonaText(base.speechStyle, incoming.speechStyle, 2_000),
-        relationship = mergePersonaText(base.relationship, incoming.relationship, 2_000),
+        portrait = mergePersonaText(base.portrait, incoming.portrait, 4_000),
+        lifeContext = mergePersonaText(base.lifeContext, incoming.lifeContext, 4_000),
+        attentionBiases = mergePersonaLines(base.attentionBiases, incoming.attentionBiases, 8),
+        perceptionBlindSpots = mergePersonaLines(base.perceptionBlindSpots, incoming.perceptionBlindSpots, 8),
+        quirks = mergePersonaLines(base.quirks, incoming.quirks, 12),
+        limitations = mergePersonaLines(base.limitations, incoming.limitations, 8),
+        coreValues = mergePersonaLines(base.coreValues, incoming.coreValues, 6),
+        coreTension = mergePersonaText(base.coreTension, incoming.coreTension, 2_000),
+        stableTraits = mergePersonaLines(base.stableTraits, incoming.stableTraits, 8),
+        mutableTraits = mergePersonaLines(base.mutableTraits, incoming.mutableTraits, 8),
+        initialUserImpression = mergePersonaText(base.initialUserImpression, incoming.initialUserImpression, 2_000),
+        voiceSamples = mergePersonaLines(base.voiceSamples, incoming.voiceSamples, 20),
         worldSetting = mergePersonaText(base.worldSetting, incoming.worldSetting, 4_000),
         franchise = mergePersonaText(base.franchise, incoming.franchise, 120),
         timelinePosition = mergePersonaText(base.timelinePosition, incoming.timelinePosition, 2_000),
-        coreMotivations = mergePersonaLines(base.coreMotivations, incoming.coreMotivations, 12),
-        valuePriorities = mergePersonaLines(base.valuePriorities, incoming.valuePriorities, 12),
-        behaviorPatterns = mergePersonaLines(base.behaviorPatterns, incoming.behaviorPatterns, 20),
-        internalContradictions = mergePersonaLines(base.internalContradictions, incoming.internalContradictions, 12),
         knowledgeBoundary = mergePersonaLines(base.knowledgeBoundary, incoming.knowledgeBoundary, 20),
         loreEntries = mergeLoreEntries(base.loreEntries, incoming.loreEntries, 80),
-        presetId = base.presetId.ifBlank { incoming.presetId }.take(120), behaviorTuning = mergeCharacterBehaviorTuning(base.behaviorTuning, incoming.behaviorTuning),
+        presetId = base.presetId.ifBlank { incoming.presetId }.take(120),
+        behaviorTuning = mergeCharacterBehaviorTuning(base.behaviorTuning, incoming.behaviorTuning),
         hardConstraints = mergePersonaLines(base.hardConstraints, incoming.hardConstraints, 20),
-        exampleDialogues = mergePersonaLines(base.exampleDialogues, incoming.exampleDialogues, 12),
         bannedPhrases = mergePersonaLines(base.bannedPhrases, incoming.bannedPhrases, 30),
-        signaturePhrases = mergePersonaLines(base.signaturePhrases, incoming.signaturePhrases, 20),
         corrections = mergePersonaLines(base.corrections, incoming.corrections, 20),
         updatedAt = maxOf(base.updatedAt, incoming.updatedAt),
     )
@@ -86,23 +86,24 @@ internal fun applyPersonaSuggestions(
         val value = suggestion.value.trim()
         if (value.isBlank()) return@forEach
         result = when (suggestion.field) {
-            "identity" -> result.copy(identity = mergePersonaText(result.identity, value, 2_000))
-            "background" -> result.copy(background = mergePersonaText(result.background, value, 4_000))
-            "personality" -> result.copy(personality = mergePersonaText(result.personality, value, 2_000))
-            "speechStyle" -> result.copy(speechStyle = mergePersonaText(result.speechStyle, value, 2_000))
-            "relationship" -> result.copy(relationship = mergePersonaText(result.relationship, value, 2_000))
+            "portrait" -> result.copy(portrait = mergePersonaText(result.portrait, value, 4_000))
+            "lifeContext" -> result.copy(lifeContext = mergePersonaText(result.lifeContext, value, 4_000))
+            "attentionBiases" -> result.copy(attentionBiases = mergePersonaLines(result.attentionBiases, listOf(value), 8))
+            "perceptionBlindSpots" -> result.copy(perceptionBlindSpots = mergePersonaLines(result.perceptionBlindSpots, listOf(value), 8))
+            "quirks" -> result.copy(quirks = mergePersonaLines(result.quirks, listOf(value), 12))
+            "limitations" -> result.copy(limitations = mergePersonaLines(result.limitations, listOf(value), 8))
+            "coreValues" -> result.copy(coreValues = mergePersonaLines(result.coreValues, listOf(value), 6))
+            "coreTension" -> result.copy(coreTension = mergePersonaText(result.coreTension, value, 2_000))
+            "stableTraits" -> result.copy(stableTraits = mergePersonaLines(result.stableTraits, listOf(value), 8))
+            "mutableTraits" -> result.copy(mutableTraits = mergePersonaLines(result.mutableTraits, listOf(value), 8))
+            "initialUserImpression" -> result.copy(initialUserImpression = mergePersonaText(result.initialUserImpression, value, 2_000))
+            "voiceSamples" -> result.copy(voiceSamples = mergePersonaLines(result.voiceSamples, listOf(value), 20))
             "worldSetting" -> result.copy(worldSetting = mergePersonaText(result.worldSetting, value, 4_000))
             "franchise" -> result.copy(franchise = mergePersonaText(result.franchise, value, 120))
             "timelinePosition" -> result.copy(timelinePosition = mergePersonaText(result.timelinePosition, value, 2_000))
-            "coreMotivations" -> result.copy(coreMotivations = mergePersonaLines(result.coreMotivations, listOf(value), 12))
-            "valuePriorities" -> result.copy(valuePriorities = mergePersonaLines(result.valuePriorities, listOf(value), 12))
-            "behaviorPatterns" -> result.copy(behaviorPatterns = mergePersonaLines(result.behaviorPatterns, listOf(value), 20))
-            "internalContradictions" -> result.copy(internalContradictions = mergePersonaLines(result.internalContradictions, listOf(value), 12))
             "knowledgeBoundary" -> result.copy(knowledgeBoundary = mergePersonaLines(result.knowledgeBoundary, listOf(value), 20))
             "hardConstraints" -> result.copy(hardConstraints = mergePersonaLines(result.hardConstraints, listOf(value), 20))
-            "exampleDialogues" -> result.copy(exampleDialogues = mergePersonaLines(result.exampleDialogues, listOf(value), 12))
             "bannedPhrases" -> result.copy(bannedPhrases = mergePersonaLines(result.bannedPhrases, listOf(value), 30))
-            "signaturePhrases" -> result.copy(signaturePhrases = mergePersonaLines(result.signaturePhrases, listOf(value), 20))
             "corrections" -> result.copy(corrections = mergePersonaLines(result.corrections, listOf(value), 20))
             else -> result
         }
@@ -121,6 +122,7 @@ internal fun mergeChatState(base: ChatCharacterState, incoming: ChatCharacterSta
             hypotheses = mergeEvidence(older.dynamics.hypotheses, newer.dynamics.hypotheses, 16),
             unknowns = mergePersonaLines(older.dynamics.unknowns, newer.dynamics.unknowns, 12),
             sharedMoments = mergePersonaLines(older.dynamics.sharedMoments, newer.dynamics.sharedMoments, 30),
+            sharedObjects = mergePersonaLines(older.dynamics.sharedObjects, newer.dynamics.sharedObjects, 30),
         ),
     )
 }
@@ -142,68 +144,7 @@ internal fun mergeGalleryStories(
     )
 }
 
-internal fun migrateLegacyEntry(entry: PersonaGalleryEntry): PersonaGalleryEntry {
-    if (entry.stories.isNotEmpty()) {
-        return entry.copy(
-            storyNotes = "",
-            history = emptyList(),
-            chatState = ChatCharacterState(),
-            sourceSessionId = "",
-        )
-    }
-    val hasLegacyStory = entry.storyNotes.isNotBlank() ||
-        entry.history.isNotEmpty() ||
-        entry.chatState.updatedAt > 0L ||
-        entry.sourceSessionId.isNotBlank()
-    val migratedStory = if (hasLegacyStory) {
-        PersonaGalleryStory(
-            id = "story-${UUID.randomUUID()}",
-            title = defaultStoryTitle(entry.history),
-            notes = entry.storyNotes,
-            history = entry.history.filter { it.role == "user" || it.role == "assistant" },
-            chatState = entry.chatState,
-            sourceSessionIds = listOf(entry.sourceSessionId).filter(String::isNotBlank),
-            updatedAt = entry.updatedAt,
-        )
-    } else {
-        null
-    }
-    return entry.copy(
-        stories = listOfNotNull(migratedStory),
-        storyNotes = "",
-        history = emptyList(),
-        chatState = ChatCharacterState(),
-        sourceSessionId = "",
-    )
-}
-
-/** V3-only migration: collapse the duplicate same-name cards created by the old snapshot model. */
-internal fun compactLegacyDuplicateGalleryEntries(
-    entries: List<PersonaGalleryEntry>,
-): List<PersonaGalleryEntry> {
-    if (entries.size < 2) return entries.map(::migrateLegacyEntry)
-    val compacted = mutableListOf<PersonaGalleryEntry>()
-    entries.sortedByDescending { it.updatedAt }.forEach { raw ->
-        val entry = migrateLegacyEntry(raw)
-        val duplicateIndex = compacted.indexOfFirst { existing ->
-            samePersonaIdentity(existing.persona, entry.persona)
-        }
-        if (duplicateIndex < 0) {
-            compacted += entry
-        } else {
-            val canonical = compacted[duplicateIndex]
-            compacted[duplicateIndex] = canonical.copy(
-                persona = mergePersonaProfiles(canonical.persona, entry.persona).copy(id = canonical.id),
-                groupChatState = mergeChatState(canonical.groupChatState, entry.groupChatState),
-                stories = mergeLegacyStoryLists(canonical.stories, entry.stories),
-                updatedAt = maxOf(canonical.updatedAt, entry.updatedAt),
-            )
-        }
-    }
-    return compacted.sortedByDescending { it.updatedAt }
-}
-
-internal fun mergeLegacyStoryLists(
+internal fun mergeGalleryStoryLists(
     base: List<PersonaGalleryStory>,
     incoming: List<PersonaGalleryStory>,
 ): List<PersonaGalleryStory> {
@@ -264,18 +205,21 @@ internal fun galleryEntryHasUnsavedChanges(
 
 private fun personaContentSignature(persona: PersonaProfile): String = listOf(
     persona.name,
-    persona.identity,
-    persona.background,
-    persona.personality,
-    persona.speechStyle,
-    persona.relationship,
+    persona.portrait,
+    persona.lifeContext,
+    persona.attentionBiases.joinToString("\u0000"),
+    persona.perceptionBlindSpots.joinToString("\u0000"),
+    persona.quirks.joinToString("\u0000"),
+    persona.limitations.joinToString("\u0000"),
+    persona.coreValues.joinToString("\u0000"),
+    persona.coreTension,
+    persona.stableTraits.joinToString("\u0000"),
+    persona.mutableTraits.joinToString("\u0000"),
+    persona.initialUserImpression,
+    persona.voiceSamples.joinToString("\u0000"),
     persona.worldSetting,
     persona.franchise,
     persona.timelinePosition,
-    persona.coreMotivations.joinToString("\u0000"),
-    persona.valuePriorities.joinToString("\u0000"),
-    persona.behaviorPatterns.joinToString("\u0000"),
-    persona.internalContradictions.joinToString("\u0000"),
     persona.knowledgeBoundary.joinToString("\u0000"),
     persona.loreEntries.joinToString("\u0000") { entry ->
         listOf(
@@ -286,9 +230,7 @@ private fun personaContentSignature(persona: PersonaProfile): String = listOf(
     },
     persona.presetId + "|" + persona.behaviorTuning.signature(),
     persona.hardConstraints.joinToString("\u0000"),
-    persona.exampleDialogues.joinToString("\u0000"),
     persona.bannedPhrases.joinToString("\u0000"),
-    persona.signaturePhrases.joinToString("\u0000"),
     persona.corrections.joinToString("\u0000"),
 ).joinToString("\u0001") { normalizePersonaText(it) }
 
