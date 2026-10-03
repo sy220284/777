@@ -312,14 +312,15 @@ internal class LocalSessionLifecycleCoordinator(
             snapshot.groupChat.mode == mode
         ) return
 
-        val target = snapshot.sessions.firstOrNull {
-            it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode && !it.blank
-        } ?: snapshot.sessions.firstOrNull {
-            it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode
+        val eligible = snapshot.sessions.filter {
+            it.usageMode == LocalUsageMode.CHAT &&
+                it.chatMode == mode &&
+                (mode != LocalChatMode.GROUP || it.groupMemberCount >= MIN_GROUP_CHAT_MEMBERS)
         }
+        val target = eligible.firstOrNull { !it.blank } ?: eligible.firstOrNull()
         if (target != null) {
             switchSession(target.id)
-        } else {
+        } else if (mode != LocalChatMode.GROUP) {
             createSession(
                 mode = LocalConversationMode.INDEPENDENT,
                 usageMode = LocalUsageMode.CHAT,
