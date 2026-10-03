@@ -24,25 +24,38 @@ data class PersonaLoreEntry(
 data class PersonaProfile(
     val id: String = DEFAULT_PERSONA_ID,
     val name: String = "默认角色",
-    val identity: String = "",
-    val background: String = "",
-    val personality: String = "",
-    val speechStyle: String = "",
-    val relationship: String = "",
+    /** Friend-like whole-person description. This is the stable identity anchor, not a trait checklist. */
+    val portrait: String = "",
+    /** Independent daily life, work, responsibilities and ongoing concerns outside the user. */
+    val lifeContext: String = "",
+    /** What this person naturally notices first. */
+    val attentionBiases: List<String> = emptyList(),
+    /** What this person often misses, misreads or understands imperfectly. */
+    val perceptionBlindSpots: List<String> = emptyList(),
+    /** Stable mundane preferences and irrational little insistences; no trauma explanation required. */
+    val quirks: List<String> = emptyList(),
+    /** Things this person is genuinely not good at. */
+    val limitations: List<String> = emptyList(),
+    /** A small set of values that matter when choices become meaningful. */
+    val coreValues: List<String> = emptyList(),
+    /** One long-running inner tension; it may influence choices but must not dominate every turn. */
+    val coreTension: String = "",
+    /** Parts that should not flip merely because the relationship becomes warmer. */
+    val stableTraits: List<String> = emptyList(),
+    /** Parts allowed to change slowly through lived interaction. */
+    val mutableTraits: List<String> = emptyList(),
+    /** The character's subjective starting impression of the user; allowed to be incomplete or wrong. */
+    val initialUserImpression: String = "",
+    /** Natural voice samples. They teach rhythm only and are never periodic catchphrases. */
+    val voiceSamples: List<String> = emptyList(),
     val worldSetting: String = "",
     val franchise: String = "",
     val timelinePosition: String = "",
-    val coreMotivations: List<String> = emptyList(),
-    val valuePriorities: List<String> = emptyList(),
-    val behaviorPatterns: List<String> = emptyList(),
-    val internalContradictions: List<String> = emptyList(),
     val knowledgeBoundary: List<String> = emptyList(),
     val loreEntries: List<PersonaLoreEntry> = emptyList(),
     val presetId: String = "",
     val hardConstraints: List<String> = emptyList(),
-    val exampleDialogues: List<String> = emptyList(),
     val bannedPhrases: List<String> = emptyList(),
-    val signaturePhrases: List<String> = emptyList(),
     val corrections: List<String> = emptyList(),
     val behaviorTuning: CharacterBehaviorTuning = CharacterBehaviorTuning(),
     val updatedAt: Long = 0L,
@@ -57,7 +70,7 @@ internal fun PersonaProfile.isUnboundChatPersona(): Boolean =
 
 @Serializable
 private data class PersonaDocument(
-    val version: Int = 1,
+    val version: Int = 2,
     val personas: List<PersonaProfile> = listOf(PersonaProfile()),
 )
 
@@ -106,7 +119,7 @@ class ChatPersonaStore internal constructor(
     private val json: Json,
 ) {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
-        this(File(context.filesDir, "local-harness/chat/personas.json"), json)
+        this(File(context.filesDir, "local-harness/chat/personas-v2.json"), json)
 
     private val durableFile = RecoveringChatDocumentFile(file)
 
@@ -161,25 +174,26 @@ class ChatPersonaStore internal constructor(
     private fun sanitize(profile: PersonaProfile): PersonaProfile = profile.copy(
         id = profile.id.trim().take(80).ifBlank { PersonaProfile.DEFAULT_PERSONA_ID },
         name = profile.name.trim().take(80).ifBlank { "默认角色" },
-        identity = profile.identity.trim().take(MAX_FIELD_CHARS),
-        background = profile.background.trim().take(MAX_LONG_FIELD_CHARS),
-        personality = profile.personality.trim().take(MAX_FIELD_CHARS),
-        speechStyle = profile.speechStyle.trim().take(MAX_FIELD_CHARS),
-        relationship = profile.relationship.trim().take(MAX_FIELD_CHARS),
+        portrait = profile.portrait.trim().take(MAX_LONG_FIELD_CHARS),
+        lifeContext = profile.lifeContext.trim().take(MAX_LONG_FIELD_CHARS),
+        attentionBiases = cleanLines(profile.attentionBiases, 8),
+        perceptionBlindSpots = cleanLines(profile.perceptionBlindSpots, 8),
+        quirks = cleanLines(profile.quirks, 12),
+        limitations = cleanLines(profile.limitations, 8),
+        coreValues = cleanLines(profile.coreValues, 6),
+        coreTension = profile.coreTension.trim().take(MAX_FIELD_CHARS),
+        stableTraits = cleanLines(profile.stableTraits, 8),
+        mutableTraits = cleanLines(profile.mutableTraits, 8),
+        initialUserImpression = profile.initialUserImpression.trim().take(MAX_FIELD_CHARS),
+        voiceSamples = cleanLines(profile.voiceSamples, 20),
         worldSetting = profile.worldSetting.trim().take(MAX_LONG_FIELD_CHARS),
         franchise = profile.franchise.trim().take(120),
         timelinePosition = profile.timelinePosition.trim().take(MAX_FIELD_CHARS),
-        coreMotivations = cleanLines(profile.coreMotivations, 12),
-        valuePriorities = cleanLines(profile.valuePriorities, 12),
-        behaviorPatterns = cleanLines(profile.behaviorPatterns, 20),
-        internalContradictions = cleanLines(profile.internalContradictions, 12),
         knowledgeBoundary = cleanLines(profile.knowledgeBoundary, 20),
         loreEntries = cleanLoreEntries(profile.loreEntries),
         presetId = profile.presetId.trim().take(120),
         hardConstraints = cleanLines(profile.hardConstraints, 20),
-        exampleDialogues = cleanLines(profile.exampleDialogues, 12),
         bannedPhrases = cleanLines(profile.bannedPhrases, 30),
-        signaturePhrases = cleanLines(profile.signaturePhrases, 20),
         corrections = cleanLines(profile.corrections, MAX_CORRECTIONS),
         behaviorTuning = profile.behaviorTuning.normalized(),
     )
