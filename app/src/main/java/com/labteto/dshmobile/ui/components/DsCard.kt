@@ -39,6 +39,7 @@ import com.labteto.dshmobile.ui.theme.wallpaperSurface
 fun DsCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    elevated: Boolean = false,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(DsSpacing.tiny),
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -61,7 +62,7 @@ fun DsCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(1.dp, DsShapes.block, clip = false)
+            .then(if (elevated) Modifier.shadow(1.dp, DsShapes.block, clip = false) else Modifier)
             .clip(DsShapes.block)
             .background(background)
             .border(1.dp, colors.borderL1, DsShapes.block)
