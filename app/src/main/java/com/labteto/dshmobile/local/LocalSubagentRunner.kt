@@ -156,9 +156,7 @@ internal class LocalSubagentRunner(
         val snapshot = state.value.copy(model = runProfile.model, baseUrl = runProfile.baseUrl)
         val routeModel = runProfile.model
         val runHistoryBudget = historyBudget?.invoke(runProfile)
-        val runCachePolicy = LocalModelPresets.promptCachePolicyFor(
-            runProfile.model, runProfile.baseUrl, runProfile.protocol, runProfile.authKind,
-        )
+        val runCachePolicy = LocalModelPresets.promptCachePolicyFor(runProfile.model, runProfile.baseUrl, runProfile.protocol, runProfile.authKind)
         val stepLimit = adaptiveAgentStepLimit(
             configuredBase = maxSteps,
             task = task,
