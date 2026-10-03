@@ -117,6 +117,29 @@ enum class LocalModelPromptUpdateMode {
     APPEND_ONLY,
 }
 
+enum class LocalPromptCacheMode {
+    NONE,
+    PREFIX_AUTO,
+    OPENAI_RESPONSES,
+}
+
+/**
+ * Provider-aware prompt-cache behavior consumed by the shared context governor.
+ *
+ * Unknown/custom routes stay conservative. Official provider routes opt in only to capabilities
+ * that their current protocol can actually use.
+ */
+data class LocalPromptCachePolicy(
+    val mode: LocalPromptCacheMode = LocalPromptCacheMode.NONE,
+    val preserveToolSurface: Boolean = false,
+    val allowAdaptiveEarlyCompaction: Boolean = true,
+    val workProjectionTargetRatioPermille: Int? = null,
+    val workProjectionTriggerRatioPermille: Int? = null,
+    val reportsHitMissTokens: Boolean = false,
+    val supportsStableCacheKey: Boolean = false,
+    val supportsCacheOptions: Boolean = false,
+)
+
 data class LocalModelRuntimeCapabilities(
     val streaming: Boolean = true,
     val toolCalling: Boolean = true,
@@ -135,6 +158,7 @@ data class LocalModelRuntimeCapabilities(
     val toolUpdateMode: LocalModelPromptUpdateMode = LocalModelPromptUpdateMode.REPLACE,
     val promptCacheUsage: Boolean = true,
     val promptCacheDiagnostics: Boolean = false,
+    val promptCachePolicy: LocalPromptCachePolicy = LocalPromptCachePolicy(),
 )
 
 data class LocalModelPreset(
@@ -531,6 +555,12 @@ object LocalModelPresets {
         val promptCacheDiagnostics =
             protocol == LocalModelProtocol.RESPONSES &&
                 authKind == LocalModelAuthKind.CHATGPT_PLAN
+        val promptCachePolicy = promptCachePolicyFor(
+            model = model,
+            baseUrl = baseUrl,
+            protocol = protocol,
+            authKind = authKind,
+        )
         return when (protocol) {
             LocalModelProtocol.CHAT_COMPLETIONS -> LocalModelRuntimeCapabilities(
                 structuredOutput = false,
@@ -542,6 +572,7 @@ object LocalModelPresets {
                 defaultMaxOutputTokens = defaultMaxOutputTokens,
                 systemPromptUpdateMode = systemPromptUpdateMode,
                 toolUpdateMode = toolUpdateMode,
+                promptCachePolicy = promptCachePolicy,
             )
             LocalModelProtocol.RESPONSES -> LocalModelRuntimeCapabilities(
                 structuredOutput = true,
@@ -554,6 +585,7 @@ object LocalModelPresets {
                 systemPromptUpdateMode = systemPromptUpdateMode,
                 toolUpdateMode = toolUpdateMode,
                 promptCacheDiagnostics = promptCacheDiagnostics,
+                promptCachePolicy = promptCachePolicy,
             )
             LocalModelProtocol.ANTHROPIC_MESSAGES -> LocalModelRuntimeCapabilities(
                 structuredOutput = false,
@@ -565,8 +597,59 @@ object LocalModelPresets {
                 defaultMaxOutputTokens = defaultMaxOutputTokens,
                 systemPromptUpdateMode = systemPromptUpdateMode,
                 toolUpdateMode = toolUpdateMode,
+                promptCachePolicy = promptCachePolicy,
             )
         }
+    }
+
+    fun promptCachePolicyFor(
+        model: String,
+        baseUrl: String,
+        protocol: LocalModelProtocol,
+        authKind: LocalModelAuthKind,
+    ): LocalPromptCachePolicy {
+        val host = runCatching {
+            URI(normalizeModelBaseUrl(baseUrl)).host?.lowercase()
+        }.getOrNull()
+        return when (host) {
+            "api.deepseek.com" -> LocalPromptCachePolicy(
+                mode = LocalPromptCacheMode.PREFIX_AUTO,
+                preserveToolSurface = true,
+                allowAdaptiveEarlyCompaction = false,
+                workProjectionTargetRatioPermille = 600,
+                workProjectionTriggerRatioPermille = 760,
+                reportsHitMissTokens = true,
+            )
+            "api.openai.com" -> {
+                val modernResponsesCache =
+                    protocol == LocalModelProtocol.RESPONSES &&
+                        authKind == LocalModelAuthKind.API_KEY &&
+                        supportsModernOpenAiPromptCache(model)
+                LocalPromptCachePolicy(
+                    mode = if (
+                        protocol == LocalModelProtocol.RESPONSES &&
+                        authKind == LocalModelAuthKind.API_KEY
+                    ) {
+                        LocalPromptCacheMode.OPENAI_RESPONSES
+                    } else {
+                        LocalPromptCacheMode.PREFIX_AUTO
+                    },
+                    preserveToolSurface = true,
+                    allowAdaptiveEarlyCompaction = false,
+                    workProjectionTargetRatioPermille = 520,
+                    workProjectionTriggerRatioPermille = 680,
+                    reportsHitMissTokens = true,
+                    supportsStableCacheKey = modernResponsesCache,
+                    supportsCacheOptions = modernResponsesCache,
+                )
+            }
+            else -> LocalPromptCachePolicy()
+        }
+    }
+
+    private fun supportsModernOpenAiPromptCache(model: String): Boolean {
+        val normalized = model.trim().lowercase()
+        return normalized.startsWith("gpt-6") || normalized.startsWith("gpt-5.6")
     }
 }
 

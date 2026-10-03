@@ -19,7 +19,7 @@ object LocalToolCatalog {
         add(tool("tool_output_read", "按 UTF-8 字节区间读取此前因上下文预算而省略的完整工具结果", properties(
             "call_id" to string("原工具调用编号"),
             "start_byte" to integer("起始 UTF-8 字节偏移，默认 0；优先使用上次结果给出的下一偏移"),
-            "max_bytes" to integer("单次读取字节数，默认 24576，允许 1024–49152"),
+            "max_bytes" to integer("单次读取字节数，默认 4096，允许 1024–49152"),
         ), listOf("call_id")))
         add(tool("write", "创建或完整替换工作区文件", properties(
             "path" to string("相对工作区的路径"),

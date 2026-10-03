@@ -54,7 +54,11 @@ class LocalPromptPressureTest {
             baseTriggerTokens = 36_000,
         )
 
-        store.record("work", pressure, assessment)
+        val sourcePressure = pressure.copy(
+            estimatedInputTokens = 42_000,
+            historyTokens = 34_000,
+        )
+        store.record("work", pressure, assessment, workSourcePressure = sourcePressure)
         val laterChatPressure = pressure.copy(
             estimatedInputTokens = 9_000,
             historyTokens = 3_000,
@@ -64,6 +68,7 @@ class LocalPromptPressureTest {
 
         assertEquals(laterChatPressure, store.latest("work"))
         assertEquals(pressure, store.latestWork("work"))
+        assertEquals(sourcePressure, store.latestWorkSource("work"))
         assertEquals(assessment, store.workAssessment("work"))
     }
 

@@ -147,6 +147,9 @@ android-17-instrumented
 - Token 诊断复用 `TokenUsageAnalyticsStore` 请求级账本，至少保留 action、run/parent/agent/step、真实 route、input/cache/output/reasoning 与 Prompt 构成；禁止再建第二套 Token 事实源。
 - Work 大上下文在请求前派生“可信检查点 + 近期原文”的有界投影；SessionEventLog 和持久模型历史仍保留完整事实。Chat 不继承 Work 专属稳态投影阈值。
 - Work 请求投影必须保持工具调用/结果批次合法，投影后 Token 必须实质下降；小上下文不得无意义重写。
+- Work 压力增长必须用 source→source 比较，不能把上一请求的投影后压力与当前完整历史比较；DeepSeek/OpenAI 缓存敏感路由在绝对阈值前不得因该错位触发提前压缩。
+- Work 工具结果超过 2 KiB 时必须先持久 spill，模型可见副本保持约 1 KiB 且可按 `call_id` 恢复；`tool_output_read` 默认分页 4 KiB，禁止默认一次重新灌回 24 KiB。
+- DeepSeek 官方路由保持共享前缀与工具 schema 顺序稳定，并以供应商实报 hit/miss 验证；OpenAI 官方 GPT-5.6+ API Key Responses 的缓存键/30m TTL 只在能力快照允许时发送，自定义兼容地址不得继承。
 - Work exposure 成功结算以供应商实报 input Token 为准；客户端估算用于准入与未知受理风险，并由实报样本校准。
 - 仅因并发 pending reservation 临时重叠造成的 exposure 超限应等待结算；当前请求在所有 pending 释放后仍无法容纳时才拒绝。
 - 本地 preflight 拒绝必须带稳定 code / failure_kind / admission_state / origin，禁止伪装成供应商模型故障。
@@ -233,6 +236,7 @@ android-17-instrumented
 - OpenAI 专属递归 strict schema 校验只对 ChatGPT 套餐和 OpenAI 官方 Responses 路由生效；第三方/自定义 Responses 仍执行公共 function/parameters 结构校验，但不继承 OpenAI 的 Structured Outputs strict 子集限制。
 - `strict=true` 的 function parameters 必须递归满足 OpenAI 约束：每一级 object 均为 `additionalProperties=false`，所有 `properties` 字段均列入 `required`；可选参数使用包含 `null` 的联合类型表达。严格模式下拒绝 `allOf/not/dependentRequired/dependentSchemas/if/then/else` 等当前不支持关键字。OpenAI 官方同时限制 schema 最多 10 层、5000 个 object properties 等总体复杂度；由于 `$ref` 与递归 schema 受支持，这类全图限制由 OpenAI 服务端作为最终权威校验，客户端不做可能误判递归引用的简化深度计算。
 - ChatGPT 套餐共享继续遵守 SIWC Responses 限制：`store=false`、`stream=true`、完整历史放入 `input`，system 转 `instructions`；不得发送 `background/conversation/max_output_tokens/max_tool_calls/metadata/moderation/multi_agent/prompt/prompt_cache_retention/safety_identifier/temperature/top_logprobs/top_p/truncation/user/previous_response_id`，本地 function/custom tools 继续使用 namespace，不启用该路由不支持的 hosted MCP、file search、Code Interpreter、native computer、tool_search 或 programmatic tool calling。
+- ChatGPT 套餐不得继承 API Key Responses 的 `prompt_cache_key` 或 `prompt_cache_options.ttl`；现有 `comparison_response_id` 仅用于允许的缓存诊断路径。OpenAI 官方 API Key Responses 与套餐共享必须保持字段白名单隔离。
 - Chat、Work、主 Agent、子代理、Automation、群聊、人物辅助和 Vision 使用相同模型凭据解析边界。
 - 后台 Automation 和一次操作内可能发生二次生成/修复的人物辅助功能，开始请求时必须冻结一个精确 profile；后续重试、去重、格式修复和连续性修复不得重新读取可变 active profile。
 - Chat 主回合完成后异步执行的 post-turn 状态归并同样属于原回合的一部分；首次归并、延迟重试和剩余 pending 续批必须一直使用该回合冻结的 profile，用户随后切换账户不得改变其认证来源。

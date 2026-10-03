@@ -17,6 +17,38 @@ class LocalHistoryCompactorTest {
     }
 
     @Test
+    fun hardBudgetCanDisableInnerAdaptiveCompactionUntilOuterGovernorTriggers() {
+        val history = buildList {
+            add(message("system", "系统"))
+            repeat(5) { index ->
+                add(message("user", "阶段-$index-" + "需求".repeat(180)))
+                add(message("assistant", "处理-$index-" + "分析".repeat(220)))
+            }
+        }
+        val encodedTokens = history.sumOf { estimateModelTokens(it.toString()) }
+        val maxTokens = (encodedTokens * 105 / 100).coerceAtLeast(encodedTokens + 1)
+        val common = LocalHistoryBudget(
+            maxHistoryChars = 1_000_000,
+            tailChars = 2_000,
+            maxSummaryChars = 2_000,
+            maxToolResultChars = 4_096,
+            maxHistoryTokens = maxTokens,
+            tailTokens = 600,
+            maxToolResultTokens = 1_600,
+        )
+
+        assertTrue(
+            LocalHistoryCompactor().compact(history, budget = common) != null,
+        )
+        assertNull(
+            LocalHistoryCompactor().compact(
+                history,
+                budget = common.copy(adaptiveCompactionTrigger = false),
+            ),
+        )
+    }
+
+    @Test
     fun preservesRecentTurnAndSummarizesOlderIntent() {
         val pad = "甲".repeat(120)
         val history = listOf(

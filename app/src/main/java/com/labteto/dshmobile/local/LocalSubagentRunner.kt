@@ -156,6 +156,7 @@ internal class LocalSubagentRunner(
         val snapshot = state.value.copy(model = runProfile.model, baseUrl = runProfile.baseUrl)
         val routeModel = runProfile.model
         val runHistoryBudget = historyBudget?.invoke(runProfile)
+        val runCachePolicy = LocalModelPresets.promptCachePolicyFor(runProfile.model, runProfile.baseUrl, runProfile.protocol, runProfile.authKind)
         val stepLimit = adaptiveAgentStepLimit(
             configuredBase = maxSteps,
             task = task,
@@ -276,7 +277,7 @@ internal class LocalSubagentRunner(
                     }
                     historyPolicy.compactHistory(
                         history, subagentId,
-                        runHistoryBudget?.let { workSteadyStateHistoryBudget(it, history.estimatedTokens) },
+                        runHistoryBudget?.let { workSteadyStateHistoryBudget(it, history.estimatedTokens, cachePolicy = runCachePolicy) },
                     )
                     modelStep += 1
                     val durableHistory = history.snapshot()
@@ -411,8 +412,7 @@ internal class LocalSubagentRunner(
                             val boundedContent = historyPolicy.retainToolResult(
                                 event.call.id,
                                 event.output,
-                                runHistoryBudget,
-                                history, event.retention,
+                                event.retention,
                             )
                             val modelOutput = AgentToolResult(
                                 content = boundedContent,

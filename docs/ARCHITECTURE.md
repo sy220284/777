@@ -160,7 +160,7 @@ sessionId
 
 Recovery does not blindly replay side effects. A started tool whose result is unknown becomes `TOOL_OUTCOME_UNKNOWN`; one that never started becomes `TOOL_NOT_STARTED`.
 
-Work 请求由 `LocalWorkRequestContextProjection` 生成：完整历史持久保留，模型侧采用可信任务检查点与最近因果链，旧工具输出按 `call_id` 从输出存储恢复。稳态目标 28k、绝对触发 36k；`LocalWorkStepContextAssessment` 只在历史占比和连续增长同时达到阈值时提前投影，不依赖步数、缓存命中或虚构 usage。Chat 与 Work 压力基线分别保存。
+Work 请求由 `LocalWorkRequestContextProjection` 生成：完整历史持久保留，模型侧采用可信任务检查点与最近因果链，超过 2 KiB 的 Work 工具结果先写入 Session 私有输出存储，模型只保留约 1 KiB 的可恢复预览，并通过 `call_id` 分页恢复。未知/自定义路由继续使用 28k 稳态目标与 36k 绝对触发；DeepSeek 官方与 OpenAI 官方按冻结路由的 `LocalPromptCachePolicy` 使用更晚的模型窗口比例阈值，优先保持前缀与工具面稳定。Work 同时保存原始 source pressure 与实际 request pressure，增长判断只比较同一 source 坐标，避免一次投影后把压缩差额误判为历史暴涨。DeepSeek 依赖服务端自动前缀缓存；OpenAI 官方 GPT-5.6+ API Key Responses 可使用稳定 `prompt_cache_key` 与 `prompt_cache_options.ttl=30m`。ChatGPT 套餐继续遵守 SIWC 限制，不发送这些 API Key 专属字段。
 
 持久事件遍历统一使用 `LocalSessionEventLog.withEvents` 的作用域快照；读取期间固定字节边界，遍历提前返回、消费者异常和正常完成均关闭全部文件与解压器，流不能逃逸作用域。
 

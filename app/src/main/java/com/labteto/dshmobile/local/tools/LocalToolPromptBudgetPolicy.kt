@@ -1,0 +1,45 @@
+package com.labteto.dshmobile.local
+
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+
+/**
+ * Chooses the optional-tool schema budget without making the projection layer own provider rules.
+ *
+ * Cache-sensitive official routes keep an already enabled tool surface stable. Other routes retain
+ * the existing context-pressure budget so unknown/custom providers do not inherit assumptions.
+ */
+internal fun optionalToolPromptBudgetForRoute(
+    state: LocalHarnessState,
+    history: List<JsonObject>,
+): Int {
+    val profile = state.modelSelection.activeProfile
+    val cachePolicy = LocalModelPresets.promptCachePolicyFor(
+        model = state.model,
+        baseUrl = state.baseUrl,
+        protocol = profile?.protocol ?: LocalModelPresets.protocolFor(state.model, state.baseUrl),
+        authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
+    )
+    if (cachePolicy.preserveToolSurface) {
+        return LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS
+    }
+    val operationalLimit = operationalInputLimitTokens(
+        state.model,
+        state.baseUrl,
+        profile?.contextWindowTokensOverride,
+    )
+    val pressure = LocalPromptPressureMeter.measure(
+        messages = history,
+        tools = JsonArray(emptyList()),
+        operationalLimitTokens = operationalLimit,
+        modelContextWindowTokens = documentedContextWindowTokens(
+            state.model,
+            state.baseUrl,
+            profile?.contextWindowTokensOverride,
+        ),
+    )
+    return minOf(
+        LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
+        (pressure.remainingOperationalTokens / 4).coerceAtLeast(0),
+    )
+}
