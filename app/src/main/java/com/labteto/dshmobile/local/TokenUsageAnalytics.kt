@@ -127,6 +127,7 @@ data class TokenUsageRecord(
     val inputTokens: Long = 0L,
     val cacheHitTokens: Long = 0L,
     val cacheMissTokens: Long = 0L,
+    val cacheWriteTokens: Long = 0L,
     val outputTokens: Long = 0L,
     val reasoningTokens: Long = 0L,
     val estimatedCostCny: Double = 0.0,
@@ -141,6 +142,7 @@ data class TokenUsageAggregate(
     val inputTokens: Long = 0L,
     val cacheHitTokens: Long = 0L,
     val cacheMissTokens: Long = 0L,
+    val cacheWriteTokens: Long = 0L,
     val outputTokens: Long = 0L,
     val reasoningTokens: Long = 0L,
     val requestCount: Long = 0L,
@@ -754,6 +756,7 @@ private class MutableTokenAggregate {
     var inputTokens: Long = 0L
     var cacheHitTokens: Long = 0L
     var cacheMissTokens: Long = 0L
+    var cacheWriteTokens: Long = 0L
     var outputTokens: Long = 0L
     var reasoningTokens: Long = 0L
     var requestCount: Long = 0L
@@ -764,6 +767,7 @@ private class MutableTokenAggregate {
         inputTokens = saturatingUsageAdd(inputTokens, record.inputTokens)
         cacheHitTokens = saturatingUsageAdd(cacheHitTokens, record.cacheHitTokens)
         cacheMissTokens = saturatingUsageAdd(cacheMissTokens, record.cacheMissTokens)
+        cacheWriteTokens = saturatingUsageAdd(cacheWriteTokens, record.cacheWriteTokens)
         outputTokens = saturatingUsageAdd(outputTokens, record.outputTokens)
         reasoningTokens = saturatingUsageAdd(reasoningTokens, record.reasoningTokens)
         if (record.reported) {
@@ -778,6 +782,7 @@ private class MutableTokenAggregate {
         inputTokens = inputTokens,
         cacheHitTokens = cacheHitTokens,
         cacheMissTokens = cacheMissTokens,
+        cacheWriteTokens = cacheWriteTokens,
         outputTokens = outputTokens,
         reasoningTokens = reasoningTokens,
         requestCount = requestCount,

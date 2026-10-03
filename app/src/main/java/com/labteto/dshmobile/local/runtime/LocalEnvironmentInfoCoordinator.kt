@@ -92,6 +92,7 @@ internal class LocalEnvironmentInfoCoordinator(
                         append(" input=").append(record.inputTokens)
                         append(" cache_hit=").append(record.cacheHitTokens)
                         append(" cache_miss=").append(record.cacheMissTokens)
+                        append(" cache_write=").append(record.cacheWriteTokens)
                         append(" output=").append(record.outputTokens)
                         append(" reasoning=").append(record.reasoningTokens)
                         append(" prompt(history=").append(prompt.historyTokens)
@@ -118,7 +119,7 @@ internal class LocalEnvironmentInfoCoordinator(
     private fun formatAggregate(value: TokenUsageAggregate): String =
         "requests=${value.requestCount} input=${value.inputTokens} " +
             "cache_hit=${value.cacheHitTokens} cache_miss=${value.cacheMissTokens} " +
-            "output=${value.outputTokens} reasoning=${value.reasoningTokens} total=${value.totalTokens} " +
+            "cache_write=${value.cacheWriteTokens} output=${value.outputTokens} reasoning=${value.reasoningTokens} total=${value.totalTokens} " +
             "unreported=${value.unreportedRequestCount}"
 
     private companion object {

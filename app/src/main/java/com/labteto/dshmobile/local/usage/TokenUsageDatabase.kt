@@ -139,6 +139,7 @@ private fun TokenUsageAggregate.add(record: TokenUsageRecord) = copy(
     inputTokens = saturatingUsageAdd(inputTokens, record.inputTokens),
     cacheHitTokens = saturatingUsageAdd(cacheHitTokens, record.cacheHitTokens),
     cacheMissTokens = saturatingUsageAdd(cacheMissTokens, record.cacheMissTokens),
+    cacheWriteTokens = saturatingUsageAdd(cacheWriteTokens, record.cacheWriteTokens),
     outputTokens = saturatingUsageAdd(outputTokens, record.outputTokens),
     reasoningTokens = saturatingUsageAdd(reasoningTokens, record.reasoningTokens),
     requestCount = saturatingUsageAdd(requestCount, if (record.reported) 1L else 0L),
