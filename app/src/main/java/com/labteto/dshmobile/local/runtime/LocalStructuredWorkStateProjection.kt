@@ -41,18 +41,15 @@ internal fun structuredWorkState(
             when (event.type) {
                 "user/message" -> {
                     eventText(event.data)
-                        ?.takeIf { text -> WORK_CONSTRAINT_CUES.any(text.lowercase()::contains) }
-                        ?.take(MAX_STRUCTURED_WORK_TEXT_CHARS)
+                        ?.let { extractLocalWorkCueSnippet(it, LocalWorkCueKind.CONSTRAINT) }
                         ?.let(constraints::add)
                 }
                 "assistant/message" -> {
-                    val text = eventText(event.data)?.take(MAX_STRUCTURED_WORK_TEXT_CHARS)
-                    if (text != null && WORK_DECISION_CUES.any(text.lowercase()::contains)) {
-                        decisions += text
-                    }
-                    if (text != null && WORK_FAILURE_CUES.any(text.lowercase()::contains)) {
-                        failures += text
-                    }
+                    val text = eventText(event.data)
+                    text?.let { extractLocalWorkCueSnippet(it, LocalWorkCueKind.DECISION) }
+                        ?.let(decisions::add)
+                    text?.let { extractLocalWorkCueSnippet(it, LocalWorkCueKind.FAILURE) }
+                        ?.let(failures::add)
                 }
                 "tool/call", "subagent/tool-call" -> {
                     val name = event.data.stringValue("name") ?: event.data.stringValue("tool_name")
@@ -175,19 +172,6 @@ private val ARTIFACT_FACT_KEYS = listOf(
     "commit_sha",
 )
 
-private val WORK_CONSTRAINT_CUES = listOf(
-    "必须", "禁止", "不能", "不要", "只允许", "仅限", "限制", "约束", "要求", "保持", "兼容",
-    "must", "must not", "never", "only", "constraint",
-)
-private val WORK_DECISION_CUES = listOf(
-    "决定", "确认", "采用", "改为", "保留", "结论", "方案", "选择",
-    "decide", "confirmed", "adopt", "keep", "conclusion",
-)
-private val WORK_FAILURE_CUES = listOf(
-    "失败", "报错", "错误", "异常", "超时", "冲突", "回退", "无法", "风险", "未通过",
-    "failure", "failed", "error", "timeout", "conflict", "rollback", "risk",
-)
-
 private const val MAX_STRUCTURED_EVENT_SCAN = 160
 private const val MAX_STRUCTURED_PLAN_ITEMS = 12
 private const val MAX_STRUCTURED_TODO_ITEMS = 12
@@ -198,4 +182,3 @@ private const val MAX_STRUCTURED_FACTS = 12
 private const val MAX_STRUCTURED_ARTIFACTS = 8
 private const val MAX_STRUCTURED_TOOLS = 12
 private const val MAX_STRUCTURED_IDENTIFIER_CHARS = 240
-private const val MAX_STRUCTURED_WORK_TEXT_CHARS = 360
