@@ -514,48 +514,24 @@ internal fun PersonaGalleryScreen(
                 selected.stories.size,
                 totalDialogue,
             )
-            SpatialPortraitStandee(
+            PersonaGalleryDetailHeaderV3(
                 entry = selected,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(320.dp),
+                relationSummary = relationSummary,
+                busy = busy,
+                onChoosePortrait = {
+                    portraitTargetId = selected.id
+                    portraitPicker.launch(arrayOf("image/*"))
+                },
+                onRemovePortrait = {
+                    busy = true
+                    error = null
+                    scope.launch {
+                        onRemovePortrait(selected.id)
+                            .onFailure { error = it.message ?: portraitSaveFailedText }
+                        busy = false
+                    }
+                },
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                DsButton(
-                    text = stringResource(
-                        if (selected.portraitPath.isBlank()) R.string.persona_gallery_portrait_add
-                        else R.string.persona_gallery_portrait_replace,
-                    ),
-                    onClick = {
-                        portraitTargetId = selected.id
-                        portraitPicker.launch(arrayOf("image/*"))
-                    },
-                    variant = DsButtonVariant.Outline,
-                    modifier = Modifier.weight(1f),
-                    enabled = !busy,
-                )
-                if (selected.portraitPath.isNotBlank()) {
-                    DsButton(
-                        text = stringResource(R.string.persona_gallery_portrait_remove),
-                        onClick = {
-                            busy = true
-                            error = null
-                            scope.launch {
-                                onRemovePortrait(selected.id)
-                                    .onFailure { error = it.message ?: portraitSaveFailedText }
-                                busy = false
-                            }
-                        },
-                        variant = DsButtonVariant.Ghost,
-                        modifier = Modifier.weight(1f),
-                        enabled = !busy,
-                    )
-                }
-            }
-            PersonaHero(persona = selected.persona, subtitle = relationSummary)
             selectedStory?.let { story ->
                 PersonaRelationshipStatusCard(story)
                 Row(
