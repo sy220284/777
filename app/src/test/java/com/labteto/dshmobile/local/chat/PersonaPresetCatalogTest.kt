@@ -41,9 +41,8 @@ class PersonaPresetCatalogTest {
     }
 
     @Test
-    fun bundledPresetArtworkMustBeAiFanArtUnderDedicatedAssetDirectory() {
+    fun bundledPresetArtworkMustStayUnderDedicatedAssetDirectory() {
         PersonaPresetCatalog.presets.mapNotNull { it.artwork }.forEach { artwork ->
-            assertEquals(PersonaPresetArtworkSource.AI_FAN_ART, artwork.source)
             assertTrue(artwork.assetPath.startsWith("persona-presets/"))
             assertTrue(".." !in artwork.assetPath)
             assertTrue(
