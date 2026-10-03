@@ -1,10 +1,15 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import android.content.Context
+import android.graphics.BitmapFactory
+import java.io.File
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -26,20 +32,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -53,10 +65,38 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
+internal data class PersonaPhotoFrameLayout(
+    val imageAspectRatio: Float,
+    val widthFraction: Float,
+)
+
+internal fun personaPhotoFrameLayout(
+    imageWidth: Int,
+    imageHeight: Int,
+): PersonaPhotoFrameLayout {
+    val imageAspectRatio = if (imageWidth > 0 && imageHeight > 0) {
+        (imageWidth.toFloat() / imageHeight.toFloat()).coerceIn(2f / 3f, 1.5f)
+    } else {
+        1f
+    }
+    val widthFraction = when {
+        imageAspectRatio < 0.85f -> 0.64f
+        imageAspectRatio > 1.15f -> 0.90f
+        else -> 0.78f
+    }
+    return PersonaPhotoFrameLayout(
+        imageAspectRatio = imageAspectRatio,
+        widthFraction = widthFraction,
+    )
+}
+
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 internal fun PersonaGalleryDetailHeaderV3(
     entry: PersonaGalleryEntry,
     relationSummary: String,
@@ -64,68 +104,181 @@ internal fun PersonaGalleryDetailHeaderV3(
     onChoosePortrait: () -> Unit,
     onRemovePortrait: () -> Unit,
 ) {
+    val colors = DsTheme.colors
+    var portraitActionsOpen by remember(entry.id) { mutableStateOf(false) }
+    val portrait by produceState<ImageBitmap?>(
+        initialValue = null,
+        key1 = entry.portraitPath,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            decodePersonaDetailPortrait(entry.portraitPath)
+        }
+    }
+    val frameLayout = remember(portrait) {
+        personaPhotoFrameLayout(
+            imageWidth = portrait?.width ?: 0,
+            imageHeight = portrait?.height ?: 0,
+        )
+    }
+    val subtitle = entry.persona.identity.ifBlank { relationSummary }
+
+    if (portraitActionsOpen && entry.portraitPath.isNotBlank()) {
+        DsBottomSheet(
+            title = stringResource(R.string.persona_gallery_portrait_actions_title),
+            onDismiss = { portraitActionsOpen = false },
+        ) {
+            DsButton(
+                text = stringResource(R.string.persona_gallery_portrait_replace),
+                onClick = {
+                    portraitActionsOpen = false
+                    onChoosePortrait()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+                variant = DsButtonVariant.Outline,
+            )
+            DsButton(
+                text = stringResource(R.string.persona_gallery_portrait_remove),
+                onClick = {
+                    portraitActionsOpen = false
+                    onRemovePortrait()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+                variant = DsButtonVariant.Danger,
+            )
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
     ) {
-        Row(
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = colors.wallpaperSurface(
+                WallpaperSurfaceLevel.CARD,
+                base = colors.bgLayer1,
+            ),
+            shadowElevation = 5.dp,
             modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 64.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                .fillMaxWidth(frameLayout.widthFraction)
+                .combinedClickable(
+                    enabled = !busy,
+                    onClick = {
+                        if (entry.portraitPath.isBlank()) onChoosePortrait()
+                    },
+                    onLongClick = {
+                        if (entry.portraitPath.isNotBlank()) portraitActionsOpen = true
+                    },
+                ),
         ) {
-            LocalPersonaHeaderAvatar(entry.persona.name, entry.portraitPath)
-            Column(Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.padding(
+                    start = 8.dp,
+                    top = 8.dp,
+                    end = 8.dp,
+                    bottom = 10.dp,
+                ),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = colors.characterAccentTertiary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(frameLayout.imageAspectRatio),
+                ) {
+                    val resolvedPortrait = portrait
+                    if (resolvedPortrait != null) {
+                        Image(
+                            bitmap = resolvedPortrait,
+                            contentDescription = entry.persona.name,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                            alignment = Alignment.Center,
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                            ) {
+                                Icon(
+                                    FeatherIcons.User,
+                                    contentDescription = null,
+                                    tint = colors.characterAccent,
+                                    modifier = Modifier.size(32.dp),
+                                )
+                                Text(
+                                    stringResource(R.string.persona_gallery_portrait_photo_empty),
+                                    style = DsType.small13.withReadingWeight(),
+                                    color = colors.labelSecondary,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.size(DsSpacing.xsmall))
                 Text(
                     entry.persona.name,
                     style = DsType.base16Strong.withReadingWeight(),
-                    color = DsTheme.colors.labelPrimary,
+                    color = colors.labelPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    entry.persona.identity.ifBlank { relationSummary },
-                    style = DsType.small13.withReadingWeight(),
-                    color = DsTheme.colors.labelSecondary,
+                    subtitle,
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
                 )
                 if (entry.persona.identity.isNotBlank()) {
                     Text(
                         relationSummary,
                         style = DsType.caption11.withReadingWeight(),
-                        color = DsTheme.colors.labelTertiary,
+                        color = colors.labelTertiary,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-        ) {
-            DsButton(
-                text = stringResource(
-                    if (entry.portraitPath.isBlank()) R.string.persona_gallery_portrait_add
-                    else R.string.persona_gallery_portrait_replace,
-                ),
-                onClick = onChoosePortrait,
-                size = DsButtonSize.Small,
-                variant = DsButtonVariant.Ghost,
-                enabled = !busy,
+
+        if (entry.portraitPath.isNotBlank()) {
+            Text(
+                stringResource(R.string.persona_gallery_portrait_long_press_hint),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelTertiary,
+                textAlign = TextAlign.Center,
             )
-            if (entry.portraitPath.isNotBlank()) {
-                DsButton(
-                    text = stringResource(R.string.persona_gallery_portrait_remove),
-                    onClick = onRemovePortrait,
-                    size = DsButtonSize.Small,
-                    variant = DsButtonVariant.Ghost,
-                    enabled = !busy,
-                )
-            }
         }
     }
+}
+
+private fun decodePersonaDetailPortrait(path: String): ImageBitmap? {
+    if (path.isBlank()) return null
+    val file = File(path)
+    if (!file.isFile) return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+    var sample = 1
+    val longest = maxOf(bounds.outWidth, bounds.outHeight)
+    while (longest / sample > 1_600) sample *= 2
+    return BitmapFactory.decodeFile(
+        file.absolutePath,
+        BitmapFactory.Options().apply { inSampleSize = sample },
+    )?.asImageBitmap()
 }
 
 @Composable
