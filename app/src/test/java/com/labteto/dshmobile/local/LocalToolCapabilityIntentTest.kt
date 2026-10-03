@@ -31,6 +31,12 @@ class LocalToolCapabilityIntentTest {
         assertTrue(LocalToolCapabilityIntent.from("把 PR #42 的冲突处理掉", emptyList()).requestsGitHub)
         assertTrue(LocalToolCapabilityIntent.from("检查 pull request 42", emptyList()).requestsGitHub)
         assertFalse(LocalToolCapabilityIntent.from("修复 process 调度", emptyList()).requestsGitHub)
+        assertTrue(
+            LocalToolCapabilityIntent.from(
+                "现在改为处理 GitHub PR 42",
+                listOf(message("user", "之前不用 GitHub")),
+            ).requestsGitHub,
+        )
     }
 
     private fun message(role: String, content: String) = buildJsonObject {
