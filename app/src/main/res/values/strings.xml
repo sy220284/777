@@ -509,6 +509,7 @@
     <string name="tasks_notification_open_result">点击进入对应工作会话查看结果。</string>
     <string name="local_run_open_results">本次文件与成果</string>
     <string name="tools_title">能力中心</string>
+    <string name="tools_loading">正在读取工具与连接状态…</string>
     <string name="tools_subtitle">查看工作模式可用能力，并按需管理外部连接</string>
     <string name="tools_refresh">刷新能力状态</string>
     <string name="tools_external_services">外部工具服务</string>
@@ -553,6 +554,7 @@
     <string name="local_files_refresh">刷新</string>
     <string name="local_files_workspace_empty">工作区暂无文件</string>
     <string name="local_files_loading">正在读取文件…</string>
+    <string name="chat_diary_loading">正在整理角色日记…</string>
     <string name="local_files_binary_hint">该文件为二进制文件，当前显示文件信息；可在工作区列表中确认其路径和大小。</string>
     <string name="local_files_truncated_hint">文件较大，以下为前 512 KB 预览。</string>
 
@@ -1229,6 +1231,7 @@
     <string name="local_plan_button_on">规划中</string>
     <string name="local_plan_button_off">规划</string>
     <string name="local_auto_approve_short">自动批准</string>
+    <string name="local_harness_loading">正在准备本机执行环境…</string>
     <string name="local_harness_title">本机 Harness</string>
     <string name="local_on_device_execution_title">手机直接执行</string>
     <string name="local_on_device_execution_hint">模型、文件、网页、命令、技能和子代理都在手机侧组织执行。远程控制入口已统一放到侧边栏。</string>
@@ -1418,8 +1421,5 @@
     <string name="persona_gallery_preset_artwork_too_large">人物预置形象图过大</string>
     <string name="persona_gallery_preset_artwork_unreadable">人物预置形象图无法识别</string>
     <string name="persona_gallery_entry_missing">图集条目已不存在</string>
-    <string name="tools_loading">正在读取工具与连接状态…</string>
-    <string name="chat_diary_loading">正在整理角色日记…</string>
-    <string name="local_harness_loading">正在准备本机执行环境…</string>
 </resources>
 
