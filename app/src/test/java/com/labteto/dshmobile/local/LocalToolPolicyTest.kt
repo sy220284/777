@@ -70,10 +70,10 @@ class LocalToolPolicyTest {
         assertFalse(LocalToolPolicy.allowedInPlan("subagent_fork", ToolAccess.AGENT_CONTROL))
     }
 
-    @Test fun shellAlwaysRequiresExplicitApprovalOutsideSafeAutoMode() {
+    @Test fun shellRemainsHighRiskWhileGlobalAutoApprovalMayApproveIt() {
         assertEquals(ToolApprovalPolicy.ALWAYS, LocalToolPolicy.approval("bash"))
         assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("bash"))
-        assertFalse(canAutoApprove(toolForPolicy("bash")))
+        assertFalse(canAutoApproveSafely(toolForPolicy("bash")))
     }
 
     private fun toolForPolicy(name: String) = HarnessTool(
