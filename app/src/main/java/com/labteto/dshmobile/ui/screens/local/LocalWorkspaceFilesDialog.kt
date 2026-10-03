@@ -164,6 +164,7 @@ internal fun LocalWorkspaceFilesDialog(
                         },
                     ),
                     modifier = Modifier.padding(horizontal = DsSpacing.medium),
+                    largeTitle = preview == null && directory.isEmpty(),
                     actionIcon = FeatherIcons.RefreshCw,
                     actionContentDescription = stringResource(R.string.local_files_refresh),
                     actionEnabled = !loading && preview == null,
