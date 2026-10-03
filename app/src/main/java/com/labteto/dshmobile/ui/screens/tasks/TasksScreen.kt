@@ -198,6 +198,7 @@ fun TasksScreen(
                 ),
                 onBack = navigateBack,
                 backContentDescription = stringResource(R.string.common_back),
+                largeTitle = true,
                 actionIcon = if (
                     showCreate || (chatMode && !canCreateChatInteraction)
                 ) null else FeatherIcons.Plus,
