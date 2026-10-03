@@ -44,7 +44,7 @@ object DsAnimations {
      */
     val expand: FiniteAnimationSpec<IntSize> = spring(
         dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessMediumLow,
+        stiffness = Spring.StiffnessMedium,
     )
 
     /**
