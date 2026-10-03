@@ -1366,6 +1366,7 @@
     <string name="chatgpt_using_plan">正在使用 ChatGPT 套餐</string>
     <string name="chatgpt_manage_usage">管理使用额度</string>
     <string name="chatgpt_switch_model_source">切换模型来源</string>
+    <string name="chatgpt_account_change_locked">当前任务运行中，结束后可切换、重新授权、断开或移除模型账户</string>
     <string name="chatgpt_welcome_title">正在使用 ChatGPT 套餐</string>
     <string name="chatgpt_welcome_body">符合条件的 AI 请求会使用你的 ChatGPT 套餐或可用额度。你可以随时在 ChatGPT 设置中查看和管理本应用的使用额度。</string>
     <string name="chatgpt_welcome_confirm">知道了</string>
