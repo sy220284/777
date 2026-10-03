@@ -80,6 +80,7 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -427,9 +428,11 @@ internal fun PersonaGalleryScreen(
                 .fillMaxSize()
                 .safeDrawingPadding(),
         ) {
-            PersonaGalleryTopBar(
+            DsTopBar(
                 title = if (selected == null) stringResource(R.string.persona_gallery_title) else selected.persona.name,
                 onBack = ::navigateBack,
+                backContentDescription = stringResource(R.string.common_back),
+                modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
             if (selected == null) {
                 PersonaGalleryOverviewV3(
