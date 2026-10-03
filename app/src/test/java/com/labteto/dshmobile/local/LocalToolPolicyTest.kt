@@ -14,8 +14,28 @@ class LocalToolPolicyTest {
             LocalToolPolicy.approval(name)
             LocalToolPolicy.metadata(name)
             LocalToolPolicy.autoApprovalScope(name)
+            LocalToolPolicy.exposure(name)
         }
         assertTrue(runCatching { LocalToolPolicy.access("new_undeclared_tool") }.isFailure)
+        assertTrue(runCatching { LocalToolPolicy.exposure("new_undeclared_tool") }.isFailure)
+    }
+
+    @Test fun ordinaryExecutionToolsStayCoreWhileNarrowCapabilitiesAreDeferred() {
+        for (name in listOf(
+            "read", "write", "edit", "apply_patch", "bash", "job_output",
+            "capability_search", "update_plan", "skill", "subagent", "workflow",
+            "memory_search", "session_event_search", "present",
+        )) {
+            assertEquals(name, ToolExposure.CORE, LocalToolPolicy.exposure(name))
+        }
+        for (name in listOf(
+            "web_search", "web_fetch", "http_request", "download_file", "network_diagnose",
+            "todo_write", "create_goal", "update_goal", "memory_list", "memory_remember",
+            "memory_update", "memory_forget", "session_trace", "session_event_trace",
+            "session_event_read",
+        )) {
+            assertEquals(name, ToolExposure.OPTIONAL, LocalToolPolicy.exposure(name))
+        }
     }
 
     @Test fun aliasesCannotBypassApprovalOrReadOnlyScope() = runTest {
