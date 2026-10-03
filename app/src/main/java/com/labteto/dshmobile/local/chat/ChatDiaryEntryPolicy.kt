@@ -27,11 +27,7 @@ internal object ChatDiaryEntryPolicy {
             importance = importance,
             disclosure = raw.disclosure.trim().uppercase(),
         ).takeIf { delta ->
-            significance == "MAJOR" ||
-                delta.feeling.isNotBlank() ||
-                delta.innerThought.isNotBlank() ||
-                delta.relationshipMeaning.isNotBlank() ||
-                delta.unresolvedEcho.isNotBlank()
+            delta.feeling.isNotBlank() || delta.innerThought.isNotBlank()
         }
     }
 
