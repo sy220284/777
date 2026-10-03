@@ -12,8 +12,7 @@ internal class LocalSubagentHistoryPolicy(
     fun retainToolResult(
         callId: String,
         output: String,
-        budget: LocalHistoryBudget?,
-        history: LocalModelHistoryBuffer, retention: com.labteto.dshmobile.harness.tools.ToolResultRetention,
+        retention: com.labteto.dshmobile.harness.tools.ToolResultRetention,
     ): String {
         val stored = retention == com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE &&
             spillToolOutput(callId, output)
