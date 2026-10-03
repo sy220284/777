@@ -104,6 +104,7 @@ internal fun appendLocalDiagnosticDetails(
         appendLine(
             "汇总 request_count=${aggregate.requestCount} input=${aggregate.inputTokens} " +
                 "cache_hit=${aggregate.cacheHitTokens} cache_miss=${aggregate.cacheMissTokens} " +
+                "cache_write=${aggregate.cacheWriteTokens} " +
                 "output=${aggregate.outputTokens} reasoning=${aggregate.reasoningTokens} " +
                 "total=${aggregate.totalTokens} unreported=${aggregate.unreportedRequestCount} " +
                 "estimated_cost_cny=${aggregate.estimatedCostCny}",
