@@ -16,9 +16,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
-/** Settings owns model identity, but ignores streaming, job and resource-counter churn. */
+/** Settings owns model identity and its mutation lock, while ignoring unrelated hot-path churn. */
 data class LocalHarnessSettingsState(
-    val loading: Boolean = true,
+    val modelIdentityLocked: Boolean = true,
     val model: String = "deepseek-flash",
     val baseUrl: String = "https://api.deepseek.com",
     val modelSelection: LocalModelSelectionState = LocalModelSelectionState(),
@@ -71,7 +71,7 @@ data class LocalHarnessShellState(
 
 internal fun LocalHarnessState.toSettingsUiState(): LocalHarnessSettingsState =
     LocalHarnessSettingsState(
-        loading = loading,
+        modelIdentityLocked = loading || running,
         model = model,
         baseUrl = baseUrl,
         modelSelection = modelSelection,
