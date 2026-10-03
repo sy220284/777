@@ -487,6 +487,78 @@ internal fun PersonaGalleryOverviewV3(
 }
 
 @Composable
+internal fun PersonaGalleryDetailHeaderV3(
+    entry: PersonaGalleryEntry,
+    relationSummary: String,
+    busy: Boolean,
+    onChoosePortrait: () -> Unit,
+    onRemovePortrait: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 64.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            LocalPersonaHeaderAvatar(entry.persona.name, entry.portraitPath)
+            Column(Modifier.weight(1f)) {
+                Text(
+                    entry.persona.name,
+                    style = DsType.base16Strong.withReadingWeight(),
+                    color = DsTheme.colors.labelPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    entry.persona.identity.ifBlank { relationSummary },
+                    style = DsType.small13.withReadingWeight(),
+                    color = DsTheme.colors.labelSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (entry.persona.identity.isNotBlank()) {
+                    Text(
+                        relationSummary,
+                        style = DsType.caption11.withReadingWeight(),
+                        color = DsTheme.colors.labelTertiary,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        ) {
+            DsButton(
+                text = stringResource(
+                    if (entry.portraitPath.isBlank()) R.string.persona_gallery_portrait_add
+                    else R.string.persona_gallery_portrait_replace,
+                ),
+                onClick = onChoosePortrait,
+                size = DsButtonSize.Small,
+                variant = DsButtonVariant.Ghost,
+                enabled = !busy,
+            )
+            if (entry.portraitPath.isNotBlank()) {
+                DsButton(
+                    text = stringResource(R.string.persona_gallery_portrait_remove),
+                    onClick = onRemovePortrait,
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Ghost,
+                    enabled = !busy,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun PersonaGalleryAddPanel(
     presets: List<PersonaPreset>,
     busy: Boolean,
