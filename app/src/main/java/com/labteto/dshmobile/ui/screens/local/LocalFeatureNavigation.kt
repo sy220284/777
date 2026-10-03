@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import com.labteto.dshmobile.local.LocalChatMode
 import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.MIN_GROUP_CHAT_MEMBERS
 
 internal enum class LocalFeaturePage {
     HOME,
@@ -36,5 +37,6 @@ internal fun localFeatureHome(): List<String> = listOf(LocalFeaturePage.HOME.nam
 internal fun hasEstablishedGroupChat(sessions: List<LocalSessionSummary>): Boolean =
     sessions.any {
         it.usageMode == LocalUsageMode.CHAT &&
-            it.chatMode == LocalChatMode.GROUP
+            it.chatMode == LocalChatMode.GROUP &&
+            it.groupMemberCount >= MIN_GROUP_CHAT_MEMBERS
     }
