@@ -303,14 +303,18 @@ private fun SidebarAvatarSheet(
 }
 
 @Composable
-internal fun SidebarAvatarImage(source: SidebarAvatarSource, contentDescription: String) {
+internal fun SidebarAvatarImage(
+    source: SidebarAvatarSource,
+    contentDescription: String,
+    decodeEdge: Float = AVATAR_DECODE_EDGE,
+) {
     val context = LocalContext.current
     val mediaKey = when (source) {
         SidebarAvatarSource.Default -> "default"
         is SidebarAvatarSource.Bundled -> "asset:${source.assetPath}"
         is SidebarAvatarSource.Custom -> "file:${source.file.absolutePath}"
     }
-    val drawable by produceState<Drawable?>(initialValue = null, mediaKey) {
+    val drawable by produceState<Drawable?>(initialValue = null, mediaKey, decodeEdge) {
         value = withContext(Dispatchers.IO) {
             if (source is SidebarAvatarSource.Default) return@withContext null
             runCatching {
@@ -329,7 +333,7 @@ internal fun SidebarAvatarImage(source: SidebarAvatarSource, contentDescription:
                 ImageDecoder.decodeDrawable(imageSource) { decoder, info, _ ->
                     val width = info.size.width
                     val height = info.size.height
-                    val scale = maxOf(width, height).toFloat() / AVATAR_DECODE_EDGE
+                    val scale = maxOf(width, height).toFloat() / decodeEdge.coerceAtLeast(AVATAR_DECODE_EDGE)
                     if (scale > 1f) {
                         decoder.setTargetSize(
                             (width / scale).toInt().coerceAtLeast(1),
