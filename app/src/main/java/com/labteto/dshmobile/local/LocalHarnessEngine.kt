@@ -787,7 +787,7 @@ class LocalHarnessEngine @Inject constructor(
                 eventLog = eventLogFor(currentSessionId)
                 prepareLocalHarnessStartup(
                     prepareRuntime = bundledRuntimeManager::prepare,
-                    installPlugins = pluginComposition::installStartup,
+                    installPlugins = { pluginComposition.installStartup() },
                     restoreSession = { load(deferReady = true) },
                 )
                 _state.update { current ->
