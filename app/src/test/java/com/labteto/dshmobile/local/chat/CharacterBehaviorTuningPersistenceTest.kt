@@ -63,6 +63,26 @@ class CharacterBehaviorTuningPersistenceTest {
         assertEquals(latest, restored.members.single().persona.behaviorTuning)
         assertEquals(latest, restored.members.single().chatState.behaviorTuning)
         assertEquals(latest, personaStore.get(entry.id).behaviorTuning)
+        assertEquals(entry.id, personaStore.get(entry.id).id)
+        assertEquals("阿青", personaStore.get(entry.id).name)
+        assertEquals(CharacterBehaviorTuning(), personaStore.get(PersonaProfile.DEFAULT_PERSONA_ID).behaviorTuning)
+    }
+
+    @Test
+    fun missingConversationPersonaRecoversGalleryIdentityWithoutChangingDefault() {
+        val gallery = ChatPersonaGalleryStore(File(temporary.root, "gallery.json"), Json)
+        val personas = ChatPersonaStore(File(temporary.root, "personas.json"), Json)
+        val tuning = CharacterBehaviorTuning(openness = 75, updatedAt = 200)
+        val entry = gallery.save(
+            PersonaProfile(name = "阿青", behaviorTuning = tuning), "", emptyList(), ChatCharacterState(), "",
+        ).entry
+        val restored = reconcileCharacterBehaviorTuning(
+            personas, gallery, "missing-persona", entry.id, ChatCharacterState(),
+        )
+        assertEquals("missing-persona", restored.persona.id)
+        assertEquals("阿青", restored.persona.name)
+        assertEquals(tuning, restored.chatState.behaviorTuning)
+        assertEquals(CharacterBehaviorTuning(), personas.get(PersonaProfile.DEFAULT_PERSONA_ID).behaviorTuning)
     }
 
     @Test

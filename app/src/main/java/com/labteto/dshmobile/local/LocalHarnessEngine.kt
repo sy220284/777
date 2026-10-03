@@ -59,7 +59,7 @@ import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.LocalReplySuggestionCoordinator
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
-import com.labteto.dshmobile.local.chat.persistCharacterBehaviorTuning
+import com.labteto.dshmobile.local.chat.LocalCharacterBehaviorTuningCoordinator
 import com.labteto.dshmobile.local.chat.reconcileGroupCharacterBehaviorTuning
 import com.labteto.dshmobile.local.chat.reconcileCharacterBehaviorTuning
 import com.labteto.dshmobile.local.memory.MemoryManager
@@ -951,48 +951,10 @@ class LocalHarnessEngine @Inject constructor(
     private fun recordStyleGuardHits(violations: List<String>) =
         settingsCoordinator.recordStyleGuardHits(violations)
 
-    internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = try {
-        sessionTransitionMutex.withLock {
-            val snapshot = _state.value
-            check(
-                !snapshot.running && !snapshot.loading &&
-                    snapshot.usageMode == LocalUsageMode.CHAT && !snapshot.groupChat.enabled
-            ) { "请在单人聊天空闲时保存角色设置" }
-            val personaId = snapshot.personaId.takeUnless {
-                it == PersonaProfile.DEFAULT_PERSONA_ID
-            } ?: "persona-${UUID.randomUUID()}"
-            val persisted = withContext(Dispatchers.IO) {
-                persistCharacterBehaviorTuning(
-                    chatPersonaStore, chatPersonaGalleryStore, snapshot.chatPersona,
-                    personaId, snapshot.galleryId, profile,
-                )
-            }
-            val durablePersona = persisted.persona
-            val sameBoundCharacter = persisted.sameBoundCharacter
-            _state.update { state ->
-                check(state.sessionId == snapshot.sessionId) { "会话已切换，请重新保存角色设置" }
-                state.copy(
-                    personaId = durablePersona.id,
-                    galleryId = state.galleryId.takeIf { sameBoundCharacter },
-                    galleryStoryId = state.galleryStoryId.takeIf { sameBoundCharacter },
-                    gallerySaveSuppressedThrough = if (sameBoundCharacter) state.gallerySaveSuppressedThrough
-                    else state.transcriptIndex.latestCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
-                    chatPersona = durablePersona,
-                    chatState = if (sameBoundCharacter) {
-                        state.chatState.copy(behaviorTuning = durablePersona.behaviorTuning)
-                    } else ChatCharacterState(behaviorTuning = durablePersona.behaviorTuning),
-                    replySuggestions = if (sameBoundCharacter) state.replySuggestions else emptyList(),
-                    handoffSummary = if (sameBoundCharacter) state.handoffSummary else null,
-                )
-            }
-            persistNow()
-        }
-        Result.success(Unit)
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (error: Exception) {
-        Result.failure(error)
-    }
+    internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> =
+        LocalCharacterBehaviorTuningCoordinator(
+            _state, chatPersonaStore, chatPersonaGalleryStore, sessionTransitionMutex, ::persistNow,
+        ).configure(profile)
 
     /**
      * Pick a saved character for the current empty chat without creating a throwaway session.

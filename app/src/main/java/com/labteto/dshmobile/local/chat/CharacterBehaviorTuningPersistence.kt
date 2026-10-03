@@ -68,11 +68,13 @@ internal fun reconcileCharacterBehaviorTuning(
     galleryId: String?,
     chatState: ChatCharacterState,
 ): CharacterBehaviorTuningRestore {
-    val persona = personaStore.get(personaId)
-    val galleryTuning = galleryId
+    val galleryPersona = galleryId
         ?.let { id -> galleryStore.list().firstOrNull { it.id == id } }
         ?.persona
-        ?.behaviorTuning
+    val persona = personaStore.get(personaId).takeIf { it.id == personaId }
+        ?: galleryPersona?.copy(id = personaId)
+        ?: PersonaProfile(id = personaId)
+    val galleryTuning = galleryPersona?.behaviorTuning
     val resolved = resolveCharacterBehaviorTuning(
         chatState.behaviorTuning,
         persona.behaviorTuning,
@@ -101,7 +103,8 @@ internal fun reconcileGroupCharacterBehaviorTuning(
     val galleryById = galleryStore.list().associateBy(PersonaGalleryEntry::id)
     return groupChat.copy(
         members = groupChat.members.map { member ->
-            val stored = personaStore.get(member.personaId)
+            val stored = personaStore.get(member.personaId).takeIf { it.id == member.personaId }
+                ?: member.persona.copy(id = member.personaId)
             val resolved = resolveCharacterBehaviorTuning(
                 resolveCharacterBehaviorTuning(
                     member.chatState.behaviorTuning,

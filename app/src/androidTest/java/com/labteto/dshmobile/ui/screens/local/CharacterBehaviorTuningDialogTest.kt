@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -27,6 +29,7 @@ class CharacterBehaviorTuningDialogTest {
         val saveStarted = CompletableDeferred<Unit>()
         val saveRelease = CompletableDeferred<Unit>()
         val dismissCount = AtomicInteger(0)
+        val initial = mutableStateOf(CharacterBehaviorTuning(intimacy = 75))
 
         compose.setContent {
             DshTheme {
@@ -36,8 +39,9 @@ class CharacterBehaviorTuningDialogTest {
                     relationshipState = "熟悉",
                     mood = "平静",
                     evolution = CharacterEvolutionState(),
-                    initial = CharacterBehaviorTuning(intimacy = 75),
-                    onSave = {
+                    initial = initial.value,
+                    onSave = { submitted ->
+                        initial.value = submitted
                         saveStarted.complete(Unit)
                         saveRelease.await()
                         Result.success(Unit)
@@ -60,6 +64,32 @@ class CharacterBehaviorTuningDialogTest {
 
         saveRelease.complete(Unit)
         compose.waitUntil(timeoutMillis = 2_000) { dismissCount.get() == 1 }
+    }
+
+    @Test
+    fun failedWriteAfterInitialStateChangesKeepsErrorAndAllowsRetry() {
+        val initial = mutableStateOf(CharacterBehaviorTuning(intimacy = 75))
+        val result = CompletableDeferred<Result<Unit>>()
+        val dismissCount = AtomicInteger(0)
+        compose.setContent {
+            DshTheme {
+                CharacterBehaviorTuningDialog(
+                    personaName = "角色", portraitPath = "", relationshipState = "熟悉", mood = "平静",
+                    evolution = CharacterEvolutionState(), initial = initial.value,
+                    onSave = { submitted -> initial.value = submitted; result.await() },
+                    onDismiss = { dismissCount.incrementAndGet() },
+                )
+            }
+        }
+        val done = context.getString(R.string.local_character_tuning_done)
+        compose.onNodeWithText(done).performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText(done).assertIsNotEnabled()
+        result.complete(Result.failure(IllegalStateException("保存失败测试")))
+        compose.waitForIdle()
+        compose.onNodeWithText("保存失败测试").assertExists()
+        compose.onNodeWithText(done).assertIsEnabled()
+        assertEquals(0, dismissCount.get())
     }
 
     @Test

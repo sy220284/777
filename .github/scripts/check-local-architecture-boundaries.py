@@ -8,6 +8,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 
 LINE_BUDGETS = {
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalCharacterBehaviorTuningCoordinator.kt": 66,
+    "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningPersistence.kt": 135,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt": 99,
     "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebSearchClient.kt": 174,
     "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebDiagnostics.kt": 127,
@@ -22,7 +24,7 @@ LINE_BUDGETS = {
     "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/SessionSchedulePayloads.kt": 71,
     "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/SessionCompactionPayloads.kt": 59,
 
-    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 4959,
+    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 4943,
     "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 1344,
     "app/src/main/java/com/labteto/dshmobile/data/SessionLifecycleRuntime.kt": 50,
     "app/src/main/java/com/labteto/dshmobile/data/SessionSlashCommandRuntime.kt": 71,
