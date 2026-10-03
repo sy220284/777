@@ -177,15 +177,20 @@ for relative, maximum in LINE_BUDGETS.items():
 diary_recall_policy = read(
     "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryRecallPolicy.kt"
 )
-diary_store = read("app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt")
+diary_recall_engine = read(
+    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryRecallEngine.kt"
+)
 if (
     "disclosure == ChatDiaryDisclosure.PUBLIC" not in diary_recall_policy
-    or "canExposeDiaryToGroup(entry.disclosure)" not in diary_store
+    or "canExposeDiaryToGroup(entry.disclosure)" not in diary_recall_engine
 ):
     die("group diary recall must stay centralized and PUBLIC-only")
-if "!= ChatDiaryDisclosure.PRIVATE" in diary_store:
+if "!= ChatDiaryDisclosure.PRIVATE" in diary_recall_engine:
     die("group diary recall must not regress to the old non-private shortcut")
-if "crossScopeAdmissible" in diary_store or "crossScopeAdmissible" in diary_recall_policy:
+if (
+    "crossScopeAdmissible" in diary_recall_engine
+    or "crossScopeAdmissible" in diary_recall_policy
+):
     die("legacy cross-scope diary bypass must not return")
 
 memory_coordinator = read(
