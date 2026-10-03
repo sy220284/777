@@ -119,7 +119,7 @@ internal class LocalEnvironmentInfoCoordinator(
     private fun formatAggregate(value: TokenUsageAggregate): String =
         "requests=${value.requestCount} input=${value.inputTokens} " +
             "cache_hit=${value.cacheHitTokens} cache_miss=${value.cacheMissTokens} " +
-            "output=${value.outputTokens} reasoning=${value.reasoningTokens} total=${value.totalTokens} " +
+            "cache_write=${value.cacheWriteTokens} output=${value.outputTokens} reasoning=${value.reasoningTokens} total=${value.totalTokens} " +
             "unreported=${value.unreportedRequestCount}"
 
     private companion object {
