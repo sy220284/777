@@ -58,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -179,6 +180,7 @@ fun LocalHarnessScreen(
     var modeIntro by remember { mutableStateOf<LocalUsageMode?>(null) }
     var pendingUsageMode by remember { mutableStateOf<LocalUsageMode?>(null) }
     val featurePage = localFeatureCurrent(featureStack)
+    val featureStateHolder = rememberSaveableStateHolder()
 
     fun pushFeature(page: LocalFeaturePage) {
         featureStack = localFeaturePush(featureStack, page)
@@ -189,6 +191,9 @@ fun LocalHarnessScreen(
     }
 
     fun resetFeatureNavigation() {
+        LocalFeaturePage.entries
+            .filterNot { it == LocalFeaturePage.HOME }
+            .forEach { featureStateHolder.removeState(it.name) }
         featureStack = localFeatureHome()
     }
 
@@ -239,6 +244,7 @@ fun LocalHarnessScreen(
     LaunchedEffect(requestedSessionId, shell.sessions) {
         val target = requestedSessionId?.takeIf(String::isNotBlank) ?: return@LaunchedEffect
         if (target == shell.sessionId || shell.sessions.any { it.id == target }) {
+            resetFeatureNavigation()
             if (target != shell.sessionId) viewModel.switchSession(target)
             onSessionRequestConsumed()
         }
@@ -341,7 +347,8 @@ fun LocalHarnessScreen(
         },
     ) {
         LocalConversationStateContent(viewModel, shell.usageMode) { state ->
-            LocalFeaturePageContent(
+            featureStateHolder.SaveableStateProvider(featurePage.name) {
+                LocalFeaturePageContent(
                 page = featurePage,
                 filesMode = filesMode,
                 settingsDestination = settingsDestination,
@@ -365,8 +372,9 @@ fun LocalHarnessScreen(
                 onPopFeature = ::popFeature,
                 onResetNavigation = ::resetFeatureNavigation,
                 onNewPersona = { showNewPersona = true },
-                onNewSession = { showNewSessionMode = true },
-            )
+                    onNewSession = { showNewSessionMode = true },
+                )
+            }
         }
     }
 
