@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolMetadata
 
 internal enum class LocalAutoApprovalScope {
@@ -25,6 +26,28 @@ internal object LocalToolPolicy {
         "spawn_subagent" to "subagent", "fork_subagent" to "subagent_fork",
     )
     fun canonical(name: String): String = aliases[name] ?: name
+
+    /**
+     * Model-facing exposure is an explicit policy decision, just like access and approval.
+     *
+     * Keep the tools needed for ordinary coding/execution loops permanently visible. Capabilities
+     * that are only useful for a narrower user intent stay registered but are exposed on demand
+     * through task-intent pre-activation or capability_search. This removes repeated schema cost
+     * without removing the capability itself.
+     */
+    fun exposure(name: String): ToolExposure = when (canonical(name)) {
+        "web_search", "web_fetch", "http_request", "download_file", "network_diagnose",
+        "todo_write", "create_goal", "update_goal",
+        "memory_list", "memory_remember", "memory_update", "memory_forget",
+        "session_trace", "session_event_trace", "session_event_read" -> ToolExposure.OPTIONAL
+        "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect", "list_files",
+        "glob", "grep", "bash", "job_list", "job_output", "job_kill", "json_query",
+        "environment_info", "capability_search", "update_plan", "exit_plan_mode", "get_goal",
+        "ask_user_question", "skill", "subagent", "subagent_fork", "list_subagent_models",
+        "list_agents", "send_message", "interrupt_agent", "workflow", "session_event_search",
+        "session_search", "memory_search", "present" -> ToolExposure.CORE
+        else -> error("内置工具尚未声明模型暴露策略：$name")
+    }
 
     /**
      * Whether [command] may run without an approval prompt.
@@ -110,9 +133,26 @@ internal object LocalToolPolicy {
             "environment_info" -> listOf("持久模型历史与最近成功请求的实际输入 Token 分开报告")
             else -> emptyList()
         }
+        val discoveryKeywords = when (canonical) {
+            "web_search" -> setOf("联网", "网页搜索", "最新信息", "web", "search")
+            "web_fetch" -> setOf("网页", "网址", "url", "抓取", "web")
+            "http_request" -> setOf("http", "https", "api", "接口请求")
+            "download_file" -> setOf("下载", "文件下载", "download", "url")
+            "network_diagnose" -> setOf("网络诊断", "连通性", "dns", "tls", "vpn", "代理")
+            "todo_write" -> setOf("待办", "任务清单", "todo")
+            "create_goal", "update_goal" -> setOf("目标", "goal")
+            "memory_list" -> setOf("记忆列表", "查看记忆", "memory")
+            "memory_remember" -> setOf("记住", "长期记忆", "memory")
+            "memory_update" -> setOf("修改记忆", "更新记忆", "memory")
+            "memory_forget" -> setOf("忘记", "删除记忆", "memory")
+            "session_trace" -> setOf("会话轨迹", "会话历史", "trace", "session")
+            "session_event_trace" -> setOf("事件轨迹", "事件上下文", "trace", "session")
+            "session_event_read" -> setOf("读取事件", "会话事件", "event", "session")
+            else -> emptySet()
+        }
         return ToolMetadata(
             family = family,
-            discoveryKeywords = emptySet(),
+            discoveryKeywords = discoveryKeywords,
             usageNotes = usageNotes,
         )
     }
