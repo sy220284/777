@@ -680,13 +680,13 @@ internal fun PersonaHero(persona: PersonaProfile, subtitle: String) {
                     color = DsTheme.colors.labelPrimary,
                 )
                 Text(
-                    persona.identity.ifBlank { subtitle },
+                    persona.portrait.ifBlank { subtitle },
                     style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (persona.identity.isNotBlank()) {
+                if (persona.portrait.isNotBlank()) {
                     Text(subtitle, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.labelTertiary)
                 }
             }
@@ -732,28 +732,29 @@ internal fun GalleryPill(text: String) {
 @Composable
 internal fun PersonaDetails(persona: PersonaProfile) {
     val scalarSections = listOf(
-        stringResource(R.string.persona_field_identity) to persona.identity,
-        stringResource(R.string.persona_field_background) to persona.background,
-        stringResource(R.string.persona_field_personality) to persona.personality,
-        stringResource(R.string.persona_field_speech_style) to persona.speechStyle,
-        stringResource(R.string.persona_field_relationship) to persona.relationship,
+        stringResource(R.string.persona_field_portrait) to persona.portrait,
+        stringResource(R.string.persona_field_life_context) to persona.lifeContext,
+        stringResource(R.string.persona_field_core_tension) to persona.coreTension,
+        stringResource(R.string.persona_field_user_impression) to persona.initialUserImpression,
         stringResource(R.string.persona_field_world_setting) to persona.worldSetting,
         stringResource(R.string.persona_field_franchise) to persona.franchise,
         stringResource(R.string.persona_field_timeline) to persona.timelinePosition,
     ).filter { it.second.isNotBlank() }
     val listSections = listOf(
-        stringResource(R.string.persona_field_motivations) to persona.coreMotivations,
-        stringResource(R.string.persona_field_values) to persona.valuePriorities,
-        stringResource(R.string.persona_field_behavior_patterns) to persona.behaviorPatterns,
-        stringResource(R.string.persona_field_internal_contradictions) to persona.internalContradictions,
+        stringResource(R.string.persona_field_attention) to persona.attentionBiases,
+        stringResource(R.string.persona_field_blind_spots) to persona.perceptionBlindSpots,
+        stringResource(R.string.persona_field_quirks) to persona.quirks,
+        stringResource(R.string.persona_field_limitations) to persona.limitations,
+        stringResource(R.string.persona_field_core_values) to persona.coreValues,
+        stringResource(R.string.persona_field_stable_traits) to persona.stableTraits,
+        stringResource(R.string.persona_field_mutable_traits) to persona.mutableTraits,
+        stringResource(R.string.persona_field_voice_samples) to persona.voiceSamples,
         stringResource(R.string.persona_field_knowledge_boundary) to persona.knowledgeBoundary,
         stringResource(R.string.persona_field_lore) to persona.loreEntries.map { entry ->
             entry.title.ifBlank { entry.content.take(80) }
         },
         stringResource(R.string.persona_field_constraints) to persona.hardConstraints,
-        stringResource(R.string.persona_field_dialogues) to persona.exampleDialogues,
         stringResource(R.string.persona_field_banned) to persona.bannedPhrases,
-        stringResource(R.string.persona_field_signature) to persona.signaturePhrases,
         stringResource(R.string.persona_field_corrections) to persona.corrections,
     ).filter { it.second.isNotEmpty() }
 
@@ -764,12 +765,8 @@ internal fun PersonaDetails(persona: PersonaProfile) {
             style = DsType.std14Strong.withReadingWeight(),
             color = DsTheme.colors.labelPrimary,
         )
-        scalarSections.forEach { (title, value) ->
-            PersonaDetailRow(title, value)
-        }
-        listSections.forEach { (title, values) ->
-            PersonaDetailRow(title, values.joinToString("；"))
-        }
+        scalarSections.forEach { (title, value) -> PersonaDetailRow(title, value) }
+        listSections.forEach { (title, values) -> PersonaDetailRow(title, values.joinToString("；")) }
     }
 }
 
