@@ -141,7 +141,10 @@ internal object LocalToolPolicy {
             "network_diagnose" -> setOf("网络诊断", "连通性", "dns", "tls", "vpn", "代理")
             "job_list", "job_output", "job_kill" -> setOf("后台", "后台任务", "进程", "job", "process")
             "json_query" -> setOf("json", "json查询", "结构化数据")
-            "environment_info" -> setOf("环境", "环境信息", "运行时信息", "自检", "诊断")
+            "environment_info" -> setOf(
+                "环境", "环境信息", "运行时信息", "自检", "诊断",
+                "token", "token用量", "token消耗", "用量统计", "上下文消耗", "提示词消耗",
+            )
             "todo_write" -> setOf("待办", "任务清单", "todo")
             "create_goal", "get_goal", "update_goal" -> setOf("目标", "goal")
             "skill" -> setOf("技能", "skill")
