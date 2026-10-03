@@ -11,6 +11,7 @@ import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.model.resolveLocalModelProtocol
+import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
@@ -77,21 +78,28 @@ internal class LocalModelRequestCoordinator(
             authKind = frozenProfile.authKind,
         )
         val routeFingerprint = frozenProfile.routeFingerprint()
+        val cachePolicy = runtimeCapabilities.promptCachePolicy
         val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
             promptCacheBaselines.get(snapshot.sessionId, routeFingerprint)
         } else {
             null
         }
+        val promptCacheKey = if (cachePolicy.supportsStableCacheKey) {
+            stablePromptCacheKey(snapshot.sessionId, routeFingerprint)
+        } else {
+            null
+        }
+        val promptCacheTtl = if (cachePolicy.supportsCacheOptions) "30m" else null
         val operationalLimit = operationalInputLimitTokens(
             frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
         )
         val modelContextWindow = documentedContextWindowTokens(
             frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
         )
-        val previousPressure = if (
+        val previousSourcePressure = if (
             executionControl != null && snapshot.usageMode == LocalUsageMode.WORK
         ) {
-            pressureStore.latestWork(snapshot.sessionId)
+            pressureStore.latestWorkSource(snapshot.sessionId)
         } else {
             null
         }
@@ -108,8 +116,9 @@ internal class LocalModelRequestCoordinator(
                 compactor = historyCompactor,
                 operationalLimitTokens = operationalLimit,
                 measuredPressure = baselinePressure,
-                previousPressure = previousPressure,
+                previousPressure = previousSourcePressure,
                 structuredWorkState = structuredWorkState(snapshot, log),
+                cachePolicy = cachePolicy,
             )
         } else {
             LocalWorkRequestProjection(
@@ -133,14 +142,21 @@ internal class LocalModelRequestCoordinator(
         ) {
             assessWorkStepContext(
                 current = pressure,
-                previous = previousPressure,
-                targetTokens = workRequestProjectionTargetTokens(operationalLimit),
-                baseTriggerTokens = workRequestProjectionTriggerTokens(operationalLimit),
+                previous = previousSourcePressure,
+                targetTokens = workRequestProjectionTargetTokens(operationalLimit, cachePolicy),
+                baseTriggerTokens = workRequestProjectionTriggerTokens(operationalLimit, cachePolicy),
+                growthCurrent = baselinePressure,
+                allowAdaptiveEarlyCompaction = cachePolicy.allowAdaptiveEarlyCompaction,
             )
         } else {
             null
         }
-        pressureStore.record(snapshot.sessionId, pressure, workContextAssessment)
+        pressureStore.record(
+            sessionId = snapshot.sessionId,
+            pressure = pressure,
+            workAssessment = workContextAssessment,
+            workSourcePressure = if (workContextAssessment != null) baselinePressure else null,
+        )
         val contextWindow = pressureStore.window(snapshot.sessionId)
         val previewOwner = if (publishPreviewEnabled) {
             streamingPreviewStore.newOwner(
@@ -190,6 +206,10 @@ internal class LocalModelRequestCoordinator(
             put("auth_kind", frozenProfile.authKind.name)
             put("protocol", resolvedProtocol.name)
             put("route_fingerprint", routeFingerprint)
+            put("prompt_cache_mode", cachePolicy.mode.name.lowercase())
+            put("prompt_cache_key_enabled", promptCacheKey != null)
+            put("prompt_cache_ttl_enabled", promptCacheTtl != null)
+            put("cache_preserve_tool_surface", cachePolicy.preserveToolSurface)
             frozenProfile.credentialRef?.takeLast(8)?.let { put("credential_ref_tail", it) }
             credentialDiagnostic.clientIdTail?.let { put("client_id_tail", it) }
             credentialDiagnostic.selectedAccountTail?.let { put("selected_account_tail", it) }
@@ -417,6 +437,8 @@ internal class LocalModelRequestCoordinator(
                                         temperature = temperature,
                                         profile = frozenProfile,
                                         promptCacheComparisonResponseId = cacheComparisonResponseId,
+                                        promptCacheKey = promptCacheKey,
+                                        promptCacheTtl = promptCacheTtl,
                                         onDelta = { delta ->
                                             val visible = streamFilter?.append(delta.content)?.text ?: delta.content
                                             streamPreview.append(visible)
@@ -542,4 +564,12 @@ internal class LocalModelRequestCoordinator(
             }
         }
     }
+    private fun stablePromptCacheKey(sessionId: String, routeFingerprint: String): String {
+        val raw = sessionId + "\u0000" + routeFingerprint
+        return MessageDigest.getInstance("SHA-256")
+            .digest(raw.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+            .take(64)
+    }
+
 }
