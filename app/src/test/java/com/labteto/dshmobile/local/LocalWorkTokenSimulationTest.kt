@@ -158,11 +158,12 @@ class LocalWorkTokenSimulationTest {
             )
             assertNotNull(compacted)
             history = requireNotNull(compacted).messages.toMutableList()
+            requireNotNull(LocalWorkCheckpoint.latestFrom(history)) {
+                "第${generation}代持久压缩后缺少可信 Work 检查点"
+            }
         }
 
-        val checkpoint = LocalWorkCheckpoint.latestFrom(history)
-        assertNotNull(checkpoint)
-        checkpoint ?: return
+        val checkpoint = requireNotNull(LocalWorkCheckpoint.latestFrom(history))
         assertTrue(checkpoint.constraints.contains("必须保持任务执行能力"))
         assertTrue(checkpoint.constraints.contains("禁止通过精简功能换取 Token"))
         assertTrue(checkpoint.constraints.contains("PR 标题和描述必须使用中文"))
