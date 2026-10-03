@@ -38,7 +38,6 @@ import com.labteto.dshmobile.local.LocalConversationFiles
 import com.labteto.dshmobile.local.LocalWorkspaceFile
 import com.labteto.dshmobile.local.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
-import com.labteto.dshmobile.ui.components.DsFullScreenDialog
 import com.labteto.dshmobile.ui.components.DsPageEmptyState
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -99,10 +98,7 @@ internal fun LocalWorkspaceFilesDialog(
 
     LaunchedEffect(mode, sessionId) { reload() }
 
-    DsFullScreenDialog(
-        onDismiss = onDismiss,
-    ) {
-        Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
+    Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val headerTitle = when {
                     preview != null -> preview?.file?.path?.substringAfterLast('/').orEmpty()
@@ -258,7 +254,6 @@ internal fun LocalWorkspaceFilesDialog(
                 }
             }
         }
-    }
 }
 
 @Composable
