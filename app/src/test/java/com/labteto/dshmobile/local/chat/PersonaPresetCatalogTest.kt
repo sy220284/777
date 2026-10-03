@@ -39,4 +39,17 @@ class PersonaPresetCatalogTest {
             assertTrue(preset.persona.speechStyle.isNotBlank())
         }
     }
+
+    @Test
+    fun bundledPresetArtworkMustBeAiFanArtUnderDedicatedAssetDirectory() {
+        PersonaPresetCatalog.presets.mapNotNull { it.artwork }.forEach { artwork ->
+            assertEquals(PersonaPresetArtworkSource.AI_FAN_ART, artwork.source)
+            assertTrue(artwork.assetPath.startsWith("persona-presets/"))
+            assertTrue(".." !in artwork.assetPath)
+            assertTrue(
+                artwork.assetPath.substringAfterLast('.', "").lowercase() in
+                    setOf("jpg", "jpeg", "png", "webp"),
+            )
+        }
+    }
 }
