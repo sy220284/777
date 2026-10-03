@@ -48,6 +48,7 @@ internal fun ChatGptAccountPanel(
     state: ChatGptUiState,
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
+    modelIdentityLocked: Boolean = false,
 ) {
     val colors = DsTheme.colors
     val context = LocalContext.current
@@ -87,6 +88,7 @@ internal fun ChatGptAccountPanel(
     )
     val authorizationCanRestart = state.phase == ChatGptAuthPhase.PREPARING ||
         state.phase == ChatGptAuthPhase.WAITING_FOR_BROWSER
+    val accountMutationEnabled = !busy && !modelIdentityLocked
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -139,7 +141,7 @@ internal fun ChatGptAccountPanel(
                 DsButton(
                     text = stringResource(R.string.chatgpt_continue),
                     onClick = { viewModel.connectChatGpt { error -> error?.let(report) } },
-                    enabled = !busy,
+                    enabled = accountMutationEnabled,
                     modifier = Modifier.fillMaxWidth(),
                 )
             } else {
@@ -163,7 +165,7 @@ internal fun ChatGptAccountPanel(
                         color = colors.labelTertiary,
                         modifier = Modifier.weight(1f),
                     )
-                    if (!busy) {
+                    if (accountMutationEnabled) {
                         DsMenu(
                             anchor = {
                                 Icon(
@@ -230,11 +232,11 @@ internal fun ChatGptAccountPanel(
                                         viewModel.connectChatGpt(account.id) { error -> error?.let(report) }
                                     }
                                 },
-                                enabled = !busy,
+                                enabled = accountMutationEnabled,
                                 size = DsButtonSize.Small,
                                 variant = DsButtonVariant.Ghost,
                             )
-                            if (!busy) {
+                            if (accountMutationEnabled) {
                                 DsMenu(
                                     anchor = {
                                         Icon(
@@ -301,7 +303,7 @@ internal fun ChatGptAccountPanel(
                     DsButton(
                         text = reauthorizeLabel,
                         onClick = { viewModel.connectChatGpt(selected.id) { error -> error?.let(report) } },
-                        enabled = !busy,
+                        enabled = accountMutationEnabled,
                         modifier = Modifier.weight(1f),
                         size = DsButtonSize.Small,
                         variant = DsButtonVariant.Outline,
@@ -311,7 +313,7 @@ internal fun ChatGptAccountPanel(
                         onClick = {
                             viewModel.disconnectChatGptAccount(selected.id) { error -> error?.let(report) }
                         },
-                        enabled = !busy,
+                        enabled = accountMutationEnabled,
                         modifier = Modifier.weight(1f),
                         size = DsButtonSize.Small,
                         variant = DsButtonVariant.Ghost,
@@ -320,13 +322,20 @@ internal fun ChatGptAccountPanel(
                 DsButton(
                     text = stringResource(R.string.chatgpt_add_account),
                     onClick = { viewModel.connectChatGpt { error -> error?.let(report) } },
-                    enabled = !busy,
+                    enabled = accountMutationEnabled,
                     modifier = Modifier.fillMaxWidth(),
                     size = DsButtonSize.Small,
                     variant = DsButtonVariant.Ghost,
                 )
             }
 
+            if (modelIdentityLocked) {
+                Text(
+                    stringResource(R.string.chatgpt_account_change_locked),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelSecondary,
+                )
+            }
             if (busy) {
                 Text(
                     when (state.phase) {
@@ -395,6 +404,7 @@ internal fun ChatGptAccountPanel(
                         removeAccountId = null
                         viewModel.removeChatGptAccount(accountId) { warning -> warning?.let(report) }
                     },
+                    enabled = accountMutationEnabled,
                     modifier = Modifier.weight(1f),
                     variant = DsButtonVariant.Danger,
                 )
