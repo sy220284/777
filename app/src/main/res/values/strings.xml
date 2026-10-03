@@ -1,6 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">神言神语</string>
+    <string name="sidebar_avatar_open">设置侧边栏头像</string>
+    <string name="sidebar_avatar_title">选择头像</string>
+    <string name="sidebar_avatar_subtitle">使用人物预置或本地图片；动图会保留播放效果</string>
+    <string name="sidebar_avatar_custom">本地图片</string>
+    <string name="sidebar_avatar_reset">恢复默认</string>
+    <string name="sidebar_avatar_presets">人物预置</string>
+    <string name="sidebar_avatar_default_mark">神</string>
+    <string name="sidebar_avatar_save_failed">头像保存失败</string>
+    <string name="sidebar_avatar_set_failed">头像设置失败</string>
+    <string name="sidebar_avatar_reset_failed">头像重置失败</string>
+    <string name="sidebar_avatar_preset_missing">头像预置不存在</string>
+    <string name="sidebar_avatar_select_image">请选择图片文件</string>
+    <string name="sidebar_avatar_dir_failed">无法创建头像目录</string>
+    <string name="sidebar_avatar_too_large">头像图片过大，请选择 20MB 以内的图片</string>
+    <string name="sidebar_avatar_read_failed">无法读取头像图片</string>
+    <string name="sidebar_avatar_dimensions_invalid">头像图片尺寸无效或过大</string>
     <string name="common_cancel">取消</string>
     <string name="common_ok">确定</string>
     <string name="common_save">保存</string>
@@ -1388,4 +1404,10 @@
     <string name="chatgpt_cancel">取消</string>
     <string name="local_model_media_not_connected">当前支持文字和图片；音视频理解暂未开放。</string>
     <string name="chatgpt_authorized_unverified">已授权，待验证</string>
+    <string name="persona_gallery_preset_artwork_invalid_path">人物预置形象图路径无效</string>
+    <string name="persona_gallery_portrait_dir_failed">无法创建人物立绘目录</string>
+    <string name="persona_gallery_preset_artwork_too_large">人物预置形象图过大</string>
+    <string name="persona_gallery_preset_artwork_unreadable">人物预置形象图无法识别</string>
+    <string name="persona_gallery_entry_missing">图集条目已不存在</string>
 </resources>
+

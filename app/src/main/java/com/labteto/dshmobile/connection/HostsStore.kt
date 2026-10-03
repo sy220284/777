@@ -33,6 +33,7 @@ class HostsStore @Inject constructor(
         val HOSTS = stringPreferencesKey("hosts_json")
         val BACKGROUND = booleanPreferencesKey("background")
         val BACKGROUND_IMAGE = stringPreferencesKey("background_image_path")
+        val SIDEBAR_AVATAR = stringPreferencesKey("sidebar_avatar_source")
         val BACKGROUND_ADAPTIVE_CONTRAST = booleanPreferencesKey("background_adaptive_contrast")
         val TEXT_SCALE = floatPreferencesKey("text_scale")
         val TEXT_WEIGHT_ADJUSTMENT = intPreferencesKey("text_weight_adjustment")
@@ -234,6 +235,7 @@ class HostsStore @Inject constructor(
             themePreference = prefs[Keys.THEME] ?: "system",
             accentTheme = prefs[Keys.ACCENT_THEME] ?: "celadon",
             backgroundImagePath = prefs[Keys.BACKGROUND_IMAGE],
+            sidebarAvatarSource = prefs[Keys.SIDEBAR_AVATAR],
             backgroundAdaptiveContrast = prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] ?: true,
             textScale = (prefs[Keys.TEXT_SCALE] ?: 1.0f).coerceIn(0.9f, 1.3f),
             textWeightAdjustment = (prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] ?: 0).coerceIn(0, 2),
@@ -273,6 +275,9 @@ class HostsStore @Inject constructor(
             prefs[Keys.ACCENT_THEME] = next.accentTheme
             next.backgroundImagePath?.let { prefs[Keys.BACKGROUND_IMAGE] = it }
                 ?: prefs.remove(Keys.BACKGROUND_IMAGE)
+            next.sidebarAvatarSource?.takeIf(String::isNotBlank)?.let {
+                prefs[Keys.SIDEBAR_AVATAR] = it
+            } ?: prefs.remove(Keys.SIDEBAR_AVATAR)
             prefs[Keys.BACKGROUND_ADAPTIVE_CONTRAST] = next.backgroundAdaptiveContrast
             prefs[Keys.TEXT_SCALE] = next.textScale.coerceIn(0.9f, 1.3f)
             prefs[Keys.TEXT_WEIGHT_ADJUSTMENT] = next.textWeightAdjustment.coerceIn(0, 2)
@@ -306,3 +311,4 @@ data class RelayIdentity(
     val fingerprint: String?,
     val tokenExpiresAt: Long,
 )
+
