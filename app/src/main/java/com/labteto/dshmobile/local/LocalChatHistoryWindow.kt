@@ -68,7 +68,6 @@ internal fun boundedChatRequestHistory(
     }
 }
 
-
 /**
  * Request-only group-chat window.
  *
