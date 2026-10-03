@@ -274,6 +274,7 @@ private fun SidebarAvatarImage(source: SidebarAvatarSource, contentDescription: 
             if (source is SidebarAvatarSource.Default) return@withContext null
             runCatching {
                 val imageSource = when (source) {
+                    SidebarAvatarSource.Default -> error("default avatar has no image source")
                     is SidebarAvatarSource.Bundled -> ImageDecoder.createSource(context.assets, source.assetPath)
                     is SidebarAvatarSource.Custom -> {
                         val root = File(context.filesDir, "ui/sidebar-avatars").canonicalFile
