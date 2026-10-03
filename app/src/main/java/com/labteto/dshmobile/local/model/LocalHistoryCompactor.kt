@@ -179,8 +179,12 @@ internal class LocalHistoryCompactor(
             extraTokens.toDouble() / it.toDouble()
         } ?: 0.0
         val historyDepth = (source.size.toDouble() / 80.0).coerceIn(0.0, 1.0)
-        val triggerRatio = (0.92 - historyDepth * 0.08 - extraTokenRatio.coerceIn(0.0, 0.5) * 0.28)
-            .coerceIn(0.68, 0.92)
+        val triggerRatio = if (budget?.adaptiveCompactionTrigger == false) {
+            1.0
+        } else {
+            (0.92 - historyDepth * 0.08 - extraTokenRatio.coerceIn(0.0, 0.5) * 0.28)
+                .coerceIn(0.68, 0.92)
+        }
         val charPressure = encodedChars > (effectiveMaxHistoryChars * triggerRatio).toInt()
         val tokenPressure = effectiveMaxHistoryTokens?.let {
             encodedTokens + extraTokens > (it * triggerRatio).toInt()
