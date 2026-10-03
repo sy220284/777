@@ -2,16 +2,13 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -20,8 +17,6 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.ListAlt
-import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -273,54 +268,17 @@ internal fun LocalConversationComposer(
             }
         }
 
-        AnimatedVisibility(
+        LocalConversationComposerExpandedRow(
             visible = expanded,
-            enter = expandVertically(
-                animationSpec = DsAnimations.composerReveal,
-                expandFrom = Alignment.Top,
-            ) + fadeIn(DsAnimations.composerFade),
-            exit = shrinkVertically(
-                animationSpec = DsAnimations.composerReveal,
-                shrinkTowards = Alignment.Top,
-            ) + fadeOut(DsAnimations.composerFade),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
-            ) {
-                MenuControl()
-                ReplySuggestionsControl()
-                if (state.usageMode == LocalUsageMode.WORK) {
-                    DsComposerAction(
-                        icon = Icons.Outlined.ListAlt,
-                        contentDescription = stringResource(
-                            if (state.planMode) R.string.local_plan_button_on
-                            else R.string.local_plan_button_off,
-                        ),
-                        onClick = { onPlanModeChange(!state.planMode) },
-                        enabled = !state.running,
-                        tint = if (state.planMode) colors.accent else colors.labelSecondary,
-                        containerColor = if (state.planMode) colors.accentTertiary else Color.Transparent,
-                    )
-                    DsComposerAction(
-                        icon = Icons.Outlined.VerifiedUser,
-                        contentDescription = stringResource(R.string.local_auto_approve_short),
-                        onClick = if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
-                        tint = if (state.safeAutoApprovalEnabled) colors.accent else colors.labelSecondary,
-                        containerColor =
-                            if (state.safeAutoApprovalEnabled) colors.accentTertiary else Color.Transparent,
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-                if (state.running) {
-                    StopControl()
-                    if (state.usageMode == LocalUsageMode.WORK) SendControl(queue = true)
-                } else {
-                    SendControl()
-                }
-            }
-        }
+            state = state,
+            menuControl = { MenuControl() },
+            replySuggestionsControl = { ReplySuggestionsControl() },
+            stopControl = { StopControl() },
+            sendControl = { queue -> SendControl(queue) },
+            onPlanModeChange = onPlanModeChange,
+            onAutoApprove = onAutoApprove,
+            onDisableAutoApprove = onDisableAutoApprove,
+        )
     }
 }
 
