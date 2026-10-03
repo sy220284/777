@@ -39,7 +39,9 @@ import com.labteto.dshmobile.local.LocalWorkspaceFile
 import com.labteto.dshmobile.local.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
 import com.labteto.dshmobile.ui.components.DsFullScreenDialog
+import com.labteto.dshmobile.ui.components.DsPageEmptyState
 import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -168,10 +170,13 @@ internal fun LocalWorkspaceFilesDialog(
                         }
                     }
                     error != null -> {
-                        Text(
-                            error.orEmpty(),
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(24.dp),
+                        DsPageEmptyState(
+                            icon = FeatherIcons.AlertTriangle,
+                            title = readFilesFailed,
+                            body = error.orEmpty(),
+                            actionText = stringResource(R.string.common_retry),
+                            onAction = { scope.launch { reload() } },
+                            modifier = Modifier.fillMaxSize(),
                         )
                     }
                     preview != null -> LocalFilePreviewBody(preview!!)
@@ -198,9 +203,13 @@ internal fun LocalWorkspaceFilesDialog(
                             }
                         } else if (files.isEmpty()) {
                             LocalFilesEmpty(
-                                stringResource(
-                                    if (section == 2) R.string.panel_artifacts_empty
-                                    else R.string.panel_involved_files_empty,
+                                title = stringResource(
+                                    if (section == 2) R.string.local_empty_artifacts_title
+                                    else R.string.local_empty_involved_title,
+                                ),
+                                body = stringResource(
+                                    if (section == 2) R.string.local_empty_artifacts_body
+                                    else R.string.local_empty_involved_body,
                                 ),
                             )
                         } else {
@@ -220,7 +229,10 @@ internal fun LocalWorkspaceFilesDialog(
                             }
                         }
                     }
-                    conversation.isEmpty -> LocalFilesEmpty(stringResource(R.string.panel_conversation_files_empty))
+                    conversation.isEmpty -> LocalFilesEmpty(
+                        title = stringResource(R.string.local_empty_conversation_files_title),
+                        body = stringResource(R.string.local_empty_conversation_files_body),
+                    )
                     else -> ConversationLocalFileList(conversation) { file ->
                         previewLoading = true
                         error = null
@@ -250,11 +262,12 @@ internal fun LocalWorkspaceFilesDialog(
 }
 
 @Composable
-private fun LocalFilesEmpty(text: String) {
-    Text(
-        text,
-        modifier = Modifier.fillMaxWidth().padding(24.dp),
-        color = DsTheme.colors.labelTertiary,
+private fun LocalFilesEmpty(title: String, body: String) {
+    DsPageEmptyState(
+        icon = FeatherIcons.Folder,
+        title = title,
+        body = body,
+        modifier = Modifier.fillMaxSize(),
     )
 }
 
@@ -322,7 +335,10 @@ private fun LocalFileList(
     }.distinct().sorted().toList()
     val filesByPath = files.associateBy(LocalWorkspaceFile::path)
     if (children.isEmpty()) {
-        LocalFilesEmpty(stringResource(R.string.local_files_workspace_empty))
+        LocalFilesEmpty(
+            title = stringResource(R.string.local_empty_workspace_title),
+            body = stringResource(R.string.local_empty_workspace_body),
+        )
         return
     }
     LazyColumn(Modifier.fillMaxSize()) {
