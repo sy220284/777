@@ -92,14 +92,14 @@ internal class LocalSessionLifecycleCoordinator(
         freshGalleryStory: Boolean = false,
         chatMode: LocalChatMode? = null,
         groupEntries: List<PersonaGalleryEntry> = emptyList(),
-    ) {
+    )): Boolean {
         if (
             chatMode == LocalChatMode.GROUP &&
             groupEntries.isNotEmpty() &&
             groupEntries.distinctBy(PersonaGalleryEntry::id).size !in
                 MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS
-        ) return
-        if (!beginTransition()) return
+        ) return false
+        if (!beginTransition()) return false
         val sourceId = currentSessionId()
         val sourceState = state.value
         val continueSingleChatBinding = shouldContinueSingleChatBinding(
@@ -301,6 +301,7 @@ internal class LocalSessionLifecycleCoordinator(
             }
             continueQueuedModeSwitch()
         }
+        return true
     }
 
     fun switchChatMode(mode: LocalChatMode) {
