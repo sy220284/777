@@ -14,7 +14,6 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaInspectionService
 import com.labteto.dshmobile.local.chat.PersonaPreset
-import com.labteto.dshmobile.local.chat.PersonaPresetArtworkSource
 import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
@@ -378,9 +377,6 @@ suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runC
 
 private fun stagePresetArtwork(preset: PersonaPreset): File? {
     val artwork = preset.artwork ?: return null
-    require(artwork.source == PersonaPresetArtworkSource.AI_FAN_ART) {
-        "人物预置仅允许内置 AI 二创形象图"
-    }
     val assetPath = artwork.assetPath.trim()
     require(
         assetPath.startsWith("persona-presets/") &&
