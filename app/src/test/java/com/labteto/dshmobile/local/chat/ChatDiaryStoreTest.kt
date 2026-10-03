@@ -156,6 +156,21 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun majorEventWithoutSubjectiveExperienceIsRejected() {
+        val memory = store()
+
+        assertNull(memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户确认周末和我去海边",
+                relationshipMeaning = "我们有了一个明确的共同计划",
+                importance = 5,
+            ),
+            evidence = "用户确认周末和我去海边",
+        )))
+        assertTrue(memory.listActive("gallery:a").isEmpty())
+    }
+
+    @Test
     fun similarUpdatesRefineOneEntryInsteadOfAppendingEveryTurn() {
         val memory = store()
         memory.record(request(
