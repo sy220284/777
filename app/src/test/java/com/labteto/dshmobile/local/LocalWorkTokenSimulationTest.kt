@@ -150,32 +150,37 @@ class LocalWorkTokenSimulationTest {
         )
 
         repeat(generations) { generation ->
-            repeat(16) { index ->
-                history += message(
-                    "user",
-                    "第${generation}代阶段任务-$index-" + "旧需求".repeat(500),
+            var compacted: LocalHistoryCompaction? = null
+            var batch = 0
+            while (compacted == null && batch < 8) {
+                repeat(16) { index ->
+                    history += message(
+                        "user",
+                        "第${generation}代批次-${batch}任务-$index-" + "旧需求".repeat(500),
+                    )
+                    history += message(
+                        "assistant",
+                        "第${generation}代批次-${batch}进展-$index-" + "旧分析".repeat(500),
+                    )
+                }
+                history += message("user", "继续第${generation}代第${batch}批最新任务")
+                compacted = LocalHistoryCompactor().compact(
+                    history = history,
+                    budget = LocalHistoryBudget(
+                        maxHistoryChars = 200_000,
+                        tailChars = 16_000,
+                        maxSummaryChars = 8_000,
+                        maxToolResultChars = 8_000,
+                        maxHistoryTokens = 12_000,
+                        tailTokens = 4_000,
+                        maxToolResultTokens = 2_400,
+                    ),
+                    summaryMode = LocalHistorySummaryMode.WORK,
+                    structuredWorkState = if (generation == 0) active else null,
                 )
-                history += message(
-                    "assistant",
-                    "第${generation}代处理进展-$index-" + "旧分析".repeat(500),
-                )
+                batch += 1
             }
-            history += message("user", "继续第${generation}代最新任务")
-            val compacted = LocalHistoryCompactor().compact(
-                history = history,
-                budget = LocalHistoryBudget(
-                    maxHistoryChars = 200_000,
-                    tailChars = 16_000,
-                    maxSummaryChars = 8_000,
-                    maxToolResultChars = 8_000,
-                    maxHistoryTokens = 12_000,
-                    tailTokens = 4_000,
-                    maxToolResultTokens = 2_400,
-                ),
-                summaryMode = LocalHistorySummaryMode.WORK,
-                structuredWorkState = if (generation == 0) active else null,
-            )
-            assertNotNull(compacted)
+            assertNotNull("第${generation}代在 8 个批次内应真实触发压缩", compacted)
             history = requireNotNull(compacted).messages.toMutableList()
         }
 
@@ -195,6 +200,7 @@ class LocalWorkTokenSimulationTest {
         var projectedCumulative = 0L
         var projectedPeak = 0
         var projectedLast = 0
+        var previousPressure: LocalPromptPressure? = null
 
         repeat(steps) { step ->
             history += message("user", "第${step}步继续当前任务：" + "需求".repeat(120))
@@ -207,6 +213,7 @@ class LocalWorkTokenSimulationTest {
                 tools = JsonArray(emptyList()),
                 compactor = LocalHistoryCompactor(),
                 operationalLimitTokens = 678_464,
+                previousPressure = previousPressure,
                 structuredWorkState = LocalStructuredWorkState(
                     goals = listOf("完成长任务"),
                     constraints = listOf("必须保持任务正确性"),
@@ -217,6 +224,11 @@ class LocalWorkTokenSimulationTest {
             projectedCumulative += projected.estimatedTokensAfter
             projectedPeak = maxOf(projectedPeak, projected.estimatedTokensAfter)
             projectedLast = projected.estimatedTokensAfter
+            previousPressure = LocalPromptPressureMeter.measure(
+                messages = projected.messages,
+                tools = JsonArray(emptyList()),
+                operationalLimitTokens = 678_464,
+            )
         }
         return SimulationResult(
             rawCumulative = rawCumulative,
