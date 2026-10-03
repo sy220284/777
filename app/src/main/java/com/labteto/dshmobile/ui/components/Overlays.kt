@@ -1,5 +1,11 @@
 package com.labteto.dshmobile.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -42,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
@@ -54,6 +61,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -79,6 +87,18 @@ fun DsDialog(
     val colors = DsTheme.colors
     val scrimInteraction = remember { MutableInteractionSource() }
     val surfaceInteraction = remember { MutableInteractionSource() }
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val scale by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0.97f,
+        animationSpec = DsAnimations.normalSpring,
+        label = "dialogScale",
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0f,
+        animationSpec = DsAnimations.fade,
+        label = "dialogAlpha",
+    )
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -114,6 +134,11 @@ fun DsDialog(
                     .widthIn(max = 520.dp)
                     .fillMaxWidth()
                     .heightIn(max = maxHeight)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        this.alpha = alpha
+                    }
                     .then(
                         if (dismissOnScrimTap) {
                             Modifier.clickable(
@@ -203,20 +228,37 @@ fun rememberDsToast(): Pair<State<String?>, (String) -> Unit> {
 /** Top-center toast plate driven by [rememberDsToast]. */
 @Composable
 fun DsToastHost(state: Pair<State<String?>, (String) -> Unit>, modifier: Modifier = Modifier) {
-    val message = state.first.value ?: return
+    val message = state.first.value
+    var displayMessage by remember { mutableStateOf(message) }
+    LaunchedEffect(message) {
+        if (message != null) {
+            displayMessage = message
+        } else {
+            delay(DsAnimations.transitionDuration.toLong())
+            displayMessage = null
+        }
+    }
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-        Surface(
-            shape = DsShapes.toast,
-            color = DsTheme.colors.toastBg,
-            shadowElevation = 4.dp,
-            modifier = Modifier.padding(top = 16.dp),
+        AnimatedVisibility(
+            visible = message != null,
+            enter = fadeIn(DsAnimations.fade) +
+                slideInVertically(DsAnimations.pageSlide) { -it / 3 },
+            exit = fadeOut(DsAnimations.fade) +
+                slideOutVertically(DsAnimations.pageSlide) { -it / 3 },
         ) {
-            Text(
-                message,
-                style = DsType.small13.withReadingWeight(),
-                color = DsTheme.colors.onAccent,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            )
+            Surface(
+                shape = DsShapes.toast,
+                color = DsTheme.colors.toastBg,
+                shadowElevation = 3.dp,
+                modifier = Modifier.padding(top = 16.dp),
+            ) {
+                Text(
+                    displayMessage.orEmpty(),
+                    style = DsType.small13.withReadingWeight(),
+                    color = DsTheme.colors.onAccent,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                )
+            }
         }
     }
 }
