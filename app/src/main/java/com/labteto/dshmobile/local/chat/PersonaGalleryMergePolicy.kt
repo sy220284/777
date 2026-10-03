@@ -144,68 +144,7 @@ internal fun mergeGalleryStories(
     )
 }
 
-internal fun migrateLegacyEntry(entry: PersonaGalleryEntry): PersonaGalleryEntry {
-    if (entry.stories.isNotEmpty()) {
-        return entry.copy(
-            storyNotes = "",
-            history = emptyList(),
-            chatState = ChatCharacterState(),
-            sourceSessionId = "",
-        )
-    }
-    val hasLegacyStory = entry.storyNotes.isNotBlank() ||
-        entry.history.isNotEmpty() ||
-        entry.chatState.updatedAt > 0L ||
-        entry.sourceSessionId.isNotBlank()
-    val migratedStory = if (hasLegacyStory) {
-        PersonaGalleryStory(
-            id = "story-${UUID.randomUUID()}",
-            title = defaultStoryTitle(entry.history),
-            notes = entry.storyNotes,
-            history = entry.history.filter { it.role == "user" || it.role == "assistant" },
-            chatState = entry.chatState,
-            sourceSessionIds = listOf(entry.sourceSessionId).filter(String::isNotBlank),
-            updatedAt = entry.updatedAt,
-        )
-    } else {
-        null
-    }
-    return entry.copy(
-        stories = listOfNotNull(migratedStory),
-        storyNotes = "",
-        history = emptyList(),
-        chatState = ChatCharacterState(),
-        sourceSessionId = "",
-    )
-}
-
-/** V3-only migration: collapse the duplicate same-name cards created by the old snapshot model. */
-internal fun compactLegacyDuplicateGalleryEntries(
-    entries: List<PersonaGalleryEntry>,
-): List<PersonaGalleryEntry> {
-    if (entries.size < 2) return entries.map(::migrateLegacyEntry)
-    val compacted = mutableListOf<PersonaGalleryEntry>()
-    entries.sortedByDescending { it.updatedAt }.forEach { raw ->
-        val entry = migrateLegacyEntry(raw)
-        val duplicateIndex = compacted.indexOfFirst { existing ->
-            samePersonaIdentity(existing.persona, entry.persona)
-        }
-        if (duplicateIndex < 0) {
-            compacted += entry
-        } else {
-            val canonical = compacted[duplicateIndex]
-            compacted[duplicateIndex] = canonical.copy(
-                persona = mergePersonaProfiles(canonical.persona, entry.persona).copy(id = canonical.id),
-                groupChatState = mergeChatState(canonical.groupChatState, entry.groupChatState),
-                stories = mergeLegacyStoryLists(canonical.stories, entry.stories),
-                updatedAt = maxOf(canonical.updatedAt, entry.updatedAt),
-            )
-        }
-    }
-    return compacted.sortedByDescending { it.updatedAt }
-}
-
-internal fun mergeLegacyStoryLists(
+internal fun mergeGalleryStoryLists(
     base: List<PersonaGalleryStory>,
     incoming: List<PersonaGalleryStory>,
 ): List<PersonaGalleryStory> {
