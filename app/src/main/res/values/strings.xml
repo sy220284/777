@@ -1224,6 +1224,7 @@
     <string name="local_plan_button_on">规划中</string>
     <string name="local_plan_button_off">规划</string>
     <string name="local_auto_approve_short">自动批准</string>
+    <string name="local_harness_loading">正在准备本机执行环境…</string>
     <string name="local_harness_title">本机 Harness</string>
     <string name="local_on_device_execution_title">手机直接执行</string>
     <string name="local_on_device_execution_hint">模型、文件、网页、命令、技能和子代理都在手机侧组织执行。远程控制入口已统一放到侧边栏。</string>
