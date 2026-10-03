@@ -5,6 +5,8 @@ import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
+import java.io.FilterInputStream
+import java.io.InputStream
 import java.util.zip.GZIPInputStream
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -74,8 +76,9 @@ class LocalSessionEventLog(
         val snapshots = delegate.openDurableFileSnapshot()
         try {
             for (source in snapshots) {
-                (if (source.name.endsWith(".gz")) GZIPInputStream(source.input).bufferedReader()
-                else source.input.bufferedReader()).use { reader ->
+                val frozenInput = SnapshotBoundedInputStream(source.input, source.length)
+                (if (source.name.endsWith(".gz")) GZIPInputStream(frozenInput).bufferedReader()
+                else frozenInput.bufferedReader()).use { reader ->
                     while (true) {
                         val line = reader.readLine() ?: break
                         val event = runCatching {
@@ -126,6 +129,35 @@ class LocalSessionEventLog(
         createdAt = createdAt,
         data = data,
     )
+
+    private class SnapshotBoundedInputStream(
+        input: InputStream,
+        length: Long,
+    ) : FilterInputStream(input) {
+        private var remaining = length.coerceAtLeast(0L)
+
+        override fun read(): Int {
+            if (remaining <= 0L) return -1
+            val value = super.read()
+            if (value >= 0) remaining--
+            return value
+        }
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+            if (remaining <= 0L) return -1
+            val allowed = minOf(length.toLong(), remaining).toInt()
+            val count = super.read(buffer, offset, allowed)
+            if (count > 0) remaining -= count
+            return count
+        }
+
+        override fun skip(count: Long): Long {
+            if (remaining <= 0L) return 0L
+            val skipped = super.skip(minOf(count, remaining))
+            remaining -= skipped
+            return skipped
+        }
+    }
 
     private companion object {
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
