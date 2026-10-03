@@ -44,6 +44,17 @@ internal fun shouldContinueSingleChatBinding(
         sourceUsageMode == LocalUsageMode.CHAT &&
         !sourceGroupEnabled
 
+/**
+ * Session navigation only waits for the visible runtime or another session transition.
+ *
+ * Session-owned Work runs are deliberately excluded so they can keep running after the user moves
+ * to Chat or another conversation.
+ */
+internal fun localSessionNavigationBusy(
+    sessionTransitioning: Boolean,
+    visibleRunActive: Boolean,
+): Boolean = sessionTransitioning || visibleRunActive
+
 internal class LocalSessionLifecycleCoordinator(
     private val scope: CoroutineScope,
     private val state: MutableStateFlow<LocalHarnessState>,
@@ -63,7 +74,7 @@ internal class LocalSessionLifecycleCoordinator(
     private val activateSession: (String, Long?) -> Unit,
     private val beginTransition: () -> Boolean,
     private val endTransition: () -> Unit,
-    private val runBusy: () -> Boolean,
+    private val navigationBusy: () -> Boolean,
     private val cancelActiveRunAndJoin: suspend () -> Unit,
     private val cancelWorkRunsAndJoin: suspend (Set<String>) -> Unit,
     private val resetModelHistory: () -> Unit,
@@ -339,7 +350,7 @@ internal class LocalSessionLifecycleCoordinator(
 
     fun switchUsageMode(mode: LocalUsageMode) {
         val snapshot = state.value
-        val busy = runBusy()
+        val busy = navigationBusy()
         if (snapshot.loading && !busy) return
         if (snapshot.loading || busy) {
             queuedUsageMode.set(mode)
@@ -378,7 +389,7 @@ internal class LocalSessionLifecycleCoordinator(
         // projection. Never stop the Work turn, its subagents, terminals or non-persistent jobs here.
         // Chat still uses the legacy visible turn slot; if one is active, close it safely before the
         // shared Chat runtime is replaced.
-        val cancelVisibleChatRun = runBusy()
+        val cancelVisibleChatRun = navigationBusy()
         if (!beginTransition()) return
         state.update { it.copy(loading = true) }
         scope.launch {

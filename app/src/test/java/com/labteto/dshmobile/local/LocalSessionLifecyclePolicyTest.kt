@@ -6,6 +6,28 @@ import org.junit.Test
 
 class LocalSessionLifecyclePolicyTest {
     @Test
+    fun sessionNavigationIgnoresDetachedWorkRunsAndKeepsVisibleGuards() {
+        assertFalse(
+            localSessionNavigationBusy(
+                sessionTransitioning = false,
+                visibleRunActive = false,
+            ),
+        )
+        assertTrue(
+            localSessionNavigationBusy(
+                sessionTransitioning = true,
+                visibleRunActive = false,
+            ),
+        )
+        assertTrue(
+            localSessionNavigationBusy(
+                sessionTransitioning = false,
+                visibleRunActive = true,
+            ),
+        )
+    }
+
+    @Test
     fun independentChatDoesNotCarryCurrentCharacterBinding() {
         assertFalse(
             shouldContinueSingleChatBinding(

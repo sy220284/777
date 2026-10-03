@@ -752,7 +752,7 @@ class LocalHarnessEngine @Inject constructor(
             },
             beginTransition = ::beginSessionTransition,
             endTransition = ::endSessionTransition,
-            runBusy = ::isRunBusy,
+            navigationBusy = { synchronized(runStateLock) { localSessionNavigationBusy(sessionTransitioning, activeJob?.isCompleted == false) } },
             cancelActiveRunAndJoin = ::cancelActiveRunAndJoin,
             cancelWorkRunsAndJoin = ::cancelWorkRunsAndJoin,
             resetModelHistory = { modelHistory.reset() },
