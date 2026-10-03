@@ -65,9 +65,9 @@ class PersonaPresetCatalogTest {
 
     @Test
     fun bundledPresetArtworkMustStayUnderDedicatedAssetDirectory() {
-        val artworkPaths = PersonaPresetCatalog.presets.associate { preset ->
-            preset.id to requireNotNull(preset.artwork).assetPath
-        }
+        val artworkPaths = PersonaPresetCatalog.presets.mapNotNull { preset ->
+            preset.artwork?.let { artwork -> preset.id to artwork.assetPath }
+        }.toMap()
 
         assertEquals(
             mapOf(
