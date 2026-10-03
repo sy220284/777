@@ -41,6 +41,7 @@ internal class LocalEnvironmentInfoCoordinator(
             contextChars = history.encodedChars,
             contextBudgetChars = historyBudget(binding).maxHistoryChars,
             requestPressure = requestPressureStore.latest(sessionId),
+            workContextAssessment = requestPressureStore.workAssessment(sessionId),
             contextWindow = requestPressureStore.window(sessionId),
             workBudget = binding?.executionControl?.budget?.snapshot() ?: foregroundWorkBudget(sessionId),
             latestRequest = latestRequest,
