@@ -20,9 +20,8 @@ internal class LocalModelAccountStateCoordinator(
     private val gateway: LocalModelGateway,
     private val state: MutableStateFlow<LocalHarnessState>,
     private val isBusy: () -> Boolean,
-    scope: CoroutineScope,
 ) {
-    init {
+    fun observeInvalidations(scope: CoroutineScope) {
         scope.launch {
             gateway.invalidatedChatGptAccounts.collect { accountId ->
                 retireChatGptAccountProfiles(accountId)

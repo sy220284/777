@@ -349,8 +349,9 @@ class LocalHarnessEngine @Inject constructor(
     internal val streamingState: StateFlow<LocalHarnessStreamingState> = streamingPreviewStore.state
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
 
-    private val modelAccountStateCoordinator =
-        LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isModelIdentityLocked, scope)
+    private val modelAccountStateCoordinator by lazy {
+        LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isModelIdentityLocked)
+    }
     private val transcriptRuntime by lazy {
         LocalTranscriptRuntime(
             state = _state,
@@ -765,6 +766,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     init {
+        modelAccountStateCoordinator.observeInvalidations(scope)
         preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
         val initialResources = resourceScheduler.snapshot()
         _state.update {
