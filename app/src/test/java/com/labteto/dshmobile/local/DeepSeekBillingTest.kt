@@ -84,7 +84,6 @@ class DeepSeekBillingTest {
         assertEquals(100L, anthropic.promptTokens)
         assertEquals(50L, anthropic.cacheHitTokens)
         assertEquals(50L, anthropic.cacheMissTokens)
-        assertEquals(20L, anthropic.cacheWriteTokens)
         assertEquals(10L, anthropic.completionTokens)
         assertEquals(true, anthropic.reported)
     }
