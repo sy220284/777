@@ -350,7 +350,7 @@ class LocalHarnessEngine @Inject constructor(
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
 
     private val modelAccountStateCoordinator by lazy {
-        LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isModelIdentityLocked)
+        LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isModelIdentityLocked, scope)
     }
     private val transcriptRuntime by lazy {
         LocalTranscriptRuntime(
@@ -854,6 +854,9 @@ class LocalHarnessEngine @Inject constructor(
         models: List<ChatGptModelOption>,
         selectFirst: Boolean = true,
     ) = modelAccountStateCoordinator.syncChatGptModels(accountId, models, selectFirst)
+
+    internal suspend fun retireChatGptAccountProfiles(accountId: String) =
+        modelAccountStateCoordinator.retireChatGptAccountProfiles(accountId)
 
     internal suspend fun removeChatGptAccountProfiles(accountId: String) =
         modelAccountStateCoordinator.removeChatGptAccountProfiles(accountId)

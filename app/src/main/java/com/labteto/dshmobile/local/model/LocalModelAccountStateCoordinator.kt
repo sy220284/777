@@ -5,9 +5,11 @@ import com.labteto.dshmobile.local.LocalModelAuthKind
 import com.labteto.dshmobile.local.LocalModelConfigurationCoordinator
 import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 internal fun canStartChatGptAccountSelection(isBusy: Boolean): Boolean = !isBusy
 
@@ -17,7 +19,15 @@ internal class LocalModelAccountStateCoordinator(
     private val gateway: LocalModelGateway,
     private val state: MutableStateFlow<LocalHarnessState>,
     private val isBusy: () -> Boolean,
+    scope: CoroutineScope,
 ) {
+    init {
+        scope.launch {
+            gateway.invalidatedChatGptAccounts.collect { accountId ->
+                retireChatGptAccountProfiles(accountId)
+            }
+        }
+    }
     fun requireAccountSelectionAllowed() {
         check(canStartChatGptAccountSelection(isBusy())) { "请先结束当前任务再切换模型账户" }
     }
@@ -62,6 +72,31 @@ internal class LocalModelAccountStateCoordinator(
                     models.isEmpty() -> "当前 ChatGPT 账户没有可用于套餐共享的模型"
                     removedActiveChatGptModel -> "当前 ChatGPT 模型已不可用，请重新选择模型"
                     else -> null
+                },
+            )
+        }
+    }
+
+    suspend fun retireChatGptAccountProfiles(accountId: String) {
+        if (state.value.loading) state.first { !it.loading }
+        val before = state.value
+        val beforeActive = gateway.activeProfile()
+        val profiles = configuration.saveChatGptModels(accountId, emptyList())
+        val active = configuration.activeProfile(before.model, before.baseUrl, profiles)
+        val configured = active != null && gateway.hasCredential(active)
+        if (configured) gateway.activate(active!!) else gateway.clearActive()
+        val retiredActive = beforeActive?.authKind == LocalModelAuthKind.CHATGPT_PLAN &&
+            beforeActive.credentialRef == accountId
+        state.update { current ->
+            current.copy(
+                configured = configured,
+                model = active?.model ?: current.model,
+                baseUrl = active?.baseUrl ?: current.baseUrl,
+                modelSelection = current.modelSelection.replaceProfiles(profiles, active?.id),
+                error = if (retiredActive) {
+                    "当前 ChatGPT 套餐授权已失效，已停止使用该模型；请重新启用套餐或手动选择其他模型"
+                } else {
+                    current.error
                 },
             )
         }
