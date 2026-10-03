@@ -36,12 +36,42 @@ class SidebarAvatarSourceTest {
     }
 
     @Test
-    fun absoluteFilePathBecomesCustomSource() {
+    fun customSourceRoundTripsCropWithoutRewritingImage() {
+        val file = File("/data/user/0/com.sy220284.dshmobile/files/ui/sidebar-avatars/avatar.gif")
+        val crop = SidebarAvatarCrop(
+            zoom = 2.25f,
+            offsetX = -0.18f,
+            offsetY = 0.27f,
+        )
+
+        val parsed = parseSidebarAvatarSource(customSidebarAvatarSource(file, crop))
+
+        assertEquals(
+            SidebarAvatarSource.Custom(file = file, crop = crop),
+            parsed,
+        )
+    }
+
+    @Test
+    fun absoluteFilePathRemainsBackwardCompatibleWithCenteredCrop() {
         val file = File("/data/user/0/com.sy220284.dshmobile/files/ui/sidebar-avatars/avatar.gif")
         val parsed = parseSidebarAvatarSource(file.absolutePath)
 
         assertTrue(parsed is SidebarAvatarSource.Custom)
         assertEquals(file, (parsed as SidebarAvatarSource.Custom).file)
+        assertEquals(SidebarAvatarCrop(), parsed.crop)
+    }
+
+    @Test
+    fun malformedCustomSourceFallsBackToDefault() {
+        assertEquals(
+            SidebarAvatarSource.Default,
+            parseSidebarAvatarSource("custom:v1:bad:0:0:/data/avatar.webp"),
+        )
+        assertEquals(
+            SidebarAvatarSource.Default,
+            parseSidebarAvatarSource("custom:v1:1:0:0:relative.webp"),
+        )
     }
 
     @Test
@@ -52,4 +82,3 @@ class SidebarAvatarSourceTest {
         )
     }
 }
-

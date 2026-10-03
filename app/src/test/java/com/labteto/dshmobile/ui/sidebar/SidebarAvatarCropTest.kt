@@ -85,4 +85,62 @@ class SidebarAvatarCropTest {
         assertEquals(0f, landscape.translateY, 0.0001f)
         assertTrue(landscape.translateX < 0f)
     }
+
+    @Test
+    fun customCropDefaultsToCenteredCover() {
+        val crop = requireNotNull(
+            calculateSidebarAvatarCustomCrop(
+                sourceWidth = 1024,
+                sourceHeight = 1536,
+                targetWidth = 52,
+                targetHeight = 52,
+                crop = SidebarAvatarCrop(),
+            ),
+        )
+
+        assertEquals(52f / 1024f, crop.scale, 0.0001f)
+        assertEquals(0f, crop.translateX, 0.0001f)
+        assertEquals(-13f, crop.translateY, 0.0001f)
+    }
+
+    @Test
+    fun customCropZoomAndPanRemainInsideAvatarFrame() {
+        val crop = requireNotNull(
+            calculateSidebarAvatarCustomCrop(
+                sourceWidth = 1024,
+                sourceHeight = 1536,
+                targetWidth = 52,
+                targetHeight = 52,
+                crop = SidebarAvatarCrop(
+                    zoom = 2f,
+                    offsetX = 0.8f,
+                    offsetY = -0.8f,
+                ),
+            ),
+        )
+
+        val scaledWidth = 1024f * crop.scale
+        val scaledHeight = 1536f * crop.scale
+        assertEquals(104f / 1024f, crop.scale, 0.0001f)
+        assertTrue(crop.translateX <= 0f)
+        assertTrue(crop.translateX >= 52f - scaledWidth)
+        assertTrue(crop.translateY <= 0f)
+        assertTrue(crop.translateY >= 52f - scaledHeight)
+    }
+
+    @Test
+    fun shrinkingZoomClampsStoredPanToNewAvailableOverflow() {
+        val normalized = normalizeSidebarAvatarCropForSource(
+            crop = SidebarAvatarCrop(
+                zoom = 1f,
+                offsetX = 2f,
+                offsetY = 2f,
+            ),
+            sourceWidth = 1024,
+            sourceHeight = 1536,
+        )
+
+        assertEquals(0f, normalized.offsetX, 0.0001f)
+        assertEquals(0.25f, normalized.offsetY, 0.0001f)
+    }
 }
