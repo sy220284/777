@@ -353,7 +353,7 @@ private class SidebarAvatarImageView(context: Context) : ImageView(context) {
         }
 
     init {
-        scaleType = ScaleType.MATRIX
+        scaleType = ImageView.ScaleType.MATRIX
     }
 
     override fun setImageDrawable(drawable: Drawable?) {
@@ -376,12 +376,12 @@ private class SidebarAvatarImageView(context: Context) : ImageView(context) {
             focusY = focusY,
         )
         if (transform == null) {
-            scaleType = ScaleType.CENTER_CROP
+            scaleType = ImageView.ScaleType.CENTER_CROP
             return
         }
 
-        if (scaleType != ScaleType.MATRIX) {
-            scaleType = ScaleType.MATRIX
+        if (scaleType != ImageView.ScaleType.MATRIX) {
+            scaleType = ImageView.ScaleType.MATRIX
         }
         imageMatrix = Matrix().apply {
             setScale(transform.scale, transform.scale)
@@ -415,10 +415,8 @@ internal fun calculateSidebarAvatarCrop(
     val scaledHeight = sourceHeight * scale
     val translateX = (targetWidth - scaledWidth) / 2f
     val minTranslateY = minOf(targetHeight - scaledHeight, 0f)
-    val translateY = (
-        targetHeight / 2f -
-            scaledHeight * focusY.coerceIn(0f, 1f)
-        ).coerceIn(minTranslateY, 0f)
+    val desiredTranslateY = targetHeight / 2f - scaledHeight * focusY.coerceIn(0f, 1f)
+    val translateY = desiredTranslateY.coerceIn(minTranslateY, 0f)
 
     return SidebarAvatarCropTransform(
         scale = scale,
