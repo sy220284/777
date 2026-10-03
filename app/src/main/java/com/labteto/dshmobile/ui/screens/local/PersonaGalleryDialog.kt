@@ -49,6 +49,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -203,15 +204,15 @@ internal fun PersonaGalleryScreen(
                 .toSet(),
         )
     }
-    var selectedId by remember { mutableStateOf<String?>(null) }
+    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val selected = entries.firstOrNull { it.id == selectedId }
-    var selectedStoryId by remember(selectedId) { mutableStateOf<String?>(null) }
+    var selectedStoryId by rememberSaveable(selectedId) { mutableStateOf<String?>(null) }
     val selectedStory = selected?.stories?.firstOrNull { it.id == selectedStoryId }
-    var search by remember { mutableStateOf("") }
-    var notes by remember(selectedId, selectedStoryId, selectedStory?.notes) {
+    var search by rememberSaveable { mutableStateOf("") }
+    var notes by rememberSaveable(selectedId, selectedStoryId, selectedStory?.notes) {
         mutableStateOf(selectedStory?.notes.orEmpty())
     }
-    var storyTitle by remember(selectedId, selectedStoryId, selectedStory?.title) {
+    var storyTitle by rememberSaveable(selectedId, selectedStoryId, selectedStory?.title) {
         mutableStateOf(selectedStory?.title.orEmpty())
     }
     var busy by remember { mutableStateOf(false) }
@@ -219,15 +220,15 @@ internal fun PersonaGalleryScreen(
     var deletingStory by remember(selectedStoryId) { mutableStateOf(false) }
     var pendingEntryDeleteId by remember { mutableStateOf<String?>(null) }
     var pendingPresetDeleteId by remember { mutableStateOf<String?>(null) }
-    var visibleHistory by remember(selectedId, selectedStoryId) { mutableStateOf(8) }
-    var showHistory by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var visibleHistory by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(8) }
+    var showHistory by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
     var pendingHistoryDeleteKey by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var notice by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var inspection by remember(selectedId, selectedStoryId) { mutableStateOf<PersonaInspectionResult?>(null) }
     var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
-    var showPersonaDetails by remember(selectedId) { mutableStateOf(false) }
-    var editingStoryTitle by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var showPersonaDetails by rememberSaveable(selectedId) { mutableStateOf(false) }
+    var editingStoryTitle by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
     var pendingExportDocument by remember { mutableStateOf<PersonaTransferDocument?>(null) }
     var showExportFormatDialog by remember { mutableStateOf(false) }
     var portraitTargetId by remember { mutableStateOf<String?>(null) }
