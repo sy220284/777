@@ -170,6 +170,18 @@ Chat keeps persona definition, relationship memory, scene continuity, character 
 
 Relationship memory uses a stable subject key; Gallery identity wins over copied persona identity. `CharacterBehaviorTuning` changes expression and pacing but cannot rewrite trust, shared events or other historical facts.
 
+### Character diary and cross-chat memory
+
+角色日记是 Chat 的长期叙事记忆投影，不是第二份事实源。原始事实继续以 `SessionEventLog` 为准，当前场景与待续状态继续由 `ChatContextState` 维护，精确关系事实继续进入 `MemoryStore`，长期人格变化继续由 `CharacterEvolution` 维护。
+
+日记复用现有 post-turn 状态整理请求生成稀疏的 `diaryDelta`，不为普通回合增加额外模型请求。只有具备跨会话价值的经历才允许落盘；条目区分客观事件锚点、角色感受、未说出口的心理活动、关系意义和仍会影响后续的余波。日记禁止逐句复述和流水账式时间串联，也禁止把角色对用户动机的推测升格为客观事实。
+
+单聊与群聊使用同一稳定角色 `subjectKey` 形成连续的人物经历。群聊状态整理为实际发言角色更新隐藏状态并生成主观日记，同时在同一次模型请求中为在场未发言角色生成只含日记的观察投影；同一公开事件可以形成不同角色视角，且不增加额外模型调用。单聊经历可在后续群聊召回，群聊经历也可在后续单聊召回。披露边界与“角色是否记得”分离：`PRIVATE` 日记仅能进入该角色的私密上下文，`SHAREABLE` 可在该角色参与的群聊中使用，群聊公开经历记为 `PUBLIC`。
+
+召回统一受模型上下文窗口预算约束。长期事实与日记共享有上限的 Chat 长期记忆预算，日记不会全量常驻 Prompt；普通输入只召回语义相关条目，显式“以前/上次/那天”等回忆请求才放宽候选。所有最终注入文本再次按模型 Token 估算硬裁剪。 Chat→Chat 继续会话不再复制旧对话生成叙事 handoff；当前场景、待续和未归并事实由迁移后的 `ChatContextState` 承接，长期经历按需从日记召回。Work 的任务 handoff 保持不变。
+
+日记保存来源会话、用户/角色消息 ID 和 generation。聊天分支编辑、历史重写或回滚时，与被丢弃消息关联的日记同步失效，避免“幽灵记忆”残留。相近经历在短时间内优先精炼已有条目，保留更完整的感受、心理和关系意义，而不是每轮追加重复记录。
+
 ### Token usage and observability
 
 `TokenUsageAnalyticsStore` migrates the legacy JSONL ledger transactionally into SQLite. Request insertion, deduplication and lifetime totals commit together; a failed write can be retried with the same request id. Request details retain at most 90 days and 10,000 records (shrinking to 9,000 after overflow), with a 4 KiB per-record bound. Lifetime totals are retained independently. The bounded projection updates incrementally; reopening, retention cleanup and time-zone changes rebuild it from the retained window. Averages, action splits and groups describe that window, while headline aggregates remain lifetime totals. Deduplication covers retained request identities; callers must use a new id for a new request and avoid replaying expired requests. API-reported input/output usage is the total; prompt sections are diagnostic attribution only and are not added again.

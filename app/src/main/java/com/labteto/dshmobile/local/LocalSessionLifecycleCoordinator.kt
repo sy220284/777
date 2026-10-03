@@ -9,6 +9,7 @@ import com.labteto.dshmobile.harness.session.HandoffState
 import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.chat.continuePendingInSession
 import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
@@ -54,6 +55,7 @@ internal class LocalSessionLifecycleCoordinator(
     private val sessionsRoot: File,
     private val conversationFilesCoordinator: LocalConversationFilesCoordinator,
     private val memoryStore: MemoryStore,
+    private val diaryStore: ChatDiaryStore,
     private val currentSessionId: () -> String,
     private val activateSession: (String, Long?) -> Unit,
     private val beginTransition: () -> Boolean,
@@ -150,11 +152,10 @@ internal class LocalSessionLifecycleCoordinator(
                             usageMode == LocalUsageMode.CHAT &&
                             sourceState.usageMode == LocalUsageMode.CHAT
                         ) {
-                            buildChatContinuationHandoff(
-                                state = sourceState.chatState,
-                                messages = sourceState.messages,
-                                context = sourceState.chatContext,
-                            )
+                            // Chat continuity/pending state is transferred below. Long-range
+                            // narrative recall now comes from character diaries, so duplicating old
+                            // dialogue into a handoff summary only wastes context.
+                            null
                         } else {
                             buildHandoffSummary(sourceState)
                         }
@@ -410,6 +411,7 @@ internal class LocalSessionLifecycleCoordinator(
                 }
                 conversationFilesCoordinator.invalidate(ids)
                 memoryStore.detachSourceSessions(ids)
+                diaryStore.detachSourceSessions(ids)
                 // All run/job producers are drained and the storage lock deletion has completed.
                 sessionCoordinator.releaseDeletionBarrier(ids)
                 state.update { it.copy(sessions = sessionSummaries()) }

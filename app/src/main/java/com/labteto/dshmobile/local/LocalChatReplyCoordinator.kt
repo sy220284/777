@@ -102,6 +102,7 @@ internal class LocalChatReplyCoordinator(
         allMembers: List<LocalGroupChatMember>,
         handoffSummary: String?,
         sharedContext: ChatContextState,
+        memoryContext: String,
         announcement: String,
         mayStaySilent: Boolean,
         silentToken: String,
@@ -121,6 +122,7 @@ internal class LocalChatReplyCoordinator(
         }
         return listOf(
             personaPrompt,
+            memoryContext,
             announcement.takeIf(String::isNotBlank)?.let { text ->
                 "【群公告·公开剧情背景】\n$text\n这是所有群成员可见的场景信息。依照你的人设和已知经历自行判断、回应；不要把公告当成你已经做过或说过的事。"
             }.orEmpty(),

@@ -137,6 +137,7 @@ private fun NavigationScreenshot() {
             groupMemberCount = 3,
             onOpenGroupChat = {},
             onOpenPersonaGallery = {},
+            onOpenDiary = {},
             onTasks = {},
             onTools = {},
             onSettings = {},

@@ -51,6 +51,7 @@ class LocalChatContextRefreshRaceTest {
         val observedProfiles = mutableListOf<String>()
         val coordinator = LocalChatContextRefreshCoordinator(
             state, scope, turns,
+            diaryStore = ChatDiaryStore(File(temporary.root, "diary"), json),
             requestPlanner = { _, _, _, selectedProfile ->
                 observedProfiles += selectedProfile.id
                 LocalModelReply(

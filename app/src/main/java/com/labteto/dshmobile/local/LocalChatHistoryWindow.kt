@@ -1,9 +1,6 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
-import com.labteto.dshmobile.local.chat.ChatContextState
-import com.labteto.dshmobile.local.chat.pendingForRequest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -138,76 +135,3 @@ private fun historicalFactSupersededByCurrent(
     historical: String,
     current: String,
 ): Boolean = ChatContextAssembler.factConflicts(historical, current)
-
-
-internal fun buildChatContinuationHandoff(
-    state: ChatCharacterState,
-    messages: List<LocalHarnessMessage>,
-    context: ChatContextState = ChatContextState(),
-): String {
-    val shared = context
-    val sceneBlock = buildString {
-        val scene = shared.scene
-        if (scene.sceneTime.isNotBlank() || scene.location.isNotBlank()) {
-            appendLine(
-                "当前硬场景：时间=${scene.sceneTime.ifBlank { "未知" }}｜地点=${scene.location.ifBlank { "未知" }}",
-            )
-            append("人物位置、动作和物件以最近原始对话为准，不从旧场景快照继承。")
-        }
-    }.trim().take(500)
-
-    val pendingBlock = buildString {
-        val pending = shared.pendingForRequest(limit = 4)
-        if (pending.isNotEmpty()) {
-            appendLine("尚未归并的最新事实：")
-            pending.forEach { turn ->
-                if (turn.userMessage.isNotBlank()) {
-                    appendLine("- 用户：${normalizeChatContinuityText(turn.userMessage).take(240)}")
-                }
-                if (turn.assistantMessage.isNotBlank()) {
-                    appendLine("- 角色：${normalizeChatContinuityText(turn.assistantMessage).take(280)}")
-                }
-            }
-        }
-    }.trim().take(1_200)
-
-    val recentUserBlock = buildString {
-        val recentUserEvents = messages.asSequence()
-            .filter { it.role == "user" }
-            .map { normalizeChatContinuityText(it.content) }
-            .filter(String::isNotBlank)
-            .toList()
-            .takeLast(4)
-        if (recentUserEvents.isNotEmpty()) {
-            appendLine("近期用户表达与事件：")
-            recentUserEvents.forEach { appendLine("- ${it.take(360)}") }
-        }
-    }.trim().take(1_200)
-
-    val continuityBlock = buildString {
-        shared.continuity.recentEvents.takeLast(5).takeIf { it.isNotEmpty() }?.let {
-            appendLine("近期关键事件：${it.joinToString("；").take(800)}")
-        }
-        shared.continuity.decisions.takeLast(4).takeIf { it.isNotEmpty() }?.let {
-            appendLine("当前有效决定：${it.joinToString("；").take(640)}")
-        }
-        shared.continuity.unfinished.takeLast(4).takeIf { it.isNotEmpty() }?.let {
-            appendLine("待续事项：${it.joinToString("；").take(640)}")
-        }
-        state.dynamics.sharedMoments.takeLast(6).takeIf { it.isNotEmpty() }?.let { moments ->
-            append("共同经历：${moments.joinToString("；").take(700)}")
-        }
-    }.trim().take(1_000)
-
-    val body = listOf(sceneBlock, pendingBlock, continuityBlock, recentUserBlock)
-        .filter(String::isNotBlank)
-        .joinToString("\n")
-        .take(3_300)
-
-    return buildString {
-        appendLine("【聊天连续性】")
-        if (body.isNotBlank()) appendLine(body)
-        append("原始聊天优先；本摘要仅保留当前有效状态和待续线索。")
-    }.trim()
-}
-

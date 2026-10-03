@@ -52,6 +52,7 @@ import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.chat.saveGroupChatAnnouncement
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
+import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.LocalReplySuggestionCoordinator
@@ -143,6 +144,7 @@ class LocalHarnessEngine @Inject constructor(
     private val chatInteractionPlanner: ChatInteractionPlanner,
 ) {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
+    private val chatDiaryStore = ChatDiaryStore(File(root, "chat-diary"), json)
     private val memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
     private val persistentJobStore = LocalPersistentJobStore(
         file = File(root, "jobs.json"),
@@ -365,6 +367,7 @@ class LocalHarnessEngine @Inject constructor(
             state = _state,
             scope = scope,
             chatTurnCoordinator = chatTurnCoordinator,
+            diaryStore = chatDiaryStore,
             requestPlanner = { snapshot, prompt, requestLog, profile ->
                 completeWithRetry(
                     key = profile.id,
@@ -426,7 +429,7 @@ class LocalHarnessEngine @Inject constructor(
     private val groupChatTurnExecutor by lazy {
         LocalGroupChatTurnExecutor(
             _state, modelGateway, chatPersonaStore, chatPersonaGalleryStore, chatReplyCoordinator,
-            chatTurnCoordinator, usageTracker, json, modelHistory, transcriptRuntime,
+            chatTurnCoordinator, chatDiaryStore, usageTracker, json, modelHistory, transcriptRuntime,
             imageCapabilities, imageRequestBudget, workspace.path, { eventLog },
             { key, snapshot, messages, step, tools, preview, attempts, overflow, temperature ->
                 completeWithRetry(
@@ -437,6 +440,15 @@ class LocalHarnessEngine @Inject constructor(
             },
             ::ensureSystemMessage,
             { text, sourceMessageId -> captureAutoMemoryDirective(text, sourceMessageId) },
+            { query, snapshot, subjectKey, viewerName ->
+                memoryCoordinator.chatMemoryContext(
+                    query = query,
+                    snapshot = snapshot,
+                    viewerSubjectKey = subjectKey,
+                    viewerName = viewerName,
+                    groupAudience = true,
+                )
+            },
             { extraTokens -> compactHistoryIfNeeded(extraTokens) },
             ::updateContextMetrics,
             ::persistChatBranchState,
@@ -695,6 +707,7 @@ class LocalHarnessEngine @Inject constructor(
             state = _state,
             memoryStore = memoryStore,
             memoryManager = memoryManager,
+            diaryStore = chatDiaryStore,
             currentSessionId = { currentSessionId },
             eventLog = { eventLog },
             persist = ::persist,
@@ -724,6 +737,7 @@ class LocalHarnessEngine @Inject constructor(
             sessionsRoot = sessionsRoot,
             conversationFilesCoordinator = conversationFilesCoordinator,
             memoryStore = memoryStore,
+            diaryStore = chatDiaryStore,
             currentSessionId = { currentSessionId },
             activateSession = { id, transcriptCursor ->
                 currentSessionId = id
@@ -1212,6 +1226,7 @@ class LocalHarnessEngine @Inject constructor(
     /** Generate reply suggestions only on explicit user request. */
     internal suspend fun generateReplySuggestions(): Boolean =
         replySuggestionCoordinator.generate()
+    internal fun chatDiaryEntries(subjectKey: String, limit: Int) = chatDiaryStore.listActive(subjectKey, limit)
 
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult {
@@ -1238,7 +1253,7 @@ class LocalHarnessEngine @Inject constructor(
             activeWorkRuns[state.sessionId]?.job?.isCompleted == false ||
             pendingInputs.size() != 0
         ) return@synchronized LocalChatUserEditResult.BUSY
-        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
+        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
         if (state.usageMode == LocalUsageMode.WORK) return@synchronized editAndResendWorkUserMessage(
             messageId,
             requestedText,
@@ -1413,7 +1428,7 @@ class LocalHarnessEngine @Inject constructor(
                 error = null,
             )
         }
-        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
+        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
         checkpointModelHistory(if (state.groupChat.enabled) "group/user-edited" else "chat/user-edited")
         persist()
         automationScheduler.onChatUserActivity(
@@ -2354,6 +2369,7 @@ class LocalHarnessEngine @Inject constructor(
             state = binding.state,
             memoryStore = memoryStore,
             memoryManager = memoryManager,
+            diaryStore = chatDiaryStore,
             currentSessionId = { binding.sessionId },
             eventLog = { binding.eventLog },
             persist = { persist(binding) },
@@ -4735,7 +4751,7 @@ class LocalHarnessEngine @Inject constructor(
         // Only mutate the durable event tail after the persisted session format is accepted.
         // A future-version session must remain completely untouched.
         val recovery = eventLog.repairInterruptedTail()
-        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore)
+        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
             eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(

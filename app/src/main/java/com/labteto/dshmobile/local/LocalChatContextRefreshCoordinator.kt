@@ -2,6 +2,10 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatDiarySourceMode
+import com.labteto.dshmobile.local.chat.ChatDiaryStore
+import com.labteto.dshmobile.local.chat.ChatDiaryWriteRequest
+import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
 import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -136,6 +140,7 @@ internal class LocalChatContextRefreshCoordinator(
     private val state: MutableStateFlow<LocalHarnessState>,
     private val scope: CoroutineScope,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
+    private val diaryStore: ChatDiaryStore,
     private val requestPlanner: suspend (
         snapshot: LocalHarnessState,
         prompt: String,
@@ -469,6 +474,43 @@ internal class LocalChatContextRefreshCoordinator(
                 persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "stale-discarded",
             )
             return
+        }
+
+        if (before.autoMemory) chatRelationshipSubjectKey(before.galleryId, before.personaId)?.let { subjectKey ->
+            runCatching {
+                diaryStore.record(
+                    ChatDiaryWriteRequest(
+                        subjectKey = subjectKey,
+                        personaName = persona.name,
+                        delta = plan.diaryDelta,
+                        turnSignificance = plan.turnSignificance,
+                        sourceMode = ChatDiarySourceMode.DIRECT,
+                        sourceSessionId = expectedSessionId,
+                        sourceUserMessageIds = pending.map(ChatPendingTurn::userMessageId),
+                        sourceAssistantMessageIds = pending.map(ChatPendingTurn::assistantMessageId),
+                        evidenceText = pending.joinToString("\n") { turn ->
+                            listOf(turn.userMessage, turn.assistantMessage)
+                                .filter(String::isNotBlank)
+                                .joinToString(" ")
+                        },
+                        generation = expectedGeneration,
+                    ),
+                )
+            }.onSuccess { diary ->
+                if (diary != null) {
+                    boundEventLog.append("chat/diary", buildJsonObject {
+                        put("status", "recorded")
+                        put("diary_id", diary.id)
+                        put("importance", diary.importance)
+                        put("source_mode", diary.sourceMode.name.lowercase())
+                    })
+                }
+            }.onFailure { error ->
+                boundEventLog.append("chat/diary", buildJsonObject {
+                    put("status", "failed")
+                    put("detail", error.message.orEmpty().take(800))
+                })
+            }
         }
 
         boundEventLog.append("chat/post-turn", buildJsonObject {

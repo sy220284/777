@@ -173,12 +173,11 @@ fun LocalHarnessScreen(
     val context = LocalContext.current
     val drawerFocusManager = LocalFocusManager.current
     val drawerKeyboard = LocalSoftwareKeyboardController.current
-    val modeIntroPreferences = remember(context) {
-        context.getSharedPreferences("local_mode_intro", android.content.Context.MODE_PRIVATE)
-    }
+    val modeIntroPreferences = remember(context) { context.getSharedPreferences("local_mode_intro", android.content.Context.MODE_PRIVATE) }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
     var filesMode by remember { mutableStateOf<LocalFilesMode?>(null) }
     var showPersonaGallery by rememberSaveable { mutableStateOf(false) }
+    var showDiary by rememberSaveable { mutableStateOf(false) }
     var showPersonaGallerySavePrompt by rememberSaveable { mutableStateOf(false) }
     var showNewPersona by rememberSaveable { mutableStateOf(false) }
     var showRunCenter by rememberSaveable { mutableStateOf(false) }
@@ -186,16 +185,8 @@ fun LocalHarnessScreen(
     var hasRenderedHarnessSurface by rememberSaveable { mutableStateOf(false) }
     var pendingUsageMode by remember { mutableStateOf<LocalUsageMode?>(null) }
 
-    LaunchedEffect(modeIntro) {
-        if (modeIntro != null) {
-            delay(6_000)
-            modeIntro = null
-        }
-    }
-
-    LaunchedEffect(shell.loading) {
-        if (!shell.loading) hasRenderedHarnessSurface = true
-    }
+    LaunchedEffect(modeIntro) { if (modeIntro != null) { delay(6_000); modeIntro = null } }
+    LaunchedEffect(shell.loading) { if (!shell.loading) hasRenderedHarnessSurface = true }
 
     LaunchedEffect(pendingUsageMode, shell.loading, shell.usageMode) {
         val pending = pendingUsageMode ?: return@LaunchedEffect
@@ -262,7 +253,7 @@ fun LocalHarnessScreen(
                 modeSwitchEnabled = localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
-                onUsageModeChange = ::switchUsageMode,
+                onUsageModeChange = { showDiary = false; switchUsageMode(it) },
                 onNewSession = {
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
@@ -298,6 +289,7 @@ fun LocalHarnessScreen(
                         showPersonaGallery = true
                     }
                 },
+                onOpenDiary = { showDiary = true; scope.launch { drawerState.close() } },
                 onTasks = {
                     scope.launch { drawerState.close() }
                     onOpenTasks()
@@ -317,7 +309,14 @@ fun LocalHarnessScreen(
             Box(Modifier.fillMaxSize()) {
                 when {
                     localHarnessShowsBlockingLoading(state.loading, hasRenderedHarnessSurface) -> LoadingScreen()
-                showPersonaGallery && state.usageMode == LocalUsageMode.CHAT -> PersonaGalleryScreen(
+                    showDiary && state.usageMode == LocalUsageMode.CHAT -> CharacterDiaryScreen(
+                        gallery = gallery,
+                        currentPersona = state.chatPersona,
+                        currentGalleryId = state.galleryId,
+                        loadEntries = viewModel::diaryEntries,
+                        onDismiss = { showDiary = false },
+                    )
+                    showPersonaGallery && state.usageMode == LocalUsageMode.CHAT -> PersonaGalleryScreen(
                     entries = gallery,
                     presets = viewModel.personaPresets,
                     currentPersona = state.chatPersona,

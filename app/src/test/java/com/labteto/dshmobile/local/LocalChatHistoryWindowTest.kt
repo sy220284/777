@@ -4,58 +4,12 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonPrimitive
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatContextState
-import com.labteto.dshmobile.local.chat.ChatContinuityState
-import com.labteto.dshmobile.local.chat.ChatSceneState
-import com.labteto.dshmobile.local.chat.RelationshipDynamics
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalChatHistoryWindowTest {
-
-    @Test
-    fun continuationHandoffKeepsFactsAndUserEventsWithoutOldRoleWording() {
-        val handoff = buildChatContinuationHandoff(
-            state = ChatCharacterState(
-                dynamics = RelationshipDynamics(
-                    sharedMoments = listOf("一起看过日落"),
-                ),
-            ),
-            context = ChatContextState(
-                scene = ChatSceneState(
-                    sceneTime = "夜晚",
-                    location = "院子",
-                    participants = listOf("用户", "绫华"),
-                    positions = listOf("两人坐在石桌旁"),
-                    activeActions = listOf("喝茶聊天"),
-                    keyObjects = listOf("茶壶"),
-                    lastSceneChange = "从书房来到院子",
-                ),
-                continuity = ChatContinuityState(
-                    decisions = listOf("明早九点去城南"),
-                    unfinished = listOf("城南之行尚未发生"),
-                ),
-            ),
-            messages = listOf(
-                LocalHarnessMessage("u1", "user", "明天去海边", createdAt = 1L),
-                LocalHarnessMessage("a1", "assistant", "我会一直陪着你去", createdAt = 2L),
-            ),
-        )
-
-        assertTrue(handoff.contains("一起看过日落"))
-        assertTrue(handoff.contains("地点=院子"))
-        assertFalse(handoff.contains("两人坐在石桌旁"))
-        assertTrue(handoff.contains("人物位置、动作和物件以最近原始对话为准"))
-        assertTrue(handoff.contains("明早九点去城南"))
-        assertTrue(handoff.contains("城南之行尚未发生"))
-        assertTrue(handoff.contains("明天去海边"))
-        assertFalse(handoff.contains("我会一直陪着你去"))
-        assertTrue(handoff.contains("原始聊天优先"))
-    }
-
 
     @Test
     fun keepsHotWindowIntactUntilWholeBatchNeedsCompaction() {

@@ -78,8 +78,7 @@ fun prompt(
     if (hasAdultIntimacyIntent(userMessage, state)) {
         appendLine("当前意图明确，状态更新按实际互动推进，不重复确认或自行转移。")
     }
-
-    appendLine("输出：{\"state\":{仅写变化字段},\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\"}")
+    appendLine("输出：{\"state\":{仅写变化字段},\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\",\"diaryDelta\":null}")
     appendLine("state字段：mood, relationshipState, currentFocus, recentImpression, activeGoal, currentAgenda, internalConflict, immediateConcern, unresolvedThreads, initiative, shareDesire；dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments)；userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)；continuity(recentEvents,decisions,unfinished)。")
     appendLine("规则：")
     appendLine("- 以真实对话和用户明确纠正为准；事实、推测、未知分开，不虚构。")

@@ -137,8 +137,8 @@ data class ChatPostTurnPlan(
     val state: ChatCharacterState = ChatCharacterState(),
     val suggestions: List<ChatReplySuggestion> = emptyList(),
     val turnSignificance: String = "MINOR",
+    val diaryDelta: ChatDiaryDelta? = null,
 )
-
 @Serializable
 data class ChatReplySuggestionPlan(
     val suggestions: List<ChatReplySuggestion> = emptyList(),
