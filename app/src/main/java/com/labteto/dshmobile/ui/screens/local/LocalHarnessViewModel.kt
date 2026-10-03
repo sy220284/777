@@ -206,7 +206,7 @@ class LocalHarnessViewModel @Inject constructor(
     fun createSession(mode: LocalConversationMode) = runtime.session.createSession(mode)
     fun setPlanMode(enabled: Boolean) = runtime.work.setPlanMode(enabled)
     fun switchUsageMode(mode: LocalUsageMode) = runtime.session.switchUsageMode(mode)
-    fun configureChatPersona(profile: PersonaProfile) = runtime.chat.configureChatPersona(profile)
+    suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = personaGalleryController.configureChatPersona(profile)
     fun selectChatDirection(direction: String?) = runtime.chat.selectChatDirection(direction)
     fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) =
         runtime.chat.undoChatPersonaCorrection(noticeId, personaId, correction)

@@ -25,6 +25,7 @@ All notable changes to DSH Mobile are documented here. Format based on
 
 ### Fixed
 
+- 角色调节保存改为确认落盘后再关闭，并统一角色、会话与人物库中的调节版本；切换对话、重开人物故事或重启应用时按最新设置恢复，旧数据也会在读取时自动收敛。
 - 侧边栏头像选择器的内置人物预置保持面部优先的上移裁切；本地自定义图片改为选图后进入可拖拽、可缩放的圆形裁剪界面，裁剪预览与最终头像共用同一取景参数，动图继续保留动画。
 - 持久事件流改用作用域快照，提前结束和异常路径也关闭文件及解压器，避免恢复与会话投影反复读取时泄漏句柄。
 - Notifications now use the supplied red/black portrait as the full-colour notification artwork,

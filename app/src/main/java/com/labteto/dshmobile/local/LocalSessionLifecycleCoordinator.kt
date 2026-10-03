@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.resolveCharacterBehaviorTuning
 import com.labteto.dshmobile.local.chat.findEstablishedGroupChatSession
 import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
 import com.labteto.dshmobile.local.memory.MemoryStore
@@ -194,8 +195,13 @@ internal class LocalSessionLifecycleCoordinator(
                         usageMode == LocalUsageMode.CHAT &&
                         !freshGalleryStory
                     ) {
-                        selectedGalleryStory?.chatState
-                            ?: ChatCharacterState(behaviorTuning = chatPersona.behaviorTuning)
+                        selectedGalleryStory?.chatState?.let { storyState ->
+                            storyState.copy(
+                                behaviorTuning = resolveCharacterBehaviorTuning(
+                                    storyState.behaviorTuning, chatPersona.behaviorTuning,
+                                ),
+                            )
+                        } ?: ChatCharacterState(behaviorTuning = chatPersona.behaviorTuning)
                     } else if (continueSingleChatBinding) {
                         sourceState.chatState
                     } else {

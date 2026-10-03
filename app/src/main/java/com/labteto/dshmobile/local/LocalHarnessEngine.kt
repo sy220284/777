@@ -59,6 +59,9 @@ import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.LocalReplySuggestionCoordinator
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
+import com.labteto.dshmobile.local.chat.LocalCharacterBehaviorTuningCoordinator
+import com.labteto.dshmobile.local.chat.reconcileGroupCharacterBehaviorTuning
+import com.labteto.dshmobile.local.chat.reconcileCharacterBehaviorTuning
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.compact
@@ -950,40 +953,10 @@ class LocalHarnessEngine @Inject constructor(
     private fun recordStyleGuardHits(violations: List<String>) =
         settingsCoordinator.recordStyleGuardHits(violations)
 
-    internal fun configureChatPersona(profile: PersonaProfile) {
-        val snapshot = _state.value
-        if (
-            snapshot.running ||
-            snapshot.loading ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.groupChat.enabled
-        ) return
-        scope.launch {
-            val personaId = snapshot.personaId.takeUnless {
-                it == PersonaProfile.DEFAULT_PERSONA_ID
-            } ?: "persona-${UUID.randomUUID()}"
-            val saved = chatPersonaStore.upsert(profile.copy(id = personaId))
-            val sameBoundCharacter =
-                com.labteto.dshmobile.local.chat.samePersonaIdentity(snapshot.chatPersona, saved)
-            _state.update { state ->
-                if (state.sessionId != snapshot.sessionId) state else state.copy(
-                    personaId = saved.id,
-                    galleryId = state.galleryId.takeIf { sameBoundCharacter },
-                    galleryStoryId = state.galleryStoryId.takeIf { sameBoundCharacter },
-                    gallerySaveSuppressedThrough = if (sameBoundCharacter) {
-                        state.gallerySaveSuppressedThrough
-                    } else {
-                        state.transcriptIndex.latestCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis()
-                    },
-                    chatPersona = saved,
-                    chatState = if (sameBoundCharacter) state.chatState.copy(behaviorTuning = saved.behaviorTuning) else ChatCharacterState(behaviorTuning = saved.behaviorTuning),
-                    replySuggestions = if (sameBoundCharacter) state.replySuggestions else emptyList(),
-                    handoffSummary = if (sameBoundCharacter) state.handoffSummary else null,
-                )
-            }
-            if (_state.value.sessionId == snapshot.sessionId) persist()
-        }
-    }
+    internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> =
+        LocalCharacterBehaviorTuningCoordinator(
+            _state, chatPersonaStore, chatPersonaGalleryStore, sessionTransitionMutex, ::persistNow,
+        ).configure(profile)
 
     /**
      * Pick a saved character for the current empty chat without creating a throwaway session.
@@ -4746,6 +4719,20 @@ class LocalHarnessEngine @Inject constructor(
             }
         }
         val profile = userProfileStore.read()
+        val restoredBehavior = withContext(Dispatchers.IO) {
+            reconcileCharacterBehaviorTuning(
+                chatPersonaStore,
+                chatPersonaGalleryStore,
+                stored.personaId,
+                stored.galleryId,
+                projectedControls.chatState,
+            )
+        }
+        val restoredGroupChat = if (stored.usageMode == LocalUsageMode.CHAT) {
+            projectedControls.groupChat.copy(
+                context = projectedControls.groupChat.context.boundDurablePending(eventLog, "group"),
+            )
+        } else LocalGroupChatState()
         val restoredLineageId = stored.lineageId.ifBlank { stored.id.ifBlank { sessionId } }
         val restoredProjectId = stored.projectId ?: when (stored.conversationMode) {
             LocalConversationMode.INDEPENDENT -> null
@@ -4783,27 +4770,23 @@ class LocalHarnessEngine @Inject constructor(
             galleryId = stored.galleryId,
             galleryStoryId = stored.galleryStoryId,
             gallerySaveSuppressedThrough = stored.gallerySaveSuppressedThrough,
-            chatPersona = chatPersonaStore.get(stored.personaId),
-            chatState = projectedControls.chatState,
+            chatPersona = restoredBehavior.persona,
+            chatState = restoredBehavior.chatState,
             chatContext = projectedControls.chatContext.boundDurablePending(eventLog),
             replySuggestions = stored.replySuggestions,
             chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !stored.groupChat.enabled) {
                 restoreMaterializedChatBranchState(
                     current = projectedControls.chatBranches,
                     activeMessages = restoredTranscript.messages,
-                    chatState = projectedControls.chatState,
+                    chatState = restoredBehavior.chatState,
                     replySuggestions = stored.replySuggestions,
                 )
             } else {
                 LocalChatBranchState()
             },
-            groupChat = if (stored.usageMode == LocalUsageMode.CHAT) {
-                projectedControls.groupChat.copy(
-                    context = projectedControls.groupChat.context.boundDurablePending(eventLog, "group"),
-                )
-            } else {
-                LocalGroupChatState()
-            },
+            groupChat = reconcileGroupCharacterBehaviorTuning(
+                restoredGroupChat, chatPersonaStore, chatPersonaGalleryStore,
+            ),
             conversationMode = stored.conversationMode,
             parentSessionId = stored.parentSessionId,
             lineageId = restoredLineageId,
@@ -4862,7 +4845,8 @@ class LocalHarnessEngine @Inject constructor(
         }
         if (
             restoredHistory.usedLegacyFallback ||
-            restoredTranscript.needsPersist
+            restoredTranscript.needsPersist ||
+            restoredBehavior.changed
         ) {
             // Materialize migrated/replayed projections so later restarts only fold the new tail.
             persist()

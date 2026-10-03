@@ -153,7 +153,7 @@ internal fun LocalConversationSurface(
     onTogglePinSession: () -> Unit,
     onRenameSession: (String) -> Boolean,
     onDeleteSession: () -> Unit,
-    onConfigureChatPersona: (PersonaProfile) -> Unit,
+    onConfigureChatPersona: suspend (PersonaProfile) -> Result<Unit>,
     onConfigureGroupMembers: (List<String>) -> Boolean,
     onSelectGalleryPersona: (String) -> Boolean,
     onAutoFillChatPersona: suspend (String) -> Result<PersonaProfile>,
@@ -832,9 +832,7 @@ internal fun LocalConversationSurface(
         ChatPersonaDialog(
             profile = personaEditorDraft ?: state.chatPersona,
             onSave = { profile ->
-                onConfigureChatPersona(profile)
-                personaEditorDraft = null
-                Result.success(Unit)
+                onConfigureChatPersona(profile).onSuccess { personaEditorDraft = null }
             },
             onAutoFill = onAutoFillChatPersona,
             onDismiss = {

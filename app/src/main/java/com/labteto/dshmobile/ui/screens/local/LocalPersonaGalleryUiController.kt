@@ -46,7 +46,10 @@ internal class LocalPersonaGalleryUiController(
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     val gallery: StateFlow<List<PersonaGalleryEntry>> = _gallery.asStateFlow()
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
-
+    suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = runSuspendResult {
+        runtime.chat.configureChatPersona(profile).getOrThrow()
+        _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
+    }
     init {
         scope.launch(Dispatchers.IO) {
             runCatching { galleryStore.list() }.onSuccess { _gallery.value = it }
