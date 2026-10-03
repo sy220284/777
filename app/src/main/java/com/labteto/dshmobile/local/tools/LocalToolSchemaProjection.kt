@@ -39,7 +39,20 @@ internal class LocalToolSchemaProjection(
         enabledOptional: Set<String>? = null,
     ): JsonArray {
         if (!policy.toolsEnabled) return JsonArray(emptyList())
-        val promptBudget = optionalPromptBudget(state, history)
+        val profile = state.modelSelection.activeProfile
+        val cachePolicy = LocalModelPresets.promptCachePolicyFor(
+            model = state.model,
+            baseUrl = state.baseUrl,
+            protocol = profile?.protocol ?: LocalModelPresets.protocolFor(state.model, state.baseUrl),
+            authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
+        )
+        // DeepSeek/OpenAI cache reuse is hurt more by silently removing tools mid-run than by
+        // carrying a small stable schema tail. Capability search may still append explicit tools.
+        val promptBudget = if (cachePolicy.preserveToolSurface) {
+            LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS
+        } else {
+            optionalPromptBudget(state, history)
+        }
         val enabled = enabledOptional ?: executionCoordinator.enabledOptionalSnapshot()
         val tools = registry.names()
             .mapNotNull(registry::get)
