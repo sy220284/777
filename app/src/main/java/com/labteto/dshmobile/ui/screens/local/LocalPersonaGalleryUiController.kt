@@ -341,27 +341,43 @@ internal suspend fun importGalleryPersona(
 suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runCatching {
     val preset = PersonaPresetCatalog.find(id) ?: error("人物预置不存在")
     val entry = withContext(Dispatchers.IO) {
-        val saved = galleryStore.save(
-            persona = preset.persona,
-            sourceSessionId = "",
-            history = emptyList(),
-            chatState = ChatCharacterState(),
-            notes = "",
-        ).entry
-        installPresetArtworkIfNeeded(preset, saved).also {
+        val existingIds = galleryStore.list().mapTo(hashSetOf(), PersonaGalleryEntry::id)
+        val stagedPortrait = stagePresetArtwork(preset)
+        var savedId: String? = null
+        try {
+            val saved = galleryStore.save(
+                persona = preset.persona,
+                sourceSessionId = "",
+                history = emptyList(),
+                chatState = ChatCharacterState(),
+                notes = "",
+            ).entry
+            savedId = saved.id
+            val installed = when {
+                stagedPortrait == null -> saved
+                saved.portraitPath.isNotBlank() -> {
+                    stagedPortrait.delete()
+                    saved
+                }
+                else -> galleryStore.updatePortraitPath(saved.id, stagedPortrait.absolutePath)
+                    ?: error("图集条目已不存在")
+            }
             _gallery.value = galleryStore.list()
+            installed
+        } catch (error: Throwable) {
+            stagedPortrait?.delete()
+            savedId
+                ?.takeIf { it !in existingIds }
+                ?.let(galleryStore::delete)
+            _gallery.value = runCatching { galleryStore.list() }.getOrDefault(_gallery.value)
+            throw error
         }
     }
     entry
 }
 
-private fun installPresetArtworkIfNeeded(
-    preset: PersonaPreset,
-    entry: PersonaGalleryEntry,
-): PersonaGalleryEntry {
-    val artwork = preset.artwork ?: return entry
-    if (entry.portraitPath.isNotBlank()) return entry
-
+private fun stagePresetArtwork(preset: PersonaPreset): File? {
+    val artwork = preset.artwork ?: return null
     require(artwork.source == PersonaPresetArtworkSource.AI_FAN_ART) {
         "人物预置仅允许内置 AI 二创形象图"
     }
@@ -405,8 +421,7 @@ private fun installPresetArtworkIfNeeded(
         require(bounds.outWidth > 0 && bounds.outHeight > 0) {
             "人物预置形象图无法识别"
         }
-        return galleryStore.updatePortraitPath(entry.id, target.absolutePath)
-            ?: error("图集条目已不存在")
+        return target
     } catch (error: Throwable) {
         target.delete()
         throw error
