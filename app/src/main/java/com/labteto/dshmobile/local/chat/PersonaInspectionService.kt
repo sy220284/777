@@ -66,25 +66,26 @@ class PersonaInspectionService @Inject constructor(
         }
 
         val prompt = buildString {
-            appendLine("【固定人设】")
-            appendLine("角色名称：${persona.name}")
-            appendField("人物身份", persona.identity)
-            appendField("背景经历", persona.background)
-            appendField("核心性格", persona.personality)
-            appendField("说话方式", persona.speechStyle)
-            appendField("与用户关系", persona.relationship)
+            appendLine("【固定人物生命资料】")
+            appendLine("人物名称：${persona.name}")
+            appendField("人物整体", persona.portrait)
+            appendField("独立生活", persona.lifeContext)
+            appendList("天然注意", persona.attentionBiases)
+            appendList("容易漏掉/误读", persona.perceptionBlindSpots)
+            appendList("小习惯/小坚持", persona.quirks)
+            appendList("不擅长", persona.limitations)
+            appendList("真正重要", persona.coreValues)
+            appendField("长期内在拉扯", persona.coreTension)
+            appendList("稳定部分", persona.stableTraits)
+            appendList("可缓慢变化", persona.mutableTraits)
+            appendField("对用户初始印象", persona.initialUserImpression)
+            appendList("声音样本", persona.voiceSamples)
             appendField("世界设定", persona.worldSetting)
             appendField("作品来源", persona.franchise)
             appendField("当前时间线", persona.timelinePosition)
-            appendList("核心动机", persona.coreMotivations)
-            appendList("价值排序", persona.valuePriorities)
-            appendList("稳定行为模式", persona.behaviorPatterns)
-            appendList("内在矛盾", persona.internalContradictions)
             appendList("知识边界", persona.knowledgeBoundary)
             appendList("硬约束", persona.hardConstraints)
-            appendList("对白参考", persona.exampleDialogues)
             appendList("禁用表达", persona.bannedPhrases)
-            appendList("常用表达", persona.signaturePhrases)
             appendList("既有纠正", persona.corrections)
             appendLine()
             appendLine("【真实对话】")
@@ -193,40 +194,42 @@ class PersonaInspectionService @Inject constructor(
         const val MAX_SUGGESTIONS = 20
 
         val ALLOWED_FIELDS = setOf(
-            "identity",
-            "background",
-            "personality",
-            "speechStyle",
-            "relationship",
+            "portrait",
+            "lifeContext",
+            "attentionBiases",
+            "perceptionBlindSpots",
+            "quirks",
+            "limitations",
+            "coreValues",
+            "coreTension",
+            "stableTraits",
+            "mutableTraits",
+            "initialUserImpression",
+            "voiceSamples",
             "worldSetting",
             "franchise",
             "timelinePosition",
-            "coreMotivations",
-            "valuePriorities",
-            "behaviorPatterns",
-            "internalContradictions",
             "knowledgeBoundary",
             "hardConstraints",
-            "exampleDialogues",
             "bannedPhrases",
-            "signaturePhrases",
             "corrections",
         )
 
         val SYSTEM_PROMPT = """
-            审计角色一致性，只整理证据，不修改人设。只输出标准 JSON：
+            审计人物长期一致性和“活人感”，只整理证据，不修改人物。只输出标准 JSON：
             {"conflicts":[{"field":"","fixedValue":"","observedValue":"","reason":""}],
              "suggestions":[{"field":"","value":"","evidence":""}]}
 
             规则：
-            1. conflicts 只报有明确对话证据的稳定冲突；玩笑、临时情绪、假设、梦境和用户猜测不算。
-            2. 同时检查知识越界、关系突变、过度迎合、推测当事实和长期表达漂移。
-            3. suggestions 只提取明确、稳定、长期有用且人设未包含的新信息；同义项去重，一条只写一个事实。
-            4. 用户明确纠正优先写入 corrections；不自动生成 loreEntries。
-            5. field 只能使用 identity, background, personality, speechStyle, relationship, worldSetting,
-               franchise, timelinePosition, coreMotivations, valuePriorities, behaviorPatterns,
-               internalContradictions, knowledgeBoundary, hardConstraints, exampleDialogues,
-               bannedPhrases, signaturePhrases, corrections；无结果返回空数组。
+            1. conflicts 只报有明确多轮证据的稳定冲突；单次玩笑、临时情绪、梦境、假设和用户猜测不算。
+            2. 同时检查：知识越界、关系突变、过度迎合、把推测当事实、人物成长过快，以及长期选择与稳定部分冲突。
+            3. 特别识别“设定表演”：频繁主动展示自身特点、重复固定句式/口头禅、所有回复都过度完整有用、人物生活完全围着用户、对用户理解得异常准确、连续多轮使用同一种互动节拍。此类问题有明确证据时写 conflicts，reason 说明具体表现。
+            4. suggestions 只提取明确、稳定、长期有用且人物资料未包含的新信息；同义项去重，一条只写一个事实。不要从模型自己的表演反推一个新的固定人设。
+            5. 用户明确纠正优先写入 corrections；不自动生成 loreEntries。
+            6. field 只能使用 portrait, lifeContext, attentionBiases, perceptionBlindSpots, quirks,
+               limitations, coreValues, coreTension, stableTraits, mutableTraits,
+               initialUserImpression, voiceSamples, worldSetting, franchise, timelinePosition,
+               knowledgeBoundary, hardConstraints, bannedPhrases, corrections；无结果返回空数组。
         """.trimIndent()
     }
 }
