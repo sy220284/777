@@ -90,7 +90,7 @@ object DsAnimations {
     val pageFade: FiniteAnimationSpec<Float> = tween(140, easing = FastOutSlowInEasing)
 
     /** One half of the restrained breathing loop used only by live loading/running semantics. */
-    val semanticPulse: FiniteAnimationSpec<Float> = tween(900, easing = FastOutSlowInEasing)
+    val semanticPulse = tween<Float>(900, easing = FastOutSlowInEasing)
 
     /** Scale animation duration for press effects */
     const val scaleDuration = 100
