@@ -195,6 +195,43 @@ class LocalWorkRequestContextProjectionTest {
     }
 
     @Test
+    fun hundredStepWorkRequestsStayBoundedAndAvoidQuadraticHistoryReplay() {
+        val history = mutableListOf(message("system", "系统规则"))
+        var rawCumulative = 0L
+        var projectedCumulative = 0L
+        var projectedPeak = 0
+
+        repeat(100) { step ->
+            history += message("user", "第$step步继续当前任务：" + "需求".repeat(160))
+            history += message("assistant", "第$step步分析并推进：" + "分析".repeat(220))
+            history += buildJsonObject {
+                put("role", "tool")
+                put("tool_call_id", "call-$step")
+                put("content", "工具结果-$step-" + "结果".repeat(420))
+            }
+
+            val rawTokens = history.sumOf { estimateModelTokens(it.toString()) }
+            val projected = projectWorkRequestContext(
+                messages = history,
+                tools = JsonArray(emptyList()),
+                compactor = LocalHistoryCompactor(),
+                operationalLimitTokens = 678_464,
+                structuredWorkState = LocalStructuredWorkState(
+                    goals = listOf("完成一百步长任务"),
+                    constraints = listOf("必须保持执行正确性"),
+                    unfinished = listOf("继续当前步骤"),
+                ),
+            )
+            rawCumulative += rawTokens
+            projectedCumulative += projected.estimatedTokensAfter
+            projectedPeak = maxOf(projectedPeak, projected.estimatedTokensAfter)
+        }
+
+        assertTrue(projectedPeak <= 40_000)
+        assertTrue(projectedCumulative * 100 < rawCumulative * 70)
+    }
+
+    @Test
     fun targetAndTriggerStayInsideSmallModelOperationalLimit() {
         val limit = 16_000
         val target = workRequestProjectionTargetTokens(limit)
