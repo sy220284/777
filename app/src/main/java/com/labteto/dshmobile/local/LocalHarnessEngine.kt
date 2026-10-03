@@ -840,6 +840,9 @@ class LocalHarnessEngine @Inject constructor(
             )
         }
     }
+    internal fun requireChatGptAccountSelectionAllowed() =
+        modelAccountStateCoordinator.requireAccountSelectionAllowed()
+
     internal suspend fun syncChatGptModels(
         accountId: String,
         models: List<ChatGptModelOption>,
