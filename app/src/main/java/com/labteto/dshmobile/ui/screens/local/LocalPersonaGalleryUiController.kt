@@ -389,14 +389,13 @@ fun startFromGallery(
     val snapshot = state.value
     if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
     val entry = gallery.value.firstOrNull { it.id == id } ?: return false
-    runtime.session.createSession(
+    return runtime.session.createSession(
         mode = LocalConversationMode.INDEPENDENT,
         usageMode = LocalUsageMode.CHAT,
         galleryEntry = entry,
         galleryStoryId = storyId,
         freshGalleryStory = freshStory,
     )
-    return true
 }
 
 
