@@ -411,8 +411,7 @@ internal class LocalSubagentRunner(
                             val boundedContent = historyPolicy.retainToolResult(
                                 event.call.id,
                                 event.output,
-                                runHistoryBudget,
-                                history, event.retention,
+                                event.retention,
                             )
                             val modelOutput = AgentToolResult(
                                 content = boundedContent,
