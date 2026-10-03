@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolMetadata
 
 internal enum class LocalAutoApprovalScope {
@@ -25,6 +26,28 @@ internal object LocalToolPolicy {
         "spawn_subagent" to "subagent", "fork_subagent" to "subagent_fork",
     )
     fun canonical(name: String): String = aliases[name] ?: name
+
+    /**
+     * Model-facing exposure is an explicit policy decision, just like access and approval.
+     *
+     * Keep the tools needed for ordinary coding/execution loops permanently visible. Capabilities
+     * that are only useful for a narrower user intent stay registered but are exposed on demand
+     * through task-intent pre-activation or capability_search. This removes repeated schema cost
+     * without removing the capability itself.
+     */
+    fun exposure(name: String): ToolExposure = when (canonical(name)) {
+        "web_search", "web_fetch", "http_request", "download_file", "network_diagnose",
+        "job_list", "job_output", "job_kill", "json_query", "environment_info",
+        "todo_write", "create_goal", "get_goal", "update_goal",
+        "skill", "subagent_fork", "list_subagent_models", "list_agents", "send_message",
+        "interrupt_agent", "workflow", "memory_search", "memory_list", "memory_remember",
+        "memory_update", "memory_forget", "session_search", "session_trace",
+        "session_event_trace", "session_event_read", "present" -> ToolExposure.OPTIONAL
+        "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect", "list_files",
+        "glob", "grep", "bash", "capability_search", "update_plan", "exit_plan_mode",
+        "ask_user_question", "subagent", "session_event_search" -> ToolExposure.CORE
+        else -> error("内置工具尚未声明模型暴露策略：$name")
+    }
 
     /**
      * Whether [command] may run without an approval prompt.
@@ -110,9 +133,40 @@ internal object LocalToolPolicy {
             "environment_info" -> listOf("持久模型历史与最近成功请求的实际输入 Token 分开报告")
             else -> emptyList()
         }
+        val discoveryKeywords = when (canonical) {
+            "web_search" -> setOf("联网", "网页搜索", "最新信息", "web", "search")
+            "web_fetch" -> setOf("网页", "网址", "url", "抓取", "web")
+            "http_request" -> setOf("http", "https", "api", "接口请求")
+            "download_file" -> setOf("下载", "文件下载", "download", "url")
+            "network_diagnose" -> setOf("网络诊断", "连通性", "dns", "tls", "vpn", "代理")
+            "job_list", "job_output", "job_kill" -> setOf("后台", "后台任务", "进程", "job", "process")
+            "json_query" -> setOf("json", "json查询", "结构化数据")
+            "environment_info" -> setOf(
+                "环境", "环境信息", "运行时信息", "自检", "诊断",
+                "token", "token用量", "token消耗", "用量统计", "上下文消耗", "提示词消耗",
+            )
+            "todo_write" -> setOf("待办", "任务清单", "todo")
+            "create_goal", "get_goal", "update_goal" -> setOf("目标", "goal")
+            "skill" -> setOf("技能", "skill")
+            "subagent_fork" -> setOf("子代理", "继承上下文", "fork", "并行代理")
+            "list_subagent_models" -> setOf("子代理模型", "worker模型", "模型列表")
+            "list_agents", "send_message", "interrupt_agent" -> setOf("代理", "agent", "子任务", "消息", "中断")
+            "workflow" -> setOf("工作流", "workflow", "流水线", "pipeline", "并行任务")
+            "memory_search" -> setOf("搜索记忆", "查找记忆", "memory")
+            "memory_list" -> setOf("记忆列表", "查看记忆", "memory")
+            "memory_remember" -> setOf("记住", "长期记忆", "memory")
+            "memory_update" -> setOf("修改记忆", "更新记忆", "memory")
+            "memory_forget" -> setOf("忘记", "删除记忆", "memory")
+            "session_search" -> setOf("搜索会话", "历史会话", "session")
+            "session_trace" -> setOf("会话轨迹", "会话历史", "trace", "session")
+            "session_event_trace" -> setOf("事件轨迹", "事件上下文", "trace", "session")
+            "session_event_read" -> setOf("读取事件", "会话事件", "event", "session")
+            "present" -> setOf("展示", "呈现", "预览", "present")
+            else -> emptySet()
+        }
         return ToolMetadata(
             family = family,
-            discoveryKeywords = emptySet(),
+            discoveryKeywords = discoveryKeywords,
             usageNotes = usageNotes,
         )
     }

@@ -66,6 +66,61 @@ class LocalToolRouterTest {
     }
 
     @Test
+    fun taskIntentPreactivatesOnlyExplicitlyRelevantOptionalCapabilities() {
+        val tools = listOf(
+            tool("read", "读取文件", ToolExposure.CORE, "文件"),
+            tool("web_search", "搜索网页", ToolExposure.OPTIONAL, "网络", setOf("联网", "网页搜索")),
+            tool("memory_update", "更新记忆", ToolExposure.OPTIONAL, "记忆", setOf("更新记忆", "memory")),
+            tool("session_trace", "会话轨迹", ToolExposure.OPTIONAL, "会话", setOf("会话轨迹", "trace")),
+        )
+
+        assertEquals(
+            listOf("web_search"),
+            LocalToolRouter.relevantOptionalToolNames(tools, "联网查一下今天的发布说明"),
+        )
+        assertEquals(
+            listOf("memory_update"),
+            LocalToolRouter.relevantOptionalToolNames(tools, "把这条更新记忆修正一下"),
+        )
+        assertTrue(LocalToolRouter.relevantOptionalToolNames(tools, "继续处理当前代码").isEmpty())
+    }
+
+    @Test
+    fun deferredBuiltInsCutBaseSchemaCostWhileKeepingCoreExecutionSurface() {
+        val tools = LocalToolCatalog.specs.map { schemaElement ->
+            val schema = schemaElement.jsonObject
+            val name = schema["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
+            HarnessTool(
+                name = name,
+                schema = schema,
+                access = LocalToolPolicy.access(name),
+                approvalPolicy = LocalToolPolicy.approval(name),
+                exposure = LocalToolPolicy.exposure(name),
+                metadata = LocalToolPolicy.metadata(name),
+                executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+            )
+        }
+        val fullTokens = tools.sumOf { tool -> estimateModelTokens(tool.schema.toString()) }
+        val coreSchemas = LocalToolRouter.visibleSchemas(tools, emptySet())
+        val coreTokens = coreSchemas.sumOf { schema -> estimateModelTokens(schema.toString()) }
+        val coreNames = names(coreSchemas)
+
+        assertTrue(coreTokens * 100 <= fullTokens * 55)
+        assertTrue(coreNames.size <= 18)
+        assertTrue(coreTokens <= 4_500)
+        assertTrue("read" in coreNames)
+        assertTrue("bash" in coreNames)
+        assertTrue("subagent" in coreNames)
+        assertTrue("session_event_search" in coreNames)
+        assertTrue("workflow" !in coreNames)
+        assertTrue("environment_info" !in coreNames)
+        assertTrue("memory_search" !in coreNames)
+        assertTrue("web_search" !in coreNames)
+        assertTrue("memory_update" !in coreNames)
+        assertEquals(LocalToolCatalog.specs.size, tools.size)
+    }
+
+    @Test
     fun optionalToolActivationPreservesStableCoreAndOnlyAppends() {
         val tools = listOf(
             tool("z_core", "核心二", ToolExposure.CORE, "文件"),

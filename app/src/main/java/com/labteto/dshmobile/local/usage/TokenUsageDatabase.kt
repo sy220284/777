@@ -30,11 +30,13 @@ internal class TokenUsageDatabase(
         transaction(db) {
             var totals = totals(db)
             var invalidRecords = 0L
-            legacy.events().filter { it.type == "usage/request" }.forEach { event ->
-                val record = runCatching {
-                    json.decodeFromJsonElement(TokenUsageRecord.serializer(), event.data).boundedForStorage()
-                }.getOrElse { invalidRecords++; return@forEach }
-                if (insert(db, record)) totals = totals.add(record)
+            legacy.withEvents { events ->
+                events.filter { it.type == "usage/request" }.forEach { event ->
+                    val record = runCatching {
+                        json.decodeFromJsonElement(TokenUsageRecord.serializer(), event.data).boundedForStorage()
+                    }.getOrElse { invalidRecords++; return@forEach }
+                    if (insert(db, record)) totals = totals.add(record)
+                }
             }
             putMetadata(db, "totals", json.encodeToString(UsageLifetimeTotals.serializer(), totals))
             prune(db)

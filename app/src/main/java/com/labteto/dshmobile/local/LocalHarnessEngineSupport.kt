@@ -98,10 +98,12 @@ internal fun cleanupUnreferencedLocalImagesNow(
         .toList()
     val references = mergeLocalImageAttachmentReferences(
         sessionIds.map { id ->
-            collectLocalImageAttachmentReferences(
-                events = eventLogFor(id).events(),
-                extraMessages = if (id == currentSessionId) modelHistory else emptyList(),
-            )
+            eventLogFor(id).withEvents { events ->
+                collectLocalImageAttachmentReferences(
+                    events = events,
+                    extraMessages = if (id == currentSessionId) modelHistory else emptyList(),
+                )
+            }
         },
     )
     val result = cleanupLocalImageAttachments(

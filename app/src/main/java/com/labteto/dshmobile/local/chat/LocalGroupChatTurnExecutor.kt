@@ -628,7 +628,7 @@ internal class LocalGroupChatTurnExecutor(
             var currentGroup = snapshot.groupChat
             var deliveredReplies = 0
             val repliesForStateUpdate = mutableListOf<GroupReplyForStateUpdate>()
-            val baseHistory = modelHistory.snapshot()
+            val baseHistory = boundedGroupChatRequestHistory(modelHistory.snapshot())
 
             coroutineScope {
                 val generatedReplies = responders.mapIndexed { index, initialMember ->

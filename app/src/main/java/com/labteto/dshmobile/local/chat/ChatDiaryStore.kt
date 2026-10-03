@@ -118,7 +118,7 @@ internal class ChatDiaryStore(
             .map { entry ->
                 entry to ChatDiaryEntryPolicy.matchScore(entry, queryCore, queryTerms, now)
             }
-            .filter { (_, score) -> ChatDiaryEntryPolicy.isRecallMatch(score, broad) }
+            .filter { (_, score) -> ChatDiaryRecallMatchPolicy.isRecallMatch(score, broad, query) }
             .sortedWith(
                 compareByDescending<Pair<ChatDiaryEntry, ChatDiaryMatchScore>> { it.second.total }
                     .thenByDescending { it.first.updatedAt },
