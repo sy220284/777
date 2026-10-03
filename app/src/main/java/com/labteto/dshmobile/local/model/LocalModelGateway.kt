@@ -91,6 +91,8 @@ class LocalModelGateway @Inject constructor(
         temperature: Double? = null,
         profile: LocalModelProfile? = null,
         promptCacheComparisonResponseId: String? = null,
+        promptCacheKey: String? = null,
+        promptCacheTtl: String? = null,
     ): LocalModelReply =
         completeResolved(
             route = resolveRoute(model, baseUrl, profile),
@@ -100,6 +102,8 @@ class LocalModelGateway @Inject constructor(
             streaming = false,
             onDelta = {},
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
+            promptCacheKey = promptCacheKey,
+            promptCacheTtl = promptCacheTtl,
         )
 
     suspend fun completeStreaming(
@@ -111,6 +115,8 @@ class LocalModelGateway @Inject constructor(
         onDelta: (LocalModelDelta) -> Unit = {},
         profile: LocalModelProfile? = null,
         promptCacheComparisonResponseId: String? = null,
+        promptCacheKey: String? = null,
+        promptCacheTtl: String? = null,
     ): LocalModelReply =
         completeResolved(
             route = resolveRoute(model, baseUrl, profile),
@@ -120,6 +126,8 @@ class LocalModelGateway @Inject constructor(
             streaming = true,
             onDelta = onDelta,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
+            promptCacheKey = promptCacheKey,
+            promptCacheTtl = promptCacheTtl,
         )
 
     suspend fun probeApiKey(
@@ -199,6 +207,8 @@ class LocalModelGateway @Inject constructor(
         streaming: Boolean,
         onDelta: (LocalModelDelta) -> Unit,
         promptCacheComparisonResponseId: String? = null,
+        promptCacheKey: String? = null,
+        promptCacheTtl: String? = null,
     ): LocalModelReply {
         val prepared = prepareLocalModelAdapterRequest(
             route = route,
@@ -207,6 +217,8 @@ class LocalModelGateway @Inject constructor(
             temperature = temperature,
             streaming = streaming,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
+            promptCacheKey = promptCacheKey,
+            promptCacheTtl = promptCacheTtl,
         )
         return adapters.adapter(route.protocol).complete(
             request = prepared.request,
@@ -233,6 +245,8 @@ internal fun prepareLocalModelAdapterRequest(
     temperature: Double?,
     streaming: Boolean,
     promptCacheComparisonResponseId: String? = null,
+    promptCacheKey: String? = null,
+    promptCacheTtl: String? = null,
 ): LocalPreparedModelRequest {
     val canonicalMessages = LocalCanonicalModelCodec.messages(messages).filterNot(::isEmptyCanonicalAssistant)
     validateCanonicalModelHistory(canonicalMessages)
@@ -278,6 +292,10 @@ internal fun prepareLocalModelAdapterRequest(
             temperature = routedTemperature,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId
                 ?.takeIf { route.protocol == LocalModelProtocol.RESPONSES && route.capabilities.promptCacheDiagnostics },
+            promptCacheKey = promptCacheKey
+                ?.takeIf { route.protocol == LocalModelProtocol.RESPONSES && route.capabilities.promptCachePolicy.supportsStableCacheKey },
+            promptCacheTtl = promptCacheTtl
+                ?.takeIf { route.protocol == LocalModelProtocol.RESPONSES && route.capabilities.promptCachePolicy.supportsCacheOptions },
         ),
         streaming = streaming && route.capabilities.streaming,
     )
