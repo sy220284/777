@@ -103,7 +103,7 @@ class ChatGptAuthRecoveryAndroidTest {
         val record = ChatGptAccountRecord(
             id = "test-${UUID.randomUUID()}", clientId = "client", issuer = CHATGPT_ISSUER, subject = "subject",
             hostId = "host", idToken = "id", accessToken = "access", refreshToken = "refresh",
-            scopes = setOf(CHATGPT_PLAN_SCOPE), accessTokenExpiresAtEpochSeconds = Long.MAX_VALUE, savedAtEpochSeconds = 1,
+            scopes = setOf(CHATGPT_PLAN_SCOPE, CHATGPT_RESOURCE_INVOKE_SCOPE), accessTokenExpiresAtEpochSeconds = Long.MAX_VALUE, savedAtEpochSeconds = 1,
         )
         try {
             accounts.put(record)

@@ -70,6 +70,21 @@ class ChatGptAuthorizationRecoveryTest {
     }
 
     @Test
+    fun planConsentIsOnlyRequestedForSignedInAccountsWithoutPlanAccess() {
+        val base = ChatGptAccountSummary(
+            id = "account",
+            clientId = "oaiapp_account",
+            email = null,
+            displayName = null,
+            signedIn = false,
+            sharingEnabled = false,
+        )
+        assertFalse(shouldRequestChatGptPlanConsent(base))
+        assertTrue(shouldRequestChatGptPlanConsent(base.copy(signedIn = true)))
+        assertFalse(shouldRequestChatGptPlanConsent(base.copy(signedIn = true, sharingEnabled = true)))
+    }
+
+    @Test
     fun terminalRefreshFailuresInvalidateOnlyTheRenewableSession() {
         listOf(
             "invalid_grant",
@@ -125,8 +140,10 @@ class ChatGptAuthorizationRecoveryTest {
             accessTokenExpiresAtEpochSeconds = Long.MAX_VALUE,
             savedAtEpochSeconds = 1L,
         )
+        assertTrue(valid.sharingEnabled)
         assertTrue(isUsableChatGptPlanBinding(id, valid))
         assertFalse(isUsableChatGptPlanBinding(id, valid.copy(clientId = CHATGPT_DYNAMIC_CLIENT_ID)))
+        assertFalse(valid.copy(scopes = setOf(CHATGPT_PLAN_SCOPE)).sharingEnabled)
         assertFalse(isUsableChatGptPlanBinding(id, valid.copy(scopes = setOf(CHATGPT_PLAN_SCOPE))))
         assertFalse(isUsableChatGptPlanBinding("other-account", valid))
     }
