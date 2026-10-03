@@ -174,9 +174,11 @@ internal object ChatDiaryEntryPolicy {
     fun isRecallMatch(
         score: ChatDiaryMatchScore,
         broad: Boolean,
-        hasSpecificAnchor: Boolean,
-    ): Boolean =
-        (broad && !hasSpecificAnchor) || score.semantic >= MIN_RECALL_SEMANTIC_SCORE
+        query: String,
+    ): Boolean {
+        val hasSpecificAnchor = broad && hasSpecificRecallAnchor(query)
+        return (broad && !hasSpecificAnchor) || score.semantic >= MIN_RECALL_SEMANTIC_SCORE
+    }
 
     private fun eventGrounded(event: String, evidence: String): Boolean {
         val a = normalizeText(event)
