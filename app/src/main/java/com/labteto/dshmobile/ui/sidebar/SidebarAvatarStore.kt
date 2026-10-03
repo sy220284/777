@@ -46,7 +46,7 @@ class SidebarAvatarStore @Inject constructor(
         replaceSource(bundledSidebarAvatarSource(normalized))
     }
 
-    suspend fun prepareCustom(uri: Uri): PreparedSidebarAvatar = mutationMutex.withLock {
+    internal suspend fun prepareCustom(uri: Uri): PreparedSidebarAvatar = mutationMutex.withLock {
         val current = hostsStore.settingsOnce().sidebarAvatarSource
         withContext(Dispatchers.IO) {
             cleanupUnusedCustomAvatars(current)
@@ -54,7 +54,7 @@ class SidebarAvatarStore @Inject constructor(
         }
     }
 
-    suspend fun saveCustom(
+    internal suspend fun saveCustom(
         prepared: PreparedSidebarAvatar,
         crop: SidebarAvatarCrop,
     ) = mutationMutex.withLock {
@@ -62,7 +62,7 @@ class SidebarAvatarStore @Inject constructor(
         replaceSource(customSidebarAvatarSource(managed, crop))
     }
 
-    suspend fun discardCustom(prepared: PreparedSidebarAvatar) = mutationMutex.withLock {
+    internal suspend fun discardCustom(prepared: PreparedSidebarAvatar) = mutationMutex.withLock {
         val current = hostsStore.settingsOnce().sidebarAvatarSource
         withContext(Dispatchers.IO) {
             val active = (parseSidebarAvatarSource(current) as? SidebarAvatarSource.Custom)
