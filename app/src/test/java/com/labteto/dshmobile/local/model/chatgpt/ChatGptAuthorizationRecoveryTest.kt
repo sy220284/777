@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.model.chatgpt
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -21,6 +22,77 @@ class ChatGptAuthorizationRecoveryTest {
     fun otherOAuthFailuresNeverEnterAutomaticAuthorizationLoop() {
         assertFalse(shouldRetryChatGptAuthorization("access_denied", allowed = true))
         assertFalse(shouldRetryChatGptAuthorization(null, allowed = true))
+    }
+
+    @Test
+    fun normalSignInDoesNotForceConsentButExplicitPlanEnableDoes() {
+        assertEquals(null, chatGptAuthorizationPrompt(requestPlanConsent = false))
+        assertEquals("consent", chatGptAuthorizationPrompt(requestPlanConsent = true))
+    }
+
+    @Test
+    fun signedInIdentityWithoutPlanScopeIsPreservedButCannotRoutePlanModels() {
+        val summary = ChatGptAccountSummary(
+            id = "account",
+            clientId = "oaiapp_account",
+            email = "user@example.com",
+            displayName = "User",
+            signedIn = true,
+            sharingEnabled = false,
+        )
+        val state = ChatGptUiState(
+            phase = ChatGptAuthPhase.CONNECTED,
+            accounts = listOf(summary),
+            selectedAccountId = summary.id,
+        )
+
+        assertTrue(state.signedIn)
+        assertFalse(state.connected)
+    }
+
+    @Test
+    fun signedInIdentityWithPlanScopeIsConnectedForModelRouting() {
+        val summary = ChatGptAccountSummary(
+            id = "account",
+            clientId = "oaiapp_account",
+            email = "user@example.com",
+            displayName = "User",
+            signedIn = true,
+            sharingEnabled = true,
+        )
+        val state = ChatGptUiState(
+            phase = ChatGptAuthPhase.CONNECTED,
+            accounts = listOf(summary),
+            selectedAccountId = summary.id,
+        )
+
+        assertTrue(state.signedIn)
+        assertTrue(state.connected)
+    }
+
+    @Test
+    fun planConsentIsOnlyRequestedForSignedInAccountsWithoutPlanAccess() {
+        val base = ChatGptAccountSummary(
+            id = "account",
+            clientId = "oaiapp_account",
+            email = null,
+            displayName = null,
+            signedIn = false,
+            sharingEnabled = false,
+        )
+        assertFalse(shouldRequestChatGptPlanConsent(base))
+        assertTrue(shouldRequestChatGptPlanConsent(base.copy(signedIn = true)))
+        assertFalse(shouldRequestChatGptPlanConsent(base.copy(signedIn = true, sharingEnabled = true)))
+    }
+
+    @Test
+    fun planInvalidationPublishedBeforeRuntimeStartIsReplayed() = runBlocking {
+        val events = ChatGptPlanAuthorizationEvents()
+        events.invalidate("account-before-runtime")
+        assertEquals(
+            "account-before-runtime",
+            withTimeout(1_000) { events.invalidatedAccounts.first() },
+        )
     }
 
     @Test
@@ -79,8 +151,10 @@ class ChatGptAuthorizationRecoveryTest {
             accessTokenExpiresAtEpochSeconds = Long.MAX_VALUE,
             savedAtEpochSeconds = 1L,
         )
+        assertTrue(valid.sharingEnabled)
         assertTrue(isUsableChatGptPlanBinding(id, valid))
         assertFalse(isUsableChatGptPlanBinding(id, valid.copy(clientId = CHATGPT_DYNAMIC_CLIENT_ID)))
+        assertFalse(valid.copy(scopes = setOf(CHATGPT_PLAN_SCOPE)).sharingEnabled)
         assertFalse(isUsableChatGptPlanBinding(id, valid.copy(scopes = setOf(CHATGPT_PLAN_SCOPE))))
         assertFalse(isUsableChatGptPlanBinding("other-account", valid))
     }

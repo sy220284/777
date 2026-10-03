@@ -16,6 +16,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -113,6 +114,36 @@ class ChatGptRefreshLifecycleAndroidTest {
     }
 
     @Test
+    fun refreshScopeDowngradePersistsRotatedCredentialsButStopsPlanAccess() = runBlocking {
+        withAccounts { accounts ->
+            val original = record()
+            accounts.put(original)
+            val http = OkHttpClient.Builder().addInterceptor { chain ->
+                Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200)
+                    .message("OK").body(
+                        """{"access_token":"signed-in-only","refresh_token":"rotated-no-plan","expires_in":3600,"scope":"openid profile email offline_access resource.invoke"}""".toResponseBody(),
+                    ).build()
+            }.build()
+            val events = ChatGptPlanAuthorizationEvents()
+            val invalidated = async(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
+                withTimeout(1_000) { events.invalidatedAccounts.first() }
+            }
+            val sessions = ChatGptSessionManager(accounts, http, Json, events)
+
+            val result = runCatching { sessions.accessToken(original.id) }
+            assertTrue(result.isFailure)
+            val stored = accounts.get(original.id)!!
+            assertEquals("signed-in-only", stored.accessToken)
+            assertEquals("rotated-no-plan", stored.refreshToken)
+            assertFalse(stored.sharingEnabled)
+            assertEquals(original.idToken, stored.idToken)
+            assertEquals(original.email, stored.email)
+            assertEquals(original.id, accounts.selectedId())
+            assertEquals(original.id, invalidated.await())
+        }
+    }
+
+    @Test
     fun cancellationAfterReceivingRotatedTokenStillPersistsItWithoutReturningSuccess() = runBlocking {
         withAccounts { accounts ->
             val original = record()
@@ -162,7 +193,7 @@ class ChatGptRefreshLifecycleAndroidTest {
         id = "test-account", clientId = "client", issuer = CHATGPT_ISSUER, subject = "subject",
         email = "user@example.com", displayName = "测试用户",
         hostId = "host", idToken = "id-token-secret", accessToken = "access-token-secret", refreshToken = "refresh-token-secret",
-        scopes = setOf(CHATGPT_PLAN_SCOPE), accessTokenExpiresAtEpochSeconds = 0, savedAtEpochSeconds = 1,
+        scopes = setOf(CHATGPT_PLAN_SCOPE, CHATGPT_RESOURCE_INVOKE_SCOPE), accessTokenExpiresAtEpochSeconds = 0, savedAtEpochSeconds = 1,
     )
 
     private fun delayedTokenClient(entered: CountDownLatch, release: CountDownLatch, status: Int) =

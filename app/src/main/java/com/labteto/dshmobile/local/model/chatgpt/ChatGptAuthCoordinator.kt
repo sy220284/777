@@ -59,11 +59,20 @@ class ChatGptAuthCoordinator @Inject constructor(
             return
         }
         val selected = stored.first { it.id == selectedId }
-        if (!hasUsableCredentials(selected)) {
+        if (!hasSignedInCredentials(selected)) {
             _state.value = ChatGptUiState(
                 phase = ChatGptAuthPhase.DISCONNECTED,
                 accounts = stored.map(::summary),
                 selectedAccountId = selectedId,
+            )
+            return
+        }
+        if (!selected.sharingEnabled) {
+            _state.value = ChatGptUiState(
+                phase = ChatGptAuthPhase.CONNECTED,
+                accounts = stored.map(::summary),
+                selectedAccountId = selectedId,
+                models = emptyList(),
             )
             return
         }
@@ -81,7 +90,10 @@ class ChatGptAuthCoordinator @Inject constructor(
             publishLoadFailure(selectedId, error, "ChatGPT 账户状态刷新失败")
         }
     }
-    suspend fun connect(existingAccountId: String? = null): ChatGptAccountRecord {
+    suspend fun connect(
+        existingAccountId: String? = null,
+        requestPlanConsent: Boolean = false,
+    ): ChatGptAccountRecord {
         check(authMutex.tryLock()) { "ChatGPT 账户操作正在进行，请稍后重试" }
         cancellationRequested = false
         authorizationInProgress = true
@@ -94,6 +106,7 @@ class ChatGptAuthCoordinator @Inject constructor(
                 requestedClientId = existing?.clientId ?: pendingClientId ?: CHATGPT_DYNAMIC_CLIENT_ID,
                 firstRegistration = existing == null && pendingClientId == null,
                 allowInvalidGrantRetry = true,
+                requestPlanConsent = requestPlanConsent,
             )
         } finally {
             activeListener = null
@@ -120,6 +133,7 @@ class ChatGptAuthCoordinator @Inject constructor(
         requestedClientId: String,
         firstRegistration: Boolean,
         allowInvalidGrantRetry: Boolean,
+        requestPlanConsent: Boolean,
     ): ChatGptAccountRecord {
         _state.value = currentState(
             phase = ChatGptAuthPhase.PREPARING,
@@ -152,6 +166,9 @@ class ChatGptAuthCoordinator @Inject constructor(
                 .addQueryParameter("nonce", nonce)
                 .addQueryParameter("code_challenge_method", "S256")
                 .addQueryParameter("code_challenge", challenge)
+            chatGptAuthorizationPrompt(requestPlanConsent)?.let { prompt ->
+                builder.addQueryParameter("prompt", prompt)
+            }
             if (firstRegistration) {
                 builder.addQueryParameter("agent_name_hint", CHATGPT_AGENT_NAME)
             } else if (existing != null) {
@@ -211,6 +228,7 @@ class ChatGptAuthCoordinator @Inject constructor(
                         requestedClientId = issuedClientId,
                         firstRegistration = false,
                         allowInvalidGrantRetry = false,
+                        requestPlanConsent = requestPlanConsent,
                     )
                 }
                 throw error
@@ -222,9 +240,6 @@ class ChatGptAuthCoordinator @Inject constructor(
                         .filter(String::isNotBlank)
                         .toSet(),
                 )
-            }
-            require(CHATGPT_PLAN_SCOPE in token.scopes) {
-                "ChatGPT 已登录，但未授权套餐用量（缺少 chatgpt.tokens.use.direct）"
             }
             val idToken = token.idToken ?: error("ChatGPT OAuth 响应缺少 id_token")
 
@@ -259,6 +274,16 @@ class ChatGptAuthCoordinator @Inject constructor(
             )
             accounts.put(record, select = true)
             hostIdentity.clearPendingClientId(issuedClientId)
+
+            if (!record.sharingEnabled) {
+                _state.value = ChatGptUiState(
+                    phase = ChatGptAuthPhase.CONNECTED,
+                    accounts = accounts.list().map(::summary),
+                    selectedAccountId = record.id,
+                    models = emptyList(),
+                )
+                return record
+            }
 
             _state.value = currentState(
                 phase = ChatGptAuthPhase.LOADING_MODELS,
@@ -304,11 +329,20 @@ class ChatGptAuthCoordinator @Inject constructor(
     suspend fun selectAccount(id: String) = authMutex.withLock {
         accounts.select(id)
         val selected = accounts.get(id) ?: error("ChatGPT 账户不存在")
-        if (!hasUsableCredentials(selected)) {
+        if (!hasSignedInCredentials(selected)) {
             _state.value = ChatGptUiState(
                 phase = ChatGptAuthPhase.DISCONNECTED,
                 accounts = accounts.list().map(::summary),
                 selectedAccountId = id,
+            )
+            return@withLock
+        }
+        if (!selected.sharingEnabled) {
+            _state.value = ChatGptUiState(
+                phase = ChatGptAuthPhase.CONNECTED,
+                accounts = accounts.list().map(::summary),
+                selectedAccountId = id,
+                models = emptyList(),
             )
             return@withLock
         }
@@ -379,16 +413,28 @@ class ChatGptAuthCoordinator @Inject constructor(
         val latest = accounts.list()
         val selected = latest.firstOrNull { it.id == selectedId }
         _state.value = ChatGptUiState(
-            phase = if (hasUsableCredentials(selected)) ChatGptAuthPhase.UNVERIFIED else ChatGptAuthPhase.DISCONNECTED,
+            phase = when {
+                !hasSignedInCredentials(selected) -> ChatGptAuthPhase.DISCONNECTED
+                selected?.sharingEnabled == false -> ChatGptAuthPhase.CONNECTED
+                else -> ChatGptAuthPhase.UNVERIFIED
+            },
             accounts = latest.map(::summary),
             selectedAccountId = selectedId,
-            models = if (hasUsableCredentials(selected) && selectedId == _state.value.selectedAccountId) _state.value.models else emptyList(),
+            models = if (
+                selected?.sharingEnabled == true &&
+                selectedId == _state.value.selectedAccountId
+            ) {
+                _state.value.models
+            } else {
+                emptyList()
+            },
             error = error.message ?: fallback,
         )
     }
 
-    private fun hasUsableCredentials(record: ChatGptAccountRecord?): Boolean =
-        record?.sharingEnabled == true &&
+    private fun hasSignedInCredentials(record: ChatGptAccountRecord?): Boolean =
+        record != null &&
+            record.idToken.isNotBlank() &&
             record.accessToken.isNotBlank() &&
             record.refreshToken.isNotBlank()
 
@@ -397,14 +443,22 @@ class ChatGptAuthCoordinator @Inject constructor(
         val selectedId = accounts.selectedId()?.takeIf { id -> stored.any { it.id == id } }
             ?: stored.firstOrNull()?.id
         val selected = selectedId?.let { id -> stored.firstOrNull { it.id == id } }
-        val connected = selected?.sharingEnabled == true &&
-            selected.accessToken.isNotBlank() &&
-            selected.refreshToken.isNotBlank()
+        val signedIn = hasSignedInCredentials(selected)
         _state.value = ChatGptUiState(
-            phase = if (connected) ChatGptAuthPhase.UNVERIFIED else ChatGptAuthPhase.DISCONNECTED,
+            phase = when {
+                !signedIn -> ChatGptAuthPhase.DISCONNECTED
+                selected?.sharingEnabled == false -> ChatGptAuthPhase.CONNECTED
+                else -> ChatGptAuthPhase.UNVERIFIED
+            },
             accounts = stored.map(::summary),
             selectedAccountId = selectedId,
-            models = if (selectedId == _state.value.selectedAccountId) _state.value.models else emptyList(),
+            models = if (
+                selected?.sharingEnabled == true && selectedId == _state.value.selectedAccountId
+            ) {
+                _state.value.models
+            } else {
+                emptyList()
+            },
         )
     }
 
@@ -430,6 +484,7 @@ class ChatGptAuthCoordinator @Inject constructor(
         clientId = record.clientId,
         email = record.email,
         displayName = record.displayName,
+        signedIn = hasSignedInCredentials(record),
         sharingEnabled = record.sharingEnabled,
     )
 

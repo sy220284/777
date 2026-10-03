@@ -25,6 +25,7 @@ class ChatGptSessionManager @Inject constructor(
     private val accounts: ChatGptAccountStore,
     private val http: OkHttpClient,
     private val json: Json,
+    private val planAuthorizationEvents: ChatGptPlanAuthorizationEvents = ChatGptPlanAuthorizationEvents(),
 ) {
     private val refreshMutex = Mutex()
 
@@ -35,12 +36,14 @@ class ChatGptSessionManager @Inject constructor(
 
     suspend fun accessToken(accountId: String): String {
         val current = accounts.get(accountId) ?: error("ChatGPT 账户凭据不可用")
+        requirePlanAccess(current)
         val now = System.currentTimeMillis() / 1_000L
         if (current.accessTokenExpiresAtEpochSeconds > now + REFRESH_EARLY_SECONDS) {
             return current.accessToken
         }
         return refreshMutex.withLock {
             val latest = accounts.get(accountId) ?: error("ChatGPT 账户凭据不可用")
+            requirePlanAccess(latest)
             val secondNow = System.currentTimeMillis() / 1_000L
             if (latest.accessTokenExpiresAtEpochSeconds > secondNow + REFRESH_EARLY_SECONDS) {
                 return@withLock latest.accessToken
@@ -50,6 +53,7 @@ class ChatGptSessionManager @Inject constructor(
             } catch (error: ChatGptOAuthTokenException) {
                 if (shouldInvalidateChatGptRefreshToken(error.oauthCode)) {
                     accounts.clearCredentials(accountId, expected = latest)
+                    planAuthorizationEvents.invalidate(accountId)
                     throw ChatGptOAuthTokenException(
                         oauthCode = error.oauthCode,
                         message = "ChatGPT 登录已过期或已被撤销，请重新授权",
@@ -57,6 +61,7 @@ class ChatGptSessionManager @Inject constructor(
                 }
                 throw error
             }
+            requirePlanAccess(refreshed)
             refreshed.accessToken
         }
     }
@@ -156,9 +161,6 @@ class ChatGptSessionManager @Inject constructor(
         requestToken(form) { token ->
             val now = System.currentTimeMillis() / 1_000L
             val grantedScopes = if (token.scopes.isEmpty()) current.scopes else token.scopes
-            require(CHATGPT_PLAN_SCOPE in grantedScopes) {
-                "ChatGPT 套餐授权已失效，请重新连接账户"
-            }
             val replacement = current.copy(
                 accessToken = token.accessToken,
                 refreshToken = token.refreshToken ?: current.refreshToken,
@@ -173,6 +175,9 @@ class ChatGptSessionManager @Inject constructor(
             withContext(NonCancellable) {
                 check(accounts.replaceCredentials(current, replacement)) {
                     "ChatGPT 账户在刷新期间已断开或变更，请重新选择账户后重试"
+                }
+                if (!replacement.sharingEnabled) {
+                    planAuthorizationEvents.invalidate(current.id)
                 }
             }
             refreshed = replacement
@@ -223,6 +228,12 @@ class ChatGptSessionManager @Inject constructor(
             )
             onToken(token)
             token
+        }
+    }
+
+    private fun requirePlanAccess(record: ChatGptAccountRecord) {
+        require(record.sharingEnabled) {
+            "ChatGPT 已登录，但套餐用量未启用或已失效，请重新启用套餐"
         }
     }
 
