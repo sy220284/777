@@ -36,6 +36,31 @@ internal fun persistGalleryBehaviorTuning(
     ).entry.persona.behaviorTuning.normalized()
 }
 
+internal data class CharacterBehaviorTuningSave(
+    val persona: PersonaProfile,
+    val sameBoundCharacter: Boolean,
+)
+
+internal fun persistCharacterBehaviorTuning(
+    personaStore: ChatPersonaStore,
+    galleryStore: ChatPersonaGalleryStore,
+    currentPersona: PersonaProfile,
+    personaId: String,
+    galleryId: String?,
+    profile: PersonaProfile,
+): CharacterBehaviorTuningSave {
+    var saved = personaStore.upsert(profile.copy(id = personaId))
+    val sameBoundCharacter = samePersonaIdentity(currentPersona, saved)
+    if (sameBoundCharacter) galleryId?.let { id ->
+        persistGalleryBehaviorTuning(galleryStore, id, saved.behaviorTuning)
+            ?.takeIf { it != saved.behaviorTuning }
+            ?.let { tuning ->
+                saved = personaStore.upsert(saved.copy(behaviorTuning = tuning))
+            }
+    }
+    return CharacterBehaviorTuningSave(saved, sameBoundCharacter)
+}
+
 internal fun reconcileCharacterBehaviorTuning(
     personaStore: ChatPersonaStore,
     galleryStore: ChatPersonaGalleryStore,
