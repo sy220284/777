@@ -38,7 +38,9 @@ class LocalWorkTokenSimulationTest {
         val twoHundred = simulate(200)
 
         assertEquals(twenty.rawCumulative, twenty.projectedCumulative)
+        assertEquals(0, twenty.adaptiveProjectionCount)
         assertTrue(twenty.projectedPeak < workRequestProjectionTriggerTokens(678_464))
+        assertTrue(fifty.adaptiveProjectionCount > 0)
         assertTrue(fifty.projectedCumulative * 100 < fifty.rawCumulative * 85)
         assertTrue(hundred.projectedCumulative * 100 < hundred.rawCumulative * 75)
         assertTrue(twoHundred.projectedCumulative * 100 < twoHundred.rawCumulative * 65)
@@ -200,6 +202,7 @@ class LocalWorkTokenSimulationTest {
         var projectedCumulative = 0L
         var projectedPeak = 0
         var projectedLast = 0
+        var adaptiveProjectionCount = 0
         var previousPressure: LocalPromptPressure? = null
 
         repeat(steps) { step ->
@@ -224,6 +227,13 @@ class LocalWorkTokenSimulationTest {
             projectedCumulative += projected.estimatedTokensAfter
             projectedPeak = maxOf(projectedPeak, projected.estimatedTokensAfter)
             projectedLast = projected.estimatedTokensAfter
+            if (
+                projected.projected &&
+                projected.preProjectionAssessment?.effectiveProjectionTriggerTokens
+                    ?.let { it < workRequestProjectionTriggerTokens(678_464) } == true
+            ) {
+                adaptiveProjectionCount += 1
+            }
             previousPressure = LocalPromptPressureMeter.measure(
                 messages = projected.messages,
                 tools = JsonArray(emptyList()),
@@ -235,6 +245,7 @@ class LocalWorkTokenSimulationTest {
             projectedCumulative = projectedCumulative,
             projectedPeak = projectedPeak,
             projectedLast = projectedLast,
+            adaptiveProjectionCount = adaptiveProjectionCount,
         )
     }
 
@@ -262,5 +273,6 @@ class LocalWorkTokenSimulationTest {
         val projectedCumulative: Long,
         val projectedPeak: Int,
         val projectedLast: Int,
+        val adaptiveProjectionCount: Int,
     )
 }
