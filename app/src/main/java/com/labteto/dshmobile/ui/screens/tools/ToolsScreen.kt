@@ -50,6 +50,7 @@ import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.components.DsPageLoadingState
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
@@ -294,7 +295,7 @@ fun ToolsScreen(
                     subtitle = stringResource(R.string.tools_subtitle),
                     onBack = onClose,
                     backContentDescription = stringResource(R.string.common_back),
-                    actionIcon = Icons.Outlined.Refresh,
+                    actionIcon = FeatherIcons.RefreshCw,
                     actionContentDescription = stringResource(R.string.tools_refresh),
                     actionEnabled = !state.loading,
                     onAction = viewModel::refresh,
@@ -304,7 +305,18 @@ fun ToolsScreen(
                     ),
                 )
 
-                Column(
+                val initialLoading = state.loading &&
+                    state.localPlugins.isEmpty() &&
+                    state.servers.isEmpty() &&
+                    state.remotePlugins == null &&
+                    !state.githubConfigured
+                if (initialLoading) {
+                    DsPageLoadingState(
+                        icon = FeatherIcons.Tool,
+                        label = stringResource(R.string.tools_loading),
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
+                } else Column(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
