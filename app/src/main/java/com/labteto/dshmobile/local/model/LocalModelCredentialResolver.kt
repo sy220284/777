@@ -130,7 +130,7 @@ class LocalModelCredentialResolver @Inject constructor(
         val accountId = profile.credentialRef?.takeIf(String::isNotBlank) ?: return null
         val account = chatGptAccounts.get(accountId)
         if (!isUsableChatGptPlanBinding(accountId, account)) {
-            _invalidatedChatGptAccounts.emit(accountId)
+            _invalidatedChatGptAccounts.tryEmit(accountId)
             return null
         }
         return account
@@ -138,7 +138,7 @@ class LocalModelCredentialResolver @Inject constructor(
 
     private suspend fun reportInvalidChatGptBinding(accountId: String) {
         if (!isUsableChatGptPlanBinding(accountId, chatGptAccounts.get(accountId))) {
-            _invalidatedChatGptAccounts.emit(accountId)
+            _invalidatedChatGptAccounts.tryEmit(accountId)
         }
     }
 }
