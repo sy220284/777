@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -15,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,8 +46,6 @@ import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
-import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -85,15 +81,10 @@ internal fun LocalConversationComposer(
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    var menuOpen by remember(state.sessionId) { mutableStateOf(false) }
     // Keep real TextField focus across session projection changes. Otherwise the IME can remain
     // visible while the composer is incorrectly reset to its idle one-row state.
     var focused by remember { mutableStateOf(false) }
     var replySuggestionsLoading by remember(state.sessionId) { mutableStateOf(false) }
-
-    LaunchedEffect(state.running) {
-        if (state.running) menuOpen = false
-    }
 
     val expanded = focused || input.contains('\n') || attachments.isNotEmpty()
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
@@ -138,29 +129,15 @@ internal fun LocalConversationComposer(
     }
 
     @Composable
-    fun MenuControl() {
+    fun AttachmentControl() {
         if (state.running) return
-        Box {
-            DsComposerAction(
-                icon = Icons.Filled.Add,
-                contentDescription = attachmentLabel,
-                onClick = { menuOpen = true },
-                tint = colors.labelPrimary,
-                containerColor = colors.hoverSolid,
-            )
-            DsPopupMenu(
-                expanded = menuOpen,
-                onDismiss = { menuOpen = false },
-                focusable = false,
-                items = listOf(
-                    MenuItem(
-                        text = attachmentLabel,
-                        icon = Icons.Outlined.AttachFile,
-                        onClick = onOpenAttachmentPicker,
-                    ),
-                ),
-            )
-        }
+        DsComposerAction(
+            icon = Icons.Filled.Add,
+            contentDescription = attachmentLabel,
+            onClick = onOpenAttachmentPicker,
+            tint = colors.labelPrimary,
+            containerColor = colors.hoverSolid,
+        )
     }
 
     @Composable
@@ -238,7 +215,7 @@ internal fun LocalConversationComposer(
                 exit = shrinkHorizontally(DsAnimations.composerReveal) + fadeOut(DsAnimations.composerFade),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
-                    MenuControl()
+                    AttachmentControl()
                     ReplySuggestionsControl()
                 }
             }
@@ -271,7 +248,7 @@ internal fun LocalConversationComposer(
         LocalConversationComposerExpandedRow(
             visible = expanded,
             state = state,
-            menuControl = { MenuControl() },
+            menuControl = { AttachmentControl() },
             replySuggestionsControl = { ReplySuggestionsControl() },
             stopControl = { StopControl() },
             sendControl = { queue -> SendControl(queue) },
