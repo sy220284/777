@@ -82,6 +82,14 @@ data class AppSettings(
      */
     val backgroundImagePath: String? = null,
     /**
+     * Source selected for the app identity shown beside “神言神语” in every navigation drawer.
+     *
+     * `asset:` values point at bundled persona artwork; absolute paths point at a validated copy
+     * inside app-private storage. Keeping one source in app settings makes the chat and local-work
+     * drawers projections of the same durable choice.
+     */
+    val sidebarAvatarSource: String? = null,
+    /**
      * Keeps custom backgrounds readable by applying a theme-aware veil behind the app surface.
      * Defaults on so existing users benefit immediately after upgrading.
      */
@@ -93,3 +101,4 @@ data class AppSettings(
     /** 0=clearer/more opaque, 1=more transparent; 0.5 preserves the previous visual baseline. */
     val wallpaperSurfaceTransparency: Float = 0.5f,
 )
+
