@@ -71,6 +71,7 @@ import com.labteto.dshmobile.ui.components.SectionHeader
 import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.rememberHostsStore
 import com.labteto.dshmobile.ui.rememberSessionStore
+import com.labteto.dshmobile.ui.sidebar.SidebarAvatarPicker
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -241,6 +242,8 @@ fun ChatListDrawer(
             modifier = Modifier.fillMaxWidth().padding(top = DsSpacing.medium, bottom = DsSpacing.medium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            SidebarAvatarPicker()
+            Spacer(Modifier.width(DsSpacing.small))
             Text(stringResource(R.string.app_name), style = DsType.large20.withReadingWeight(), color = colors.labelPrimary, modifier = Modifier.weight(1f))
             DsIconButton(
                 icon = Icons.Filled.Add,
@@ -588,3 +591,4 @@ fun ChatListDrawer(
         )
     }
 }
+
