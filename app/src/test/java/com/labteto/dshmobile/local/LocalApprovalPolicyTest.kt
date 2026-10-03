@@ -15,20 +15,20 @@ import org.junit.Test
 
 class LocalApprovalPolicyTest {
     @Test
-    fun safeAutoApprovalCoversConfinedWorkspaceWritesAndReadOnlyTools() {
+    fun lowRiskClassificationCoversConfinedWorkspaceWritesAndReadOnlyTools() {
         for (name in listOf("write", "edit", "apply_patch", "download_file")) {
-            assertTrue(canAutoApprove(tool(name, LocalToolPolicy.access(name), LocalToolPolicy.approval(name))))
+            assertTrue(canAutoApproveSafely(tool(name, LocalToolPolicy.access(name), LocalToolPolicy.approval(name))))
         }
-        assertTrue(canAutoApprove(tool("session_trace", ToolAccess.READ_ONLY, ToolApprovalPolicy.ALWAYS)))
-        assertTrue(canAutoApprove(tool("plugin_external_read", ToolAccess.READ_ONLY, ToolApprovalPolicy.ALWAYS)))
+        assertTrue(canAutoApproveSafely(tool("session_trace", ToolAccess.READ_ONLY, ToolApprovalPolicy.ALWAYS)))
+        assertTrue(canAutoApproveSafely(tool("plugin_external_read", ToolAccess.READ_ONLY, ToolApprovalPolicy.ALWAYS)))
 
-        // Shell shares the app UID and can leave cwd, so safe auto-approval must never cover it.
-        assertFalse(canAutoApprove(tool("bash", ToolAccess.PROCESS, ToolApprovalPolicy.ALWAYS)))
+        // Shell shares the app UID and can leave cwd, so it stays outside the low-risk classification.
+        assertFalse(canAutoApproveSafely(tool("bash", ToolAccess.PROCESS, ToolApprovalPolicy.ALWAYS)))
 
-        // Categories that act outside the filesystem sandbox stay explicit.
-        assertFalse(canAutoApprove(tool("http_request", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS)))
-        assertFalse(canAutoApprove(tool("memory_forget", ToolAccess.SESSION_WRITE, ToolApprovalPolicy.ALWAYS)))
-        assertFalse(canAutoApprove(tool("plugin_external_write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS)))
+        // Categories acting outside the filesystem sandbox remain high-risk classifications.
+        assertFalse(canAutoApproveSafely(tool("http_request", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS)))
+        assertFalse(canAutoApproveSafely(tool("memory_forget", ToolAccess.SESSION_WRITE, ToolApprovalPolicy.ALWAYS)))
+        assertFalse(canAutoApproveSafely(tool("plugin_external_write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS)))
     }
 
     @Test
@@ -51,7 +51,7 @@ class LocalApprovalPolicyTest {
         )
 
         assertTrue(canResolvePendingByEnablingAutoApproval(lowRisk))
-        assertFalse(canResolvePendingByEnablingAutoApproval(highRisk))
+        assertTrue(canResolvePendingByEnablingAutoApproval(highRisk))
         assertFalse(canResolvePendingByEnablingAutoApproval(null))
     }
 
@@ -73,7 +73,7 @@ class LocalApprovalPolicyTest {
         for (name in listOf("session_event_search", "session_trace", "session_event_trace", "session_event_read")) {
             val definition = tool(name, LocalToolPolicy.access(name), LocalToolPolicy.approval(name))
             org.junit.Assert.assertEquals(ToolApprovalPolicy.ALWAYS, definition.approvalPolicy)
-            assertTrue(canAutoApprove(definition))
+            assertTrue(canAutoApproveSafely(definition))
         }
     }
 

@@ -16,7 +16,8 @@ class LocalAutomationWorkException(
     cause: Throwable? = null,
 ) : IllegalStateException(message, cause)
 
-internal fun canAutoApprove(tool: HarnessTool): Boolean =
+/** Low-risk classification only; global auto approval can approve any approval-gated tool. */
+internal fun canAutoApproveSafely(tool: HarnessTool): Boolean =
     tool.access == ToolAccess.READ_ONLY ||
         runCatching {
             LocalToolPolicy.autoApprovalScope(tool.name) in setOf(
@@ -28,7 +29,7 @@ internal fun canAutoApprove(tool: HarnessTool): Boolean =
 internal fun approvalImpact(tool: HarnessTool): LocalApprovalImpact = when (tool.access) {
     ToolAccess.READ_ONLY -> LocalApprovalImpact.LOW
     ToolAccess.WORKSPACE_WRITE ->
-        if (canAutoApprove(tool)) LocalApprovalImpact.LOW else LocalApprovalImpact.MEDIUM
+        if (canAutoApproveSafely(tool)) LocalApprovalImpact.LOW else LocalApprovalImpact.MEDIUM
     ToolAccess.SESSION_WRITE, ToolAccess.AGENT_CONTROL, ToolAccess.NETWORK -> LocalApprovalImpact.MEDIUM
     ToolAccess.PROCESS, ToolAccess.DEVICE -> LocalApprovalImpact.HIGH
     ToolAccess.PRIVILEGED -> LocalApprovalImpact.CRITICAL
@@ -49,7 +50,7 @@ internal fun projectWorkResourceCount(
 ): Int = if (usageMode == LocalUsageMode.WORK) count else 0
 
 internal fun canResolvePendingByEnablingAutoApproval(approval: LocalApproval?): Boolean =
-    approval?.canAutoApproveSafely == true
+    approval != null
 
 internal fun localResourceBudgetForMemoryClass(memoryClassMb: Int): HarnessResourceBudget = when {
     memoryClassMb >= 512 -> HarnessResourceBudget(

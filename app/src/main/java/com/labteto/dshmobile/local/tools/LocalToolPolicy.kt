@@ -120,9 +120,9 @@ internal object LocalToolPolicy {
     /**
      * Tools whose execution is gated by the approval pipeline.
      *
-     * `ALWAYS` means the call reaches the approval decision. Safe auto-approval may resolve only
-     * tools whose [autoApprovalScope] is explicitly safe; process-level Shell stays outside that
-     * scope and therefore always requires an explicit approval.
+     * `ALWAYS` means the call reaches the approval decision. When global automatic approval is
+     * enabled, that decision may be resolved automatically for every approval-gated tool. The
+     * [autoApprovalScope] below only classifies lower-risk operations; it is not a global allowlist.
      */
     fun approval(name: String): ToolApprovalPolicy = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file", "bash", "job_kill", "send_message", "interrupt_agent",
@@ -132,16 +132,17 @@ internal object LocalToolPolicy {
     }
 
     /**
-     * Authoritative scope for safe auto-approval.
+     * Low-risk classification used by approval impact and UI messaging.
      *
-     * - workspace-bounded writes and read-only tools may be approved by the safe mode;
+     * - workspace-bounded writes and read-only tools are classified as lower risk;
      * - process, network, privileged, agent-control and session mutation capabilities stay outside it;
+     * - global automatic approval is intentionally broader and may approve these higher-risk classes;
      * - Shell starts in the workspace but can leave cwd under the app UID, so it is never classified
      *   as a workspace-bounded operation.
      */
     fun autoApprovalScope(name: String): LocalAutoApprovalScope = when (canonical(name)) {
         "write", "edit", "apply_patch", "download_file" -> LocalAutoApprovalScope.WORKSPACE
-        // A shell can leave cwd and reach same-UID app-private state; require explicit approval.
+        // A shell can leave cwd and reach same-UID app-private state; keep it outside low-risk classification.
         "bash" -> LocalAutoApprovalScope.NONE
         else -> if (access(name) == ToolAccess.READ_ONLY) {
             LocalAutoApprovalScope.READ_ONLY
