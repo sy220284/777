@@ -1,12 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
-enum class PersonaPresetArtworkSource {
-    AI_FAN_ART,
-}
-
 data class PersonaPresetArtwork(
     val assetPath: String,
-    val source: PersonaPresetArtworkSource = PersonaPresetArtworkSource.AI_FAN_ART,
 )
 
 data class PersonaPreset(
