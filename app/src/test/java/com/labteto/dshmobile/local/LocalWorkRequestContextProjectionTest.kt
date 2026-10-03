@@ -26,13 +26,27 @@ class LocalWorkRequestContextProjectionTest {
             tools = JsonArray(emptyList()),
             compactor = LocalHistoryCompactor(),
             operationalLimitTokens = 678_464,
+            structuredWorkState = LocalStructuredWorkState(
+                goals = listOf("完成 Token 优化并保持任务效果"),
+                constraints = listOf("必须保留长任务关键约束"),
+                decisions = listOf("采用状态驱动的热上下文投影"),
+                failures = listOf("旧工具输出曾造成上下文膨胀"),
+                unfinished = listOf("[in_progress] 完整回归验证"),
+            ),
         )
 
         assertTrue(projected.projected)
         assertTrue(projected.estimatedTokensBefore > workRequestProjectionTriggerTokens(678_464))
         assertTrue(projected.estimatedTokensAfter < projected.estimatedTokensBefore)
         assertTrue(projected.messages.size < history.size)
-        assertTrue(projected.messages.any { it["content"].toString().contains("<work-checkpoint>") })
+        val checkpoint = projected.messages
+            .first { it["content"].toString().contains("<work-checkpoint>") }
+            ["content"].toString()
+        assertTrue(checkpoint.contains("完成 Token 优化并保持任务效果"))
+        assertTrue(checkpoint.contains("必须保留长任务关键约束"))
+        assertTrue(checkpoint.contains("采用状态驱动的热上下文投影"))
+        assertTrue(checkpoint.contains("旧工具输出曾造成上下文膨胀"))
+        assertTrue(checkpoint.contains("[in_progress] 完整回归验证"))
         assertTrue(projected.messages.last()["content"].toString().contains("当前继续处理最新任务"))
     }
 
