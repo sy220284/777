@@ -190,6 +190,119 @@ internal object FeatherIcons {
         }
     }
 
+
+    /** `plus` — compact create action. */
+    val Plus: ImageVector by lazy {
+        feather("Plus") {
+            moveTo(12f, 5f); lineTo(12f, 19f)
+            moveTo(5f, 12f); lineTo(19f, 12f)
+        }
+    }
+
+    /** `users` — group conversation. */
+    val Users: ImageVector by lazy {
+        feather("Users") {
+            circle(9f, 8f, 4f)
+            moveTo(1f, 21f)
+            arcToRelative(8f, 8f, 0f, isMoreThanHalf = false, isPositiveArc = true, 16f, 0f)
+            circle(17f, 9f, 3f)
+            moveTo(16f, 16f)
+            arcToRelative(6f, 6f, 0f, isMoreThanHalf = false, isPositiveArc = true, 7f, 5f)
+        }
+    }
+
+    /** `image` — gallery / visual asset. */
+    val Image: ImageVector by lazy {
+        feather("Image") {
+            rectangle(3f, 3f, 18f, 18f)
+            circle(8.5f, 8.5f, 1.5f)
+            moveTo(21f, 15f); lineTo(16f, 10f); lineTo(5f, 21f)
+        }
+    }
+
+    /** `book-open` — diary and long-form memory. */
+    val BookOpen: ImageVector by lazy {
+        feather("BookOpen") {
+            moveTo(3f, 4f); lineTo(9f, 4f); lineTo(12f, 7f); lineTo(12f, 21f)
+            lineTo(9f, 19f); lineTo(3f, 19f); close()
+            moveTo(21f, 4f); lineTo(15f, 4f); lineTo(12f, 7f); lineTo(12f, 21f)
+            lineTo(15f, 19f); lineTo(21f, 19f); close()
+        }
+    }
+
+    /** `clock` — scheduled / automation work. */
+    val Clock: ImageVector by lazy {
+        feather("Clock") {
+            circle(12f, 12f, 9f)
+            moveTo(12f, 7f); lineTo(12f, 12f); lineTo(15.5f, 14f)
+        }
+    }
+
+    /** `folder` — workspace browser. */
+    val Folder: ImageVector by lazy {
+        feather("Folder") {
+            moveTo(3f, 5f); lineTo(9f, 5f); lineTo(11f, 8f); lineTo(21f, 8f)
+            lineTo(21f, 19f); lineTo(3f, 19f); close()
+        }
+    }
+
+    /** `activity` — run center / live execution. */
+    val Activity: ImageVector by lazy {
+        feather("Activity") {
+            moveTo(3f, 12f); lineTo(7f, 12f); lineTo(10f, 5f)
+            lineTo(14f, 19f); lineTo(17f, 12f); lineTo(21f, 12f)
+        }
+    }
+
+    /** `smartphone` — remote device entry. */
+    val Device: ImageVector by lazy {
+        feather("Device") {
+            rectangle(6f, 2f, 12f, 20f)
+            moveTo(10f, 18f); lineTo(14f, 18f)
+        }
+    }
+
+    /** `sliders` — settings / tuning without the heavier Material gear. */
+    val Sliders: ImageVector by lazy {
+        feather("Sliders") {
+            moveTo(4f, 6f); lineTo(20f, 6f)
+            circle(9f, 6f, 2f)
+            moveTo(4f, 12f); lineTo(20f, 12f)
+            circle(15f, 12f, 2f)
+            moveTo(4f, 18f); lineTo(20f, 18f)
+            circle(11f, 18f, 2f)
+        }
+    }
+
+    /** `map-pin`-like push pin — pinned conversation state. */
+    val Pin: ImageVector by lazy {
+        feather("Pin") {
+            moveTo(8f, 3f); lineTo(16f, 3f)
+            moveTo(9f, 3f); lineTo(8f, 9f); lineTo(6f, 14f)
+            lineTo(18f, 14f); lineTo(16f, 9f); lineTo(15f, 3f)
+            moveTo(12f, 14f); lineTo(12f, 22f)
+        }
+    }
+
+    /** `trash-2` — destructive session action. */
+    val Trash2: ImageVector by lazy {
+        feather("Trash2") {
+            moveTo(3f, 6f); lineTo(21f, 6f)
+            moveTo(8f, 6f); lineTo(8f, 4f); lineTo(16f, 4f); lineTo(16f, 6f)
+            moveTo(6f, 6f); lineTo(7f, 21f); lineTo(17f, 21f); lineTo(18f, 6f)
+            moveTo(10f, 10f); lineTo(10f, 17f)
+            moveTo(14f, 10f); lineTo(14f, 17f)
+        }
+    }
+
+    /** `x` — close / cancel action. */
+    val X: ImageVector by lazy {
+        feather("X") {
+            moveTo(6f, 6f); lineTo(18f, 18f)
+            moveTo(18f, 6f); lineTo(6f, 18f)
+        }
+    }
+
     /** `chevron-right` — disclosure affordance; rotates to 90° when open. */
     val ChevronRight: ImageVector by lazy {
         feather("ChevronRight") {

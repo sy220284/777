@@ -246,6 +246,15 @@ fun LocalHarnessScreen(
                     localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
+                currentGalleryId = shell.galleryId,
+                currentGalleryStoryId = shell.galleryStoryId,
+                currentPersonaName = shell.chatPersona.name,
+                currentPersonaIdentity = shell.chatPersona.identity,
+                workModelLabel = activeModelProfile?.displayName
+                    ?: activeModelProfile?.model
+                    ?: stringResource(R.string.local_model_setup),
+                groupChatEnabled = shell.groupChat.enabled,
+                running = shell.running,
                 onUsageModeChange = { showDiary = false; switchUsageMode(it) },
                 onNewSession = {
                     scope.launch { drawerState.close() }
@@ -268,7 +277,6 @@ fun LocalHarnessScreen(
                     scope.launch { drawerState.close() }
                     showRunCenter = true
                 },
-                galleryCount = gallery.size,
                 groupMemberCount = shell.groupChat.members.size,
                 onOpenGroupChat = {
                     scope.launch { drawerState.close() }
