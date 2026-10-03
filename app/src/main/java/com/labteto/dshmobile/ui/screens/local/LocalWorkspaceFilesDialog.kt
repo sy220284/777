@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -98,6 +99,17 @@ internal fun LocalWorkspaceFilesDialog(
 
     LaunchedEffect(mode, sessionId) { reload() }
 
+    fun navigateBack() {
+        when {
+            preview != null -> preview = null
+            mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty() ->
+                directory = directory.substringBeforeLast('/', "")
+            else -> onDismiss()
+        }
+    }
+
+    BackHandler(onBack = ::navigateBack)
+
     Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val headerTitle = when {
@@ -114,14 +126,7 @@ internal fun LocalWorkspaceFilesDialog(
                 DsTopBar(
                     title = headerTitle,
                     subtitle = headerSubtitle,
-                    onBack = {
-                        when {
-                            preview != null -> preview = null
-                            mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty() ->
-                                directory = directory.substringBeforeLast('/', "")
-                            else -> onDismiss()
-                        }
-                    },
+                    onBack = ::navigateBack,
                     backContentDescription = stringResource(
                         if (preview != null || directory.isNotEmpty()) {
                             R.string.local_files_back_to_files
