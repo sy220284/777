@@ -85,7 +85,6 @@ internal fun resolveCharacterMode(
     if (personaText.containsAnyMode("理性", "逻辑", "谨慎", "较真", "推理", "分析", "冷静", "认真")) {
         analysis += 16
         repair += 8
-        freedom += 8
     }
     if (personaText.containsAnyMode("感性", "敏感", "心软", "冲动", "共情", "情绪")) affect += 15
     if (personaText.containsAnyMode("细腻", "观察", "敏锐", "细节", "画面", "声音", "气味", "动作")) sensory += 15
@@ -164,6 +163,7 @@ internal fun resolveCharacterMode(
         association += 14
         playfulness += 7
         repair += 8
+        freedom += 8
     }
     if (state.mood.containsAnyMode("开心", "兴奋", "期待", "雀跃")) {
         association += 10
