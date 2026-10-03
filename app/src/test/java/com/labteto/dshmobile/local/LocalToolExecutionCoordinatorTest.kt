@@ -23,6 +23,37 @@ import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
     @Test
+    fun githubKeywordPreactivationCannotBypassNegationOrCredentialGate() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool(
+                name = "github_status",
+                access = ToolAccess.NETWORK,
+                approval = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.OPTIONAL,
+                family = "GitHub",
+                keywords = setOf("github", "pr"),
+            ) { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        val history = listOf(buildJsonObject {
+            put("role", "user")
+            put("content", "检查 GitHub PR")
+        })
+        var credentialReads = 0
+        coordinator.prepareWorkTurnCapabilities("不使用github，继续本地工作", history, { credentialReads++; true })
+        assertEquals(0, credentialReads)
+        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
+        coordinator.prepareWorkTurnCapabilities("检查 GitHub PR", emptyList(), { false })
+        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
+        val detached = linkedSetOf<String>()
+        coordinator.prepareWorkTurnCapabilities("检查 GitHub PR", emptyList(), { true }, detached)
+        assertEquals(setOf("github_status"), detached)
+        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
+        // Explicit discovery remains available even without automatic pre-activation.
+        assertTrue(coordinator.searchCapabilities("github").contains("github_status"))
+    }
+
+    @Test
     fun workIntentDoesNotReadGitHubCredentialsForUnrelatedTaskAndPropagatesCancellation() = runBlocking {
         val coordinator = coordinator(ToolRegistry())
         var reads = 0

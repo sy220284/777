@@ -54,7 +54,9 @@ internal class LocalToolExecutionCoordinator(
         taskContext: String,
         target: MutableSet<String> = enabledOptionalTools,
     ) {
-        val tools = registry.names().mapNotNull(registry::get)
+        // GitHub pre-activation has its own intent and credential gate. Generic keyword matches
+        // must not reactivate it from a negated current input or an older GitHub request.
+        val tools = registry.names().mapNotNull(registry::get).filterNot(::isGitHubConnectorTool)
         enableOptionalTools(
             LocalToolRouter.relevantOptionalToolNames(tools, taskContext),
             target,
@@ -93,12 +95,14 @@ internal class LocalToolExecutionCoordinator(
     fun enableGitHubConnectorTools(target: MutableSet<String> = enabledOptionalTools) {
         val githubTools = registry.names().mapNotNull(registry::get)
             .filter { tool ->
-                LocalToolRouter.isOptional(tool) &&
-                    tool.metadata.family.equals(GITHUB_TOOL_FAMILY, ignoreCase = true)
+                LocalToolRouter.isOptional(tool) && isGitHubConnectorTool(tool)
             }
             .map(HarnessTool::name)
         enableOptionalTools(githubTools, target)
     }
+
+    private fun isGitHubConnectorTool(tool: HarnessTool): Boolean =
+        tool.metadata.family.equals(GITHUB_TOOL_FAMILY, ignoreCase = true)
 
     fun capabilitySummary(enabledOptional: Set<String> = enabledOptionalSnapshot()): String {
         val tools = registry.names().mapNotNull(registry::get)
