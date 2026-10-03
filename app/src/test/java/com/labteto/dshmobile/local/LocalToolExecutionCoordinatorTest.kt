@@ -344,6 +344,44 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun explicitTaskIntentPreEnablesMatchingCapabilityWithoutInflatingUnrelatedTurns() {
+        val registry = ToolRegistry().apply {
+            register(
+                tool(
+                    name = "web_search",
+                    access = ToolAccess.NETWORK,
+                    approval = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "网络",
+                    keywords = setOf("联网", "网页搜索"),
+                ) { ToolResult("ok") },
+            )
+            register(
+                tool(
+                    name = "memory_update",
+                    access = ToolAccess.SESSION_WRITE,
+                    approval = ToolApprovalPolicy.ALWAYS,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "记忆",
+                    keywords = setOf("更新记忆"),
+                ) { ToolResult("ok") },
+            )
+        }
+        val coordinator = coordinator(registry)
+
+        coordinator.enableTaskRelevantOptionalTools("继续修改本地代码")
+        assertEquals(0, coordinator.visibleSchemas(localAgentRunPolicy(LocalUsageMode.WORK)).size)
+
+        coordinator.enableTaskRelevantOptionalTools("联网搜索最新文档")
+        assertEquals(
+            listOf("web_search"),
+            LocalToolSchemaProjection(registry, coordinator).names(
+                coordinator.visibleSchemas(localAgentRunPolicy(LocalUsageMode.WORK)),
+            ),
+        )
+    }
+
+    @Test
     fun subagentSchemaProjectionPreservesReadOnlyAndVirtualScreenBoundaries() {
         val registry = ToolRegistry().apply {
             register(
@@ -387,6 +425,33 @@ class LocalToolExecutionCoordinatorTest {
             ),
         )
         assertEquals(listOf("read", "android_vscreen_status"), withVirtualScreen)
+    }
+
+    @Test
+    fun planModeSchemaProjectionOmitsToolsThatExecutionWouldReject() {
+        val registry = ToolRegistry().apply {
+            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { ToolResult("ok") })
+            register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) { ToolResult("ok") })
+            register(
+                tool(
+                    name = "remote_lookup",
+                    access = ToolAccess.NETWORK,
+                    approval = ToolApprovalPolicy.NEVER,
+                    exposure = ToolExposure.OPTIONAL,
+                    family = "网络",
+                    keywords = setOf("联网"),
+                ) { ToolResult("ok") },
+            )
+        }
+        val projection = LocalToolSchemaProjection(registry, coordinator(registry))
+        val schemas = projection.modelSchemas(
+            policy = localAgentRunPolicy(LocalUsageMode.WORK),
+            state = LocalHarnessState(planMode = true),
+            history = emptyList(),
+            enabledOptional = setOf("remote_lookup"),
+        )
+
+        assertEquals(listOf("read", "remote_lookup"), projection.names(schemas))
     }
 
     private fun coordinator(
