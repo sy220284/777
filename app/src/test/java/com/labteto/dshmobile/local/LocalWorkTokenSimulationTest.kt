@@ -52,7 +52,7 @@ class LocalWorkTokenSimulationTest {
     }
 
     @Test
-    fun burstOfLargeToolOutputsKeepsOnlyTwoRecentPayloadsHot() {
+    fun burstOfLargeToolOutputsLeavesNoOversizedPayloadHot() {
         val history = buildList {
             add(message("system", "系统规则"))
             add(message("user", "检查十二组大结果"))
@@ -73,18 +73,12 @@ class LocalWorkTokenSimulationTest {
         assertEquals(12, tools.size)
         assertTrue(projected.estimatedTokensAfter * 100 < before * 45)
         assertEquals(
-            10,
+            12,
             tools.count {
                 it["content"]?.jsonPrimitive?.contentOrNull
                     ?.contains("旧工具结果已从实时模型上下文衰减") == true
             },
         )
-        tools.takeLast(2).forEach { tool ->
-            assertFalse(
-                tool["content"]?.jsonPrimitive?.contentOrNull
-                    ?.contains("旧工具结果已从实时模型上下文衰减") == true,
-            )
-        }
     }
 
     @Test
@@ -211,11 +205,17 @@ class LocalWorkTokenSimulationTest {
             history += toolMessage(step, "工具结果-$step-" + "结果".repeat(420))
 
             val rawTokens = history.sumOf { estimateModelTokens(it.toString()) }
+            val sourcePressure = LocalPromptPressureMeter.measure(
+                messages = history,
+                tools = JsonArray(emptyList()),
+                operationalLimitTokens = 678_464,
+            )
             val projected = projectWorkRequestContext(
                 messages = history,
                 tools = JsonArray(emptyList()),
                 compactor = LocalHistoryCompactor(),
                 operationalLimitTokens = 678_464,
+                measuredPressure = sourcePressure,
                 previousPressure = previousPressure,
                 structuredWorkState = LocalStructuredWorkState(
                     goals = listOf("完成长任务"),
@@ -234,11 +234,7 @@ class LocalWorkTokenSimulationTest {
             ) {
                 adaptiveProjectionCount += 1
             }
-            previousPressure = LocalPromptPressureMeter.measure(
-                messages = projected.messages,
-                tools = JsonArray(emptyList()),
-                operationalLimitTokens = 678_464,
-            )
+            previousPressure = sourcePressure
         }
         return SimulationResult(
             rawCumulative = rawCumulative,
