@@ -139,6 +139,7 @@ internal fun appendLocalDiagnosticDetails(
             append(" input=").append(record.inputTokens)
             append(" cache_hit=").append(record.cacheHitTokens)
             append(" cache_miss=").append(record.cacheMissTokens)
+            append(" cache_write=").append(record.cacheWriteTokens)
             append(" output=").append(record.outputTokens)
             append(" reasoning=").append(record.reasoningTokens)
             append(" total=").append(record.totalTokens)
@@ -183,6 +184,7 @@ private val DIAGNOSTIC_EVENT_KEYS = listOf(
     "prompt_tokens",
     "cache_hit_tokens",
     "cache_miss_tokens",
+    "cache_write_tokens",
     "completion_tokens",
     "reasoning_tokens",
     "total_tokens",
@@ -218,6 +220,11 @@ private val DIAGNOSTIC_EVENT_KEYS = listOf(
     "context_generation",
     "context_prefill_tokens",
     "context_prefill_source",
+    "cache_series_generation",
+    "cache_prefix_continuity",
+    "cache_tool_surface_stable",
+    "cache_message_prefix_stable",
+    "cache_previous_message_count",
     "plan_mode",
     "temperature",
     "credential_binding_valid",
