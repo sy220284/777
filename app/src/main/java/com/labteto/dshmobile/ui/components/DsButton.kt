@@ -55,10 +55,10 @@ fun DsButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    loading: Boolean = false,
     variant: DsButtonVariant = DsButtonVariant.Primary,
     size: DsButtonSize = DsButtonSize.Normal,
     icon: ImageVector? = null,
+    loading: Boolean = false,
 ) {
     val colors = DsTheme.colors
     val interaction = remember { MutableInteractionSource() }
