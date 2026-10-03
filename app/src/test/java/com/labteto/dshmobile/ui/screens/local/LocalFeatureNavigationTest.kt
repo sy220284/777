@@ -62,5 +62,10 @@ class LocalFeatureNavigationTest {
         assertFalse(hasEstablishedGroupChat(listOf(emptyGroup, direct)))
         assertTrue(hasEstablishedGroupChat(listOf(configuredGroup, direct)))
         assertFalse(hasEstablishedGroupChat(listOf(direct)))
+        assertEquals(
+            "group-configured",
+            establishedGroupChatSessionId(listOf(emptyGroup, configuredGroup, direct)),
+        )
+        assertEquals(null, establishedGroupChatSessionId(listOf(emptyGroup, direct)))
     }
 }
