@@ -1117,13 +1117,12 @@ class LocalHarnessEngine @Inject constructor(
         if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
         val snapshot = _state.value
         if (snapshot.loading || snapshot.running) return false
-        createSession(
+        return createSession(
             mode = LocalConversationMode.INDEPENDENT,
             usageMode = LocalUsageMode.CHAT,
             chatMode = LocalChatMode.GROUP,
             groupEntries = selected,
         )
-        return true
     }
 
     internal fun createSingleChatSession() {
