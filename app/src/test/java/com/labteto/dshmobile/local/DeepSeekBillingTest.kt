@@ -66,12 +66,13 @@ class DeepSeekBillingTest {
 
         val openAi = parseDeepSeekOpenAiUsage(
             json.parseToJsonElement(
-                """{"usage":{"prompt_tokens":100,"prompt_cache_hit_tokens":60,"prompt_cache_miss_tokens":40,"completion_tokens":20,"completion_tokens_details":{"reasoning_tokens":10}}}"""
+                """{"usage":{"prompt_tokens":100,"prompt_cache_hit_tokens":60,"prompt_cache_miss_tokens":40,"prompt_tokens_details":{"cache_write_tokens":15},"completion_tokens":20,"completion_tokens_details":{"reasoning_tokens":10}}}"""
             ).jsonObject,
         )
         assertEquals(100L, openAi.promptTokens)
         assertEquals(60L, openAi.cacheHitTokens)
         assertEquals(40L, openAi.cacheMissTokens)
+        assertEquals(15L, openAi.cacheWriteTokens)
         assertEquals(20L, openAi.completionTokens)
         assertEquals(10L, openAi.reasoningTokens)
 
@@ -83,6 +84,7 @@ class DeepSeekBillingTest {
         assertEquals(100L, anthropic.promptTokens)
         assertEquals(50L, anthropic.cacheHitTokens)
         assertEquals(50L, anthropic.cacheMissTokens)
+        assertEquals(20L, anthropic.cacheWriteTokens)
         assertEquals(10L, anthropic.completionTokens)
         assertEquals(true, anthropic.reported)
     }
@@ -114,6 +116,7 @@ class DeepSeekBillingTest {
                 promptTokens = 100,
                 cacheHitTokens = 60,
                 cacheMissTokens = 40,
+                cacheWriteTokens = 12,
                 completionTokens = 20,
                 reported = true,
             ),
