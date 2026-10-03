@@ -7,7 +7,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 @Singleton
 class ChatGptPlanAuthorizationEvents @Inject constructor() {
-    private val _invalidatedAccounts = MutableSharedFlow<String>(extraBufferCapacity = 16)
+    // Auth may refresh before Local Harness is instantiated. Replay keeps a bounded set of recent
+    // invalidations so the model runtime can retire stale plan profiles when it starts later.
+    private val _invalidatedAccounts = MutableSharedFlow<String>(replay = 16, extraBufferCapacity = 16)
     val invalidatedAccounts = _invalidatedAccounts.asSharedFlow()
 
     fun invalidate(accountId: String) {

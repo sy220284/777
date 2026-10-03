@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.model.chatgpt
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -82,6 +83,16 @@ class ChatGptAuthorizationRecoveryTest {
         assertFalse(shouldRequestChatGptPlanConsent(base))
         assertTrue(shouldRequestChatGptPlanConsent(base.copy(signedIn = true)))
         assertFalse(shouldRequestChatGptPlanConsent(base.copy(signedIn = true, sharingEnabled = true)))
+    }
+
+    @Test
+    fun planInvalidationPublishedBeforeRuntimeStartIsReplayed() = runBlocking {
+        val events = ChatGptPlanAuthorizationEvents()
+        events.invalidate("account-before-runtime")
+        assertEquals(
+            "account-before-runtime",
+            withTimeout(1_000) { events.invalidatedAccounts.first() },
+        )
     }
 
     @Test
