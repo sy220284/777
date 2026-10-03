@@ -32,7 +32,7 @@ data class ChatGptAccountRecord(
     val savedAtEpochSeconds: Long,
 ) {
     val sharingEnabled: Boolean
-        get() = CHATGPT_PLAN_SCOPE in scopes
+        get() = CHATGPT_PLAN_SCOPE in scopes && CHATGPT_RESOURCE_INVOKE_SCOPE in scopes
 
     override fun toString(): String =
         "ChatGptAccountRecord(id=$id, clientId=$clientId, issuer=$issuer, subject=$subject, " +
@@ -87,6 +87,9 @@ internal fun shouldRetryChatGptAuthorization(oauthCode: String?, allowed: Boolea
 
 internal fun chatGptAuthorizationPrompt(requestPlanConsent: Boolean): String? =
     if (requestPlanConsent) "consent" else null
+
+internal fun shouldRequestChatGptPlanConsent(account: ChatGptAccountSummary): Boolean =
+    account.signedIn && !account.sharingEnabled
 
 internal fun shouldInvalidateChatGptRefreshToken(oauthCode: String?): Boolean =
     oauthCode in setOf(
