@@ -311,6 +311,43 @@ class ChatDiaryStoreTest {
         assertTrue(recalled.single().event.contains("周日下午三点"))
     }
 
+
+    @Test
+    fun explicitSpecificRecallDoesNotInjectUnrelatedImportantDiary() {
+        val memory = store()
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "雨夜公交站用户把银杏书签交给我，背面刻着Q17",
+                feeling = "我一直很珍惜这个小礼物",
+                importance = 5,
+            ),
+            userId = "u-bookmark",
+            assistantId = "a-bookmark",
+            evidence = "雨夜公交站用户把银杏书签交给我，背面刻着Q17",
+        ))
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户只告诉我小时候最怕打雷",
+                feeling = "我知道这是很私人的秘密",
+                importance = 5,
+                disclosure = "PRIVATE",
+            ),
+            userId = "u-thunder",
+            assistantId = "a-thunder",
+            evidence = "用户只告诉我小时候最怕打雷，还说别告诉别人",
+        ))
+
+        val recalled = memory.search(
+            "你还记得银杏书签背面刻了什么吗？",
+            "gallery:a",
+            groupAudience = false,
+            maxItems = 3,
+        )
+
+        assertEquals(1, recalled.size)
+        assertTrue(recalled.single().event.contains("Q17"))
+    }
+
     @Test
     fun unrelatedHighImportanceDiaryDoesNotPolluteOrdinaryConversation() {
         val memory = store()
