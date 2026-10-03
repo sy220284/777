@@ -16,6 +16,9 @@
     <string name="common_close">关闭</string>
     <string name="local_delete_session">删除会话</string>
     <string name="local_selected_count">已选择 %1$d 项</string>
+    <string name="local_drawer_pinned">置顶</string>
+    <string name="local_drawer_recent">最近</string>
+    <string name="local_drawer_running">运行中</string>
     <string name="local_regenerate_reply">重新生成回复</string>
     <string name="local_regenerate_reply_failed">当前状态无法重新生成这条回复。</string>
     <string name="local_select_variant_failed">暂时无法切换回复版本，请等待当前回复结束后重试。</string>
@@ -1385,7 +1388,6 @@
     <string name="chatgpt_cancel">取消</string>
     <string name="local_model_media_not_connected">当前支持文字和图片；音视频理解暂未开放。</string>
     <string name="chatgpt_authorized_unverified">已授权，待验证</string>
-
     <string name="persona_gallery_preset_artwork_invalid_path">人物预置形象图路径无效</string>
     <string name="persona_gallery_portrait_dir_failed">无法创建人物立绘目录</string>
     <string name="persona_gallery_preset_artwork_too_large">人物预置形象图过大</string>
