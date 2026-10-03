@@ -8,6 +8,21 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
+internal enum class ChatGptModelSyncBusyPolicy {
+    PROCEED,
+    DEFER_REFRESH,
+    BLOCK_ACCOUNT_CHANGE,
+}
+
+internal fun chatGptModelSyncBusyPolicy(
+    busy: Boolean,
+    selectFirst: Boolean,
+): ChatGptModelSyncBusyPolicy = when {
+    !busy -> ChatGptModelSyncBusyPolicy.PROCEED
+    !selectFirst -> ChatGptModelSyncBusyPolicy.DEFER_REFRESH
+    else -> ChatGptModelSyncBusyPolicy.BLOCK_ACCOUNT_CHANGE
+}
+
 /** Projects ChatGPT account model mutations into the aggregate runtime without owning OAuth. */
 internal class LocalModelAccountStateCoordinator(
     private val configuration: LocalModelConfigurationCoordinator,
@@ -20,7 +35,12 @@ internal class LocalModelAccountStateCoordinator(
         models: List<ChatGptModelOption>,
         selectFirst: Boolean,
     ) {
-        require(!isBusy()) { "请先结束当前任务再切换模型账户" }
+        when (chatGptModelSyncBusyPolicy(isBusy(), selectFirst)) {
+            ChatGptModelSyncBusyPolicy.DEFER_REFRESH -> return
+            ChatGptModelSyncBusyPolicy.BLOCK_ACCOUNT_CHANGE ->
+                throw IllegalStateException("请先结束当前任务再切换模型账户")
+            ChatGptModelSyncBusyPolicy.PROCEED -> Unit
+        }
         val before = state.value
         val beforeActiveProfile = gateway.activeProfile()
         val profiles = configuration.saveChatGptModels(accountId, models)
@@ -57,7 +77,9 @@ internal class LocalModelAccountStateCoordinator(
     }
 
     suspend fun removeChatGptAccountProfiles(accountId: String) {
-        require(!isBusy()) { "请先结束当前任务再断开模型账户" }
+        if (isBusy()) {
+            throw IllegalStateException("请先结束当前任务再断开模型账户")
+        }
         val current = state.value
         val result = configuration.removeChatGptAccount(
             accountId = accountId,
