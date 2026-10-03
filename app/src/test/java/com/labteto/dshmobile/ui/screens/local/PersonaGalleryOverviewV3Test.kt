@@ -45,4 +45,29 @@ class PersonaGalleryOverviewV3Test {
             ).hasRunCenterContent(),
         )
     }
+
+    @Test
+    fun portraitPhotoFramePreservesTallArtworkWithoutExhibitionPerspective() {
+        val layout = personaPhotoFrameLayout(imageWidth = 1024, imageHeight = 1536)
+
+        assertEquals(2f / 3f, layout.imageAspectRatio, 0.01f)
+        assertEquals(0.64f, layout.widthFraction, 0.001f)
+    }
+
+    @Test
+    fun landscapePhotoFrameUsesWiderAlbumLayout() {
+        val layout = personaPhotoFrameLayout(imageWidth = 1536, imageHeight = 1024)
+
+        assertEquals(1.5f, layout.imageAspectRatio, 0.01f)
+        assertEquals(0.90f, layout.widthFraction, 0.001f)
+    }
+
+    @Test
+    fun photoFrameFallsBackToStableSquareBeforeArtworkLoads() {
+        val layout = personaPhotoFrameLayout(imageWidth = 0, imageHeight = 0)
+
+        assertEquals(1f, layout.imageAspectRatio, 0.001f)
+        assertEquals(0.78f, layout.widthFraction, 0.001f)
+    }
+
 }
