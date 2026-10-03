@@ -88,6 +88,13 @@ internal class LocalModelRequestCoordinator(
         val modelContextWindow = documentedContextWindowTokens(
             frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
         )
+        val previousPressure = if (
+            executionControl != null && snapshot.usageMode == LocalUsageMode.WORK
+        ) {
+            pressureStore.latest(snapshot.sessionId)
+        } else {
+            null
+        }
         val baselinePressure = LocalPromptPressureMeter.measure(
             messages = messages,
             tools = tools,
@@ -101,6 +108,7 @@ internal class LocalModelRequestCoordinator(
                 compactor = historyCompactor,
                 operationalLimitTokens = operationalLimit,
                 measuredPressure = baselinePressure,
+                previousPressure = previousPressure,
                 structuredWorkState = structuredWorkState(snapshot, log),
             )
         } else {
@@ -120,7 +128,19 @@ internal class LocalModelRequestCoordinator(
                 modelContextWindowTokens = modelContextWindow,
             )
         } else baselinePressure
-        pressureStore.record(snapshot.sessionId, pressure)
+        val workContextAssessment = if (
+            executionControl != null && snapshot.usageMode == LocalUsageMode.WORK
+        ) {
+            assessWorkStepContext(
+                current = pressure,
+                previous = previousPressure,
+                targetTokens = workRequestProjectionTargetTokens(operationalLimit),
+                baseTriggerTokens = workRequestProjectionTriggerTokens(operationalLimit),
+            )
+        } else {
+            null
+        }
+        pressureStore.record(snapshot.sessionId, pressure, workContextAssessment)
         val contextWindow = pressureStore.window(snapshot.sessionId)
         val previewOwner = if (publishPreviewEnabled) {
             streamingPreviewStore.newOwner(
@@ -141,6 +161,15 @@ internal class LocalModelRequestCoordinator(
                 put("estimated_tokens_after", workProjection.estimatedTokensAfter)
                 put("omitted_messages", workProjection.omittedMessages)
                 put("strategy", "active_work_checkpoint_plus_recent_causal_tail")
+                workProjection.preProjectionAssessment?.let { assessment ->
+                    put("context_status_before", assessment.status.name.lowercase())
+                    put("effective_projection_trigger_tokens", assessment.effectiveProjectionTriggerTokens)
+                    put("history_ratio_permille_before", assessment.historyRatioPermille)
+                    put("history_growth_tokens_before", assessment.historyGrowthTokens)
+                    put("projection_reasons", buildJsonArray {
+                        assessment.reasons.forEach { add(JsonPrimitive(it)) }
+                    })
+                }
             })
         }
         val logMessages = redactModelImages(requestMessages)
@@ -181,6 +210,17 @@ internal class LocalModelRequestCoordinator(
             put("history_tokens_estimate", pressure.historyTokens)
             put("current_user_tokens_estimate", pressure.currentUserTokens)
             put("tool_definition_tokens_estimate", pressure.toolDefinitionTokens)
+            workContextAssessment?.let { assessment ->
+                put("context_efficiency_status", assessment.status.name.lowercase())
+                put("history_ratio_permille", assessment.historyRatioPermille)
+                put("tool_ratio_permille", assessment.toolRatioPermille)
+                put("input_growth_tokens", assessment.inputGrowthTokens)
+                put("history_growth_tokens", assessment.historyGrowthTokens)
+                put("effective_projection_trigger_tokens", assessment.effectiveProjectionTriggerTokens)
+                put("context_efficiency_reasons", buildJsonArray {
+                    assessment.reasons.forEach { add(JsonPrimitive(it)) }
+                })
+            }
             contextWindow?.let { window ->
                 put("context_generation", window.generation)
                 put("context_prefill_tokens", window.prefillTokens)
