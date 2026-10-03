@@ -11,6 +11,7 @@ internal object LocalEnvironmentReport {
         contextChars: Int,
         contextBudgetChars: Int,
         requestPressure: LocalPromptPressure? = null,
+        workContextAssessment: LocalWorkStepContextAssessment? = null,
         contextWindow: LocalContextWindowSnapshot? = null,
         workBudget: LocalWorkExecutionBudget.Snapshot? = null,
         latestRequest: TokenUsageRecord?,
@@ -48,6 +49,18 @@ internal object LocalEnvironmentReport {
             appendLine(
                 "请求构成估算：system=${pressure.systemTokens}，history=${pressure.historyTokens}，" +
                     "current_user=${pressure.currentUserTokens}，tools=${pressure.toolDefinitionTokens}",
+            )
+        }
+        workContextAssessment?.let { assessment ->
+            appendLine(
+                "Work 单步上下文：${assessment.status.name.lowercase()}；" +
+                    "history=${assessment.historyRatioPermille / 10.0}%；" +
+                    "tools=${assessment.toolRatioPermille / 10.0}%；" +
+                    "input_delta=${assessment.inputGrowthTokens}；" +
+                    "history_delta=${assessment.historyGrowthTokens}；" +
+                    "trigger=${assessment.effectiveProjectionTriggerTokens} token" +
+                    if (assessment.reasons.isEmpty()) "" else
+                        "；原因=${assessment.reasons.joinToString(",")}",
             )
         }
         workBudget?.let { budget ->
