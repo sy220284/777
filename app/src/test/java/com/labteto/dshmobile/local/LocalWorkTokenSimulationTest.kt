@@ -109,7 +109,26 @@ class LocalWorkTokenSimulationTest {
     }
 
     @Test
-    fun repeatedWorkWindowsKeepActiveConstraintsAcrossFiveCompactionGenerations() {
+    fun activeWorkCheckpointSurvivesOnePersistentCompaction() {
+        assertActiveWorkCheckpointSurvives(1)
+    }
+
+    @Test
+    fun activeWorkCheckpointSurvivesTwoPersistentCompactions() {
+        assertActiveWorkCheckpointSurvives(2)
+    }
+
+    @Test
+    fun activeWorkCheckpointSurvivesThreePersistentCompactions() {
+        assertActiveWorkCheckpointSurvives(3)
+    }
+
+    @Test
+    fun activeWorkCheckpointSurvivesFivePersistentCompactions() {
+        assertActiveWorkCheckpointSurvives(5)
+    }
+
+    private fun assertActiveWorkCheckpointSurvives(generations: Int) {
         var history = mutableListOf(message("system", "系统规则"))
         val active = LocalStructuredWorkState(
             goals = listOf("完成 Token 优化并保证任务正确"),
@@ -130,7 +149,7 @@ class LocalWorkTokenSimulationTest {
             unfinished = listOf("完成全部回归验证"),
         )
 
-        repeat(5) { generation ->
+        repeat(generations) { generation ->
             repeat(16) { index ->
                 history += message(
                     "user",
@@ -158,9 +177,6 @@ class LocalWorkTokenSimulationTest {
             )
             assertNotNull(compacted)
             history = requireNotNull(compacted).messages.toMutableList()
-            requireNotNull(LocalWorkCheckpoint.latestFrom(history)) {
-                "第${generation}代持久压缩后缺少可信 Work 检查点"
-            }
         }
 
         val checkpoint = requireNotNull(LocalWorkCheckpoint.latestFrom(history))
