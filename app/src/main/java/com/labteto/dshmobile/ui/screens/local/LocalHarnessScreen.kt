@@ -111,9 +111,6 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.screens.main.RenameDialog
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
-import com.labteto.dshmobile.ui.screens.settings.SettingsScreen
-import com.labteto.dshmobile.ui.screens.tasks.TasksScreen
-import com.labteto.dshmobile.ui.screens.tools.ToolsScreen
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -344,149 +341,32 @@ fun LocalHarnessScreen(
         },
     ) {
         LocalConversationStateContent(viewModel, shell.usageMode) { state ->
-            Box(Modifier.fillMaxSize()) {
-                when (featurePage) {
-                    LocalFeaturePage.DIARY -> CharacterDiaryScreen(
-                        gallery = gallery,
-                        currentPersona = state.chatPersona,
-                        currentGalleryId = state.galleryId,
-                        loadEntries = viewModel::diaryEntries,
-                        onDismiss = ::popFeature,
-                    )
-                    LocalFeaturePage.PERSONA_GALLERY -> PersonaGalleryScreen(
-                        entries = gallery,
-                        presets = viewModel.personaPresets,
-                        currentPersona = state.chatPersona,
-                        currentGalleryId = state.galleryId,
-                        currentGalleryStoryId = state.galleryStoryId,
-                        currentHasUnsavedChanges = viewModel.currentGalleryHasUnsavedChanges(),
-                        currentSessionId = state.sessionId,
-                        canSave = !state.loading && !state.running,
-                        onSaveCurrent = viewModel::saveCurrentToGallery,
-                        onEditNotes = viewModel::editGalleryNotes,
-                        onRenameStory = viewModel::renameGalleryStory,
-                        onInspect = viewModel::inspectGalleryPersona,
-                        onApplySuggestions = viewModel::applyGallerySuggestions,
-                        onDelete = viewModel::deleteGalleryEntry,
-                        onDeleteStory = viewModel::deleteGalleryStory,
-                        onDeleteHistoryMessage = viewModel::deleteGalleryHistoryMessage,
-                        onExport = viewModel::exportGalleryPersona,
-                        onImport = viewModel::importGalleryPersona,
-                        onInstallPreset = viewModel::installPersonaPreset,
-                        onSetPortrait = viewModel::setGalleryPortrait,
-                        onRemovePortrait = viewModel::removeGalleryPortrait,
-                        onStart = { id, storyId, freshStory ->
-                            if (viewModel.startFromGallery(id, storyId, freshStory)) {
-                                resetFeatureNavigation()
-                            }
-                        },
-                        onCreate = { showNewPersona = true },
-                        onDismiss = ::popFeature,
-                    )
-                    LocalFeaturePage.WORKSPACE -> LocalWorkspaceFilesDialog(
-                        mode = filesMode,
-                        sessionId = shell.sessionId,
-                        workspacePath = shell.workspacePath,
-                        loadWorkspace = viewModel::workspaceFiles,
-                        loadConversation = viewModel::conversationFiles,
-                        loadPreview = viewModel::previewWorkspaceFile,
-                        onDismiss = ::popFeature,
-                    )
-                    LocalFeaturePage.RUN_CENTER -> LocalWorkStateContent(viewModel) { workState ->
-                        LocalRunCenterScreen(
-                            state = workState,
-                            onJobOutput = viewModel::backgroundJobOutput,
-                            onStopJob = viewModel::stopBackgroundJob,
-                            onOpenResults = {
-                                filesMode = LocalFilesMode.CONVERSATION
-                                pushFeature(LocalFeaturePage.WORKSPACE)
-                            },
-                            onDismiss = ::popFeature,
-                        )
-                    }
-                    LocalFeaturePage.TASKS -> TasksScreen(
-                        onClose = {
-                            taskMode = null
-                            popFeature()
-                        },
-                        onOpenSession = { sessionId ->
-                            taskMode = null
-                            resetFeatureNavigation()
-                            viewModel.switchSession(sessionId)
-                        },
-                        initialMode = taskMode,
-                    )
-                    LocalFeaturePage.TOOLS -> ToolsScreen(
-                        onClose = ::popFeature,
-                        onOpenTasks = {
-                            taskMode = AutomationMode.WORK
-                            pushFeature(LocalFeaturePage.TASKS)
-                        },
-                        onOpenSettings = { destination ->
-                            settingsDestination = destination
-                            pushFeature(LocalFeaturePage.SETTINGS)
-                        },
-                    )
-                    LocalFeaturePage.SETTINGS -> SettingsScreen(
-                        onClose = {
-                            settingsDestination = SettingsDestination.ROOT
-                            popFeature()
-                        },
-                        initialDestination = settingsDestination,
-                        onCheckUpdate = onCheckUpdate,
-                        updateStatus = updateStatus,
-                    )
-                    LocalFeaturePage.HOME -> LocalConversationSurface(
-                        state = state,
-                        activeModelProfile = activeModelProfile,
-                        sendFeedback = sendFeedback,
-                        streamingState = viewModel.streamingState,
-                        gallery = gallery,
-                        transcriptHistory = transcriptHistory,
-                        modeIntro = modeIntro,
-                        onConfigure = {
-                            settingsDestination = SettingsDestination.ROOT
-                            pushFeature(LocalFeaturePage.SETTINGS)
-                        },
-                        onSelectModel = viewModel::selectModel,
-                        onSend = viewModel::send,
-                        onEditAndResend = viewModel::editAndResendUserMessage,
-                        onSelectMessageVariant = viewModel::selectChatMessageVariant,
-                        onRegenerate = viewModel::regenerateReply,
-                        onGenerateReplySuggestions = viewModel::generateReplySuggestions,
-                        onLoadOlderTranscript = viewModel::loadOlderTranscript,
-                        onImportAttachment = viewModel::importAttachment,
-                        onStop = viewModel::stop,
-                        onNewSession = { showNewSessionMode = true },
-                        onExitGroupChat = viewModel::leaveGroupChatMode,
-                        onOpenRunCenter = { pushFeature(LocalFeaturePage.RUN_CENTER) },
-                        sessionTitle = sessionTitleOverrides[state.sessionId]
-                            ?: shell.sessions.firstOrNull { it.id == state.sessionId }?.title
-                            ?: stringResource(R.string.chatlist_new_session),
-                        sessionPinned = state.sessionId in pinnedSessionIds,
-                        onTogglePinSession = { viewModel.toggleSessionPinned(state.sessionId) },
-                        onRenameSession = { title -> viewModel.renameSession(state.sessionId, title) },
-                        onDeleteSession = { scope.launch { viewModel.deleteSessions(setOf(state.sessionId)) } },
-                        onConfigureChatPersona = viewModel::configureChatPersona,
-                        onConfigureGroupMembers = viewModel::configureGroupChatMembers,
-                        onSelectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
-                        onAutoFillChatPersona = viewModel::autoFillChatPersona,
-                        onSaveGroupAnnouncement = viewModel::setGroupChatAnnouncement,
-                        onGenerateGroupAnnouncement = viewModel::generateGroupChatAnnouncement,
-                        onUndoPersonaCorrection = viewModel::undoChatPersonaCorrection,
-                        onPlanModeChange = viewModel::setPlanMode,
-                        onApprove = viewModel::approve,
-                        onDeny = viewModel::deny,
-                        onAutoApprove = viewModel::enableAutoApproval,
-                        onAutoApprovePending = viewModel::enableAutoApprovalForPending,
-                        onApproveDeviceTurn = viewModel::enableDeviceApprovalLease,
-                        onDisableDeviceTurn = viewModel::disableDeviceApprovalLease,
-                        onDisableAutoApprove = viewModel::disableAutoApproval,
-                        onAnswerQuestion = viewModel::answerQuestion,
-                        onCancelQuestion = viewModel::cancelQuestion,
-                    )
-                }
-            }
+            LocalFeaturePageContent(
+                page = featurePage,
+                filesMode = filesMode,
+                settingsDestination = settingsDestination,
+                taskMode = taskMode,
+                shell = shell,
+                state = state,
+                activeModelProfile = activeModelProfile,
+                sendFeedback = sendFeedback,
+                gallery = gallery,
+                transcriptHistory = transcriptHistory,
+                modeIntro = modeIntro,
+                pinnedSessionIds = pinnedSessionIds,
+                sessionTitleOverrides = sessionTitleOverrides,
+                updateStatus = updateStatus,
+                onCheckUpdate = onCheckUpdate,
+                viewModel = viewModel,
+                onFilesModeChange = { filesMode = it },
+                onSettingsDestinationChange = { settingsDestination = it },
+                onTaskModeChange = { taskMode = it },
+                onPushFeature = ::pushFeature,
+                onPopFeature = ::popFeature,
+                onResetNavigation = ::resetFeatureNavigation,
+                onNewPersona = { showNewPersona = true },
+                onNewSession = { showNewSessionMode = true },
+            )
         }
     }
 
