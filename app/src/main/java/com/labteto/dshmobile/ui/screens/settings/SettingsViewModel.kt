@@ -106,7 +106,7 @@ class SettingsViewModel @Inject constructor(
             hostsStore.settings.collect { _state.value = it }
         }
         refreshAdvancedSettings()
-        viewModelScope.launch { localHarness.refreshChatGpt() }
+        refreshChatGpt()
     }
 
     fun set(transform: (AppSettings) -> AppSettings) {
