@@ -31,7 +31,7 @@ class LocalSettingsRuntime @Inject constructor(
         auth = chatGptAuth,
         requireAccountSelectionAllowed = engine::requireChatGptAccountSelectionAllowed,
         syncModels = engine::syncChatGptModels,
-        retireProfiles = engine::retireChatGptAccountProfiles,
+        retireProfiles = engine.modelAccountStateCoordinator::retireChatGptAccountProfiles,
         removeProfiles = engine::removeChatGptAccountProfiles,
         testAccount = chatGptPlanTester::test,
     )
