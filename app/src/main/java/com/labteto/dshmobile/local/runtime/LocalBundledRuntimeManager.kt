@@ -4,6 +4,9 @@ import android.os.Environment
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -16,9 +19,13 @@ class LocalBundledRuntimeManager @Inject internal constructor(
     private val prepareMutex = Mutex()
 
     suspend fun prepare() = prepareMutex.withLock {
-        node.prepare()
-        python.prepare()
-        git.prepare()
+        coroutineScope {
+            awaitAll(
+                async { node.prepare() },
+                async { python.prepare() },
+                async { git.prepare() },
+            )
+        }
     }
 
     fun searchPaths(): List<File> =
