@@ -15,23 +15,27 @@ internal data class LocalToolCapabilityIntent(
             input: String,
             history: List<JsonObject>,
         ): LocalToolCapabilityIntent {
+            val recentUserInputs = history.asReversed().asSequence()
+                .filter { message -> message["role"]?.jsonPrimitive?.contentOrNull == "user" }
+                .mapNotNull { message -> (message["content"] as? JsonPrimitive)?.contentOrNull }
+                .filterNot(::isSyntheticCheckpoint)
+                .take(4)
+                .toList()
             val context = buildString {
                 append(input.takeLast(4_000))
-                history.asReversed().asSequence()
-                    .filter { message -> message["role"]?.jsonPrimitive?.contentOrNull == "user" }
-                    .mapNotNull { message -> (message["content"] as? JsonPrimitive)?.contentOrNull }
-                    .filterNot(::isSyntheticCheckpoint)
-                    .take(4)
-                    .forEach { content ->
-                        append('\n')
-                        append(content.takeLast(1_500))
-                    }
+                recentUserInputs.forEach { content ->
+                    append('\n')
+                    append(content.takeLast(1_500))
+                }
             }.takeLast(10_000)
-            val normalized = context.lowercase()
+            val githubIntent = sequenceOf(input)
+                .plus(recentUserInputs.asSequence())
+                .mapNotNull(::githubIntentSignal)
+                .firstOrNull()
+                ?: false
             return LocalToolCapabilityIntent(
                 context = context,
-                requestsGitHub = GITHUB_INTENT_MARKERS.any(normalized::contains) ||
-                    PR_INTENT_REGEX.containsMatchIn(normalized),
+                requestsGitHub = githubIntent,
             )
         }
 
@@ -40,6 +44,26 @@ internal data class LocalToolCapabilityIntent(
                 "<compacted-summary>" in content ||
                 "<chat-continuity>" in content
 
+        private fun githubIntentSignal(text: String): Boolean? {
+            val normalized = text.lowercase()
+            if (GITHUB_NEGATION_MARKERS.any(normalized::contains)) return false
+            if (
+                GITHUB_INTENT_MARKERS.any(normalized::contains) ||
+                PR_INTENT_REGEX.containsMatchIn(normalized)
+            ) {
+                return true
+            }
+            return null
+        }
+
+        private val GITHUB_NEGATION_MARKERS = listOf(
+            "不用github",
+            "不使用github",
+            "不要github",
+            "不涉及github",
+            "不涉及远程仓库",
+            "无需远程仓库",
+        )
         private val GITHUB_INTENT_MARKERS = listOf(
             "github",
             "pull request",
