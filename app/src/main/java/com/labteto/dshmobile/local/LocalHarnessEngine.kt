@@ -848,8 +848,7 @@ class LocalHarnessEngine @Inject constructor(
             )
         }
     }
-    internal fun requireChatGptAccountSelectionAllowed() =
-        modelAccountStateCoordinator.requireAccountSelectionAllowed()
+    internal fun requireChatGptAccountSelectionAllowed() = modelAccountStateCoordinator.requireAccountSelectionAllowed()
 
     internal suspend fun syncChatGptModels(
         accountId: String,
@@ -857,8 +856,7 @@ class LocalHarnessEngine @Inject constructor(
         selectFirst: Boolean = true,
     ) = modelAccountStateCoordinator.syncChatGptModels(accountId, models, selectFirst)
 
-    internal suspend fun retireChatGptAccountProfiles(accountId: String) =
-        modelAccountStateCoordinator.retireChatGptAccountProfiles(accountId)
+    internal suspend fun retireChatGptAccountProfiles(accountId: String) = modelAccountStateCoordinator.retireChatGptAccountProfiles(accountId)
 
     internal suspend fun removeChatGptAccountProfiles(accountId: String) =
         modelAccountStateCoordinator.removeChatGptAccountProfiles(accountId)
