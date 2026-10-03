@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 private data class LocalSessionSummaryRecord(
-    val version: Int = 2,
+    val version: Int,
     val id: String,
     val title: String,
     val updatedAt: Long,
@@ -40,6 +40,7 @@ internal class LocalSessionSummaryIndex(
     fun write(summary: LocalSessionSummary, sourceModifiedAt: Long) = synchronized(lock) {
         require(sourceModifiedAt > 0L) { "会话摘要缺少有效源文件代际：${summary.id}" }
         val record = LocalSessionSummaryRecord(
+            version = CURRENT_VERSION,
             id = summary.id,
             title = summary.title,
             updatedAt = summary.updatedAt,
