@@ -140,6 +140,7 @@ internal fun PersonaGalleryOverviewV3(
     var deleting by remember { mutableStateOf(false) }
     val selectedIds = remember { mutableStateListOf<String>() }
     val scope = rememberCoroutineScope()
+    val deleteSelectedFailed = stringResource(R.string.persona_gallery_delete_selected_failed)
 
     fun persistOrder(next: List<String>) {
         orderIds = next
@@ -214,8 +215,7 @@ internal fun PersonaGalleryOverviewV3(
                                     managing = false
                                 }
                                 .onFailure {
-                                    deleteError = it.message
-                                        ?: context.getString(R.string.persona_gallery_delete_selected_failed)
+                                    deleteError = it.message ?: deleteSelectedFailed
                                 }
                             deleting = false
                         }
