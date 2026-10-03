@@ -187,7 +187,6 @@ private val usageDetailSelectionStateSaver =
         save = { state -> encodeUsageDetailSelection(state.value) },
         restore = { saved -> mutableStateOf(decodeUsageDetailSelection(saved)) },
     )
-
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
