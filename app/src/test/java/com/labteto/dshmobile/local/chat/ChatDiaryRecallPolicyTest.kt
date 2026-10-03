@@ -18,8 +18,9 @@ class ChatDiaryRecallPolicyTest {
     @Test
     fun groupRecallKeepsPrivateDiaryOutOfPromptAndInnerNarrativeBounded() {
         val instruction = diaryRecallUsageInstruction(groupAudience = true)
-        assertTrue(instruction.contains("PRIVATE 不进入群聊 Prompt"))
-        assertTrue(instruction.contains("不代表其他成员知情"))
+        assertTrue(instruction.contains("只能使用 disclosure=PUBLIC"))
+        assertTrue(instruction.contains("PRIVATE 与 SHAREABLE 都不得进入群聊 Prompt"))
+        assertTrue(instruction.contains("不代表其他成员此前已经知情"))
         assertTrue(instruction.contains("不得回潮"))
     }
 
