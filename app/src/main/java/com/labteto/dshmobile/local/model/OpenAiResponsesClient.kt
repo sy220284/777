@@ -282,7 +282,10 @@ class OpenAiResponsesClient @Inject constructor(
         if (cacheComparison != null || cacheTtl != null) {
             put("prompt_cache_options", buildJsonObject {
                 cacheComparison?.let { put("comparison_response_id", it.take(512)) }
-                cacheTtl?.let { put("ttl", it) }
+                cacheTtl?.let {
+                    put("mode", "implicit")
+                    put("ttl", it)
+                }
             })
         }
         if (includeEncryptedReasoning) {
