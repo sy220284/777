@@ -4,7 +4,9 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.LocalUsageMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalHarnessUiStateTest {
@@ -22,7 +24,6 @@ class LocalHarnessUiStateTest {
     fun settingsProjectionIgnoresUnrelatedHotRuntimeChanges() {
         val base = LocalHarnessState()
         val hotPathUpdate = base.copy(
-            running = true,
             resources = base.resources.copy(
                 activeModelRequests = 1,
                 activeAgents = 1,
@@ -31,6 +32,13 @@ class LocalHarnessUiStateTest {
         )
 
         assertEquals(base.toSettingsUiState(), hotPathUpdate.toSettingsUiState())
+    }
+
+    @Test
+    fun settingsProjectionLocksModelIdentityDuringStartupOrForegroundRun() {
+        assertTrue(LocalHarnessState(loading = true, running = false).toSettingsUiState().modelIdentityLocked)
+        assertTrue(LocalHarnessState(loading = false, running = true).toSettingsUiState().modelIdentityLocked)
+        assertFalse(LocalHarnessState(loading = false, running = false).toSettingsUiState().modelIdentityLocked)
     }
 
     @Test
