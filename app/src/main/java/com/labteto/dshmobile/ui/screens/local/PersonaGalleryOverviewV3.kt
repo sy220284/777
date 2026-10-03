@@ -578,10 +578,9 @@ private fun PersonaGalleryAddPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DsIconButton(
-                icon = FeatherIcons.ChevronRight,
+                icon = FeatherIcons.ArrowLeft,
                 contentDescription = stringResource(R.string.persona_gallery_back_to_list),
                 onClick = onBack,
-                modifier = Modifier.pointerInput(Unit) {},
             )
             Column(Modifier.weight(1f)) {
                 Text(
