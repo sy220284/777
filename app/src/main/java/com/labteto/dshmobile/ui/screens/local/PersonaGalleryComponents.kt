@@ -487,6 +487,7 @@ private fun PersonaPresetArtworkPreview(
             bitmap = resolvedArtwork,
             contentDescription = preset.persona.name,
             contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
             modifier = Modifier
                 .size(72.dp)
                 .clip(RoundedCornerShape(18.dp)),
@@ -1108,4 +1109,3 @@ private fun personaFieldLabel(field: String): String = when (field) {
     "corrections" -> stringResource(R.string.persona_field_corrections)
     else -> field
 }
-

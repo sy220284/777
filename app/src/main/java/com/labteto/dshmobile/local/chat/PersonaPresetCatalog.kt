@@ -36,6 +36,9 @@ private fun compactPreset(
     id = id,
     franchise = franchise,
     summary = summary,
+    artwork = PersonaPresetArtwork(
+        assetPath = "persona-presets/$id.webp",
+    ),
     persona = PersonaProfile(
         name = name,
         identity = identity,
