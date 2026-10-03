@@ -127,22 +127,6 @@ class LocalSessionEventLog(
         data = data,
     )
 
-    private fun orderedFiles(): List<File> {
-        val parent = file.parentFile ?: return listOfNotNull(file.takeIf(File::isFile))
-        val prefix = "${file.name}.part-"
-        val segments = parent.listFiles().orEmpty()
-            .filter { it.isFile && it.name.startsWith(prefix) &&
-                Regex("[0-9]+(?:\\.gz)?").matches(it.name.removePrefix(prefix)) }
-            .mapNotNull { candidate ->
-                candidate.name.removePrefix(prefix).removeSuffix(".gz").toIntOrNull()
-                    ?.let { it to candidate }
-            }
-            .groupBy({ it.first }, { it.second })
-            .toSortedMap()
-            .values.map { copies -> copies.firstOrNull { !it.name.endsWith(".gz") } ?: copies.first() }
-        return segments + listOfNotNull(file.takeIf(File::isFile))
-    }
-
     private companion object {
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
     }
