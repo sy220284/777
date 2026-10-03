@@ -28,11 +28,15 @@ internal fun composePersonaExpressionSemanticsPrompt(persona: PersonaProfile): S
 
 private fun PersonaProfile.hasIndirectExpressionSemantics(): Boolean {
     val expressionProfile = buildString {
-        append(personality)
+        append(portrait)
         append(' ')
-        append(speechStyle)
+        append(coreTension)
         append(' ')
-        append(behaviorPatterns.joinToString(" "))
+        append(stableTraits.joinToString(" "))
+        append(' ')
+        append(mutableTraits.joinToString(" "))
+        append(' ')
+        append(voiceSamples.joinToString(" "))
         append(' ')
         append(corrections.joinToString(" "))
     }
