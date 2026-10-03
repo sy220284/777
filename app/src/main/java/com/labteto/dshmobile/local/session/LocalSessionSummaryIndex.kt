@@ -8,12 +8,13 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 private data class LocalSessionSummaryRecord(
-    val version: Int = 1,
+    val version: Int = 2,
     val id: String,
     val title: String,
     val updatedAt: Long,
     val usageMode: String,
     val chatMode: String,
+    val groupMemberCount: Int = 0,
     val personaId: String? = null,
     val galleryId: String? = null,
     val blank: Boolean,
@@ -44,6 +45,7 @@ internal class LocalSessionSummaryIndex(
             updatedAt = summary.updatedAt,
             usageMode = summary.usageMode.name,
             chatMode = summary.chatMode.name,
+            groupMemberCount = summary.groupMemberCount,
             personaId = summary.personaId,
             galleryId = summary.galleryId,
             blank = summary.blank,
@@ -94,6 +96,7 @@ internal class LocalSessionSummaryIndex(
             updatedAt = updatedAt,
             usageMode = usage,
             chatMode = mode,
+            groupMemberCount = groupMemberCount,
             personaId = personaId,
             galleryId = galleryId,
             blank = blank,
@@ -122,7 +125,7 @@ internal class LocalSessionSummaryIndex(
     }
 
     private companion object {
-        const val CURRENT_VERSION = 1
+        const val CURRENT_VERSION = 2
         const val SUMMARY_SUFFIX = ".summary"
     }
 }
