@@ -32,9 +32,8 @@ internal class LocalToolExecutionCoordinator(
         summary: String,
     ) -> Boolean,
 ) {
-    fun clearTurnCapabilities(target: MutableSet<String>? = null) {
-        val owned = target ?: enabledOptionalTools
-        synchronized(owned) { owned.clear() }
+    fun clearTurnCapabilities(target: MutableSet<String> = enabledOptionalTools) {
+        synchronized(target) { target.clear() }
     }
 
     fun enabledOptionalSnapshot(): Set<String> =
