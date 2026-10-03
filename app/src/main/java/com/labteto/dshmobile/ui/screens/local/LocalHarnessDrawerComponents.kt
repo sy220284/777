@@ -97,11 +97,9 @@ internal fun DrawerContextCard(
     portraitPath: String,
     group: Boolean,
     running: Boolean,
-    onClick: () -> Unit,
 ) {
     val colors = DsTheme.colors
     Surface(
-        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
         color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
@@ -155,12 +153,6 @@ internal fun DrawerContextCard(
                     )
                 }
             }
-            Icon(
-                FeatherIcons.ChevronRight,
-                contentDescription = null,
-                tint = colors.labelCaption,
-                modifier = Modifier.size(18.dp),
-            )
         }
     }
 }
