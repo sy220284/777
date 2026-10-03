@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
 import com.labteto.dshmobile.local.memory.MemoryStore
 import java.io.File
 import java.util.UUID
@@ -90,7 +91,14 @@ internal class LocalSessionLifecycleCoordinator(
         galleryStoryId: String? = null,
         freshGalleryStory: Boolean = false,
         chatMode: LocalChatMode? = null,
+        groupEntries: List<PersonaGalleryEntry> = emptyList(),
     ) {
+        if (
+            chatMode == LocalChatMode.GROUP &&
+            groupEntries.isNotEmpty() &&
+            groupEntries.distinctBy(PersonaGalleryEntry::id).size !in
+                MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS
+        ) return
         if (!beginTransition()) return
         val sourceId = currentSessionId()
         val sourceState = state.value
@@ -194,6 +202,18 @@ internal class LocalSessionLifecycleCoordinator(
                         ChatCharacterState(behaviorTuning = chatPersona.behaviorTuning)
                     }
 
+                    val initialGroupMembers = if (
+                        resolvedChatMode == LocalChatMode.GROUP && groupEntries.isNotEmpty()
+                    ) {
+                        resolveLocalGroupChatMembers(
+                            entries = groupEntries.take(MAX_GROUP_CHAT_MEMBERS),
+                            previousMembers = emptyList(),
+                            chatPersonaStore = chatPersonaStore,
+                        )
+                    } else {
+                        emptyList()
+                    }
+
                     val chatContext = when {
                         resolvedChatMode == LocalChatMode.GROUP -> ChatContextState()
                         galleryEntry != null && usageMode == LocalUsageMode.CHAT && !freshGalleryStory ->
@@ -245,7 +265,10 @@ internal class LocalSessionLifecycleCoordinator(
                             replySuggestions = emptyList(),
                             chatBranches = LocalChatBranchState(),
                             groupChat = if (resolvedChatMode == LocalChatMode.GROUP) {
-                                continuedGroup ?: LocalGroupChatState(mode = LocalChatMode.GROUP)
+                                continuedGroup ?: LocalGroupChatState(
+                                    mode = LocalChatMode.GROUP,
+                                    members = initialGroupMembers,
+                                )
                             } else LocalGroupChatState(),
                             groupActiveSpeakerName = null,
                             personaCorrectionNotice = null,
