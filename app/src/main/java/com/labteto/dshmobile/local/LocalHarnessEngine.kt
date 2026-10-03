@@ -2314,7 +2314,8 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun isModelIdentityLocked(): Boolean = _state.value.loading || isRunBusy()
+    private fun isModelIdentityLocked(): Boolean =
+        _state.value.let { it.loading || it.running } || isRunBusy()
 
     private fun isRunBusy(): Boolean = synchronized(runStateLock) {
         sessionTransitioning ||
