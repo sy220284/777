@@ -383,14 +383,14 @@ internal class LocalSessionLifecycleCoordinator(
         }
     }
 
-    fun switchSession(sessionId: String) {
-        if (sessionId == currentSessionId()) return
+    fun switchSession(sessionId: String): Boolean {
+        if (sessionId == currentSessionId()) return true
         // Work turns are session-owned: changing the visible conversation only changes the UI
         // projection. Never stop the Work turn, its subagents, terminals or non-persistent jobs here.
         // Chat still uses the legacy visible turn slot; if one is active, close it safely before the
         // shared Chat runtime is replaced.
         val cancelVisibleChatRun = navigationBusy()
-        if (!beginTransition()) return
+        if (!beginTransition()) return false
         state.update { it.copy(loading = true) }
         scope.launch {
             transitionMutex.withLock {
@@ -408,6 +408,7 @@ internal class LocalSessionLifecycleCoordinator(
             continueQueuedModeSwitch()
             startNextQueuedTurnIfIdle()?.start()
         }
+        return true
     }
 
     suspend fun deleteSessions(requestedIds: Set<String>): Int {
