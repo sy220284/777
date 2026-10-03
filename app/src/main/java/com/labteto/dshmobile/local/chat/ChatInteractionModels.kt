@@ -22,6 +22,8 @@ data class RelationshipDynamics(
     val hypotheses: List<RelationshipEvidence> = emptyList(),
     val unknowns: List<String> = emptyList(),
     val sharedMoments: List<String> = emptyList(),
+    /** Shared objects, private jokes and small promises that make the relationship feel lived-in. */
+    val sharedObjects: List<String> = emptyList(),
 )
 
 @Serializable
@@ -81,6 +83,8 @@ data class ChatContinuityState(
 
 @Serializable
 data class ChatCharacterState(
+    /** Short-lived bodily condition that can naturally affect attention and reply length. */
+    val physicalState: String = "",
     val mood: String = "自然",
     val relationshipState: String = "熟悉中",
     val currentFocus: String = "",
