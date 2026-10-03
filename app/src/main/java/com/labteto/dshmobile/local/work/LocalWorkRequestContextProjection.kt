@@ -8,9 +8,9 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Derives a bounded Work-only request surface from the durable model history.
  *
- * The durable/session history remains the source of truth. Older semantic history is represented by
- * the existing trusted work checkpoint while a recent verbatim tail stays available to the model.
- * This mirrors the "full facts + bounded model projection" split used by the reference Harnesses.
+ * Work is state-driven rather than transcript-driven: complete facts stay durable, the model sees
+ * a trusted active-work checkpoint plus a recent causal tail, and old tool payloads leave the hot
+ * request early while remaining recoverable through tool_output_read/session_event_search.
  */
 internal data class LocalWorkRequestProjection(
     val messages: List<JsonObject>,
@@ -19,7 +19,6 @@ internal data class LocalWorkRequestProjection(
     val estimatedTokensAfter: Int,
     val omittedMessages: Int = 0,
 )
-
 
 internal fun workSteadyStateHistoryBudget(
     base: LocalHistoryBudget,
@@ -51,6 +50,7 @@ internal fun projectWorkRequestContext(
     compactor: LocalHistoryCompactor,
     operationalLimitTokens: Int,
     measuredPressure: LocalPromptPressure? = null,
+    structuredWorkState: LocalStructuredWorkState? = null,
 ): LocalWorkRequestProjection {
     val limit = operationalLimitTokens.coerceAtLeast(1)
     val beforePressure = measuredPressure ?: LocalPromptPressureMeter.measure(
@@ -58,71 +58,82 @@ internal fun projectWorkRequestContext(
         tools = tools,
         operationalLimitTokens = limit,
     )
+    val budget = workRequestBudget(limit)
+
+    // Large command/file outputs are the fastest-growing part of Work history. Keep only the two
+    // newest results verbatim; older full payloads remain in LocalToolOutputStore and are readable
+    // by call_id, so shrinking their model-facing copies does not remove capability.
+    val staleToolProjection = projectStaleToolResults(
+        history = messages,
+        budget = budget,
+        keepRecentToolResults = WORK_REQUEST_RECENT_TOOL_RESULTS,
+    )
+    val toolProjectedMessages = staleToolProjection?.messages ?: messages
+    val toolProjectedPressure = if (staleToolProjection != null) {
+        LocalPromptPressureMeter.measure(
+            messages = toolProjectedMessages,
+            tools = tools,
+            operationalLimitTokens = limit,
+        )
+    } else {
+        beforePressure
+    }
+
     val trigger = workRequestProjectionTriggerTokens(limit)
-    if (beforePressure.estimatedInputTokens <= trigger) {
+    if (toolProjectedPressure.estimatedInputTokens <= trigger) {
         return LocalWorkRequestProjection(
-            messages = messages,
-            projected = false,
+            messages = toolProjectedMessages,
+            projected = staleToolProjection != null,
             estimatedTokensBefore = beforePressure.estimatedInputTokens,
-            estimatedTokensAfter = beforePressure.estimatedInputTokens,
+            estimatedTokensAfter = toolProjectedPressure.estimatedInputTokens,
         )
     }
 
-    val target = workRequestProjectionTargetTokens(limit)
-    val leadingSystemCount = messages.takeWhile { message ->
+    val leadingSystemCount = toolProjectedMessages.takeWhile { message ->
         message["role"]?.jsonPrimitive?.contentOrNull == "system"
     }.size
-    val protectedHead = messages.take(leadingSystemCount)
+    val protectedHead = toolProjectedMessages.take(leadingSystemCount)
     val compactableMessages = if (leadingSystemCount > 1) {
-        listOf(protectedHead.first()) + messages.drop(leadingSystemCount)
+        listOf(protectedHead.first()) + toolProjectedMessages.drop(leadingSystemCount)
     } else {
-        messages
+        toolProjectedMessages
     }
     val protectedHeadTokens = protectedHead.drop(1).sumOf { estimateModelTokens(it.toString()) }
     val historyTokens = compactableMessages.sumOf { estimateModelTokens(it.toString()) }
     val historyChars = compactableMessages.sumOf { it.toString().length }
-    val budget = LocalHistoryBudget(
-        // Token pressure owns the Work request projection. Character limits remain a separate heap
-        // guard and should not accidentally make this route-specific projection more aggressive.
-        maxHistoryChars = Int.MAX_VALUE / 4,
-        tailChars = WORK_REQUEST_TAIL_CHARS,
-        maxSummaryChars = WORK_REQUEST_SUMMARY_CHARS,
-        maxToolResultChars = WORK_REQUEST_TOOL_RESULT_CHARS,
-        maxHistoryTokens = target,
-        tailTokens = minOf(WORK_REQUEST_TAIL_TOKENS, (target * 0.38).toInt().coerceAtLeast(1_024)),
-        maxToolResultTokens = WORK_REQUEST_TOOL_RESULT_TOKENS,
-    )
+
     val compacted = compactHistoryWithStaleToolProjection(
         history = compactableMessages,
         compactor = compactor,
         budget = budget,
-        extraTokens = beforePressure.toolDefinitionTokens + protectedHeadTokens,
+        extraTokens = toolProjectedPressure.toolDefinitionTokens + protectedHeadTokens,
         summaryMode = LocalHistorySummaryMode.WORK,
         currentChars = historyChars,
         currentTokens = historyTokens,
+        structuredWorkState = structuredWorkState,
     ) ?: return LocalWorkRequestProjection(
-        messages = messages,
-        projected = false,
+        messages = toolProjectedMessages,
+        projected = staleToolProjection != null,
         estimatedTokensBefore = beforePressure.estimatedInputTokens,
-        estimatedTokensAfter = beforePressure.estimatedInputTokens,
+        estimatedTokensAfter = toolProjectedPressure.estimatedInputTokens,
     )
+
     val projectedMessages = if (leadingSystemCount > 1) {
         protectedHead + compacted.messages.drop(1)
     } else {
         compacted.messages
     }
-
     val afterPressure = LocalPromptPressureMeter.measure(
         messages = projectedMessages,
         tools = tools,
         operationalLimitTokens = limit,
     )
-    if (afterPressure.estimatedInputTokens >= beforePressure.estimatedInputTokens) {
+    if (afterPressure.estimatedInputTokens >= toolProjectedPressure.estimatedInputTokens) {
         return LocalWorkRequestProjection(
-            messages = messages,
-            projected = false,
+            messages = toolProjectedMessages,
+            projected = staleToolProjection != null,
             estimatedTokensBefore = beforePressure.estimatedInputTokens,
-            estimatedTokensAfter = beforePressure.estimatedInputTokens,
+            estimatedTokensAfter = toolProjectedPressure.estimatedInputTokens,
         )
     }
     return LocalWorkRequestProjection(
@@ -151,10 +162,27 @@ internal fun workRequestProjectionTriggerTokens(operationalLimitTokens: Int): In
     ).coerceAtMost(limit)
 }
 
-private const val WORK_REQUEST_TARGET_TOKENS = 64_000
-private const val WORK_REQUEST_TRIGGER_TOKENS = 80_000
-private const val WORK_REQUEST_TAIL_TOKENS = 24_000
-private const val WORK_REQUEST_TAIL_CHARS = 96_000
-private const val WORK_REQUEST_SUMMARY_CHARS = 12_000
-private const val WORK_REQUEST_TOOL_RESULT_CHARS = 24_000
-private const val WORK_REQUEST_TOOL_RESULT_TOKENS = 8_000
+private fun workRequestBudget(limit: Int): LocalHistoryBudget {
+    val target = workRequestProjectionTargetTokens(limit)
+    return LocalHistoryBudget(
+        maxHistoryChars = Int.MAX_VALUE / 4,
+        tailChars = WORK_REQUEST_TAIL_CHARS,
+        maxSummaryChars = WORK_REQUEST_SUMMARY_CHARS,
+        maxToolResultChars = WORK_REQUEST_TOOL_RESULT_CHARS,
+        maxHistoryTokens = target,
+        tailTokens = minOf(
+            WORK_REQUEST_TAIL_TOKENS,
+            (target * 0.38).toInt().coerceAtLeast(1_024),
+        ),
+        maxToolResultTokens = WORK_REQUEST_TOOL_RESULT_TOKENS,
+    )
+}
+
+private const val WORK_REQUEST_TARGET_TOKENS = 28_000
+private const val WORK_REQUEST_TRIGGER_TOKENS = 36_000
+private const val WORK_REQUEST_TAIL_TOKENS = 10_000
+private const val WORK_REQUEST_TAIL_CHARS = 40_000
+private const val WORK_REQUEST_SUMMARY_CHARS = 8_000
+private const val WORK_REQUEST_TOOL_RESULT_CHARS = 8_000
+private const val WORK_REQUEST_TOOL_RESULT_TOKENS = 2_400
+private const val WORK_REQUEST_RECENT_TOOL_RESULTS = 2
