@@ -22,17 +22,20 @@ class LocalToolPolicyTest {
 
     @Test fun ordinaryExecutionToolsStayCoreWhileNarrowCapabilitiesAreDeferred() {
         for (name in listOf(
-            "read", "write", "edit", "apply_patch", "bash", "job_output",
-            "capability_search", "update_plan", "skill", "subagent", "workflow",
-            "memory_search", "session_event_search", "present",
+            "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect",
+            "list_files", "glob", "grep", "bash", "capability_search", "update_plan",
+            "exit_plan_mode", "ask_user_question", "subagent", "session_event_search",
         )) {
             assertEquals(name, ToolExposure.CORE, LocalToolPolicy.exposure(name))
         }
         for (name in listOf(
             "web_search", "web_fetch", "http_request", "download_file", "network_diagnose",
-            "todo_write", "create_goal", "update_goal", "memory_list", "memory_remember",
-            "memory_update", "memory_forget", "session_trace", "session_event_trace",
-            "session_event_read",
+            "job_list", "job_output", "job_kill", "json_query", "environment_info",
+            "todo_write", "create_goal", "get_goal", "update_goal", "skill",
+            "subagent_fork", "list_subagent_models", "list_agents", "send_message",
+            "interrupt_agent", "workflow", "memory_search", "memory_list", "memory_remember",
+            "memory_update", "memory_forget", "session_search", "session_trace",
+            "session_event_trace", "session_event_read", "present",
         )) {
             assertEquals(name, ToolExposure.OPTIONAL, LocalToolPolicy.exposure(name))
         }
