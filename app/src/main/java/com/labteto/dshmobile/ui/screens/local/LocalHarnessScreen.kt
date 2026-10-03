@@ -260,6 +260,7 @@ fun LocalHarnessScreen(
                 workModelLabel = activeModelProfile?.displayName
                     ?: activeModelProfile?.model
                     ?: stringResource(R.string.local_model_setup),
+                groupChatEnabled = shell.groupChat.enabled,
                 running = shell.running,
                 onUsageModeChange = { showDiary = false; switchUsageMode(it) },
                 onNewSession = {
