@@ -12,9 +12,7 @@ import com.labteto.dshmobile.local.model.chatgpt.isUsableChatGptPlanBinding
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 data class LocalResolvedCredential(
@@ -37,11 +35,11 @@ class LocalModelCredentialResolver @Inject constructor(
     private val apiKeys: LocalApiKeyStore,
     private val chatGptAccounts: ChatGptAccountStore,
     private val chatGptSessions: ChatGptSessionManager,
+    private val planAuthorizationEvents: com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanAuthorizationEvents,
 ) {
     private val _activeProfile = MutableStateFlow<LocalModelProfile?>(null)
-    private val _invalidatedChatGptAccounts = MutableSharedFlow<String>(extraBufferCapacity = 16)
     val activeProfile = _activeProfile.asStateFlow()
-    val invalidatedChatGptAccounts = _invalidatedChatGptAccounts.asSharedFlow()
+    val invalidatedChatGptAccounts = planAuthorizationEvents.invalidatedAccounts
 
     fun activate(profile: LocalModelProfile) {
         _activeProfile.value = profile
@@ -130,7 +128,7 @@ class LocalModelCredentialResolver @Inject constructor(
         val accountId = profile.credentialRef?.takeIf(String::isNotBlank) ?: return null
         val account = chatGptAccounts.get(accountId)
         if (!isUsableChatGptPlanBinding(accountId, account)) {
-            _invalidatedChatGptAccounts.tryEmit(accountId)
+            planAuthorizationEvents.invalidate(accountId)
             return null
         }
         return account
@@ -138,7 +136,7 @@ class LocalModelCredentialResolver @Inject constructor(
 
     private suspend fun reportInvalidChatGptBinding(accountId: String) {
         if (!isUsableChatGptPlanBinding(accountId, chatGptAccounts.get(accountId))) {
-            _invalidatedChatGptAccounts.tryEmit(accountId)
+            planAuthorizationEvents.invalidate(accountId)
         }
     }
 }
