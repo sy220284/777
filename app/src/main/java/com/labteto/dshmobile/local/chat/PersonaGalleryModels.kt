@@ -41,6 +41,9 @@ data class PersonaGalleryStory(
             chatState.dynamics.sharedMoments.takeLast(6).takeIf { it.isNotEmpty() }?.let {
                 appendLine("已发生的共同经历：${it.joinToString("；").take(800)}")
             }
+            chatState.dynamics.sharedObjects.takeLast(6).takeIf { it.isNotEmpty() }?.let {
+                appendLine("仍有生命的小物件、共同梗和约定：${it.joinToString("；").take(700)}")
+            }
             chatState.unresolvedThreads.takeLast(3).takeIf { it.isNotEmpty() }?.let {
                 appendLine("仍待推进的线索：${it.joinToString("；").take(400)}")
             }
@@ -72,11 +75,6 @@ data class PersonaGalleryEntry(
     val portraitPath: String = "",
     val groupChatState: ChatCharacterState = ChatCharacterState(),
     val stories: List<PersonaGalleryStory> = emptyList(),
-    // V3 compatibility fields. They are migrated into stories and cleared on the first V4 read.
-    val storyNotes: String = "",
-    val history: List<LocalHarnessMessage> = emptyList(),
-    val chatState: ChatCharacterState = ChatCharacterState(),
-    val sourceSessionId: String = "",
     val updatedAt: Long = 0L,
 ) {
     fun story(storyId: String?): PersonaGalleryStory? =
@@ -101,14 +99,14 @@ data class PersonaGallerySaveOutcome(
 
 @Serializable
 internal data class PersonaShareEnvelope(
-    val schema: Int = 1,
+    val schema: Int = 2,
     val source: String = "神言神语",
     val persona: PersonaProfile,
 )
 
 @Serializable
 internal data class GalleryDocument(
-    val version: Int = 4,
+    val version: Int = 5,
     val entries: List<PersonaGalleryEntry> = emptyList(),
 )
 
