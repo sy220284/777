@@ -37,6 +37,7 @@ internal class LocalModelRequestCoordinator(
     private val persistOverflowCompaction: (LocalHarnessState, LocalHistorySummaryMode) -> Unit,
     private val pressureStore: LocalRequestPressureStore = LocalRequestPressureStore(),
     private val promptCacheBaselines: LocalPromptCacheBaselineStore = LocalPromptCacheBaselineStore(),
+    private val promptCacheContinuity: LocalPromptCacheContinuityStore = LocalPromptCacheContinuityStore(),
     private val maxStreamPreviewChars: Int = 4_096,
     private val streamPreviewIntervalMs: Long = 50L,
 ) {
@@ -129,6 +130,16 @@ internal class LocalModelRequestCoordinator(
             )
         }
         val requestMessages = workProjection.messages
+        val prefixAssessment = if (cachePolicy.mode != LocalPromptCacheMode.NONE) {
+            promptCacheContinuity.assess(
+                snapshot.sessionId,
+                routeFingerprint,
+                requestMessages,
+                tools,
+            )
+        } else {
+            null
+        }
         val pressure = if (workProjection.projected) {
             LocalPromptPressureMeter.measure(
                 messages = requestMessages,
@@ -210,6 +221,13 @@ internal class LocalModelRequestCoordinator(
             put("prompt_cache_key_enabled", promptCacheKey != null)
             put("prompt_cache_ttl_enabled", promptCacheTtl != null)
             put("cache_preserve_tool_surface", cachePolicy.preserveToolSurface)
+            prefixAssessment?.let { cache ->
+                put("cache_series_generation", cache.generation)
+                put("cache_prefix_continuity", cache.continuity.name.lowercase())
+                put("cache_tool_surface_stable", cache.toolSurfaceStable)
+                put("cache_message_prefix_stable", cache.messagePrefixStable)
+                put("cache_previous_message_count", cache.previousMessageCount)
+            }
             frozenProfile.credentialRef?.takeLast(8)?.let { put("credential_ref_tail", it) }
             credentialDiagnostic.clientIdTail?.let { put("client_id_tail", it) }
             credentialDiagnostic.selectedAccountTail?.let { put("selected_account_tail", it) }
@@ -484,6 +502,15 @@ internal class LocalModelRequestCoordinator(
                             }.also { reply ->
                                 streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
                                 streamPreview.flush()
+                                prefixAssessment?.let { cache ->
+                                    promptCacheContinuity.recordSuccess(
+                                        snapshot.sessionId,
+                                        routeFingerprint,
+                                        requestMessages,
+                                        tools,
+                                        cache.generation,
+                                    )
+                                }
                                 if (reply.usage.reported) {
                                     pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
                                 }
