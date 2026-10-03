@@ -51,7 +51,7 @@ object DsAnimations {
      * Composer single-row ↔ two-row reveal. Short and unbouncy so it follows the platform IME
      * instead of finishing with a delayed spring settle.
      */
-    val composerReveal: FiniteAnimationSpec<Int> = tween(220, easing = FastOutSlowInEasing)
+    val composerReveal: FiniteAnimationSpec<IntSize> = tween(220, easing = FastOutSlowInEasing)
 
     /** Controls fade slightly faster than the geometry changes. */
     val composerFade: FiniteAnimationSpec<Float> = tween(120, easing = FastOutSlowInEasing)
