@@ -277,9 +277,7 @@ internal class LocalSubagentRunner(
                     }
                     historyPolicy.compactHistory(
                         history, subagentId,
-                        runHistoryBudget?.let {
-                            workSteadyStateHistoryBudget(it, history.estimatedTokens, cachePolicy = runCachePolicy)
-                        },
+                        runHistoryBudget?.let { workSteadyStateHistoryBudget(it, history.estimatedTokens, cachePolicy = runCachePolicy) },
                     )
                     modelStep += 1
                     val durableHistory = history.snapshot()
