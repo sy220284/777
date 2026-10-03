@@ -42,11 +42,11 @@ fun DsIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    selected: Boolean = false,
     tint: Color = DsTheme.colors.labelSecondary,
     iconSize: Dp = 20.dp,
     containerColor: Color = Color.Transparent,
     shadowElevation: Dp = 0.dp,
+    selected: Boolean = false,
 ) {
     val colors = DsTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
