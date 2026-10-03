@@ -29,6 +29,7 @@
     <string name="persona_gallery_compact_meta">%1$d 条故事 · %2$d 条对白</string>
     <string name="persona_gallery_detail_stories">故事</string>
     <string name="persona_gallery_detail_more">人物资料与管理</string>
+    <string name="persona_gallery_detail_less">收起人物资料与管理</string>
     <string name="local_empty_workspace_title">工作空间还是空的</string>
     <string name="local_empty_workspace_body">Agent 创建或修改文件后，会在这里按目录显示。</string>
     <string name="local_empty_involved_title">还没有涉及文件</string>
