@@ -47,22 +47,6 @@ internal fun resolveCharacterAttention(
     )
 }
 
-internal fun renderCharacterAttentionPrompt(projection: CharacterAttentionProjection): String {
-    if (projection.noticed.isEmpty() && projection.possibleBlindSpot.isBlank()) return ""
-    return buildString {
-        appendLine("【本轮注意力】")
-        if (projection.noticed.isNotEmpty()) {
-            appendLine("第一眼更容易接住：${projection.noticed.joinToString("；")}")
-        }
-        projection.possibleBlindSpot.takeIf(String::isNotBlank)?.let {
-            appendLine("已有认知盲点可能影响理解：$it")
-        }
-        append(
-            "注意力只决定自然篇幅和先后，不制造误解；真正的信息型问题、拒绝、边界、承诺和重要事实必须优先准确处理。",
-        )
-    }.trim()
-}
-
 internal fun relatedAttentionText(left: String, right: String): Boolean {
     val a = normalizeAttentionText(left)
     val b = normalizeAttentionText(right)

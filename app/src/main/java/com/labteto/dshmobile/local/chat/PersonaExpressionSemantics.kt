@@ -12,11 +12,3 @@ internal fun StringBuilder.appendPersonaExpressionContext(persona: PersonaProfil
     }
 }
 
-internal fun composePersonaExpressionSemanticsPrompt(persona: PersonaProfile): String {
-    val corrections = persona.corrections.takeLast(6)
-    if (corrections.isEmpty()) return ""
-    return buildString {
-        appendLine("【用户纠正｜最高优先】")
-        append(corrections.joinToString("；"))
-    }.trim()
-}
