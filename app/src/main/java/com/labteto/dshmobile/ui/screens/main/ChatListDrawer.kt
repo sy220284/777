@@ -84,13 +84,10 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
-
 internal data class DrawerSessionSections(
     val current: SessionRow?,
     val history: List<SessionRow>,
 )
-
 /**
  * Split the harness's existing session-list records for the drawer.
  *
