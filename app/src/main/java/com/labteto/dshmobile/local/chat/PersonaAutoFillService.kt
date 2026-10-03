@@ -21,24 +21,25 @@ import kotlinx.serialization.json.put
 
 internal data class PersonaDraft(
     val name: String = "",
-    val identity: String = "",
-    val background: String = "",
-    val personality: String = "",
-    val speechStyle: String = "",
-    val relationship: String = "",
+    val portrait: String = "",
+    val lifeContext: String = "",
+    val attentionBiases: List<String> = emptyList(),
+    val perceptionBlindSpots: List<String> = emptyList(),
+    val quirks: List<String> = emptyList(),
+    val limitations: List<String> = emptyList(),
+    val coreValues: List<String> = emptyList(),
+    val coreTension: String = "",
+    val stableTraits: List<String> = emptyList(),
+    val mutableTraits: List<String> = emptyList(),
+    val initialUserImpression: String = "",
+    val voiceSamples: List<String> = emptyList(),
     val worldSetting: String = "",
     val franchise: String = "",
     val timelinePosition: String = "",
-    val coreMotivations: List<String> = emptyList(),
-    val valuePriorities: List<String> = emptyList(),
-    val behaviorPatterns: List<String> = emptyList(),
-    val internalContradictions: List<String> = emptyList(),
     val knowledgeBoundary: List<String> = emptyList(),
     val loreEntries: List<PersonaLoreEntry> = emptyList(),
     val hardConstraints: List<String> = emptyList(),
-    val exampleDialogues: List<String> = emptyList(),
     val bannedPhrases: List<String> = emptyList(),
-    val signaturePhrases: List<String> = emptyList(),
 )
 
 internal fun parsePersonaDraft(json: Json, raw: String): PersonaDraft {
@@ -48,26 +49,27 @@ internal fun parsePersonaDraft(json: Json, raw: String): PersonaDraft {
 
     return PersonaDraft(
         name = root.text("name"),
-        identity = root.text("identity"),
-        background = root.text("background"),
-        personality = root.text("personality"),
-        speechStyle = root.text("speechStyle"),
-        relationship = root.text("relationship"),
+        portrait = root.text("portrait"),
+        lifeContext = root.text("lifeContext"),
+        attentionBiases = root.stringList("attentionBiases"),
+        perceptionBlindSpots = root.stringList("perceptionBlindSpots"),
+        quirks = root.stringList("quirks"),
+        limitations = root.stringList("limitations"),
+        coreValues = root.stringList("coreValues"),
+        coreTension = root.text("coreTension"),
+        stableTraits = root.stringList("stableTraits"),
+        mutableTraits = root.stringList("mutableTraits"),
+        initialUserImpression = root.text("initialUserImpression"),
+        voiceSamples = root.stringList("voiceSamples"),
         worldSetting = root.text("worldSetting"),
         franchise = root.text("franchise"),
         timelinePosition = root.text("timelinePosition"),
-        coreMotivations = root.stringList("coreMotivations"),
-        valuePriorities = root.stringList("valuePriorities"),
-        behaviorPatterns = root.stringList("behaviorPatterns"),
-        internalContradictions = root.stringList("internalContradictions"),
         knowledgeBoundary = root.stringList("knowledgeBoundary"),
         loreEntries = root.loreEntries(),
         hardConstraints = root.stringList("hardConstraints"),
-        exampleDialogues = root.stringList("exampleDialogues"),
         bannedPhrases = root.stringList("bannedPhrases"),
-        signaturePhrases = root.stringList("signaturePhrases"),
     )
-}
+}}
 
 private fun JsonObject.text(name: String): String =
     (this[name] as? JsonPrimitive)
@@ -267,33 +269,26 @@ class PersonaAutoFillService @Inject constructor(
         }
 
         val currentContext = buildString {
-            appendLine("当前默认角色中已填写的内容：")
+            appendLine("当前人物生命资料中已填写的内容：")
             appendLine("名称：${current.name}")
-            if (current.identity.isNotBlank()) appendLine("身份：${current.identity}")
-            if (current.background.isNotBlank()) appendLine("背景：${current.background}")
-            if (current.personality.isNotBlank()) appendLine("性格：${current.personality}")
-            if (current.speechStyle.isNotBlank()) appendLine("说话方式：${current.speechStyle}")
-            if (current.relationship.isNotBlank()) appendLine("与用户关系：${current.relationship}")
+            if (current.portrait.isNotBlank()) appendLine("人物整体：${current.portrait}")
+            if (current.lifeContext.isNotBlank()) appendLine("独立生活：${current.lifeContext}")
+            if (current.attentionBiases.isNotEmpty()) appendLine("天然注意：${current.attentionBiases.joinToString("；")}")
+            if (current.perceptionBlindSpots.isNotEmpty()) appendLine("容易漏掉/误读：${current.perceptionBlindSpots.joinToString("；")}")
+            if (current.quirks.isNotEmpty()) appendLine("小习惯：${current.quirks.joinToString("；")}")
+            if (current.limitations.isNotEmpty()) appendLine("不擅长：${current.limitations.joinToString("；")}")
+            if (current.coreValues.isNotEmpty()) appendLine("真正重要：${current.coreValues.joinToString("；")}")
+            if (current.coreTension.isNotBlank()) appendLine("长期拉扯：${current.coreTension}")
+            if (current.stableTraits.isNotEmpty()) appendLine("稳定部分：${current.stableTraits.joinToString("；")}")
+            if (current.mutableTraits.isNotEmpty()) appendLine("可缓慢变化：${current.mutableTraits.joinToString("；")}")
+            if (current.initialUserImpression.isNotBlank()) appendLine("对用户初始印象：${current.initialUserImpression}")
+            if (current.voiceSamples.isNotEmpty()) appendLine("自然声音样本：${current.voiceSamples.joinToString("；")}")
             if (current.worldSetting.isNotBlank()) appendLine("世界设定：${current.worldSetting}")
             if (current.franchise.isNotBlank()) appendLine("作品来源：${current.franchise}")
             if (current.timelinePosition.isNotBlank()) appendLine("时间线：${current.timelinePosition}")
-            if (current.coreMotivations.isNotEmpty()) appendLine("核心动机：${current.coreMotivations.joinToString("；")}")
-            if (current.valuePriorities.isNotEmpty()) appendLine("价值排序：${current.valuePriorities.joinToString("；")}")
-            if (current.behaviorPatterns.isNotEmpty()) appendLine("行为模式：${current.behaviorPatterns.joinToString("；")}")
-            if (current.internalContradictions.isNotEmpty()) appendLine("内在矛盾：${current.internalContradictions.joinToString("；")}")
             if (current.knowledgeBoundary.isNotEmpty()) appendLine("知识边界：${current.knowledgeBoundary.joinToString("；")}")
-            if (current.hardConstraints.isNotEmpty()) {
-                appendLine("不可违反：${current.hardConstraints.joinToString("；")}")
-            }
-            if (current.exampleDialogues.isNotEmpty()) {
-                appendLine("对白参考：${current.exampleDialogues.joinToString("；")}")
-            }
-            if (current.bannedPhrases.isNotEmpty()) {
-                appendLine("禁用表达：${current.bannedPhrases.joinToString("；")}")
-            }
-            if (current.signaturePhrases.isNotEmpty()) {
-                appendLine("常用表达：${current.signaturePhrases.joinToString("；")}")
-            }
+            if (current.hardConstraints.isNotEmpty()) appendLine("不可违反：${current.hardConstraints.joinToString("；")}")
+            if (current.bannedPhrases.isNotEmpty()) appendLine("禁用表达：${current.bannedPhrases.joinToString("；")}")
         }.trim()
 
         val userPrompt = buildString {
@@ -395,25 +390,27 @@ class PersonaAutoFillService @Inject constructor(
         current.copy(
             id = PersonaProfile.DEFAULT_PERSONA_ID,
             name = draft.name.ifBlank { current.name.ifBlank { "默认角色" } },
-            identity = draft.identity.ifBlank { current.identity },
-            background = draft.background.ifBlank { current.background },
-            personality = draft.personality.ifBlank { current.personality },
-            speechStyle = draft.speechStyle.ifBlank { current.speechStyle },
-            relationship = draft.relationship.ifBlank { current.relationship },
+            portrait = draft.portrait.ifBlank { current.portrait },
+            lifeContext = draft.lifeContext.ifBlank { current.lifeContext },
+            attentionBiases = draft.attentionBiases.ifEmpty { current.attentionBiases },
+            perceptionBlindSpots = draft.perceptionBlindSpots.ifEmpty { current.perceptionBlindSpots },
+            quirks = draft.quirks.ifEmpty { current.quirks },
+            limitations = draft.limitations.ifEmpty { current.limitations },
+            coreValues = draft.coreValues.ifEmpty { current.coreValues },
+            coreTension = draft.coreTension.ifBlank { current.coreTension },
+            stableTraits = draft.stableTraits.ifEmpty { current.stableTraits },
+            mutableTraits = draft.mutableTraits.ifEmpty { current.mutableTraits },
+            initialUserImpression = draft.initialUserImpression.ifBlank { current.initialUserImpression },
+            voiceSamples = draft.voiceSamples.ifEmpty { current.voiceSamples },
             worldSetting = draft.worldSetting.ifBlank { current.worldSetting },
             franchise = draft.franchise.ifBlank { current.franchise },
             timelinePosition = draft.timelinePosition.ifBlank { current.timelinePosition },
-            coreMotivations = draft.coreMotivations.ifEmpty { current.coreMotivations },
-            valuePriorities = draft.valuePriorities.ifEmpty { current.valuePriorities },
-            behaviorPatterns = draft.behaviorPatterns.ifEmpty { current.behaviorPatterns },
-            internalContradictions = draft.internalContradictions.ifEmpty { current.internalContradictions },
             knowledgeBoundary = draft.knowledgeBoundary.ifEmpty { current.knowledgeBoundary },
             loreEntries = draft.loreEntries.ifEmpty { current.loreEntries },
             hardConstraints = draft.hardConstraints.ifEmpty { current.hardConstraints },
-            exampleDialogues = draft.exampleDialogues.ifEmpty { current.exampleDialogues },
             bannedPhrases = draft.bannedPhrases.ifEmpty { current.bannedPhrases },
-            signaturePhrases = draft.signaturePhrases.ifEmpty { current.signaturePhrases },
         )
+        }
         }
     }
 
@@ -424,20 +421,25 @@ class PersonaAutoFillService @Inject constructor(
         const val MAX_REPAIR_CHARS = 24_000
 
         val SYSTEM_PROMPT = """
-            你负责把角色需求整理成结构化角色卡，只输出可解析 JSON，不解释。
+            你负责把角色需求整理成“人物生命资料”，只输出可解析 JSON，不解释。
 
-            字段：name, identity, background, personality, speechStyle, relationship,
-            worldSetting, franchise, timelinePosition, coreMotivations, valuePriorities,
-            behaviorPatterns, internalContradictions, knowledgeBoundary, loreEntries,
-            hardConstraints, exampleDialogues, bannedPhrases, signaturePhrases。
+            字段：name, portrait, lifeContext, attentionBiases, perceptionBlindSpots, quirks,
+            limitations, coreValues, coreTension, stableTraits, mutableTraits,
+            initialUserImpression, voiceSamples, worldSetting, franchise, timelinePosition,
+            knowledgeBoundary, loreEntries, hardConstraints, bannedPhrases。
 
             规则：
-            1. 用户明确设定和已有字段优先；name 必填，未知信息可省略，只做低风险补全。
-            2. identity/background 写身份与经历；personality/speechStyle 写稳定性格与可执行表达；relationship 写与用户的长期互动边界。
-            3. coreMotivations/valuePriorities/behaviorPatterns/internalContradictions 写长期驱动、价值排序、稳定行为和内在拉扯；knowledgeBoundary/timelinePosition 明确认知范围与剧情阶段。
-            4. loreEntries 仅保存稳定世界资料，每项为 {"id":"","title":"","content":"","keywords":[],"secondaryKeywords":[],"priority":50,"alwaysOn":false,"spoilerLevel":0}，优先0～6条；hardConstraints 3～8条，exampleDialogues 2～4条；禁用词和惯用语保持少量。
-            5. 出现明确角色名时替换占位名；数组使用 JSON 数组。
-            6. 优先保证 JSON 完整；单文本尽量≤500字，数组≤8项。
+            1. 用户明确设定和已有资料优先；name 必填，未知信息留空，禁止为了填满字段编造经历。
+            2. portrait 用200～500字像熟人介绍这个人的自然叙述：身份、处境、气质和长期选择逻辑揉在一起，禁止人格测试式标签堆砌。
+            3. lifeContext 写用户不在时这个人怎样生活：工作/学业、身边的人、持续压力、小计划和未完成事情。不要让全部生活围着用户转。
+            4. attentionBiases 写3～5个“首先会注意什么”；perceptionBlindSpots 写1～3个容易漏听、误读或判断不完整的方向。
+            5. quirks 写无需创伤解释的小坚持和习惯；limitations 写真实不擅长的事。不要把每个习惯都心理学化。
+            6. coreValues 最多3项；coreTension 只保留一个长期矛盾；stableTraits / mutableTraits 区分不容易改变与能被共同经历缓慢改变的部分。
+            7. initialUserImpression 是角色主观看法，允许有偏差；不得伪造已经发生的共同经历。
+            8. voiceSamples 生成6～12条长短混杂的自然聊天样本，至少一半平淡普通；只体现节奏，不生成固定口头禅、频率规则、反应表或“用户说X就回Y”。
+            9. loreEntries 只保存稳定世界资料，每项为 {"id":"","title":"","content":"","keywords":[],"secondaryKeywords":[],"priority":50,"alwaysOn":false,"spoilerLevel":0}，优先0～6条。
+            10. knowledgeBoundary / hardConstraints 只写真正影响一致性和知识边界的规则；数组保持少量、具体、互不重复。
+            11. 目标是让人物能自然生活和做选择，不要求模型每轮展示人物特点。
         """.trimIndent()
 
         val REPAIR_PROMPT = """
