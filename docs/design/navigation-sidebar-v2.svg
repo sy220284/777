@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1040" viewBox="0 0 1600 1040">
+  <defs>
+    <style>
+      text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;fill:#0F1514}
+      .title{font-size:30px;font-weight:700}.h2{font-size:20px;font-weight:650}.body{font-size:15px}.small{font-size:12px;fill:#616B67}
+      .caption{font-size:11px;fill:#818B87}.stroke{fill:none;stroke:#616B67;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+      .strokeA{fill:none;stroke:#3E8E8C;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    </style>
+  </defs>
+  <rect width="1600" height="1040" fill="#F0F3F1"/>
+  <text x="56" y="62" class="title">777 导航 / 侧边栏设计稿 V2</text>
+  <text x="56" y="92" class="small">基于当前主线 UI Token：纸面底色 #F7F8F6 · 白色浮层 · 青瓷强调色 #3E8E8C · Feather 24×24 / 2px 线性符号</text>
+
+  <!-- Chat sidebar -->
+  <g transform="translate(56 132)">
+    <rect x="0" y="0" width="390" height="840" rx="28" fill="#F7F8F6" stroke="#CFD6D2"/>
+    <text x="26" y="48" class="h2">神言神语</text>
+    <g transform="translate(302 26)" class="stroke"><path d="M12 2v20M2 12h20"/></g>
+    <g transform="translate(342 26)" class="stroke"><circle cx="10" cy="10" r="7"/><path d="M15 15l5 5"/></g>
+
+    <rect x="24" y="70" width="342" height="42" rx="21" fill="#EAEFEC"/>
+    <rect x="28" y="74" width="166" height="34" rx="17" fill="#FFFFFF"/>
+    <text x="86" y="97" class="body" font-weight="650">聊天</text>
+    <text x="250" y="97" class="body">工作</text>
+
+    <rect x="24" y="128" width="342" height="74" rx="18" fill="#FFFFFF" stroke="#E0E6E2"/>
+    <circle cx="58" cy="165" r="22" fill="#DCEEEC"/>
+    <text x="52" y="171" class="body" font-weight="700">绫</text>
+    <text x="92" y="158" class="body" font-weight="650">神里绫华</text>
+    <text x="92" y="181" class="small">稻妻日常 · 白鹭公主</text>
+
+    <!-- quick tiles -->
+    <g>
+      <rect x="24" y="218" width="166" height="58" rx="15" fill="#FFFFFF"/>
+      <g transform="translate(38 233)" class="stroke"><circle cx="9" cy="7" r="5"/><circle cx="18" cy="9" r="4"/><path d="M2 23c1-6 5-9 10-9s9 3 10 9"/><path d="M17 16c4 0 7 2 8 6"/></g>
+      <text x="76" y="252" class="body" font-weight="600">群聊</text>
+
+      <rect x="200" y="218" width="166" height="58" rx="15" fill="#FFFFFF"/>
+      <g transform="translate(214 233)" class="stroke"><rect x="2" y="2" width="22" height="20" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M4 20l7-7 5 4 4-4 4 5"/></g>
+      <text x="252" y="252" class="body" font-weight="600">人物</text>
+
+      <rect x="24" y="286" width="166" height="58" rx="15" fill="#FFFFFF"/>
+      <g transform="translate(38 301)" class="stroke"><path d="M3 4h7l3 3v17l-3-2H3z"/><path d="M23 4h-7l-3 3v17l3-2h7z"/></g>
+      <text x="76" y="320" class="body" font-weight="600">日记</text>
+
+      <rect x="200" y="286" width="166" height="58" rx="15" fill="#FFFFFF"/>
+      <g transform="translate(214 301)" class="stroke"><circle cx="13" cy="13" r="10"/><path d="M13 7v6l4 2"/></g>
+      <text x="252" y="320" class="body" font-weight="600">定时互动</text>
+    </g>
+
+    <text x="28" y="382" class="small" font-weight="650">置顶</text>
+    <g transform="translate(24 396)">
+      <rect width="342" height="66" rx="14" fill="#EAEFEC"/>
+      <circle cx="24" cy="24" r="15" fill="#DCEEEC"/><text x="20" y="29" class="small" font-weight="700">绫</text>
+      <text x="50" y="24" class="body" font-weight="650">绫华 · 稻妻日常</text>
+      <text x="50" y="45" class="caption">刚刚 · 当前会话</text>
+      <g transform="translate(310 17)" class="stroke"><path d="M8 2h8M9 2L8 8 6 13h12l-2-5-1-6M12 13v9"/></g>
+    </g>
+
+    <text x="28" y="494" class="small" font-weight="650">最近</text>
+    <g transform="translate(24 508)">
+      <circle cx="24" cy="22" r="15" fill="#F2F4F2"/><text x="20" y="27" class="small">刻</text>
+      <text x="50" y="21" class="body">刻晴 · 璃月散步</text><text x="50" y="43" class="caption">昨天 · “下次再一起去吧”</text>
+    </g>
+    <g transform="translate(24 568)">
+      <circle cx="24" cy="22" r="15" fill="#F2F4F2"/><text x="20" y="27" class="small">甘</text>
+      <text x="50" y="21" class="body">甘雨 · 月海亭</text><text x="50" y="43" class="caption">2 天前 · 14 条消息</text>
+    </g>
+
+    <line x1="24" y1="660" x2="366" y2="660" stroke="#E0E6E2"/>
+    <g transform="translate(28 684)" class="stroke"><rect x="5" y="2" width="14" height="22" rx="3"/><path d="M10 20h4"/></g>
+    <text x="68" y="702" class="body">远程控制</text>
+    <g transform="translate(28 736)" class="stroke"><path d="M3 6h22M3 13h22M3 20h22"/><circle cx="10" cy="6" r="2"/><circle cx="17" cy="13" r="2"/><circle cx="12" cy="20" r="2"/></g>
+    <text x="68" y="754" class="body">设置</text>
+  </g>
+
+  <!-- Work sidebar -->
+  <g transform="translate(480 132)">
+    <rect x="0" y="0" width="390" height="840" rx="28" fill="#F7F8F6" stroke="#CFD6D2"/>
+    <text x="26" y="48" class="h2">神言神语</text>
+    <g transform="translate(302 26)" class="stroke"><path d="M12 2v20M2 12h20"/></g>
+    <g transform="translate(342 26)" class="stroke"><circle cx="10" cy="10" r="7"/><path d="M15 15l5 5"/></g>
+
+    <rect x="24" y="70" width="342" height="42" rx="21" fill="#EAEFEC"/>
+    <rect x="196" y="74" width="166" height="34" rx="17" fill="#FFFFFF"/>
+    <text x="86" y="97" class="body">聊天</text>
+    <text x="250" y="97" class="body" font-weight="650">工作</text>
+
+    <rect x="24" y="128" width="342" height="74" rx="18" fill="#FFFFFF" stroke="#E0E6E2"/>
+    <circle cx="58" cy="165" r="22" fill="#DCEEEC"/>
+    <g transform="translate(46 153)" class="strokeA"><path d="M2 12h5l3-8 6 16 3-8h5"/></g>
+    <text x="92" y="158" class="body" font-weight="650">重构侧边栏与导航</text>
+    <text x="92" y="181" class="small">GPT-5.6 Sol · 运行中</text>
+
+    <g>
+      <rect x="24" y="218" width="166" height="58" rx="15" fill="#FFFFFF"/>
+      <g transform="translate(38 233)" class="stroke"><path d="M3 6h8l3 4h10v14H3z"/></g><text x="76" y="252" class="body" font-weight="600">工作空间</text>
+      <rect x="200" y="218" width="166" height="58" rx="15" fill="#FFFFFF"/>
+      <g transform="translate(214 233)" class="strokeA"><path d="M2 13h5l3-8 6 16 3-8h5"/></g><text x="252" y="252" class="body" font-weight="600">运行中心</text>
+      <rect x="24" y="286" width="166" height="58" rx="15" fill="#FFFFFF"/>
+      <g transform="translate(38 301)" class="stroke"><circle cx="13" cy="13" r="10"/><path d="M13 7v6l4 2"/></g><text x="76" y="320" class="body" font-weight="600">自动任务</text>
+      <rect x="200" y="286" width="166" height="58" rx="15" fill="#FFFFFF"/>
+      <g transform="translate(214 301)" class="stroke"><path d="M5 20l6-6M15 4l5 5M12 7l5 5M3 22l6-1 12-12-5-5L4 16z"/></g><text x="252" y="320" class="body" font-weight="600">工具</text>
+    </g>
+
+    <text x="28" y="382" class="small" font-weight="650">置顶</text>
+    <g transform="translate(24 396)">
+      <rect width="342" height="66" rx="14" fill="#EAEFEC"/>
+      <g transform="translate(10 15)" class="strokeA"><path d="M2 12h5l3-8 6 16 3-8h5"/></g>
+      <text x="50" y="24" class="body" font-weight="650">重构侧边栏与导航</text>
+      <text x="50" y="45" class="caption">运行中 · 第 4 / 7 步</text>
+      <rect x="280" y="18" width="46" height="22" rx="11" fill="#DCEEEC"/><text x="292" y="33" class="caption" fill="#35726F">运行中</text>
+    </g>
+    <text x="28" y="494" class="small" font-weight="650">最近</text>
+    <g transform="translate(24 508)">
+      <g transform="translate(10 11)" class="stroke"><path d="M4 13l5 5 11-12"/></g><text x="50" y="21" class="body">审查记忆系统</text><text x="50" y="43" class="caption">已完成 · 27 个步骤</text>
+    </g>
+    <g transform="translate(24 568)">
+      <g transform="translate(10 11)" class="stroke"><path d="M13 2v22M2 13h22"/></g><text x="50" y="21" class="body">分析 APK 动效</text><text x="50" y="43" class="caption">昨天 · 已完成</text>
+    </g>
+
+    <line x1="24" y1="660" x2="366" y2="660" stroke="#E0E6E2"/>
+    <g transform="translate(28 684)" class="stroke"><rect x="5" y="2" width="14" height="22" rx="3"/><path d="M10 20h4"/></g>
+    <text x="68" y="702" class="body">远程控制</text>
+    <g transform="translate(28 736)" class="stroke"><path d="M3 6h22M3 13h22M3 20h22"/><circle cx="10" cy="6" r="2"/><circle cx="17" cy="13" r="2"/><circle cx="12" cy="20" r="2"/></g>
+    <text x="68" y="754" class="body">设置</text>
+  </g>
+
+  <!-- specs -->
+  <g transform="translate(930 132)">
+    <text x="0" y="28" class="h2">视觉规则</text>
+    <rect x="0" y="48" width="600" height="250" rx="18" fill="#FFFFFF"/>
+    <text x="24" y="82" class="body" font-weight="650">图标</text>
+    <text x="24" y="108" class="small">24×24 网格 · 2px 描边 · round cap/join · 无填充 · 单色</text>
+    <g transform="translate(28 132)" class="stroke"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/></g>
+    <g transform="translate(82 132)" class="stroke"><path d="M3 6h8l3 4h10v14H3z"/></g>
+    <g transform="translate(136 132)" class="stroke"><path d="M2 13h5l3-8 6 16 3-8h5"/></g>
+    <g transform="translate(190 132)" class="stroke"><path d="M3 4h7l3 3v17l-3-2H3z"/><path d="M23 4h-7l-3 3v17l3-2h7z"/></g>
+    <text x="24" y="192" class="body" font-weight="650">间距 / 尺寸</text>
+    <text x="24" y="218" class="small">侧栏内边距 24 · 行最小 48 · 快捷卡 56 · 圆角 14–18 · 分组间距 16</text>
+    <text x="24" y="246" class="body" font-weight="650">色彩</text>
+    <rect x="24" y="260" width="38" height="16" rx="8" fill="#F7F8F6"/><text x="72" y="273" class="caption">Canvas</text>
+    <rect x="150" y="260" width="38" height="16" rx="8" fill="#FFFFFF" stroke="#E0E6E2"/><text x="198" y="273" class="caption">Surface</text>
+    <rect x="286" y="260" width="38" height="16" rx="8" fill="#DCEEEC"/><text x="334" y="273" class="caption">Accent soft</text>
+    <rect x="430" y="260" width="38" height="16" rx="8" fill="#3E8E8C"/><text x="478" y="273" class="caption">Accent</text>
+
+    <text x="0" y="346" class="h2">交互规则</text>
+    <rect x="0" y="366" width="600" height="314" rx="18" fill="#FFFFFF"/>
+    <text x="24" y="404" class="body" font-weight="650">1. 侧栏只负责“进入能力”</text>
+    <text x="24" y="430" class="small">管理型能力进入完整页面；快速选择进入 Sheet；确认/风险进入 Dialog。</text>
+    <text x="24" y="470" class="body" font-weight="650">2. Chat / Work 骨架不换</text>
+    <text x="24" y="496" class="small">只替换当前上下文、四个快捷入口和历史行语义，降低切换认知成本。</text>
+    <text x="24" y="536" class="body" font-weight="650">3. 工作历史使用任务语义</text>
+    <text x="24" y="562" class="small">运行中 / 完成 / 失败要有独立状态，避免继续用人物头像式会话行。</text>
+    <text x="24" y="602" class="body" font-weight="650">4. 动效解释状态变化</text>
+    <text x="24" y="628" class="small">点击反馈 80–120ms · 图标切换 120–160ms · 页面进入 180–220ms。</text>
+
+    <text x="0" y="730" class="h2">入口承载</text>
+    <rect x="0" y="750" width="600" height="222" rx="18" fill="#FFFFFF"/>
+    <text x="24" y="786" class="body">人物 / 日记 / 工作空间 / 运行中心 / 任务 / 工具 / 远程 / 设置</text>
+    <text x="24" y="812" class="small">→ 完整页面</text>
+    <text x="24" y="852" class="body">人物快速切换 / 模型选择 / 群成员 / 快速运行状态</text>
+    <text x="24" y="878" class="small">→ Bottom Sheet</text>
+    <text x="24" y="918" class="body">审批 / Ask / 人物调节 / 高风险确认</text>
+    <text x="24" y="944" class="small">→ Dialog</text>
+  </g>
+</svg>
