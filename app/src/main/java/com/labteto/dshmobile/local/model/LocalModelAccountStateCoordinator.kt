@@ -8,7 +8,7 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
-/** 自动目录刷新只更新可用模型；运行中的显式账户切换仍需等当前冻结路由结束。 */
+/** 运行中的自动目录刷新服务于后续请求；显式账户切换仍需等当前冻结路由结束。 */
 internal fun canSyncChatGptModels(isBusy: Boolean, selectFirst: Boolean): Boolean =
     !isBusy || !selectFirst
 
