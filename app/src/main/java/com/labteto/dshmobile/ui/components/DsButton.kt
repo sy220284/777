@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,6 +55,7 @@ fun DsButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    loading: Boolean = false,
     variant: DsButtonVariant = DsButtonVariant.Primary,
     size: DsButtonSize = DsButtonSize.Normal,
     icon: ImageVector? = null,
@@ -62,10 +64,11 @@ fun DsButton(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
+    val interactionEnabled = enabled && !loading
     
     // Animate scale on press for tactile feedback
     val scale by animateFloatAsState(
-        targetValue = if (pressed && enabled) DsAnimations.Scale.pressed else DsAnimations.Scale.normal,
+        targetValue = if (pressed && interactionEnabled) DsAnimations.Scale.pressed else DsAnimations.Scale.normal,
         animationSpec = DsAnimations.pressScale,
         label = "buttonScale"
     )
@@ -101,7 +104,7 @@ fun DsButton(
                 scaleX = scale
                 scaleY = scale
             },
-        enabled = enabled,
+        enabled = interactionEnabled,
         shape = if (normal) DsShapes.buttonCapsule else DsShapes.buttonSmall,
         color = background,
         contentColor = contentColor,
@@ -117,7 +120,14 @@ fun DsButton(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (icon != null) {
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(if (normal) 16.dp else 14.dp),
+                    color = contentColor,
+                    strokeWidth = 2.dp,
+                )
+                if (text.isNotEmpty()) Spacer(Modifier.width(6.dp))
+            } else if (icon != null) {
                 Icon(
                     icon,
                     contentDescription = null,
