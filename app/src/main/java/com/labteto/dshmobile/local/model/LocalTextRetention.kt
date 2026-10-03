@@ -99,6 +99,28 @@ internal fun retainTextForModel(
     )
 }
 
+/**
+ * Work keeps small tool results inline, but a large result must never become the next request's hot
+ * payload. The full durable result is spilled by the caller; this returns only a sub-1 KiB-ish
+ * recoverable preview so cache-friendly history can keep growing by append instead of compaction.
+ */
+internal fun retainWorkToolResultForModel(value: String): LocalRetainedText {
+    val bytes = value.toByteArray(Charsets.UTF_8)
+    if (bytes.size <= WORK_TOOL_INLINE_BYTES) {
+        return LocalRetainedText(value, truncated = false, omittedBytes = 0)
+    }
+    return retainTextForModel(
+        value = value,
+        maxTokens = WORK_TOOL_PREVIEW_TOKENS,
+        maxChars = WORK_TOOL_PREVIEW_CHARS,
+        tailRatio = 0.20,
+    )
+}
+
+private const val WORK_TOOL_INLINE_BYTES = 2 * 1024
+private const val WORK_TOOL_PREVIEW_CHARS = 1_024
+private const val WORK_TOOL_PREVIEW_TOKENS = 300
+
 private fun safeUtf8PrefixEnd(bytes: ByteArray, requested: Int): Int {
     var end = requested.coerceIn(0, bytes.size)
     if (end == bytes.size) return end
