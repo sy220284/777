@@ -120,6 +120,7 @@ internal fun LocalModeDrawer(
     currentPersonaName: String,
     currentPersonaIdentity: String,
     workModelLabel: String,
+    groupChatEnabled: Boolean,
     running: Boolean,
     onUsageModeChange: (LocalUsageMode) -> Unit,
     onNewSession: () -> Unit,
@@ -158,7 +159,7 @@ internal fun LocalModeDrawer(
 
     val galleryById = remember(gallery) { gallery.associateBy { it.id } }
     val currentGalleryEntry = remember(galleryById, currentGalleryId) {
-        currentGalleryId?.let(galleryById::get)
+        currentGalleryId?.let { galleryById[it] }
     }
     val currentStoryTitle = remember(currentGalleryEntry, currentGalleryStoryId) {
         currentGalleryStoryId?.let { id ->
@@ -270,7 +271,7 @@ internal fun LocalModeDrawer(
                 DrawerContextCard(
                     usageMode = usageMode,
                     title = when {
-                        usageMode == LocalUsageMode.CHAT && groupMemberCount > 0 ->
+                        usageMode == LocalUsageMode.CHAT && groupChatEnabled ->
                             stringResource(R.string.local_group_chat_title)
                         usageMode == LocalUsageMode.CHAT ->
                             currentPersonaName.ifBlank {
@@ -281,7 +282,7 @@ internal fun LocalModeDrawer(
                         }
                     },
                     subtitle = when {
-                        usageMode == LocalUsageMode.CHAT && groupMemberCount > 0 ->
+                        usageMode == LocalUsageMode.CHAT && groupChatEnabled ->
                             stringResource(R.string.local_group_chat_member_count, groupMemberCount)
                         usageMode == LocalUsageMode.CHAT ->
                             currentStoryTitle ?: currentPersonaIdentity.takeIf(String::isNotBlank)
@@ -290,11 +291,11 @@ internal fun LocalModeDrawer(
                         else -> workModelLabel
                     },
                     portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
-                    group = usageMode == LocalUsageMode.CHAT && groupMemberCount > 0,
+                    group = usageMode == LocalUsageMode.CHAT && groupChatEnabled,
                     running = running,
                     onClick = when {
                         usageMode == LocalUsageMode.WORK -> onSettings
-                        groupMemberCount > 0 -> onOpenGroupChat
+                        groupChatEnabled -> onOpenGroupChat
                         else -> onOpenPersonaGallery
                     },
                 )
@@ -332,7 +333,7 @@ internal fun LocalModeDrawer(
                         LocalSessionDrawerRow(
                             session = session,
                             displayTitle = sessionTitleOverrides[session.id] ?: session.title,
-                            galleryEntry = session.galleryId?.let(galleryById::get),
+                            galleryEntry = session.galleryId?.let { galleryById[it] },
                             current = session.id == currentSessionId,
                             pinned = true,
                             running = running && session.id == currentSessionId,
@@ -366,7 +367,7 @@ internal fun LocalModeDrawer(
                         LocalSessionDrawerRow(
                             session = session,
                             displayTitle = sessionTitleOverrides[session.id] ?: session.title,
-                            galleryEntry = session.galleryId?.let(galleryById::get),
+                            galleryEntry = session.galleryId?.let { galleryById[it] },
                             current = session.id == currentSessionId,
                             pinned = false,
                             running = running && session.id == currentSessionId,
