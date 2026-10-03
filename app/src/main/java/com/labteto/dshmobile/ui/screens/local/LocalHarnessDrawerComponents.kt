@@ -393,7 +393,7 @@ internal fun DrawerSectionTitle(
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
-private fun LocalSessionDrawerRow(
+internal fun LocalSessionDrawerRow(
     session: LocalSessionSummary,
     displayTitle: String,
     galleryEntry: PersonaGalleryEntry?,
