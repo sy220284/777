@@ -2325,7 +2325,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun beginSessionTransition(): Boolean {
         val started = synchronized(runStateLock) {
-            if (sessionTransitioning) return@synchronized false
+            if (_state.value.loading || sessionTransitioning) return@synchronized false
             sessionTransitioning = true
             true
         }
