@@ -44,7 +44,7 @@ internal fun bundledSidebarAvatarSource(assetPath: String): String {
 }
 
 internal fun customSidebarAvatarSource(file: File, crop: SidebarAvatarCrop): String {
-    require(file.isAbsolute) { "自定义头像路径必须为绝对路径" }
+    require(file.isAbsolute) { "Custom avatar path must be absolute" }
     val normalized = crop.normalized()
     return buildString {
         append(SIDEBAR_AVATAR_CUSTOM_PREFIX)
