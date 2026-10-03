@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountRecord
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountStore
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptSessionManager
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanAuthorizationEvents
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_PLAN_SCOPE
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_RESOURCE_INVOKE_SCOPE
 import com.labteto.dshmobile.local.model.chatgpt.isUsableChatGptPlanBinding
@@ -35,7 +36,7 @@ class LocalModelCredentialResolver @Inject constructor(
     private val apiKeys: LocalApiKeyStore,
     private val chatGptAccounts: ChatGptAccountStore,
     private val chatGptSessions: ChatGptSessionManager,
-    private val planAuthorizationEvents: com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanAuthorizationEvents,
+    private val planAuthorizationEvents: ChatGptPlanAuthorizationEvents,
 ) {
     private val _activeProfile = MutableStateFlow<LocalModelProfile?>(null)
     val activeProfile = _activeProfile.asStateFlow()

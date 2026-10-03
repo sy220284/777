@@ -188,6 +188,8 @@ android-17-instrumented
 - API Key 与 ChatGPT 套餐 profile ID 隔离。
 - OAuth callback 编码、state/nonce/PKCE 与 ID Token 验证路径。
 - access token 过期时 single-flight refresh，refresh token 轮换后原子替换。
+- ChatGPT 身份登录与套餐推理授权必须独立建模：缺少任一套餐推理 scope 时保留合法登录身份，但不得发现、暴露或继续使用套餐模型 Profile。
+- refresh 成功后若套餐 scope 降级，必须先原子保存轮换后的 access/refresh token 与新 scopes，再退休对应套餐 Profile；当前活动套餐路由立即变为未配置，禁止静默回退到 API Key 或其他可能计费来源。
 - Responses 请求固定 `store=false`、`stream=true`；不发送套餐共享暂不支持的采样字段。
 - ChatGPT 套餐 HTTP Responses 每次必须有非空 `input`；system 内容只进入 `instructions`，后台状态整理不得产生 system-only 请求。
 - ChatGPT 套餐请求收到成功 HTTP 响应后若 SSE 在 `response.completed` 前断开，视为“执行结果未知”，禁止自动整轮重放；仅明确的服务端可重试错误按官方恢复语义退避。
