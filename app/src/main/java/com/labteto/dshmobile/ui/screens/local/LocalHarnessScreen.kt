@@ -242,7 +242,8 @@ fun LocalHarnessScreen(
                 sessions = shell.sessions,
                 gallery = gallery,
                 usageMode = localHarnessDrawerUsageMode(shell.usageMode, pendingUsageMode),
-                modeSwitchEnabled = localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
+                modeSwitchEnabled = !shell.loading &&
+                    localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
                 onUsageModeChange = { showDiary = false; switchUsageMode(it) },
