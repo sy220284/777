@@ -1,10 +1,14 @@
 package com.labteto.dshmobile.harness.session
 
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SessionEventLogMultiInstanceTest {
@@ -73,6 +77,57 @@ class SessionEventLogMultiInstanceTest {
             assertEquals((0L until 1_000L).toList(), snapshot.map(SessionEvent::sequence))
             assertEquals(1_000, snapshot.map(SessionEvent::sequence).toSet().size)
         } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun concurrentWritersStayMonotonicAndLosslessAcrossRotations() {
+        val root = createTempDir(prefix = "session-log-concurrent-writers-")
+        val pool = Executors.newFixedThreadPool(8)
+        val start = CountDownLatch(1)
+        val ready = CountDownLatch(8)
+        val logs = List(8) { index ->
+            SessionEventLog(
+                file = File(root, "session.events.jsonl"),
+                json = json,
+                maxBytes = 1_024,
+                clock = { index.toLong() },
+            )
+        }
+        try {
+            val writesPerWorker = 250
+            val futures = logs.mapIndexed { writer, log ->
+                pool.submit {
+                    ready.countDown()
+                    check(start.await(5, TimeUnit.SECONDS)) { "并发写入启动超时" }
+                    repeat(writesPerWorker) { local ->
+                        log.append(
+                            "test/concurrent-stress",
+                            buildJsonObject {
+                                put("writer", writer)
+                                put("local", local)
+                                put("payload", "x".repeat(64))
+                            },
+                        )
+                    }
+                }
+            }
+
+            assertTrue("并发写线程未全部就绪", ready.await(5, TimeUnit.SECONDS))
+            start.countDown()
+            futures.forEach { it.get(20, TimeUnit.SECONDS) }
+
+            val expected = logs.size * writesPerWorker
+            val snapshot = logs.first().snapshot()
+            assertEquals(expected, snapshot.size)
+            assertEquals((0L until expected.toLong()).toList(), snapshot.map(SessionEvent::sequence))
+            assertEquals(expected, snapshot.map(SessionEvent::sequence).toSet().size)
+        } finally {
+            start.countDown()
+            pool.shutdownNow()
+            pool.awaitTermination(5, TimeUnit.SECONDS)
+            logs.forEach(SessionEventLog::close)
             root.deleteRecursively()
         }
     }

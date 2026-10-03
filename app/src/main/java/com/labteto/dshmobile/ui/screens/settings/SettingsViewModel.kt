@@ -106,7 +106,7 @@ class SettingsViewModel @Inject constructor(
             hostsStore.settings.collect { _state.value = it }
         }
         refreshAdvancedSettings()
-        viewModelScope.launch { localHarness.refreshChatGpt() }
+        refreshChatGpt()
     }
 
     fun set(transform: (AppSettings) -> AppSettings) {
@@ -273,9 +273,8 @@ class SettingsViewModel @Inject constructor(
         }
     }
     fun refreshChatGpt() {
-        viewModelScope.launch { runCatching { localHarness.refreshChatGpt() } }
+        viewModelScope.launch { localHarness.refreshChatGpt() }
     }
-
     fun removeLocalModel(id: String) = localHarness.removeModel(id)
 
     suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null): String =

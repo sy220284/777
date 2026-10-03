@@ -29,6 +29,7 @@ class LocalSettingsRuntime @Inject constructor(
 ) {
     private val chatGpt = ChatGptSettingsController(
         auth = chatGptAuth,
+        requireAccountSelectionAllowed = engine::requireChatGptAccountSelectionAllowed,
         syncModels = engine::syncChatGptModels,
         removeProfiles = engine::removeChatGptAccountProfiles,
         testAccount = chatGptPlanTester::test,
