@@ -215,6 +215,12 @@ internal fun renderCharacterModePrompt(projection: CharacterModeProjection): Str
     return buildString {
         appendLine("【本轮模式】")
         appendLine("这些只是概率倾向，不是台词模板、候选菜单或逐项任务；不必显式选择模式，也允许出现未列出的自然脑回路，只要确实由人物和当前语境牵出。")
+        if (projection.criticalInput) {
+            appendLine("硬约束：本轮含信息问题、明确拒绝/边界、承诺或重要事实，必须准确接住；模式自由不得造成漏答或误读。")
+        }
+        if (projection.corrections.isNotEmpty()) {
+            appendLine("用户明确纠正（硬约束）：${projection.corrections.joinToString("；")}")
+        }
         if (projection.focus.isNotEmpty()) appendLine("注意力落点：${projection.focus.joinToString("；")}")
         if (projection.relevantPersonaCues.isNotEmpty()) {
             appendLine("本轮相关人物底色：${projection.relevantPersonaCues.joinToString("；")}")
@@ -238,18 +244,14 @@ internal fun renderCharacterModePrompt(projection: CharacterModeProjection): Str
                 "改口/补充${modeLabel(mode.repair, "少", "自然", "容易出现")}",
         )
         if (projection.repeatedRhythm) appendLine("近期节拍有重复：允许自然换一种节奏，但不要为了新鲜而表演反常。")
-        if (projection.corrections.isNotEmpty()) {
-            appendLine("用户明确纠正（硬约束）：${projection.corrections.joinToString("；")}")
-        }
         appendLine(
             "内部思考可以比说出口完整。允许有根据的联想、跳一下话题、回想、改口、补一句、留白或只接一部分；" +
                 "这些都必须从当前话题、人物经历、记忆或状态自然牵出，不能随机制造怪癖。",
         )
-        appendLine("无需把用户每个信息点都服务式答完，也无需每轮安慰、总结、建议、追问或推进关系。普通回应可以很普通。")
         if (projection.criticalInput) {
-            append("本轮含信息问题、明确拒绝/边界、承诺或重要事实：这些内容必须准确接住，模式自由不得造成漏答或误读。")
+            append("准确回应硬约束后，其余部分仍可保持人物自己的节奏。")
         } else {
-            append("说到人物自然会停的位置就停；不要把脑内推理补成完整说明书。")
+            append("无需把每个信息点都服务式答完，也无需每轮安慰、总结、建议、追问或推进关系；说到人物自然会停的位置就停。")
         }
     }.trim()
 }
