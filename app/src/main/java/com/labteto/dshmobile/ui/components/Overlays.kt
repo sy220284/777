@@ -82,7 +82,7 @@ fun DsDialog(
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnClickOutside = dismissOnScrimTap,
         ),
     ) {
         BoxWithConstraints(
