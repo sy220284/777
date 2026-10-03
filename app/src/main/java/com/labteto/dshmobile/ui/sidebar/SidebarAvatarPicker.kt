@@ -271,9 +271,9 @@ private fun SidebarAvatarImage(source: SidebarAvatarSource, contentDescription: 
     val context = LocalContext.current
     val drawable by produceState<Drawable?>(initialValue = null, source) {
         value = withContext(Dispatchers.IO) {
+            if (source is SidebarAvatarSource.Default) return@withContext null
             runCatching {
                 val imageSource = when (source) {
-                    SidebarAvatarSource.Default -> return@runCatching null
                     is SidebarAvatarSource.Bundled -> ImageDecoder.createSource(context.assets, source.assetPath)
                     is SidebarAvatarSource.Custom -> {
                         val root = File(context.filesDir, "ui/sidebar-avatars").canonicalFile
