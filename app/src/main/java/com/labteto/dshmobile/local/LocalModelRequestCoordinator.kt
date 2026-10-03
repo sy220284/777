@@ -57,6 +57,7 @@ internal class LocalModelRequestCoordinator(
         executionControl: LocalWorkExecutionControl? = null,
     ): LocalModelReply {
         val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
+        val log = requestLog ?: defaultEventLog()
         val frozenProfile = profile ?: modelGateway.profileForRoute(
             snapshot.modelSelection.activeProfileId,
             snapshot.model,
@@ -100,6 +101,7 @@ internal class LocalModelRequestCoordinator(
                 compactor = historyCompactor,
                 operationalLimitTokens = operationalLimit,
                 measuredPressure = baselinePressure,
+                structuredWorkState = structuredWorkState(snapshot, log),
             )
         } else {
             LocalWorkRequestProjection(
@@ -129,7 +131,6 @@ internal class LocalModelRequestCoordinator(
         } else {
             null
         }
-        val log = requestLog ?: defaultEventLog()
         if (workProjection.projected) {
             log.append("request/history-projection", buildJsonObject {
                 put("step", step)
@@ -139,7 +140,7 @@ internal class LocalModelRequestCoordinator(
                 put("estimated_tokens_before", workProjection.estimatedTokensBefore)
                 put("estimated_tokens_after", workProjection.estimatedTokensAfter)
                 put("omitted_messages", workProjection.omittedMessages)
-                put("strategy", "work_checkpoint_plus_recent_tail")
+                put("strategy", "active_work_checkpoint_plus_recent_causal_tail")
             })
         }
         val logMessages = redactModelImages(requestMessages)
