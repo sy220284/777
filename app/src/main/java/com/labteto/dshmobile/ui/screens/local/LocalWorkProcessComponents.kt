@@ -310,7 +310,7 @@ private fun WorkProcessOperationRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
     ) {
-        DsIconBox(icon = icon, family = family)
+        DsIconBox(icon = icon, family = family, active = rowRunning)
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),

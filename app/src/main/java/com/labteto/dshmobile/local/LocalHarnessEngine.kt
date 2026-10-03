@@ -57,6 +57,7 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.LocalReplySuggestionCoordinator
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.compact
@@ -1109,11 +1110,18 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    internal fun createGroupChatSession() {
-        createSession(
+    internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean {
+        val selected = entries
+            .distinctBy(PersonaGalleryEntry::id)
+            .take(MAX_GROUP_CHAT_MEMBERS)
+        if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
+        val snapshot = _state.value
+        if (snapshot.loading || snapshot.running) return false
+        return createSession(
             mode = LocalConversationMode.INDEPENDENT,
             usageMode = LocalUsageMode.CHAT,
             chatMode = LocalChatMode.GROUP,
+            groupEntries = selected,
         )
     }
 
@@ -1139,30 +1147,11 @@ class LocalHarnessEngine @Inject constructor(
             .take(MAX_GROUP_CHAT_MEMBERS)
         if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
         scope.launch {
-            val members = selected.map { entry ->
-                val existingPersona = chatPersonaStore.get(entry.id)
-                val saved = chatPersonaStore.upsert(
-                    entry.persona.copy(
-                        id = entry.id,
-                        corrections = (entry.persona.corrections + existingPersona.corrections)
-                            .map(String::trim)
-                            .filter(String::isNotBlank)
-                            .distinct(),
-                    ),
-                )
-                val previous = snapshot.groupChat.members.firstOrNull { it.galleryId == entry.id }
-                LocalGroupChatMember(
-                    galleryId = entry.id,
-                    personaId = saved.id,
-                    displayName = saved.name,
-                    portraitPath = entry.portraitPath,
-                    persona = saved,
-                    chatState = previous?.chatState
-                        ?: entry.groupChatState.takeIf { it.updatedAt > 0L }
-                        ?: entry.stories.maxByOrNull { it.updatedAt }?.chatState
-                        ?: ChatCharacterState(),
-                )
-            }
+            val members = resolveLocalGroupChatMembers(
+                entries = selected,
+                previousMembers = snapshot.groupChat.members,
+                chatPersonaStore = chatPersonaStore,
+            )
             _state.update { current ->
                 if (
                     current.sessionId != snapshot.sessionId ||
@@ -2260,6 +2249,7 @@ class LocalHarnessEngine @Inject constructor(
         galleryStoryId: String? = null,
         freshGalleryStory: Boolean = false,
         chatMode: LocalChatMode? = null,
+        groupEntries: List<PersonaGalleryEntry> = emptyList(),
     ) = sessionLifecycle.createSession(
         mode = mode,
         usageMode = usageMode,
@@ -2267,6 +2257,7 @@ class LocalHarnessEngine @Inject constructor(
         galleryStoryId = galleryStoryId,
         freshGalleryStory = freshGalleryStory,
         chatMode = chatMode,
+        groupEntries = groupEntries,
     )
 
     /** Backward-compatible entry point: a plain new session is fully independent. */

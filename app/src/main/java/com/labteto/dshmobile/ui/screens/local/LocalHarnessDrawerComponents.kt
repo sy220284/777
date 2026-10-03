@@ -266,7 +266,7 @@ internal fun DrawerQuickAction(
         targetValue = when {
             pressed -> colors.hoverAccent
             hovered -> colors.hover
-            else -> colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
+            else -> Color.Transparent
         },
         animationSpec = DsAnimations.interactionColor,
         label = "drawerQuickActionFeedback",

@@ -6,7 +6,6 @@ import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalImportedAttachment
 import javax.inject.Inject
 import javax.inject.Singleton
-
 /** Chat/persona capability boundary for the local UI. */
 @Singleton
 class LocalChatRuntime @Inject constructor(
@@ -25,7 +24,7 @@ class LocalChatRuntime @Inject constructor(
     internal fun selectChatDirection(direction: String?) = engine.selectChatDirection(direction)
     internal suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile =
         engine.syncDefaultChatPersona(profile)
-    internal fun createGroupChatSession() = engine.createGroupChatSession()
+    internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean = engine.createGroupChatSession(entries)
     internal fun createSingleChatSession() = engine.createSingleChatSession()
     internal fun switchChatMode(mode: LocalChatMode) = engine.switchChatMode(mode)
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean =

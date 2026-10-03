@@ -70,6 +70,7 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.SectionHeader
@@ -261,7 +262,7 @@ private fun HeaderRow(onClose: () -> Unit) {
     val colors = DsTheme.colors
     Row(verticalAlignment = Alignment.CenterVertically) {
         DsIconButton(
-            icon = Icons.AutoMirrored.Filled.ArrowBack,
+            icon = FeatherIcons.ArrowLeft,
             contentDescription = stringResource(R.string.common_back),
             onClick = onClose,
         )

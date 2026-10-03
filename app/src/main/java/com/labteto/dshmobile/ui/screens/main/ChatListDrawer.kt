@@ -22,14 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material.icons.outlined.Extension
-import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -242,7 +235,7 @@ fun ChatListDrawer(
             Spacer(Modifier.width(DsSpacing.small))
             Text(stringResource(R.string.app_name), style = DsType.large20.withReadingWeight(), color = colors.labelPrimary, modifier = Modifier.weight(1f))
             DsIconButton(
-                icon = Icons.Filled.Add,
+                icon = FeatherIcons.Plus,
                 contentDescription = stringResource(R.string.chatlist_new_session),
                 onClick = { newSessionOpen = true },
                 tint = colors.labelPrimary,
@@ -258,7 +251,7 @@ fun ChatListDrawer(
             placeholder = { Text(stringResource(R.string.chatlist_search_hint), style = DsType.std14.withReadingWeight()) },
             leadingIcon = {
                 Icon(
-                    Icons.Filled.Search,
+                    FeatherIcons.Search,
                     contentDescription = null,
                     tint = colors.labelTertiary,
                     modifier = Modifier.size(20.dp),
@@ -410,7 +403,7 @@ fun ChatListDrawer(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    Icons.Filled.Add,
+                    FeatherIcons.Plus,
                     contentDescription = null,
                     tint = colors.labelTertiary,
                     modifier = Modifier.size(16.dp),
@@ -457,7 +450,7 @@ fun ChatListDrawer(
                     },
                 )
                 DsCategoryRow(
-                    icon = Icons.Outlined.Schedule,
+                    icon = FeatherIcons.Clock,
                     title = stringResource(R.string.tasks_title),
                     iconFamily = DsIconFamily.Amber,
                     onClick = {
@@ -466,7 +459,7 @@ fun ChatListDrawer(
                     },
                 )
                 DsCategoryRow(
-                    icon = Icons.Outlined.Extension,
+                    icon = FeatherIcons.Tool,
                     title = stringResource(R.string.tools_title),
                     iconFamily = DsIconFamily.Neutral,
                     onClick = {
@@ -475,7 +468,7 @@ fun ChatListDrawer(
                     },
                 )
                 DsCategoryRow(
-                    icon = Icons.Outlined.PhoneAndroid,
+                    icon = FeatherIcons.Device,
                     title = stringResource(R.string.chatlist_exit_remote_control),
                     iconFamily = DsIconFamily.Cyan,
                     onClick = {
@@ -484,7 +477,7 @@ fun ChatListDrawer(
                     },
                 )
                 DsCategoryRow(
-                    icon = Icons.Filled.Settings,
+                    icon = FeatherIcons.Sliders,
                     title = stringResource(R.string.settings_title),
                     iconFamily = DsIconFamily.Neutral,
                     onClick = {

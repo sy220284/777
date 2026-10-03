@@ -1,23 +1,29 @@
 package com.labteto.dshmobile.ui.components
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.Ds
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsTheme
 
 /**
  * Function families for tinted icon containers. Each family maps one navigation concept to one
- * hue so a screen can be scanned by color before it is read: 聊天/人设 purple, 工作 cyan,
- * 通知/任务 amber, 权限 green, 模型 celadon accent, everything else neutral ink.
+ * hue so a screen can be scanned by color before it is read.
  */
 enum class DsIconFamily {
     Accent,
@@ -28,7 +34,6 @@ enum class DsIconFamily {
     Neutral,
 }
 
-/** Container + content colors for a family, resolved against the active theme. */
 private data class DsIconFamilyColors(val container: Color, val content: Color)
 
 @Composable
@@ -45,8 +50,10 @@ private fun colorsFor(family: DsIconFamily): DsIconFamilyColors {
 }
 
 /**
- * 30dp rounded tint container behind a 15dp outlined icon. The container — not the glyph — carries
- * the family hue, which keeps the icon itself quiet and the page rhythm even.
+ * 30dp rounded tint container behind a 15dp outlined icon.
+ *
+ * [active] is reserved for a genuinely live operation. Only the glyph breathes; container geometry
+ * stays still, which keeps dense process lists readable and avoids relayout work.
  */
 @Composable
 fun DsIconBox(
@@ -54,8 +61,24 @@ fun DsIconBox(
     family: DsIconFamily = DsIconFamily.Neutral,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
+    active: Boolean = false,
 ) {
     val familyColors = colorsFor(family)
+    val iconAlpha = if (active) {
+        val transition = rememberInfiniteTransition(label = "activeIcon")
+        val pulse by transition.animateFloat(
+            initialValue = 0.48f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = DsAnimations.semanticPulse,
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "activeIconPulse",
+        )
+        pulse
+    } else {
+        1f
+    }
     Box(
         modifier = modifier
             .size(30.dp)
@@ -66,7 +89,9 @@ fun DsIconBox(
             icon,
             contentDescription = contentDescription,
             tint = familyColors.content,
-            modifier = Modifier.size(15.dp),
+            modifier = Modifier
+                .size(15.dp)
+                .graphicsLayer { alpha = iconAlpha },
         )
     }
 }

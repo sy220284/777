@@ -105,6 +105,7 @@ data class LocalSessionSummary(
     val updatedAt: Long,
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
     val chatMode: LocalChatMode = LocalChatMode.SINGLE,
+    val groupMemberCount: Int = 0,
     val personaId: String? = null,
     val galleryId: String? = null,
     val blank: Boolean = false,

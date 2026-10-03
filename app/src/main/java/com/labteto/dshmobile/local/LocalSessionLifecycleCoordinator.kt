@@ -16,6 +16,8 @@ import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.findEstablishedGroupChatSession
+import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
 import com.labteto.dshmobile.local.memory.MemoryStore
 import java.io.File
 import java.util.UUID
@@ -90,8 +92,14 @@ internal class LocalSessionLifecycleCoordinator(
         galleryStoryId: String? = null,
         freshGalleryStory: Boolean = false,
         chatMode: LocalChatMode? = null,
-    ) {
-        if (!beginTransition()) return
+        groupEntries: List<PersonaGalleryEntry> = emptyList(),
+    ): Boolean {
+        if (
+            chatMode == LocalChatMode.GROUP &&
+            groupEntries.distinctBy(PersonaGalleryEntry::id).size !in
+                MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS
+        ) return false
+        if (!beginTransition()) return false
         val sourceId = currentSessionId()
         val sourceState = state.value
         val continueSingleChatBinding = shouldContinueSingleChatBinding(
@@ -194,6 +202,18 @@ internal class LocalSessionLifecycleCoordinator(
                         ChatCharacterState(behaviorTuning = chatPersona.behaviorTuning)
                     }
 
+                    val initialGroupMembers = if (
+                        resolvedChatMode == LocalChatMode.GROUP && groupEntries.isNotEmpty()
+                    ) {
+                        resolveLocalGroupChatMembers(
+                            entries = groupEntries.take(MAX_GROUP_CHAT_MEMBERS),
+                            previousMembers = emptyList(),
+                            chatPersonaStore = chatPersonaStore,
+                        )
+                    } else {
+                        emptyList()
+                    }
+
                     val chatContext = when {
                         resolvedChatMode == LocalChatMode.GROUP -> ChatContextState()
                         galleryEntry != null && usageMode == LocalUsageMode.CHAT && !freshGalleryStory ->
@@ -245,7 +265,10 @@ internal class LocalSessionLifecycleCoordinator(
                             replySuggestions = emptyList(),
                             chatBranches = LocalChatBranchState(),
                             groupChat = if (resolvedChatMode == LocalChatMode.GROUP) {
-                                continuedGroup ?: LocalGroupChatState(mode = LocalChatMode.GROUP)
+                                continuedGroup ?: LocalGroupChatState(
+                                    mode = LocalChatMode.GROUP,
+                                    members = initialGroupMembers,
+                                )
                             } else LocalGroupChatState(),
                             groupActiveSpeakerName = null,
                             personaCorrectionNotice = null,
@@ -278,6 +301,7 @@ internal class LocalSessionLifecycleCoordinator(
             }
             continueQueuedModeSwitch()
         }
+        return true
     }
 
     fun switchChatMode(mode: LocalChatMode) {
@@ -288,14 +312,17 @@ internal class LocalSessionLifecycleCoordinator(
             snapshot.groupChat.mode == mode
         ) return
 
-        val target = snapshot.sessions.firstOrNull {
-            it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode && !it.blank
-        } ?: snapshot.sessions.firstOrNull {
-            it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode
+        val eligible = if (mode == LocalChatMode.GROUP) {
+            listOfNotNull(findEstablishedGroupChatSession(snapshot.sessions))
+        } else {
+            snapshot.sessions.filter {
+                it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode
+            }
         }
+        val target = eligible.firstOrNull { !it.blank } ?: eligible.firstOrNull()
         if (target != null) {
             switchSession(target.id)
-        } else {
+        } else if (mode != LocalChatMode.GROUP) {
             createSession(
                 mode = LocalConversationMode.INDEPENDENT,
                 usageMode = LocalUsageMode.CHAT,

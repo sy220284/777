@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,8 +40,10 @@ import com.labteto.dshmobile.local.LocalConversationFiles
 import com.labteto.dshmobile.local.LocalWorkspaceFile
 import com.labteto.dshmobile.local.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
-import com.labteto.dshmobile.ui.components.DsFullScreenDialog
+import com.labteto.dshmobile.ui.components.DsPageEmptyState
+import com.labteto.dshmobile.ui.components.DsPageLoadingState
 import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -65,14 +69,32 @@ internal fun LocalWorkspaceFilesDialog(
     var workspace by remember(mode, sessionId) { mutableStateOf(emptyList<LocalWorkspaceFile>()) }
     var conversation by remember(mode, sessionId) { mutableStateOf(LocalConversationFiles()) }
     var preview by remember(mode, sessionId) { mutableStateOf<LocalWorkspaceFilePreview?>(null) }
+    var previewPath by rememberSaveable(mode, sessionId) { mutableStateOf<String?>(null) }
     var previewLoading by remember(mode, sessionId) { mutableStateOf(false) }
-    var directory by remember(mode, sessionId) { mutableStateOf("") }
-    var section by remember(mode, sessionId) {
+    var directory by rememberSaveable(mode, sessionId) { mutableStateOf("") }
+    var section by rememberSaveable(mode, sessionId) {
         mutableStateOf(if (mode == LocalFilesMode.WORKSPACE) 0 else 1)
     }
     val scope = rememberCoroutineScope()
     val readFilesFailed = stringResource(R.string.local_files_read_failed)
     val previewFailed = stringResource(R.string.local_files_preview_failed)
+
+    suspend fun openPreview(path: String) {
+        previewLoading = true
+        error = null
+        try {
+            preview = loadPreview(path)
+            previewPath = path
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            error = failure.message ?: previewFailed
+            preview = null
+            previewPath = null
+        } finally {
+            previewLoading = false
+        }
+    }
 
     suspend fun reload() {
         loading = true
@@ -86,10 +108,15 @@ internal fun LocalWorkspaceFilesDialog(
                 }
                 LocalFilesMode.CONVERSATION -> conversation = loadConversation(sessionId)
             }
+            previewPath?.let { path ->
+                preview = loadPreview(path)
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            error = failure.message ?: readFilesFailed
+            error = failure.message ?: if (previewPath == null) readFilesFailed else previewFailed
+            preview = null
+            previewPath = null
         } finally {
             loading = false
         }
@@ -97,10 +124,22 @@ internal fun LocalWorkspaceFilesDialog(
 
     LaunchedEffect(mode, sessionId) { reload() }
 
-    DsFullScreenDialog(
-        onDismiss = onDismiss,
-    ) {
-        Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
+    fun navigateBack() {
+        when {
+            preview != null || previewPath != null -> {
+                preview = null
+                previewPath = null
+                error = null
+            }
+            mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty() ->
+                directory = directory.substringBeforeLast('/', "")
+            else -> onDismiss()
+        }
+    }
+
+    BackHandler(onBack = ::navigateBack)
+
+    Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val headerTitle = when {
                     preview != null -> preview?.file?.path?.substringAfterLast('/').orEmpty()
@@ -116,23 +155,16 @@ internal fun LocalWorkspaceFilesDialog(
                 DsTopBar(
                     title = headerTitle,
                     subtitle = headerSubtitle,
-                    onBack = {
-                        when {
-                            preview != null -> preview = null
-                            mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty() ->
-                                directory = directory.substringBeforeLast('/', "")
-                            else -> onDismiss()
-                        }
-                    },
+                    onBack = ::navigateBack,
                     backContentDescription = stringResource(
-                        if (preview != null || directory.isNotEmpty()) {
+                        if (preview != null || previewPath != null || directory.isNotEmpty()) {
                             R.string.local_files_back_to_files
                         } else {
                             R.string.local_files_back
                         },
                     ),
                     modifier = Modifier.padding(horizontal = DsSpacing.medium),
-                    actionIcon = Icons.Outlined.Refresh,
+                    actionIcon = FeatherIcons.RefreshCw,
                     actionContentDescription = stringResource(R.string.local_files_refresh),
                     actionEnabled = !loading && preview == null,
                     onAction = { scope.launch { reload() } },
@@ -159,19 +191,20 @@ internal fun LocalWorkspaceFilesDialog(
 
                 when {
                     loading -> {
-                        Column(
-                            Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            CircularProgressIndicator()
-                        }
+                        DsPageLoadingState(
+                            icon = FeatherIcons.Folder,
+                            label = stringResource(R.string.local_files_loading),
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     }
                     error != null -> {
-                        Text(
-                            error.orEmpty(),
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(24.dp),
+                        DsPageEmptyState(
+                            icon = FeatherIcons.AlertTriangle,
+                            title = readFilesFailed,
+                            body = error.orEmpty(),
+                            actionText = stringResource(R.string.common_retry),
+                            onAction = { scope.launch { reload() } },
+                            modifier = Modifier.fillMaxSize(),
                         )
                     }
                     preview != null -> LocalFilePreviewBody(preview!!)
@@ -183,57 +216,31 @@ internal fun LocalWorkspaceFilesDialog(
                         }
                         if (files == null) {
                             LocalFileList(workspace, directory, onDirectory = { directory = it }) { file ->
-                                previewLoading = true
-                                error = null
-                                try {
-                                    preview = loadPreview(file.path)
-                                } catch (cancelled: CancellationException) {
-                                    throw cancelled
-                                } catch (failure: Exception) {
-                                    error = failure.message ?: previewFailed
-                                    preview = null
-                                } finally {
-                                    previewLoading = false
-                                }
+                                openPreview(file.path)
                             }
                         } else if (files.isEmpty()) {
                             LocalFilesEmpty(
-                                stringResource(
-                                    if (section == 2) R.string.panel_artifacts_empty
-                                    else R.string.panel_involved_files_empty,
+                                title = stringResource(
+                                    if (section == 2) R.string.local_empty_artifacts_title
+                                    else R.string.local_empty_involved_title,
+                                ),
+                                body = stringResource(
+                                    if (section == 2) R.string.local_empty_artifacts_body
+                                    else R.string.local_empty_involved_body,
                                 ),
                             )
                         } else {
                             LocalFlatFileList(files) { file ->
-                                previewLoading = true
-                                error = null
-                                try {
-                                    preview = loadPreview(file.path)
-                                } catch (cancelled: CancellationException) {
-                                    throw cancelled
-                                } catch (failure: Exception) {
-                                    error = failure.message ?: previewFailed
-                                    preview = null
-                                } finally {
-                                    previewLoading = false
-                                }
+                                openPreview(file.path)
                             }
                         }
                     }
-                    conversation.isEmpty -> LocalFilesEmpty(stringResource(R.string.panel_conversation_files_empty))
+                    conversation.isEmpty -> LocalFilesEmpty(
+                        title = stringResource(R.string.local_empty_conversation_files_title),
+                        body = stringResource(R.string.local_empty_conversation_files_body),
+                    )
                     else -> ConversationLocalFileList(conversation) { file ->
-                        previewLoading = true
-                        error = null
-                        try {
-                            preview = loadPreview(file.path)
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (failure: Exception) {
-                            error = failure.message ?: previewFailed
-                            preview = null
-                        } finally {
-                            previewLoading = false
-                        }
+                                openPreview(file.path)
                     }
                 }
 
@@ -246,15 +253,15 @@ internal fun LocalWorkspaceFilesDialog(
                 }
             }
         }
-    }
 }
 
 @Composable
-private fun LocalFilesEmpty(text: String) {
-    Text(
-        text,
-        modifier = Modifier.fillMaxWidth().padding(24.dp),
-        color = DsTheme.colors.labelTertiary,
+private fun LocalFilesEmpty(title: String, body: String) {
+    DsPageEmptyState(
+        icon = FeatherIcons.Folder,
+        title = title,
+        body = body,
+        modifier = Modifier.fillMaxSize(),
     )
 }
 
@@ -322,7 +329,10 @@ private fun LocalFileList(
     }.distinct().sorted().toList()
     val filesByPath = files.associateBy(LocalWorkspaceFile::path)
     if (children.isEmpty()) {
-        LocalFilesEmpty(stringResource(R.string.local_files_workspace_empty))
+        LocalFilesEmpty(
+            title = stringResource(R.string.local_empty_workspace_title),
+            body = stringResource(R.string.local_empty_workspace_body),
+        )
         return
     }
     LazyColumn(Modifier.fillMaxSize()) {

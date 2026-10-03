@@ -8,12 +8,13 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 private data class LocalSessionSummaryRecord(
-    val version: Int = 1,
+    val version: Int? = null,
     val id: String,
     val title: String,
     val updatedAt: Long,
     val usageMode: String,
     val chatMode: String,
+    val groupMemberCount: Int = 0,
     val personaId: String? = null,
     val galleryId: String? = null,
     val blank: Boolean,
@@ -39,11 +40,13 @@ internal class LocalSessionSummaryIndex(
     fun write(summary: LocalSessionSummary, sourceModifiedAt: Long) = synchronized(lock) {
         require(sourceModifiedAt > 0L) { "会话摘要缺少有效源文件代际：${summary.id}" }
         val record = LocalSessionSummaryRecord(
+            version = CURRENT_VERSION,
             id = summary.id,
             title = summary.title,
             updatedAt = summary.updatedAt,
             usageMode = summary.usageMode.name,
             chatMode = summary.chatMode.name,
+            groupMemberCount = summary.groupMemberCount,
             personaId = summary.personaId,
             galleryId = summary.galleryId,
             blank = summary.blank,
@@ -94,6 +97,7 @@ internal class LocalSessionSummaryIndex(
             updatedAt = updatedAt,
             usageMode = usage,
             chatMode = mode,
+            groupMemberCount = groupMemberCount,
             personaId = personaId,
             galleryId = galleryId,
             blank = blank,
@@ -122,7 +126,7 @@ internal class LocalSessionSummaryIndex(
     }
 
     private companion object {
-        const val CURRENT_VERSION = 1
+        const val CURRENT_VERSION = 2
         const val SUMMARY_SUFFIX = ".summary"
     }
 }

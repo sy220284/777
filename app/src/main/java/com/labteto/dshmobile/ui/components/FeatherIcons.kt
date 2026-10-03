@@ -303,6 +303,33 @@ internal object FeatherIcons {
         }
     }
 
+    /** `refresh-cw` — retry / reload while keeping the same outlined chrome language. */
+    val RefreshCw: ImageVector by lazy {
+        feather("RefreshCw") {
+            moveTo(20f, 3f); lineTo(20f, 8f); lineTo(15f, 8f)
+            moveTo(4f, 21f); lineTo(4f, 16f); lineTo(9f, 16f)
+            moveTo(20f, 8f)
+            arcToRelative(8f, 8f, 0f, isMoreThanHalf = false, isPositiveArc = false, -14f, -2f)
+            moveTo(4f, 16f)
+            arcToRelative(8f, 8f, 0f, isMoreThanHalf = false, isPositiveArc = false, 14f, 2f)
+        }
+    }
+
+    /** `arrow-left` — page back navigation. */
+    val ArrowLeft: ImageVector by lazy {
+        feather("ArrowLeft") {
+            moveTo(19f, 12f); lineTo(5f, 12f)
+            moveTo(12f, 19f); lineTo(5f, 12f); lineTo(12f, 5f)
+        }
+    }
+
+    /** `chevron-down` — compact selector disclosure. */
+    val ChevronDown: ImageVector by lazy {
+        feather("ChevronDown") {
+            moveTo(6f, 9f); lineTo(12f, 15f); lineTo(18f, 9f)
+        }
+    }
+
     /** `chevron-right` — disclosure affordance; rotates to 90° when open. */
     val ChevronRight: ImageVector by lazy {
         feather("ChevronRight") {

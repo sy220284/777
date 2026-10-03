@@ -2,7 +2,6 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -43,16 +41,6 @@ import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
-
-@Composable
-internal fun LoadingScreen() {
-    Box(
-        Modifier.fillMaxSize().background(DsTheme.colors.rootSurface()),
-        contentAlignment = Alignment.Center,
-    ) {
-        CircularProgressIndicator(color = DsTheme.colors.brandPrimary)
-    }
-}
 
 @Composable
 internal fun LocalConfiguration(

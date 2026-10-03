@@ -22,14 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material.icons.outlined.Extension
-import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -306,7 +299,7 @@ internal fun SessionRowItem(
             if (childCount > 0) {
                 Spacer(Modifier.width(DsSpacing.xsmall))
                 DsIconButton(
-                    icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    icon = FeatherIcons.ChevronRight,
                     contentDescription = stringResource(R.string.chatlist_subagents),
                     onClick = onToggleChildren,
                     modifier = Modifier.graphicsLayer { rotationZ = chevronRotation },
