@@ -602,7 +602,7 @@ object LocalModelPresets {
         }
     }
 
-    private fun promptCachePolicyFor(
+    fun promptCachePolicyFor(
         model: String,
         baseUrl: String,
         protocol: LocalModelProtocol,
