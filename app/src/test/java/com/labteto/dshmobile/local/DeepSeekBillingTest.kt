@@ -128,6 +128,7 @@ class DeepSeekBillingTest {
         assertEquals(2L, next.unreportedRequestCount)
         assertEquals(3L, next.totalRequestCount)
         assertEquals(100L, next.inputTokens)
+        assertEquals(12L, next.cacheWriteTokens)
         assertEquals(20L, next.outputTokens)
     }
 
