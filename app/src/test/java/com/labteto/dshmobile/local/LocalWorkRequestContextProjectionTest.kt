@@ -128,6 +128,39 @@ class LocalWorkRequestContextProjectionTest {
 
 
     @Test
+    fun cacheSensitiveSteadyStateUsesHardBudgetUntilRouteTrigger() {
+        val base = LocalHistoryBudget(
+            maxHistoryChars = 700_000,
+            tailChars = 320_000,
+            maxSummaryChars = 20_000,
+            maxToolResultChars = 60_000,
+            maxHistoryTokens = 678_464,
+            tailTokens = 119_040,
+            maxToolResultTokens = 16_000,
+        )
+        val policy = LocalModelPresets.runtimeCapabilitiesFor(
+            model = "deepseek-flash",
+            baseUrl = "https://api.deepseek.com",
+        ).promptCachePolicy
+
+        val beforeTrigger = workSteadyStateHistoryBudget(
+            base = base,
+            currentHistoryTokens = 120_000,
+            cachePolicy = policy,
+        )
+        assertEquals(base.maxHistoryTokens, beforeTrigger.maxHistoryTokens)
+        assertFalse(beforeTrigger.adaptiveCompactionTrigger)
+
+        val afterTrigger = workSteadyStateHistoryBudget(
+            base = base,
+            currentHistoryTokens = 600_000,
+            cachePolicy = policy,
+        )
+        assertTrue(requireNotNull(afterTrigger.maxHistoryTokens) < requireNotNull(base.maxHistoryTokens))
+        assertFalse(afterTrigger.adaptiveCompactionTrigger)
+    }
+
+    @Test
     fun staleToolPayloadsLeaveHotRequestBeforeHistoryNeedsFullCompaction() {
         val history = buildList {
             add(message("system", "系统规则"))
