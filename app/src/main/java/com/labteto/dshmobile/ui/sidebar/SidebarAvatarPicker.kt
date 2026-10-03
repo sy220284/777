@@ -1,9 +1,12 @@
 package com.labteto.dshmobile.ui.sidebar
 
+import android.content.Context
 import android.graphics.ImageDecoder
+import android.graphics.Matrix
 import android.graphics.drawable.AnimatedImageDrawable
 import android.graphics.drawable.Drawable
 import android.widget.ImageView
+import androidx.appcompat.widget.AppCompatImageView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -326,11 +329,13 @@ private fun SidebarAvatarImage(source: SidebarAvatarSource, contentDescription: 
         }
     } else {
         AndroidView(
-            factory = { viewContext ->
-                ImageView(viewContext).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
-            },
+            factory = { viewContext -> SidebarAvatarImageView(viewContext) },
             update = { imageView ->
                 imageView.contentDescription = contentDescription
+                imageView.focusY = when (source) {
+                    is SidebarAvatarSource.Bundled -> BUNDLED_AVATAR_FOCUS_Y
+                    else -> CENTERED_AVATAR_FOCUS_Y
+                }
                 imageView.setImageDrawable(drawable)
                 (drawable as? AnimatedImageDrawable)?.start()
             },
@@ -339,5 +344,90 @@ private fun SidebarAvatarImage(source: SidebarAvatarSource, contentDescription: 
     }
 }
 
+private class SidebarAvatarImageView(context: Context) : AppCompatImageView(context) {
+    var focusY: Float = CENTERED_AVATAR_FOCUS_Y
+        set(value) {
+            val normalized = value.coerceIn(0f, 1f)
+            if (field == normalized) return
+            field = normalized
+            updateCropMatrix()
+        }
+
+    init {
+        scaleType = ImageView.ScaleType.MATRIX
+    }
+
+    override fun setImageDrawable(drawable: Drawable?) {
+        super.setImageDrawable(drawable)
+        updateCropMatrix()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        updateCropMatrix()
+    }
+
+    private fun updateCropMatrix() {
+        val currentDrawable = drawable ?: return
+        val transform = calculateSidebarAvatarCrop(
+            sourceWidth = currentDrawable.intrinsicWidth,
+            sourceHeight = currentDrawable.intrinsicHeight,
+            targetWidth = width,
+            targetHeight = height,
+            focusY = focusY,
+        )
+        if (transform == null) {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            return
+        }
+
+        if (scaleType != ImageView.ScaleType.MATRIX) {
+            scaleType = ImageView.ScaleType.MATRIX
+        }
+        imageMatrix = Matrix().apply {
+            setScale(transform.scale, transform.scale)
+            postTranslate(transform.translateX, transform.translateY)
+        }
+    }
+}
+
+internal data class SidebarAvatarCropTransform(
+    val scale: Float,
+    val translateX: Float,
+    val translateY: Float,
+)
+
+internal fun calculateSidebarAvatarCrop(
+    sourceWidth: Int,
+    sourceHeight: Int,
+    targetWidth: Int,
+    targetHeight: Int,
+    focusY: Float,
+): SidebarAvatarCropTransform? {
+    if (sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) {
+        return null
+    }
+
+    val scale = maxOf(
+        targetWidth.toFloat() / sourceWidth.toFloat(),
+        targetHeight.toFloat() / sourceHeight.toFloat(),
+    )
+    val scaledWidth = sourceWidth * scale
+    val scaledHeight = sourceHeight * scale
+    val translateX = (targetWidth - scaledWidth) / 2f
+    val minTranslateY = minOf(targetHeight - scaledHeight, 0f)
+    val desiredTranslateY = targetHeight / 2f - scaledHeight * focusY.coerceIn(0f, 1f)
+    val translateY = desiredTranslateY.coerceIn(minTranslateY, 0f)
+
+    return SidebarAvatarCropTransform(
+        scale = scale,
+        translateX = translateX,
+        translateY = translateY,
+    )
+}
+
+// 内置人物图统一使用竖构图，头像裁切向上偏置，优先保留头部与面部。
+private const val BUNDLED_AVATAR_FOCUS_Y = 0.38f
+private const val CENTERED_AVATAR_FOCUS_Y = 0.5f
 private const val AVATAR_DECODE_EDGE = 256f
 
