@@ -92,7 +92,7 @@ internal class LocalSessionLifecycleCoordinator(
         freshGalleryStory: Boolean = false,
         chatMode: LocalChatMode? = null,
         groupEntries: List<PersonaGalleryEntry> = emptyList(),
-    )): Boolean {
+    ): Boolean {
         if (
             chatMode == LocalChatMode.GROUP &&
             groupEntries.isNotEmpty() &&
