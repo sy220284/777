@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
 /**
@@ -20,4 +21,18 @@ internal suspend fun prepareLocalHarnessStartup(
     session.await()
     runtime.await()
     plugins.await()
+}
+
+
+internal suspend fun prepareBundledRuntimes(
+    node: BundledNodeRuntime,
+    python: BundledPythonRuntime,
+    git: BundledGitRuntime,
+) = coroutineScope {
+    awaitAll(
+        async { node.prepare() },
+        async { python.prepare() },
+        async { git.prepare() },
+    )
+    Unit
 }
