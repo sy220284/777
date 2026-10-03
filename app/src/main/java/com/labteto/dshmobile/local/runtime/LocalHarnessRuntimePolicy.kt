@@ -16,7 +16,6 @@ class LocalAutomationWorkException(
     cause: Throwable? = null,
 ) : IllegalStateException(message, cause)
 
-/** Low-risk classification only; global auto approval can approve any approval-gated tool. */
 internal fun canAutoApproveSafely(tool: HarnessTool): Boolean =
     tool.access == ToolAccess.READ_ONLY ||
         runCatching {
