@@ -54,3 +54,14 @@ internal fun establishedGroupChatSessionId(sessions: List<LocalSessionSummary>):
 
 internal fun hasEstablishedGroupChat(sessions: List<LocalSessionSummary>): Boolean =
     establishedGroupChatSessionId(sessions) != null
+
+internal fun acceptLocalSessionNavigation(
+    currentSessionId: String,
+    targetSessionId: String,
+    sessions: List<LocalSessionSummary>,
+    switchSession: (String) -> Boolean,
+): Boolean {
+    if (targetSessionId == currentSessionId) return true
+    if (sessions.none { it.id == targetSessionId }) return false
+    return switchSession(targetSessionId)
+}

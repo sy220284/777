@@ -10,6 +10,61 @@ import org.junit.Test
 
 class LocalFeatureNavigationTest {
     @Test
+    fun sessionNavigationOnlyCommitsKnownAcceptedTargets() {
+        val session = LocalSessionSummary(
+            id = "target",
+            title = "目标会话",
+            updatedAt = 1L,
+            usageMode = LocalUsageMode.WORK,
+            blank = false,
+        )
+        var switchCalls = 0
+        val rejected = acceptLocalSessionNavigation(
+            currentSessionId = "current",
+            targetSessionId = session.id,
+            sessions = listOf(session),
+        ) {
+            switchCalls += 1
+            false
+        }
+        assertFalse(rejected)
+        assertEquals(1, switchCalls)
+
+        val accepted = acceptLocalSessionNavigation(
+            currentSessionId = "current",
+            targetSessionId = session.id,
+            sessions = listOf(session),
+        ) {
+            switchCalls += 1
+            true
+        }
+        assertTrue(accepted)
+        assertEquals(2, switchCalls)
+
+        val alreadyCurrent = acceptLocalSessionNavigation(
+            currentSessionId = session.id,
+            targetSessionId = session.id,
+            sessions = emptyList(),
+        ) {
+            switchCalls += 1
+            false
+        }
+        assertTrue(alreadyCurrent)
+        assertEquals(2, switchCalls)
+
+        val unknown = acceptLocalSessionNavigation(
+            currentSessionId = "current",
+            targetSessionId = "missing",
+            sessions = listOf(session),
+        ) {
+            switchCalls += 1
+            true
+        }
+        assertFalse(unknown)
+        assertEquals(2, switchCalls)
+    }
+
+    @Test
     fun backReturnsToFeatureThatOpenedCurrentPage() {
         var stack = localFeatureHome()
         stack = localFeaturePush(stack, LocalFeaturePage.DIARY)

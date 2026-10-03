@@ -112,9 +112,10 @@ internal fun LocalFeaturePageContent(
                     onPopFeature()
                 },
                 onOpenSession = { sessionId ->
-                    onTaskModeChange(null)
-                    onResetNavigation()
-                    viewModel.switchSession(sessionId)
+                    if (viewModel.switchSession(sessionId)) {
+                        onTaskModeChange(null)
+                        onResetNavigation()
+                    }
                 },
                 initialMode = taskMode,
             )
