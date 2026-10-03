@@ -41,6 +41,14 @@ class LocalToolPolicyTest {
         }
     }
 
+    @Test fun tokenAnalysisDiscoversStructuredEnvironmentInfoInsteadOfRawLogScanning() {
+        val keywords = LocalToolPolicy.metadata("environment_info").discoveryKeywords
+        assertTrue("token" in keywords)
+        assertTrue("token消耗" in keywords)
+        assertEquals(ToolExposure.OPTIONAL, LocalToolPolicy.exposure("environment_info"))
+        assertEquals(ToolAccess.READ_ONLY, LocalToolPolicy.access("environment_info"))
+    }
+
     @Test fun aliasesCannotBypassApprovalOrReadOnlyScope() = runTest {
         for (name in listOf("write", "write_file", "edit", "edit_file", "bash", "run_shell")) {
             var executed = 0
