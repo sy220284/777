@@ -1,10 +1,5 @@
 package com.labteto.dshmobile.local.chat
 
-internal data class ChatDiaryMatchScore(
-    val semantic: Int,
-    val total: Int,
-)
-
 internal object ChatDiaryEntryPolicy {
     fun sanitizeDelta(request: ChatDiaryWriteRequest): ChatDiaryDelta? {
         val raw = request.delta ?: return null
