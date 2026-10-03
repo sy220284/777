@@ -7,9 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -50,11 +48,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
@@ -497,200 +492,6 @@ internal fun PersonaPresetCard(
             )
         }
     }
-}
-
-@Composable
-internal fun GalleryPersonaCard(
-    entry: PersonaGalleryEntry,
-    unsaved: Boolean,
-    modifier: Modifier = Modifier,
-    onChoosePortrait: () -> Unit,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-) {
-    val waitingText = stringResource(R.string.persona_gallery_waiting)
-    val subtitle = when {
-        entry.persona.identity.isNotBlank() -> entry.persona.identity
-        entry.persona.personality.isNotBlank() -> entry.persona.personality
-        else -> waitingText
-    }
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = DsTheme.colors.bgLayer1),
-        shadowElevation = 4.dp,
-        modifier = modifier.combinedClickable(
-            onClick = onClick,
-            onLongClick = onLongClick,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.padding(DsSpacing.small),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-        ) {
-            Box(Modifier.fillMaxWidth()) {
-                SpatialPortraitStandee(
-                    entry = entry,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(230.dp),
-                )
-                DsIconButton(
-                    icon = Icons.Outlined.Image,
-                    contentDescription = stringResource(
-                        if (entry.portraitPath.isBlank()) R.string.persona_gallery_portrait_add
-                        else R.string.persona_gallery_portrait_replace,
-                    ),
-                    onClick = onChoosePortrait,
-                    modifier = Modifier.align(Alignment.TopEnd),
-                    containerColor = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, base = DsTheme.colors.bgLayer2),
-                )
-            }
-            Text(
-                entry.persona.name,
-                style = DsType.std14Strong.withReadingWeight(),
-                color = DsTheme.colors.labelPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                subtitle,
-                style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelSecondary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                stringResource(
-                    R.string.persona_gallery_standee_meta,
-                    entry.stories.size,
-                    entry.totalDialogueCount(),
-                ),
-                style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelTertiary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (unsaved) {
-                GalleryPill(stringResource(R.string.persona_gallery_unsaved_badge))
-            }
-        }
-    }
-}
-
-@Composable
-internal fun SpatialPortraitStandee(
-    entry: PersonaGalleryEntry,
-    modifier: Modifier = Modifier,
-) {
-    val colors = DsTheme.colors
-    var rotationX by remember(entry.id) { mutableStateOf(0f) }
-    var rotationY by remember(entry.id) { mutableStateOf(0f) }
-    val portrait by produceState<ImageBitmap?>(
-        initialValue = null,
-        key1 = entry.portraitPath,
-    ) {
-        value = withContext(Dispatchers.IO) {
-            decodeGalleryPortrait(entry.portraitPath)
-        }
-    }
-
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Bottom,
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .pointerInput(entry.id, entry.portraitPath) {
-                    detectDragGestures(
-                        onDragEnd = {
-                            rotationX = 0f
-                            rotationY = 0f
-                        },
-                        onDragCancel = {
-                            rotationX = 0f
-                            rotationY = 0f
-                        },
-                    ) { change, dragAmount ->
-                        change.consume()
-                        rotationY = (rotationY + dragAmount.x / 28f).coerceIn(-11f, 11f)
-                        rotationX = (rotationX - dragAmount.y / 36f).coerceIn(-7f, 7f)
-                    }
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = colors.accent.copy(alpha = 0.07f),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-                    .shadow(12.dp, RoundedCornerShape(28.dp))
-                    .graphicsLayer {
-                        this.rotationX = rotationX
-                        this.rotationY = rotationY
-                        cameraDistance = 24f * density
-                    },
-            ) {
-                if (portrait != null) {
-                    Image(
-                        bitmap = portrait!!,
-                        contentDescription = entry.persona.name,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(8.dp)
-                            .clip(RoundedCornerShape(22.dp)),
-                        contentScale = ContentScale.Fit,
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(colors.accent.copy(alpha = 0.04f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            PersonaAvatar(entry.persona.name, large = true)
-                            Spacer(Modifier.size(DsSpacing.small))
-                            Text(
-                                stringResource(R.string.persona_gallery_portrait_empty),
-                                style = DsType.caption11.withReadingWeight(),
-                                color = colors.labelTertiary,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        Surface(
-            shape = CircleShape,
-            color = colors.labelTertiary.copy(alpha = 0.16f),
-            modifier = Modifier
-                .fillMaxWidth(0.56f)
-                .height(10.dp)
-                .graphicsLayer {
-                    rotationX = 65f
-                    cameraDistance = 18f * density
-                },
-        ) {}
-    }
-}
-
-private fun decodeGalleryPortrait(path: String): ImageBitmap? {
-    if (path.isBlank()) return null
-    val file = File(path)
-    if (!file.isFile) return null
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeFile(file.absolutePath, bounds)
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-    var sample = 1
-    val longest = maxOf(bounds.outWidth, bounds.outHeight)
-    while (longest / sample > 1_600) sample *= 2
-    val options = BitmapFactory.Options().apply { inSampleSize = sample }
-    return BitmapFactory.decodeFile(file.absolutePath, options)?.asImageBitmap()
 }
 
 @Composable
