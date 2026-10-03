@@ -21,7 +21,7 @@ internal class LocalBuiltinPlugin(
                         schema = schema,
                         access = LocalToolPolicy.access(name),
                         approvalPolicy = LocalToolPolicy.approval(name),
-                        exposure = ToolExposure.CORE,
+                        exposure = LocalToolPolicy.exposure(name),
                         metadata = LocalToolPolicy.metadata(name),
                         executor = HarnessToolExecutor { toolContext, input, rawArguments ->
                             val callId = toolContext.attributes["call_id"] as? String
