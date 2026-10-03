@@ -235,11 +235,6 @@ internal fun LocalModeDrawer(
                     portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
                     group = usageMode == LocalUsageMode.CHAT && groupChatEnabled,
                     running = running,
-                    onClick = when {
-                        usageMode == LocalUsageMode.WORK -> onSettings
-                        groupChatEnabled -> onOpenGroupChat
-                        else -> onOpenPersonaGallery
-                    },
                 )
 
                 DrawerQuickActions(
