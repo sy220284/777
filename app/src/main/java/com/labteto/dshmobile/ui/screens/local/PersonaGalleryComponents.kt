@@ -448,6 +448,53 @@ internal fun GalleryOverviewHeader(
 }
 
 @Composable
+private fun PersonaPresetArtworkPreview(
+    preset: PersonaPreset,
+) {
+    val context = LocalContext.current
+    val assetPath = preset.artwork?.assetPath.orEmpty()
+    val artwork by produceState<ImageBitmap?>(
+        initialValue = null,
+        key1 = assetPath,
+    ) {
+        value = if (assetPath.isBlank()) {
+            null
+        } else {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    context.assets.open(assetPath).use { input ->
+                        BitmapFactory.decodeStream(input, null, bounds)
+                    }
+                    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+                    var sample = 1
+                    val longest = maxOf(bounds.outWidth, bounds.outHeight)
+                    while (longest / sample > 720) sample *= 2
+                    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+                    context.assets.open(assetPath).use { input ->
+                        BitmapFactory.decodeStream(input, null, options)?.asImageBitmap()
+                    }
+                }.getOrNull()
+            }
+        }
+    }
+
+    val resolvedArtwork = artwork
+    if (resolvedArtwork == null) {
+        PersonaAvatar(preset.persona.name)
+    } else {
+        Image(
+            bitmap = resolvedArtwork,
+            contentDescription = preset.persona.name,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(72.dp)
+                .clip(RoundedCornerShape(18.dp)),
+        )
+    }
+}
+
+@Composable
 internal fun PersonaPresetCard(
     preset: PersonaPreset,
     busy: Boolean,
@@ -472,7 +519,7 @@ internal fun PersonaPresetCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
         ) {
-            PersonaAvatar(preset.persona.name)
+            PersonaPresetArtworkPreview(preset)
             Text(
                 preset.persona.name,
                 style = DsType.std14Strong.withReadingWeight(),
