@@ -752,7 +752,7 @@ class LocalHarnessEngine @Inject constructor(
             },
             beginTransition = ::beginSessionTransition,
             endTransition = ::endSessionTransition,
-            navigationBusy = ::isSessionNavigationBusy,
+            navigationBusy = { synchronized(runStateLock) { localSessionNavigationBusy(sessionTransitioning, activeJob?.isCompleted == false) } },
             cancelActiveRunAndJoin = ::cancelActiveRunAndJoin,
             cancelWorkRunsAndJoin = ::cancelWorkRunsAndJoin,
             resetModelHistory = { modelHistory.reset() },
@@ -2281,13 +2281,6 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun isModelIdentityLocked(): Boolean =
         _state.value.let { it.loading || it.running } || isRunBusy()
-
-    private fun isSessionNavigationBusy(): Boolean = synchronized(runStateLock) {
-        localSessionNavigationBusy(
-            sessionTransitioning = sessionTransitioning,
-            visibleRunActive = activeJob?.isCompleted == false,
-        )
-    }
 
     private fun isRunBusy(): Boolean = synchronized(runStateLock) {
         sessionTransitioning ||
