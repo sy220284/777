@@ -98,6 +98,7 @@ internal class LocalRequestPressureStore(
 
     private data class SessionEntry(
         var latest: LocalPromptPressure? = null,
+        var latestWorkAssessment: LocalWorkStepContextAssessment? = null,
         val window: MutableWindow = MutableWindow(),
     )
 
@@ -109,9 +110,14 @@ internal class LocalRequestPressureStore(
     }
 
     @Synchronized
-    fun record(sessionId: String, pressure: LocalPromptPressure) {
+    fun record(
+        sessionId: String,
+        pressure: LocalPromptPressure,
+        workAssessment: LocalWorkStepContextAssessment? = null,
+    ) {
         val entry = sessions.getOrPut(sessionId) { SessionEntry() }
         entry.latest = pressure
+        if (workAssessment != null) entry.latestWorkAssessment = workAssessment
         val window = entry.window
         if (window.prefillTokens <= 0L) window.prefillTokens = pressure.estimatedInputTokens.toLong()
         window.lastInputTokens = pressure.estimatedInputTokens
@@ -142,6 +148,10 @@ internal class LocalRequestPressureStore(
 
     @Synchronized
     fun latest(sessionId: String): LocalPromptPressure? = sessions[sessionId]?.latest
+
+    @Synchronized
+    fun workAssessment(sessionId: String): LocalWorkStepContextAssessment? =
+        sessions[sessionId]?.latestWorkAssessment
 
     @Synchronized
     fun window(sessionId: String): LocalContextWindowSnapshot? = sessions[sessionId]?.window?.let { value ->
