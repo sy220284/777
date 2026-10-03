@@ -8,9 +8,7 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
-/** 运行中的自动目录刷新服务于后续请求；显式账户切换仍需等当前冻结路由结束。 */
-internal fun canSyncChatGptModels(isBusy: Boolean, selectFirst: Boolean): Boolean =
-    !isBusy || !selectFirst
+internal fun canStartChatGptAccountSelection(isBusy: Boolean): Boolean = !isBusy
 
 /** Projects ChatGPT account model mutations into the aggregate runtime without owning OAuth. */
 internal class LocalModelAccountStateCoordinator(
@@ -19,12 +17,16 @@ internal class LocalModelAccountStateCoordinator(
     private val state: MutableStateFlow<LocalHarnessState>,
     private val isBusy: () -> Boolean,
 ) {
+    fun requireAccountSelectionAllowed() {
+        check(canStartChatGptAccountSelection(isBusy())) { "请先结束当前任务再切换模型账户" }
+    }
+
     suspend fun syncChatGptModels(
         accountId: String,
         models: List<ChatGptModelOption>,
         selectFirst: Boolean,
     ) {
-        check(canSyncChatGptModels(isBusy(), selectFirst)) { "请先结束当前任务再切换模型账户" }
+        // 已开始的账户操作允许完整提交；正在运行的请求使用冻结路由，不会被这里改写。
         val before = state.value
         val beforeActiveProfile = gateway.activeProfile()
         val profiles = configuration.saveChatGptModels(accountId, models)
@@ -61,7 +63,7 @@ internal class LocalModelAccountStateCoordinator(
     }
 
     suspend fun removeChatGptAccountProfiles(accountId: String) {
-        require(!isBusy()) { "请先结束当前任务再断开模型账户" }
+        check(!isBusy()) { "请先结束当前任务再断开模型账户" }
         val current = state.value
         val result = configuration.removeChatGptAccount(
             accountId = accountId,

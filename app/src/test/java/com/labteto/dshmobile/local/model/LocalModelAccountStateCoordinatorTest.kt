@@ -6,18 +6,12 @@ import org.junit.Test
 
 class LocalModelAccountStateCoordinatorTest {
     @Test
-    fun automaticCatalogRefreshIsAllowedWhileRunIsBusy() {
-        assertTrue(canSyncChatGptModels(isBusy = true, selectFirst = false))
+    fun accountSelectionAdmissionRejectsBusyRuntime() {
+        assertFalse(canStartChatGptAccountSelection(isBusy = true))
     }
 
     @Test
-    fun explicitAccountSelectionIsBlockedWhileRunIsBusy() {
-        assertFalse(canSyncChatGptModels(isBusy = true, selectFirst = true))
-    }
-
-    @Test
-    fun idleRuntimeAllowsBothRefreshAndSelection() {
-        assertTrue(canSyncChatGptModels(isBusy = false, selectFirst = false))
-        assertTrue(canSyncChatGptModels(isBusy = false, selectFirst = true))
+    fun accountSelectionAdmissionAllowsIdleRuntime() {
+        assertTrue(canStartChatGptAccountSelection(isBusy = false))
     }
 }

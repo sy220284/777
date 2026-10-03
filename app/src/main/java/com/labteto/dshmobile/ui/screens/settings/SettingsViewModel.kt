@@ -24,7 +24,6 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryStore
-import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_DIR
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_FILE
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -274,15 +273,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
     fun refreshChatGpt() {
-        viewModelScope.launch {
-            try {
-                localHarness.refreshChatGpt()
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                AppLog.warn("SettingsViewModel", "ChatGPT background refresh failed", error)
-            }
-        }
+        viewModelScope.launch { localHarness.refreshChatGpt() }
     }
 
     fun removeLocalModel(id: String) = localHarness.removeModel(id)
