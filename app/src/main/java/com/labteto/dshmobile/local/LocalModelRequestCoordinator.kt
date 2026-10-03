@@ -494,6 +494,7 @@ internal class LocalModelRequestCoordinator(
                                     put("prompt_tokens", reply.usage.promptTokens)
                                     put("cache_hit_tokens", reply.usage.cacheHitTokens)
                                     put("cache_miss_tokens", reply.usage.cacheMissTokens)
+                                    put("cache_write_tokens", reply.usage.cacheWriteTokens)
                                     put("completion_tokens", reply.usage.completionTokens)
                                     put("reasoning_tokens", reply.usage.reasoningTokens)
                                     put("total_tokens", reply.usage.totalTokens)
