@@ -141,14 +141,12 @@ class SidebarAvatarStore @Inject constructor(
     }.getOrDefault("")
 
     private fun validatePlatformImage(file: File): Pair<Int, Int> {
-        var dimensions = 0 to 0
-        ImageDecoder.decodeDrawable(ImageDecoder.createSource(file)) { decoder, info, _ ->
+        val drawable = ImageDecoder.decodeDrawable(ImageDecoder.createSource(file)) { decoder, info, _ ->
             val width = info.size.width
             val height = info.size.height
             require(width in 1..MAX_SIDEBAR_AVATAR_EDGE && height in 1..MAX_SIDEBAR_AVATAR_EDGE) {
                 context.getString(R.string.sidebar_avatar_dimensions_invalid)
             }
-            dimensions = width to height
             val scale = maxOf(width, height).toFloat() / VALIDATION_TARGET_EDGE
             if (scale > 1f) {
                 decoder.setTargetSize(
@@ -157,7 +155,12 @@ class SidebarAvatarStore @Inject constructor(
                 )
             }
         }
-        return dimensions
+        val displayedWidth = drawable.intrinsicWidth
+        val displayedHeight = drawable.intrinsicHeight
+        require(displayedWidth > 0 && displayedHeight > 0) {
+            context.getString(R.string.sidebar_avatar_dimensions_invalid)
+        }
+        return displayedWidth to displayedHeight
     }
 
     private fun requireManagedCustomFile(file: File): File {
