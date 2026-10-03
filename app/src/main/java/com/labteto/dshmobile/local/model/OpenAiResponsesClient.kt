@@ -59,6 +59,8 @@ class OpenAiResponsesClient @Inject constructor(
         temperature: Double? = null,
         planSharing: Boolean,
         promptCacheComparisonResponseId: String? = null,
+        promptCacheKey: String? = null,
+        promptCacheTtl: String? = null,
         onDelta: (LocalModelDelta) -> Unit = {},
     ): LocalModelReply = withContext(Dispatchers.IO) {
         val promptBreakdown = estimatePromptBreakdown(messages, tools)
@@ -72,6 +74,8 @@ class OpenAiResponsesClient @Inject constructor(
             includeEncryptedReasoning = openAiContract,
             enforceOpenAiToolSchema = openAiContract,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
+            promptCacheKey = promptCacheKey,
+            promptCacheTtl = promptCacheTtl,
         )
         validateRequestPayload(payload)
         val admissionTracker = LocalModelAdmissionTracker()
@@ -256,15 +260,29 @@ class OpenAiResponsesClient @Inject constructor(
         includeEncryptedReasoning: Boolean = true,
         enforceOpenAiToolSchema: Boolean = planSharing,
         promptCacheComparisonResponseId: String? = null,
+        promptCacheKey: String? = null,
+        promptCacheTtl: String? = null,
     ): JsonObject = buildJsonObject {
         put("model", model)
         responseInstructions(messages).takeIf(String::isNotBlank)?.let { put("instructions", it) }
         put("input", responseInput(messages))
         put("store", false)
         put("stream", true)
-        promptCacheComparisonResponseId?.trim()?.takeIf(String::isNotBlank)?.let { baseline ->
+        if (!planSharing) {
+            promptCacheKey?.trim()?.takeIf(String::isNotBlank)?.let { key ->
+                put("prompt_cache_key", key.take(MAX_PROMPT_CACHE_KEY_CHARS))
+            }
+        }
+        val cacheComparison = promptCacheComparisonResponseId
+            ?.trim()
+            ?.takeIf(String::isNotBlank)
+        val cacheTtl = promptCacheTtl
+            ?.trim()
+            ?.takeIf { !planSharing && it in SUPPORTED_PROMPT_CACHE_TTLS }
+        if (cacheComparison != null || cacheTtl != null) {
             put("prompt_cache_options", buildJsonObject {
-                put("comparison_response_id", baseline.take(512))
+                cacheComparison?.let { put("comparison_response_id", it.take(512)) }
+                cacheTtl?.let { put("ttl", it) }
             })
         }
         if (includeEncryptedReasoning) {
@@ -800,5 +818,7 @@ class OpenAiResponsesClient @Inject constructor(
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
         private const val MAX_STREAM_BYTES = 32 * 1024 * 1024
         private const val ERROR_BODY_LIMIT = 8_000
+        private const val MAX_PROMPT_CACHE_KEY_CHARS = 64
+        private val SUPPORTED_PROMPT_CACHE_TTLS = setOf("30m")
     }
 }
