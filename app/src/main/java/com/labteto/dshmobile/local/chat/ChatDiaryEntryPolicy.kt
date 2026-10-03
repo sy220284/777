@@ -164,22 +164,6 @@ internal object ChatDiaryEntryPolicy {
         )
     }
 
-    fun hasSpecificRecallAnchor(query: String): Boolean {
-        val core = normalizeText(query)
-            .replace(SPECIFIC_RECALL_NOISE, "")
-            .trim()
-        return core.length >= 2 && core !in GENERIC_RECALL_CORES
-    }
-
-    fun isRecallMatch(
-        score: ChatDiaryMatchScore,
-        broad: Boolean,
-        query: String,
-    ): Boolean {
-        val hasSpecificAnchor = broad && hasSpecificRecallAnchor(query)
-        return (broad && !hasSpecificAnchor) || score.semantic >= MIN_RECALL_SEMANTIC_SCORE
-    }
-
     private fun eventGrounded(event: String, evidence: String): Boolean {
         val a = normalizeText(event)
         val b = normalizeText(evidence)
@@ -284,7 +268,6 @@ internal object ChatDiaryEntryPolicy {
     private const val MIN_EVENT_CHARS = 6
     private const val MIN_IMPORTANCE = 2
     private const val MINOR_IMPORTANCE = 3
-    private const val MIN_RECALL_SEMANTIC_SCORE = 24
     private const val DUPLICATE_WINDOW_MILLIS = 6 * 60 * 60 * 1_000L
     private const val DAY_MILLIS = 24 * 60 * 60 * 1_000L
     private const val DUPLICATE_SIMILARITY = 0.72
@@ -296,9 +279,5 @@ internal object ChatDiaryEntryPolicy {
     private val RECALL_STOP_TERMS = setOf(
         "什么", "时候", "怎么", "我们", "你们", "他们", "她们", "在哪", "最后", "那个", "这个", "事情",
     )
-    private val SPECIFIC_RECALL_NOISE = Regex(
-        """(?:你还记得|还记得|你记得|记不记得|以前|之前|上次|第一次|当时|我跟你说过|我和你说过|你知道我|你还知道|那件事|那件|那次|那天|那时候|那个|这个|什么|吗|么|呢)""",
-    )
-    private val GENERIC_RECALL_CORES = setOf("我", "事", "事情", "这事", "那事")
     private val PRIVACY_SIGNAL = Regex("""(?:别告诉|不要告诉|别跟.+说|不要跟.+说|保密|秘密|只告诉你|只跟你说|别让.+知道)""")
 }
