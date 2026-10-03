@@ -34,9 +34,12 @@ internal fun localFeaturePop(stack: List<String>): List<String> =
 
 internal fun localFeatureHome(): List<String> = listOf(LocalFeaturePage.HOME.name)
 
-internal fun hasEstablishedGroupChat(sessions: List<LocalSessionSummary>): Boolean =
-    sessions.any {
+internal fun establishedGroupChatSessionId(sessions: List<LocalSessionSummary>): String? =
+    sessions.firstOrNull {
         it.usageMode == LocalUsageMode.CHAT &&
             it.chatMode == LocalChatMode.GROUP &&
             it.groupMemberCount >= MIN_GROUP_CHAT_MEMBERS
-    }
+    }?.id
+
+internal fun hasEstablishedGroupChat(sessions: List<LocalSessionSummary>): Boolean =
+    establishedGroupChatSessionId(sessions) != null
