@@ -111,7 +111,7 @@ class LocalWorkRequestContextProjectionTest {
 
         val small = workSteadyStateHistoryBudget(
             base = base,
-            currentHistoryTokens = 40_000,
+            currentHistoryTokens = 20_000,
             extraTokens = 10_000,
         )
         assertEquals(base, small)
