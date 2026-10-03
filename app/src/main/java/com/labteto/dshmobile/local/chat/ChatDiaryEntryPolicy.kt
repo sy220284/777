@@ -1,10 +1,5 @@
 package com.labteto.dshmobile.local.chat
 
-internal data class ChatDiaryMatchScore(
-    val semantic: Int,
-    val total: Int,
-)
-
 internal object ChatDiaryEntryPolicy {
     fun sanitizeDelta(request: ChatDiaryWriteRequest): ChatDiaryDelta? {
         val raw = request.delta ?: return null
@@ -160,9 +155,6 @@ internal object ChatDiaryEntryPolicy {
         )
     }
 
-    fun isRecallMatch(score: ChatDiaryMatchScore, broad: Boolean): Boolean =
-        broad || score.semantic >= MIN_RECALL_SEMANTIC_SCORE
-
     private fun eventGrounded(event: String, evidence: String): Boolean {
         val a = normalizeText(event)
         val b = normalizeText(evidence)
@@ -232,7 +224,7 @@ internal object ChatDiaryEntryPolicy {
             .replace("一起", "")
 
     private fun terms(text: String): Set<String> {
-        val normalized = normalizeText(text)
+        val normalized = normalizeRecallText(text)
         val terms = Regex("[\\p{L}\\p{N}_-]{2,}")
             .findAll(normalized)
             .map { it.value }
@@ -241,8 +233,12 @@ internal object ChatDiaryEntryPolicy {
         Regex("[\\u4e00-\\u9fff]{2,}").findAll(normalized).forEach { match ->
             match.value.windowed(2).take(24).forEach(terms::add)
         }
-        return terms
+        return terms.filterNotTo(linkedSetOf()) { it in RECALL_STOP_TERMS }
     }
+
+    private fun normalizeRecallText(text: String): String =
+        normalizeText(text)
+            .replace(RECALL_PLAN_VARIANTS, "约定")
 
     private fun normalizeText(text: String): String =
         text.lowercase()
@@ -263,7 +259,6 @@ internal object ChatDiaryEntryPolicy {
     private const val MIN_EVENT_CHARS = 6
     private const val MIN_IMPORTANCE = 2
     private const val MINOR_IMPORTANCE = 3
-    private const val MIN_RECALL_SEMANTIC_SCORE = 24
     private const val DUPLICATE_WINDOW_MILLIS = 6 * 60 * 60 * 1_000L
     private const val DAY_MILLIS = 24 * 60 * 60 * 1_000L
     private const val DUPLICATE_SIMILARITY = 0.72
@@ -271,5 +266,9 @@ internal object ChatDiaryEntryPolicy {
     private val NEGATION_SIGNAL = Regex("""(?:不再|不用|不要|别再|别|没有|没|未|不|取消|撤销|拒绝)""")
     private val REPEATED_CONFIRMATION_NOISE = Regex("""(?:再次|再一次|又一次|重新)""")
     private val AGREEMENT_VARIANTS = Regex("""(?:答应|确认|确定|说定|约定)""")
+    private val RECALL_PLAN_VARIANTS = Regex("""(?:安排|计划|说好|说定|约定|确认)""")
+    private val RECALL_STOP_TERMS = setOf(
+        "什么", "时候", "怎么", "我们", "你们", "他们", "她们", "在哪", "最后", "那个", "这个", "事情",
+    )
     private val PRIVACY_SIGNAL = Regex("""(?:别告诉|不要告诉|别跟.+说|不要跟.+说|保密|秘密|只告诉你|只跟你说|别让.+知道)""")
 }

@@ -7,6 +7,7 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.observability.AppLog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.JsonArray
@@ -49,15 +50,59 @@ internal class LocalToolExecutionCoordinator(
         }
     }
 
+    fun enableTaskRelevantOptionalTools(
+        taskContext: String,
+        target: MutableSet<String> = enabledOptionalTools,
+    ) {
+        // GitHub pre-activation has its own intent and credential gate. Generic keyword matches
+        // must not reactivate it from a negated current input or an older GitHub request.
+        val tools = registry.names().mapNotNull(registry::get).filterNot(::isGitHubConnectorTool)
+        enableOptionalTools(
+            LocalToolRouter.relevantOptionalToolNames(tools, taskContext),
+            target,
+        )
+    }
+
+    suspend fun prepareWorkTurnCapabilities(
+        input: String,
+        history: List<JsonObject>,
+        gitHubConfigured: suspend () -> Boolean,
+        target: MutableSet<String>? = null,
+    ) {
+        val intent = LocalToolCapabilityIntent.from(input, history)
+        val enableGitHub = if (intent.requestsGitHub) {
+            try {
+                gitHubConfigured()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                false
+            }
+        } else false
+        prepareWorkTurnCapabilities(intent.context, enableGitHub, target)
+    }
+
+    fun prepareWorkTurnCapabilities(
+        taskContext: String,
+        enableGitHub: Boolean,
+        target: MutableSet<String>? = null,
+    ) {
+        val resolvedTarget = target ?: enabledOptionalTools
+        enableTaskRelevantOptionalTools(taskContext, resolvedTarget)
+        if (enableGitHub) enableGitHubConnectorTools(resolvedTarget)
+    }
+
     fun enableGitHubConnectorTools(target: MutableSet<String> = enabledOptionalTools) {
         val githubTools = registry.names().mapNotNull(registry::get)
             .filter { tool ->
-                LocalToolRouter.isOptional(tool) &&
-                    tool.metadata.family.equals(GITHUB_TOOL_FAMILY, ignoreCase = true)
+                LocalToolRouter.isOptional(tool) && isGitHubConnectorTool(tool)
             }
             .map(HarnessTool::name)
         enableOptionalTools(githubTools, target)
     }
+
+    private fun isGitHubConnectorTool(tool: HarnessTool): Boolean =
+        tool.metadata.family.equals(GITHUB_TOOL_FAMILY, ignoreCase = true)
 
     fun capabilitySummary(enabledOptional: Set<String> = enabledOptionalSnapshot()): String {
         val tools = registry.names().mapNotNull(registry::get)
@@ -90,7 +135,7 @@ internal class LocalToolExecutionCoordinator(
         val tools = registry.names().mapNotNull(registry::get)
         val matches = LocalToolRouter.search(tools, query)
         if (matches.isEmpty()) {
-            return "未找到匹配的扩展能力；可换用 GitHub、Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
+            return "未找到匹配的扩展能力；可换用联网、下载、记忆、会话、GitHub、Android、视觉、运行时、MCP、LSP、自动化或 Webhook 等关键词"
         }
         synchronized(target) {
             target += matches.map(HarnessTool::name)

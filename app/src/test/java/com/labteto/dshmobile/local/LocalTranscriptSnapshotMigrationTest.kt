@@ -86,11 +86,11 @@ class LocalTranscriptSnapshotMigrationTest {
             assertNotNull(migrated)
             assertEquals(
                 1,
-                log.events().count { it.type == LOCAL_TRANSCRIPT_MIGRATION_BASELINE_EVENT },
+                log.withEvents { events -> events.count { it.type == LOCAL_TRANSCRIPT_MIGRATION_BASELINE_EVENT } },
             )
             assertEquals(
                 3,
-                log.events().count { it.type == LOCAL_TRANSCRIPT_MIGRATION_CHUNK_EVENT },
+                log.withEvents { events -> events.count { it.type == LOCAL_TRANSCRIPT_MIGRATION_CHUNK_EVENT } },
             )
             assertEquals(
                 legacyMessages.map { it.id },
@@ -116,7 +116,7 @@ class LocalTranscriptSnapshotMigrationTest {
             assertEquals(5L, second.index.totalMessageCount)
             assertEquals(
                 1,
-                log.events().count { it.type == LOCAL_TRANSCRIPT_MIGRATION_BASELINE_EVENT },
+                log.withEvents { events -> events.count { it.type == LOCAL_TRANSCRIPT_MIGRATION_BASELINE_EVENT } },
             )
         }
     }

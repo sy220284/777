@@ -17,12 +17,14 @@ All notable changes to DSH Mobile are documented here. Format based on
 
 ### Changed
 
+- Work 请求采用可信任务检查点、最近因果链与可恢复的旧工具输出预览；低频工具按任务意图或能力搜索暴露，完整历史和工具能力保持可用。
 - Reorganized Settings around direct task entry points: removed the General/language selector, split Model and Experience into separate groups, promoted Appearance & Reading and Session to top-level pages, renamed Model to Model Settings, and moved API pricing plus usage into a separate Model Pricing & Usage page.
 - Retired the old per-app language stack completely: Chinese is now the single default resource surface, Android's app-language entry is removed, and legacy saved app-language state is cleared through a one-way startup migration.
 
 ### Fixed
 
 - 侧边栏头像选择器的内置人物预置保持面部优先的上移裁切；本地自定义图片改为选图后进入可拖拽、可缩放的圆形裁剪界面，裁剪预览与最终头像共用同一取景参数，动图继续保留动画。
+- 持久事件流改用作用域快照，提前结束和异常路径也关闭文件及解压器，避免恢复与会话投影反复读取时泄漏句柄。
 - Notifications now use the supplied red/black portrait as the full-colour notification artwork,
   with a matching monochrome butterfly for the Android status bar. All notification builders,
   including the Harness Webhook foreground service, use the same artwork.

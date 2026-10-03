@@ -19,6 +19,11 @@ internal fun buildTrustedWorkCheckpointModelMessage(content: String): JsonObject
     put("content", content)
 }
 
+private fun isTrustedWorkCheckpointModelMessage(message: JsonObject): Boolean =
+    (message["role"] as? JsonPrimitive)?.contentOrNull == "user" &&
+        (message[WORK_CHECKPOINT_PROVENANCE_KEY] as? JsonPrimitive)?.contentOrNull ==
+            WORK_CHECKPOINT_PROVENANCE_VALUE
+
 internal data class LocalHistoryCompaction(
     val messages: List<JsonObject>,
     val omittedMessages: Int,
@@ -31,6 +36,9 @@ internal data class LocalHistoryCompaction(
 internal data class LocalStructuredWorkState(
     val goals: List<String> = emptyList(),
     val plan: List<String> = emptyList(),
+    val constraints: List<String> = emptyList(),
+    val decisions: List<String> = emptyList(),
+    val failures: List<String> = emptyList(),
     val unfinished: List<String> = emptyList(),
     val progress: List<String> = emptyList(),
     val facts: List<String> = emptyList(),
@@ -81,7 +89,10 @@ internal data class LocalWorkCheckpoint(
                     return@firstNotNullOfOrNull null
                 }
                 val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return@firstNotNullOfOrNull null
-                val start = content.lastIndexOf("<work-checkpoint>")
+                // Trusted checkpoint messages always have one outer wrapper emitted by us.
+                // Payload fields may legitimately contain the same literal text, so the outer
+                // opening tag must be the first occurrence while the closing tag stays the last.
+                val start = content.indexOf("<work-checkpoint>")
                 val end = content.lastIndexOf("</work-checkpoint>")
                 if (start < 0 || end <= start) return@firstNotNullOfOrNull null
                 val payload = content
@@ -149,6 +160,11 @@ internal class LocalHistoryCompactor(
         structuredWorkState: LocalStructuredWorkState? = null,
     ): LocalHistoryCompaction? {
         val source = durableModelHistorySnapshot(history)
+        val previousWorkCheckpoint = if (summaryMode == LocalHistorySummaryMode.WORK) {
+            LocalWorkCheckpoint.latestFrom(source)
+        } else {
+            null
+        }
         val sourceChanged = source !== history
         val effectiveMaxHistoryChars = budget?.maxHistoryChars ?: maxHistoryChars
         val effectiveTailChars = budget?.tailChars ?: tailChars
@@ -207,7 +223,12 @@ internal class LocalHistoryCompactor(
 
         val omitted = source.subList(firstBodyIndex, start)
         val workCheckpoint = if (summaryMode == LocalHistorySummaryMode.WORK) {
-            buildWorkCheckpoint(omitted, effectiveSummaryChars, structuredWorkState)
+            buildWorkCheckpoint(
+                omitted,
+                effectiveSummaryChars,
+                structuredWorkState,
+                previousWorkCheckpoint,
+            )
         } else {
             null
         }
@@ -228,7 +249,7 @@ internal class LocalHistoryCompactor(
                     },
                 ),
             )
-            addAll(source.drop(start))
+            addAll(source.drop(start).filterNot(::isTrustedWorkCheckpointModelMessage))
         }
         val estimatedTokensBefore = encodedTokens + extraTokens
         val estimatedTokensAfter = compacted.sumOf { estimateModelTokens(it.toString()) } + extraTokens
@@ -388,15 +409,21 @@ internal class LocalHistoryCompactor(
         messages: List<JsonObject>,
         summaryLimit: Int,
         structuredWorkState: LocalStructuredWorkState?,
+        previousCheckpoint: LocalWorkCheckpoint?,
     ): LocalWorkCheckpoint {
         val used = linkedSetOf<String>()
         val maxPerItem = (summaryLimit / 48).coerceIn(100, 360)
+        // A previous trusted checkpoint is already carried forward structurally through
+        // previousCheckpoint. Re-extracting its serialized model block as ordinary user text
+        // nests <work-checkpoint> markers inside the next checkpoint and corrupts subsequent
+        // parsing while also wasting context.
+        val extractionMessages = messages.filterNot(::isTrustedWorkCheckpointModelMessage)
 
         fun select(
             role: String? = null,
             cues: Set<String>? = null,
             maxItems: Int,
-        ): List<String> = messages.asReversed()
+        ): List<String> = extractionMessages.asReversed()
             .asSequence()
             .filter { role == null || it["role"].asText() == role }
             .mapNotNull(::messageText)
@@ -420,32 +447,54 @@ internal class LocalHistoryCompactor(
             .take(maxItems)
             .map { truncateWithoutSplittingSurrogatePair(it, maxPerItem) }
 
-        // Runtime-owned goal/plan/todo/tool facts are authoritative. Keyword classification remains
-        // only as a bounded fallback for older history that predates the structured run state.
-        val constraints = select(cues = WORK_CONSTRAINT_CUES, maxItems = 3)
-        val failures = select(cues = WORK_FAILURE_CUES, maxItems = 3)
-        val decisions = select(role = "assistant", cues = WORK_DECISION_CUES, maxItems = 3)
+        // Runtime-owned active work state is authoritative. A trusted previous checkpoint is then
+        // carried forward so repeated compaction cannot silently forget still-valid constraints,
+        // decisions or known failed approaches. Keyword extraction remains a bounded fallback for
+        // history that predates the structured state.
+        val constraints = mergeStructured(
+            structuredWorkState?.constraints.orEmpty() + previousCheckpoint?.constraints.orEmpty(),
+            select(cues = WORK_CONSTRAINT_CUES, maxItems = 6),
+            maxItems = 8,
+        )
+        val failures = mergeStructured(
+            structuredWorkState?.failures.orEmpty() + previousCheckpoint?.failures.orEmpty(),
+            select(cues = WORK_FAILURE_CUES, maxItems = 4),
+            maxItems = 6,
+        )
+        val decisions = mergeStructured(
+            structuredWorkState?.decisions.orEmpty() + previousCheckpoint?.decisions.orEmpty(),
+            select(role = "assistant", cues = WORK_DECISION_CUES, maxItems = 4),
+            maxItems = 6,
+        )
         // Reserve explicit unfinished work before the broad user-goal fallback. Otherwise a
         // "下一步/继续" message is consumed as a generic goal by the shared de-dup set.
         val unfinishedFallback = select(cues = WORK_UNFINISHED_CUES, maxItems = 4)
         val goals = mergeStructured(
-            structuredWorkState?.goals.orEmpty(),
+            structuredWorkState?.goals.orEmpty() + previousCheckpoint?.goals.orEmpty(),
             select(role = "user", maxItems = 4),
             maxItems = 5,
         )
-        val plan = mergeStructured(structuredWorkState?.plan.orEmpty(), emptyList(), maxItems = 8)
+        val plan = mergeStructured(
+            structuredWorkState?.plan.orEmpty() + previousCheckpoint?.plan.orEmpty(),
+            emptyList(),
+            maxItems = 8,
+        )
         val unfinished = mergeStructured(
-            structuredWorkState?.unfinished.orEmpty(),
+            structuredWorkState?.unfinished.orEmpty() + previousCheckpoint?.unfinished.orEmpty(),
             unfinishedFallback,
             maxItems = 8,
         )
         val progress = mergeStructured(
-            structuredWorkState?.progress.orEmpty(),
+            structuredWorkState?.progress.orEmpty() + previousCheckpoint?.progress.orEmpty(),
             select(role = "assistant", maxItems = 3),
             maxItems = 8,
         )
-        val facts = mergeStructured(structuredWorkState?.facts.orEmpty(), emptyList(), maxItems = 10)
-        val extractedArtifacts = messages.asReversed()
+        val facts = mergeStructured(
+            structuredWorkState?.facts.orEmpty() + previousCheckpoint?.facts.orEmpty(),
+            emptyList(),
+            maxItems = 10,
+        )
+        val extractedArtifacts = extractionMessages.asReversed()
             .asSequence()
             .mapNotNull(::messageText)
             .flatMap { text -> WORK_ARTIFACT_PATTERN.findAll(text).map { match ->
@@ -460,13 +509,13 @@ internal class LocalHistoryCompactor(
             .toList()
             .asReversed()
         val artifacts = mergeStructured(
-            structuredWorkState?.artifacts.orEmpty(),
+            structuredWorkState?.artifacts.orEmpty() + previousCheckpoint?.artifacts.orEmpty(),
             extractedArtifacts,
             maxItems = 8,
         )
         val tools = mergeStructured(
-            structuredWorkState?.tools.orEmpty(),
-            recentTools(messages, maxItems = 8),
+            structuredWorkState?.tools.orEmpty() + previousCheckpoint?.tools.orEmpty(),
+            recentTools(extractionMessages, maxItems = 8),
             maxItems = 12,
         )
 

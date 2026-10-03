@@ -161,6 +161,33 @@ class ChatSceneRuntimeTest {
     }
 
     @Test
+    fun threeHundredTurnDialogueKeepsLatestHardSceneWithoutFillerDrift() {
+        var context = ChatContextState()
+        repeat(300) { zeroBased ->
+            val turn = zeroBased + 1
+            val user = when (turn) {
+                120 -> "我们回到河岸旧书店吧。"
+                180 -> "第二天早上，我们来到海边民宿。"
+                else -> "第${turn}轮，继续聊眼前的日常。"
+            }
+            val assistant = when (turn) {
+                120 -> "好，我们回到河岸旧书店继续聊。"
+                180 -> "第二天早上，她和你一起走进海边民宿。"
+                else -> "第${turn}轮回应，不移动场景，也不推进时间。"
+            }
+            context = context.applySceneTurn(
+                userMessage = user,
+                assistantMessage = assistant,
+                sequence = turn.toLong(),
+            )
+        }
+
+        assertEquals("海边民宿", context.scene.location)
+        assertTrue(context.scene.sceneTime.startsWith("第二天"))
+        assertTrue(context.sceneEvents.size <= 12)
+    }
+
+    @Test
     fun continuityGuardRetriesOnceAndReturnsRepairedReply() = runBlocking {
         var retries = 0
         val result = ChatReplyContinuityGuard.enforce(

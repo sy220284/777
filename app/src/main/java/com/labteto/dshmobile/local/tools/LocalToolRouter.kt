@@ -16,6 +16,38 @@ import kotlinx.serialization.json.jsonPrimitive
 internal object LocalToolRouter {
     fun isOptional(tool: HarnessTool): Boolean = tool.exposure == ToolExposure.OPTIONAL
 
+    /**
+     * Finds optional capabilities that are already explicit in the current task intent.
+     *
+     * This is deliberately conservative: only declared discovery keywords or the concrete tool
+     * name can pre-activate a capability. Ambiguous natural-language inference stays with
+     * capability_search so an unrelated task does not silently re-inflate the prompt.
+     */
+    fun relevantOptionalToolNames(
+        tools: List<HarnessTool>,
+        taskContext: String,
+        limit: Int = MAX_TASK_PREACTIVATED_TOOLS,
+    ): List<String> {
+        val normalized = taskContext
+            .takeLast(MAX_TASK_CONTEXT_CHARS)
+            .lowercase()
+        if (normalized.isBlank()) return emptyList()
+
+        return tools.asSequence()
+            .filter(::isOptional)
+            .filter { tool ->
+                normalized.contains(tool.name.lowercase()) ||
+                    tool.metadata.discoveryKeywords.any { keyword ->
+                        normalized.contains(keyword.lowercase())
+                    }
+            }
+            .map(HarnessTool::name)
+            .distinct()
+            .sorted()
+            .take(limit.coerceIn(1, MAX_TASK_PREACTIVATED_TOOLS))
+            .toList()
+    }
+
     fun visibleSchemas(
         tools: List<HarnessTool>,
         enabledOptional: Set<String>,
@@ -175,4 +207,6 @@ internal object LocalToolRouter {
     private const val MAX_OPTIONAL_SCHEMA_PROPERTIES = 256
     private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
     private const val MAX_CAPABILITY_DESCRIPTION_CHARS = 480
+    private const val MAX_TASK_PREACTIVATED_TOOLS = 16
+    private const val MAX_TASK_CONTEXT_CHARS = 12_000
 }

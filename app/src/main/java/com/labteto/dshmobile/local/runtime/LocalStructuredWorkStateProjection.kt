@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -27,6 +29,9 @@ internal fun structuredWorkState(
         .map { todo -> "[completed] ${todo.content}" }
         .takeLast(MAX_STRUCTURED_TODO_ITEMS)
 
+    val constraints = linkedSetOf<String>()
+    val decisions = linkedSetOf<String>()
+    val failures = linkedSetOf<String>()
     val facts = linkedSetOf<String>()
     val tools = linkedSetOf<String>()
     val artifacts = linkedSetOf<String>()
@@ -34,6 +39,18 @@ internal fun structuredWorkState(
         .asReversed()
         .forEach { event ->
             when (event.type) {
+                "user/message" -> {
+                    eventText(event.data)
+                        ?.let { extractLocalWorkCueSnippet(it, LocalWorkCueKind.CONSTRAINT) }
+                        ?.let(constraints::add)
+                }
+                "assistant/message" -> {
+                    val text = eventText(event.data)
+                    text?.let { extractLocalWorkCueSnippet(it, LocalWorkCueKind.DECISION) }
+                        ?.let(decisions::add)
+                    text?.let { extractLocalWorkCueSnippet(it, LocalWorkCueKind.FAILURE) }
+                        ?.let(failures::add)
+                }
                 "tool/call", "subagent/tool-call" -> {
                     val name = event.data.stringValue("name") ?: event.data.stringValue("tool_name")
                     val callId = event.data.stringValue("id") ?: event.data.stringValue("call_id")
@@ -61,7 +78,10 @@ internal fun structuredWorkState(
                         isError?.let { append(" is_error=").append(it) }
                         safeIdentifiers(event.data).takeIf(String::isNotEmpty)
                             ?.let { append(" ").append(it) }
-                    }.let(facts::add)
+                    }.let { fact ->
+                        facts += fact
+                        if (errorCode != null || isError == "true") failures += fact
+                    }
                     collectArtifacts(event.data, artifacts)
                 }
                 "request/header" -> {
@@ -83,6 +103,9 @@ internal fun structuredWorkState(
     return LocalStructuredWorkState(
         goals = goals,
         plan = plan,
+        constraints = constraints.toList().takeLast(MAX_STRUCTURED_CONSTRAINTS),
+        decisions = decisions.toList().takeLast(MAX_STRUCTURED_DECISIONS),
+        failures = failures.toList().takeLast(MAX_STRUCTURED_FAILURES),
         unfinished = unfinished,
         progress = progress,
         facts = facts.toList().takeLast(MAX_STRUCTURED_FACTS),
@@ -93,6 +116,28 @@ internal fun structuredWorkState(
 
 private fun JsonObject.stringValue(key: String): String? =
     this[key]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+
+private fun eventText(data: JsonObject): String? {
+    data.stringValue("content")?.let { return it }
+    for (key in listOf("model_message", "message")) {
+        val message = data[key] as? JsonObject ?: continue
+        when (val content = message["content"]) {
+            is JsonPrimitive -> content.contentOrNull?.takeIf(String::isNotBlank)?.let { return it }
+            is JsonArray -> {
+                val text = content.joinToString("\n") { part ->
+                    when (part) {
+                        is JsonPrimitive -> part.contentOrNull.orEmpty()
+                        is JsonObject -> part.stringValue("text").orEmpty()
+                        else -> ""
+                    }
+                }.trim()
+                if (text.isNotBlank()) return text
+            }
+            else -> Unit
+        }
+    }
+    return null
+}
 
 private fun safeIdentifiers(data: JsonObject): String = SAFE_FACT_KEYS
     .mapNotNull { key ->
@@ -128,9 +173,12 @@ private val ARTIFACT_FACT_KEYS = listOf(
     "commit_sha",
 )
 
-private const val MAX_STRUCTURED_EVENT_SCAN = 80
+private const val MAX_STRUCTURED_EVENT_SCAN = 160
 private const val MAX_STRUCTURED_PLAN_ITEMS = 12
 private const val MAX_STRUCTURED_TODO_ITEMS = 12
+private const val MAX_STRUCTURED_CONSTRAINTS = 8
+private const val MAX_STRUCTURED_DECISIONS = 6
+private const val MAX_STRUCTURED_FAILURES = 6
 private const val MAX_STRUCTURED_FACTS = 12
 private const val MAX_STRUCTURED_ARTIFACTS = 8
 private const val MAX_STRUCTURED_TOOLS = 12
