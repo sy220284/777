@@ -381,7 +381,10 @@ internal class LocalSessionLifecycleCoordinator(
                 chatMode = if (mode == LocalUsageMode.CHAT) LocalChatMode.SINGLE else null,
             )
         }
-        if (!accepted) queuedUsageMode.set(mode)
+        if (!accepted) {
+            queuedUsageMode.set(mode)
+            if (!state.value.loading && !navigationBusy()) continueQueuedModeSwitch()
+        }
     }
 
     fun switchSession(sessionId: String): Boolean {
