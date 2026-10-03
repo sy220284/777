@@ -147,6 +147,11 @@ internal fun parseDeepSeekOpenAiUsage(root: JsonObject): DeepSeekTokenUsage {
         .coerceAtLeast(0L)
         .takeIf { it > 0L }
         ?: nonNegativeUsageDifference(promptTokens, normalizedCacheHitTokens)
+    val cacheWriteTokens = usage["prompt_tokens_details"]?.jsonObject
+        ?.get("cache_write_tokens")?.jsonPrimitive?.longOrNull
+        ?.coerceAtLeast(0L)
+        ?.coerceAtMost(cacheMissTokens)
+        ?: 0L
     val completionTokens = (usage["completion_tokens"]?.jsonPrimitive?.longOrNull ?: 0L).coerceAtLeast(0L)
     val reasoningTokens = usage["completion_tokens_details"]?.jsonObject
         ?.get("reasoning_tokens")?.jsonPrimitive?.longOrNull
@@ -155,6 +160,7 @@ internal fun parseDeepSeekOpenAiUsage(root: JsonObject): DeepSeekTokenUsage {
         promptTokens = promptTokens,
         cacheHitTokens = normalizedCacheHitTokens,
         cacheMissTokens = cacheMissTokens,
+        cacheWriteTokens = cacheWriteTokens,
         completionTokens = completionTokens,
         reasoningTokens = reasoningTokens.coerceAtLeast(0L),
         reported = true,
