@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 private data class LocalSessionSummaryRecord(
-    val version: Int,
+    val version: Int? = null,
     val id: String,
     val title: String,
     val updatedAt: Long,
