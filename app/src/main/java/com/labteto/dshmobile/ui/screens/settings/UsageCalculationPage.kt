@@ -418,7 +418,6 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
             inputTokens = record.inputTokens,
             cacheHitTokens = record.cacheHitTokens,
             cacheMissTokens = record.cacheMissTokens,
-            cacheWriteTokens = record.cacheWriteTokens,
             outputTokens = record.outputTokens,
             reasoningTokens = record.reasoningTokens,
             requestCount = if (record.reported) 1 else 0,
