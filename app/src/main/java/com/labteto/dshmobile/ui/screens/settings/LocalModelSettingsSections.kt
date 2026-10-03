@@ -135,12 +135,7 @@ internal fun LocalModelSettingsCard(
     }
 
     SettingsCard(stringResource(R.string.advanced_model_settings), Icons.Outlined.Cloud) {
-        ChatGptAccountPanel(
-            state = chatGpt,
-            viewModel = viewModel,
-            report = report,
-            modelIdentityLocked = local.loading || local.running,
-        )
+        ChatGptAccountPanel(chatGpt, viewModel, report, local.loading || local.running)
         Text(stringResource(R.string.local_model_list_hint), style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary)
         if (local.modelProfiles.isEmpty()) {
