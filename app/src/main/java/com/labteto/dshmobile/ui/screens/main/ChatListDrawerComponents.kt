@@ -306,7 +306,7 @@ internal fun SessionRowItem(
             if (childCount > 0) {
                 Spacer(Modifier.width(DsSpacing.xsmall))
                 DsIconButton(
-                    icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    icon = FeatherIcons.ChevronRight,
                     contentDescription = stringResource(R.string.chatlist_subagents),
                     onClick = onToggleChildren,
                     modifier = Modifier.graphicsLayer { rotationZ = chevronRotation },
