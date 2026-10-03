@@ -349,7 +349,7 @@ class LocalHarnessEngine @Inject constructor(
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
 
     private val modelAccountStateCoordinator by lazy {
-        LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isRunBusy)
+        LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isModelIdentityLocked)
     }
     private val transcriptRuntime by lazy {
         LocalTranscriptRuntime(
@@ -832,7 +832,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) {
-        require(!isRunBusy()) { "请先结束当前任务再切换模型" }
+        check(!isModelIdentityLocked()) { "请等待初始化完成或结束当前任务后再切换模型" }
         val result = modelConfiguration.save(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
         imageCapabilities.clearRoute(result.baseUrl, result.model)
         _state.update {
@@ -863,7 +863,7 @@ class LocalHarnessEngine @Inject constructor(
             val current = _state.value
             val selected = current.modelProfiles.firstOrNull { it.id == id } ?: return@launch
             if (
-                current.loading || current.running || isRunBusy() ||
+                isModelIdentityLocked() ||
                 selected.id == modelGateway.activeProfile()?.id
             ) return@launch
             runCatching { modelConfiguration.select(id, current.modelProfiles) }
@@ -885,7 +885,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     internal fun removeModelProfile(id: String) {
-        if (isRunBusy() || _state.value.loading) return
+        if (isModelIdentityLocked()) return
         scope.launch {
             val current = _state.value
             runCatching {
@@ -2313,6 +2313,8 @@ class LocalHarnessEngine @Inject constructor(
             }
         }
     }
+
+    private fun isModelIdentityLocked(): Boolean = _state.value.loading || isRunBusy()
 
     private fun isRunBusy(): Boolean = synchronized(runStateLock) {
         sessionTransitioning ||
