@@ -225,6 +225,10 @@ private fun traitRelated(trait: String, text: String): Boolean {
     val b = normalizeEvolutionText(text)
     if (a.length < 2 || b.length < 2) return false
     if (b.contains(a)) return true
+    val actionAnchor = a.takeLast(2)
+    if (actionAnchor.length == 2 && actionAnchor !in GENERIC_TRAIT_ANCHORS && b.contains(actionAnchor)) {
+        return true
+    }
     if (a.length <= 3) return false
     val grams = a.windowed(2).toSet()
     val hits = grams.count(b::contains)
@@ -302,6 +306,7 @@ private fun Int.sign(): Int = when {
     else -> 0
 }
 
+private val GENERIC_TRAIT_ANCHORS = setOf("自己", "一点", "一些", "时候", "关系", "状态", "方式")
 private val NEGATIVE_TRAIT_SIGNAL = Regex("(?:不再|不想|不愿|拒绝|避免|改掉|收回|后悔|不像以前)")
 private const val EVOLUTION_SIGNAL_GAP = 10
 private const val MINOR_EVOLUTION_THRESHOLD = 3
