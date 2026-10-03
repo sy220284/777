@@ -92,6 +92,7 @@ internal class LocalEnvironmentInfoCoordinator(
                         append(" input=").append(record.inputTokens)
                         append(" cache_hit=").append(record.cacheHitTokens)
                         append(" cache_miss=").append(record.cacheMissTokens)
+                        append(" cache_write=").append(record.cacheWriteTokens)
                         append(" output=").append(record.outputTokens)
                         append(" reasoning=").append(record.reasoningTokens)
                         append(" prompt(history=").append(prompt.historyTokens)
