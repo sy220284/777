@@ -1110,14 +1110,6 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    internal fun createGroupChatSession() {
-        createSession(
-            mode = LocalConversationMode.INDEPENDENT,
-            usageMode = LocalUsageMode.CHAT,
-            chatMode = LocalChatMode.GROUP,
-        )
-    }
-
     internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean {
         val selected = entries
             .distinctBy(PersonaGalleryEntry::id)
