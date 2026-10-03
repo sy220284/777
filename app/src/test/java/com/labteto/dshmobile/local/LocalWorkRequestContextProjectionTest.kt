@@ -128,6 +128,39 @@ class LocalWorkRequestContextProjectionTest {
 
 
     @Test
+    fun cacheSensitiveSteadyStateUsesHardBudgetUntilRouteTrigger() {
+        val base = LocalHistoryBudget(
+            maxHistoryChars = 700_000,
+            tailChars = 320_000,
+            maxSummaryChars = 20_000,
+            maxToolResultChars = 60_000,
+            maxHistoryTokens = 678_464,
+            tailTokens = 119_040,
+            maxToolResultTokens = 16_000,
+        )
+        val policy = LocalModelPresets.runtimeCapabilitiesFor(
+            model = "deepseek-flash",
+            baseUrl = "https://api.deepseek.com",
+        ).promptCachePolicy
+
+        val beforeTrigger = workSteadyStateHistoryBudget(
+            base = base,
+            currentHistoryTokens = 120_000,
+            cachePolicy = policy,
+        )
+        assertEquals(base.maxHistoryTokens, beforeTrigger.maxHistoryTokens)
+        assertFalse(beforeTrigger.adaptiveCompactionTrigger)
+
+        val afterTrigger = workSteadyStateHistoryBudget(
+            base = base,
+            currentHistoryTokens = 600_000,
+            cachePolicy = policy,
+        )
+        assertTrue(requireNotNull(afterTrigger.maxHistoryTokens) < requireNotNull(base.maxHistoryTokens))
+        assertFalse(afterTrigger.adaptiveCompactionTrigger)
+    }
+
+    @Test
     fun staleToolPayloadsLeaveHotRequestBeforeHistoryNeedsFullCompaction() {
         val history = buildList {
             add(message("system", "系统规则"))
@@ -157,8 +190,7 @@ class LocalWorkRequestContextProjectionTest {
         val toolContents = projected.messages
             .filter { it["role"].toString().trim('"') == "tool" }
             .map { it["content"].toString() }
-        assertTrue(toolContents.take(3).all { it.contains("旧工具结果已从实时模型上下文衰减") })
-        assertTrue(toolContents.takeLast(2).none { it.contains("旧工具结果已从实时模型上下文衰减") })
+        assertTrue(toolContents.all { it.contains("旧工具结果已从实时模型上下文衰减") })
     }
 
     @Test
@@ -212,11 +244,17 @@ class LocalWorkRequestContextProjectionTest {
             }
 
             val rawTokens = history.sumOf { estimateModelTokens(it.toString()) }
+            val sourcePressure = LocalPromptPressureMeter.measure(
+                messages = history,
+                tools = JsonArray(emptyList()),
+                operationalLimitTokens = 678_464,
+            )
             val projected = projectWorkRequestContext(
                 messages = history,
                 tools = JsonArray(emptyList()),
                 compactor = LocalHistoryCompactor(),
                 operationalLimitTokens = 678_464,
+                measuredPressure = sourcePressure,
                 previousPressure = previousPressure,
                 structuredWorkState = LocalStructuredWorkState(
                     goals = listOf("完成一百步长任务"),
@@ -227,11 +265,7 @@ class LocalWorkRequestContextProjectionTest {
             rawCumulative += rawTokens
             projectedCumulative += projected.estimatedTokensAfter
             projectedPeak = maxOf(projectedPeak, projected.estimatedTokensAfter)
-            previousPressure = LocalPromptPressureMeter.measure(
-                messages = projected.messages,
-                tools = JsonArray(emptyList()),
-                operationalLimitTokens = 678_464,
-            )
+            previousPressure = sourcePressure
         }
 
         assertTrue(projectedPeak <= 40_000)
@@ -279,6 +313,33 @@ class LocalWorkRequestContextProjectionTest {
         assertEquals(LocalWorkStepContextStatus.COMPACT, assessment.status)
         assertTrue("adaptive_history_pressure" in assessment.reasons)
         assertTrue(assessment.effectiveProjectionTriggerTokens < 36_000)
+    }
+
+    @Test
+    fun deepSeekAndOpenAiUseCacheAwareProjectionThresholdsWhileUnknownKeepsDefault() {
+        val deepSeekPolicy = LocalModelPresets.runtimeCapabilitiesFor(
+            model = "deepseek-flash",
+            baseUrl = "https://api.deepseek.com",
+        ).promptCachePolicy
+        val openAiPolicy = LocalModelPresets.runtimeCapabilitiesFor(
+            model = "gpt-6-astra",
+            baseUrl = "https://api.openai.com/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            authKind = LocalModelAuthKind.API_KEY,
+        ).promptCachePolicy
+
+        val deepSeekLimit = operationalInputLimitTokens("deepseek-flash", "https://api.deepseek.com")
+        val openAiLimit = operationalInputLimitTokens("gpt-6-astra", "https://api.openai.com/v1")
+        assertTrue(
+            workRequestProjectionTriggerTokens(deepSeekLimit, deepSeekPolicy) >
+                workRequestProjectionTriggerTokens(deepSeekLimit),
+        )
+        assertTrue(
+            workRequestProjectionTriggerTokens(openAiLimit, openAiPolicy) >
+                workRequestProjectionTriggerTokens(openAiLimit),
+        )
+        assertEquals(28_000, workRequestProjectionTargetTokens(192_000))
+        assertEquals(36_000, workRequestProjectionTriggerTokens(192_000))
     }
 
     @Test

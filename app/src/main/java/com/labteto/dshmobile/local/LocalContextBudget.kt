@@ -20,6 +20,8 @@ internal data class LocalHistoryBudget(
     val maxToolResultTokens: Int = DEFAULT_TOOL_RESULT_TOKENS,
     val outputReserveTokens: Int? = null,
     val headroomTokens: Int? = null,
+    /** False means the caller owns the semantic-compaction trigger; this budget remains a hard guard. */
+    val adaptiveCompactionTrigger: Boolean = true,
 )
 
 internal fun localHistoryBudgetFor(

@@ -34,14 +34,24 @@ internal fun assessWorkStepContext(
     previous: LocalPromptPressure?,
     targetTokens: Int,
     baseTriggerTokens: Int,
+    growthCurrent: LocalPromptPressure = current,
+    allowAdaptiveEarlyCompaction: Boolean = true,
 ): LocalWorkStepContextAssessment {
     val total = current.estimatedInputTokens.coerceAtLeast(0)
     val target = targetTokens.coerceAtLeast(1)
     val baseTrigger = baseTriggerTokens.coerceAtLeast(target + 1)
     val historyRatio = ratioPermille(current.historyTokens, total)
     val toolRatio = ratioPermille(current.toolDefinitionTokens, total)
-    val inputGrowth = previous?.let { total - it.estimatedInputTokens } ?: 0
-    val historyGrowth = previous?.let { current.historyTokens - it.historyTokens } ?: 0
+    // Growth must compare the same source-history coordinate system on both sides. Request-only
+    // projection can be much smaller than durable history; comparing a projected previous request
+    // with an unprojected current source creates false growth and causes repeated cache-breaking
+    // compaction.
+    val inputGrowth = previous?.let {
+        growthCurrent.estimatedInputTokens - it.estimatedInputTokens
+    } ?: 0
+    val historyGrowth = previous?.let {
+        growthCurrent.historyTokens - it.historyTokens
+    } ?: 0
 
     val historyDominant = historyRatio >= HISTORY_DOMINANT_PERMILLE
     val toolHeavy =
@@ -60,7 +70,8 @@ internal fun assessWorkStepContext(
         ),
     )
     val earlyCompaction =
-        total >= earlyTrigger &&
+        allowAdaptiveEarlyCompaction &&
+            total >= earlyTrigger &&
             historyDominant &&
             rapidHistoryGrowth
     val absoluteCompaction = total >= baseTrigger

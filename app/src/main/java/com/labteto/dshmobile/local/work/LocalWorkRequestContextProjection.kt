@@ -24,24 +24,51 @@ internal data class LocalWorkRequestProjection(
 internal fun workSteadyStateHistoryBudget(
     base: LocalHistoryBudget,
     currentHistoryTokens: Int,
+    extraTokens: Int,
+    state: LocalHarnessState,
+): LocalHistoryBudget {
+    val profile = state.modelSelection.activeProfile
+    return workSteadyStateHistoryBudget(
+        base = base,
+        currentHistoryTokens = currentHistoryTokens,
+        extraTokens = extraTokens,
+        cachePolicy = LocalModelPresets.promptCachePolicyFor(
+            model = state.model,
+            baseUrl = state.baseUrl,
+            protocol = profile?.protocol ?: LocalModelPresets.protocolFor(state.model, state.baseUrl),
+            authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
+        ),
+    )
+}
+
+internal fun workSteadyStateHistoryBudget(
+    base: LocalHistoryBudget,
+    currentHistoryTokens: Int,
     extraTokens: Int = 0,
+    cachePolicy: LocalPromptCachePolicy = LocalPromptCachePolicy(),
 ): LocalHistoryBudget {
     val operationalLimit = base.maxHistoryTokens ?: return base
-    val totalRequestTokens = currentHistoryTokens.toLong() + extraTokens.coerceAtLeast(0).toLong()
-    if (totalRequestTokens <= workRequestProjectionTriggerTokens(operationalLimit).toLong()) {
-        return base
+    val steadyBase = if (cachePolicy.allowAdaptiveEarlyCompaction) {
+        base
+    } else {
+        base.copy(adaptiveCompactionTrigger = false)
     }
-    val target = workRequestProjectionTargetTokens(operationalLimit)
-    return base.copy(
+    val totalRequestTokens = currentHistoryTokens.toLong() + extraTokens.coerceAtLeast(0).toLong()
+    if (totalRequestTokens <= workRequestProjectionTriggerTokens(operationalLimit, cachePolicy).toLong()) {
+        return steadyBase
+    }
+    val target = workRequestProjectionTargetTokens(operationalLimit, cachePolicy)
+    val tailTarget = workRequestTailTokens(target, cachePolicy)
+    return steadyBase.copy(
         maxHistoryTokens = target,
         tailTokens = minOf(
-            base.tailTokens ?: WORK_REQUEST_TAIL_TOKENS,
-            WORK_REQUEST_TAIL_TOKENS,
+            steadyBase.tailTokens ?: tailTarget,
+            tailTarget,
             (target * 0.38).toInt().coerceAtLeast(1_024),
         ),
-        maxSummaryChars = minOf(base.maxSummaryChars, WORK_REQUEST_SUMMARY_CHARS),
-        maxToolResultChars = minOf(base.maxToolResultChars, WORK_REQUEST_TOOL_RESULT_CHARS),
-        maxToolResultTokens = minOf(base.maxToolResultTokens, WORK_REQUEST_TOOL_RESULT_TOKENS),
+        maxSummaryChars = minOf(steadyBase.maxSummaryChars, WORK_REQUEST_SUMMARY_CHARS),
+        maxToolResultChars = minOf(steadyBase.maxToolResultChars, WORK_REQUEST_TOOL_RESULT_CHARS),
+        maxToolResultTokens = minOf(steadyBase.maxToolResultTokens, WORK_REQUEST_TOOL_RESULT_TOKENS),
     )
 }
 
@@ -53,6 +80,7 @@ internal fun projectWorkRequestContext(
     measuredPressure: LocalPromptPressure? = null,
     previousPressure: LocalPromptPressure? = null,
     structuredWorkState: LocalStructuredWorkState? = null,
+    cachePolicy: LocalPromptCachePolicy = LocalPromptCachePolicy(),
 ): LocalWorkRequestProjection {
     val limit = operationalLimitTokens.coerceAtLeast(1)
     val beforePressure = measuredPressure ?: LocalPromptPressureMeter.measure(
@@ -60,15 +88,14 @@ internal fun projectWorkRequestContext(
         tools = tools,
         operationalLimitTokens = limit,
     )
-    val budget = workRequestBudget(limit)
+    val budget = workRequestBudget(limit, cachePolicy)
 
-    // Large command/file outputs are the fastest-growing part of Work history. Keep only the two
-    // newest results verbatim; older full payloads remain in LocalToolOutputStore and are readable
-    // by call_id, so shrinking their model-facing copies does not remove capability.
+    // Large command/file outputs are the fastest-growing part of Work history. No oversized result
+    // stays verbatim in the hot request; full payloads remain recoverable from LocalToolOutputStore.
     val staleToolProjection = projectStaleToolResults(
         history = messages,
         budget = budget,
-        keepRecentToolResults = WORK_REQUEST_RECENT_TOOL_RESULTS,
+        keepRecentToolResults = 0,
     )
     val toolProjectedMessages = staleToolProjection?.messages ?: messages
     val toolProjectedPressure = if (staleToolProjection != null) {
@@ -81,12 +108,14 @@ internal fun projectWorkRequestContext(
         beforePressure
     }
 
-    val baseTrigger = workRequestProjectionTriggerTokens(limit)
+    val baseTrigger = workRequestProjectionTriggerTokens(limit, cachePolicy)
     val assessment = assessWorkStepContext(
         current = toolProjectedPressure,
         previous = previousPressure,
-        targetTokens = workRequestProjectionTargetTokens(limit),
+        targetTokens = workRequestProjectionTargetTokens(limit, cachePolicy),
         baseTriggerTokens = baseTrigger,
+        growthCurrent = beforePressure,
+        allowAdaptiveEarlyCompaction = cachePolicy.allowAdaptiveEarlyCompaction,
     )
     val trigger = assessment.effectiveProjectionTriggerTokens
     if (!assessment.recommendsCompaction && toolProjectedPressure.estimatedInputTokens < trigger) {
@@ -158,36 +187,77 @@ internal fun projectWorkRequestContext(
     )
 }
 
-internal fun workRequestProjectionTargetTokens(operationalLimitTokens: Int): Int {
+internal fun workRequestProjectionTargetTokens(
+    operationalLimitTokens: Int,
+    cachePolicy: LocalPromptCachePolicy = LocalPromptCachePolicy(),
+): Int {
     val limit = operationalLimitTokens.coerceAtLeast(1)
+    val ratio = cachePolicy.workProjectionTargetRatioPermille
+    if (ratio != null) {
+        return maxOf(
+            WORK_REQUEST_TARGET_TOKENS,
+            ((limit.toLong() * ratio.coerceIn(1, 999)) / 1_000L).toInt(),
+        ).coerceAtMost(limit)
+    }
     return minOf(
         WORK_REQUEST_TARGET_TOKENS,
         maxOf(4_096, (limit * 0.55).toInt()),
     ).coerceAtMost(limit)
 }
 
-internal fun workRequestProjectionTriggerTokens(operationalLimitTokens: Int): Int {
+internal fun workRequestProjectionTriggerTokens(
+    operationalLimitTokens: Int,
+    cachePolicy: LocalPromptCachePolicy = LocalPromptCachePolicy(),
+): Int {
     val limit = operationalLimitTokens.coerceAtLeast(1)
-    val target = workRequestProjectionTargetTokens(limit)
+    val target = workRequestProjectionTargetTokens(limit, cachePolicy)
+    val ratio = cachePolicy.workProjectionTriggerRatioPermille
+    if (ratio != null) {
+        return maxOf(
+            target + 1,
+            WORK_REQUEST_TRIGGER_TOKENS,
+            ((limit.toLong() * ratio.coerceIn(1, 1_000)) / 1_000L).toInt(),
+        ).coerceAtMost(limit)
+    }
     return minOf(
         WORK_REQUEST_TRIGGER_TOKENS,
         maxOf(target + 1, (limit * 0.70).toInt()),
     ).coerceAtMost(limit)
 }
 
-private fun workRequestBudget(limit: Int): LocalHistoryBudget {
-    val target = workRequestProjectionTargetTokens(limit)
+private fun workRequestTailTokens(
+    targetTokens: Int,
+    cachePolicy: LocalPromptCachePolicy,
+): Int {
+    if (cachePolicy.workProjectionTargetRatioPermille == null) return WORK_REQUEST_TAIL_TOKENS
+    return maxOf(
+        WORK_REQUEST_TAIL_TOKENS,
+        (targetTokens * CACHE_AWARE_TAIL_RATIO).toInt(),
+    ).coerceAtMost(CACHE_AWARE_MAX_TAIL_TOKENS)
+}
+
+private fun workRequestBudget(
+    limit: Int,
+    cachePolicy: LocalPromptCachePolicy,
+): LocalHistoryBudget {
+    val target = workRequestProjectionTargetTokens(limit, cachePolicy)
+    val tailTarget = workRequestTailTokens(target, cachePolicy)
     return LocalHistoryBudget(
         maxHistoryChars = Int.MAX_VALUE / 4,
-        tailChars = WORK_REQUEST_TAIL_CHARS,
+        tailChars = if (cachePolicy.workProjectionTargetRatioPermille == null) {
+            WORK_REQUEST_TAIL_CHARS
+        } else {
+            CACHE_AWARE_TAIL_CHARS
+        },
         maxSummaryChars = WORK_REQUEST_SUMMARY_CHARS,
         maxToolResultChars = WORK_REQUEST_TOOL_RESULT_CHARS,
         maxHistoryTokens = target,
         tailTokens = minOf(
-            WORK_REQUEST_TAIL_TOKENS,
+            tailTarget,
             (target * 0.38).toInt().coerceAtLeast(1_024),
         ),
         maxToolResultTokens = WORK_REQUEST_TOOL_RESULT_TOKENS,
+        adaptiveCompactionTrigger = cachePolicy.allowAdaptiveEarlyCompaction,
     )
 }
 
@@ -196,6 +266,8 @@ private const val WORK_REQUEST_TRIGGER_TOKENS = 36_000
 private const val WORK_REQUEST_TAIL_TOKENS = 10_000
 private const val WORK_REQUEST_TAIL_CHARS = 40_000
 private const val WORK_REQUEST_SUMMARY_CHARS = 8_000
-private const val WORK_REQUEST_TOOL_RESULT_CHARS = 8_000
-private const val WORK_REQUEST_TOOL_RESULT_TOKENS = 2_400
-private const val WORK_REQUEST_RECENT_TOOL_RESULTS = 2
+private const val WORK_REQUEST_TOOL_RESULT_CHARS = 4_096
+private const val WORK_REQUEST_TOOL_RESULT_TOKENS = 1_600
+private const val CACHE_AWARE_TAIL_RATIO = 0.16
+private const val CACHE_AWARE_MAX_TAIL_TOKENS = 64_000
+private const val CACHE_AWARE_TAIL_CHARS = 160_000

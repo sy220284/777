@@ -301,6 +301,47 @@ class LocalModelProfilesTest {
 
 
 
+    @Test fun promptCachePoliciesAreRouteAndProtocolSpecific() {
+        val deepSeek = LocalModelPresets.runtimeCapabilitiesFor(
+            model = "deepseek-flash",
+            baseUrl = "https://api.deepseek.com",
+        ).promptCachePolicy
+        assertEquals(LocalPromptCacheMode.PREFIX_AUTO, deepSeek.mode)
+        assertTrue(deepSeek.preserveToolSurface)
+        assertFalse(deepSeek.allowAdaptiveEarlyCompaction)
+        assertTrue(deepSeek.reportsHitMissTokens)
+
+        val openAiApi = LocalModelPresets.runtimeCapabilitiesFor(
+            model = "gpt-6-astra",
+            baseUrl = "https://api.openai.com/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            authKind = LocalModelAuthKind.API_KEY,
+        ).promptCachePolicy
+        assertEquals(LocalPromptCacheMode.OPENAI_RESPONSES, openAiApi.mode)
+        assertTrue(openAiApi.supportsStableCacheKey)
+        assertTrue(openAiApi.supportsCacheOptions)
+        assertFalse(openAiApi.allowAdaptiveEarlyCompaction)
+
+        val plan = LocalModelPresets.runtimeCapabilitiesFor(
+            model = "gpt-6-astra",
+            baseUrl = "https://api.openai.com/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            authKind = LocalModelAuthKind.CHATGPT_PLAN,
+        ).promptCachePolicy
+        assertEquals(LocalPromptCacheMode.PREFIX_AUTO, plan.mode)
+        assertFalse(plan.supportsStableCacheKey)
+        assertFalse(plan.supportsCacheOptions)
+
+        val custom = LocalModelPresets.runtimeCapabilitiesFor(
+            model = "custom-model",
+            baseUrl = "https://proxy.example/v1",
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+            authKind = LocalModelAuthKind.API_KEY,
+        ).promptCachePolicy
+        assertEquals(LocalPromptCacheMode.NONE, custom.mode)
+        assertFalse(custom.preserveToolSurface)
+    }
+
     @Test fun promptCacheDiagnosticsFollowChatGptPlanRouteIdentityInsteadOfModelName() {
         listOf("gpt-5.6", "gpt-6-astra", "future-plan-model", "totally-new-name").forEach { model ->
             assertTrue(

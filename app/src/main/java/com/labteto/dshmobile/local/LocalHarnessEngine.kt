@@ -4511,10 +4511,10 @@ class LocalHarnessEngine @Inject constructor(
         )
         val stored = retention == com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE &&
             callId?.let { toolOutputStore.store(sessionId, it, result) } != null
-        val retained = retainTextForModel(
-            value = result,
-            maxTokens = budget.maxToolResultTokens,
-            maxChars = budget.maxToolResultChars,
+        val retained = retainToolResultForModel(
+            result,
+            (binding?.state?.value ?: _state.value).usageMode,
+            budget,
         )
         if (!retained.truncated) return retained.text
         val recovery = when {
@@ -4536,7 +4536,7 @@ class LocalHarnessEngine @Inject constructor(
         val log = binding?.eventLog ?: eventLog
         val workMode = targetState.value.usageMode == LocalUsageMode.WORK
         val budget = if (workMode) {
-            workSteadyStateHistoryBudget(baseBudget, history.estimatedTokens, extraTokens)
+            workSteadyStateHistoryBudget(baseBudget, history.estimatedTokens, extraTokens, targetState.value)
         } else {
             baseBudget
         }

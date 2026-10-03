@@ -51,6 +51,21 @@ class LocalToolOutputStoreTest {
     }
 
     @Test
+    fun defaultRecoveryPageStaysNearFourKiB() {
+        val store = LocalToolOutputStore(File(temporary.root, "tool-output-default"))
+        val content = "x".repeat(20_000)
+        assertTrue(store.store("session-default", "call-default", content) != null)
+
+        val first = store.read("session-default", "call-default")
+        val nextByte = Regex("start_byte 设为 (\\d+)").find(first)
+            ?.groupValues?.get(1)?.toInt()
+            ?: error("missing continuation offset")
+
+        assertTrue(nextByte in 1..LocalToolOutputStore.DEFAULT_READ_BYTES)
+        assertTrue(first.contains("后续仍有内容"))
+    }
+
+    @Test
     fun deletingSessionRemovesItsPrivateOutputs() {
         val root = File(temporary.root, "tool-output")
         val store = LocalToolOutputStore(root)
