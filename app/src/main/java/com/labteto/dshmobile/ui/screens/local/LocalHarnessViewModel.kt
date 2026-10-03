@@ -142,7 +142,6 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
         withContext(Dispatchers.IO) { runtime.chat.diaryEntries(subjectKey) }
-    fun createGroupChatSession() = runtime.chat.createGroupChatSession()
     fun createGroupChatSession(ids: List<String>): Boolean {
         val distinctIds = ids.distinct()
         val entriesById = gallery.value.associateBy(PersonaGalleryEntry::id)
