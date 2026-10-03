@@ -361,7 +361,7 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.MODELS },
                             )
                             DsCategoryRow(
-                                icon = Icons.Outlined.History,
+                                icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.settings_page_model_usage),
                                 subtitle = stringResource(R.string.settings_model_usage_subtitle),
                                 iconFamily = DsIconFamily.Amber,
@@ -457,7 +457,7 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.SESSION -> {
-                        SettingsCard(stringResource(R.string.chatlist_title), Icons.Outlined.History) {
+                        SettingsCard(stringResource(R.string.chatlist_title), FeatherIcons.Clock) {
                             ToggleRow(
                                 stringResource(R.string.chatlist_sort_updated),
                                 sessionSort == "updated",
@@ -657,7 +657,7 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.PRICING },
                             )
                             DsCategoryRow(
-                                icon = Icons.Outlined.History,
+                                icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.usage_calculation_title),
                                 subtitle = stringResource(R.string.usage_calculation_subtitle),
                                 iconFamily = DsIconFamily.Cyan,
