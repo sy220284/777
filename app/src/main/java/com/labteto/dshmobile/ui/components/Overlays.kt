@@ -229,15 +229,6 @@ fun rememberDsToast(): Pair<State<String?>, (String) -> Unit> {
 @Composable
 fun DsToastHost(state: Pair<State<String?>, (String) -> Unit>, modifier: Modifier = Modifier) {
     val message = state.first.value
-    var displayMessage by remember { mutableStateOf(message) }
-    LaunchedEffect(message) {
-        if (message != null) {
-            displayMessage = message
-        } else {
-            delay(DsAnimations.transitionDuration.toLong())
-            displayMessage = null
-        }
-    }
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         AnimatedVisibility(
             visible = message != null,
@@ -253,7 +244,7 @@ fun DsToastHost(state: Pair<State<String?>, (String) -> Unit>, modifier: Modifie
                 modifier = Modifier.padding(top = 16.dp),
             ) {
                 Text(
-                    displayMessage.orEmpty(),
+                    message.orEmpty(),
                     style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.onAccent,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
