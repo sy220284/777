@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -13,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
+import com.labteto.dshmobile.ui.components.DsFullScreenDialog
 import com.labteto.dshmobile.ui.components.DsPageEmptyState
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -40,16 +40,16 @@ internal fun LocalRunCenterScreen(
     onOpenResults: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    BackHandler(onBack = onDismiss)
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = DsTheme.colors.rootSurface(),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding(),
+    DsFullScreenDialog(onDismiss = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = DsTheme.colors.rootSurface(),
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding(),
+            ) {
             DsTopBar(
                 title = stringResource(R.string.local_run_center),
                 onBack = onDismiss,
