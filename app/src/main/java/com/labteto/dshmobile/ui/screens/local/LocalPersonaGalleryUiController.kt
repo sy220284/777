@@ -388,7 +388,7 @@ private fun stagePresetArtwork(preset: PersonaPreset): File? {
     }
 
     val portraitDir = File(appContext.filesDir, "local-harness/chat/persona-portraits").apply {
-        check(exists() || mkdirs()) { "无法创建人物立绘目录" }
+        check(exists() || mkdirs()) { appContext.getString(R.string.persona_gallery_portrait_dir_failed) }
     }
     val safeId = preset.id.replace(Regex("""[^A-Za-z0-9._-]"""), "_").take(80)
     val extension = assetPath.substringAfterLast('.').lowercase()
