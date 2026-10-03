@@ -84,7 +84,7 @@ private fun isHighPriorityUserClause(text: String): Boolean =
         HARD_BOUNDARY_OR_COMMITMENT.containsMatchIn(text) ||
         DIRECT_BIE_BOUNDARY.containsMatchIn(text)
 
-private fun attentionBiasMatches(bias: String, text: String): Boolean {
+internal fun attentionBiasMatches(bias: String, text: String): Boolean {
     if (relatedAttentionText(bias, text)) return true
     val normalizedText = normalizeAttentionText(text)
     return bias.split(Regex("(?:和|与|以及|、|的|对|会|容易|偏向|常常|通常)"))
