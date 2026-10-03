@@ -36,7 +36,9 @@ internal data class PersonaTransferMemorySummary(
     val continuitySummary: String = "",
     val relationshipState: String = "",
     val mood: String = "",
+    val physicalState: String = "",
     val sharedMoments: List<String> = emptyList(),
+    val sharedObjects: List<String> = emptyList(),
     val unresolvedThreads: List<String> = emptyList(),
     val currentFocus: String = "",
     val recentImpression: String = "",
@@ -45,16 +47,16 @@ internal data class PersonaTransferMemorySummary(
 
 @Serializable
 internal data class PersonaArchiveEnvelope(
-    val schema: Int = 2,
+    val schema: Int = 3,
     val source: String = "神言神语",
     val entry: PersonaGalleryEntry,
     val memorySummaries: List<PersonaTransferMemorySummary> = emptyList(),
 )
 
 internal object PersonaTransferDocuments {
-    private const val MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V2_BASE64"
-    private const val MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V2_BASE64_END -->"
-    private const val WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V2_BASE64:"
+    private const val MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V3_BASE64"
+    private const val MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V3_BASE64_END -->"
+    private const val WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V3_BASE64:"
     private const val CUSTOM_XML_ENTRY = "customXml/persona-transfer.xml"
 
     fun encode(
@@ -108,7 +110,7 @@ internal object PersonaTransferDocuments {
 
     fun decodeArchive(json: Json, canonicalJson: String): PersonaArchiveEnvelope =
         json.decodeFromString(PersonaArchiveEnvelope.serializer(), canonicalJson).also {
-            require(it.schema == 2) { "暂不支持这个人物迁移版本" }
+            require(it.schema == 3) { "人物文件版本不受支持，请使用新版人物生命档案" }
         }
 
     private fun portableEntry(entry: PersonaGalleryEntry): PersonaGalleryEntry =
@@ -121,10 +123,6 @@ internal object PersonaTransferDocuments {
                     history = story.history.filter { it.role == "user" || it.role == "assistant" },
                 )
             },
-            storyNotes = "",
-            history = emptyList(),
-            chatState = ChatCharacterState(),
-            sourceSessionId = "",
         )
 
     private fun memorySummary(
@@ -138,7 +136,9 @@ internal object PersonaTransferDocuments {
             continuitySummary = story.context(personaName),
             relationshipState = story.chatState.relationshipState,
             mood = story.chatState.mood,
+            physicalState = story.chatState.physicalState,
             sharedMoments = story.chatState.dynamics.sharedMoments,
+            sharedObjects = story.chatState.dynamics.sharedObjects,
             unresolvedThreads = story.chatState.unresolvedThreads,
             currentFocus = story.chatState.currentFocus,
             recentImpression = story.chatState.recentImpression,
@@ -194,28 +194,29 @@ internal object PersonaTransferDocuments {
         val persona = entry.persona
         return buildList {
             add(DocLine("人物档案：${persona.name}", 1))
-            add(DocLine("神言神语人物迁移文档 · 版本 2"))
+            add(DocLine("神言神语人物生命档案 · 版本 3"))
             add(DocLine("包含人物设定、记忆摘要与完整已归档对话记录。"))
 
-            add(DocLine("人物设定", 2))
+            add(DocLine("人物生命资料", 2))
             addField("姓名", persona.name)
-            addField("身份", persona.identity)
-            addField("背景", persona.background)
-            addField("性格", persona.personality)
-            addField("说话风格", persona.speechStyle)
-            addField("基础关系", persona.relationship)
+            addField("人物整体", persona.portrait)
+            addField("独立生活", persona.lifeContext)
+            addList("天然注意", persona.attentionBiases)
+            addList("容易漏掉或误读", persona.perceptionBlindSpots)
+            addList("小习惯和小坚持", persona.quirks)
+            addList("不擅长", persona.limitations)
+            addList("真正重要", persona.coreValues)
+            addField("长期内在拉扯", persona.coreTension)
+            addList("稳定部分", persona.stableTraits)
+            addList("可缓慢变化", persona.mutableTraits)
+            addField("对用户初始印象", persona.initialUserImpression)
+            addList("自然声音样本", persona.voiceSamples)
             addField("世界设定", persona.worldSetting)
             addField("作品/世界来源", persona.franchise)
             addField("时间线位置", persona.timelinePosition)
-            addList("核心动机", persona.coreMotivations)
-            addList("价值优先级", persona.valuePriorities)
-            addList("稳定行为", persona.behaviorPatterns)
-            addList("内在矛盾", persona.internalContradictions)
             addList("知识边界", persona.knowledgeBoundary)
             addList("硬约束", persona.hardConstraints)
-            addList("参考对白", persona.exampleDialogues)
             addList("禁用表达", persona.bannedPhrases)
-            addList("标志性表达", persona.signaturePhrases)
             addList("用户纠正", persona.corrections)
             if (persona.loreEntries.isNotEmpty()) {
                 add(DocLine("世界书", 3))
@@ -242,11 +243,13 @@ internal object PersonaTransferDocuments {
                     addField("剧情提要", summary.plotSummary)
                     addField("连续性摘要", summary.continuitySummary)
                     addField("关系状态", summary.relationshipState)
+                    addField("当前身体", summary.physicalState)
                     addField("当前情绪", summary.mood)
                     addField("当前关注", summary.currentFocus)
                     addField("近期印象", summary.recentImpression)
                     addField("当前目标", summary.activeGoal)
                     addList("共同经历", summary.sharedMoments)
+                    addList("共同物/共同梗/小约定", summary.sharedObjects)
                     addList("未完线索", summary.unresolvedThreads)
                 }
             }
