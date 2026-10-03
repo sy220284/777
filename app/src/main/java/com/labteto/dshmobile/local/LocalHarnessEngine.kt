@@ -2938,13 +2938,11 @@ class LocalHarnessEngine @Inject constructor(
         clearRunCapabilities(binding)
         if (runState.value.usageMode == LocalUsageMode.WORK) {
             val capabilityIntent = LocalToolCapabilityIntent.from(input, runHistory.snapshot())
-            enableRunTaskRelevantCapabilities(capabilityIntent.context, binding)
-            if (
-                capabilityIntent.requestsGitHub &&
-                runCatching { githubCredentials.configured() }.getOrDefault(false)
-            ) {
-                enableRunGitHubCapabilities(binding)
-            }
+            toolExecutionCoordinator.prepareWorkTurnCapabilities(
+                capabilityIntent.context,
+                capabilityIntent.requestsGitHub && runCatching { githubCredentials.configured() }.getOrDefault(false),
+                binding?.enabledOptionalTools,
+            )
         }
         if (runState.value.usageMode == LocalUsageMode.CHAT) {
             // Queued chat turns can start immediately after the previous answer. Stop that
@@ -3889,20 +3887,6 @@ class LocalHarnessEngine @Inject constructor(
     private fun clearRunCapabilities(binding: LocalWorkRunBinding?) {
         binding?.enabledOptionalTools?.let(toolExecutionCoordinator::clearTurnCapabilities)
             ?: toolExecutionCoordinator.clearTurnCapabilities()
-    }
-
-    private fun enableRunTaskRelevantCapabilities(
-        taskContext: String,
-        binding: LocalWorkRunBinding?,
-    ) {
-        binding?.enabledOptionalTools?.let { target ->
-            toolExecutionCoordinator.enableTaskRelevantOptionalTools(taskContext, target)
-        } ?: toolExecutionCoordinator.enableTaskRelevantOptionalTools(taskContext)
-    }
-
-    private fun enableRunGitHubCapabilities(binding: LocalWorkRunBinding?) {
-        binding?.enabledOptionalTools?.let(toolExecutionCoordinator::enableGitHubConnectorTools)
-            ?: toolExecutionCoordinator.enableGitHubConnectorTools()
     }
 
     private fun searchCapabilities(query: String): String =
