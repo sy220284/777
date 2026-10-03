@@ -137,7 +137,7 @@ private fun NavigationScreenshot() {
             onNewSession = {},
             onRemote = {},
             onSwitchSession = {},
-            onDeleteSessions = {},
+            onDeleteSessions = { 0 },
             onWorkspaceFiles = {},
             onOpenRunCenter = {},
             groupMemberCount = 3,
