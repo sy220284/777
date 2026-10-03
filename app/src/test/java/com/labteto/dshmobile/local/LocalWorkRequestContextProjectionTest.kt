@@ -157,8 +157,7 @@ class LocalWorkRequestContextProjectionTest {
         val toolContents = projected.messages
             .filter { it["role"].toString().trim('"') == "tool" }
             .map { it["content"].toString() }
-        assertTrue(toolContents.take(3).all { it.contains("旧工具结果已从实时模型上下文衰减") })
-        assertTrue(toolContents.takeLast(2).none { it.contains("旧工具结果已从实时模型上下文衰减") })
+        assertTrue(toolContents.all { it.contains("旧工具结果已从实时模型上下文衰减") })
     }
 
     @Test
@@ -212,11 +211,17 @@ class LocalWorkRequestContextProjectionTest {
             }
 
             val rawTokens = history.sumOf { estimateModelTokens(it.toString()) }
+            val sourcePressure = LocalPromptPressureMeter.measure(
+                messages = history,
+                tools = JsonArray(emptyList()),
+                operationalLimitTokens = 678_464,
+            )
             val projected = projectWorkRequestContext(
                 messages = history,
                 tools = JsonArray(emptyList()),
                 compactor = LocalHistoryCompactor(),
                 operationalLimitTokens = 678_464,
+                measuredPressure = sourcePressure,
                 previousPressure = previousPressure,
                 structuredWorkState = LocalStructuredWorkState(
                     goals = listOf("完成一百步长任务"),
@@ -227,11 +232,7 @@ class LocalWorkRequestContextProjectionTest {
             rawCumulative += rawTokens
             projectedCumulative += projected.estimatedTokensAfter
             projectedPeak = maxOf(projectedPeak, projected.estimatedTokensAfter)
-            previousPressure = LocalPromptPressureMeter.measure(
-                messages = projected.messages,
-                tools = JsonArray(emptyList()),
-                operationalLimitTokens = 678_464,
-            )
+            previousPressure = sourcePressure
         }
 
         assertTrue(projectedPeak <= 40_000)
@@ -279,6 +280,33 @@ class LocalWorkRequestContextProjectionTest {
         assertEquals(LocalWorkStepContextStatus.COMPACT, assessment.status)
         assertTrue("adaptive_history_pressure" in assessment.reasons)
         assertTrue(assessment.effectiveProjectionTriggerTokens < 36_000)
+    }
+
+    @Test
+    fun deepSeekAndOpenAiUseCacheAwareProjectionThresholdsWhileUnknownKeepsDefault() {
+        val deepSeekPolicy = LocalModelPresets.runtimeCapabilitiesFor(
+            model = "deepseek-flash",
+            baseUrl = "https://api.deepseek.com",
+        ).promptCachePolicy
+        val openAiPolicy = LocalModelPresets.runtimeCapabilitiesFor(
+            model = "gpt-6-astra",
+            baseUrl = "https://api.openai.com/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            authKind = LocalModelAuthKind.API_KEY,
+        ).promptCachePolicy
+
+        val deepSeekLimit = operationalInputLimitTokens("deepseek-flash", "https://api.deepseek.com")
+        val openAiLimit = operationalInputLimitTokens("gpt-6-astra", "https://api.openai.com/v1")
+        assertTrue(
+            workRequestProjectionTriggerTokens(deepSeekLimit, deepSeekPolicy) >
+                workRequestProjectionTriggerTokens(deepSeekLimit),
+        )
+        assertTrue(
+            workRequestProjectionTriggerTokens(openAiLimit, openAiPolicy) >
+                workRequestProjectionTriggerTokens(openAiLimit),
+        )
+        assertEquals(28_000, workRequestProjectionTargetTokens(192_000))
+        assertEquals(36_000, workRequestProjectionTriggerTokens(192_000))
     }
 
     @Test
