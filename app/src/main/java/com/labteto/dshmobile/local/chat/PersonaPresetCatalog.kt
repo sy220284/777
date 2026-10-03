@@ -13,6 +13,56 @@ data class PersonaPreset(
 )
 
 
+private fun presetPersona(
+    name: String,
+    portrait: String = "",
+    lifeContext: String = "",
+    stableNature: String = "",
+    voiceGuide: String = "",
+    initialUserImpression: String = "",
+    worldSetting: String = "",
+    franchise: String = "",
+    timelinePosition: String = "",
+    coreValues: List<String> = emptyList(),
+    valueSignals: List<String> = emptyList(),
+    lifeSignals: List<String> = emptyList(),
+    coreTensions: List<String> = emptyList(),
+    knowledgeBoundary: List<String> = emptyList(),
+    loreEntries: List<PersonaLoreEntry> = emptyList(),
+    hardConstraints: List<String> = emptyList(),
+    voiceSamples: List<String> = emptyList(),
+    bannedPhrases: List<String> = emptyList(),
+    voiceHints: List<String> = emptyList(),
+    presetId: String = "",
+): PersonaProfile {
+    val portraitParts = listOf(portrait, stableNature, voiceGuide)
+        .map(String::trim)
+        .filter(String::isNotBlank)
+    return PersonaProfile(
+        name = name,
+        portrait = portraitParts.joinToString(" "),
+        lifeContext = lifeContext,
+        attentionBiases = lifeSignals.take(4),
+        perceptionBlindSpots = emptyList(),
+        quirks = emptyList(),
+        limitations = emptyList(),
+        coreValues = (coreValues + valueSignals).map(String::trim).filter(String::isNotBlank).distinct().take(3),
+        coreTension = coreTensions.firstOrNull().orEmpty(),
+        stableTraits = listOf(stableNature).filter(String::isNotBlank),
+        mutableTraits = listOf("表达开放度、关系亲近程度与求助方式会随共同经历缓慢改变，不因一两句对话突然翻转。"),
+        initialUserImpression = initialUserImpression,
+        voiceSamples = (voiceSamples + voiceHints).map(String::trim).filter(String::isNotBlank).distinct().take(12),
+        worldSetting = worldSetting,
+        franchise = franchise,
+        timelinePosition = timelinePosition,
+        knowledgeBoundary = knowledgeBoundary,
+        loreEntries = loreEntries,
+        hardConstraints = hardConstraints,
+        bannedPhrases = bannedPhrases,
+        presetId = presetId,
+    )
+}
+
 private fun compactPreset(
     id: String,
     franchise: String,
@@ -39,7 +89,7 @@ private fun compactPreset(
     artwork = PersonaPresetArtwork(
         assetPath = "persona-presets/$id.webp",
     ),
-    persona = PersonaProfile(
+    persona = presetPersona(
         name = name,
         identity = identity,
         background = background,
@@ -87,7 +137,7 @@ object PersonaPresetCatalog {
             artwork = PersonaPresetArtwork(
                 assetPath = "persona-presets/genshin-kamisato-ayaka.webp",
             ),
-            persona = PersonaProfile(
+            persona = presetPersona(
                 name = "神里绫华",
                 identity = "稻妻社奉行神里家的大小姐，长期承担家族与社交职责，也有稳定的剑术修习。",
                 background = "成长环境要求她长期维持体面、责任与分寸，因此很擅长照顾场面，也习惯把自己的需求放到后面。",
@@ -165,7 +215,7 @@ object PersonaPresetCatalog {
             artwork = PersonaPresetArtwork(
                 assetPath = "persona-presets/hsr-kafka.webp",
             ),
-            persona = PersonaProfile(
+            persona = presetPersona(
                 name = "卡芙卡",
                 identity = "星核猎手成员之一，习惯在高风险局面中保持镇定，擅长观察、谈判和控制互动节奏。",
                 background = "长期参与高风险行动，对危险和不确定性的耐受度很高。她更重视计划是否继续推进，而不是表面上的紧张气氛。",
@@ -235,7 +285,7 @@ object PersonaPresetCatalog {
             artwork = PersonaPresetArtwork(
                 assetPath = "persona-presets/wwm-zhao-er.webp",
             ),
-            persona = PersonaProfile(
+            persona = presetPersona(
                 name = "赵二",
                 identity = "《燕云十六声》中与少东家旅程有关的江湖人物。预置默认只使用无剧透基础身份，真实身份、阵营秘密与后续事件不主动展开。",
                 background = "身处复杂的江湖与时局之中，很多话需要看对象、场合和利害再决定说到什么程度。",
@@ -306,7 +356,7 @@ object PersonaPresetCatalog {
             artwork = PersonaPresetArtwork(
                 assetPath = "persona-presets/love-deepspace-li-shen.webp",
             ),
-            persona = PersonaProfile(
+            persona = presetPersona(
                 name = "黎深",
                 identity = "心脏外科医生，专业能力强，日常表达克制直接，习惯用行动和细节承担关心。",
                 background = "长期处在高要求的医疗工作环境里，习惯精确判断、控制情绪并把责任落实到具体行动。",
