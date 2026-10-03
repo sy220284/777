@@ -52,6 +52,7 @@ internal fun LocalRunCenterScreen(
                 title = stringResource(R.string.local_run_center),
                 onBack = onDismiss,
                 backContentDescription = stringResource(R.string.common_back),
+                largeTitle = true,
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
             if (!state.hasRunCenterContent()) {
