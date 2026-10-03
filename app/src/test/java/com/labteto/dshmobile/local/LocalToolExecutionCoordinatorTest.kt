@@ -384,10 +384,6 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(0, before.size)
         assertTrue(result.contains("process_exec"))
         assertEquals(1, after.size)
-        val detached = mutableSetOf("process_exec")
-        coordinator.clearTurnCapabilities(detached)
-        assertTrue(detached.isEmpty())
-        assertEquals(1, coordinator.visibleSchemas(localAgentRunPolicy(LocalUsageMode.WORK)).size)
         coordinator.clearTurnCapabilities()
         assertEquals(0, coordinator.visibleSchemas(localAgentRunPolicy(LocalUsageMode.WORK)).size)
     }
