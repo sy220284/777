@@ -62,9 +62,10 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
-    fun attentionAndBehaviorPreferCharacterSpecificFocus() {
+    fun attentionAndModePreferCharacterSpecificFocusWithoutLockingReplyShape() {
         val persona = PersonaProfile(
             name = "叶澜",
+            portrait = "做插画，思路灵动，偶尔会从一个细节联想到别处。",
             attentionBiases = listOf("画画和构图的细节"),
             perceptionBlindSpots = listOf("容易忽略别人拐弯表达的情绪"),
         )
@@ -72,15 +73,14 @@ class CharacterLifeRuntimeV3Test {
             physicalState = "刚下班，很累",
             lifeState = CharacterLifeState(currentBeat = "晚上会整理插画稿"),
         )
-        val attention = resolveCharacterAttention(
-            persona,
-            state,
-            "我妈刚才又催我回家，不过我今天画了一张新的构图，线条终于顺了。",
-        )
-        val behavior = resolveCharacterBehavior(persona, state, "给你看看这张画？", attention)
+        val input = "我妈刚才又催我回家，不过我今天画了一张新的构图，线条终于顺了。"
+        val attention = resolveCharacterAttention(persona, state, input)
+        val mode = resolveCharacterMode(persona, state, input, attention)
 
         assertTrue(attention.noticed.any { it.contains("画") || it.contains("构图") || it.contains("线条") })
-        assertEquals(CharacterBehaviorMode.NORMAL, behavior.mode)
+        assertTrue(mode.focus.isNotEmpty())
+        assertTrue(mode.vector.association > 50)
+        assertTrue(renderCharacterModePrompt(mode).contains("不是台词模板"))
     }
 
     @Test
@@ -152,24 +152,44 @@ class CharacterLifeRuntimeV3Test {
     }
 
     @Test
-    fun busyStateCanShortenSmallTalkButCannotSuppressExplicitQuestion() {
+    fun busyStateCompressesSmallTalkButCriticalQuestionRestoresCoverage() {
         val persona = PersonaProfile(name = "陈拾")
         val state = ChatCharacterState(physicalState = "刚下班，很累")
-        val casual = resolveCharacterBehavior(
-            persona,
-            state,
-            "今天路上人好多",
-            resolveCharacterAttention(persona, state, "今天路上人好多"),
+        val casualInput = "今天路上人好多"
+        val questionInput = "你为什么没回我刚才的问题？"
+        val casual = resolveCharacterMode(
+            persona, state, casualInput, resolveCharacterAttention(persona, state, casualInput),
         )
-        val question = resolveCharacterBehavior(
-            persona,
-            state,
-            "你为什么没回我刚才的问题？",
-            resolveCharacterAttention(persona, state, "你为什么没回我刚才的问题？"),
+        val question = resolveCharacterMode(
+            persona, state, questionInput, resolveCharacterAttention(persona, state, questionInput),
         )
 
-        assertEquals(CharacterBehaviorMode.BRIEF, casual.mode)
-        assertEquals(CharacterBehaviorMode.NORMAL, question.mode)
+        assertTrue(casual.vector.compression > question.vector.compression)
+        assertTrue(question.vector.coverage > casual.vector.coverage)
+        assertTrue(question.vector.analysis > casual.vector.analysis)
+        assertTrue(question.criticalInput)
+    }
+
+    @Test
+    fun sameCharacterCanMoveBetweenLooseAndFocusedModesByContext() {
+        val persona = PersonaProfile(
+            name = "阿青",
+            portrait = "灵动爱开玩笑，但遇到正事会认真。",
+            voiceSamples = listOf("等下，我突然想到个东西。", "你先说重点。"),
+        )
+        val state = ChatCharacterState()
+        val casualText = "我刚看到一只猫追着塑料袋跑，笑死"
+        val factualText = "你必须告诉我，明天几点出发？"
+        val casual = resolveCharacterMode(
+            persona, state, casualText, resolveCharacterAttention(persona, state, casualText),
+        )
+        val factual = resolveCharacterMode(
+            persona, state, factualText, resolveCharacterAttention(persona, state, factualText),
+        )
+
+        assertTrue(casual.vector.association > factual.vector.association)
+        assertTrue(casual.vector.playfulness > factual.vector.playfulness)
+        assertTrue(factual.vector.coverage > casual.vector.coverage)
     }
 
     @Test

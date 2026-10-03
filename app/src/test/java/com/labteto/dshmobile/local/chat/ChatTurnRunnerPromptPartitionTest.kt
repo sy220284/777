@@ -75,12 +75,11 @@ class ChatTurnRunnerPromptPartitionTest {
         assertTrue(context.dynamicPrompt.contains("【此刻】"))
         assertTrue(context.dynamicPrompt.contains("身体：刚下班，有点累"))
         assertTrue(context.dynamicPrompt.contains("正在做：在收拾桌上的东西"))
-        assertTrue(context.dynamicPrompt.contains("【用户纠正｜最高优先】"))
-        assertTrue(context.dynamicPrompt.contains("【角色表达解释】"))
-        assertTrue(context.dynamicPrompt.contains("不得仅凭脱离语境的单个"))
-        assertTrue(context.dynamicPrompt.contains("明确边界始终优先"))
-        assertTrue(context.dynamicPrompt.contains("即使只表达一次"))
-        assertTrue(context.dynamicPrompt.contains("无需等待重复确认"))
+        assertTrue(context.dynamicPrompt.contains("【本轮模式】"))
+        assertTrue(context.dynamicPrompt.contains("不是台词模板"))
+        assertTrue(context.dynamicPrompt.contains("用户明确纠正（硬约束）"))
+        assertTrue(context.dynamicPrompt.contains("脑内推理"))
+        assertFalse(context.dynamicPrompt.contains("【角色表达解释】"))
         assertTrue(context.dynamicPrompt.contains("情绪：不高兴"))
         assertTrue(context.dynamicPrompt.contains("你目前怎么看对方：还记得刚才的争执"))
         assertTrue(context.dynamicPrompt.contains("【当前场景｜硬连续性】"))
@@ -115,7 +114,7 @@ class ChatTurnRunnerPromptPartitionTest {
     }
 
     @Test
-    fun genericRestraintDoesNotInjectIndirectExpressionPrompt() {
+    fun genericRestraintStaysAFreeModeSignalInsteadOfHardcodedExpressionRecipe() {
         val runner = ChatTurnRunner(
             personaStore = ChatPersonaStore(File(temporary.root, "personas-restraint.json"), json),
             relationshipEngine = ChatRelationshipEngine(),
@@ -132,6 +131,8 @@ class ChatTurnRunnerPromptPartitionTest {
         )
 
         assertFalse(context.dynamicPrompt.contains("【角色表达解释】"))
+        assertTrue(context.dynamicPrompt.contains("【本轮模式】"))
+        assertTrue(context.dynamicPrompt.contains("表达："))
     }
 
     @Test

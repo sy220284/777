@@ -428,17 +428,18 @@ class PersonaAutoFillService @Inject constructor(
             knowledgeBoundary, loreEntries, hardConstraints, bannedPhrases。
 
             规则：
-            1. 用户明确设定和已有资料优先；name 必填，未知信息留空，禁止为了填满字段编造经历。
-            2. portrait 用200～500字像熟人介绍这个人的自然叙述：身份、处境、气质和长期选择逻辑揉在一起，禁止人格测试式标签堆砌。
-            3. lifeContext 写用户不在时这个人怎样生活：工作/学业、身边的人、持续压力、小计划和未完成事情。不要让全部生活围着用户转。
-            4. attentionBiases 写3～5个“首先会注意什么”；perceptionBlindSpots 写1～3个容易漏听、误读或判断不完整的方向。
-            5. quirks 写无需创伤解释的小坚持和习惯；limitations 写真实不擅长的事。不要把每个习惯都心理学化。
-            6. coreValues 最多3项；coreTension 只保留一个长期矛盾；stableTraits / mutableTraits 区分不容易改变与能被共同经历缓慢改变的部分。
-            7. initialUserImpression 是角色主观看法，允许有偏差；不得伪造已经发生的共同经历。
-            8. voiceSamples 生成10～20条长短混杂的自然聊天样本，至少一半平淡普通；只体现节奏，不生成固定口头禅、频率规则、反应表或“用户说X就回Y”。
+            1. 用户明确设定和已有资料优先；name 必填。没有明确证据的字段保持空白，禁止为了“完整”自动补满人物。
+            2. portrait 是主要人物锚点，用120～320字像熟人一样描述身份、处境、气质和长期选择逻辑；不要拆成人格测试、行为清单或反应规则。
+            3. lifeContext 只写真正稳定的独立生活背景：工作/学业、重要的人、持续责任、长期小计划。不要替人物预编每天会发生什么。
+            4. attentionBiases 最多2项、perceptionBlindSpots 最多1项；只有描述里有明显依据时才写。运行时会动态决定本轮注意力，不需要预设完整注意力表。
+            5. quirks 最多3项、limitations 最多2项；只保留有辨识度且长期成立的内容，普通人类行为不要都写成人设。
+            6. coreValues 最多2项；coreTension、stableTraits、mutableTraits 都是可选项，最多各2项。能由 portrait 自然表达清楚的内容不要重复拆字段。
+            7. initialUserImpression 只有用户明确给出初始关系或看法时才写；不得伪造共同经历。
+            8. voiceSamples 只有用户强调说话感觉时才生成3～6条，长短混合且至少一半平淡普通；只作节奏参考，禁止固定口头禅、频率规则、反应表或“用户说X就回Y”。
             9. loreEntries 只保存稳定世界资料，每项为 {"id":"","title":"","content":"","keywords":[],"secondaryKeywords":[],"priority":50,"alwaysOn":false,"spoilerLevel":0}，优先0～6条。
-            10. knowledgeBoundary / hardConstraints 只写真正影响一致性和知识边界的规则；数组保持少量、具体、互不重复。
-            11. 目标是让人物能自然生活和做选择，不要求模型每轮展示人物特点。
+            10. knowledgeBoundary / hardConstraints 只写真正影响一致性和知识边界的少量硬规则；不要把语气、动作、思维路线写成硬约束。
+            11. 不生成“思维模式、行为模式、表达模式”的固定标签或权重。运行时会根据人物底色、当前状态、关系、记忆和话题自由组合模式。
+            12. 目标是留下足够稳定的“这个人是谁”，把“这一轮怎么想、怎么接、怎么说”交给运行时，避免人物越写越死。
         """.trimIndent()
 
         val REPAIR_PROMPT = """
