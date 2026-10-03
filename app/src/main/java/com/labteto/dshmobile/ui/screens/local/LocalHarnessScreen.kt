@@ -310,9 +310,10 @@ fun LocalHarnessScreen(
                 groupMemberCount = shell.groupChat.members.size,
                 onOpenGroupChat = {
                     scope.launch { drawerState.close() }
-                    if (hasEstablishedGroupChat(shell.sessions)) {
+                    val establishedSessionId = establishedGroupChatSessionId(shell.sessions)
+                    if (establishedSessionId != null) {
                         resetFeatureNavigation()
-                        viewModel.openGroupChatMode()
+                        viewModel.switchSession(establishedSessionId)
                     } else {
                         showGroupSetup = true
                     }
