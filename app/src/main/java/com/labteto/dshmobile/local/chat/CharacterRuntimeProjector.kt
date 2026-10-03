@@ -1,0 +1,189 @@
+package com.labteto.dshmobile.local.chat
+
+import com.labteto.dshmobile.local.estimateModelTokens
+
+/**
+ * Single request-time projection for the V3 character-life runtime.
+ *
+ * Durable facts stay rich. The model sees a compact identity anchor plus a per-turn mode vector,
+ * so character traits influence the reply without becoming a fixed performance checklist.
+ */
+internal class CharacterRuntimeProjector(
+    private val relationshipEngine: ChatRelationshipEngine,
+    private val loreEngine: CharacterLoreEngine,
+) {
+    fun project(
+        persona: PersonaProfile,
+        state: ChatCharacterState,
+        context: ChatContextState,
+        userInput: String,
+        storyContext: String?,
+    ): CharacterRuntimeProjection {
+        val privateState = state.copy(scene = ChatSceneState(), continuity = ChatContinuityState())
+        val lifeState = advanceCharacterLife(persona, privateState)
+        val runtimeState = privateState.copy(lifeState = lifeState)
+        val attention = resolveCharacterAttention(persona, runtimeState, userInput)
+        val mode = resolveCharacterMode(persona, runtimeState, userInput, attention)
+        val storyPrompt = storyContext?.takeIf(String::isNotBlank)?.let {
+            """
+            【连续性摘要｜已发生】
+            ${it.take(MAX_STORY_CONTEXT_CHARS)}
+            只把它当作已经发生的背景；当前输入、当前状态和更精确的记忆优先，不主动复述旧内容。
+            """.trimIndent()
+        }.orEmpty()
+
+        return CharacterRuntimeProjection(
+            stablePrompt = stablePrompt(persona),
+            dynamicPrompt = listOf(
+                takeWithinModelTokenBudget(momentPrompt(persona, runtimeState), MOMENT_TOKEN_BUDGET),
+                renderCharacterLifePrompt(lifeState),
+                takeWithinModelTokenBudget(renderCharacterModePrompt(mode), MODE_TOKEN_BUDGET),
+                renderChatContextForModel(context),
+                renderChatTurnModeForModel(userInput),
+                relevantBackgroundPrompt(persona, userInput),
+                storyPrompt,
+                loreEngine.prompt(persona, userInput),
+                relationshipEngine.prompt(userInput, runtimeState),
+            ).filter(String::isNotBlank).joinToString("\n\n"),
+        )
+    }
+
+    private fun stablePrompt(persona: PersonaProfile): String {
+        val critical = takeWithinModelTokenBudget(
+            buildString {
+                appendLine("【人物】${persona.name}")
+                appendLine(COMMON_CHARACTER_BOUNDARY)
+                appendLine(ANTI_PERFORMANCE_RULE)
+                appendStableSection("真正重要的东西", persona.coreValues, 3, 120)
+                appendStableSection(
+                    "专属硬约束",
+                    persona.hardConstraints.filterNot(::isCommonCharacterBoundary),
+                    4,
+                    110,
+                )
+                appendStableSection(
+                    "专属知识边界",
+                    persona.knowledgeBoundary.filterNot(::isCommonCharacterBoundary),
+                    3,
+                    110,
+                )
+            }.trim(),
+            STABLE_CRITICAL_TOKEN_BUDGET,
+        )
+        val remaining = (STABLE_PERSONA_TOKEN_BUDGET - estimateModelTokens(critical)).coerceAtLeast(0)
+        val descriptive = if (remaining == 0) "" else takeWithinModelTokenBudget(
+            descriptiveStablePrompt(persona),
+            remaining,
+        )
+        return listOf(critical, descriptive).filter(String::isNotBlank).joinToString("\n\n")
+    }
+
+    private fun descriptiveStablePrompt(persona: PersonaProfile): String = buildString {
+        appendLine("【人物底色】")
+        appendLine("只保留长期身份与生活底色；具体脑回路、行为和表达由每轮模式自由组合，不把任何形容词演成固定套路。")
+        persona.portrait.takeIf(String::isNotBlank)?.let { appendLine(it.take(900)) }
+        persona.lifeContext.takeIf(String::isNotBlank)?.let { appendLine("生活：${it.take(520)}") }
+
+        val samples = persona.voiceSamples.asSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .take(MAX_STABLE_VOICE_SAMPLES)
+            .toList()
+        if (samples.isNotEmpty()) {
+            appendLine("声音参考：")
+            samples.forEach { appendLine("- ${it.take(120)}") }
+            appendLine("只取自然节奏，不复读词句，不形成固定口头禅。")
+        }
+    }.trim()
+
+    private fun StringBuilder.appendStableSection(title: String, values: List<String>, limit: Int, maxChars: Int) {
+        val selected = values.asSequence().map(String::trim).filter(String::isNotBlank).take(limit).toList()
+        if (selected.isEmpty()) return
+        appendLine("【$title】")
+        selected.forEach { appendLine("- ${it.take(maxChars)}") }
+    }
+
+    private fun momentPrompt(persona: PersonaProfile, state: ChatCharacterState): String {
+        val lines = mutableListOf<String>()
+        state.physicalState.takeIf(String::isNotBlank)?.let { lines += "身体：${it.take(140)}" }
+        state.mood.takeUnless { it.isBlank() || it == "自然" }?.let { lines += "情绪：${it.take(100)}" }
+        state.currentAgenda.takeIf(String::isNotBlank)?.let { lines += "正在做：${it.take(180)}" }
+        state.immediateConcern.takeIf(String::isNotBlank)?.let { lines += "脑子里还挂着：${it.take(180)}" }
+        state.currentFocus.takeIf(String::isNotBlank)?.let { lines += "这一刻容易注意：${it.take(180)}" }
+        state.currentUserImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}" }
+            ?: state.recentImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}" }
+            ?: persona.initialUserImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}" }
+        state.internalConflict.takeIf(String::isNotBlank)?.let { lines += "此刻的拉扯：${it.take(180)}" }
+        state.dynamics.unresolvedConflict.takeIf(String::isNotBlank)?.let { lines += "关系里还没过去的事：${it.take(180)}" }
+        state.dynamics.sharedObjects.takeLast(2).takeIf(List<String>::isNotEmpty)?.let {
+            lines += "你们之间还在延续的小东西：${it.joinToString("；").take(260)}"
+        }
+        state.unresolvedThreads.takeLast(2).takeIf(List<String>::isNotEmpty)?.let {
+            lines += "还没做完/说完：${it.joinToString("；").take(260)}"
+        }
+        lines += "这些只是此刻的背景噪音；只有真的牵动本轮反应时才自然露出来。"
+
+        return buildString {
+            appendLine("【此刻】")
+            lines.forEach(::appendLine)
+        }.trim()
+    }
+
+    private fun relevantBackgroundPrompt(persona: PersonaProfile, userInput: String): String {
+        if (userInput.isBlank()) return ""
+        val anchors = listOf(
+            "生活" to persona.lifeContext,
+            "世界" to persona.worldSetting,
+            "时间线" to persona.timelinePosition,
+            "来源" to persona.franchise,
+        ).filter { (_, value) -> value.isNotBlank() && relevantTo(value, userInput) }
+        if (anchors.isEmpty()) return ""
+        return buildString {
+            appendLine("【本轮相关背景】只在当前话题自然需要时使用，不主动扩写。")
+            anchors.forEach { (label, value) -> appendLine("$label：${value.take(800)}") }
+        }.trim()
+    }
+
+    private fun relevantTo(source: String, query: String): Boolean {
+        val a = normalize(source)
+        val b = normalize(query)
+        if (a.isBlank() || b.length < 2) return false
+        val pairs = if (b.length == 2) setOf(b) else b.windowed(2).toSet()
+        val hits = pairs.count(a::contains)
+        return hits >= minOf(2, pairs.size)
+    }
+
+    private fun normalize(text: String): String =
+        text.lowercase().replace(Regex("""[\s，。！？；：、,.!?;:'"“”‘’()（）\[\]【】]+"""), "")
+
+    private fun isCommonCharacterBoundary(value: String): Boolean {
+        val normalized = value.replace(Regex("[\\s，。！？；：、,.!?;:'\"“”‘’()（）\\[\\]【】]+"), "")
+        return COMMON_BOUNDARY_FRAGMENTS.any(normalized::contains)
+    }
+
+    private companion object {
+        const val MAX_STORY_CONTEXT_CHARS = 2_500
+        const val MAX_STABLE_VOICE_SAMPLES = 2
+        const val STABLE_CRITICAL_TOKEN_BUDGET = 260
+        const val STABLE_PERSONA_TOKEN_BUDGET = 520
+        const val MOMENT_TOKEN_BUDGET = 230
+        const val MODE_TOKEN_BUDGET = 330
+        const val COMMON_CHARACTER_BOUNDARY =
+            "只使用自己合理经历、被告知或当前时间线允许知道的事实；不读玩家上帝视角，不凭空补全未发生内容；关系变化必须由真实共同经历支撑；不替用户决定重大行动，也不自称 AI。"
+        const val ANTI_PERFORMANCE_RULE =
+            "人物资料不是回复模板。每轮先形成自然反应，再决定说多少；不必完整、有用、漂亮，也不要把脑内思考全过程解释给用户。"
+        val COMMON_BOUNDARY_FRAGMENTS = listOf(
+            "不读取玩家上帝视角",
+            "不凭空知道未发生或未获知的剧情",
+            "关系变化必须有共同经历支撑",
+            "不自称AI",
+            "只知道当前时间线中自己合理经历获知或被用户明确建立的事实",
+            "玩家视角隐藏剧情他人私下经历和后续版本信息不会自动成为角色知识",
+        )
+    }
+}
+
+internal data class CharacterRuntimeProjection(
+    val stablePrompt: String,
+    val dynamicPrompt: String,
+)

@@ -26,15 +26,35 @@ internal object ChatDiaryEntryPolicy {
         }
     }
 
-    fun disclosureFor(request: ChatDiaryWriteRequest, delta: ChatDiaryDelta): ChatDiaryDisclosure =
-        if (
-            request.sourceMode == ChatDiarySourceMode.DIRECT &&
-            PRIVACY_SIGNAL.containsMatchIn(request.evidenceText)
-        ) {
-            ChatDiaryDisclosure.PRIVATE
-        } else {
-            normalizedDisclosure(delta.disclosure, request.sourceMode)
+    fun disclosureFor(request: ChatDiaryWriteRequest, delta: ChatDiaryDelta): ChatDiaryDisclosure {
+        val requested = runCatching {
+            ChatDiaryDisclosure.valueOf(delta.disclosure.trim().uppercase())
+        }.getOrNull()
+        val explicitIntent = explicitDisclosureIntent(request.evidenceText)
+        if (explicitIntent == ChatDiaryDisclosure.PRIVATE) return ChatDiaryDisclosure.PRIVATE
+
+        return when (request.sourceMode) {
+            ChatDiarySourceMode.GROUP -> when (requested) {
+                ChatDiaryDisclosure.PRIVATE -> ChatDiaryDisclosure.PRIVATE
+                else -> ChatDiaryDisclosure.PUBLIC
+            }
+            ChatDiarySourceMode.DIRECT -> when {
+                explicitIntent == ChatDiaryDisclosure.PUBLIC -> ChatDiaryDisclosure.PUBLIC
+                requested == ChatDiaryDisclosure.PRIVATE -> ChatDiaryDisclosure.PRIVATE
+                else -> ChatDiaryDisclosure.SHAREABLE
+            }
         }
+    }
+
+    private fun explicitDisclosureIntent(evidence: String): ChatDiaryDisclosure? {
+        val privacy = PRIVACY_SIGNAL.findAll(evidence).lastOrNull()?.range?.first ?: -1
+        val public = PUBLIC_TO_GROUP_SIGNAL.findAll(evidence).lastOrNull()?.range?.first ?: -1
+        return when {
+            privacy < 0 && public < 0 -> null
+            public > privacy -> ChatDiaryDisclosure.PUBLIC
+            else -> ChatDiaryDisclosure.PRIVATE
+        }
+    }
 
     fun sourcesFor(request: ChatDiaryWriteRequest): List<ChatDiarySourceRef> {
         val users = request.sourceUserMessageIds.map(String::trim)
@@ -83,9 +103,6 @@ internal object ChatDiaryEntryPolicy {
     ): ChatDiaryEntry {
         require(revisions.isNotEmpty())
         val current = revisions.last()
-        val disclosure = revisions
-            .map(ChatDiaryRevision::disclosure)
-            .reduce(::stricterDisclosure)
         val sources = revisions.flatMap(ChatDiaryRevision::sources).distinct()
         return entry.copy(
             event = current.event.take(MAX_EVENT_CHARS),
@@ -94,7 +111,7 @@ internal object ChatDiaryEntryPolicy {
             relationshipMeaning = current.relationshipMeaning.take(MAX_RELATIONSHIP_CHARS),
             unresolvedEcho = current.unresolvedEcho.take(MAX_ECHO_CHARS),
             importance = revisions.maxOf(ChatDiaryRevision::importance),
-            disclosure = disclosure,
+            disclosure = current.disclosure,
             sources = sources,
             revisions = revisions,
             updatedAt = updatedAt,
@@ -109,6 +126,7 @@ internal object ChatDiaryEntryPolicy {
         existing.active &&
             existing.subjectKey == candidate.subjectKey &&
             existing.sourceMode == candidate.sourceMode &&
+            existing.disclosure == candidate.disclosure &&
             revisionsOf(existing).size < MAX_REFINEMENT_REVISIONS &&
             now - existing.updatedAt <= DUPLICATE_WINDOW_MILLIS &&
             similarity(existing.event, candidate.event) >= DUPLICATE_SIMILARITY
@@ -168,30 +186,6 @@ internal object ChatDiaryEntryPolicy {
         return shared >= 2 && coverage >= MIN_EVIDENCE_COVERAGE
     }
 
-    private fun normalizedDisclosure(raw: String, mode: ChatDiarySourceMode): ChatDiaryDisclosure {
-        val requested = runCatching { ChatDiaryDisclosure.valueOf(raw.trim().uppercase()) }.getOrNull()
-        return when (mode) {
-            ChatDiarySourceMode.DIRECT -> when (requested) {
-                ChatDiaryDisclosure.PRIVATE -> ChatDiaryDisclosure.PRIVATE
-                else -> ChatDiaryDisclosure.SHAREABLE
-            }
-            ChatDiarySourceMode.GROUP -> when (requested) {
-                ChatDiaryDisclosure.PRIVATE -> ChatDiaryDisclosure.PRIVATE
-                else -> ChatDiaryDisclosure.PUBLIC
-            }
-        }
-    }
-
-    private fun stricterDisclosure(
-        left: ChatDiaryDisclosure,
-        right: ChatDiaryDisclosure,
-    ): ChatDiaryDisclosure = when {
-        left == ChatDiaryDisclosure.PRIVATE || right == ChatDiaryDisclosure.PRIVATE ->
-            ChatDiaryDisclosure.PRIVATE
-        left == ChatDiaryDisclosure.SHAREABLE || right == ChatDiaryDisclosure.SHAREABLE ->
-            ChatDiaryDisclosure.SHAREABLE
-        else -> ChatDiaryDisclosure.PUBLIC
-    }
 
     private fun searchText(entry: ChatDiaryEntry): String =
         listOf(
@@ -266,9 +260,14 @@ internal object ChatDiaryEntryPolicy {
     private val NEGATION_SIGNAL = Regex("""(?:不再|不用|不要|别再|别|没有|没|未|不|取消|撤销|拒绝)""")
     private val REPEATED_CONFIRMATION_NOISE = Regex("""(?:再次|再一次|又一次|重新)""")
     private val AGREEMENT_VARIANTS = Regex("""(?:答应|确认|确定|说定|约定)""")
-    private val RECALL_PLAN_VARIANTS = Regex("""(?:安排|计划|说好|说定|约定|确认)""")
+    private val RECALL_PLAN_VARIANTS = Regex("""(?:安排|计划|说好|说定|约定|约的|约了|确认)""")
     private val RECALL_STOP_TERMS = setOf(
         "什么", "时候", "怎么", "我们", "你们", "他们", "她们", "在哪", "最后", "那个", "这个", "事情",
     )
-    private val PRIVACY_SIGNAL = Regex("""(?:别告诉|不要告诉|别跟.+说|不要跟.+说|保密|秘密|只告诉你|只跟你说|别让.+知道)""")
+    private val PRIVACY_SIGNAL = Regex(
+        """(?:别告诉|不要告诉|别跟.{0,40}说|不要跟.{0,40}说|(?<!不用)(?<!不必)保密|只告诉你|只跟你说|别让.{0,40}知道|不要公开|别公开|只能你知道)""",
+    )
+    private val PUBLIC_TO_GROUP_SIGNAL = Regex(
+        """(?:可以告诉大家|可以跟大家说|可以和大家说|群里可以说|群里可以提|可以公开|公开说|不用保密|不必保密|可以让别人知道|可以带到群里)""",
+    )
 }

@@ -71,7 +71,8 @@ internal fun reconcileCharacterBehaviorTuning(
     val galleryPersona = galleryId
         ?.let { id -> galleryStore.list().firstOrNull { it.id == id } }
         ?.persona
-    val persona = personaStore.get(personaId).takeIf { it.id == personaId }
+    val storedPersona = personaStore.get(personaId).takeIf { it.id == personaId }
+    val persona = storedPersona
         ?: galleryPersona?.copy(id = personaId)
         ?: PersonaProfile(id = personaId)
     val galleryTuning = galleryPersona?.behaviorTuning
@@ -81,7 +82,9 @@ internal fun reconcileCharacterBehaviorTuning(
         galleryTuning,
     )
     galleryId?.let { persistGalleryBehaviorTuning(galleryStore, it, resolved) }
-    val restoredPersona = if (persona.behaviorTuning == resolved) persona else {
+    val restoredPersona = if (storedPersona != null && persona.behaviorTuning == resolved) {
+        persona
+    } else {
         personaStore.upsert(persona.copy(behaviorTuning = resolved))
     }
     val restoredState = if (chatState.behaviorTuning == resolved) chatState else {
@@ -103,32 +106,24 @@ internal fun reconcileGroupCharacterBehaviorTuning(
     val galleryById = galleryStore.list().associateBy(PersonaGalleryEntry::id)
     return groupChat.copy(
         members = groupChat.members.map { member ->
-            val stored = personaStore.get(member.personaId).takeIf { it.id == member.personaId }
-                ?: member.persona.copy(id = member.personaId)
+            val galleryPersona = galleryById[member.galleryId]?.persona
+            val storedPersona = personaStore.get(member.personaId).takeIf { it.id == member.personaId }
+            val stored = storedPersona
+                ?: galleryPersona?.copy(id = member.personaId)
+                ?: PersonaProfile(id = member.personaId, name = member.displayName)
             val resolved = resolveCharacterBehaviorTuning(
-                resolveCharacterBehaviorTuning(
-                    member.chatState.behaviorTuning,
-                    member.persona.behaviorTuning,
-                ),
+                member.chatState.behaviorTuning,
                 stored.behaviorTuning,
-                galleryById[member.galleryId]?.persona?.behaviorTuning,
+                galleryPersona?.behaviorTuning,
             )
             persistGalleryBehaviorTuning(galleryStore, member.galleryId, resolved)
-            val durablePersona = if (stored.behaviorTuning == resolved) stored else {
+            if (storedPersona == null || stored.behaviorTuning != resolved) {
                 personaStore.upsert(stored.copy(behaviorTuning = resolved))
             }
-            if (
-                member.persona.behaviorTuning == resolved &&
-                member.chatState.behaviorTuning == resolved
-            ) {
+            if (member.chatState.behaviorTuning == resolved) {
                 member
             } else {
-                member.copy(
-                    persona = member.persona.copy(
-                        behaviorTuning = durablePersona.behaviorTuning,
-                    ),
-                    chatState = member.chatState.copy(behaviorTuning = resolved),
-                )
+                member.copy(chatState = member.chatState.copy(behaviorTuning = resolved))
             }
         },
     )

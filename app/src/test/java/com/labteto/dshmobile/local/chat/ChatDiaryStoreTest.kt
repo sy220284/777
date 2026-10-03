@@ -82,7 +82,7 @@ class ChatDiaryStoreTest {
     }
 
     @Test
-    fun ordinaryDirectExperienceCanRecallInGroupButExplicitSecretCannot() {
+    fun groupRecallAcceptsOnlyPublicDiaryAndNeverPrivateOrShareable() {
         val memory = store()
         memory.record(request(
             delta = ChatDiaryDelta(
@@ -96,23 +96,199 @@ class ChatDiaryStoreTest {
         ))
         memory.record(request(
             delta = ChatDiaryDelta(
+                event = "用户说他喜欢海边，并明确说群里可以提",
+                feeling = "我觉得这个偏好挺容易记住",
+                innerThought = "以后聊旅行时可以自然提到",
+                importance = 3,
+                disclosure = "PUBLIC",
+            ),
+            userId = "u-public",
+            assistantId = "a-public",
+            evidence = "用户说他喜欢海边，并明确说群里可以提，可以告诉大家",
+        ))
+        memory.record(request(
+            delta = ChatDiaryDelta(
                 event = "用户私下告诉我他准备给朋友一个惊喜",
                 feeling = "我有点替他兴奋，也知道这件事不能说出去",
                 innerThought = "在惊喜揭晓前，我得把这件事藏好",
                 importance = 4,
                 disclosure = "PRIVATE",
             ),
-            userId = "u2",
-            assistantId = "a2",
+            userId = "u-secret",
+            assistantId = "a-secret",
             evidence = "用户私下告诉我他准备给朋友一个惊喜，并说先别告诉别人",
         ))
 
-        val groupRecall = memory.search("还记得我喜欢什么天气吗", "gallery:a", groupAudience = true, maxItems = 6)
-        assertTrue(groupRecall.any { it.event.contains("雨天") })
-        assertTrue(groupRecall.none { it.event.contains("惊喜") })
+        val groupRecall = memory.search("你还记得我喜欢什么吗", "gallery:a", groupAudience = true, maxItems = 6)
+        assertEquals(1, groupRecall.size)
+        assertTrue(groupRecall.single().event.contains("海边"))
+        assertEquals(ChatDiaryDisclosure.PUBLIC, groupRecall.single().disclosure)
 
         val directRecall = memory.search("之前我跟你说过的惊喜", "gallery:a", groupAudience = false, maxItems = 6)
         assertTrue(directRecall.any { it.event.contains("惊喜") })
+    }
+
+    @Test
+    fun privateDiaryCanBeExplicitlyReleasedToGroupAndRelockedLater() {
+        val memory = store()
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户准备辞职，并说这件事先只告诉我",
+                feeling = "我知道这是他交给我的秘密",
+                innerThought = "在他允许前我不会提",
+                importance = 5,
+                disclosure = "PRIVATE",
+            ),
+            evidence = "用户说：这件事先只告诉你，我准备辞职，别告诉别人。",
+        ))
+        val released = memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户准备辞职，现在明确说可以告诉大家",
+                feeling = "他愿意公开以后我不用再刻意避开",
+                innerThought = "群里聊到工作时可以自然提到",
+                importance = 5,
+                disclosure = "PUBLIC",
+            ),
+            userId = "u-release",
+            assistantId = "a-release",
+            evidence = "用户说：辞职这件事现在不用保密了，可以告诉大家，群里可以提。",
+        ))
+        assertEquals(ChatDiaryDisclosure.PUBLIC, released?.disclosure)
+        assertTrue(memory.search("辞职", "gallery:a", groupAudience = true, maxItems = 3).isNotEmpty())
+
+        val relocked = memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户准备辞职，但又明确要求先别告诉别人",
+                feeling = "我知道他又想把这件事收回来",
+                innerThought = "之后在群里必须避开",
+                importance = 5,
+                disclosure = "PRIVATE",
+            ),
+            userId = "u-relock",
+            assistantId = "a-relock",
+            evidence = "用户说：辞职这件事还是先别告诉别人，不要公开。",
+        ))
+        assertEquals(ChatDiaryDisclosure.PRIVATE, relocked?.disclosure)
+        assertTrue(memory.search("辞职", "gallery:a", groupAudience = true, maxItems = 3).isEmpty())
+        assertTrue(memory.search("辞职", "gallery:a", groupAudience = false, maxItems = 3).isNotEmpty())
+    }
+
+    @Test
+    fun supersededDiaryDoesNotReviveUnlessUserExplicitlyAsksForHistory() {
+        val memory = store()
+        val old = memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "两人约定周六上午十点在南门钟楼见面",
+                feeling = "我把时间记住了",
+                importance = 4,
+            ),
+            userId = "u-old",
+            assistantId = "a-old",
+            evidence = "两人约定周六上午十点在南门钟楼见面",
+        ))!!
+        val current = memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "见面安排改为周日下午三点在白桦咖啡馆",
+                feeling = "新的安排确定以后我安心了",
+                innerThought = "现在应该只按这个新时间准备",
+                importance = 5,
+            ),
+            userId = "u-new",
+            assistantId = "a-new",
+            evidence = "见面安排改为周日下午三点在白桦咖啡馆",
+        ))!!
+        assertEquals(current.id, memory.listActive("gallery:a").first { it.id == old.id }.supersededBy)
+
+        val currentRecall = memory.search(
+            "我们最后约定什么时候见",
+            "gallery:a",
+            groupAudience = false,
+            maxItems = 6,
+        )
+        assertTrue(currentRecall.any { it.id == current.id })
+        assertTrue(currentRecall.none { it.id == old.id })
+
+        val historyRecall = memory.search(
+            "最开始我们原来约的什么时候见",
+            "gallery:a",
+            groupAudience = false,
+            maxItems = 6,
+        )
+        assertTrue(historyRecall.any { it.id == old.id })
+    }
+
+    @Test
+    fun directPublicRequestWithoutExplicitPermissionIsDowngradedAndCannotEnterGroup() {
+        val memory = store()
+        val saved = memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户说他喜欢在雨天散步",
+                feeling = "我觉得这个习惯很像他",
+                innerThought = "下雨时我可能会想起这句话",
+                importance = 3,
+                disclosure = "PUBLIC",
+            ),
+            evidence = "用户说他喜欢在雨天散步。",
+        ))
+
+        assertEquals(ChatDiaryDisclosure.SHAREABLE, saved?.disclosure)
+        assertTrue(memory.search("雨天散步", "gallery:a", groupAudience = true, maxItems = 3).isEmpty())
+    }
+
+    @Test
+    fun privacyEvidenceOverridesEvenRequestedPublicDisclosure() {
+        val memory = store()
+        val saved = memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户告诉我他准备辞职",
+                feeling = "我有点意外",
+                innerThought = "这件事先替他守着",
+                importance = 5,
+                disclosure = "PUBLIC",
+            ),
+            evidence = "用户说：只告诉你，我准备辞职，别告诉别人。",
+        ))
+
+        assertEquals(ChatDiaryDisclosure.PRIVATE, saved?.disclosure)
+        assertTrue(memory.search("辞职", "gallery:a", groupAudience = true, maxItems = 3).isEmpty())
+        assertTrue(memory.search("辞职", "gallery:a", groupAudience = false, maxItems = 3).isNotEmpty())
+    }
+
+    @Test
+    fun explicitPublicAuthorizationCreatesSeparatePublicEntryWithoutRelaxingEarlierBoundary() {
+        val memory = store()
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户说他喜欢雨天散步",
+                feeling = "我记住了这个小习惯",
+                innerThought = "下雨时我可能会想起来",
+                importance = 3,
+                disclosure = "SHAREABLE",
+            ),
+            evidence = "用户说他喜欢雨天散步。",
+        ))
+        memory.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户再次提到喜欢雨天散步，并说群里可以提",
+                feeling = "现在这件事可以公开聊了",
+                innerThought = "以后在群里提到也没关系",
+                importance = 3,
+                disclosure = "PUBLIC",
+            ),
+            userId = "u-public-later",
+            assistantId = "a-public-later",
+            evidence = "用户再次提到喜欢雨天散步，并明确说群里可以提，可以告诉大家。",
+        ))
+
+        val all = memory.listActive("gallery:a")
+        assertEquals(2, all.size)
+        assertEquals(
+            setOf(ChatDiaryDisclosure.SHAREABLE, ChatDiaryDisclosure.PUBLIC),
+            all.map(ChatDiaryEntry::disclosure).toSet(),
+        )
+        val groupRecall = memory.search("雨天散步", "gallery:a", groupAudience = true, maxItems = 6)
+        assertEquals(1, groupRecall.size)
+        assertEquals(ChatDiaryDisclosure.PUBLIC, groupRecall.single().disclosure)
     }
 
     @Test

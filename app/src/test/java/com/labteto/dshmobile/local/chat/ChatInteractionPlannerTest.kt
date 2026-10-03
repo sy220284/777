@@ -56,6 +56,7 @@ class ChatInteractionPlannerTest {
             mood = "平静",
             currentFocus = "旧话题",
             recentImpression = "还在介意",
+            currentUserImpression = "还在介意",
             activeGoal = "继续追问",
             currentAgenda = "把旧事说完",
             internalConflict = "想问又不想问",
@@ -71,7 +72,8 @@ class ChatInteractionPlannerTest {
 
         assertEquals("平静", state.mood)
         assertTrue(state.currentFocus.isBlank())
-        assertTrue(state.recentImpression.isBlank())
+        assertEquals("还在介意", state.currentUserImpression)
+        assertEquals("还在介意", state.recentImpression)
         assertTrue(state.activeGoal.isBlank())
         assertTrue(state.currentAgenda.isBlank())
         assertTrue(state.internalConflict.isBlank())
@@ -82,10 +84,10 @@ class ChatInteractionPlannerTest {
     private val planner = ChatInteractionPlanner(Json { ignoreUnknownKeys = true })
 
     @Test
-    fun plannerAndSuggestionsHonorPersonaCorrectionsForIndirectExpression() {
+    fun plannerAndSuggestionsHonorCorrectionsWithoutFixedExpressionRecipe() {
         val persona = PersonaProfile(
             name = "阿青",
-            personality = "嘴硬心软",
+            portrait = "嘴硬心软",
             corrections = listOf("不善于拒绝，会服软，很多推辞只是她自己的表达方式"),
         )
         val state = ChatCharacterState(
@@ -111,10 +113,10 @@ class ChatInteractionPlannerTest {
 
         assertTrue(plannerPrompt.contains("用户纠正（最高优先）"))
         assertTrue(plannerPrompt.contains("不善于拒绝，会服软"))
-        assertTrue(plannerPrompt.contains("表达解释：角色存在嘴硬"))
-        assertTrue(plannerPrompt.contains("模糊或习惯性推辞不得单独触发关系降温"))
+        assertTrue(!plannerPrompt.contains("表达解释：角色存在嘴硬"))
+        assertTrue(plannerPrompt.contains("角色台词的模糊或习惯性推辞不得单独触发关系降温"))
         assertTrue(suggestionsPrompt.contains("用户纠正（最高优先）"))
-        assertTrue(suggestionsPrompt.contains("不把模糊或习惯性推辞自动解释为关系拒绝"))
+        assertTrue(suggestionsPrompt.contains("不把单个模糊推辞自动解释为关系拒绝"))
         assertTrue(suggestionsPrompt.contains("清晰明确停止、退出或拒绝继续一次即生效"))
     }
 
@@ -122,8 +124,7 @@ class ChatInteractionPlannerTest {
     fun genericRestraintAloneDoesNotEnableIndirectRefusalSemantics() {
         val persona = PersonaProfile(
             name = "阿青",
-            personality = "克制谨慎",
-            speechStyle = "表达含蓄",
+            portrait = "克制谨慎，表达含蓄",
         )
         val prompt = planner.prompt(
             persona = persona,
@@ -139,7 +140,7 @@ class ChatInteractionPlannerTest {
     fun explicitCurrentBoundaryIsOneShotAndDoesNotRequireRepetition() {
         val persona = PersonaProfile(
             name = "阿青",
-            personality = "嘴硬心软",
+            portrait = "嘴硬心软",
         )
         val plannerPrompt = planner.prompt(
             persona = persona,

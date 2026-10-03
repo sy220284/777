@@ -3,28 +3,6 @@ package com.labteto.dshmobile.local.chat
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class RelationshipEvidence(
-    val text: String = "",
-    val confidence: Int = 50,
-    val source: String = "",
-)
-
-@Serializable
-data class RelationshipDynamics(
-    val stage: String = "FAMILIAR",
-    val warmth: Int = 50,
-    val trust: Int = 50,
-    val reciprocity: Int = 50,
-    val tension: Int = 10,
-    val stability: Int = 50,
-    val unresolvedConflict: String = "",
-    val facts: List<RelationshipEvidence> = emptyList(),
-    val hypotheses: List<RelationshipEvidence> = emptyList(),
-    val unknowns: List<String> = emptyList(),
-    val sharedMoments: List<String> = emptyList(),
-)
-
-@Serializable
 data class UserChatPattern(
     val replyLength: String = "mixed",
     val directness: Int = 50,
@@ -79,12 +57,18 @@ data class ChatContinuityState(
     val evidence: List<ChatContinuityEvidence> = emptyList(),
 )
 
+
 @Serializable
 data class ChatCharacterState(
+    /** Short-lived bodily condition that can naturally affect attention and reply length. */
+    val physicalState: String = "",
     val mood: String = "自然",
     val relationshipState: String = "熟悉中",
     val currentFocus: String = "",
     val recentImpression: String = "",
+    /** Durable subjective impression; unlike transient mood/focus it does not expire by turn count. */
+    val currentUserImpression: String = "",
+    val lifeState: CharacterLifeState = CharacterLifeState(),
     val activeGoal: String = "",
     val currentAgenda: String = "",
     val internalConflict: String = "",

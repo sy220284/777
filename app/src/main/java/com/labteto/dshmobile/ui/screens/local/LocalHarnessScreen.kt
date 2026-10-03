@@ -292,7 +292,7 @@ fun LocalHarnessScreen(
                 currentGalleryId = shell.galleryId,
                 currentGalleryStoryId = shell.galleryStoryId,
                 currentPersonaName = shell.chatPersona.name,
-                currentPersonaIdentity = shell.chatPersona.identity,
+                currentPersonaIdentity = shell.chatPersona.portrait,
                 workModelLabel = activeModelProfile?.displayName
                     ?: activeModelProfile?.model
                     ?: stringResource(R.string.local_model_setup),

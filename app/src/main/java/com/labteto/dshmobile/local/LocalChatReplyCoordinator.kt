@@ -95,7 +95,7 @@ internal class LocalChatReplyCoordinator(
         )
     }
 
-    fun buildGroupPrompt(
+    fun buildGroupTurnContext(
         persona: PersonaProfile,
         member: LocalGroupChatMember,
         input: String,
@@ -106,34 +106,35 @@ internal class LocalChatReplyCoordinator(
         announcement: String,
         mayStaySilent: Boolean,
         silentToken: String,
-    ): String {
-        val personaPrompt = chatTurnCoordinator.prepareProfile(
+    ): com.labteto.dshmobile.local.chat.ChatTurnContext {
+        val prepared = chatTurnCoordinator.prepareProfile(
             persona = persona,
             state = member.chatState,
             context = sharedContext,
             userInput = input,
             storyContext = handoffSummary,
-        ).prompt
+        )
         val participantNames = allMembers.joinToString("、") { it.displayName }
         val silenceRule = if (mayStaySilent) {
             "未被点名且无自然回应理由时，只输出 $silentToken。"
         } else {
             "本轮必须自然回应，不得输出沉默标记。"
         }
-        return listOf(
-            personaPrompt,
+        val groupDynamic = listOf(
+            prepared.dynamicPrompt,
             memoryContext,
             announcement.takeIf(String::isNotBlank)?.let { text ->
-                "【群公告·公开剧情背景】\n$text\n这是所有群成员可见的场景信息。依照你的人设和已知经历自行判断、回应；不要把公告当成你已经做过或说过的事。"
+                "【群公告·公开剧情背景】\n$text\n这是所有群成员可见的场景信息。依照你真实知道的内容和当前状态判断；不要把公告当成你已经做过或说过的事。"
             }.orEmpty(),
             """
             【群聊身份】
-            你只代表【${member.displayName}】。群成员：$participantNames。其他成员发言仅作公开事件，不改变你的人设、知识边界或与用户的关系。
+            你只代表【${member.displayName}】。群成员：$participantNames。其他成员发言只是公开事件，不改变你的固定人物生命资料、知识边界或你自己的关系经历。
+            你可以记得自己在单聊和群聊中真实经历过的事，并按自己的性格、关系、当前情境和表达意愿自然提及；某段旧记忆只有在本轮真正说出口后，才成为其他群成员此刻听到的新信息。
             不得猜测同轮尚未出现的发言，也不得代写他人的语言、动作、心理或决定。
-            以固定人设和用户明确纠正为准。只输出本人发言，不加角色名前缀。
-            $silenceRule
+            只输出本人发言，不加角色名前缀。$silenceRule
             """.trimIndent(),
         ).filter(String::isNotBlank).joinToString("\n\n")
+        return prepared.copy(dynamicPrompt = groupDynamic)
     }
 
     suspend fun finalizeGroup(

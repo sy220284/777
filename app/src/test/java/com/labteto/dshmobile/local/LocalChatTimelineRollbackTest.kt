@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.PersonaProfile
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -87,7 +86,6 @@ class LocalChatTimelineRollbackTest {
                     galleryId = "gallery-a",
                     personaId = "persona-a",
                     displayName = "阿青",
-                    persona = PersonaProfile(id = "persona-a", name = "阿青"),
                     chatState = memberState,
                 ),
             ),

@@ -18,8 +18,8 @@ class PersonaAutoFillParsingTest {
             ```json
             {
               "name": "流萤",
-              "identity": "星核猎手成员",
-              "coreMotivations": "活下去；守护珍视的人",
+              "portrait": "星核猎手成员",
+              "coreValues": "活下去；守护珍视的人",
               "hardConstraints": ["避免机械式解释", "保持角色视角"],
               "loreEntries": {
                 "title": "萨姆",
@@ -37,7 +37,7 @@ class PersonaAutoFillParsingTest {
         val draft = parsePersonaDraft(json, raw)
 
         assertEquals("流萤", draft.name)
-        assertEquals(listOf("活下去", "守护珍视的人"), draft.coreMotivations)
+        assertEquals(listOf("活下去", "守护珍视的人"), draft.coreValues)
         assertEquals(1, draft.loreEntries.size)
         assertEquals(listOf("星核猎手", "萨姆"), draft.loreEntries.single().keywords)
         assertEquals(80, draft.loreEntries.single().priority)
@@ -50,8 +50,8 @@ class PersonaAutoFillParsingTest {
             前置说明
             {
               "name": "流萤",
-              "background": "她记得一句话：{别怕，我在。}",
-              "exampleDialogues": "第一句\n第二句",
+              "lifeContext": "她记得一句话：{别怕，我在。}",
+              "voiceSamples": "第一句\n第二句",
             }
             {"name":"不应读取这个对象"}
         """.trimIndent()
@@ -59,8 +59,8 @@ class PersonaAutoFillParsingTest {
         val draft = parsePersonaDraft(json, raw)
 
         assertEquals("流萤", draft.name)
-        assertEquals("她记得一句话：{别怕，我在。}", draft.background)
-        assertEquals(listOf("第一句", "第二句"), draft.exampleDialogues)
+        assertEquals("她记得一句话：{别怕，我在。}", draft.lifeContext)
+        assertEquals(listOf("第一句", "第二句"), draft.voiceSamples)
     }
 
     @Test
@@ -68,7 +68,7 @@ class PersonaAutoFillParsingTest {
         val result = runCatching {
             parsePersonaDraft(
                 json,
-                """{"name":"流萤","identity":"星核猎手成员"""",
+                """{"name":"流萤","portrait":"星核猎手成员"""",
             )
         }
 

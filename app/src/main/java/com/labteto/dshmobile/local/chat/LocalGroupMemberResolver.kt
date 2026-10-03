@@ -32,7 +32,6 @@ internal fun resolveLocalGroupChatMembers(
             personaId = saved.id,
             displayName = saved.name,
             portraitPath = entry.portraitPath,
-            persona = saved,
             chatState = restoredState.copy(
                 behaviorTuning = resolveCharacterBehaviorTuning(
                     restoredState.behaviorTuning,
