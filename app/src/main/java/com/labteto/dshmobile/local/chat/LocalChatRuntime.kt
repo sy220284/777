@@ -26,6 +26,8 @@ class LocalChatRuntime @Inject constructor(
     internal suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile =
         engine.syncDefaultChatPersona(profile)
     internal fun createGroupChatSession() = engine.createGroupChatSession()
+    internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean =
+        engine.createGroupChatSession(entries)
     internal fun createSingleChatSession() = engine.createSingleChatSession()
     internal fun switchChatMode(mode: LocalChatMode) = engine.switchChatMode(mode)
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean =
