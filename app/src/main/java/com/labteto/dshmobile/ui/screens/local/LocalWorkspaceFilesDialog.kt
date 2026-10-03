@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,14 +68,32 @@ internal fun LocalWorkspaceFilesDialog(
     var workspace by remember(mode, sessionId) { mutableStateOf(emptyList<LocalWorkspaceFile>()) }
     var conversation by remember(mode, sessionId) { mutableStateOf(LocalConversationFiles()) }
     var preview by remember(mode, sessionId) { mutableStateOf<LocalWorkspaceFilePreview?>(null) }
+    var previewPath by rememberSaveable(mode, sessionId) { mutableStateOf<String?>(null) }
     var previewLoading by remember(mode, sessionId) { mutableStateOf(false) }
-    var directory by remember(mode, sessionId) { mutableStateOf("") }
-    var section by remember(mode, sessionId) {
+    var directory by rememberSaveable(mode, sessionId) { mutableStateOf("") }
+    var section by rememberSaveable(mode, sessionId) {
         mutableStateOf(if (mode == LocalFilesMode.WORKSPACE) 0 else 1)
     }
     val scope = rememberCoroutineScope()
     val readFilesFailed = stringResource(R.string.local_files_read_failed)
     val previewFailed = stringResource(R.string.local_files_preview_failed)
+
+    suspend fun openPreview(path: String) {
+        previewLoading = true
+        error = null
+        try {
+            preview = loadPreview(path)
+            previewPath = path
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            error = failure.message ?: previewFailed
+            preview = null
+            previewPath = null
+        } finally {
+            previewLoading = false
+        }
+    }
 
     suspend fun reload() {
         loading = true
@@ -88,10 +107,15 @@ internal fun LocalWorkspaceFilesDialog(
                 }
                 LocalFilesMode.CONVERSATION -> conversation = loadConversation(sessionId)
             }
+            previewPath?.let { path ->
+                preview = loadPreview(path)
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            error = failure.message ?: readFilesFailed
+            error = failure.message ?: if (previewPath == null) readFilesFailed else previewFailed
+            preview = null
+            previewPath = null
         } finally {
             loading = false
         }
@@ -101,7 +125,11 @@ internal fun LocalWorkspaceFilesDialog(
 
     fun navigateBack() {
         when {
-            preview != null -> preview = null
+            preview != null || previewPath != null -> {
+                preview = null
+                previewPath = null
+                error = null
+            }
             mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty() ->
                 directory = directory.substringBeforeLast('/', "")
             else -> onDismiss()
@@ -189,18 +217,8 @@ internal fun LocalWorkspaceFilesDialog(
                         }
                         if (files == null) {
                             LocalFileList(workspace, directory, onDirectory = { directory = it }) { file ->
-                                previewLoading = true
-                                error = null
-                                try {
-                                    preview = loadPreview(file.path)
-                                } catch (cancelled: CancellationException) {
-                                    throw cancelled
-                                } catch (failure: Exception) {
-                                    error = failure.message ?: previewFailed
-                                    preview = null
-                                } finally {
-                                    previewLoading = false
-                                }
+                                openPreview(file.path)
+
                             }
                         } else if (files.isEmpty()) {
                             LocalFilesEmpty(
@@ -215,18 +233,8 @@ internal fun LocalWorkspaceFilesDialog(
                             )
                         } else {
                             LocalFlatFileList(files) { file ->
-                                previewLoading = true
-                                error = null
-                                try {
-                                    preview = loadPreview(file.path)
-                                } catch (cancelled: CancellationException) {
-                                    throw cancelled
-                                } catch (failure: Exception) {
-                                    error = failure.message ?: previewFailed
-                                    preview = null
-                                } finally {
-                                    previewLoading = false
-                                }
+                                openPreview(file.path)
+
                             }
                         }
                     }
@@ -235,18 +243,8 @@ internal fun LocalWorkspaceFilesDialog(
                         body = stringResource(R.string.local_empty_conversation_files_body),
                     )
                     else -> ConversationLocalFileList(conversation) { file ->
-                        previewLoading = true
-                        error = null
-                        try {
-                            preview = loadPreview(file.path)
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (failure: Exception) {
-                            error = failure.message ?: previewFailed
-                            preview = null
-                        } finally {
-                            previewLoading = false
-                        }
+                                openPreview(file.path)
+
                     }
                 }
 
