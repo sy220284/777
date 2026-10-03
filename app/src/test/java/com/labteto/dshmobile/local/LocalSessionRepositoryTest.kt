@@ -134,6 +134,40 @@ class LocalSessionRepositoryTest {
         assertTrue(failures.isEmpty())
     }
 
+    @Test fun legacySummarySidecarRebuildsGroupMemberCountFromAuthoritativeSession() = runTest {
+        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        repository.writeNow(
+            LocalHarnessSession(
+                id = "legacy-group",
+                title = "旧群聊",
+                updatedAt = 10L,
+                usageMode = LocalUsageMode.CHAT,
+                groupChat = LocalGroupChatState(
+                    mode = LocalChatMode.GROUP,
+                    members = listOf(
+                        LocalGroupChatMember("a", "persona-a", "甲"),
+                        LocalGroupChatMember("b", "persona-b", "乙"),
+                    ),
+                ),
+            ),
+        )
+
+        val main = java.io.File(temporary.root, "legacy-group.json")
+        val summaryFile = java.io.File(temporary.root, ".summaries/legacy-group.summary")
+        val sourceModifiedAt = main.lastModified()
+        summaryFile.writeText(
+            """{"id":"legacy-group","title":"旧群聊","updatedAt":10,"usageMode":"CHAT","chatMode":"GROUP","blank":true,"sourceModifiedAt":$sourceModifiedAt}""",
+        )
+
+        val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        val summary = reopened.summaries().single { it.id == "legacy-group" }
+
+        assertEquals(2, summary.groupMemberCount)
+        assertTrue(summary.blank)
+        assertTrue(summaryFile.readText().contains("\"version\":2"))
+        assertTrue(summaryFile.readText().contains("\"groupMemberCount\":2"))
+    }
+
     @Test fun staleSummarySidecarRebuildsOnlyFromItsAuthoritativeSession() = runTest {
         val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
         repository.writeNow(LocalHarnessSession(id = "stale", title = "旧标题", updatedAt = 1L))

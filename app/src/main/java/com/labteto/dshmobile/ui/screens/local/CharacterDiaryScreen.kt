@@ -47,6 +47,9 @@ import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsPageEmptyState
+import com.labteto.dshmobile.ui.components.DsPageLoadingState
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.DsSegmentedTabs
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -187,7 +190,8 @@ internal fun CharacterDiaryScreen(
             )
 
             if (subjects.isEmpty()) {
-                CharacterDiaryEmptyState(
+                DsPageEmptyState(
+                    icon = FeatherIcons.BookOpen,
                     title = stringResource(R.string.chat_diary_no_character_title),
                     body = stringResource(R.string.chat_diary_no_character_body),
                     modifier = Modifier.fillMaxSize(),
@@ -229,7 +233,7 @@ internal fun CharacterDiaryScreen(
                         placeholder = { Text(stringResource(R.string.chat_diary_search_hint)) },
                         leadingIcon = {
                             Icon(
-                                Icons.Outlined.Search,
+                                FeatherIcons.Search,
                                 contentDescription = null,
                                 tint = colors.labelTertiary,
                             )
@@ -253,31 +257,25 @@ internal fun CharacterDiaryScreen(
 
                 when {
                     loading -> item(key = "diary-loading") {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(DsSpacing.xxlarge),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp,
-                                color = colors.accent,
-                            )
-                        }
-                    }
-                    loadFailed -> item(key = "diary-load-failed") {
-                        CharacterDiaryEmptyState(
-                            title = stringResource(R.string.chat_diary_load_failed_title),
-                            body = stringResource(R.string.chat_diary_load_failed_body),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.xlarge),
-                        )
-                        DsButton(
-                            text = stringResource(R.string.common_retry),
-                            onClick = { reloadNonce++ },
+                        DsPageLoadingState(
+                            icon = FeatherIcons.BookOpen,
+                            label = stringResource(R.string.chat_diary_loading),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
+                    loadFailed -> item(key = "diary-load-failed") {
+                        DsPageEmptyState(
+                            icon = FeatherIcons.AlertTriangle,
+                            title = stringResource(R.string.chat_diary_load_failed_title),
+                            body = stringResource(R.string.chat_diary_load_failed_body),
+                            actionText = stringResource(R.string.common_retry),
+                            onAction = { reloadNonce++ },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.xlarge),
+                        )
+                    }
                     visibleEntries.isEmpty() -> item(key = "diary-empty") {
-                        CharacterDiaryEmptyState(
+                        DsPageEmptyState(
+                            icon = if (query.isNotBlank()) FeatherIcons.Search else FeatherIcons.BookOpen,
                             title = stringResource(
                                 if (query.isNotBlank()) R.string.chat_diary_no_match_title
                                 else R.string.chat_diary_empty_title,
@@ -373,41 +371,6 @@ private fun CharacterDiaryNarrativeBlock(label: String, text: String) {
             text,
             style = DsType.std14.withReadingWeight(),
             color = colors.labelSecondary,
-        )
-    }
-}
-
-@Composable
-private fun CharacterDiaryEmptyState(
-    title: String,
-    body: String,
-    modifier: Modifier = Modifier,
-) {
-    val colors = DsTheme.colors
-    Column(
-        modifier = modifier.padding(horizontal = DsSpacing.xlarge),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            Icons.Outlined.History,
-            contentDescription = null,
-            tint = colors.labelCaption,
-            modifier = Modifier.size(32.dp),
-        )
-        Text(
-            title,
-            style = DsType.base16Strong.withReadingWeight(),
-            color = colors.labelPrimary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = DsSpacing.medium),
-        )
-        Text(
-            body,
-            style = DsType.small13.withReadingWeight(),
-            color = colors.labelTertiary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = DsSpacing.tiny),
         )
     }
 }

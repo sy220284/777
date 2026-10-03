@@ -34,7 +34,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Chat
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Memory
@@ -89,6 +88,7 @@ import com.labteto.dshmobile.ui.components.DsSegment
 import com.labteto.dshmobile.ui.components.DsSegmented
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ToggleRow
@@ -331,7 +331,7 @@ fun SettingsScreen(
                     onBack = ::navigateBack,
                     backContentDescription = stringResource(R.string.common_back),
                     modifier = Modifier.padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
-                    actionIcon = Icons.Outlined.History.takeIf { page == SettingsDestination.USAGE },
+                    actionIcon = FeatherIcons.Clock.takeIf { page == SettingsDestination.USAGE },
                     actionContentDescription = stringResource(R.string.usage_log_open)
                         .takeIf { page == SettingsDestination.USAGE },
                     onAction = if (page == SettingsDestination.USAGE) {
@@ -361,7 +361,7 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.MODELS },
                             )
                             DsCategoryRow(
-                                icon = Icons.Outlined.History,
+                                icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.settings_page_model_usage),
                                 subtitle = stringResource(R.string.settings_model_usage_subtitle),
                                 iconFamily = DsIconFamily.Amber,
@@ -457,7 +457,7 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.SESSION -> {
-                        SettingsCard(stringResource(R.string.chatlist_title), Icons.Outlined.History) {
+                        SettingsCard(stringResource(R.string.chatlist_title), FeatherIcons.Clock) {
                             ToggleRow(
                                 stringResource(R.string.chatlist_sort_updated),
                                 sessionSort == "updated",
@@ -657,7 +657,7 @@ fun SettingsScreen(
                                 onClick = { page = SettingsDestination.PRICING },
                             )
                             DsCategoryRow(
-                                icon = Icons.Outlined.History,
+                                icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.usage_calculation_title),
                                 subtitle = stringResource(R.string.usage_calculation_subtitle),
                                 iconFamily = DsIconFamily.Cyan,

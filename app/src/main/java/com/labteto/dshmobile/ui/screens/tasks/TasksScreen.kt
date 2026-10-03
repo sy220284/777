@@ -19,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -62,6 +61,7 @@ import com.labteto.dshmobile.ui.components.DsTimelineItem
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.EmptyHero
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -200,7 +200,7 @@ fun TasksScreen(
                 backContentDescription = stringResource(R.string.common_back),
                 actionIcon = if (
                     showCreate || (chatMode && !canCreateChatInteraction)
-                ) null else Icons.Filled.Add,
+                ) null else FeatherIcons.Plus,
                 actionContentDescription = stringResource(
                     if (chatMode) R.string.tasks_chat_new else R.string.tasks_new,
                 ),

@@ -16,8 +16,8 @@ import androidx.compose.ui.unit.IntSize
  * everything expanding, swapping, or settling shares one feel — and so a timing can be retuned in
  * one place rather than hunted across twenty call sites.
  *
- * The house rule: motion explains a change, it does not decorate one. Nothing loops forever except
- * a loading skeleton, and only while something is genuinely loading.
+ * The house rule: motion explains a change, it does not decorate one. Continuous motion is reserved
+ * for genuine loading or a genuinely live running state; completed and failed states settle immediately.
  */
 object DsAnimations {
     /** Quick and settled — direct manipulation should feel tactile without visible rebound. */
@@ -82,6 +82,15 @@ object DsAnimations {
 
     /** Panel slide-in, faster than the platform default so it keeps up with a drag. */
     val panelSlide: FiniteAnimationSpec<IntOffset> = tween(200, easing = FastOutSlowInEasing)
+
+    /** Full-page hierarchy transition. Short enough to preserve direct manipulation on a phone. */
+    val pageSlide: FiniteAnimationSpec<IntOffset> = tween(210, easing = FastOutSlowInEasing)
+
+    /** Page opacity settles slightly before geometry so navigation never feels floaty. */
+    val pageFade: FiniteAnimationSpec<Float> = tween(140, easing = FastOutSlowInEasing)
+
+    /** One half of the restrained breathing loop used only by live loading/running semantics. */
+    val semanticPulse = tween<Float>(900, easing = FastOutSlowInEasing)
 
     /** Scale animation duration for press effects */
     const val scaleDuration = 100

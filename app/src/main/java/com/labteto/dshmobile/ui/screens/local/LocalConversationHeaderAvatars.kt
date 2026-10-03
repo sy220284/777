@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -17,14 +16,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.local.LocalGroupChatMember
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -32,7 +29,7 @@ import kotlinx.coroutines.withContext
 internal fun GroupChatMemberAvatar(member: LocalGroupChatMember, active: Boolean) {
     val colors = DsTheme.colors
     val portrait by produceState<ImageBitmap?>(null, member.portraitPath) {
-        value = withContext(Dispatchers.IO) { decodeLocalPersonaHeaderPortrait(member.portraitPath) }
+        value = withContext(Dispatchers.IO) { decodePersonaPortraitBitmap(member.portraitPath, maxEdgePx = 256) }
     }
     Surface(
         modifier = Modifier.size(24.dp),
@@ -65,7 +62,7 @@ internal fun GroupChatMemberAvatar(member: LocalGroupChatMember, active: Boolean
 internal fun LocalPersonaHeaderAvatar(name: String, portraitPath: String) {
     val colors = DsTheme.colors
     val portrait by produceState<ImageBitmap?>(null, portraitPath) {
-        value = withContext(Dispatchers.IO) { decodeLocalPersonaHeaderPortrait(portraitPath) }
+        value = withContext(Dispatchers.IO) { decodePersonaPortraitBitmap(portraitPath, maxEdgePx = 256) }
     }
     Surface(
         modifier = Modifier.size(34.dp),
@@ -93,18 +90,3 @@ internal fun LocalPersonaHeaderAvatar(name: String, portraitPath: String) {
     }
 }
 
-private fun decodeLocalPersonaHeaderPortrait(path: String): ImageBitmap? {
-    if (path.isBlank()) return null
-    val file = File(path)
-    if (!file.isFile) return null
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeFile(file.absolutePath, bounds)
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-    var sample = 1
-    val longest = maxOf(bounds.outWidth, bounds.outHeight)
-    while (longest / sample > 256) sample *= 2
-    return BitmapFactory.decodeFile(
-        file.absolutePath,
-        BitmapFactory.Options().apply { inSampleSize = sample },
-    )?.asImageBitmap()
-}

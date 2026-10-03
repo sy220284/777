@@ -49,6 +49,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -80,6 +81,7 @@ import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -202,15 +204,15 @@ internal fun PersonaGalleryScreen(
                 .toSet(),
         )
     }
-    var selectedId by remember { mutableStateOf<String?>(null) }
+    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val selected = entries.firstOrNull { it.id == selectedId }
-    var selectedStoryId by remember(selectedId) { mutableStateOf<String?>(null) }
+    var selectedStoryId by rememberSaveable(selectedId) { mutableStateOf<String?>(null) }
     val selectedStory = selected?.stories?.firstOrNull { it.id == selectedStoryId }
-    var search by remember { mutableStateOf("") }
-    var notes by remember(selectedId, selectedStoryId, selectedStory?.notes) {
+    var search by rememberSaveable { mutableStateOf("") }
+    var notes by rememberSaveable(selectedId, selectedStoryId, selectedStory?.notes) {
         mutableStateOf(selectedStory?.notes.orEmpty())
     }
-    var storyTitle by remember(selectedId, selectedStoryId, selectedStory?.title) {
+    var storyTitle by rememberSaveable(selectedId, selectedStoryId, selectedStory?.title) {
         mutableStateOf(selectedStory?.title.orEmpty())
     }
     var busy by remember { mutableStateOf(false) }
@@ -218,15 +220,15 @@ internal fun PersonaGalleryScreen(
     var deletingStory by remember(selectedStoryId) { mutableStateOf(false) }
     var pendingEntryDeleteId by remember { mutableStateOf<String?>(null) }
     var pendingPresetDeleteId by remember { mutableStateOf<String?>(null) }
-    var visibleHistory by remember(selectedId, selectedStoryId) { mutableStateOf(8) }
-    var showHistory by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var visibleHistory by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(8) }
+    var showHistory by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
     var pendingHistoryDeleteKey by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var notice by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var inspection by remember(selectedId, selectedStoryId) { mutableStateOf<PersonaInspectionResult?>(null) }
     var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
-    var showPersonaDetails by remember(selectedId) { mutableStateOf(false) }
-    var editingStoryTitle by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var showPersonaDetails by rememberSaveable(selectedId) { mutableStateOf(false) }
+    var editingStoryTitle by rememberSaveable(selectedId, selectedStoryId) { mutableStateOf(false) }
     var pendingExportDocument by remember { mutableStateOf<PersonaTransferDocument?>(null) }
     var showExportFormatDialog by remember { mutableStateOf(false) }
     var portraitTargetId by remember { mutableStateOf<String?>(null) }
@@ -427,150 +429,60 @@ internal fun PersonaGalleryScreen(
                 .fillMaxSize()
                 .safeDrawingPadding(),
         ) {
-            PersonaGalleryTopBar(
+            DsTopBar(
                 title = if (selected == null) stringResource(R.string.persona_gallery_title) else selected.persona.name,
                 onBack = ::navigateBack,
+                backContentDescription = stringResource(R.string.common_back),
+                modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-            ) {
-                if (selected == null) {
-            GalleryOverviewHeader(
-                characterCount = entries.size,
-                storyCount = entries.sumOf { it.stories.size },
-                dialogueCount = entries.sumOf { it.totalDialogueCount() },
-            )
-            DsButton(
-                text = stringResource(R.string.local_persona_picker_new),
-                onClick = onCreate,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !busy,
-            )
-
-            val installedPresetIds = entries
-                .map { it.persona.presetId }
-                .filter(String::isNotBlank)
-                .toSet()
-            val visiblePresets = presets.filter { preset ->
-                preset.id !in installedPresetIds && preset.id !in hiddenPresetIds
-            }
-            if (visiblePresets.isNotEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        stringResource(R.string.persona_gallery_presets_title),
-                        style = DsType.std14Strong.withReadingWeight(),
-                        color = DsTheme.colors.labelPrimary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    GalleryPill(visiblePresets.size.toString())
-                }
-                Text(
-                    stringResource(R.string.persona_gallery_presets_hint),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = DsTheme.colors.labelTertiary,
-                )
-                Text(
-                    stringResource(R.string.persona_gallery_preset_long_press_delete_hint),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = DsTheme.colors.labelTertiary,
-                )
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                ) {
-                    visiblePresets.chunked(2).forEach { rowPresets ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                        ) {
-                            rowPresets.forEach { preset ->
-                                PersonaPresetCard(
-                                    preset = preset,
-                                    busy = busy,
-                                    modifier = Modifier.weight(1f),
-                                    onInstall = {
-                                        busy = true
-                                        error = null
-                                        notice = null
-                                        scope.launch {
-                                            onInstallPreset(preset.id)
-                                                .onSuccess { entry ->
-                                                    notice = presetInstalledText
-                                                    selectedId = entry.id
-                                                    selectedStoryId = null
-                                                }
-                                                .onFailure { error = it.message ?: presetInstallFailedText }
-                                            busy = false
-                                        }
-                                    },
-                                    onLongClick = {
-                                        pendingPresetDeleteId = preset.id
-                                        error = null
-                                    },
-                                )
-                            }
-                            if (rowPresets.size == 1) Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-
-            DsButton(
-                text = stringResource(R.string.persona_gallery_import_file),
-                onClick = {
-                    importDocument.launch(
-                        arrayOf(
-                            "application/json",
-                            "text/plain",
-                            "text/markdown",
-                            PERSONA_WORD_MIME,
-                        ),
-                    )
-                },
-                variant = DsButtonVariant.Outline,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !busy,
-            )
-            Text(
-                stringResource(R.string.persona_gallery_long_press_delete_hint),
-                style = DsType.caption11.withReadingWeight(),
-                color = DsTheme.colors.labelTertiary,
-            )
-
-            entries.firstOrNull { it.id == pendingEntryDeleteId }?.let { pending ->
-                DeleteCharacterConfirm(
-                    entry = pending,
+            if (selected == null) {
+                PersonaGalleryOverviewV3(
+                    entries = entries,
+                    presets = presets,
+                    hiddenPresetIds = hiddenPresetIds,
+                    currentPersona = currentPersona,
+                    currentGalleryId = currentGalleryId,
+                    currentHasUnsavedChanges = currentHasUnsavedChanges,
+                    canSave = canSave,
                     busy = busy,
-                    onCancel = { pendingEntryDeleteId = null },
-                    onConfirm = {
+                    errorMessage = error,
+                    onSelectEntry = { id ->
+                        selectedId = id
+                        selectedStoryId = null
+                        error = null
+                        notice = null
+                    },
+                    onCreate = onCreate,
+                    onImport = {
+                        importDocument.launch(
+                            arrayOf(
+                                "application/json",
+                                "text/plain",
+                                "text/markdown",
+                                PERSONA_WORD_MIME,
+                            ),
+                        )
+                    },
+                    onInstallPreset = { presetId ->
                         busy = true
                         error = null
+                        notice = null
                         scope.launch {
-                            onDelete(pending.id)
-                                .onSuccess { pendingEntryDeleteId = null }
-                                .onFailure { error = it.message ?: deleteFailedText }
+                            onInstallPreset(presetId)
+                                .onSuccess { entry ->
+                                    notice = presetInstalledText
+                                    selectedId = entry.id
+                                    selectedStoryId = null
+                                }
+                                .onFailure { error = it.message ?: presetInstallFailedText }
                             busy = false
                         }
                     },
-                )
-            }
-
-            if (currentGalleryId == null || currentHasUnsavedChanges) {
-                DsButton(
-                    text = if (currentGalleryId == null) {
-                        stringResource(R.string.persona_gallery_sync_current, currentPersona.name)
-                    } else {
-                        stringResource(R.string.persona_gallery_update_current, currentPersona.name)
+                    onRequestHidePreset = { presetId ->
+                        pendingPresetDeleteId = presetId
+                        error = null
                     },
-                    onClick = {
+                    onSyncCurrent = {
                         busy = true
                         error = null
                         scope.launch {
@@ -584,150 +496,50 @@ internal fun PersonaGalleryScreen(
                             busy = false
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = canSave && !busy,
-                    variant = DsButtonVariant.Outline,
-                )
-            } else {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = DsTheme.colors.characterAccentTertiary,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        stringResource(R.string.persona_gallery_current_synced),
-                        style = DsType.small13.withReadingWeight(),
-                        color = DsTheme.colors.labelSecondary,
-                        modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.persona_gallery_my_characters),
-                    style = DsType.std14Strong.withReadingWeight(),
-                    color = DsTheme.colors.labelPrimary,
+                    onDeleteSelected = { ids ->
+                        var firstFailure: Throwable? = null
+                        ids.forEach { id ->
+                            onDelete(id).exceptionOrNull()?.let { failure ->
+                                if (firstFailure == null) firstFailure = failure
+                            }
+                        }
+                        firstFailure?.let { Result.failure(it) } ?: Result.success(Unit)
+                    },
                     modifier = Modifier.weight(1f),
                 )
-                GalleryPill(entries.size.toString())
-            }
-
-            OutlinedTextField(
-                value = search,
-                onValueChange = { search = it },
-                label = { Text(stringResource(R.string.persona_gallery_search)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            val query = search.trim()
-            val filtered = entries.filter { entry ->
-                query.isBlank() ||
-                    entry.persona.name.contains(query, ignoreCase = true) ||
-                    entry.persona.identity.contains(query, ignoreCase = true) ||
-                    entry.persona.worldSetting.contains(query, ignoreCase = true) ||
-                    entry.stories.any { story ->
-                        story.title.contains(query, ignoreCase = true) ||
-                            story.notes.contains(query, ignoreCase = true)
-                    }
-            }
-            if (filtered.isEmpty()) {
-                DsCard {
-                    Text(
-                        if (entries.isEmpty()) stringResource(R.string.persona_gallery_empty)
-                        else stringResource(R.string.persona_gallery_no_match),
-                        style = DsType.small13.withReadingWeight(),
-                        color = DsTheme.colors.labelSecondary,
-                    )
-                }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 720.dp),
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
                 ) {
-                    items(filtered.chunked(2), key = { row -> row.joinToString("|") { it.id } }) { rowEntries ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-                        ) {
-                            rowEntries.forEach { entry ->
-                                GalleryPersonaCard(
-                                    entry = entry,
-                                    unsaved = entry.id == currentGalleryId && currentHasUnsavedChanges,
-                                    modifier = Modifier.weight(1f),
-                                    onChoosePortrait = {
-                                        portraitTargetId = entry.id
-                                        portraitPicker.launch(arrayOf("image/*"))
-                                    },
-                                    onClick = {
-                                        selectedId = entry.id
-                                        selectedStoryId = null
-                                        error = null
-                                        notice = null
-                                    },
-                                    onLongClick = {
-                                        pendingEntryDeleteId = entry.id
-                                        error = null
-                                    },
-                                )
-                            }
-                            if (rowEntries.size == 1) Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-        } else {
-            val totalDialogue = selected.totalDialogueCount()
+                    val totalDialogue = selected.totalDialogueCount()
             val relationSummary = stringResource(
                 R.string.persona_gallery_character_summary,
                 selected.stories.size,
                 totalDialogue,
             )
-            SpatialPortraitStandee(
+            PersonaGalleryDetailHeaderV3(
                 entry = selected,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(320.dp),
+                relationSummary = relationSummary,
+                busy = busy,
+                onChoosePortrait = {
+                    portraitTargetId = selected.id
+                    portraitPicker.launch(arrayOf("image/*"))
+                },
+                onRemovePortrait = {
+                    busy = true
+                    error = null
+                    scope.launch {
+                        onRemovePortrait(selected.id)
+                            .onFailure { error = it.message ?: portraitSaveFailedText }
+                        busy = false
+                    }
+                },
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-            ) {
-                DsButton(
-                    text = stringResource(
-                        if (selected.portraitPath.isBlank()) R.string.persona_gallery_portrait_add
-                        else R.string.persona_gallery_portrait_replace,
-                    ),
-                    onClick = {
-                        portraitTargetId = selected.id
-                        portraitPicker.launch(arrayOf("image/*"))
-                    },
-                    variant = DsButtonVariant.Outline,
-                    modifier = Modifier.weight(1f),
-                    enabled = !busy,
-                )
-                if (selected.portraitPath.isNotBlank()) {
-                    DsButton(
-                        text = stringResource(R.string.persona_gallery_portrait_remove),
-                        onClick = {
-                            busy = true
-                            error = null
-                            scope.launch {
-                                onRemovePortrait(selected.id)
-                                    .onFailure { error = it.message ?: portraitSaveFailedText }
-                                busy = false
-                            }
-                        },
-                        variant = DsButtonVariant.Ghost,
-                        modifier = Modifier.weight(1f),
-                        enabled = !busy,
-                    )
-                }
-            }
-            PersonaHero(persona = selected.persona, subtitle = relationSummary)
             selectedStory?.let { story ->
                 PersonaRelationshipStatusCard(story)
                 Row(
@@ -769,30 +581,6 @@ internal fun PersonaGalleryScreen(
                     )
                 }
             }
-
-            DsButton(
-                text = stringResource(
-                    if (showPersonaDetails) R.string.persona_gallery_hide_fixed_persona
-                    else R.string.persona_gallery_show_fixed_persona,
-                ),
-                onClick = { showPersonaDetails = !showPersonaDetails },
-                variant = DsButtonVariant.Ghost,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (showPersonaDetails) {
-                PersonaDetails(selected.persona)
-            }
-
-            DsButton(
-                text = stringResource(R.string.persona_gallery_export_file),
-                onClick = {
-                    error = null
-                    showExportFormatDialog = true
-                },
-                variant = DsButtonVariant.Ghost,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !busy,
-            )
 
             Text(
                 stringResource(R.string.persona_gallery_storylines_title),
@@ -1083,33 +871,57 @@ internal fun PersonaGalleryScreen(
                 }
             }
 
-            if (deletingCharacter) {
-                DeleteCharacterConfirm(
-                    entry = selected,
-                    busy = busy,
-                    onCancel = { deletingCharacter = false },
-                    onConfirm = {
-                        busy = true
-                        scope.launch {
-                            onDelete(selected.id)
-                                .onSuccess {
-                                    selectedId = null
-                                    selectedStoryId = null
-                                    deletingCharacter = false
-                                }
-                                .onFailure { error = it.message ?: deleteFailedText }
-                            busy = false
-                        }
-                    },
-                )
-            } else {
+            DsButton(
+                text = stringResource(
+                    if (showPersonaDetails) R.string.persona_gallery_detail_less
+                    else R.string.persona_gallery_detail_more,
+                ),
+                onClick = { showPersonaDetails = !showPersonaDetails },
+                variant = DsButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (showPersonaDetails) {
+                PersonaDetails(selected.persona)
                 DsButton(
-                    text = stringResource(R.string.persona_gallery_delete),
-                    onClick = { deletingCharacter = true },
+                    text = stringResource(R.string.persona_gallery_export_file),
+                    onClick = {
+                        error = null
+                        showExportFormatDialog = true
+                    },
                     variant = DsButtonVariant.Ghost,
-                    enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy,
                 )
+            if (deletingCharacter) {
+                    DeleteCharacterConfirm(
+                        entry = selected,
+                        busy = busy,
+                        onCancel = { deletingCharacter = false },
+                        onConfirm = {
+                            busy = true
+                            scope.launch {
+                                onDelete(selected.id)
+                                    .onSuccess {
+                                        selectedId = null
+                                        selectedStoryId = null
+                                        deletingCharacter = false
+                                    }
+                                    .onFailure { error = it.message ?: deleteFailedText }
+                                busy = false
+                            }
+                        },
+                    )
+                } else {
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_delete),
+                        onClick = { deletingCharacter = true },
+                        variant = DsButtonVariant.Ghost,
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+
             }
 
             DsButton(

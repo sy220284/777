@@ -341,6 +341,9 @@ internal class LocalSessionRepository(
                         ?: LocalChatMode.SINGLE.name,
                 )
             }.getOrDefault(LocalChatMode.SINGLE),
+            groupMemberCount = ((payload["groupChat"] as? JsonObject)?.get("members") as? JsonArray)
+                ?.size
+                ?: 0,
             personaId = payload["personaId"]?.jsonPrimitive?.contentOrNull,
             galleryId = payload["galleryId"]?.jsonPrimitive?.contentOrNull,
             blank = when {
@@ -394,6 +397,7 @@ internal class LocalSessionRepository(
         updatedAt = updatedAt,
         usageMode = usageMode,
         chatMode = groupChat.mode,
+        groupMemberCount = groupChat.members.size,
         personaId = personaId,
         galleryId = galleryId,
         blank = transcriptIndex.totalMessageCount == 0L &&

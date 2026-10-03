@@ -20,7 +20,7 @@
 | [VALIDATION.md](VALIDATION.md) | CI、差分验证、Android 16 / 17、架构与性能门禁 |
 | [UI-UX.zh-CN.md](UI-UX.zh-CN.md) | 当前聊天 / 工作模式、人物调节、Token 页面与交互规范 |
 | [UI-ARTIFACTS.md](UI-ARTIFACTS.md) | 当前效果图清单与截图归档规则 |
-| [design/navigation-and-pages-v2.md](design/navigation-and-pages-v2.md) | 当前导航、侧边栏与主要功能子页面设计稿及交互承载规范 |
+| [design/mobile-ui.md](design/mobile-ui.md) | 当前手机侧边栏、人物图集与主要子页面设计稿及交互承载规范 |
 
 ## 其他入口
 

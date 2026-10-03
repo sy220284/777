@@ -58,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalModelProfile
@@ -89,7 +91,6 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.isUnboundChatPersona
-import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
@@ -110,6 +111,7 @@ import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.screens.main.RenameDialog
+import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -150,9 +152,8 @@ fun LocalHarnessScreen(
     requestedSessionId: String? = null,
     onSessionRequestConsumed: () -> Unit = {},
     onOpenRemote: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenTasks: () -> Unit,
-    onOpenTools: () -> Unit,
+    onCheckUpdate: () -> Unit = {},
+    updateStatus: String? = null,
     viewModel: LocalHarnessViewModel = hiltViewModel(),
 ) {
     val shell by viewModel.shellState.collectAsStateWithLifecycle()
@@ -169,14 +170,32 @@ fun LocalHarnessScreen(
     val drawerKeyboard = LocalSoftwareKeyboardController.current
     val modeIntroPreferences = remember(context) { context.getSharedPreferences("local_mode_intro", android.content.Context.MODE_PRIVATE) }
     var showNewSessionMode by rememberSaveable { mutableStateOf(false) }
-    var filesMode by remember { mutableStateOf<LocalFilesMode?>(null) }
-    var showPersonaGallery by rememberSaveable { mutableStateOf(false) }
-    var showDiary by rememberSaveable { mutableStateOf(false) }
+    var featureStack by rememberSaveable { mutableStateOf(localFeatureHome()) }
+    var filesMode by rememberSaveable { mutableStateOf(LocalFilesMode.WORKSPACE) }
+    var settingsDestination by rememberSaveable { mutableStateOf(SettingsDestination.ROOT) }
+    var taskMode by rememberSaveable { mutableStateOf<AutomationMode?>(null) }
+    var showGroupSetup by rememberSaveable { mutableStateOf(false) }
     var showPersonaGallerySavePrompt by rememberSaveable { mutableStateOf(false) }
     var showNewPersona by rememberSaveable { mutableStateOf(false) }
-    var showRunCenter by rememberSaveable { mutableStateOf(false) }
     var modeIntro by remember { mutableStateOf<LocalUsageMode?>(null) }
     var pendingUsageMode by remember { mutableStateOf<LocalUsageMode?>(null) }
+    val featurePage = localFeatureCurrent(featureStack)
+    val featureStateHolder = rememberSaveableStateHolder()
+
+    fun pushFeature(page: LocalFeaturePage) {
+        featureStack = localFeaturePush(featureStack, page)
+    }
+
+    fun popFeature() {
+        featureStack = localFeaturePop(featureStack)
+    }
+
+    fun resetFeatureNavigation() {
+        LocalFeaturePage.entries
+            .filterNot { it == LocalFeaturePage.HOME }
+            .forEach { featureStateHolder.removeState(it.name) }
+        featureStack = localFeatureHome()
+    }
 
     LaunchedEffect(modeIntro) { if (modeIntro != null) { delay(6_000); modeIntro = null } }
 
@@ -225,13 +244,18 @@ fun LocalHarnessScreen(
     LaunchedEffect(requestedSessionId, shell.sessions) {
         val target = requestedSessionId?.takeIf(String::isNotBlank) ?: return@LaunchedEffect
         if (target == shell.sessionId || shell.sessions.any { it.id == target }) {
+            resetFeatureNavigation()
             if (target != shell.sessionId) viewModel.switchSession(target)
             onSessionRequestConsumed()
         }
     }
 
-    BackHandler(enabled = drawerState.isOpen) {
-        scope.launch { drawerState.close() }
+    BackHandler(enabled = drawerState.isOpen || featurePage != LocalFeaturePage.HOME) {
+        if (drawerState.isOpen) {
+            scope.launch { drawerState.close() }
+        } else {
+            popFeature()
+        }
     }
 
     ModalNavigationDrawer(
@@ -255,141 +279,106 @@ fun LocalHarnessScreen(
                     ?: stringResource(R.string.local_model_setup),
                 groupChatEnabled = shell.groupChat.enabled,
                 running = shell.running,
-                onUsageModeChange = { showDiary = false; switchUsageMode(it) },
+                onUsageModeChange = {
+                    resetFeatureNavigation()
+                    switchUsageMode(it)
+                },
                 onNewSession = {
                     scope.launch { drawerState.close() }
                     showNewSessionMode = true
                 },
                 onRemote = {
                     scope.launch { drawerState.close() }
+                    resetFeatureNavigation()
                     onOpenRemote()
                 },
                 onSwitchSession = { sessionId ->
+                    resetFeatureNavigation()
                     viewModel.switchSession(sessionId)
                     scope.launch { drawerState.close() }
                 },
                 onDeleteSessions = { ids -> scope.launch { viewModel.deleteSessions(ids) } },
                 onWorkspaceFiles = {
                     filesMode = LocalFilesMode.WORKSPACE
+                    pushFeature(LocalFeaturePage.WORKSPACE)
                     scope.launch { drawerState.close() }
                 },
                 onOpenRunCenter = {
+                    pushFeature(LocalFeaturePage.RUN_CENTER)
                     scope.launch { drawerState.close() }
-                    showRunCenter = true
                 },
                 groupMemberCount = shell.groupChat.members.size,
                 onOpenGroupChat = {
                     scope.launch { drawerState.close() }
-                    viewModel.openGroupChatMode()
+                    val establishedSessionId = establishedGroupChatSessionId(shell.sessions)
+                    if (establishedSessionId != null) {
+                        resetFeatureNavigation()
+                        viewModel.switchSession(establishedSessionId)
+                    } else {
+                        showGroupSetup = true
+                    }
                 },
                 onOpenPersonaGallery = {
                     scope.launch { drawerState.close() }
                     if (viewModel.hasUnsavedCurrentPersona()) {
                         showPersonaGallerySavePrompt = true
                     } else {
-                        showPersonaGallery = true
+                        pushFeature(LocalFeaturePage.PERSONA_GALLERY)
                     }
                 },
-                onOpenDiary = { showDiary = true; scope.launch { drawerState.close() } },
-                onTasks = {
+                onOpenDiary = {
+                    pushFeature(LocalFeaturePage.DIARY)
                     scope.launch { drawerState.close() }
-                    onOpenTasks()
+                },
+                onTasks = {
+                    taskMode = null
+                    pushFeature(LocalFeaturePage.TASKS)
+                    scope.launch { drawerState.close() }
                 },
                 onTools = {
+                    pushFeature(LocalFeaturePage.TOOLS)
                     scope.launch { drawerState.close() }
-                    onOpenTools()
                 },
                 onSettings = {
+                    settingsDestination = SettingsDestination.ROOT
+                    pushFeature(LocalFeaturePage.SETTINGS)
                     scope.launch { drawerState.close() }
-                    onOpenSettings()
                 },
             )
         },
     ) {
         LocalConversationStateContent(viewModel, shell.usageMode) { state ->
-            Box(Modifier.fillMaxSize()) {
-                when {
-                    showDiary && state.usageMode == LocalUsageMode.CHAT -> CharacterDiaryScreen(
+            LocalFeatureAnimatedHost(
+                stack = featureStack,
+                modifier = Modifier.fillMaxSize(),
+            ) { renderedPage ->
+                featureStateHolder.SaveableStateProvider(renderedPage.name) {
+                    LocalFeaturePageContent(
+                        page = renderedPage,
+                        filesMode = filesMode,
+                        settingsDestination = settingsDestination,
+                        taskMode = taskMode,
+                        shell = shell,
+                        state = state,
+                        activeModelProfile = activeModelProfile,
+                        sendFeedback = sendFeedback,
                         gallery = gallery,
-                        currentPersona = state.chatPersona,
-                        currentGalleryId = state.galleryId,
-                        loadEntries = viewModel::diaryEntries,
-                        onDismiss = { showDiary = false },
+                        transcriptHistory = transcriptHistory,
+                        modeIntro = modeIntro,
+                        pinnedSessionIds = pinnedSessionIds,
+                        sessionTitleOverrides = sessionTitleOverrides,
+                        updateStatus = updateStatus,
+                        onCheckUpdate = onCheckUpdate,
+                        viewModel = viewModel,
+                        onFilesModeChange = { filesMode = it },
+                        onSettingsDestinationChange = { settingsDestination = it },
+                        onTaskModeChange = { taskMode = it },
+                        onPushFeature = ::pushFeature,
+                        onPopFeature = ::popFeature,
+                        onResetNavigation = ::resetFeatureNavigation,
+                        onNewPersona = { showNewPersona = true },
+                        onNewSession = { showNewSessionMode = true },
                     )
-                    showPersonaGallery && state.usageMode == LocalUsageMode.CHAT -> PersonaGalleryScreen(
-                    entries = gallery,
-                    presets = viewModel.personaPresets,
-                    currentPersona = state.chatPersona,
-                    currentGalleryId = state.galleryId,
-                    currentGalleryStoryId = state.galleryStoryId,
-                    currentHasUnsavedChanges = viewModel.currentGalleryHasUnsavedChanges(),
-                    currentSessionId = state.sessionId,
-                    canSave = !state.loading && !state.running,
-                    onSaveCurrent = viewModel::saveCurrentToGallery,
-                    onEditNotes = viewModel::editGalleryNotes,
-                    onRenameStory = viewModel::renameGalleryStory,
-                    onInspect = viewModel::inspectGalleryPersona,
-                    onApplySuggestions = viewModel::applyGallerySuggestions,
-                    onDelete = viewModel::deleteGalleryEntry,
-                    onDeleteStory = viewModel::deleteGalleryStory,
-                    onDeleteHistoryMessage = viewModel::deleteGalleryHistoryMessage,
-                    onExport = viewModel::exportGalleryPersona,
-                    onImport = viewModel::importGalleryPersona,
-                    onInstallPreset = viewModel::installPersonaPreset,
-                    onSetPortrait = viewModel::setGalleryPortrait,
-                    onRemovePortrait = viewModel::removeGalleryPortrait,
-                    onStart = { id, storyId, freshStory ->
-                        if (viewModel.startFromGallery(id, storyId, freshStory)) showPersonaGallery = false
-                    },
-                    onCreate = { showNewPersona = true },
-                    onDismiss = { showPersonaGallery = false },
-                )
-                else -> LocalConversationSurface(
-                    state = state,
-                    activeModelProfile = activeModelProfile,
-                    sendFeedback = sendFeedback,
-                    streamingState = viewModel.streamingState,
-                    gallery = gallery,
-                    transcriptHistory = transcriptHistory,
-                    modeIntro = modeIntro,
-                    onConfigure = onOpenSettings,
-                    onSelectModel = viewModel::selectModel,
-                    onSend = viewModel::send,
-                    onEditAndResend = viewModel::editAndResendUserMessage,
-                    onSelectMessageVariant = viewModel::selectChatMessageVariant,
-                    onRegenerate = viewModel::regenerateReply,
-                    onGenerateReplySuggestions = viewModel::generateReplySuggestions,
-                    onLoadOlderTranscript = viewModel::loadOlderTranscript,
-                    onImportAttachment = viewModel::importAttachment,
-                    onStop = viewModel::stop,
-                    onNewSession = { showNewSessionMode = true },
-                    onExitGroupChat = viewModel::leaveGroupChatMode,
-                    onOpenRunCenter = { showRunCenter = true },
-                    sessionTitle = sessionTitleOverrides[state.sessionId]
-                        ?: shell.sessions.firstOrNull { it.id == state.sessionId }?.title
-                        ?: stringResource(R.string.chatlist_new_session),
-                    sessionPinned = state.sessionId in pinnedSessionIds,
-                    onTogglePinSession = { viewModel.toggleSessionPinned(state.sessionId) },
-                    onRenameSession = { title -> viewModel.renameSession(state.sessionId, title) },
-                    onDeleteSession = { scope.launch { viewModel.deleteSessions(setOf(state.sessionId)) } },
-                    onConfigureChatPersona = viewModel::configureChatPersona,
-                    onConfigureGroupMembers = viewModel::configureGroupChatMembers,
-                    onSelectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
-                    onAutoFillChatPersona = viewModel::autoFillChatPersona,
-                    onSaveGroupAnnouncement = viewModel::setGroupChatAnnouncement,
-                    onGenerateGroupAnnouncement = viewModel::generateGroupChatAnnouncement,
-                    onUndoPersonaCorrection = viewModel::undoChatPersonaCorrection,
-                    onPlanModeChange = viewModel::setPlanMode,
-                    onApprove = viewModel::approve,
-                    onDeny = viewModel::deny,
-                    onAutoApprove = viewModel::enableAutoApproval,
-                    onAutoApprovePending = viewModel::enableAutoApprovalForPending,
-                    onApproveDeviceTurn = viewModel::enableDeviceApprovalLease,
-                    onDisableDeviceTurn = viewModel::disableDeviceApprovalLease,
-                    onDisableAutoApprove = viewModel::disableAutoApproval,
-                    onAnswerQuestion = viewModel::answerQuestion,
-                    onCancelQuestion = viewModel::cancelQuestion,
-                )
                 }
             }
         }
@@ -401,10 +390,11 @@ fun LocalHarnessScreen(
                 onDismiss = { showNewSessionMode = false },
                 onNewGroup = {
                     showNewSessionMode = false
-                    viewModel.createGroupChatSession()
+                    showGroupSetup = true
                 },
                 onNewSingle = {
                     showNewSessionMode = false
+                    resetFeatureNavigation()
                     viewModel.createSingleChatSession()
                 },
             )
@@ -414,6 +404,7 @@ fun LocalHarnessScreen(
                 onDismiss = { showNewSessionMode = false },
                 onSelect = { mode ->
                     showNewSessionMode = false
+                    resetFeatureNavigation()
                     viewModel.createSession(mode)
                 },
             )
@@ -430,36 +421,21 @@ fun LocalHarnessScreen(
         )
     }
 
-    filesMode?.let { mode ->
-        LocalWorkspaceFilesDialog(
-            mode = mode,
-            sessionId = shell.sessionId,
-            workspacePath = shell.workspacePath,
-            loadWorkspace = viewModel::workspaceFiles,
-            loadConversation = viewModel::conversationFiles,
-            loadPreview = viewModel::previewWorkspaceFile,
-            onDismiss = { filesMode = null },
+    if (showGroupSetup) {
+        GroupChatMemberPickerSheet(
+            entries = gallery,
+            currentIds = emptyList(),
+            enabled = !shell.loading && !shell.running,
+            onSave = { ids ->
+                val created = viewModel.createGroupChatSession(ids)
+                if (created) {
+                    showGroupSetup = false
+                    resetFeatureNavigation()
+                }
+                created
+            },
+            onDismiss = { showGroupSetup = false },
         )
-    }
-
-    if (showRunCenter && shell.usageMode == LocalUsageMode.WORK) {
-        LocalWorkStateContent(viewModel) { workState ->
-            DsBottomSheet(
-                title = stringResource(R.string.local_run_center),
-                onDismiss = { showRunCenter = false },
-            ) {
-                ExecutionStatusCard(
-                    state = workState,
-                    onJobOutput = viewModel::backgroundJobOutput,
-                    onStopJob = viewModel::stopBackgroundJob,
-                    onOpenResults = {
-                        showRunCenter = false
-                        filesMode = LocalFilesMode.CONVERSATION
-                    },
-                    showHeader = false,
-                )
-            }
-        }
     }
 
     if (showPersonaGallerySavePrompt && shell.usageMode == LocalUsageMode.CHAT) {
@@ -476,7 +452,7 @@ fun LocalHarnessScreen(
             },
             onContinue = {
                 showPersonaGallerySavePrompt = false
-                showPersonaGallery = true
+                pushFeature(LocalFeaturePage.PERSONA_GALLERY)
             },
             onDismiss = { showPersonaGallerySavePrompt = false },
         )

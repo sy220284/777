@@ -50,6 +50,7 @@ import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.components.DsPageLoadingState
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
@@ -294,7 +295,7 @@ fun ToolsScreen(
                     subtitle = stringResource(R.string.tools_subtitle),
                     onBack = onClose,
                     backContentDescription = stringResource(R.string.common_back),
-                    actionIcon = Icons.Outlined.Refresh,
+                    actionIcon = FeatherIcons.RefreshCw,
                     actionContentDescription = stringResource(R.string.tools_refresh),
                     actionEnabled = !state.loading,
                     onAction = viewModel::refresh,
@@ -304,7 +305,18 @@ fun ToolsScreen(
                     ),
                 )
 
-                Column(
+                val initialLoading = state.loading &&
+                    state.localPlugins.isEmpty() &&
+                    state.servers.isEmpty() &&
+                    state.remotePlugins == null &&
+                    !state.githubConfigured
+                if (initialLoading) {
+                    DsPageLoadingState(
+                        icon = FeatherIcons.Tool,
+                        label = stringResource(R.string.tools_loading),
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
+                } else Column(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
@@ -325,7 +337,7 @@ fun ToolsScreen(
                     }
                     DsGroupCard {
                         DsCategoryRow(
-                            icon = Icons.Outlined.Extension,
+                            icon = FeatherIcons.Tool,
                             title = stringResource(R.string.skills_title),
                             subtitle = stringResource(R.string.tools_capability_agent_available),
                             value = capabilityStateLabel("local-builtin" in state.localPlugins),
@@ -347,21 +359,21 @@ fun ToolsScreen(
                             onClick = { onOpenSettings(SettingsDestination.ADVANCED) },
                         )
                         DsCategoryRow(
-                            icon = Icons.Outlined.PhoneAndroid,
+                            icon = FeatherIcons.Device,
                             title = stringResource(R.string.tools_capability_device),
                             subtitle = stringResource(R.string.tools_capability_agent_available),
                             value = capabilityStateLabel("android-device" in state.localPlugins),
                             onClick = { onOpenSettings(SettingsDestination.PERMISSIONS) },
                         )
                         DsCategoryRow(
-                            icon = Icons.Outlined.Image,
+                            icon = FeatherIcons.Image,
                             title = stringResource(R.string.tools_capability_vision),
                             subtitle = stringResource(R.string.tools_capability_agent_available),
                             value = capabilityStateLabel("local-vision" in state.localPlugins),
                             onClick = { onOpenSettings(SettingsDestination.MODELS) },
                         )
                         DsCategoryRow(
-                            icon = Icons.Outlined.Schedule,
+                            icon = FeatherIcons.Clock,
                             title = stringResource(R.string.tools_capability_automation),
                             subtitle = stringResource(R.string.tools_capability_automation_hint),
                             value = capabilityStateLabel(
@@ -379,7 +391,7 @@ fun ToolsScreen(
                     )
                     DsGroupCard {
                         DsCategoryRow(
-                            icon = Icons.Outlined.Link,
+                            icon = FeatherIcons.GitBranch,
                             title = stringResource(R.string.tools_github_connector),
                             subtitle = stringResource(R.string.tools_github_connector_hint),
                             value = stringResource(
@@ -389,7 +401,7 @@ fun ToolsScreen(
                             onClick = { showGitHubConfig = true },
                         )
                         DsCategoryRow(
-                            icon = Icons.Outlined.Link,
+                            icon = FeatherIcons.Globe,
                             title = stringResource(R.string.tools_external_services),
                             subtitle = stringResource(R.string.tools_external_services_hint),
                             value = state.servers.size.toString(),
