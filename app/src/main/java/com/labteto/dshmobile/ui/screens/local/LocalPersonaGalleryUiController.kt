@@ -362,7 +362,7 @@ suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runC
                 else -> galleryStore.updatePortraitPath(saved.id, stagedPortrait.absolutePath)
                     ?: error(appContext.getString(R.string.persona_gallery_entry_missing))
             }
-            _gallery.value = galleryStore.list()
+            _gallery.value = runCatching { galleryStore.list() }.getOrDefault(_gallery.value)
             installed
         } catch (error: Throwable) {
             stagedPortrait?.delete()
