@@ -200,6 +200,7 @@ class LocalWorkRequestContextProjectionTest {
         var rawCumulative = 0L
         var projectedCumulative = 0L
         var projectedPeak = 0
+        var previousPressure: LocalPromptPressure? = null
 
         repeat(100) { step ->
             history += message("user", "第${step}步继续当前任务：" + "需求".repeat(160))
@@ -216,6 +217,7 @@ class LocalWorkRequestContextProjectionTest {
                 tools = JsonArray(emptyList()),
                 compactor = LocalHistoryCompactor(),
                 operationalLimitTokens = 678_464,
+                previousPressure = previousPressure,
                 structuredWorkState = LocalStructuredWorkState(
                     goals = listOf("完成一百步长任务"),
                     constraints = listOf("必须保持执行正确性"),
@@ -225,10 +227,58 @@ class LocalWorkRequestContextProjectionTest {
             rawCumulative += rawTokens
             projectedCumulative += projected.estimatedTokensAfter
             projectedPeak = maxOf(projectedPeak, projected.estimatedTokensAfter)
+            previousPressure = LocalPromptPressureMeter.measure(
+                messages = projected.messages,
+                tools = JsonArray(emptyList()),
+                operationalLimitTokens = 678_464,
+            )
         }
 
         assertTrue(projectedPeak <= 40_000)
         assertTrue(projectedCumulative * 100 < rawCumulative * 70)
+    }
+
+    @Test
+    fun rapidlyGrowingHistoryCanProjectBeforeAbsoluteThirtySixKTrigger() {
+        val history = buildList {
+            add(message("system", "系统规则"))
+            repeat(9) { index ->
+                add(message("user", "阶段-$index-" + "问".repeat(1_200)))
+                add(message("assistant", "阶段-$index-" + "答".repeat(2_500)))
+            }
+            add(message("user", "继续当前阶段"))
+        }
+        val currentPressure = LocalPromptPressureMeter.measure(
+            messages = history,
+            tools = JsonArray(emptyList()),
+            operationalLimitTokens = 678_464,
+        )
+        assertTrue(currentPressure.estimatedInputTokens < 36_000)
+        assertTrue(currentPressure.estimatedInputTokens > 31_000)
+        val previous = currentPressure.copy(
+            estimatedInputTokens = currentPressure.estimatedInputTokens - 3_000,
+            historyTokens = currentPressure.historyTokens - 3_000,
+        )
+
+        val projected = projectWorkRequestContext(
+            messages = history,
+            tools = JsonArray(emptyList()),
+            compactor = LocalHistoryCompactor(),
+            operationalLimitTokens = 678_464,
+            measuredPressure = currentPressure,
+            previousPressure = previous,
+            structuredWorkState = LocalStructuredWorkState(
+                goals = listOf("继续当前阶段"),
+                constraints = listOf("保持执行正确性"),
+            ),
+        )
+
+        assertTrue(projected.projected)
+        assertTrue(projected.estimatedTokensAfter < projected.estimatedTokensBefore)
+        val assessment = requireNotNull(projected.preProjectionAssessment)
+        assertEquals(LocalWorkStepContextStatus.COMPACT, assessment.status)
+        assertTrue("adaptive_history_pressure" in assessment.reasons)
+        assertTrue(assessment.effectiveProjectionTriggerTokens < 36_000)
     }
 
     @Test
