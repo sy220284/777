@@ -497,9 +497,13 @@ internal fun PersonaGalleryScreen(
                         }
                     },
                     onDeleteSelected = { ids ->
-                        runCatching {
-                            ids.forEach { id -> onDelete(id).getOrThrow() }
+                        var firstFailure: Throwable? = null
+                        ids.forEach { id ->
+                            onDelete(id).exceptionOrNull()?.let { failure ->
+                                if (firstFailure == null) firstFailure = failure
+                            }
                         }
+                        firstFailure?.let { Result.failure(it) } ?: Result.success(Unit)
                     },
                     modifier = Modifier.weight(1f),
                 )
