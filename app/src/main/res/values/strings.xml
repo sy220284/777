@@ -3,8 +3,14 @@
     <string name="app_name" translatable="false">神言神语</string>
     <string name="sidebar_avatar_open">设置侧边栏头像</string>
     <string name="sidebar_avatar_title">选择头像</string>
-    <string name="sidebar_avatar_subtitle">使用人物预置或本地图片；动图会保留播放效果</string>
+    <string name="sidebar_avatar_subtitle">使用人物预置或本地图片；本地图可拖动缩放裁剪，动图保留播放效果</string>
     <string name="sidebar_avatar_custom">本地图片</string>
+    <string name="sidebar_avatar_crop_title">裁剪头像</string>
+    <string name="sidebar_avatar_crop_subtitle">调整到你想保留的位置，确认后会按这个取景显示头像。</string>
+    <string name="sidebar_avatar_crop_preview">头像裁剪预览</string>
+    <string name="sidebar_avatar_crop_gesture_hint">拖动调整位置 · 双指缩放，或使用下方滑杆</string>
+    <string name="sidebar_avatar_crop_zoom">缩放</string>
+    <string name="sidebar_avatar_crop_confirm">使用这个头像</string>
     <string name="sidebar_avatar_reset">恢复默认</string>
     <string name="sidebar_avatar_presets">人物预置</string>
     <string name="sidebar_avatar_default_mark">神</string>
