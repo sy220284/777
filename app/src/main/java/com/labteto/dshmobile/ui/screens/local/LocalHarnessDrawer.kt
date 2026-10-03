@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,6 +51,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun LocalModeDrawer(
@@ -71,7 +73,7 @@ internal fun LocalModeDrawer(
     onNewSession: () -> Unit,
     onRemote: () -> Unit,
     onSwitchSession: (String) -> Unit,
-    onDeleteSessions: (Set<String>) -> Unit,
+    onDeleteSessions: suspend (Set<String>) -> Int,
     onWorkspaceFiles: () -> Unit,
     onOpenRunCenter: () -> Unit,
     groupMemberCount: Int,
@@ -97,6 +99,22 @@ internal fun LocalModeDrawer(
     }
 
     val selectedIds = remember { mutableStateListOf<String>() }
+    val deleteScope = rememberCoroutineScope()
+    var deleteInFlight by remember { mutableStateOf(false) }
+    fun requestDelete(ids: Set<String>) {
+        if (deleteInFlight || ids.isEmpty()) return
+        deleteInFlight = true
+        deleteScope.launch {
+            try {
+                if (onDeleteSessions(ids) > 0) {
+                    selectedIds.removeAll(ids)
+                    if (selectedIds.isEmpty()) selectionOpen = false
+                }
+            } finally {
+                deleteInFlight = false
+            }
+        }
+    }
     LaunchedEffect(usageMode) {
         selectionOpen = false
         selectedIds.clear()
@@ -293,7 +311,7 @@ internal fun LocalModeDrawer(
                                 if (session.id !in selectedIds) selectedIds.add(session.id)
                                 selectionOpen = true
                             },
-                            onDelete = { onDeleteSessions(setOf(session.id)) },
+                            onDelete = { requestDelete(setOf(session.id)) },
                         )
                     }
                 }
@@ -327,7 +345,7 @@ internal fun LocalModeDrawer(
                                 if (session.id !in selectedIds) selectedIds.add(session.id)
                                 selectionOpen = true
                             },
-                            onDelete = { onDeleteSessions(setOf(session.id)) },
+                            onDelete = { requestDelete(setOf(session.id)) },
                         )
                     }
                 }
@@ -373,13 +391,8 @@ internal fun LocalModeDrawer(
                             )
                             DsButton(
                                 text = stringResource(R.string.local_delete_session),
-                                onClick = {
-                                    val ids = selectedIds.toSet()
-                                    selectionOpen = false
-                                    selectedIds.clear()
-                                    if (ids.isNotEmpty()) onDeleteSessions(ids)
-                                },
-                                enabled = selectedIds.isNotEmpty(),
+                                onClick = { requestDelete(selectedIds.toSet()) },
+                                enabled = selectedIds.isNotEmpty() && !deleteInFlight,
                                 variant = DsButtonVariant.Danger,
                                 size = DsButtonSize.Small,
                             )
