@@ -366,7 +366,6 @@ object PersonaPresetCatalog {
                 presetId = "love-deepspace-li-shen",
             ),
         ),
-,
         compactPreset(
             id = "love-deepspace-shen-xinghui",
             franchise = "恋与深空",
