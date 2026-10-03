@@ -106,7 +106,7 @@ class SettingsViewModel @Inject constructor(
             hostsStore.settings.collect { _state.value = it }
         }
         refreshAdvancedSettings()
-        viewModelScope.launch { localHarness.refreshChatGpt() }
+        refreshChatGpt()
     }
 
     fun set(transform: (AppSettings) -> AppSettings) {
@@ -273,7 +273,15 @@ class SettingsViewModel @Inject constructor(
         }
     }
     fun refreshChatGpt() {
-        viewModelScope.launch { runCatching { localHarness.refreshChatGpt() } }
+        viewModelScope.launch {
+            try {
+                localHarness.refreshChatGpt()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // 授权协调器会发布刷新失败；后台刷新不能把设置页所在主线程打崩。
+            }
+        }
     }
 
     fun removeLocalModel(id: String) = localHarness.removeModel(id)

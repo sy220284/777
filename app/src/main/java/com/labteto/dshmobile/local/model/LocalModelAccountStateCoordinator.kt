@@ -8,6 +8,10 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
+/** 自动目录刷新只更新可用模型；运行中的显式账户切换仍需等当前冻结路由结束。 */
+internal fun canSyncChatGptModels(isBusy: Boolean, selectFirst: Boolean): Boolean =
+    !isBusy || !selectFirst
+
 /** Projects ChatGPT account model mutations into the aggregate runtime without owning OAuth. */
 internal class LocalModelAccountStateCoordinator(
     private val configuration: LocalModelConfigurationCoordinator,
@@ -20,7 +24,7 @@ internal class LocalModelAccountStateCoordinator(
         models: List<ChatGptModelOption>,
         selectFirst: Boolean,
     ) {
-        require(!isBusy()) { "请先结束当前任务再切换模型账户" }
+        check(canSyncChatGptModels(isBusy(), selectFirst)) { "请先结束当前任务再切换模型账户" }
         val before = state.value
         val beforeActiveProfile = gateway.activeProfile()
         val profiles = configuration.saveChatGptModels(accountId, models)
