@@ -246,6 +246,54 @@ class LocalChatHistoryWindowTest {
         assertFalse(checkpoint.toString().contains("明早九点去城南"))
     }
 
+    @Test
+    fun groupWindowKeepsOlderPublicSpeakerEventsAndRecentDialogue() {
+        val history = buildList {
+            add(message("system", "群聊系统"))
+            repeat(30) { index ->
+                add(message("user", "用户事件$index"))
+                add(message("assistant", "[角色A] 公开回应$index"))
+            }
+        }
+
+        val bounded = boundedGroupChatRequestHistory(
+            history = history,
+            recentMessages = 12,
+            compactionBatch = 4,
+            maxContinuityEvents = 8,
+        )
+        val text = bounded.joinToString("\n") { it.toString() }
+
+        assertTrue(text.contains("<group-chat-continuity>"))
+        assertTrue(text.contains("群聊成员："))
+        assertTrue(text.contains("公开回应"))
+        assertTrue(text.contains("用户事件29"))
+        assertTrue(text.contains("公开回应29"))
+        assertTrue(bounded.size <= 22)
+    }
+
+    @Test
+    fun groupRequestHistoryStaysBoundedAsDurableTranscriptGrows() {
+        fun history(turns: Int) = buildList {
+            add(message("system", "群聊系统"))
+            repeat(turns) { index ->
+                add(message("user", "用户第${index}轮：" + "问".repeat(40)))
+                add(message("assistant", "[角色A] " + "答".repeat(160)))
+                add(message("assistant", "[角色B] " + "应".repeat(160)))
+            }
+        }
+
+        val oneHundred = boundedGroupChatRequestHistory(history(100))
+        val fiveHundred = boundedGroupChatRequestHistory(history(500))
+        val tokens100 = oneHundred.sumOf { estimateModelTokens(it.toString()) }
+        val tokens500 = fiveHundred.sumOf { estimateModelTokens(it.toString()) }
+
+        assertTrue(oneHundred.size <= 46)
+        assertTrue(fiveHundred.size <= 46)
+        assertTrue(tokens500 <= tokens100 + 1_000)
+        assertTrue(fiveHundred.joinToString("\n").contains("用户第499轮"))
+    }
+
     private fun message(role: String, content: String) = buildJsonObject {
         put("role", role)
         put("content", content)

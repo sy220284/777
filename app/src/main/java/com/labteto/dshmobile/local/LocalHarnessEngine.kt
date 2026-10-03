@@ -2928,8 +2928,11 @@ class LocalHarnessEngine @Inject constructor(
         val runSessionId = binding?.sessionId ?: currentSessionId
         val runPolicy = localAgentRunPolicy(runState.value.usageMode)
         clearRunCapabilities(binding)
-        if (runState.value.usageMode == LocalUsageMode.WORK && runCatching { githubCredentials.configured() }.getOrDefault(false))
-            enableRunGitHubCapabilities(binding)
+        if (runState.value.usageMode == LocalUsageMode.WORK) {
+            toolExecutionCoordinator.prepareWorkTurnCapabilities(
+                input, runHistory.snapshot(), githubCredentials::configured, binding?.enabledOptionalTools,
+            )
+        }
         if (runState.value.usageMode == LocalUsageMode.CHAT) {
             // Queued chat turns can start immediately after the previous answer. Stop that
             // answer's background relationship/state refresh before capturing this turn's context.
@@ -3873,11 +3876,6 @@ class LocalHarnessEngine @Inject constructor(
     private fun clearRunCapabilities(binding: LocalWorkRunBinding?) {
         binding?.enabledOptionalTools?.let(toolExecutionCoordinator::clearTurnCapabilities)
             ?: toolExecutionCoordinator.clearTurnCapabilities()
-    }
-
-    private fun enableRunGitHubCapabilities(binding: LocalWorkRunBinding?) {
-        binding?.enabledOptionalTools?.let(toolExecutionCoordinator::enableGitHubConnectorTools)
-            ?: toolExecutionCoordinator.enableGitHubConnectorTools()
     }
 
     private fun searchCapabilities(query: String): String =

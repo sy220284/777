@@ -14,8 +14,39 @@ class LocalToolPolicyTest {
             LocalToolPolicy.approval(name)
             LocalToolPolicy.metadata(name)
             LocalToolPolicy.autoApprovalScope(name)
+            LocalToolPolicy.exposure(name)
         }
         assertTrue(runCatching { LocalToolPolicy.access("new_undeclared_tool") }.isFailure)
+        assertTrue(runCatching { LocalToolPolicy.exposure("new_undeclared_tool") }.isFailure)
+    }
+
+    @Test fun ordinaryExecutionToolsStayCoreWhileNarrowCapabilitiesAreDeferred() {
+        for (name in listOf(
+            "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect",
+            "list_files", "glob", "grep", "bash", "capability_search", "update_plan",
+            "exit_plan_mode", "ask_user_question", "subagent", "session_event_search",
+        )) {
+            assertEquals(name, ToolExposure.CORE, LocalToolPolicy.exposure(name))
+        }
+        for (name in listOf(
+            "web_search", "web_fetch", "http_request", "download_file", "network_diagnose",
+            "job_list", "job_output", "job_kill", "json_query", "environment_info",
+            "todo_write", "create_goal", "get_goal", "update_goal", "skill",
+            "subagent_fork", "list_subagent_models", "list_agents", "send_message",
+            "interrupt_agent", "workflow", "memory_search", "memory_list", "memory_remember",
+            "memory_update", "memory_forget", "session_search", "session_trace",
+            "session_event_trace", "session_event_read", "present",
+        )) {
+            assertEquals(name, ToolExposure.OPTIONAL, LocalToolPolicy.exposure(name))
+        }
+    }
+
+    @Test fun tokenAnalysisDiscoversStructuredEnvironmentInfoInsteadOfRawLogScanning() {
+        val keywords = LocalToolPolicy.metadata("environment_info").discoveryKeywords
+        assertTrue("token" in keywords)
+        assertTrue("token消耗" in keywords)
+        assertEquals(ToolExposure.OPTIONAL, LocalToolPolicy.exposure("environment_info"))
+        assertEquals(ToolAccess.READ_ONLY, LocalToolPolicy.access("environment_info"))
     }
 
     @Test fun aliasesCannotBypassApprovalOrReadOnlyScope() = runTest {

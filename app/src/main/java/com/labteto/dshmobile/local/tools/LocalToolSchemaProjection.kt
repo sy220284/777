@@ -38,17 +38,17 @@ internal class LocalToolSchemaProjection(
         history: List<JsonObject>,
         enabledOptional: Set<String>? = null,
     ): JsonArray {
-        val promptBudget = optionalPromptBudget(state, history)
-        if (enabledOptional == null) {
-            return executionCoordinator.visibleSchemas(
-                policy = policy,
-                maxOptionalDefinitionTokens = promptBudget,
-            )
-        }
         if (!policy.toolsEnabled) return JsonArray(emptyList())
+        val promptBudget = optionalPromptBudget(state, history)
+        val enabled = enabledOptional ?: executionCoordinator.enabledOptionalSnapshot()
+        val tools = registry.names()
+            .mapNotNull(registry::get)
+            .filter { tool ->
+                !state.planMode || LocalToolPolicy.allowedInPlan(tool.name, tool.access)
+            }
         return LocalToolRouter.visibleSchemas(
-            tools = registry.names().mapNotNull(registry::get),
-            enabledOptional = enabledOptional,
+            tools = tools,
+            enabledOptional = enabled,
             maxOptionalDefinitionTokens = promptBudget,
         )
     }

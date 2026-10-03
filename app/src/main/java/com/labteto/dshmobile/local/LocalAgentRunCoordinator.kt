@@ -485,9 +485,9 @@ internal class LocalAgentRunCoordinator(
         log: LocalSessionEventLog,
         checkpointType: String,
         runId: String,
-    ): Boolean {
+    ): Boolean = log.withEvents { events ->
         val startedCalls = linkedSetOf<String>()
-        for (event in log.events()) {
+        for (event in events) {
             if (event.type != checkpointType) continue
             val data = event.data
             if (data["run_id"]?.jsonPrimitive?.contentOrNull != runId) continue
@@ -498,11 +498,11 @@ internal class LocalAgentRunCoordinator(
                 }
                 LocalAgentRunPhase.TOOL_FINISHED.name.lowercase() -> {
                     if (!callId.isNullOrBlank()) startedCalls -= callId
-                    if (data["side_effect"]?.jsonPrimitive?.contentOrNull != "none") return true
+                    if (data["side_effect"]?.jsonPrimitive?.contentOrNull != "none") return@withEvents true
                 }
             }
         }
-        return startedCalls.isNotEmpty()
+        startedCalls.isNotEmpty()
     }
 
     private fun hasDurableFinalAssistant(log: LocalSessionEventLog): Boolean {

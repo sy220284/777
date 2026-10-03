@@ -173,6 +173,7 @@ class LocalSessionRepositoryTest {
         repository.writeNow(LocalHarnessSession(id = "stale", title = "旧标题", updatedAt = 1L))
 
         val store = VersionedSessionStore(temporary.root, Json)
+        val originalGeneration = requireNotNull(store.lastModified("stale"))
         val updated = LocalHarnessSession(
             id = "stale",
             title = "新标题",
@@ -186,6 +187,9 @@ class LocalSessionRepositoryTest {
             updatedAt = updated.updatedAt,
         )
 
+        // This fixture represents a different source generation; rapid writes can share one
+        // filesystem millisecond, so establish the stale-sidecar condition without sleeping.
+        assertTrue(java.io.File(temporary.root, "stale.json").setLastModified(originalGeneration + 1_000L))
         val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
         val summary = reopened.summaries().single { it.id == "stale" }
 

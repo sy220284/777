@@ -40,7 +40,7 @@ class LocalAttachmentMaintenanceTest {
                 },
             )
 
-            val refs = collectLocalImageAttachmentReferences(log.events())
+            val refs = log.withEvents { collectLocalImageAttachmentReferences(it) }
 
             assertEquals(setOf("digest-a"), refs.attachmentIds)
             assertEquals(setOf(".dsh/attachments/digest-a.png"), refs.paths)

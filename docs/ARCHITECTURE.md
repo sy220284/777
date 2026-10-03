@@ -158,9 +158,15 @@ sessionId
 
 Recovery does not blindly replay side effects. A started tool whose result is unknown becomes `TOOL_OUTCOME_UNKNOWN`; one that never started becomes `TOOL_NOT_STARTED`.
 
+Work 请求由 `LocalWorkRequestContextProjection` 生成：完整历史持久保留，模型侧采用可信任务检查点与最近因果链，旧工具输出按 `call_id` 从输出存储恢复。稳态目标 28k、绝对触发 36k；`LocalWorkStepContextAssessment` 只在历史占比和连续增长同时达到阈值时提前投影，不依赖步数、缓存命中或虚构 usage。Chat 与 Work 压力基线分别保存。
+
+持久事件遍历统一使用 `LocalSessionEventLog.withEvents` 的作用域快照；读取期间固定字节边界，遍历提前返回、消费者异常和正常完成均关闭全部文件与解压器，流不能逃逸作用域。
+
 ### Tool and plugin composition
 
 Platform-specific providers are built by `LocalPluginCompositionFactory` / `LocalPluginComposition`, not by the Engine.
+
+`LocalToolPolicy` 统一声明内置工具的暴露策略；常用执行工具常驻，低频工具仍完整注册，通过任务意图预激活或 `capability_search` 按需暴露。`LocalToolExecutionCoordinator` 持有每次 Work 的激活编排，GitHub 只读取当前及有限最近真实用户意图；计划模式在投影前执行原权限过滤。
 
 Built-in plugins are described by `PluginDescriptor` and registered in a `PluginCatalog`. `PluginManager` resolves dependency order and minimum versions before lifecycle mutation, prevents disabling providers with active dependents, and keeps descriptor/catalog state synchronized with the live registry. Runtime replacement uses `PluginRegistry.replace`: registry mutations are staged and published together after admitted tool calls drain (up to 30 seconds). Failed replacements clean up the candidate and reinstall the previous plugin, publishing the newly created resources instead of old closed references. If resource restoration or cleanup fails, tools fail closed until the failed plugin is successfully disabled. UI management resolves the active instance under the lifecycle mutation lock. The Android composition rejects hot replacement or disabling of runtime/device providers that are also retained by long-lived owners; changing these providers requires restarting the runtime.
 
