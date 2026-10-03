@@ -87,6 +87,7 @@ internal fun SidebarAvatarCropper(
                 SidebarAvatarImage(
                     source = previewSource,
                     contentDescription = stringResource(R.string.sidebar_avatar_crop_preview),
+                    decodeEdge = AVATAR_CROPPER_DECODE_EDGE,
                 )
             }
         }
@@ -225,3 +226,5 @@ internal fun calculateSidebarAvatarCustomCrop(
             .coerceIn(minTranslateY, 0f),
     )
 }
+
+private const val AVATAR_CROPPER_DECODE_EDGE = 1024f
