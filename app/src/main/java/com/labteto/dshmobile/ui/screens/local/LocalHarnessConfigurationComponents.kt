@@ -38,6 +38,8 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.labteto.dshmobile.ui.components.DsPageLoadingState
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -46,11 +48,12 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
 internal fun LoadingScreen() {
-    Box(
-        Modifier.fillMaxSize().background(DsTheme.colors.rootSurface()),
-        contentAlignment = Alignment.Center,
-    ) {
-        CircularProgressIndicator(color = DsTheme.colors.brandPrimary)
+    Box(Modifier.fillMaxSize().background(DsTheme.colors.rootSurface())) {
+        DsPageLoadingState(
+            icon = FeatherIcons.Activity,
+            label = stringResource(R.string.local_harness_loading),
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 
