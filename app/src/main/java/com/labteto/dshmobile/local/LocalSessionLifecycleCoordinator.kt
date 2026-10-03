@@ -372,7 +372,7 @@ internal class LocalSessionLifecycleCoordinator(
             it.usageMode == mode &&
                 (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE)
         }
-        if (target != null) {
+        val accepted = if (target != null) {
             switchSession(target.id)
         } else {
             createSession(
@@ -381,6 +381,7 @@ internal class LocalSessionLifecycleCoordinator(
                 chatMode = if (mode == LocalUsageMode.CHAT) LocalChatMode.SINGLE else null,
             )
         }
+        if (!accepted) queuedUsageMode.set(mode)
     }
 
     fun switchSession(sessionId: String): Boolean {
