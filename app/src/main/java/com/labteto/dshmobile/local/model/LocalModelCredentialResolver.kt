@@ -125,6 +125,9 @@ class LocalModelCredentialResolver @Inject constructor(
         }
     }
 
+    suspend fun hasChatGptPlanAuthorization(accountId: String): Boolean =
+        isUsableChatGptPlanBinding(accountId, chatGptAccounts.get(accountId))
+
     private suspend fun chatGptAccount(profile: LocalModelProfile): ChatGptAccountRecord? {
         val accountId = profile.credentialRef?.takeIf(String::isNotBlank) ?: return null
         val account = chatGptAccounts.get(accountId)

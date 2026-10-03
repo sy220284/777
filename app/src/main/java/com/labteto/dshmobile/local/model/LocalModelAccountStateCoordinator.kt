@@ -79,6 +79,8 @@ internal class LocalModelAccountStateCoordinator(
 
     suspend fun retireChatGptAccountProfiles(accountId: String) {
         if (state.value.loading) state.first { !it.loading }
+        // 回放或等待就绪期间可能已经重新授权；旧失效事件不能退休新授权的档案。
+        if (gateway.hasChatGptPlanAuthorization(accountId)) return
         val before = state.value
         val beforeActive = gateway.activeProfile()
         val profiles = configuration.saveChatGptModels(accountId, emptyList())

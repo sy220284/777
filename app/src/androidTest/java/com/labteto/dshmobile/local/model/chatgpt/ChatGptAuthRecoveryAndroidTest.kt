@@ -30,6 +30,40 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ChatGptAuthRecoveryAndroidTest {
     @Test
+    fun replayedInvalidationChecksCurrentAuthorizationWithoutPublishingAgain() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val file = context.cacheDir.resolve("auth-replay-${UUID.randomUUID()}.preferences_pb")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val preferences = PreferenceDataStoreFactory.create(scope = scope, produceFile = { file })
+        val accounts = ChatGptAccountStore(preferences, Json)
+        val events = ChatGptPlanAuthorizationEvents()
+        val resolver = com.labteto.dshmobile.local.model.LocalModelCredentialResolver(
+            com.labteto.dshmobile.local.LocalApiKeyStore(preferences), accounts,
+            ChatGptSessionManager(accounts, OkHttpClient(), Json), events,
+        )
+        val id = ChatGptAccountStore.accountId("oaiapp_replay", "subject")
+        val record = ChatGptAccountRecord(
+            id = id, clientId = "oaiapp_replay", issuer = CHATGPT_ISSUER, subject = "subject",
+            hostId = "host", idToken = "id", accessToken = "access", refreshToken = "refresh",
+            scopes = setOf(CHATGPT_PLAN_SCOPE, CHATGPT_RESOURCE_INVOKE_SCOPE),
+            accessTokenExpiresAtEpochSeconds = Long.MAX_VALUE, savedAtEpochSeconds = 1,
+        )
+        try {
+            accounts.put(record.copy(scopes = emptySet()))
+            events.invalidate(id)
+            assertFalse(resolver.hasChatGptPlanAuthorization(id))
+            accounts.put(record)
+            assertEquals(id, withTimeout(1_000) { events.invalidatedAccounts.first() })
+            assertTrue(resolver.hasChatGptPlanAuthorization(id))
+            assertFalse(resolver.hasChatGptPlanAuthorization("unknown-account"))
+            assertEquals(listOf(id), events.invalidatedAccounts.replayCache)
+        } finally {
+            scope.coroutineContext[Job]!!.cancelAndJoin()
+            file.delete()
+        }
+    }
+
+    @Test
     fun signedInWithoutPlanScopeStaysSavedAndSkipsModelDiscovery() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val file = context.cacheDir.resolve("auth-no-plan-${UUID.randomUUID()}.preferences_pb")

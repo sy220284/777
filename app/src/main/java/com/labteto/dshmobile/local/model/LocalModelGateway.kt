@@ -28,6 +28,9 @@ class LocalModelGateway @Inject constructor(
     val activeProfileState = credentials.activeProfile
     val invalidatedChatGptAccounts = credentials.invalidatedChatGptAccounts
 
+    suspend fun hasChatGptPlanAuthorization(accountId: String): Boolean =
+        credentials.hasChatGptPlanAuthorization(accountId)
+
     fun activate(profile: LocalModelProfile) = credentials.activate(profile)
     fun clearActive() = credentials.clearActive()
     fun activeProfile(): LocalModelProfile? = credentials.active()
