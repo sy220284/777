@@ -574,30 +574,6 @@ internal fun PersonaGalleryScreen(
                 }
             }
 
-            DsButton(
-                text = stringResource(
-                    if (showPersonaDetails) R.string.persona_gallery_hide_fixed_persona
-                    else R.string.persona_gallery_show_fixed_persona,
-                ),
-                onClick = { showPersonaDetails = !showPersonaDetails },
-                variant = DsButtonVariant.Ghost,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (showPersonaDetails) {
-                PersonaDetails(selected.persona)
-            }
-
-            DsButton(
-                text = stringResource(R.string.persona_gallery_export_file),
-                onClick = {
-                    error = null
-                    showExportFormatDialog = true
-                },
-                variant = DsButtonVariant.Ghost,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !busy,
-            )
-
             Text(
                 stringResource(R.string.persona_gallery_storylines_title),
                 style = DsType.std14Strong.withReadingWeight(),
@@ -887,33 +863,57 @@ internal fun PersonaGalleryScreen(
                 }
             }
 
-            if (deletingCharacter) {
-                DeleteCharacterConfirm(
-                    entry = selected,
-                    busy = busy,
-                    onCancel = { deletingCharacter = false },
-                    onConfirm = {
-                        busy = true
-                        scope.launch {
-                            onDelete(selected.id)
-                                .onSuccess {
-                                    selectedId = null
-                                    selectedStoryId = null
-                                    deletingCharacter = false
-                                }
-                                .onFailure { error = it.message ?: deleteFailedText }
-                            busy = false
-                        }
-                    },
-                )
-            } else {
+            DsButton(
+                text = stringResource(
+                    if (showPersonaDetails) R.string.persona_gallery_detail_less
+                    else R.string.persona_gallery_detail_more,
+                ),
+                onClick = { showPersonaDetails = !showPersonaDetails },
+                variant = DsButtonVariant.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (showPersonaDetails) {
+                PersonaDetails(selected.persona)
                 DsButton(
-                    text = stringResource(R.string.persona_gallery_delete),
-                    onClick = { deletingCharacter = true },
+                    text = stringResource(R.string.persona_gallery_export_file),
+                    onClick = {
+                        error = null
+                        showExportFormatDialog = true
+                    },
                     variant = DsButtonVariant.Ghost,
-                    enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy,
                 )
+            if (deletingCharacter) {
+                    DeleteCharacterConfirm(
+                        entry = selected,
+                        busy = busy,
+                        onCancel = { deletingCharacter = false },
+                        onConfirm = {
+                            busy = true
+                            scope.launch {
+                                onDelete(selected.id)
+                                    .onSuccess {
+                                        selectedId = null
+                                        selectedStoryId = null
+                                        deletingCharacter = false
+                                    }
+                                    .onFailure { error = it.message ?: deleteFailedText }
+                                busy = false
+                            }
+                        },
+                    )
+                } else {
+                    DsButton(
+                        text = stringResource(R.string.persona_gallery_delete),
+                        onClick = { deletingCharacter = true },
+                        variant = DsButtonVariant.Ghost,
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+
             }
 
             DsButton(
