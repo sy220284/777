@@ -275,7 +275,6 @@ class SettingsViewModel @Inject constructor(
     fun refreshChatGpt() {
         viewModelScope.launch { localHarness.refreshChatGpt() }
     }
-
     fun removeLocalModel(id: String) = localHarness.removeModel(id)
 
     suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null): String =
