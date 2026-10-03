@@ -8,7 +8,21 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 
 LINE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 5060,
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt": 99,
+    "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebSearchClient.kt": 174,
+    "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebDiagnostics.kt": 127,
+    "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebHttpPolicy.kt": 33,
+    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/Events.kt": 512,
+    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/LlmContent.kt": 233,
+    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/LlmMessages.kt": 111,
+    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/LlmRequests.kt": 61,
+    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/SessionTurnPayloads.kt": 163,
+    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/SessionControlPayloads.kt": 100,
+    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/SessionWorkflowPayloads.kt": 79,
+    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/SessionSchedulePayloads.kt": 71,
+    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/SessionCompactionPayloads.kt": 59,
+
+    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 4959,
     "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 1344,
     "app/src/main/java/com/labteto/dshmobile/data/SessionLifecycleRuntime.kt": 50,
     "app/src/main/java/com/labteto/dshmobile/data/SessionSlashCommandRuntime.kt": 71,
@@ -82,7 +96,7 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt": 585,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelStepExecutor.kt": 153,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentStructureRecovery.kt": 81,
-    "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt": 690,
+    "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt": 418,
     "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTargetResolver.kt": 261,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentHistoryPolicy.kt": 66,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt": 316,

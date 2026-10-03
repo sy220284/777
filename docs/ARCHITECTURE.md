@@ -85,6 +85,8 @@ New UI and worker code should enter through the relevant capability runtime inst
 
 `LocalHarnessEngine` owns consistency across a local turn/session. Focused behavior lives in extracted coordinators for model transport, tool execution, Chat preparation/finalization, Session persistence, Agent run recovery, automation, group Chat and sending.
 
+Work 的计划、待办和目标变更由 `local.work.LocalWorkProgressCoordinator` 统一处理，包括输入规整、数量/长度上限、状态更新、事件 payload 和持久化调用顺序。Engine 只选择本次调用绑定的状态、事件日志和持久化回调；后台 Work 始终使用原 run 的会话，不跟随当前可见会话。
+
 The Engine has CI-enforced line, dependency and public-surface ratchets. New responsibilities must move outward rather than expanding the central orchestration surface.
 
 
@@ -170,6 +172,10 @@ Built-in plugins are described by `PluginDescriptor` and registered in a `Plugin
 
 Startup plugin installation remains atomic. Dynamic MCP disconnect stops new admission, drains in-flight calls, unregisters tools, then closes transport. Downstream Agent code depends on capability contracts rather than Android UI classes. External DEX/JAR loading is intentionally outside this trust boundary until the plugin API is stable; the current hot-swap contract applies to trusted in-process plugin definitions.
 
+### Web capability boundaries
+
+`LocalWebProvider` 保留网页获取、通用 HTTP 请求与下载入口。`local.web.LocalWebSearchClient` 负责 DeepSeek 辅助搜索协议、结果格式化和真实 API usage 归属；`LocalWebDiagnostics` 负责 DNS/代理/VPN 事实及有上限的 HTTP/TLS 探测。获取与诊断共用同一个 `LocalWebTargetResolver`，安全地址判断与路由构造仍只有一个实现；`LocalWebHttpPolicy` 提供搜索与 HTTP 共用的有界响应读取、User-Agent 和传输错误分类。搜索、诊断与通用 HTTP 保留各自的重试边界。
+
 ### Chat continuity and memory
 
 Chat keeps persona definition, relationship memory, scene continuity, character evolution and user behavior tuning as separate concerns.
@@ -220,6 +226,8 @@ Important invariants:
 CI performance guards reject known hot-path regressions and full-history scans.
 
 ## Remote Harness architecture
+
+远程 wire DTO 按协议功能组织：`LlmContent.kt` 承载内容块、流式 chunk 及其原样透传序列化器，`LlmMessages.kt` 承载消息、来源、终态和 usage，`LlmRequests.kt` 承载模型请求配置与工具 schema。会话 payload 分为回合、控制/审批、工作流/子代理、调度和压缩；`Events.kt` 只保留事件 envelope 与统一类型分派。既有 package、类型名、wire 字段及未知类型原样保留契约保持一致。
 
 The remote path stays separate from the local native Agent kernel.
 
