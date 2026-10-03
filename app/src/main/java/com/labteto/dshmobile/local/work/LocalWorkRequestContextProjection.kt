@@ -24,6 +24,26 @@ internal data class LocalWorkRequestProjection(
 internal fun workSteadyStateHistoryBudget(
     base: LocalHistoryBudget,
     currentHistoryTokens: Int,
+    extraTokens: Int,
+    state: LocalHarnessState,
+): LocalHistoryBudget {
+    val profile = state.modelSelection.activeProfile
+    return workSteadyStateHistoryBudget(
+        base = base,
+        currentHistoryTokens = currentHistoryTokens,
+        extraTokens = extraTokens,
+        cachePolicy = LocalModelPresets.promptCachePolicyFor(
+            model = state.model,
+            baseUrl = state.baseUrl,
+            protocol = profile?.protocol ?: LocalModelPresets.protocolFor(state.model, state.baseUrl),
+            authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
+        ),
+    )
+}
+
+internal fun workSteadyStateHistoryBudget(
+    base: LocalHistoryBudget,
+    currentHistoryTokens: Int,
     extraTokens: Int = 0,
     cachePolicy: LocalPromptCachePolicy = LocalPromptCachePolicy(),
 ): LocalHistoryBudget {
