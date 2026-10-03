@@ -17,6 +17,8 @@ All notable changes to DSH Mobile are documented here. Format based on
 
 ### Changed
 
+- 按协议与能力职责拆分远程模型/事件 DTO、本机网页搜索/网络诊断和 Work 计划/待办/目标管理；保留统一事件分派、网络安全策略、会话归属与持久化顺序，并收紧相关架构预算。
+
 - Reorganized Settings around direct task entry points: removed the General/language selector, split Model and Experience into separate groups, promoted Appearance & Reading and Session to top-level pages, renamed Model to Model Settings, and moved API pricing plus usage into a separate Model Pricing & Usage page.
 - Retired the old per-app language stack completely: Chinese is now the single default resource surface, Android's app-language entry is removed, and legacy saved app-language state is cleared through a one-way startup migration.
 
