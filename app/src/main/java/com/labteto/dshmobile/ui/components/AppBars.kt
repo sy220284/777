@@ -41,11 +41,11 @@ fun DsTopBar(
     backContentDescription: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
-    largeTitle: Boolean = false,
     actionIcon: ImageVector? = null,
     actionContentDescription: String? = null,
     actionEnabled: Boolean = true,
     onAction: (() -> Unit)? = null,
+    largeTitle: Boolean = false,
 ) {
     val colors = DsTheme.colors
     val floating = colors.wallpaperSurface(
