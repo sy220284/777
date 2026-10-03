@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -54,6 +55,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.labteto.dshmobile.ui.theme.DsShapes
+import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -235,7 +237,17 @@ data class MenuItem(
 fun DsMenu(anchor: @Composable () -> Unit, items: List<MenuItem>) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        Box(Modifier.clickable { expanded = true }) { anchor() }
+        Box(
+            modifier = Modifier
+                .sizeIn(
+                    minWidth = DsSpacing.touchTarget,
+                    minHeight = DsSpacing.touchTarget,
+                )
+                .clickable { expanded = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            anchor()
+        }
         DsPopupMenu(
             expanded = expanded,
             onDismiss = { expanded = false },
