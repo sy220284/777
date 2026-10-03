@@ -48,22 +48,27 @@ internal fun workSteadyStateHistoryBudget(
     cachePolicy: LocalPromptCachePolicy = LocalPromptCachePolicy(),
 ): LocalHistoryBudget {
     val operationalLimit = base.maxHistoryTokens ?: return base
+    val steadyBase = if (cachePolicy.allowAdaptiveEarlyCompaction) {
+        base
+    } else {
+        base.copy(adaptiveCompactionTrigger = false)
+    }
     val totalRequestTokens = currentHistoryTokens.toLong() + extraTokens.coerceAtLeast(0).toLong()
     if (totalRequestTokens <= workRequestProjectionTriggerTokens(operationalLimit, cachePolicy).toLong()) {
-        return base
+        return steadyBase
     }
     val target = workRequestProjectionTargetTokens(operationalLimit, cachePolicy)
     val tailTarget = workRequestTailTokens(target, cachePolicy)
-    return base.copy(
+    return steadyBase.copy(
         maxHistoryTokens = target,
         tailTokens = minOf(
-            base.tailTokens ?: tailTarget,
+            steadyBase.tailTokens ?: tailTarget,
             tailTarget,
             (target * 0.38).toInt().coerceAtLeast(1_024),
         ),
-        maxSummaryChars = minOf(base.maxSummaryChars, WORK_REQUEST_SUMMARY_CHARS),
-        maxToolResultChars = minOf(base.maxToolResultChars, WORK_REQUEST_TOOL_RESULT_CHARS),
-        maxToolResultTokens = minOf(base.maxToolResultTokens, WORK_REQUEST_TOOL_RESULT_TOKENS),
+        maxSummaryChars = minOf(steadyBase.maxSummaryChars, WORK_REQUEST_SUMMARY_CHARS),
+        maxToolResultChars = minOf(steadyBase.maxToolResultChars, WORK_REQUEST_TOOL_RESULT_CHARS),
+        maxToolResultTokens = minOf(steadyBase.maxToolResultTokens, WORK_REQUEST_TOOL_RESULT_TOKENS),
     )
 }
 
@@ -85,9 +90,8 @@ internal fun projectWorkRequestContext(
     )
     val budget = workRequestBudget(limit, cachePolicy)
 
-    // Large command/file outputs are the fastest-growing part of Work history. Keep only the two
-    // newest results verbatim; older full payloads remain in LocalToolOutputStore and are readable
-    // by call_id, so shrinking their model-facing copies does not remove capability.
+    // Large command/file outputs are the fastest-growing part of Work history. No oversized result
+    // stays verbatim in the hot request; full payloads remain recoverable from LocalToolOutputStore.
     val staleToolProjection = projectStaleToolResults(
         history = messages,
         budget = budget,
@@ -253,6 +257,7 @@ private fun workRequestBudget(
             (target * 0.38).toInt().coerceAtLeast(1_024),
         ),
         maxToolResultTokens = WORK_REQUEST_TOOL_RESULT_TOKENS,
+        adaptiveCompactionTrigger = cachePolicy.allowAdaptiveEarlyCompaction,
     )
 }
 
