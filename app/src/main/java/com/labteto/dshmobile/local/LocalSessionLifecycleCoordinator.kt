@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.findEstablishedGroupChatSession
 import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
 import com.labteto.dshmobile.local.memory.MemoryStore
 import java.io.File
@@ -95,7 +96,6 @@ internal class LocalSessionLifecycleCoordinator(
     ): Boolean {
         if (
             chatMode == LocalChatMode.GROUP &&
-            groupEntries.isNotEmpty() &&
             groupEntries.distinctBy(PersonaGalleryEntry::id).size !in
                 MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS
         ) return false
@@ -312,10 +312,12 @@ internal class LocalSessionLifecycleCoordinator(
             snapshot.groupChat.mode == mode
         ) return
 
-        val eligible = snapshot.sessions.filter {
-            it.usageMode == LocalUsageMode.CHAT &&
-                it.chatMode == mode &&
-                (mode != LocalChatMode.GROUP || it.groupMemberCount >= MIN_GROUP_CHAT_MEMBERS)
+        val eligible = if (mode == LocalChatMode.GROUP) {
+            listOfNotNull(findEstablishedGroupChatSession(snapshot.sessions))
+        } else {
+            snapshot.sessions.filter {
+                it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode
+            }
         }
         val target = eligible.firstOrNull { !it.blank } ?: eligible.firstOrNull()
         if (target != null) {
