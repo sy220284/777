@@ -36,14 +36,19 @@ class LocalFeatureNavigationTest {
     }
 
     @Test
-    fun groupSessionCountsAsEstablishedEvenBeforeFirstMessage() {
+    fun onlyGroupWithConfiguredMembersCountsAsEstablished() {
         val emptyGroup = LocalSessionSummary(
             id = "group-empty",
             title = "群聊",
             updatedAt = 1L,
             usageMode = LocalUsageMode.CHAT,
             chatMode = LocalChatMode.GROUP,
+            groupMemberCount = 0,
             blank = true,
+        )
+        val configuredGroup = emptyGroup.copy(
+            id = "group-configured",
+            groupMemberCount = 2,
         )
         val direct = LocalSessionSummary(
             id = "direct",
@@ -53,10 +58,9 @@ class LocalFeatureNavigationTest {
             chatMode = LocalChatMode.SINGLE,
             blank = false,
         )
-        val readyGroup = emptyGroup.copy(id = "group-ready", blank = false)
 
-        assertTrue(hasEstablishedGroupChat(listOf(emptyGroup, direct)))
-        assertTrue(hasEstablishedGroupChat(listOf(emptyGroup, direct, readyGroup)))
+        assertFalse(hasEstablishedGroupChat(listOf(emptyGroup, direct)))
+        assertTrue(hasEstablishedGroupChat(listOf(configuredGroup, direct)))
         assertFalse(hasEstablishedGroupChat(listOf(direct)))
     }
 }
