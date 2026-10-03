@@ -255,11 +255,12 @@ fun LocalHarnessScreen(
         viewModel.switchUsageMode(target)
     }
 
-    LaunchedEffect(requestedSessionId, shell.sessions) {
+    LaunchedEffect(requestedSessionId, shell.sessions, shell.loading, shell.sessionId) {
         val target = requestedSessionId?.takeIf(String::isNotBlank) ?: return@LaunchedEffect
-        if (target == shell.sessionId || shell.sessions.any { it.id == target }) {
+        val accepted = target == shell.sessionId ||
+            (shell.sessions.any { it.id == target } && viewModel.switchSession(target))
+        if (accepted) {
             resetFeatureNavigation()
-            if (target != shell.sessionId) viewModel.switchSession(target)
             onSessionRequestConsumed()
         }
     }
@@ -307,11 +308,12 @@ fun LocalHarnessScreen(
                     onOpenRemote()
                 },
                 onSwitchSession = { sessionId ->
-                    resetFeatureNavigation()
-                    viewModel.switchSession(sessionId)
-                    scope.launch { drawerState.close() }
+                    if (viewModel.switchSession(sessionId)) {
+                        resetFeatureNavigation()
+                        scope.launch { drawerState.close() }
+                    }
                 },
-                onDeleteSessions = { ids -> scope.launch { viewModel.deleteSessions(ids) } },
+                onDeleteSessions = viewModel::deleteSessions,
                 onWorkspaceFiles = {
                     filesMode = LocalFilesMode.WORKSPACE
                     openFeatureFromDrawer(LocalFeaturePage.WORKSPACE)
@@ -323,13 +325,15 @@ fun LocalHarnessScreen(
                 },
                 groupMemberCount = shell.groupChat.members.size,
                 onOpenGroupChat = {
-                    scope.launch { drawerState.close() }
                     val establishedSessionId = establishedGroupChatSessionId(shell.sessions)
                     if (establishedSessionId != null) {
-                        resetFeatureNavigation()
-                        viewModel.switchSession(establishedSessionId)
+                        if (viewModel.switchSession(establishedSessionId)) {
+                            resetFeatureNavigation()
+                            scope.launch { drawerState.close() }
+                        }
                     } else {
                         showGroupSetup = true
+                        scope.launch { drawerState.close() }
                     }
                 },
                 onOpenPersonaGallery = {
@@ -407,9 +411,10 @@ fun LocalHarnessScreen(
                     showGroupSetup = true
                 },
                 onNewSingle = {
-                    showNewSessionMode = false
-                    resetFeatureNavigation()
-                    viewModel.createSingleChatSession()
+                    if (viewModel.createSingleChatSession()) {
+                        showNewSessionMode = false
+                        resetFeatureNavigation()
+                    }
                 },
             )
         } else {
@@ -417,9 +422,10 @@ fun LocalHarnessScreen(
                 usageMode = shell.usageMode,
                 onDismiss = { showNewSessionMode = false },
                 onSelect = { mode ->
-                    showNewSessionMode = false
-                    resetFeatureNavigation()
-                    viewModel.createSession(mode)
+                    if (viewModel.createSession(mode)) {
+                        showNewSessionMode = false
+                        resetFeatureNavigation()
+                    }
                 },
             )
         }
