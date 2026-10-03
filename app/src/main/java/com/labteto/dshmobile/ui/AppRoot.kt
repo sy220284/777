@@ -182,20 +182,10 @@ fun AppRoot(
                         autoScanPair = true
                         overlay = RootOverlay.PAIR
                     },
-                    onOpenSettings = {
-                        overlayReturn = null
-                        settingsDestination = SettingsDestination.ROOT
-                        overlay = RootOverlay.SETTINGS
+                    onCheckUpdate = {
+                        viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
                     },
-                    onOpenTasks = {
-                        overlayReturn = null
-                        taskMode = null
-                        overlay = RootOverlay.TASKS
-                    },
-                    onOpenTools = {
-                        overlayReturn = null
-                        overlay = RootOverlay.TOOLS
-                    },
+                    updateStatus = updateInstallStatus,
                 )
 
                 showMain && selectedRemoteMatches -> MainScreen(
