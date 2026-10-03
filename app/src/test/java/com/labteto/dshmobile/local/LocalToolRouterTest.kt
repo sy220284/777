@@ -106,6 +106,8 @@ class LocalToolRouterTest {
         val coreNames = names(coreSchemas)
 
         assertTrue(coreTokens * 100 <= fullTokens * 55)
+        assertTrue(coreNames.size <= 18)
+        assertTrue(coreTokens <= 4_500)
         assertTrue("read" in coreNames)
         assertTrue("bash" in coreNames)
         assertTrue("subagent" in coreNames)
