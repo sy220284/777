@@ -142,15 +142,22 @@ class LocalWorkTokenSimulationTest {
                 )
             }
             history += message("user", "继续第${generation}代最新任务")
-            val projected = projectWorkRequestContext(
-                messages = history,
-                tools = JsonArray(emptyList()),
-                compactor = LocalHistoryCompactor(),
-                operationalLimitTokens = 678_464,
+            val compacted = LocalHistoryCompactor().compact(
+                history = history,
+                budget = LocalHistoryBudget(
+                    maxHistoryChars = 200_000,
+                    tailChars = 16_000,
+                    maxSummaryChars = 8_000,
+                    maxToolResultChars = 8_000,
+                    maxHistoryTokens = 12_000,
+                    tailTokens = 4_000,
+                    maxToolResultTokens = 2_400,
+                ),
+                summaryMode = LocalHistorySummaryMode.WORK,
                 structuredWorkState = if (generation == 0) active else null,
             )
-            assertTrue(projected.projected)
-            history = projected.messages.toMutableList()
+            assertNotNull(compacted)
+            history = requireNotNull(compacted).messages.toMutableList()
         }
 
         val checkpoint = LocalWorkCheckpoint.latestFrom(history)
