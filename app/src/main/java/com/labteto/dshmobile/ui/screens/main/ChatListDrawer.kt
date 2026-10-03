@@ -116,7 +116,6 @@ internal fun drawerSessionSections(
     }
     return DrawerSessionSections(current = current, history = history)
 }
-
 /** [com.labteto.dshmobile.connection.HostsStore.sessionSort]: the workspace's own row order. */
 private const val SORT_MANUAL = "manual"
 
