@@ -22,7 +22,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
 RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 14,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 12,
-    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 14,
+    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 13,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 4,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 4,
@@ -180,6 +180,12 @@ if "runtimeStateStore.sendFeedbackState" not in session_runtime_source:
     die("LocalSessionRuntime send feedback must consume LocalRuntimeStateStore")
 if "engine.sendFeedbackState" in session_runtime_source:
     die("LocalSessionRuntime must not reach through LocalHarnessEngine for send feedback state")
+if "runtimeStateStore.streamingPreviewStore.state" not in session_runtime_source:
+    die("LocalSessionRuntime streaming preview must consume LocalRuntimeStateStore")
+if "engine.streamingState" in session_runtime_source:
+    die("LocalSessionRuntime must not reach through LocalHarnessEngine for streaming preview state")
+if "private val streamingPreviewStore = LocalStreamingPreviewStore()" in engine:
+    die("LocalHarnessEngine must not own the process-wide streaming preview store")
 if "MutableStateFlow(LocalSendFeedbackState())" in engine:
     die("LocalHarnessEngine must not own send feedback state")
 
