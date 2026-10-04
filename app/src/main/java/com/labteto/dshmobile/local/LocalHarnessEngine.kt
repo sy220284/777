@@ -888,20 +888,22 @@ class LocalHarnessEngine @Inject constructor(
     internal fun selectModel(id: String) {
         scope.launch {
             val current = _state.value
-            val selected = current.modelState.modelProfiles.firstOrNull { it.id == id } ?: return@launch
+            val selected = current.modelState.modelSelection.profiles.firstOrNull { it.id == id } ?: return@launch
             if (
                 isModelIdentityLocked() ||
                 selected.id == modelGateway.activeProfile()?.id
             ) return@launch
-            runCatching { modelConfiguration.select(id, current.modelState.modelProfiles) }
+            runCatching { modelConfiguration.select(id, current.modelState.modelSelection.profiles) }
                 .onSuccess { result ->
                     if (result != null) {
                         _state.update { state ->
                             state.copy(
-                                configured = result.configured,
-                                model = result.model,
-                                baseUrl = result.baseUrl,
-                                modelSelection = state.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+                                modelState = state.modelState.copy(
+                                    configured = result.configured,
+                                    model = result.model,
+                                    baseUrl = result.baseUrl,
+                                    modelSelection = state.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+                                ),
                                 error = null,
                             )
                         }
