@@ -83,6 +83,7 @@ internal class LocalWorkRunBinding(
                     running = false,
                     queuedInputCount = 0,
                 ),
+                deviceApprovalLease = false,
             )
         }
         val activeJob = job.also { job = null }
@@ -131,6 +132,7 @@ internal fun mirrorLocalWorkRunState(
                 messages = run.messages,
                 transcriptIndex = run.transcriptIndex,
                 work = run.work,
+                deviceApprovalLease = run.deviceApprovalLease,
                 kernel = visible.kernel.copy(
                     running = run.kernel.running,
                     queuedInputCount = run.kernel.queuedInputCount,
