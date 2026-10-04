@@ -169,6 +169,7 @@ internal class LocalSubagentRunner(
         )
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var modelStep = 0
+        var activeModelToolNames = emptySet<String>()
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
         // runtime capability must never make that capability appear in its parent or sibling run.
         val enabledOptionalTools = linkedSetOf<String>()
@@ -292,11 +293,18 @@ internal class LocalSubagentRunner(
                         routeModel,
                     )
                     val nativeImagesSent = hasMaterializedImageUrls(preparedHistory)
+                    val stepTools = runToolSurface.next(
+                        schemas(allowMutation, virtualScreenId != null, enabledOptionalTools),
+                    )
+                    activeModelToolNames = stepTools.mapNotNull { element ->
+                        val function = (element as? JsonObject)?.get("function") as? JsonObject
+                        (function?.get("name") as? JsonPrimitive)?.contentOrNull
+                    }.toSet()
                     val reply = try {
                         modelStepExecutor.complete(
                             surface = runSurface,
                             history = preparedHistory,
-                            tools = runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools)),
+                            tools = stepTools,
                             subagentId = subagentId,
                             step = modelStep,
                             durableHistory = history,
@@ -376,6 +384,13 @@ internal class LocalSubagentRunner(
                                 errorCode = "SUBAGENT_VIRTUAL_SCREEN_MISMATCH",
                                 recoveryHint = "使用系统上下文中提供的虚拟屏 id。",
                             )
+                        !LocalToolPolicy.isVisibleCall(call.name, activeModelToolNames) ->
+                            AgentToolResult(
+                                content = "模型调用了本步骤未暴露的工具：" + call.name,
+                                isError = true,
+                                errorCode = "TOOL_NOT_EXPOSED",
+                                recoveryHint = "先使用 capability_search，等待下一轮工具表更新后再调用。",
+                            )
                         else -> withContext(LocalModelRunContext(runProfile)) {
                             execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
                         }
@@ -401,7 +416,7 @@ internal class LocalSubagentRunner(
                                 put("step", event.step)
                                 put("id", event.call.id)
                                 put("name", event.call.name)
-                                put("arguments", event.call.arguments)
+                                put("execution_started", false)
                             })
                         }
                         is AgentEvent.ToolFinished -> {
