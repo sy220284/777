@@ -306,6 +306,25 @@ if 'eventLog.append("user/queue"' in engine:
     violations.append("Queued user input must use the durable agent/inbox/spliced fact, not legacy user/queue writers")
 if "decodeLocalAgentInboxPending" not in engine or "pendingInputs.restore(" not in engine:
     violations.append("LocalHarnessEngine must restore the durable Agent inbox on Session load")
+
+live_rebind_pos = engine.find("if (!shouldUseDurableSessionRecovery(liveBinding != null))")
+durable_repair_pos = engine.find("val recovery = eventLog.repairInterruptedTail()")
+if live_rebind_pos < 0 or durable_repair_pos < 0 or live_rebind_pos > durable_repair_pos:
+    violations.append(
+        "Live session-bound Work runtime must be rebound before durable interrupted-tail recovery"
+    )
+if "liveWorkRuntimeActive = liveWorkRun(currentSessionId) != null" not in engine:
+    violations.append(
+        "Shared visible queue must stay idle while the current session has a live bound Work runtime"
+    )
+if "fun isCurrentForegroundRun(" not in run_coordinator:
+    violations.append(
+        "Foreground run checkpoints must reject late events after recovery or ownership replacement"
+    )
+if "binding = binding," not in engine:
+    violations.append(
+        "Bound Work tool execution must keep the originating session binding after UI navigation"
+    )
 wake_path_count = (
     engine.count("startNextQueuedTurnIfIdle()?.start()") +
     lifecycle_coordinator.count("startNextQueuedTurnIfIdle()?.start()")
