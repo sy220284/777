@@ -160,6 +160,14 @@ if "runtimeStateStore.initialize(" not in engine:
     die("LocalHarnessEngine must initialize state through LocalRuntimeStateStore")
 if "private val runtimeStateStore: LocalRuntimeStateStore" not in constructor.group(1):
     die("LocalHarnessEngine must receive the shared LocalRuntimeStateStore by injection")
+if "foregroundSessionId" not in runtime_state_store or "activateSession(sessionId: String)" not in runtime_state_store:
+    die("LocalRuntimeStateStore must own foreground Session identity")
+if "private var currentSessionId" in engine:
+    die("LocalHarnessEngine must not keep a second mutable foreground Session id")
+if "get() = runtimeStateStore.currentSessionId" not in engine:
+    die("LocalHarnessEngine foreground Session reads must resolve through LocalRuntimeStateStore")
+if "runtimeStateStore.activateSession(id)" not in engine:
+    die("Session activation must update LocalRuntimeStateStore ownership before projection load")
 
 session_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt")
