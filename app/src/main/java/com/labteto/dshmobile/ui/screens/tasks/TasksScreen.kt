@@ -41,6 +41,7 @@ fun TasksScreen(
     onClose: () -> Unit,
     onOpenSession: (String) -> Unit = {},
     initialMode: AutomationMode? = null,
+    handleRootSystemBack: Boolean = true,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -57,6 +58,7 @@ fun TasksScreen(
             viewModel = viewModel,
             onClose = onClose,
             onOpenSession = onOpenSession,
+            handleRootSystemBack = handleRootSystemBack,
         )
         return
     }
@@ -66,6 +68,7 @@ fun TasksScreen(
         viewModel = viewModel,
         onClose = onClose,
         onOpenSession = onOpenSession,
+        handleRootSystemBack = handleRootSystemBack,
     )
 }
 
@@ -75,6 +78,7 @@ private fun WorkTasksScreen(
     viewModel: TasksViewModel,
     onClose: () -> Unit,
     onOpenSession: (String) -> Unit,
+    handleRootSystemBack: Boolean,
 ) {
     val colors = DsTheme.colors
     val visibleTasks = state.tasks.filter { it.mode == AutomationMode.WORK }
@@ -110,7 +114,7 @@ private fun WorkTasksScreen(
         showCreate = true
     }
     val navigateBack = { if (showCreate) resetEditor() else onClose() }
-    BackHandler { navigateBack() }
+    BackHandler(enabled = showCreate || handleRootSystemBack) { navigateBack() }
 
     val toast = rememberDsToast()
     val noticeMessage = state.notice?.let { notice ->
