@@ -270,7 +270,7 @@ internal class LocalAutomationChatCoordinator(
                     messages = recentTranscript,
                     transcriptIndex = sessionTranscriptIndex,
                     work = LocalWorkState(),
-                    kernel = snapshot.kernel.copy(running = false, queuedInputCount = 0),
+                    kernel = runtime.kernel.copy(running = false, queuedInputCount = 0),
                     error = null,
                 )
                 val chatContext = chatTurnCoordinator.prepareProfile(
