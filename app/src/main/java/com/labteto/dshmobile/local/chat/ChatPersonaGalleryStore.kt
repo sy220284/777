@@ -134,7 +134,7 @@ class ChatPersonaGalleryStore internal constructor(
                 updatedAt = now,
             )
         }
-        val entry = history.archiveEntry(mergedEntry)
+        val entry = history.archiveEntry(normalizeEntry(mergedEntry))
         documentStore.write(doc.copy(version = 5, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return entry
     }
@@ -183,6 +183,7 @@ class ChatPersonaGalleryStore internal constructor(
         history: List<LocalHarnessMessage>,
         chatState: ChatCharacterState,
         notes: String,
+        chatContext: ChatContextState = ChatContextState(),
         existingId: String? = null,
         existingStoryId: String? = null,
         forceNewStory: Boolean = false,
@@ -216,7 +217,8 @@ class ChatPersonaGalleryStore internal constructor(
             baseStory != null ||
             incomingHistory.isNotEmpty() ||
             notes.isNotBlank() ||
-            chatState.updatedAt > 0L
+            chatState.updatedAt > 0L ||
+            chatContext.hasUsefulFacts()
         if (!shouldSaveStory) {
             val entry = baseEntry.copy(
                 persona = mergePersonaProfiles(baseEntry.persona, persona)
@@ -237,7 +239,8 @@ class ChatPersonaGalleryStore internal constructor(
             history = archivedHistory.messages,
             historyTotalCount = archivedHistory.totalCount,
             historyArchived = true,
-            chatState = chatState,
+            chatState = chatState.canonicalizeLegacyCharacterState().withoutLegacyConversationContext(),
+            chatContext = chatContext.normalized(),
             sourceSessionIds = listOf(sourceSessionId).filter(String::isNotBlank),
             excludedMessageKeys = excluded,
             updatedAt = now,
@@ -330,7 +333,7 @@ class ChatPersonaGalleryStore internal constructor(
         val current = doc.entries.firstOrNull { it.id == id } ?: return null
         val now = System.currentTimeMillis()
         val updated = current.copy(
-            groupChatState = chatState,
+            groupChatState = chatState.canonicalizeLegacyCharacterState().withoutLegacyConversationContext(),
             updatedAt = maxOf(current.updatedAt, now),
         )
         documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
@@ -341,7 +344,10 @@ class ChatPersonaGalleryStore internal constructor(
     fun updateGroupChatState(id: String, chatState: ChatCharacterState): PersonaGalleryEntry? {
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return null
-        val mergedState = mergeChatState(current.groupChatState, chatState)
+        val mergedState = mergeChatState(
+            current.groupChatState,
+            chatState.canonicalizeLegacyCharacterState().withoutLegacyConversationContext(),
+        )
         val now = maxOf(System.currentTimeMillis(), mergedState.updatedAt)
         val updated = current.copy(
             groupChatState = mergedState,
@@ -427,12 +433,25 @@ class ChatPersonaGalleryStore internal constructor(
         return true
     }
 
+    private fun normalizeEntry(entry: PersonaGalleryEntry): PersonaGalleryEntry = entry.copy(
+        groupChatState = entry.groupChatState
+            .canonicalizeLegacyCharacterState()
+            .withoutLegacyConversationContext(),
+        stories = entry.stories.map { story ->
+            val legacyState = story.chatState.canonicalizeLegacyCharacterState()
+            story.copy(
+                chatState = legacyState.withoutLegacyConversationContext(),
+                chatContext = story.chatContext.withLegacyFallback(legacyState),
+            )
+        },
+    )
+
     private fun readNormalized(): GalleryDocument {
         val document = documentStore.read()
         require(document.version == 5) {
             "人物图集版本不受支持；新版角色系统不读取旧人物数据"
         }
-        val entries = document.entries.map(history::migrate)
+        val entries = document.entries.map(history::migrate).map(::normalizeEntry)
         val normalized = document.copy(entries = entries)
         if (normalized != document) documentStore.write(normalized)
         return normalized

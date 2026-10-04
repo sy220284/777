@@ -13,6 +13,7 @@ data class PersonaGalleryStory(
     val historyTotalCount: Int = history.size,
     val historyArchived: Boolean = false,
     val chatState: ChatCharacterState = ChatCharacterState(),
+    val chatContext: ChatContextState = ChatContextState(),
     val sourceSessionIds: List<String> = emptyList(),
     val excludedMessageKeys: List<String> = emptyList(),
     val updatedAt: Long = 0L,
@@ -21,7 +22,7 @@ data class PersonaGalleryStory(
         if (notes.isNotBlank()) appendLine("剧情提要：${notes.trim().take(2_500)}")
         if (chatState.updatedAt > 0L) {
             appendLine("保存时的关系：${chatState.relationshipState.take(80)}")
-            val shared = ChatContextState().withLegacyFallback(chatState)
+            val shared = chatContext.withLegacyFallback(chatState)
             val scene = shared.scene
             if (scene.sceneTime.isNotBlank() || scene.location.isNotBlank()) {
                 appendLine(
