@@ -514,7 +514,7 @@ internal class LocalAutomationChatCoordinator(
         step = CHAT_POST_TURN_MODEL_STEP + 200,
         toolsOverride = JsonArray(emptyList()),
         publishPreviewEnabled = false,
-        maxAttemptsOverride = snapshot.modelAttempts.coerceIn(1, 3),
+        maxAttemptsOverride = snapshot.modelState.modelState.modelAttempts.coerceIn(1, 3),
         allowContextOverflowRecovery = allowContextOverflowRecovery,
         persistOverflowHistory = false,
         requestLog = eventLogFor(snapshot.sessionId),
