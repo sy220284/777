@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.automation
 
+import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.harness.state.RuntimeStateTransition
 import com.labteto.dshmobile.harness.state.RuntimeStateTransitionPolicy
 import com.labteto.dshmobile.harness.state.acceptRuntimeStateTransition
@@ -9,6 +10,12 @@ internal data class AutomationPlanningRevision(
     val sessionId: String,
     val latestDialogueMessageId: String?,
     val chatContextGeneration: Long,
+)
+
+internal fun LocalHarnessState.toAutomationPlanningRevision() = AutomationPlanningRevision(
+    sessionId = sessionId,
+    latestDialogueMessageId = transcriptIndex.latestDialogueMessageId,
+    chatContextGeneration = chatContext.generation,
 )
 
 private val AUTOMATION_PLANNING_REVISION_POLICY =
