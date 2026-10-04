@@ -265,6 +265,7 @@ internal fun PersonaGalleryDetailHeaderV3(
 @Composable
 internal fun PersonaGalleryAddPanel(
     presets: List<PersonaPreset>,
+    installedPresetIds: Set<String>,
     busy: Boolean,
     onBack: () -> Unit,
     onCreate: () -> Unit,
@@ -324,6 +325,7 @@ internal fun PersonaGalleryAddPanel(
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
                 items(presets, key = PersonaPreset::id) { preset ->
+                    val installed = preset.id in installedPresetIds
                     Surface(
                         shape = DsShapes.row,
                         color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
@@ -352,9 +354,14 @@ internal fun PersonaGalleryAddPanel(
                                 )
                             }
                             DsButton(
-                                text = stringResource(R.string.persona_gallery_preset_add),
-                                onClick = { onInstallPreset(preset.id) },
-                                enabled = !busy,
+                                text = stringResource(
+                                    if (installed) R.string.persona_gallery_preset_taken
+                                    else R.string.persona_gallery_preset_add,
+                                ),
+                                onClick = {
+                                    if (!installed) onInstallPreset(preset.id)
+                                },
+                                enabled = !busy && !installed,
                                 variant = DsButtonVariant.Ghost,
                                 size = DsButtonSize.Small,
                             )
