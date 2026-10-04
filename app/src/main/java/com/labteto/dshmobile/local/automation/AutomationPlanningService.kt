@@ -2,6 +2,10 @@ package com.labteto.dshmobile.local.automation
 
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.local.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalAgentModelRequestRuntime
+import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
+import com.labteto.dshmobile.local.toRunModelSurface
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageContext
@@ -30,6 +34,7 @@ internal data class AutomationPlanningMessage(
 
 internal data class AutomationPlanningContext(
     val sessionId: String,
+    val revision: AutomationPlanningRevision,
     val configured: Boolean,
     val usageMode: LocalUsageMode,
     val groupChatEnabled: Boolean,
@@ -42,6 +47,7 @@ internal data class AutomationPlanningContext(
 
 internal data class AutomationPlanDraft(
     val sourceSessionId: String,
+    val sourceRevision: AutomationPlanningRevision,
     val prompt: String,
     val scheduleType: AutomationScheduleType,
     val firstRunAt: Long,
@@ -53,6 +59,7 @@ internal data class AutomationPlanDraft(
 
 internal data class AutomationSuggestionSet(
     val sourceSessionId: String,
+    val sourceRevision: AutomationPlanningRevision,
     val suggestions: List<String>,
 )
 
@@ -63,6 +70,8 @@ class AutomationPlanningService @Inject constructor(
     private val usageTracker: DeepSeekUsageTracker,
     private val json: Json,
 ) {
+    private val modelStepRuntime = LocalAgentModelStepRuntime()
+    private val requestRuntime = LocalAgentModelRequestRuntime(modelGateway)
     internal suspend fun plan(input: String): AutomationPlanDraft {
         val context = runtime.planningContext()
         validateContext(context)
@@ -90,6 +99,7 @@ class AutomationPlanningService @Inject constructor(
             json = json,
             nowMillis = now,
             sourceSessionId = context.sessionId,
+            sourceRevision = context.revision,
         )
     }
 
@@ -97,7 +107,7 @@ class AutomationPlanningService @Inject constructor(
         val context = runtime.planningContext()
         validateContext(context)
         if (context.recentMessages.isEmpty()) {
-            return AutomationSuggestionSet(context.sessionId, emptyList())
+            return AutomationSuggestionSet(context.sessionId, context.revision, emptyList())
         }
         val reply = complete(
             context = context,
@@ -116,35 +126,56 @@ class AutomationPlanningService @Inject constructor(
         )
         return AutomationSuggestionSet(
             sourceSessionId = context.sessionId,
+            sourceRevision = context.revision,
             suggestions = parseAutomationSuggestions(reply, json),
         )
     }
+
+    internal fun isCurrent(draft: AutomationPlanDraft): Boolean =
+        resolveAutomationPlanningRevision(runtime.planningRevision(), draft.sourceRevision).accepted
+
+    internal fun isCurrent(suggestions: AutomationSuggestionSet): Boolean =
+        resolveAutomationPlanningRevision(runtime.planningRevision(), suggestions.sourceRevision).accepted
 
     private suspend fun complete(
         context: AutomationPlanningContext,
         system: String,
         user: String,
-    ): String = modelGateway.withFrozenRoute(
-        context.profileId,
-        context.model,
-        context.baseUrl,
-    ) {
-        val reply = modelGateway.complete(
-            model = context.model,
-            baseUrl = context.baseUrl,
-            messages = listOf(
-                buildJsonObject {
-                    put("role", "system")
-                    put("content", system)
-                },
-                buildJsonObject {
-                    put("role", "user")
-                    put("content", user)
-                },
-            ),
-            tools = JsonArray(emptyList()),
-            temperature = 0.35,
+    ): String {
+        val profile = modelGateway.profileForRoute(
+            context.profileId,
+            context.model,
+            context.baseUrl,
         )
+        val surface = profile.toRunModelSurface()
+        val messages = listOf(
+            buildJsonObject {
+                put("role", "system")
+                put("content", system)
+            },
+            buildJsonObject {
+                put("role", "user")
+                put("content", user)
+            },
+        )
+        val reply = modelStepRuntime.execute(
+            initialMessages = messages,
+            maxAttempts = 2,
+            retryable = { error ->
+                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
+            },
+            backoffMillis = { failedAttempt, error ->
+                (error as? LocalModelException)?.providerRetryAfterMs?.coerceIn(0L, 30_000L)
+                    ?: (750L shl (failedAttempt - 1).coerceIn(0, 10))
+            },
+        ) { activeMessages ->
+            requestRuntime.complete(
+                surface = surface,
+                messages = activeMessages,
+                tools = JsonArray(emptyList()),
+                temperature = 0.35,
+            )
+        }
         withContext(Dispatchers.IO) {
             usageTracker.record(
                 model = context.model,
@@ -160,7 +191,7 @@ class AutomationPlanningService @Inject constructor(
                 route = reply.routeIdentity,
             )
         }
-        reply.content?.trim()?.takeIf(String::isNotBlank)
+        return reply.content?.trim()?.takeIf(String::isNotBlank)
             ?: error("模型没有生成可用的定时事件")
     }
 
@@ -200,6 +231,16 @@ internal fun parseAutomationPlan(
     json: Json,
     nowMillis: Long,
     sourceSessionId: String,
+    sourceRevision: AutomationPlanningRevision = AutomationPlanningRevision(
+        sessionId = sourceSessionId,
+        usageMode = LocalUsageMode.CHAT,
+        groupChatEnabled = false,
+        personaId = "",
+        galleryId = null,
+        galleryStoryId = null,
+        latestDialogueMessageId = null,
+        chatContextGeneration = 0L,
+    ),
 ): AutomationPlanDraft {
     val root = json.parseToJsonElement(extractPlannerJson(raw)).jsonObject
     val task = root["task"]?.jsonObject ?: root
@@ -241,6 +282,7 @@ internal fun parseAutomationPlan(
     }
     return AutomationPlanDraft(
         sourceSessionId = sourceSessionId,
+        sourceRevision = sourceRevision,
         prompt = prompt,
         scheduleType = scheduleType,
         firstRunAt = if (

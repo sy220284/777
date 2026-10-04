@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.chat
 import com.labteto.dshmobile.local.ChatStyleGuard
 import com.labteto.dshmobile.local.DeepSeekTokenUsage
 import com.labteto.dshmobile.local.LocalModelReply
+import com.labteto.dshmobile.local.quality.LocalOutputQualityContext
+import com.labteto.dshmobile.local.quality.LocalOutputQualityPipeline
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,6 +26,7 @@ class ChatTurnRunner @Inject constructor(
     loreEngine: CharacterLoreEngine,
 ) {
     private val runtimeProjector = CharacterRuntimeProjector(relationshipEngine, loreEngine)
+    private val outputQualityPipeline = LocalOutputQualityPipeline(listOf(CharacterReplyAnomalyGuard))
     fun prepare(
         personaId: String,
         state: ChatCharacterState = ChatCharacterState(),
@@ -111,10 +114,10 @@ class ChatTurnRunner @Inject constructor(
         }
 
         if (guardEnabled && !persona.isUnboundChatPersona()) {
-            val anomaly = CharacterReplyAnomalyGuard.repair(content)
-            if (anomaly.anomalies.isNotEmpty()) {
-                onGuardEvent("anomaly-filter", anomaly.anomalies.take(4))
-                content = anomaly.text
+            val quality = outputQualityPipeline.inspect(content, LocalOutputQualityContext())
+            if (quality.findings.isNotEmpty()) {
+                onGuardEvent("anomaly-filter", quality.findings.take(4))
+                content = quality.text
             }
         }
 

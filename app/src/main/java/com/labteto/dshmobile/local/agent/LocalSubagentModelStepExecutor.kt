@@ -1,28 +1,34 @@
 package com.labteto.dshmobile.local.agent
 
-import com.labteto.dshmobile.harness.agent.*
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
-import com.labteto.dshmobile.local.*
+import com.labteto.dshmobile.local.LocalAgentModelRequestRuntime
+import com.labteto.dshmobile.local.LocalHistoryCompactor
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelReply
+import com.labteto.dshmobile.local.LocalRunModelSurface
+import com.labteto.dshmobile.local.LocalSessionEventLog
+import com.labteto.dshmobile.local.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
-import com.labteto.dshmobile.local.model.compactOverflow
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
-/** Owns one subagent model-step request, retry and context-overflow recovery policy. */
+/** Owns subagent model-step orchestration; recovery details live in LocalSubagentModelStepPolicy. */
 internal class LocalSubagentModelStepExecutor(
-    private val modelGateway: LocalModelGateway,
+    modelGateway: LocalModelGateway,
     private val modelAttempts: () -> Int,
-    private val resourceScheduler: HarnessResourceScheduler,
-    private val eventLog: () -> LocalSessionEventLog,
-    private val historyCompactor: LocalHistoryCompactor,
-    private val executionControl: LocalWorkExecutionControl? = null,
+    resourceScheduler: HarnessResourceScheduler,
+    eventLog: () -> LocalSessionEventLog,
+    historyCompactor: LocalHistoryCompactor,
+    executionControl: LocalWorkExecutionControl? = null,
 ) {
     private val requestBoundary = LocalSubagentModelRequestBoundary(
-        LocalAgentModelRequestRuntime(modelGateway, resourceScheduler), eventLog, executionControl,
+        LocalAgentModelRequestRuntime(modelGateway, resourceScheduler),
+        eventLog,
+        executionControl,
     )
+    private val modelStepRuntime = LocalAgentModelStepRuntime()
+    private val stepPolicy = LocalSubagentModelStepPolicy(eventLog, historyCompactor)
 
     suspend fun complete(
         surface: LocalRunModelSurface,
@@ -32,121 +38,31 @@ internal class LocalSubagentModelStepExecutor(
         step: Int,
         durableHistory: LocalModelHistoryBuffer? = null,
         allowContextOverflowRecovery: Boolean = true,
-    ): LocalModelReply {
-        val executor = AgentRequestExecutor(
-            maxAttempts = modelAttempts().coerceIn(1, 5),
-            retryable = { error ->
-                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
-            },
-            backoffMillis = { failedAttempt, error ->
-                (error as? LocalModelException)?.providerRetryAfterMs?.coerceIn(0L, 60_000L)
-                    ?: (1_000L shl (failedAttempt - 1).coerceIn(0, 20))
-            },
-            eventSink = AgentRequestEventSink { event ->
-                when (event) {
-                    is AgentRequestEvent.AttemptStarted -> {
-                        eventLog().append("subagent/request", buildJsonObject {
-                            put("agent_id", subagentId)
-                            put("step", step)
-                            put("attempt", event.attempt)
-                            put("max_attempts", event.maxAttempts)
-                        })
-                    }
-                    is AgentRequestEvent.AttemptFailed -> {
-                        eventLog().append("subagent/request-error", buildJsonObject {
-                            put("agent_id", subagentId)
-                            put("step", step)
-                            put("attempt", event.attempt)
-                            put("retryable", event.retryable)
-                            put("will_retry", event.willRetry)
-                            put("detail", event.reason.take(2_000))
-                        })
-                    }
-                    is AgentRequestEvent.RetryScheduled -> {
-                        eventLog().append("subagent/retry", buildJsonObject {
-                            put("agent_id", subagentId)
-                            put("step", step)
-                            put("attempt", event.attempt)
-                            put("next_attempt", event.nextAttempt)
-                            put("delay_ms", event.delayMillis)
-                        })
-                    }
-                    is AgentRequestEvent.AttemptCancelled -> {
-                        eventLog().append("subagent/request-cancelled", buildJsonObject {
-                            put("agent_id", subagentId)
-                            put("step", step)
-                            put("attempt", event.attempt)
-                            event.reason?.let { put("detail", it.take(2_000)) }
-                        })
-                    }
-                    is AgentRequestEvent.AttemptSucceeded -> Unit
-                }
-            },
+    ): LocalModelReply = modelStepRuntime.execute(
+        initialMessages = history,
+        maxAttempts = modelAttempts().coerceIn(1, 5),
+        retryable = { error ->
+            (error as? LocalModelException)?.retryable == true || error is java.io.IOException
+        },
+        backoffMillis = { failedAttempt, error ->
+            (error as? LocalModelException)?.providerRetryAfterMs?.coerceIn(0L, 60_000L)
+                ?: (1_000L shl (failedAttempt - 1).coerceIn(0, 20))
+        },
+        eventSink = stepPolicy.eventSink(subagentId, step),
+        recoveryPolicy = stepPolicy.recoveryPolicy(
+            surface = surface,
+            subagentId = subagentId,
+            step = step,
+            durableHistory = durableHistory,
+            allowContextOverflowRecovery = allowContextOverflowRecovery,
+        ),
+    ) { activeHistory ->
+        requestBoundary.complete(
+            surface = surface,
+            messages = activeHistory,
+            tools = tools,
+            subagentId = subagentId,
+            step = step,
         )
-        var activeHistory = history
-        var overflowRound = 0
-        var structureRecoveryAttempted = false
-        var continuationRound = 0
-        while (true) {
-            try {
-                return executor.execute {
-                    requestBoundary.complete(
-                        surface = surface,
-                        messages = activeHistory,
-                        tools = tools,
-                        subagentId = subagentId,
-                        step = step,
-                    )
-                }
-            } catch (error: Throwable) {
-                val modelError = error as? LocalModelException
-                val continuation = modelError?.let {
-                    subagentContinuationMessage(it, continuationRound)
-                }
-                if (continuation != null) {
-                    continuationRound += 1
-                    activeHistory = activeHistory + continuation
-                    recordSubagentContinuation(
-                        continuation, modelError, continuationRound, durableHistory, eventLog(), subagentId, step,
-                    )
-                    continue
-                }
-                if (!structureRecoveryAttempted) {
-                    LocalSubagentStructureRecovery.recover(
-                        error, activeHistory, subagentId, step, eventLog(),
-                    )?.let { recovered ->
-                        structureRecoveryAttempted = true
-                        activeHistory = recovered
-                        continue
-                    }
-                }
-                if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
-                val compacted = historyCompactor.compactForOverflow(
-                    activeHistory,
-                    LocalHistorySummaryMode.WORK,
-                ) ?: throw error
-                val madeProgress = compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
-                    compacted.messages != activeHistory
-                if (!madeProgress) throw error
-
-                overflowRound += 1
-                durableHistory?.compactOverflow(
-                    compactor = historyCompactor,
-                    summaryMode = LocalHistorySummaryMode.WORK,
-                )?.let { durableCompaction ->
-                    recordSubagentCompaction(durableCompaction, eventLog(), subagentId, overflowRound)
-                }
-                eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
-                    put("agent_id", subagentId)
-                    put("step", step)
-                    put("round", overflowRound)
-                    put("model", surface.model)
-                    put("estimated_tokens_before", compacted.estimatedTokensBefore)
-                    put("estimated_tokens_after", compacted.estimatedTokensAfter)
-                    put("omitted_messages", compacted.omittedMessages)
-                })
-                activeHistory = compacted.messages
-            }
-        }
     }
 }
