@@ -1182,6 +1182,12 @@ class LocalHarnessEngine @Inject constructor(
     internal suspend fun generateReplySuggestions(): Boolean =
         replySuggestionCoordinator.generate()
     internal fun chatDiaryEntries(subjectKey: String, limit: Int) = chatDiaryStore.listActive(subjectKey, limit)
+    internal fun chatDiaryEntriesForTransfer(subjectKey: String) = chatDiaryStore.listForTransfer(subjectKey)
+    internal fun importChatDiaryEntriesForTransfer(
+        subjectKey: String,
+        personaName: String,
+        entries: List<com.labteto.dshmobile.local.chat.ChatDiaryEntry>,
+    ): Int = chatDiaryStore.importForTransfer(subjectKey, personaName, entries)
 
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult {
