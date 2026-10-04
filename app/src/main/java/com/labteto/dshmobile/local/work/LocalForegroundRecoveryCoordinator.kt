@@ -9,9 +9,9 @@ internal data class LocalForegroundRecoveryResult(
 /** Owns persisted foreground-run recovery after runtime ownership has been ruled out. */
 internal class LocalForegroundRecoveryCoordinator(
     private val agentRunCoordinator: LocalAgentRunCoordinator,
-    private val hasCredential: (LocalModelProfile) -> Boolean,
+    private val hasCredential: suspend (LocalModelProfile) -> Boolean,
 ) {
-    fun restore(
+    suspend fun restore(
         sessionId: String,
         decision: LocalAgentRunRecoveryDecision?,
         profiles: List<LocalModelProfile>,
