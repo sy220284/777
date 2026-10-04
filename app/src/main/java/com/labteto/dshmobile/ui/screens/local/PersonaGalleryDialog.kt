@@ -369,7 +369,7 @@ internal fun PersonaGalleryScreen(
         }
     }
 
-    BackHandler(onBack = ::navigateBack)
+    BackHandler(enabled = selected != null, onBack = ::navigateBack)
 
     presets.firstOrNull { it.id == pendingPresetDeleteId }?.let { pending ->
         DeletePresetConfirmDialog(
