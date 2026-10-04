@@ -57,7 +57,9 @@ class PersonaPresetCatalogTest {
     fun starterPresetsContainLivingCharacterSignals() {
         PersonaPresetCatalog.presets.forEach { preset ->
             assertTrue(preset.persona.coreValues.isNotEmpty())
+            assertTrue(preset.persona.coreTension.isNotBlank())
             assertTrue(preset.persona.attentionBiases.isNotEmpty())
+            assertTrue(preset.persona.attentionKeywords.isNotEmpty())
             assertTrue(preset.persona.perceptionBlindSpots.isNotEmpty())
             assertTrue(preset.persona.quirks.isNotEmpty())
             assertTrue(preset.persona.limitations.isNotEmpty())
