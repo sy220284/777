@@ -56,4 +56,24 @@ class LocalToolSchemaContinuityTest {
         assertEquals(removed, appendOnlyToolSchemas(previous, removed))
         assertEquals(mutated, appendOnlyToolSchemas(previous, mutated))
     }
+    @Test
+    fun frozenRunSurfaceKeepsToolUpdateModeStableAcrossLaterStateChanges() {
+        val surface = LocalModelProfile(
+            id = "deepseek-run",
+            model = "deepseek-chat",
+            baseUrl = "https://api.deepseek.com",
+            provider = "DeepSeek",
+        ).toRunModelSurface()
+        val runTools = LocalRunToolSurface(surface)
+
+        assertEquals(
+            listOf("a", "b"),
+            names(runTools.next(JsonArray(listOf(tool("a"), tool("b"))))),
+        )
+        assertEquals(
+            listOf("a", "b", "c"),
+            names(runTools.next(JsonArray(listOf(tool("b"), tool("a"), tool("c"))))),
+        )
+    }
+
 }
