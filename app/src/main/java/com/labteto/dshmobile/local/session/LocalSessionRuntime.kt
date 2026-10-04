@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.chat.MIN_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.StateFlow
@@ -24,8 +25,9 @@ import kotlinx.coroutines.flow.StateFlow
 @Singleton
 class LocalSessionRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
+    private val runtimeStateStore: LocalRuntimeStateStore,
 ) {
-    internal val state: StateFlow<LocalHarnessState> = engine.state
+    internal val state: StateFlow<LocalHarnessState> = runtimeStateStore.state
     internal val streamingState: StateFlow<LocalHarnessStreamingState> = engine.streamingState; internal val sendFeedbackState: StateFlow<com.labteto.dshmobile.local.send.LocalSendFeedbackState> = engine.sendFeedbackState
 
     internal fun createSession(mode: LocalConversationMode) = engine.createSession(mode)
@@ -68,6 +70,7 @@ class LocalSessionRuntime @Inject constructor(
         chatMode = LocalChatMode.SINGLE,
     )
 
+    internal fun switchChatMode(mode: LocalChatMode) = engine.switchChatMode(mode)
     internal fun switchUsageMode(mode: LocalUsageMode) = engine.switchUsageMode(mode)
     internal fun switchSession(sessionId: String) = engine.switchSession(sessionId)
     internal suspend fun deleteSessions(ids: Set<String>): Int = engine.deleteSessions(ids)
