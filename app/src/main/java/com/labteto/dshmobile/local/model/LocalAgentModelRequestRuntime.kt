@@ -7,11 +7,10 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
 /**
- * Shared physical provider-call boundary for foreground agents and subagents.
+ * Shared admitted provider-call boundary for foreground agents and subagents.
  *
- * Retry, admission, projection and recovery stay with their existing policy owners for now. The
- * frozen route, resource lease and actual provider invocation already share one implementation,
- * giving later request-lifecycle convergence a stable seam without changing current retry behavior.
+ * Route identity, context admission, Work exposure budget, resource lease and provider invocation
+ * are one operation. Retry/recovery orchestration is owned by LocalAgentModelStepRuntime.
  */
 internal class LocalAgentModelRequestRuntime(
     private val modelGateway: LocalModelGateway,
@@ -26,33 +25,44 @@ internal class LocalAgentModelRequestRuntime(
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
+        executionControl: LocalWorkExecutionControl? = null,
         onDelta: (LocalModelDelta) -> Unit = {},
-    ): LocalModelReply = resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-        if (streaming) {
-            modelGateway.completeStreaming(
-                model = surface.model,
-                baseUrl = surface.baseUrl,
-                messages = messages,
-                tools = tools,
-                temperature = temperature,
-                profile = surface.profile,
-                promptCacheComparisonResponseId = promptCacheComparisonResponseId,
-                promptCacheKey = promptCacheKey,
-                promptCacheTtl = promptCacheTtl,
-                onDelta = onDelta,
-            )
-        } else {
-            modelGateway.complete(
-                model = surface.model,
-                baseUrl = surface.baseUrl,
-                messages = messages,
-                tools = tools,
-                temperature = temperature,
-                profile = surface.profile,
-                promptCacheComparisonResponseId = promptCacheComparisonResponseId,
-                promptCacheKey = promptCacheKey,
-                promptCacheTtl = promptCacheTtl,
-            )
+    ): LocalModelReply = executeWithModelAdmission(
+        control = executionControl,
+        routeFingerprint = surface.routeFingerprint,
+        model = surface.model,
+        baseUrl = surface.baseUrl,
+        contextWindowTokensOverride = surface.contextWindowTokensOverride,
+        messages = messages,
+        tools = tools,
+    ) {
+        resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+            if (streaming) {
+                modelGateway.completeStreaming(
+                    model = surface.model,
+                    baseUrl = surface.baseUrl,
+                    messages = messages,
+                    tools = tools,
+                    temperature = temperature,
+                    profile = surface.profile,
+                    promptCacheComparisonResponseId = promptCacheComparisonResponseId,
+                    promptCacheKey = promptCacheKey,
+                    promptCacheTtl = promptCacheTtl,
+                    onDelta = onDelta,
+                )
+            } else {
+                modelGateway.complete(
+                    model = surface.model,
+                    baseUrl = surface.baseUrl,
+                    messages = messages,
+                    tools = tools,
+                    temperature = temperature,
+                    profile = surface.profile,
+                    promptCacheComparisonResponseId = promptCacheComparisonResponseId,
+                    promptCacheKey = promptCacheKey,
+                    promptCacheTtl = promptCacheTtl,
+                )
+            }
         }
     }
 }
