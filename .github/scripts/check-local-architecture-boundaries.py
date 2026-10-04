@@ -772,6 +772,11 @@ if "package com.labteto.dshmobile.local.runtime" not in session_runtime_registry
     die("Session ownership must live in the shared runtime package")
 if "package com.labteto.dshmobile.local.runtime" not in agent_run_runtime:
     die("Agent run ownership/recovery must live in the shared runtime package")
+recovery_model_route = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/model/LocalRecoveryModelRoute.kt")
+)
+if "import com.labteto.dshmobile.local.runtime.LocalAgentRunRouteIdentity" not in recovery_model_route:
+    die("Recovery model routing must consume the shared Runtime route identity after package migration")
 session_lifecycle = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt")
 )

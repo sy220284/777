@@ -487,6 +487,9 @@ class LocalHarnessEngine @Inject internal constructor(
     )
     private val resourceBudget get() = runtimeStateStore.resourceBudget
     private val resourceScheduler get() = runtimeStateStore.resourceScheduler
+    private val imageCapabilities = LocalImageCapabilityRegistry()
+    private val imageRequestBudget =
+        localImageRequestBudgetForModelConcurrency(resourceBudget.maxModelRequests)
     private fun liveWorkRun(sessionId: String): LocalWorkRunBinding? =
         workRunRegistry.live(sessionId)
     private val jobs = LocalJobManager(scope, persistentJobStore) { snapshot ->
