@@ -211,13 +211,11 @@ class LocalHarnessEngine @Inject internal constructor(
     }
     private val toolRegistry
         get() = pluginComposition.tools
-    private val enabledOptionalTools = linkedSetOf<String>()
     private val toolExecutionCoordinator by lazy {
         LocalToolExecutionCoordinator(
             registry = toolRegistry,
             currentSessionId = { currentSessionId },
             planMode = { _state.value.work.planMode },
-            enabledOptionalTools = enabledOptionalTools,
             requestApproval = { call, tool, summary -> approve(call, summary, tool) },
             recordExecutionStarted = { sessionId, call ->
                 eventLogFor(sessionId).append("tool/execution-started", buildJsonObject {
@@ -2992,13 +2990,7 @@ class LocalHarnessEngine @Inject internal constructor(
         val completedToolCallIds = linkedSetOf<String>()
 
         fun settlePendingTools(reason: String) {
-            val stepStartSequence = runEventLog.latest("step/start")?.sequence ?: -1L
-            val actuallyStarted = activeToolCalls.mapNotNull { call ->
-                val started = runEventLog.latestMatching(setOf("tool/execution-started")) { data ->
-                    data["id"]?.jsonPrimitive?.contentOrNull == call.id
-                }
-                call.id.takeIf { started != null && started.sequence > stepStartSequence }
-            }.toSet()
+            val actuallyStarted = startedToolCallIdsForActiveStep(runEventLog, activeToolCalls)
             val settlements = pendingToolSettlements(
                 calls = activeToolCalls,
                 startedCallIds = actuallyStarted,
