@@ -51,8 +51,8 @@ internal object PersonaImmersionPolicy {
                 entry.keywords.forEach(::appendLine)
             }
         }
-        return NON_EMBODIED_CHARACTER_MARKERS.any { marker ->
-            source.contains(marker, ignoreCase = true)
+        return NON_EMBODIED_CHARACTER_PATTERNS.any { pattern ->
+            pattern.containsMatchIn(source)
         }
     }
 
@@ -70,10 +70,10 @@ internal object PersonaImmersionPolicy {
         Regex("""(?i)(?:我)?\s*(?:没有|不具备|无法产生|不能产生)\s*(?:真正的|真实的)?\s*(?:感情|情感|感受)"""),
     )
 
-    private val NON_EMBODIED_CHARACTER_MARKERS = listOf(
-        "幽灵", "灵体", "意识体", "机器人", "仿生人", "机械生命", "人工智能", "AI",
-        "程序生命", "数字生命", "虚拟生命", "全息投影", "投影形态", "无实体", "没有固定肉身",
-        "寄宿", "机体",
+    private val NON_EMBODIED_CHARACTER_PATTERNS = listOf(
+        Regex("""幽灵|灵体|意识体|机器人|仿生人|机械生命|程序生命|数字生命|虚拟生命|全息投影|投影形态|无实体|没有固定肉身|寄宿.{0,16}(?:镜|物|载体)|机械机体"""),
+        Regex("""(?i)(?:本体|身份|自身|角色|她|他|它|ta).{0,12}(?:是|属于|为).{0,8}(?:AI|人工智能)(?:意识|生命|程序|人格|个体)?"""),
+        Regex("""(?i)(?:AI|人工智能)(?:意识|生命|程序|人格|个体|角色)"""),
     )
 
     private val OUT_OF_ROLE_PATTERNS = listOf(
