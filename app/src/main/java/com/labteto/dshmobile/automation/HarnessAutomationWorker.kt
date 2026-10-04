@@ -77,6 +77,16 @@ class HarnessAutomationWorker(
         val id = inputData.getString(HarnessAutomationScheduler.KEY_TASK_ID)
             ?: return Result.failure()
         val manualRun = inputData.getBoolean(HarnessAutomationScheduler.KEY_MANUAL_RUN, false)
+        val lease = AutomationExecutionRegistry.tryAcquire(id)
+            ?: return if (manualRun) Result.success() else Result.retry()
+        return try {
+            doOwnedWork(id, manualRun)
+        } finally {
+            lease.close()
+        }
+    }
+
+    private suspend fun doOwnedWork(id: String, manualRun: Boolean): Result {
         val entry = EntryPointAccessors.fromApplication(
             applicationContext,
             WorkerEntryPoint::class.java,
@@ -84,21 +94,31 @@ class HarnessAutomationWorker(
         val store = entry.automationStore()
         val scheduler = entry.automationScheduler()
         var task = store.get(id) ?: return Result.success()
-        if ((!manualRun && task.scheduleGeneration != inputData.getLong(HarnessAutomationScheduler.KEY_SCHEDULE_GENERATION, 0L)) ||
+        val requestedGeneration = inputData.getLong(
+            HarnessAutomationScheduler.KEY_SCHEDULE_GENERATION,
+            task.scheduleGeneration,
+        )
+        if (
+            task.scheduleGeneration != requestedGeneration ||
             (task.status in setOf("paused", "waiting_user") && !manualRun)
         ) return Result.success()
 
         val recovering = !manualRun && task.status == "running" && task.lastRunAt != null
         val started = if (recovering) task.lastRunAt!! else System.currentTimeMillis()
         if (!manualRun) {
-            store.update(id) {
+            task = store.updateIf(
+                id,
+                predicate = {
+                    it.scheduleGeneration == requestedGeneration &&
+                        it.status !in setOf("paused", "waiting_user")
+                },
+            ) {
                 it.copy(
                     status = "running",
                     lastRunAt = started,
                     lastError = null,
                 )
-            }
-            task = store.get(id) ?: return Result.success()
+            } ?: return Result.success()
         }
 
         return try {
@@ -108,10 +128,12 @@ class HarnessAutomationWorker(
                     text = task.prompt,
                     preferredSessionId = task.workSessionId,
                 ).also { sessionId ->
-                    store.update(id) { current ->
+                    task = store.updateIf(
+                        id,
+                        predicate = { it.scheduleGeneration == requestedGeneration },
+                    ) { current ->
                         current.copy(workSessionId = sessionId)
-                    }
-                    task = store.get(id) ?: task.copy(workSessionId = sessionId)
+                    } ?: return Result.success()
                 }
             } else {
                 task.workSessionId
@@ -150,7 +172,7 @@ class HarnessAutomationWorker(
             }
             val finished = System.currentTimeMillis()
             val chained = !manualRun && usesChainedChatScheduling(task)
-            val waitingForUserReply = !manualRun &&
+            val waitingRequested = !manualRun &&
                 run.waitingForUserReply &&
                 task.mode == AutomationMode.CHAT &&
                 task.recurringMinutes != null
@@ -158,24 +180,35 @@ class HarnessAutomationWorker(
                 task.recurringMinutes == null &&
                 !run.delivered &&
                 run.nextRunAtHint != null
-            val next = when {
-                waitingForUserReply -> null
-                chained -> nextAnchoredAutomationRun(
-                    task = task,
-                    afterMillis = finished,
-                    suggestedRunAt = run.nextRunAtHint,
-                )
-                deferredOneShot -> run.nextRunAtHint
-                !manualRun && task.recurringMinutes != null ->
-                    checkedAutomationFutureMillis(finished, task.recurringMinutes, "任务周期")
-                else -> task.nextRunAt
-            }
             val receiptStatus = if (run.delivered) "completed" else "skipped"
             val resultText = run.skipReason ?: run.output
-            val updated = store.update(id) { current ->
+            var committedNext: Long? = null
+            var committedWaiting = false
+            val updated = store.updateIf(
+                id,
+                predicate = { it.scheduleGeneration == requestedGeneration },
+            ) { current ->
+                val userActivityDuringRun = current.lastUserActivityAt
+                    ?.takeIf { it >= started }
+                committedWaiting = waitingRequested && userActivityDuringRun == null
+                committedNext = when {
+                    manualRun -> current.nextRunAt
+                    waitingRequested && userActivityDuringRun != null ->
+                        nextAutomationRunAfterUserActivity(current, userActivityDuringRun)
+                    committedWaiting -> null
+                    chained -> nextAnchoredAutomationRun(
+                        task = current,
+                        afterMillis = finished,
+                        suggestedRunAt = run.nextRunAtHint,
+                    )
+                    deferredOneShot -> run.nextRunAtHint
+                    current.recurringMinutes != null ->
+                        checkedAutomationFutureMillis(finished, current.recurringMinutes, "任务周期")
+                    else -> current.nextRunAt
+                }
                 val nextStatus = when {
                     manualRun -> current.status
-                    waitingForUserReply -> "waiting_user"
+                    committedWaiting -> "waiting_user"
                     chained || deferredOneShot || current.recurringMinutes != null -> "scheduled"
                     else -> "completed"
                 }
@@ -186,7 +219,7 @@ class HarnessAutomationWorker(
                         current.workSessionId
                     },
                     status = nextStatus,
-                    nextRunAt = if (manualRun) current.nextRunAt else next ?: current.nextRunAt,
+                    nextRunAt = if (manualRun) current.nextRunAt else committedNext ?: current.nextRunAt,
                     lastResult = truncateWithoutSplittingSurrogatePair(resultText, 20_000),
                     lastError = null,
                     failureStreak = if (manualRun) current.failureStreak else 0,
@@ -205,25 +238,27 @@ class HarnessAutomationWorker(
                     ),
                 )
             }
-            if (run.delivered) {
+            if (updated != null && run.delivered) {
                 maybeNotify(
                     entry = entry,
-                    task = task,
+                    task = updated,
                     titleRes = R.string.tasks_notification_complete,
                     sessionId = run.sessionId,
                     resultText = run.output,
                 )
             }
             if (
-                (chained || deferredOneShot) &&
-                next != null &&
-                updated?.status == "scheduled"
+                updated?.status == "scheduled" &&
+                committedNext != null &&
+                (usesChainedChatScheduling(updated) || updated.recurringMinutes == null)
             ) {
-                scheduler.enqueueNextChained(id, next)
+                scheduler.enqueueNextChained(id, requireNotNull(committedNext))
             }
-            if (waitingForUserReply) {
+            if (updated != null && committedWaiting) {
                 WorkManager.getInstance(applicationContext)
-                    .cancelUniqueWork(HarnessAutomationScheduler.workName(id))
+                    .cancelUniqueWork(
+                        HarnessAutomationScheduler.workName(id, requestedGeneration),
+                    )
             }
             Result.success()
         } catch (cancelled: CancellationException) {
