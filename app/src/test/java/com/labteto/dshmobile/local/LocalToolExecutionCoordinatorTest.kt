@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.work.LocalWorkState
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
@@ -592,7 +593,7 @@ class LocalToolExecutionCoordinatorTest {
         ).single().jsonObject
         val planning = projection.modelSchemas(
             policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            state = LocalHarnessState(planMode = true),
+            state = LocalHarnessState(work = LocalWorkState(planMode = true)),
             history = emptyList(),
         ).single().jsonObject
         val writable = projection.subagentSchemas(
@@ -629,7 +630,7 @@ class LocalToolExecutionCoordinatorTest {
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
         val schemas = projection.modelSchemas(
             policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            state = LocalHarnessState(planMode = true),
+            state = LocalHarnessState(work = LocalWorkState(planMode = true)),
             history = emptyList(),
             enabledOptional = setOf("remote_lookup"),
         )
