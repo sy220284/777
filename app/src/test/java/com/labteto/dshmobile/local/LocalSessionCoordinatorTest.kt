@@ -161,7 +161,12 @@ class LocalSessionCoordinatorTest {
         )
         coordinator.writeNow(snapshot)
 
-        val restored = requireNotNull(coordinator.read("round-trip"))
+        // A fresh repository must decode disk, rather than returning the writer's cached snapshot.
+        val coldRepository = LocalSessionRepository(sessions, json, backgroundScope, {}, {})
+        val coldCoordinator = LocalSessionCoordinator(
+            coldRepository, { id -> LocalSessionEventLog(File(sessions, "$id.events.jsonl"), json) }, 2,
+        )
+        val restored = requireNotNull(coldCoordinator.read("round-trip"))
         assertEquals(snapshot, restored)
         assertEquals(chat.chatBranches, restored.chatBranches)
         assertEquals(chat.groupChat, restored.groupChat)
