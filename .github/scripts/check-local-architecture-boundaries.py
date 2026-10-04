@@ -26,7 +26,7 @@ RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 4,
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 12,
+    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 9,
 }
 PROJECTION_FIELD_BUDGETS = {
     "LocalHarnessSettingsState": 17,
@@ -288,6 +288,15 @@ if "runtimeStateStore.state" not in settings_runtime_source:
     die("LocalSettingsRuntime must consume LocalRuntimeStateStore for visible settings state")
 if "engine.state" in settings_runtime_source:
     die("LocalSettingsRuntime must not reach through LocalHarnessEngine for aggregate state")
+if "private val modelRuntime: LocalModelRuntime" not in settings_runtime_source:
+    die("LocalSettingsRuntime must depend on the Model capability for model operations")
+for forbidden_model_proxy in (
+    "engine.configure(apiKey, model, baseUrl)",
+    "engine.selectModel(id)",
+    "engine.clearCredential()",
+):
+    if forbidden_model_proxy in settings_runtime_source:
+        die("LocalSettingsRuntime must route model operations through LocalModelRuntime: " + forbidden_model_proxy)
 
 automation_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt")
