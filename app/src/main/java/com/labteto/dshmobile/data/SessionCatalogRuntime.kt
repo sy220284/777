@@ -13,15 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * Unified owner for host/session capability catalogs exposed by the remote harness.
- *
- * SessionStore remains the conversation stream/fold owner. Catalog discovery, loading flags and
- * stale-response guards live here so commands, models, skills, plugins, presets and permissions do
- * not each maintain an independent control plane.
- */
+/** Host/session catalogs with one stale-response boundary for every async publication. */
 internal class SessionCatalogRuntime(
-    private val apiProvider: () -> DshApiClient?,
     private val apiForHost: (String?) -> DshApiClient?,
     private val activeHostKey: () -> String?,
     private val currentSessionId: () -> String?,
@@ -65,15 +58,16 @@ internal class SessionCatalogRuntime(
 
     suspend fun refreshCommands(sessionId: String?) {
         val sid = sessionId ?: return
-        val api = apiProvider() ?: return
+        val scope = SessionAsyncScope(activeHostKey(), sid)
+        val api = apiForHost(scope.hostKey) ?: return
         when (val result = api.commandsList(sid)) {
-            is RpcResult.Ok -> {
-                if (currentSessionId() == sid) {
-                    _commands.value = result.value
-                    _commandsAvailable.value = true
-                }
+            is RpcResult.Ok -> if (scope.isCurrent(activeHostKey, currentSessionId)) {
+                _commands.value = result.value
+                _commandsAvailable.value = true
             }
-            is RpcResult.Err -> markCommandsUnavailable(result.error.code, result.error.message)
+            is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) {
+                markCommandsUnavailable(result.error.code, result.error.message)
+            }
         }
     }
 
@@ -84,10 +78,11 @@ internal class SessionCatalogRuntime(
     }
 
     suspend fun refreshPlugins() {
-        val api = apiProvider() ?: return
+        val scope = SessionAsyncScope(activeHostKey())
+        val api = apiForHost(scope.hostKey) ?: return
         when (val result = api.pluginInventoryList()) {
-            is RpcResult.Ok -> _plugins.value = result.value
-            is RpcResult.Err -> {
+            is RpcResult.Ok -> if (scope.isCurrent(activeHostKey, currentSessionId)) _plugins.value = result.value
+            is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) {
                 _plugins.value = null
                 logger("pluginInventory/list unavailable (${result.error.code}): ${result.error.message}")
             }
@@ -95,47 +90,47 @@ internal class SessionCatalogRuntime(
     }
 
     suspend fun refreshAgentPresets() {
-        val api = apiProvider() ?: return
+        val scope = SessionAsyncScope(activeHostKey())
+        val api = apiForHost(scope.hostKey) ?: return
         when (val result = api.agentPresetList()) {
-            is RpcResult.Ok -> _agentPresets.value = result.value
-            is RpcResult.Err ->
+            is RpcResult.Ok -> if (scope.isCurrent(activeHostKey, currentSessionId)) _agentPresets.value = result.value
+            is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) {
                 logger("agentPreset.list unavailable (${result.error.code}): ${result.error.message}")
+            }
         }
     }
 
     suspend fun loadSkills(sessionId: String) {
-        val api = apiProvider()
+        val scope = SessionAsyncScope(activeHostKey(), sessionId)
+        val api = apiForHost(scope.hostKey)
         if (api == null) {
-            if (currentSessionId() == sessionId) _skillsLoading.value = false
+            if (scope.isCurrent(activeHostKey, currentSessionId)) _skillsLoading.value = false
             return
         }
         try {
             when (val result = api.skillList(SkillListRequest(sessionId))) {
-                is RpcResult.Ok -> {
-                    if (currentSessionId() == sessionId) _skills.value = result.value.skills
-                }
-                is RpcResult.Err -> onConnectionError(result.error.message)
+                is RpcResult.Ok -> if (scope.isCurrent(activeHostKey, currentSessionId)) _skills.value = result.value.skills
+                is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) onConnectionError(result.error.message)
             }
         } finally {
-            if (currentSessionId() == sessionId) _skillsLoading.value = false
+            if (scope.isCurrent(activeHostKey, currentSessionId)) _skillsLoading.value = false
         }
     }
 
     suspend fun loadModels(sessionId: String) {
-        val api = apiProvider()
+        val scope = SessionAsyncScope(activeHostKey(), sessionId)
+        val api = apiForHost(scope.hostKey)
         if (api == null) {
-            if (currentSessionId() == sessionId) _modelsLoading.value = false
+            if (scope.isCurrent(activeHostKey, currentSessionId)) _modelsLoading.value = false
             return
         }
         try {
             when (val result = api.sessionModelCatalog()) {
-                is RpcResult.Ok -> {
-                    if (currentSessionId() == sessionId) _models.value = result.value
-                }
-                is RpcResult.Err -> onConnectionError(result.error.message)
+                is RpcResult.Ok -> if (scope.isCurrent(activeHostKey, currentSessionId)) _models.value = result.value
+                is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) onConnectionError(result.error.message)
             }
         } finally {
-            if (currentSessionId() == sessionId) _modelsLoading.value = false
+            if (scope.isCurrent(activeHostKey, currentSessionId)) _modelsLoading.value = false
         }
     }
 
