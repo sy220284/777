@@ -169,7 +169,6 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 
 - `LocalHarnessEngine` public surface。
 - Engine 构造依赖。
-- 已知热点文件行数。
 - UI / Worker 直接依赖 Engine 的 allowlist。
 - capability package 边界。
 - 聚合状态规模。
