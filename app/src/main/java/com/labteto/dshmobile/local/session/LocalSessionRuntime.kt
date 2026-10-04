@@ -32,7 +32,7 @@ class LocalSessionRuntime @Inject constructor(
     internal val sendFeedbackState: StateFlow<com.labteto.dshmobile.local.send.LocalSendFeedbackState> =
         runtimeStateStore.sendFeedbackState
 
-    internal fun createSession(mode: LocalConversationMode) = engine.createSession(mode)
+    internal fun createSession(mode: LocalConversationMode) = createSession(mode, state.value.usageMode)
     internal fun createSession(
         mode: LocalConversationMode,
         usageMode: LocalUsageMode,
