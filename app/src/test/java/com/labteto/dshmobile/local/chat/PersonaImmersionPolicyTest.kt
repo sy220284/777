@@ -63,6 +63,17 @@ class PersonaImmersionPolicyTest {
     }
 
     @Test
+    fun ordinaryDiscussionAboutAiIsNotTreatedAsIdentityLeak() {
+        val persona = PersonaProfile(
+            name = "林然",
+            portrait = "一家科技公司的AI研究员，平时喜欢跑步和做饭。",
+        )
+
+        assertTrue(!PersonaImmersionPolicy.breaksReplyImmersion(persona, "我今天在看语言模型的上下文窗口设计，论文写得有点绕。"))
+        assertTrue(!PersonaImmersionPolicy.breaksReplyImmersion(persona, "这个系统提示写得太啰嗦了，得重新整理一下。"))
+    }
+
+    @Test
     fun runtimeKeepsInWorldLimitsForExplicitNonEmbodiedCharacters() {
         val persona = PersonaProfile(
             name = "镜中客",
