@@ -815,7 +815,8 @@ class ChatDiaryStoreTest {
     @Test
     fun failedGalleryCommitRollsBackDiaryImportBeforeReleasingWriterLock() {
         val source = ChatDiaryStore(File(temporary.root, "rollback-source"), json)
-        val target = ChatDiaryStore(File(temporary.root, "rollback-target"), json)
+        val targetRoot = File(temporary.root, "rollback-target")
+        val target = ChatDiaryStore(targetRoot, json)
         val transferred = listOf(source.record(request(
             delta = ChatDiaryDelta(
                 event = "用户答应周末一起吃饭",
