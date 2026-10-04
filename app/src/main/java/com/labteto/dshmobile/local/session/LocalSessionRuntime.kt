@@ -28,7 +28,9 @@ class LocalSessionRuntime @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
 ) {
     internal val state: StateFlow<LocalHarnessState> = runtimeStateStore.state
-    internal val streamingState: StateFlow<LocalHarnessStreamingState> = engine.streamingState; internal val sendFeedbackState: StateFlow<com.labteto.dshmobile.local.send.LocalSendFeedbackState> = engine.sendFeedbackState
+    internal val streamingState: StateFlow<LocalHarnessStreamingState> = engine.streamingState
+    internal val sendFeedbackState: StateFlow<com.labteto.dshmobile.local.send.LocalSendFeedbackState> =
+        runtimeStateStore.sendFeedbackState
 
     internal fun createSession(mode: LocalConversationMode) = engine.createSession(mode)
     internal fun createSession(
