@@ -338,6 +338,46 @@ class PersonaTransferDocumentsTest {
     }
 
     @Test
+    fun galleryChangeAfterPreparationRollsBackDiaryImport() {
+        val gallery = ChatPersonaGalleryStore(File(temporary.root, "transaction-gallery.json"), json)
+        val diary = ChatDiaryStore(File(temporary.root, "transaction-diary"), json)
+        val document = PersonaTransferDocuments.encode(
+            json = json,
+            entry = sampleEntry(),
+            format = PersonaTransferFormat.JSON,
+            diaryEntries = sampleDiaryEntries(),
+        )
+        val prepared = gallery.preparePersonaDocumentImport(
+            bytes = document.bytes,
+            fileName = "小岚.persona.json",
+            mimeType = "application/json",
+        ) as PersonaGalleryPreparedImport.Archive
+        val subjectKey = "gallery:${prepared.entry.id}"
+
+        gallery.save(
+            persona = PersonaProfile(name = "旁观者", portrait = "用于制造并发图集变更"),
+            sourceSessionId = "",
+            history = emptyList(),
+            chatState = ChatCharacterState(),
+            notes = "",
+        )
+
+        val result = runCatching {
+            diary.importForTransfer(
+                subjectKey = subjectKey,
+                personaName = prepared.entry.persona.name,
+                entries = prepared.diaryEntries,
+            ) {
+                gallery.commitPersonaDocumentImport(prepared)
+            }
+        }
+
+        assertTrue(result.isFailure)
+        assertTrue(diary.listForTransfer(subjectKey).isEmpty())
+        assertEquals(listOf("旁观者"), gallery.list().map { it.persona.name })
+    }
+
+    @Test
     fun currentPersonaShareJsonImportsWithoutStories() {
         val source = ChatPersonaGalleryStore(
             File(temporary.root, "legacy-source.json"),
