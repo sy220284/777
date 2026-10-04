@@ -61,14 +61,14 @@ internal class LocalAgentModelRequestRuntime(
         }
         if (admissionHandledExternally) return invokeProvider()
         return executeWithModelAdmission(
-        control = executionControl,
-        routeFingerprint = surface.routeFingerprint,
-        model = surface.model,
-        baseUrl = surface.baseUrl,
-        contextWindowTokensOverride = surface.contextWindowTokensOverride,
-        messages = messages,
-        tools = tools,
-    ) {
+            control = executionControl,
+            routeFingerprint = surface.routeFingerprint,
+            model = surface.model,
+            baseUrl = surface.baseUrl,
+            contextWindowTokensOverride = surface.contextWindowTokensOverride,
+            messages = messages,
+            tools = tools,
+        ) {
             invokeProvider()
         }
     }
