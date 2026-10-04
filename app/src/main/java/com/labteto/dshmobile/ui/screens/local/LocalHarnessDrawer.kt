@@ -61,6 +61,7 @@ internal fun LocalModeDrawer(
     gallery: List<PersonaGalleryEntry>,
     usageMode: LocalUsageMode,
     modeSwitchEnabled: Boolean,
+    drawerOpen: Boolean,
     pinnedSessionIds: Set<String>,
     sessionTitleOverrides: Map<String, String>,
     currentGalleryId: String?,
@@ -121,7 +122,7 @@ internal fun LocalModeDrawer(
         selectedIds.clear()
     }
 
-    BackHandler(enabled = selectionOpen || searchOpen) {
+    BackHandler(enabled = drawerOpen && (selectionOpen || searchOpen)) {
         when {
             selectionOpen -> {
                 selectionOpen = false
