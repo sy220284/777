@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
+import com.labteto.dshmobile.local.runtime.LocalAgentRunRecoveryDecision
+
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 internal data class LocalForegroundRecoveryResult(
     val profile: LocalModelProfile? = null,

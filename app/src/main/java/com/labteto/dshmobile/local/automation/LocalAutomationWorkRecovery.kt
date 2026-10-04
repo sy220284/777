@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
+import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+
 internal data class LocalAutomationWorkRecoveryPlan(
     val executionTask: String,
     val profile: LocalModelProfile? = null,

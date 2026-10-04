@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
+
 import com.labteto.dshmobile.local.send.LocalSendDisposition
 import java.util.UUID
 import kotlinx.coroutines.test.runTest

@@ -12,7 +12,7 @@ import javax.inject.Singleton
 @Singleton
 class LocalAutomationRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
-    runtimeStateStore: LocalRuntimeStateStore,
+    private val runtimeStateStore: LocalRuntimeStateStore,
 ) {
     private val runtimeState = runtimeStateStore.state
     internal val planningRevisions = runtimeState.map { it.toAutomationPlanningRevision() }.distinctUntilChanged()
@@ -28,7 +28,7 @@ class LocalAutomationRuntime @Inject constructor(
         runWork(text = text, timeoutMillis = timeoutMillis).output
 
     internal suspend fun <T> withModelRequestResource(block: suspend () -> T): T =
-        engine.withAutomationModelRequestResource(block)
+        runtimeStateStore.withModelRequestResource(block)
 
 
     internal suspend fun prepareWorkSession(text: String, preferredSessionId: String? = null): String =

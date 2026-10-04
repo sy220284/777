@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
+
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.work.LocalWorkState

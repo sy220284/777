@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

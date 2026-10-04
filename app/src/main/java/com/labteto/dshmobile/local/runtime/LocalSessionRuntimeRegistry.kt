@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.sync.Mutex

@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
+import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.capability.HarnessVirtualDisplayProvider
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+
 import com.labteto.dshmobile.local.chat.ChatReplyRepairBudget
 import com.labteto.dshmobile.local.chat.ChatContinuityGuardMode
 import com.labteto.dshmobile.local.chat.ChatContextState

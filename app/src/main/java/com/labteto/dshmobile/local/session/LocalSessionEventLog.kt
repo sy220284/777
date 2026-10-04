@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+
 import com.labteto.dshmobile.harness.session.SessionEventLog
 import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery

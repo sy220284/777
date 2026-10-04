@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
+
 import com.labteto.dshmobile.local.runtime.LocalKernelState
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler

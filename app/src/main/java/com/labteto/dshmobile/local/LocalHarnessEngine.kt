@@ -1,5 +1,19 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
+
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+
+import com.labteto.dshmobile.local.runtime.LocalAgentRunResourceBudget
+
+import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+
+import com.labteto.dshmobile.local.runtime.LocalAgentRunContext
+
+import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
+
 import com.labteto.dshmobile.local.work.LocalWorkProgressCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.local.work.guardWorkCompletionDelivery
@@ -8,7 +22,6 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.send.prepareLocalSend
-import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
 import com.labteto.dshmobile.observability.AppLog
@@ -29,7 +42,6 @@ import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.capability.ProcessRequest
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
-import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
@@ -149,7 +161,7 @@ class LocalHarnessEngine @Inject internal constructor(
     private val chatPersonaStore get() = chatPersistence.personaStore
     private val chatPersonaGalleryStore get() = chatPersistence.galleryStore
     private val chatDiaryStore get() = chatPersistence.diaryStore
-    private val memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
+    private val memoryClassMb get() = runtimeStateStore.memoryClassMb
     private val persistentJobStore = LocalPersistentJobStore(
         file = File(root, "jobs.json"),
         json = json,
@@ -341,6 +353,26 @@ class LocalHarnessEngine @Inject internal constructor(
         ),
     )
 
+    init {
+        runtimeStateStore.observeResourceSnapshots { snapshot ->
+            projectResourceSnapshotToSessionStates(
+                snapshot = snapshot,
+                contextBudgetFor = { current ->
+                    localHistoryBudgetFor(
+                        memoryClassMb = memoryClassMb,
+                        pressure = snapshot.pressure,
+                        model = current.modelState.model,
+                        baseUrl = current.modelState.baseUrl,
+                        contextWindowTokensOverride =
+                            current.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
+                    ).maxHistoryChars
+                },
+                visibleState = _state,
+                activeRuns = workRunRegistry,
+            )
+        }
+    }
+
     private val currentSessionId: String
         get() = runtimeStateStore.currentSessionId
 
@@ -478,28 +510,8 @@ class LocalHarnessEngine @Inject internal constructor(
                 }
             },
     )
-    private val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
-    private val imageCapabilities = LocalImageCapabilityRegistry()
-    private val imageRequestBudget = localImageRequestBudgetForModelConcurrency(resourceBudget.maxModelRequests)
-    private val resourceScheduler = HarnessResourceScheduler(
-        budget = resourceBudget,
-        onChanged = { snapshot ->
-            projectResourceSnapshotToSessionStates(
-                snapshot = snapshot,
-                contextBudgetFor = { current ->
-                    localHistoryBudgetFor(
-                        memoryClassMb = memoryClassMb,
-                        pressure = snapshot.pressure,
-                        model = current.modelState.model,
-                        baseUrl = current.modelState.baseUrl,
-                        contextWindowTokensOverride = current.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
-                    ).maxHistoryChars
-                },
-                visibleState = _state,
-                activeRuns = workRunRegistry,
-            )
-        },
-    )
+    private val resourceBudget get() = runtimeStateStore.resourceBudget
+    private val resourceScheduler get() = runtimeStateStore.resourceScheduler
     private fun liveWorkRun(sessionId: String): LocalWorkRunBinding? =
         workRunRegistry.live(sessionId)
     private val jobs = LocalJobManager(scope, persistentJobStore) { snapshot ->
@@ -1818,9 +1830,6 @@ class LocalHarnessEngine @Inject internal constructor(
         (binding?.modelHistory ?: modelHistory).append(message)
         updateContextMetrics(binding)
     }
-
-    internal suspend fun <T> withAutomationModelRequestResource(block: suspend () -> T): T =
-        resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST, "automation-planning", block)
 
     internal suspend fun prepareAutomationWorkSession(
         text: String,

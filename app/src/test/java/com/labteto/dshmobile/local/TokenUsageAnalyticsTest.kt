@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+
 import java.time.Instant
 import java.time.ZoneId
 import kotlinx.serialization.json.JsonArray

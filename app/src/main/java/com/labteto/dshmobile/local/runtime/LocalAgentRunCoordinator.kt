@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
+
+import com.labteto.dshmobile.local.*
 
 import com.labteto.dshmobile.local.model.LOCAL_MODEL_TOOL_CALLS_EVENT_KEY
 import com.labteto.dshmobile.harness.agent.AgentEvent

@@ -25,7 +25,7 @@ RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 12,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 4,
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 7,
 }
 PROJECTION_FIELD_BUDGETS = {
@@ -744,8 +744,15 @@ session_event_log = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt")
 )
 session_runtime_registry = strip_comments(
-    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntimeRegistry.kt")
+    read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionRuntimeRegistry.kt")
 )
+agent_run_runtime = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt")
+)
+if "package com.labteto.dshmobile.local.runtime" not in session_runtime_registry:
+    die("Session ownership must live in the shared runtime package")
+if "package com.labteto.dshmobile.local.runtime" not in agent_run_runtime:
+    die("Agent run ownership/recovery must live in the shared runtime package")
 session_lifecycle = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt")
 )
@@ -753,11 +760,19 @@ transcript_history_loader = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryLoader.kt")
 )
 if "runtime.withModelRequestResource" not in automation_planning:
-    die("Automation planning provider calls must use the Engine-owned model request resource lease")
-if "engine.withAutomationModelRequestResource(block)" not in automation_runtime:
-    die("Automation runtime must delegate model request resource ownership to LocalHarnessEngine")
-if 'resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST, "automation-planning", block)' not in engine:
-    die("Automation planning must reuse the Engine-owned HarnessResourceScheduler")
+    die("Automation planning provider calls must use the shared Runtime resource capability")
+if "runtimeStateStore.withModelRequestResource(block)" not in automation_runtime:
+    die("Automation runtime must acquire model-request resources from LocalRuntimeStateStore")
+if "engine.withAutomationModelRequestResource" in automation_runtime or "withAutomationModelRequestResource" in engine:
+    die("Automation resource ownership must not route through LocalHarnessEngine")
+if "internal val resourceScheduler = HarnessResourceScheduler(" not in runtime_state_store:
+    die("LocalRuntimeStateStore must own the single process-wide HarnessResourceScheduler")
+if "private val resourceScheduler = HarnessResourceScheduler(" in engine:
+    die("LocalHarnessEngine must not own HarnessResourceScheduler after Kernel boundary freeze")
+if "LocalWorkRunRegistry" in runtime_state_store or "com.labteto.dshmobile.local.work" in runtime_state_store:
+    die("Shared Runtime capability must not depend on WorkFeature internals")
+if "observeResourceSnapshots" not in runtime_state_store:
+    die("Shared Runtime resource ownership must expose snapshots without importing Feature state")
 if "AutomationExecutionRegistry.tryAcquire(id)" not in automation_worker:
     die("Automation scheduled/manual execution must share one task runtime lease")
 if "AutomationExecutionRegistry.tryAcquire(id) ?: return Result.retry()" not in automation_worker:

@@ -386,70 +386,59 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 ## 12. 迁移阶段
 
-### 阶段 1：Feature 组合骨架与导航事实源
+### 阶段 1：冻结 Kernel / Shared Capability 边界
 
-状态：**进行中，本 PR 开始落地。**
+状态：**已完成。**
 
-内容：
-
-- 建立不可变 `LocalFeatureCatalog`；
-- 子功能路由唯一归属 Feature；
-- 本机导航从 Catalog 解析；
-- 功能页面状态清理从 Catalog 枚举；
-- 增加唯一归属测试与架构门禁；
-- README / 权威架构文档切换到 3.0。
+- Session ownership 正式进入 `local.runtime` 共享运行层，前台、Automation、维护和删除继续共用同一 owner 事实源；
+- Agent run identity、迟到提交栅栏与 recovery coordinator 正式进入 `local.runtime`，Feature 不拥有第二套 run owner；
+- 进程唯一 `HarnessResourceScheduler` 从 `LocalHarnessEngine` 移交 `LocalRuntimeStateStore`；
+- Automation 规划模型请求直接从共享 Runtime 获取 `MODEL_REQUEST` 租约，对应 Engine 转发入口删除；
+- cancellation / recovery 继续以 Session owner、Agent run checkpoint、Foreground interaction owner 为共享边界；
+- 门禁锁定上述所有权，禁止 Engine 重新持有资源调度器。
 
 ### 阶段 2：领域状态拆分
 
-状态：**进行中。**
+状态：**已完成，继续保持单一事实源。**
 
-当前已落地的状态迁移：
+- `LocalHarnessState` 已拆出 Chat / Work / Kernel / Model 领域状态；
+- UI 已通过 Chat / Work / Shell 投影消费状态，高频 streaming preview 独立；
+- 已迁字段禁止重新平铺回聚合状态，不保留长期双读/双写。
 
-- Work / Model 基线已通过完整 CI：静态门禁、单测、arm64、x86、Android 16/17 设备测试与 merge-gate 全部成功；
-- 新增 `local/work/LocalWorkState`，由 Work 领域独占 `plan / todos / goal / planMode` 运行态；
-- `LocalHarnessState` 删除上述四个平铺字段，只组合 `work: LocalWorkState`；
-- Work 写入、目标迁移、模型/工具策略、Session 快照、Automation、UI projection 与输出质量判断全部切到新的单一事实源；
-- `LocalHarnessSession` 继续保持稳定的持久化投影结构，不把运行时聚合结构直接写入存储；
-- 架构门禁禁止重新向 `LocalHarnessState` 写回这四个 Work 字段。
+### 阶段 3：建立 ChatFeature / WorkFeature
 
-- Model 已引入 `local/model/LocalModelState`，集中 `configured / model / baseUrl / modelSelection / modelAttempts / imageInputMode`；模型切换、账户、前台与后台执行、子代理、自动任务、能力判断和 UI 投影改读此状态，关联测试同步迁移；
-- Chat 已引入 `local/chat/LocalChatState`，集中人物/图集绑定、人物状态、会话上下文、回复建议、分支、群聊、当前发言人和人物纠正提示；Session 持久化仍保持稳定扁平投影格式，运行态不保留双写；
-- Chat 多字段变更通过一次 `chat.copy(...)` 原子提交，避免人物状态、上下文、分支或群聊出现中间态不一致；
-- Kernel 已引入 `local/runtime/LocalKernelState`，集中运行标记、输入队列计数、资源快照与上下文占用/预算；Work 同时接管 jobs、workflowProgress、pendingApproval、pendingQuestion，聚合字段预算收紧至 28。
-- 前后台 Work 镜像、Session 生命周期、交互等待/取消、Automation 与 UI projection 已迁移到领域状态。
-- 架构门禁禁止 Work / Model / Chat / Kernel 已迁字段重新平铺回 `LocalHarnessState`。
+状态：**待完成。**
 
-继续推进：
+- Runtime 的 `engine.xxx()` 行为逐项迁入所属 Feature；
+- 每迁走一项立即删除对应 Engine 入口；
+- Feature internal 只依赖 Shared Capability / Kernel 契约；
+- 禁止用“Port → Engine 原样转发”冒充完成；
+- 完成时 ChatRuntime / WorkRuntime 对 `LocalHarnessEngine` 直接引用必须为 0。
 
-- Chat / Kernel 状态迁移基线 `ab81c1ef` 已通过完整 CI #4238（含 Android 16/17 与 merge-gate）；
-- Work 前台镜像补齐本轮设备授权标记，运行时销毁同时清理授权；新增授权启用/撤销、跨会话隔离与销毁回归，修复 Head 需重新验证；
-- UI projection 继续改为组合领域状态；
-- 全程不保留长期双写。
+### 阶段 4：建立 AutomationFeature
 
-本轮迁移审计修复：Session 快照通过延迟状态读取，确保先捕获日志游标再读取前台状态；回归测试与静态门禁同时覆盖调用边界，防止“旧状态 + 新游标”导致恢复遗漏。Model 迁移中的旧字段读写与重复嵌套访问已逐链收敛，并已通过完整 CI。Chat / Kernel 运行态拆分基线已完成代码迁移与完整 CI；本轮设备授权镜像修复仍以最新 Head 的完整 CI 为准。阶段 2 的其余共享配置边界继续联审，后续业务所有权迁移尚未完成。
+状态：**待完成。**
 
-### 阶段 3：ChatFeature / WorkFeature 接管业务所有权
+- Automation 只通过 `ChatExecutionPort` / `WorkExecutionPort` / Session Capability 工作；
+- 不进入 Chat / Work internal Coordinator；
+- Session owner、scheduleGeneration、run ownership 与迟到提交栅栏继续属于共享运行边界。
 
-- 逐项迁移 Runtime 当前 `engine.xxx()` 代理行为；
-- 每迁走一项就删除对应 Engine 业务入口；
-- Coordinator 改为依赖窄能力契约，不再回调 Engine 内部状态。
+### 阶段 5：FeatureCatalog + UI Contribution
 
-### 阶段 4：AutomationFeature 通过 Port 组合 Chat / Work
+状态：**部分基础已提前落地，待按本阶段完成验收。**
 
-- 自动聊天只依赖 ChatExecutionPort；
-- 自动工作只依赖 WorkExecutionPort；
-- Session owner、scheduleGeneration、run ownership 保留在共享运行边界。
+- 不可变 `LocalFeatureCatalog` 与唯一 route owner 继续保留；
+- 页面渲染、Back ownership、Drawer 入口、Settings/Diagnostics contribution 迁入 Feature；
+- 删除中央 `LocalFeaturePageContent` 巨大分发。
 
-### 阶段 5：Feature 驱动 UI
+### 阶段 6：收缩为 LocalRuntimeKernel
 
-- 页面、Back ownership、Drawer 入口、Settings/Diagnostics contribution 从中央分发迁入各 Feature；
-- 删除巨大页面 `when`。
+状态：**待完成。**
 
-### 阶段 6：LocalHarnessEngine 收缩为 Runtime Kernel
-
-- 业务规则全部退出 Engine；
-- 收紧构造依赖、方法数和直接消费者门禁；
-- 最终按职责更名/替换为 `LocalRuntimeKernel`。
+- `LocalHarnessEngine` 的 Feature 业务规则、Feature API 与迁移期代理全部退出；
+- Kernel 只保留 Session/run ownership、跨域事务、取消传播、资源租约、run identity、recovery 与生命周期协调；
+- Engine 构造依赖、internal API、直接消费者门禁持续向下 ratchet，最终更名/替换为 `LocalRuntimeKernel`；
+- Kernel 不得理解 Persona / Gallery / Todo / GitHub Token / UI 页面。
 
 ## 13. 迁移约束
 
