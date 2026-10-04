@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
+import com.labteto.dshmobile.local.chat.PersonaGalleryPreparedImport
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
@@ -24,14 +25,15 @@ internal class LocalPersonaTransferCoordinator(
         fileName: String?,
         mimeType: String?,
     ): PersonaGalleryEntry = withContext(Dispatchers.IO) {
-        val outcome = galleryStore.importPersonaDocumentWithDiary(bytes, fileName, mimeType)
-        if (outcome.diaryEntries.isNotEmpty()) {
-            runtime.chat.importDiaryEntriesForTransfer(
-                subjectKey = "gallery:${outcome.entry.id}",
-                personaName = outcome.entry.persona.name,
-                entries = outcome.diaryEntries,
-            )
+        when (val prepared = galleryStore.preparePersonaDocumentImport(bytes, fileName, mimeType)) {
+            is PersonaGalleryPreparedImport.Share -> galleryStore.commitPersonaDocumentImport(prepared)
+            is PersonaGalleryPreparedImport.Archive -> runtime.chat.importDiaryEntriesForTransfer(
+                subjectKey = "gallery:${prepared.entry.id}",
+                personaName = prepared.entry.persona.name,
+                entries = prepared.diaryEntries,
+            ) {
+                galleryStore.commitPersonaDocumentImport(prepared)
+            }
         }
-        outcome.entry
     }
 }
