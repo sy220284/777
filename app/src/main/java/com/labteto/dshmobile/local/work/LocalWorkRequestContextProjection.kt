@@ -27,15 +27,15 @@ internal fun workSteadyStateHistoryBudget(
     extraTokens: Int,
     state: LocalHarnessState,
 ): LocalHistoryBudget {
-    val profile = state.modelSelection.activeProfile
+    val profile = state.modelState.modelState.modelSelection.activeProfile
     return workSteadyStateHistoryBudget(
         base = base,
         currentHistoryTokens = currentHistoryTokens,
         extraTokens = extraTokens,
         cachePolicy = LocalModelPresets.promptCachePolicyFor(
-            model = state.model,
-            baseUrl = state.baseUrl,
-            protocol = profile?.protocol ?: LocalModelPresets.protocolFor(state.model, state.baseUrl),
+            model = state.modelState.model,
+            baseUrl = state.modelState.baseUrl,
+            protocol = profile?.protocol ?: LocalModelPresets.protocolFor(state.modelState.model, state.modelState.baseUrl),
             authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
         ),
     )
