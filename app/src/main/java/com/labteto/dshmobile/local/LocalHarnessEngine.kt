@@ -30,7 +30,6 @@ import com.labteto.dshmobile.harness.capability.ProcessRequest
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
-import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.harness.tools.HarnessTool
@@ -4912,22 +4911,15 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun persistenceSnapshot(binding: LocalWorkRunBinding? = null): LocalHarnessSession {
-        // Capture durable projection boundaries before reading mutable state. If a concurrent update
-        // lands afterwards, replaying its event is safe and idempotent. Reading state first could
-        // instead persist old state with a newer cursor and make recovery skip that event.
-        val log = binding?.eventLog ?: eventLog
-        val controlProjectedThroughSequence = log.latestSequence()
-        val transcriptProjectedThroughSequence =
-            binding?.transcriptProjectionCursor ?: transcriptProjectionCursor
-        val state = binding?.state?.value ?: _state.value
-        return sessionCoordinator.snapshot(
-            sessionId = binding?.sessionId ?: currentSessionId,
-            state = state,
-            controlProjectedThroughSequence = controlProjectedThroughSequence,
-            transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
+    private fun persistenceSnapshot(binding: LocalWorkRunBinding? = null): LocalHarnessSession =
+        localSessionPersistenceSnapshot(
+            sessionCoordinator = sessionCoordinator,
+            currentSessionId = currentSessionId,
+            currentState = _state.value,
+            eventLog = eventLog,
+            transcriptProjectionCursor = transcriptProjectionCursor,
+            binding = binding,
         )
-    }
 
     private fun persist(binding: LocalWorkRunBinding? = null) {
         sessionCoordinator.enqueue(persistenceSnapshot(binding))
@@ -4942,10 +4934,8 @@ class LocalHarnessEngine @Inject constructor(
 
     private fun eventLogFor(id: String) = eventLogRegistry.get(id)
 
-    private fun sessionSummaries(): List<LocalSessionSummary> = try {
-        sessionCoordinator.summaries()
-    } catch (future: FutureSessionVersionException) {
-        _state.update { it.copy(error = future.message) }
-        emptyList()
-    }
+    private fun sessionSummaries(): List<LocalSessionSummary> =
+        localSessionSummariesOrEmpty(sessionCoordinator) { future ->
+            _state.update { it.copy(error = future.message) }
+        }
 }
