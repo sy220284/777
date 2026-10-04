@@ -414,4 +414,20 @@ class AgentLoopTest {
         assertFalse(events.any { it is AgentEvent.TurnFailed })
     }
 
+    @Test
+    fun configuredBudgetCanStartAboveLegacy128Limit() = runTest {
+        val loop = AgentLoop(
+            model = AgentModel { AgentModelReply(content = "完成") },
+            tools = AgentToolExecutor { error("不应调用工具") },
+            maxSteps = 256,
+            idFactory = { "turn-configured-over-128" },
+        )
+
+        val result = loop.run("执行")
+
+        assertEquals(AgentStopReason.COMPLETED, result.stopReason)
+        assertEquals(1, result.steps)
+        assertEquals("完成", result.answer)
+    }
+
 }

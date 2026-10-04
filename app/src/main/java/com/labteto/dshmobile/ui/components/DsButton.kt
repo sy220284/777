@@ -23,8 +23,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,6 +43,7 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
+import kotlinx.coroutines.delay
 
 /** Button variants mirroring the harness primary/info/ghost/outline/danger palette. */
 enum class DsButtonVariant { Primary, Info, Ghost, Outline, Danger }
@@ -59,12 +62,23 @@ fun DsButton(
     size: DsButtonSize = DsButtonSize.Normal,
     icon: ImageVector? = null,
     loading: Boolean = false,
+    onHoldRepeat: (() -> Unit)? = null,
 ) {
     val colors = DsTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
     val interactionEnabled = enabled && !loading
+    val latestHoldRepeat by rememberUpdatedState(onHoldRepeat)
+
+    LaunchedEffect(pressed, interactionEnabled) {
+        if (!pressed || !interactionEnabled || latestHoldRepeat == null) return@LaunchedEffect
+        delay(HOLD_REPEAT_INITIAL_DELAY_MS)
+        while (true) {
+            latestHoldRepeat?.invoke() ?: break
+            delay(HOLD_REPEAT_INTERVAL_MS)
+        }
+    }
     
     // Animate scale on press for tactile feedback
     val scale by animateFloatAsState(
@@ -147,6 +161,9 @@ fun DsButton(
         }
     }
 }
+
+private const val HOLD_REPEAT_INITIAL_DELAY_MS = 420L
+private const val HOLD_REPEAT_INTERVAL_MS = 90L
 
 @Preview(showBackground = true, widthDp = 360)
 @Composable

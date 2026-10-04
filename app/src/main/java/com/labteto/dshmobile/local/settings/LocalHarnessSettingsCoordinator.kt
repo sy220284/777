@@ -25,9 +25,9 @@ internal class LocalHarnessSettingsCoordinator(
         subagentMaxSteps: Int,
         modelAttempts: Int,
     ) {
-        val main = mainMaxSteps.coerceIn(4, 128)
-        val subagent = subagentMaxSteps.coerceIn(1, 128)
-        val attempts = modelAttempts.coerceIn(1, 5)
+        val main = LocalAgentRuntimeLimits.normalizeMainSteps(mainMaxSteps)
+        val subagent = LocalAgentRuntimeLimits.normalizeSubagentSteps(subagentMaxSteps)
+        val attempts = LocalAgentRuntimeLimits.normalizeModelAttempts(modelAttempts)
         preferences.edit()
             .putInt(KEY_MAIN_MAX_STEPS, main)
             .putInt(KEY_SUBAGENT_MAX_STEPS, subagent)
