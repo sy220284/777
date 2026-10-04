@@ -1727,8 +1727,8 @@ class LocalHarnessEngine @Inject constructor(
     ) {
         val binding = ownedBinding ?: liveWorkRun(sessionId) ?: return
         val liveState = binding.state.value
-        liveState.modelSelection.activeProfile
-            ?.takeIf { liveState.configured }
+        liveState.modelState.modelSelection.activeProfile
+            ?.takeIf { liveState.modelState.configured }
             ?.let(modelGateway::activate)
         val resources = resourceScheduler.snapshot()
         _state.value = liveState.copy(
@@ -3251,7 +3251,7 @@ class LocalHarnessEngine @Inject constructor(
                 when (event) {
                     is AgentEvent.TurnStarted -> {
                         runEventLog.append("turn/start", buildJsonObject {
-                            put("model", runState.value.model)
+                            put("model", runState.value.modelState.model)
                         })
                     }
                     is AgentEvent.StepStarted -> {
