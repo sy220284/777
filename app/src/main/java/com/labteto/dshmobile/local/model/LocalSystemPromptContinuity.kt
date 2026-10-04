@@ -19,12 +19,26 @@ internal fun recordRuntimeSystemPromptUpdate(
     prompt: String,
     state: LocalHarnessState,
     log: LocalSessionEventLog,
-): LocalModelPromptUpdateMode =
-    applyRuntimeSystemPromptUpdate(history, prompt, state).also { mode ->
+): LocalModelPromptUpdateMode {
+    val hadSystem = history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
+    return applyRuntimeSystemPromptUpdate(history, prompt, state).also { mode ->
         log.append("system/prompt", buildJsonObject {
             put("content", prompt)
+            put("model_content", runtimeSystemPromptContent(prompt, mode, hadSystem))
             put("update_mode", mode.name.lowercase())
         })
+    }
+}
+
+internal fun runtimeSystemPromptContent(
+    prompt: String,
+    mode: LocalModelPromptUpdateMode,
+    hasExistingSystem: Boolean,
+): String =
+    if (hasExistingSystem && mode == LocalModelPromptUpdateMode.APPEND_ONLY) {
+        "【系统规则更新；后续以本条为准】\n$prompt"
+    } else {
+        prompt
     }
 
 internal fun applyRuntimeSystemPromptUpdate(
@@ -45,14 +59,7 @@ internal fun applyRuntimeSystemPromptUpdate(
     val hasSystem = history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
     val message = buildJsonObject {
         put("role", "system")
-        put(
-            "content",
-            if (hasSystem && mode == LocalModelPromptUpdateMode.APPEND_ONLY) {
-                "【系统规则更新；后续以本条为准】\n$prompt"
-            } else {
-                prompt
-            },
-        )
+        put("content", runtimeSystemPromptContent(prompt, mode, hasSystem))
     }
     when {
         !hasSystem -> history.prepend(message)
