@@ -9,6 +9,7 @@ import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.observability.AppLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
