@@ -89,6 +89,26 @@ class LocalHarnessUiStateTest {
     }
 
     @Test
+    fun workProjectionReadsWorkDomainState() {
+        val aggregate = LocalHarnessState(
+            work = LocalWorkState(
+                plan = listOf("第一步"),
+                todos = listOf(com.labteto.dshmobile.local.LocalTodoItem("继续", "in_progress")),
+                goal = com.labteto.dshmobile.local.LocalGoal("完成迁移"),
+                planMode = true,
+            ),
+        )
+
+        val work = aggregate.toWorkUiState()
+        val surface = aggregate.toWorkSurfaceUiState()
+
+        assertEquals(listOf("第一步"), work.plan)
+        assertEquals("完成迁移", work.goal?.description)
+        assertEquals(1, work.todos.size)
+        assertTrue(surface.planMode)
+    }
+
+    @Test
     fun chatSurfaceProjectionIgnoresWorkOnlyChurn() {
         val base = LocalHarnessState(usageMode = LocalUsageMode.CHAT)
         val workOnlyUpdate = base.copy(model = "another-model", work = LocalWorkState(planMode = true), safeAutoApprovalEnabled = true, contextChars = 48_000, queuedInputCount = 4)
