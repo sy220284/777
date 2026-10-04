@@ -225,7 +225,15 @@ internal class LocalHistoryCompactor(
         }
         if (start <= firstBodyIndex || start >= source.size) return null
 
-        val omitted = source.subList(firstBodyIndex, start)
+        val latestTailSystemIndex = (source.lastIndex downTo firstBodyIndex)
+            .firstOrNull { source[it]["role"].asText() == "system" }
+        val protectedTailSystem = latestTailSystemIndex
+            ?.takeIf { it < start }
+            ?.let(source::get)
+        val omitted = source.subList(firstBodyIndex, start).filterIndexed { offset, _ ->
+            firstBodyIndex + offset != latestTailSystemIndex
+        }
+        if (omitted.isEmpty()) return null
         val workCheckpoint = if (summaryMode == LocalHistorySummaryMode.WORK) {
             buildWorkCheckpoint(
                 omitted,
@@ -253,6 +261,7 @@ internal class LocalHistoryCompactor(
                     },
                 ),
             )
+            protectedTailSystem?.let(::add)
             addAll(source.drop(start).filterNot(::isTrustedWorkCheckpointModelMessage))
         }
         val estimatedTokensBefore = encodedTokens + extraTokens
