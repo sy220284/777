@@ -84,4 +84,9 @@ class ChatStyleGuardTest {
         assertEquals("开头中间结尾", filtered)
     }
 
+    @Test fun naturalAdviceAndInvitationRemainUnlessExplicitlyBanned() {
+        val text = "建议你先吃饭。让我们一起去散步。"
+        assertEquals(text, ChatStyleGuard.scrub(text))
+        assertEquals(listOf("建议你"), ChatStyleGuard.violations(text, listOf("建议你")))
+    }
 }

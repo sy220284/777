@@ -1482,5 +1482,13 @@
     <string name="persona_gallery_preset_artwork_too_large">人物预置形象图过大</string>
     <string name="persona_gallery_preset_artwork_unreadable">人物预置形象图无法识别</string>
     <string name="persona_gallery_entry_missing">图集条目已不存在</string>
+    <string name="audit_show_all">展开全部事项</string>
+    <string name="audit_show_summary">收起为摘要</string>
+    <string name="audit_status_idle">等待中</string>
+    <string name="audit_status_warning">需要注意</string>
+    <string name="audit_attempt_failed">含失败尝试</string>
+    <string name="audit_group_partial">部分角色回复未成功，已收到的内容已保留</string>
+    <string name="audit_group_retry_member">重试 %1$s</string>
+    <string name="audit_group_retry_request">@%1$s 请继续回应刚才未完成的问题。</string>
 </resources>
 

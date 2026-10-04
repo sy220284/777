@@ -23,6 +23,9 @@ data class LocalHarnessMessage(
     val speakerName: String? = null,
     /** Role-authored message produced without a new user turn, e.g. a scheduled roleplay interaction. */
     val proactive: Boolean = false,
+    /** Null only for legacy tool rows without structured execution facts. */
+    val toolIsError: Boolean? = null,
+    val toolErrorCode: String? = null,
 )
 
 @Serializable

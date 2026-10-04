@@ -31,6 +31,8 @@ data class LocalGroupChatState(
     val context: ChatContextState = ChatContextState(),
     /** Public scene premise shared with every group member in this conversation. */
     val announcement: String = "",
+    /** Durable partial delivery notice; cleared only for members whose next response succeeds. */
+    val failedReplyMemberIds: List<String> = emptyList(),
 ) {
     val enabled: Boolean get() = mode == LocalChatMode.GROUP
 }

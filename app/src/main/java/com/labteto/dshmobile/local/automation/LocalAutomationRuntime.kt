@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.automation
 
 import com.labteto.dshmobile.local.LocalAutomationRunResult
 import com.labteto.dshmobile.local.LocalHarnessEngine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -10,6 +12,7 @@ import javax.inject.Singleton
 class LocalAutomationRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
 ) {
+    internal val planningRevisions = engine.state.map { it.toAutomationPlanningRevision() }.distinctUntilChanged()
     internal fun planningContext(): AutomationPlanningContext {
         val snapshot = engine.state.value
         return AutomationPlanningContext(
@@ -31,16 +34,12 @@ class LocalAutomationRuntime @Inject constructor(
                 .map { AutomationPlanningMessage(it.role, it.content) },
         )
     }
-
     internal fun planningRevision(): AutomationPlanningRevision =
         engine.state.value.toAutomationPlanningRevision()
-
     internal suspend fun runPrompt(text: String, timeoutMillis: Long = 5 * 60_000L): String =
         engine.runAutomationPrompt(text, timeoutMillis)
-
     internal suspend fun prepareWorkSession(text: String, preferredSessionId: String? = null): String =
         engine.prepareAutomationWorkSession(text, preferredSessionId)
-
     internal suspend fun runWork(
         text: String,
         preferredSessionId: String? = null,
@@ -52,7 +51,6 @@ class LocalAutomationRuntime @Inject constructor(
         timeoutMillis = timeoutMillis,
         recoverInterrupted = recoverInterrupted,
     )
-
     internal suspend fun runChat(
         instruction: String,
         targetSessionId: String,

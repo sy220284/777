@@ -408,6 +408,7 @@ class SessionEventLog(
             file.parentFile?.mkdirs()
             file.writeText("")
             nextSequence.set(0L)
+            CompressedEventSegmentCache.invalidate(pathKey)
         }
     }
 
@@ -420,6 +421,7 @@ class SessionEventLog(
                 synchronized(current.lock) {
                     current.references -= 1
                     check(current.references >= 0) { "事件日志共享路径引用计数异常" }
+                    if (current.references == 0) CompressedEventSegmentCache.invalidate(pathKey)
                     current.takeIf { it.references > 0 }
                 }
             }
@@ -578,16 +580,21 @@ class SessionEventLog(
     ): Boolean {
         if (!source.isFile || source.length() == 0L) return true
         if (source.name.endsWith(COMPRESSED_SUFFIX)) {
-            // One decoded segment is bounded by maxBytes (8 MiB in production).
-            val lines = try {
-                source.eventReader().useLines { it.toList() }
+            val bytes = try {
+                CompressedEventSegmentCache.read(source, maxEventBytes + maxBytes + 1L)
             } catch (error: Exception) {
                 reportSegmentReadFailure(source, error)
                 return true
             }
-            for (line in lines.asReversed()) {
-                val event = decodeEventOrNull(line) ?: continue
-                if (!visitor(event)) return false
+            var end = bytes.size
+            while (end > 0) {
+                if (bytes[end - 1] == '\n'.code.toByte()) { end -= 1; continue }
+                var start = end - 1
+                while (start >= 0 && bytes[start] != '\n'.code.toByte()) start -= 1
+                val line = String(bytes, start + 1, end - start - 1, Charsets.UTF_8).trimEnd('\r')
+                val event = decodeEventOrNull(line)
+                if (event != null && !visitor(event)) return false
+                end = start
             }
             return true
         }

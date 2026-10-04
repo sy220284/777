@@ -460,7 +460,7 @@ internal fun CompactPersonaRow(
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
     val rowColor = when {
-        selected -> colors.accentTertiary
+        selected -> colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = colors.accentTertiary)
         backgroundState.hasImage -> colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
         else -> Color.Transparent
     }

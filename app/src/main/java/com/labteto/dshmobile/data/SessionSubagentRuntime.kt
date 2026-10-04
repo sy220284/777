@@ -32,33 +32,30 @@ internal class SessionSubagentRuntime(
 ) {
     private val _subagents = MutableStateFlow<List<SubagentListEntry>>(emptyList())
     val subagents: StateFlow<List<SubagentListEntry>> = _subagents.asStateFlow()
-
     private val _conversation = MutableStateFlow<ConversationSnapshot?>(null)
     val conversation: StateFlow<ConversationSnapshot?> = _conversation.asStateFlow()
-
     private val _mode = MutableStateFlow<String?>(null)
     val mode: StateFlow<String?> = _mode.asStateFlow()
-
+    private val requests = SessionAsyncRequestRegistry()
     fun resetSession() {
+        requests.reset()
         remoteStreams.cancelSubagentFollow()
         _subagents.value = emptyList()
         _conversation.value = null
         _mode.value = null
     }
-
     suspend fun refresh() {
         val parentSessionId = currentSessionId() ?: return
-        val scope = SessionAsyncScope(activeHostKey(), parentSessionId)
+        val scope = requests.capture("refresh", activeHostKey(), parentSessionId)
         val api = apiForHost(scope.hostKey) ?: return
         when (val result = api.subagentList(parentSessionId)) {
             is RpcResult.Ok -> if (scope.isCurrent(activeHostKey, currentSessionId)) _subagents.value = result.value.entries
             is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) onConnectionError(result.error.message)
         }
     }
-
     suspend fun interrupt(childSessionId: String) {
         val parentSessionId = currentSessionId() ?: return
-        val scope = SessionAsyncScope(activeHostKey(), parentSessionId)
+        val scope = requests.capture("interrupt", activeHostKey(), parentSessionId)
         val api = apiForHost(scope.hostKey) ?: return
         when (
             val result = api.subagentInterrupt(
@@ -70,14 +67,13 @@ internal class SessionSubagentRuntime(
             is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) onConnectionError(result.error.message)
         }
     }
-
     suspend fun prompt(
         childSessionId: String,
         text: String,
         delivery: String = "queue",
     ): Boolean {
         val parentSessionId = currentSessionId() ?: return false
-        val scope = SessionAsyncScope(activeHostKey(), parentSessionId)
+        val scope = requests.capture("prompt", activeHostKey(), parentSessionId)
         val api = apiForHost(scope.hostKey) ?: return false
         val request = SubagentPromptRequest(
             requestId = newPromptRequestId(),
@@ -96,10 +92,10 @@ internal class SessionSubagentRuntime(
             }
         }
     }
-
     suspend fun openTranscript(childSessionId: String) {
         val parentSessionId = currentSessionId() ?: return
         val hostKey = activeHostKey() ?: return
+        val transcriptScope = requests.capture("transcript", hostKey, parentSessionId)
         apiForHost(hostKey) ?: return
         val entry = _subagents.value.firstOrNull { entryId(it) == childSessionId }
         val transcriptMode = when (entry) {
@@ -113,7 +109,6 @@ internal class SessionSubagentRuntime(
             logger("subagent $childSessionId has no readable transcript mode", null)
             return
         }
-
         remoteStreams.cancelSubagentFollow()
         _conversation.value = null
         val events = mutableListOf<SessionEventEnvelope>()
@@ -125,7 +120,7 @@ internal class SessionSubagentRuntime(
             mode = transcriptMode,
             maxMessages = HISTORY_PAGE_SIZE,
         ) { frame ->
-            if (activeHostKey() != hostKey || currentSessionId() != parentSessionId) return@followSubagent
+            if (!transcriptScope.isCurrent(activeHostKey, currentSessionId)) return@followSubagent
             when (frame) {
                 is SessionFollowFrame.Snapshot -> {
                     events.clear()
@@ -154,19 +149,18 @@ internal class SessionSubagentRuntime(
             logger("cannot follow subagent $childSessionId: no connection generation", null)
         }
     }
-
-    fun closeTranscript() = remoteStreams.cancelSubagentFollow()
-
+    fun closeTranscript() {
+        requests.invalidate("transcript")
+        remoteStreams.cancelSubagentFollow()
+    }
     private fun expandRecords(records: List<com.labteto.dshmobile.core.wire.dto.SessionHistoryRecord>): List<SessionEventEnvelope> =
         ChunkRows.expandAll(records).map { wireEventToEnvelope(it) }
-
     private fun entryId(entry: SubagentListEntry): String? = when (entry) {
         is SubagentListEntry.ChildOneShot -> entry.id
         is SubagentListEntry.ChildContinuable -> entry.id
         is SubagentListEntry.Diagnostic -> entry.id
         is UnknownSubagentListEntry -> null
     }
-
     private companion object {
         const val HISTORY_PAGE_SIZE = 60
     }

@@ -202,7 +202,7 @@ class LocalTranscriptPresentationTest {
         )
 
         assertEquals(DsStatus.Running, workProcessStatus(listOf(failed, completed), running = true))
-        assertEquals(DsStatus.Failed, workProcessStatus(listOf(failed, completed), running = false))
+        assertEquals(DsStatus.Warning, workProcessStatus(listOf(failed, completed), running = false))
         assertEquals(DsStatus.Done, workProcessStatus(listOf(completed), running = false))
     }
 
@@ -293,5 +293,11 @@ class LocalTranscriptPresentationTest {
         toolName = toolName,
         createdAt = 1L,
     )
+    @Test
+    fun structuredSuccessDoesNotTreatErrorDocumentationAsFailedTool() {
+        val nodes = buildWorkProcessNodes(listOf(LocalHarnessMessage(id = "tool", role = "tool",
+            content = "说明：[NETWORK_ERROR] 是错误代码", createdAt = 1L, toolName = "read_file", toolIsError = false)))
+        assertEquals(DsStatus.Done, workProcessStatus(nodes, running = false))
+    }
 }
 

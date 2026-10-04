@@ -509,6 +509,9 @@ internal fun LocalConversationSurface(
             }
         }
 
+        if (state.groupChat.enabled && state.groupChat.failedReplyMemberIds.isNotEmpty()) {
+            GroupReplyFailureNotice(state.groupChat, state.running) { request -> onSend(request, emptyList()) }
+        }
         Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(scrollConnection)) {
             LazyColumn(
                 state = listState,
