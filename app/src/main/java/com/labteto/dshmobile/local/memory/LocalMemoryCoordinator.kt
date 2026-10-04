@@ -122,7 +122,7 @@ internal class LocalMemoryCoordinator(
         val contextWindow = documentedContextWindowTokens(
             snapshot.modelState.model,
             snapshot.modelState.baseUrl,
-            snapshot.modelState.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
+            snapshot.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
         )
         val budget = chatLongTermMemoryBudget(contextWindow)
         val blocks = mutableListOf<String>()
