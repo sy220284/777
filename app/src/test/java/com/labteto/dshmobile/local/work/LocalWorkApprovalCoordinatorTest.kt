@@ -119,13 +119,33 @@ class LocalWorkApprovalCoordinatorTest {
 
         f.runtime.activateSession("b")
         f.runtime.mutableState.value = f.runtime.state.value.copy(sessionId = "b")
-        f.approvals.disableDeviceApprovalLease()
+        f.approvals.disableDeviceApprovalLease(f.runtime.state.value.sessionId)
         assertTrue(a.state.value.deviceApprovalLease)
         f.runtime.activateSession("a")
         f.runtime.mutableState.value = f.runtime.state.value.copy(sessionId = "a", deviceApprovalLease = true)
-        f.approvals.disableDeviceApprovalLease()
+        f.approvals.disableDeviceApprovalLease(f.runtime.state.value.sessionId)
         assertFalse(a.state.value.deviceApprovalLease)
         assertFalse(f.runtime.state.value.deviceApprovalLease)
+    }
+
+    @Test fun staleVisibleRevokeCannotClearNewForegroundRunLeaseDuringTransition() = runTest {
+        val f = Fixture()
+        val a = f.binding("a")
+        val b = f.binding("b")
+        a.state.value = a.state.value.copy(deviceApprovalLease = true)
+        b.state.value = b.state.value.copy(deviceApprovalLease = true)
+        f.runtime.mutableState.value = f.runtime.state.value.copy(
+            sessionId = "a",
+            deviceApprovalLease = true,
+        )
+
+        // Session identity advances before the visible projection switches away from A.
+        f.runtime.activateSession("b")
+        f.approvals.disableDeviceApprovalLease("a")
+
+        assertFalse(a.state.value.deviceApprovalLease)
+        assertFalse(f.runtime.state.value.deviceApprovalLease)
+        assertTrue(b.state.value.deviceApprovalLease)
     }
 
     @Test fun ineligibleDeviceToolRemainsWaitingWithDurableRejection() = runTest {

@@ -94,12 +94,16 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
         }
     }
 
-    internal fun disableDeviceApprovalLease() {
-        val target = currentTarget() ?: return
+    internal fun disableDeviceApprovalLease(sessionId: String) {
+        val target = runs[sessionId]?.let { Target(it.state, it.interactions, it.eventLog) }
+            ?: runtime.state.value
+                .takeIf { it.sessionId == sessionId }
+                ?.let { Target(runtime.mutableState, runtime.foregroundInteractions, events.get(sessionId)) }
+            ?: return
         target.log.append("approval/device-lease", buildJsonObject { put("active", false) })
         target.state.update { it.copy(deviceApprovalLease = false) }
         runtime.mutableState.update { visible ->
-            if (visible.sessionId == target.state.value.sessionId) visible.copy(deviceApprovalLease = false)
+            if (visible.sessionId == sessionId) visible.copy(deviceApprovalLease = false)
             else visible
         }
     }

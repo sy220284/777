@@ -23,7 +23,7 @@ class LocalWorkRuntime @Inject constructor(
     internal fun enableAutoApproval() = approvals.enableAutoApproval()
     internal fun enableAutoApprovalForPending(callId: String) = approvals.enableAutoApprovalForPending(callId)
     internal fun enableDeviceApprovalLease(callId: String) = approvals.enableDeviceApprovalLease(callId)
-    internal fun disableDeviceApprovalLease() = approvals.disableDeviceApprovalLease()
+    internal fun disableDeviceApprovalLease() = approvals.disableDeviceApprovalLease(runtimeStateStore.state.value.sessionId)
     internal fun disableAutoApproval() = approvals.disableAutoApproval()
     internal fun answerQuestion(callId: String, answer: String) {
         val binding = workRunRegistry[runtimeStateStore.currentSessionId]

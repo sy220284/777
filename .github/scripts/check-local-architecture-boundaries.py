@@ -311,6 +311,10 @@ work_approval_source = strip_comments(
 )
 if "LocalHarnessEngine" in work_approval_source or "persist:" in work_approval_source:
     die("Work approval policy must depend on shared capabilities, not Engine callbacks")
+if "approvals.disableDeviceApprovalLease(runtimeStateStore.state.value.sessionId)" not in work_runtime_source:
+    die("Device approval revocation must bind to the visible Session instead of mutable foreground identity")
+if "internal fun disableDeviceApprovalLease(sessionId: String)" not in work_approval_source:
+    die("Work approval coordinator must require an explicit Session for device lease revocation")
 for method in (
     "enableAutoApproval", "enableAutoApprovalForPending", "enableDeviceApprovalLease",
     "disableDeviceApprovalLease", "disableAutoApproval",
