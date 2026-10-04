@@ -1846,6 +1846,11 @@ class LocalHarnessEngine @Inject constructor(
     internal suspend fun <T> withAutomationModelRequestResource(block: suspend () -> T): T =
         resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST, "automation-planning", block)
 
+    internal suspend fun runAutomationPrompt(
+        text: String,
+        timeoutMillis: Long = 5 * 60_000L,
+    ): String = automationWorkCoordinator.runPrompt(text, timeoutMillis)
+
     internal suspend fun prepareAutomationWorkSession(
         text: String,
         preferredSessionId: String? = null,
