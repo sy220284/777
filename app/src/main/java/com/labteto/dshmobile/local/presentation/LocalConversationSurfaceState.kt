@@ -98,9 +98,9 @@ internal fun LocalHarnessState.toWorkSurfaceUiState(): LocalConversationSurfaceS
         planMode = work.planMode,
         safeAutoApprovalEnabled = safeAutoApprovalEnabled,
         deviceApprovalLease = deviceApprovalLease,
-        queuedInputCount = kernel.queuedInputCount,
+        queuedInputCount = work.queuedInputCount,
         contextChars = kernel.contextChars,
         contextBudgetChars = kernel.contextBudgetChars,
-        pendingApproval = kernel.pendingApproval,
-        pendingQuestion = kernel.pendingQuestion,
+        pendingApproval = work.pendingApproval,
+        pendingQuestion = work.pendingQuestion,
     )
