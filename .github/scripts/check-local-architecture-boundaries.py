@@ -96,6 +96,8 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt": 128,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRunnerFactory.kt": 135,
     "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt": 585,
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": 871,
+    "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt": 621,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelStepExecutor.kt": 153,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentStructureRecovery.kt": 81,
     "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt": 418,
@@ -124,8 +126,25 @@ LINE_BUDGETS = {
 }
 
 ENGINE_MAX_PUBLIC_METHODS = 0
+ENGINE_MAX_INTERNAL_METHODS = 80
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 19
 AGGREGATE_STATE_MAX_FIELDS = 55
+
+HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": ("LocalGroupChatTurnExecutor", 26),
+    "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt": ("LocalSubagentRunner", 23),
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt": ("LocalAutomationChatCoordinator", 14),
+    "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt": ("LocalModelRequestCoordinator", 12),
+}
+
+RUNTIME_ENGINE_REFERENCE_BUDGETS = {
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 19,
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 12,
+    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 15,
+    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 4,
+    "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 6,
+}
 LOCAL_ROOT_MAX_KOTLIN_FILES = 23
 PROJECTION_FIELD_BUDGETS = {
     "LocalHarnessSettingsState": 17,
@@ -170,6 +189,45 @@ for relative, maximum in LINE_BUDGETS.items():
     if lines > maximum:
         die(f"{relative} grew to {lines} lines (ratchet: {maximum}); move the new responsibility out")
     print(f"[architecture-guard] {relative}: {lines}/{maximum} lines")
+
+
+def constructor_dependency_count(relative: str, class_name: str) -> int:
+    source = strip_comments(read(relative))
+    match = re.search(
+        rf"\bclass\s+{re.escape(class_name)}\s*\((.*?)\n\)\s*\{{",
+        source,
+        re.DOTALL,
+    )
+    if match is None:
+        die(f"unable to locate {class_name} constructor in {relative}")
+    return len(re.findall(r"\bprivate\s+val\s+[A-Za-z0-9_]+\s*:", match.group(1)))
+
+
+for relative, (class_name, maximum) in HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS.items():
+    dependencies = constructor_dependency_count(relative, class_name)
+    if dependencies > maximum:
+        die(
+            f"{class_name} has {dependencies} constructor dependencies (ratchet: {maximum}); "
+            "split ownership/capabilities instead of extending dependency soup"
+        )
+    print(
+        f"[architecture-guard] {class_name}: "
+        f"{dependencies}/{maximum} constructor dependencies"
+    )
+
+
+for relative, maximum in RUNTIME_ENGINE_REFERENCE_BUDGETS.items():
+    runtime_source = strip_comments(read(relative))
+    references = len(re.findall(r"\bengine\.[A-Za-z0-9_]+", runtime_source))
+    if references > maximum:
+        die(
+            f"{relative} has {references} direct LocalHarnessEngine references "
+            f"(ratchet: {maximum}); capability runtimes must own behavior instead of growing proxies"
+        )
+    print(
+        f"[architecture-guard] {relative}: "
+        f"{references}/{maximum} direct engine references"
+    )
 
 # Diary privacy is a security/knowledge-boundary invariant, not a tuning preference.
 # Group prompts may receive PUBLIC diary entries only. Do not relax this to "anything except PRIVATE"
@@ -228,6 +286,20 @@ if public_method_count > ENGINE_MAX_PUBLIC_METHODS:
     die(
         f"LocalHarnessEngine exposes {public_method_count} methods "
         f"(ratchet: {ENGINE_MAX_PUBLIC_METHODS}); add capability-specific APIs instead"
+    )
+
+internal_method_count = len(
+    re.findall(
+        r"^    internal\s+(?:suspend\s+)?fun\s+[A-Za-z0-9_]+\s*\(",
+        engine,
+        re.MULTILINE,
+    )
+)
+if internal_method_count > ENGINE_MAX_INTERNAL_METHODS:
+    die(
+        f"LocalHarnessEngine exposes {internal_method_count} internal methods "
+        f"(ratchet: {ENGINE_MAX_INTERNAL_METHODS}); "
+        "internal capability API is still architecture API and must move outward"
     )
 
 models_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessModels.kt"
@@ -537,5 +609,6 @@ for relative in tool_registration_files:
 print(
     "[architecture-guard] OK: "
     f"engine deps={dependency_count}, public methods={public_method_count}, "
+    f"internal methods={internal_method_count}, "
     f"aggregate fields={state_field_count}, local root files={len(local_root_files)}"
 )
