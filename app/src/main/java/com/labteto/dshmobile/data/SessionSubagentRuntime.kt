@@ -23,7 +23,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /** Owns the connected session's subagent list, commands and child-transcript projection. */
 internal class SessionSubagentRuntime(
-    private val apiProvider: () -> DshApiClient?,
+    private val apiForHost: (String?) -> DshApiClient?,
     private val currentSessionId: () -> String?,
     private val activeHostKey: () -> String?,
     private val remoteStreams: SessionRemoteStreamCoordinator,
@@ -48,20 +48,22 @@ internal class SessionSubagentRuntime(
 
     suspend fun refresh() {
         val parentSessionId = currentSessionId() ?: return
-        val api = apiProvider() ?: return
+        val scope = SessionAsyncScope(activeHostKey(), parentSessionId)
+        val api = apiForHost(scope.hostKey) ?: return
         when (val result = api.subagentList(parentSessionId)) {
-            is RpcResult.Ok -> {
-                if (currentSessionId() == parentSessionId) {
-                    _subagents.value = result.value.entries
-                }
+            is RpcResult.Ok -> if (scope.isCurrent(activeHostKey, currentSessionId)) {
+                _subagents.value = result.value.entries
             }
-            is RpcResult.Err -> onConnectionError(result.error.message)
+            is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) {
+                onConnectionError(result.error.message)
+            }
         }
     }
 
     suspend fun interrupt(childSessionId: String) {
         val parentSessionId = currentSessionId() ?: return
-        val api = apiProvider() ?: return
+        val scope = SessionAsyncScope(activeHostKey(), parentSessionId)
+        val api = apiForHost(scope.hostKey) ?: return
         when (
             val result = api.subagentInterrupt(
                 childSessionId = childSessionId,
@@ -69,7 +71,9 @@ internal class SessionSubagentRuntime(
             )
         ) {
             is RpcResult.Ok -> Unit
-            is RpcResult.Err -> onConnectionError(result.error.message)
+            is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) {
+                onConnectionError(result.error.message)
+            }
         }
     }
 
@@ -79,7 +83,8 @@ internal class SessionSubagentRuntime(
         delivery: String = "queue",
     ): Boolean {
         val parentSessionId = currentSessionId() ?: return false
-        val api = apiProvider() ?: return false
+        val scope = SessionAsyncScope(activeHostKey(), parentSessionId)
+        val api = apiForHost(scope.hostKey) ?: return false
         val request = SubagentPromptRequest(
             requestId = newPromptRequestId(),
             parentSessionId = parentSessionId,
@@ -92,7 +97,7 @@ internal class SessionSubagentRuntime(
         return when (val result = api.subagentPrompt(request)) {
             is RpcResult.Ok -> true
             is RpcResult.Err -> {
-                onConnectionError(result.error.message)
+                if (scope.isCurrent(activeHostKey, currentSessionId)) onConnectionError(result.error.message)
                 false
             }
         }
@@ -100,7 +105,8 @@ internal class SessionSubagentRuntime(
 
     suspend fun openTranscript(childSessionId: String) {
         val parentSessionId = currentSessionId() ?: return
-        apiProvider() ?: return
+        val hostKey = activeHostKey() ?: return
+        apiForHost(hostKey) ?: return
         val entry = _subagents.value.firstOrNull { entryId(it) == childSessionId }
         val transcriptMode = when (entry) {
             is SubagentListEntry.ChildOneShot -> "one-shot"
@@ -116,7 +122,6 @@ internal class SessionSubagentRuntime(
 
         remoteStreams.cancelSubagentFollow()
         _conversation.value = null
-        val hostKey = activeHostKey() ?: return
         val events = mutableListOf<SessionEventEnvelope>()
         val live = AssistantLiveState()
         var hasMore = false
