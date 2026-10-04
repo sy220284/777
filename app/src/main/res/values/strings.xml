@@ -1200,7 +1200,7 @@
     <string name="chat_diary_disclosure_public">群聊公开</string>
     <string name="chat_diary_importance">重要度 %1$d/5</string>
     <string name="tasks_chat_title">定时互动</string>
-    <string name="tasks_chat_subtitle">让当前角色在约定时间主动来找你，继续这段关系和当前故事。</string>
+    <string name="tasks_chat_subtitle">直接说什么时候、想让角色做什么，AI 会替你安排成可执行事件。</string>
     <string name="tasks_chat_new">新建定时互动</string>
     <string name="tasks_chat_target">当前角色：%1$s</string>
     <string name="tasks_chat_character_fallback">当前角色</string>
