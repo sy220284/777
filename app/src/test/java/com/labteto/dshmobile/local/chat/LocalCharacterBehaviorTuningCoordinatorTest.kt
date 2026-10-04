@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.runtime.LocalKernelState
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
@@ -77,7 +78,7 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
     fun busyRuntimeRejectsEditsBeforeAnyDurableWrite() = runBlocking {
         val personas = ChatPersonaStore(File(temporary.root, "personas.json"), Json)
         val gallery = ChatPersonaGalleryStore(File(temporary.root, "gallery.json"), Json)
-        val state = MutableStateFlow(LocalHarnessState(loading = false, running = true, usageMode = LocalUsageMode.CHAT))
+        val state = MutableStateFlow(LocalHarnessState(loading = false, kernel = LocalKernelState(running = true), usageMode = LocalUsageMode.CHAT))
         var writes = 0
         val coordinator = LocalCharacterBehaviorTuningCoordinator(state, personas, gallery, Mutex()) { writes++ }
         assertTrue(coordinator.configure(PersonaProfile()).isFailure)
