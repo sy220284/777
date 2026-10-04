@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 import com.labteto.dshmobile.local.LocalChatUserEditResult
-import androidx.activity.BackEventCompat
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
