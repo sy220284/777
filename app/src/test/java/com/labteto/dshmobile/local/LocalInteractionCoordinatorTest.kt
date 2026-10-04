@@ -26,11 +26,11 @@ class LocalInteractionCoordinatorTest {
         val result = async { coordinator.awaitApproval(approval) }
         runCurrent()
 
-        assertEquals("approval-1", state.value.pendingApproval?.callId)
+        assertEquals("approval-1", state.value.work.pendingApproval?.callId)
         assertFalse(coordinator.answerApproval("stale-id", true))
         assertTrue(coordinator.answerApproval("approval-1", true))
         assertTrue(result.await())
-        assertNull(state.value.pendingApproval)
+        assertNull(state.value.work.pendingApproval)
     }
 
     @Test
@@ -51,17 +51,17 @@ class LocalInteractionCoordinatorTest {
         val question = async { coordinator.awaitQuestion(second) }
         runCurrent()
 
-        assertEquals("first", state.value.pendingApproval?.callId)
-        assertNull(state.value.pendingQuestion)
+        assertEquals("first", state.value.work.pendingApproval?.callId)
+        assertNull(state.value.work.pendingQuestion)
 
         assertTrue(coordinator.answerApproval("first", true))
         assertTrue(approval.await())
         runCurrent()
 
-        assertEquals("second", state.value.pendingQuestion?.callId)
+        assertEquals("second", state.value.work.pendingQuestion?.callId)
         assertTrue(coordinator.answerQuestion("second", "继续"))
         assertEquals("继续", question.await())
-        assertNull(state.value.pendingQuestion)
+        assertNull(state.value.work.pendingQuestion)
     }
 
     @Test
@@ -92,8 +92,8 @@ class LocalInteractionCoordinatorTest {
         runCurrent()
 
         assertTrue(queuedQuestion.await().isFailure)
-        assertNull(state.value.pendingApproval)
-        assertNull(state.value.pendingQuestion)
+        assertNull(state.value.work.pendingApproval)
+        assertNull(state.value.work.pendingQuestion)
     }
 
     @Test
@@ -107,7 +107,7 @@ class LocalInteractionCoordinatorTest {
 
         assertTrue(coordinator.cancelQuestion("question-1"))
         assertEquals(LOCAL_QUESTION_CANCELLED_RESPONSE, question.await())
-        assertNull(state.value.pendingQuestion)
+        assertNull(state.value.work.pendingQuestion)
     }
 
     @Test
@@ -142,11 +142,11 @@ class LocalInteractionCoordinatorTest {
         }
         runCurrent()
 
-        assertEquals("replacement", state.value.pendingApproval?.callId)
+        assertEquals("replacement", state.value.work.pendingApproval?.callId)
         assertFalse(coordinator.answerApproval("old", true))
         assertTrue(coordinator.answerApproval("replacement", true))
         assertTrue(replacement.await())
-        assertNull(state.value.pendingApproval)
+        assertNull(state.value.work.pendingApproval)
     }
 
 }
