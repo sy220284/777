@@ -16,12 +16,19 @@ class LocalRuntimeStateStoreTest {
 
         assertSame(mutable, store.mutableState)
         assertEquals("session-a", store.state.value.sessionId)
+        assertEquals("session-a", store.currentSessionId)
+
+        store.activateSession("session-c")
+        assertEquals("session-c", store.currentSessionId)
+        // Visible projection changes only when Session lifecycle loads/projects that conversation.
+        assertEquals("session-a", store.state.value.sessionId)
 
         try {
             store.initialize(LocalHarnessState(sessionId = "session-b"))
             fail("第二个运行状态所有者不应重新初始化共享 Store")
         } catch (_: IllegalStateException) {
             assertEquals("session-a", store.state.value.sessionId)
+            assertEquals("session-c", store.currentSessionId)
         }
     }
 }
