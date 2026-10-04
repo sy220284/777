@@ -9,9 +9,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 @Singleton
 class ChatPersonaGalleryStore internal constructor(
@@ -75,21 +72,9 @@ class ChatPersonaGalleryStore internal constructor(
             fileName = fileName,
             mimeType = mimeType,
         )
-        val root = runCatching {
-            json.parseToJsonElement(canonicalJson).jsonObject
-        }.getOrElse { error ->
-            throw IllegalArgumentException("人物迁移数据格式不正确", error)
-        }
-        val schema = root["schema"]?.jsonPrimitive?.intOrNull
-        return when {
-            schema == 3 && "entry" in root -> importArchivedEntry(
-                PersonaTransferDocuments.decodeArchive(json, canonicalJson).entry,
-            )
-            schema == 2 && "entry" in root -> importArchivedEntry(
-                PersonaSchemaMigration.decodeLegacyArchiveEntry(json, canonicalJson),
-            )
-            (schema == 2 || schema == 1) && "persona" in root -> importPersona(canonicalJson)
-            else -> throw IllegalArgumentException("人物文件版本不受支持")
+        return when (val decoded = PersonaSchemaMigration.decodeDocumentImport(json, canonicalJson)) {
+            is PersonaDocumentImport.Archive -> importArchivedEntry(decoded.entry)
+            PersonaDocumentImport.Share -> importPersona(canonicalJson)
         }
     }
 
@@ -147,25 +132,7 @@ class ChatPersonaGalleryStore internal constructor(
         require(cleanPayload.isNotEmpty() && cleanPayload.length <= MAX_PERSONA_IMPORT_CHARS) {
             "人物分享数据为空或过大"
         }
-        val root = runCatching {
-            json.parseToJsonElement(cleanPayload).jsonObject
-        }.getOrElse { error ->
-            throw IllegalArgumentException("人物分享数据格式不正确", error)
-        }
-        val schema = root["schema"]?.jsonPrimitive?.intOrNull
-        val decodedPersona = when (schema) {
-            2 -> runCatching {
-                json.decodeFromString(PersonaShareEnvelope.serializer(), cleanPayload).persona
-            }.getOrElse { error ->
-                throw IllegalArgumentException("人物分享数据格式不正确", error)
-            }
-            1 -> runCatching {
-                PersonaSchemaMigration.decodeLegacyShare(json, cleanPayload)
-            }.getOrElse { error ->
-                throw IllegalArgumentException("旧人物分享数据无法升级", error)
-            }
-            else -> throw IllegalArgumentException("人物文件版本不受支持")
-        }
+        val decodedPersona = PersonaSchemaMigration.decodeShare(json, cleanPayload)
 
         val now = System.currentTimeMillis()
         val imported = fullSharePersona(decodedPersona).copy(updatedAt = now)
