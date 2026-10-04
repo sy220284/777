@@ -193,6 +193,34 @@ if state_field_count > AGGREGATE_STATE_MAX_FIELDS:
 if "streamingAssistant" in models or "streamingReasoning" in models:
     die("streaming preview must stay outside LocalHarnessState")
 
+aggregate_state_source = models[state_start:state_end]
+if "val work: LocalWorkState = LocalWorkState()" not in aggregate_state_source:
+    die("LocalHarnessState must compose Work runtime state through LocalWorkState")
+for legacy_work_field in ("plan", "todos", "goal", "planMode"):
+    if re.search(rf"^\s*val\s+{legacy_work_field}\s*:", aggregate_state_source, re.MULTILINE):
+        die(
+            f"LocalHarnessState must not reintroduce flattened Work field: {legacy_work_field}"
+        )
+
+work_state = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkState.kt")
+)
+for owned_field in ("plan", "todos", "goal", "planMode"):
+    if not re.search(rf"\bval\s+{owned_field}\s*:", work_state):
+        die(f"LocalWorkState must own Work field: {owned_field}")
+
+work_progress = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt")
+)
+for required_mutation in (
+    "it.copy(work = it.work.copy(plan = normalized))",
+    "it.copy(work = it.work.copy(todos = items))",
+    "it.copy(work = it.work.copy(goal = goal))",
+    "it.copy(work = it.work.copy(goal = updated))",
+):
+    if required_mutation not in work_progress:
+        die("Work mutations must write through LocalWorkState: " + required_mutation)
+
 stream_state_start = models.find("data class LocalHarnessStreamingState(")
 stream_state_end = models.find("\n)", stream_state_start)
 if stream_state_start < 0 or stream_state_end < 0:
