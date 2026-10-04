@@ -2,10 +2,10 @@ package com.labteto.dshmobile.local.usage
 
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalSessionEventLog
-import com.labteto.dshmobile.local.LocalWorkRunBinding
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.buildToolTokenUsageContext
+import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
  */
 internal class LocalTokenUsageContextBridge(
     private val state: StateFlow<LocalHarnessState>,
-    private val activeWorkRuns: Map<String, LocalWorkRunBinding>,
+    private val workRuns: LocalWorkRunRegistry,
     private val eventLogFor: (String) -> LocalSessionEventLog,
     private val currentSessionId: () -> String,
 ) {
@@ -27,7 +27,7 @@ internal class LocalTokenUsageContextBridge(
         fallbackTaskLabel: String? = null,
     ): TokenUsageContext {
         val resolvedSessionId = sessionId?.takeIf(String::isNotBlank) ?: currentSessionId()
-        val snapshot = activeWorkRuns[resolvedSessionId]?.state?.value
+        val snapshot = workRuns.state(resolvedSessionId)
             ?: state.value.copy(sessionId = resolvedSessionId)
         return buildToolTokenUsageContext(
             snapshot = snapshot,
