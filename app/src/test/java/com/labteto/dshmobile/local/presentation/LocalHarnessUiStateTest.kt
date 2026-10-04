@@ -73,7 +73,7 @@ class LocalHarnessUiStateTest {
         val unrelatedUpdate = base.copy(
             chatPersona = base.chatPersona.copy(name = "另一人物"),
             galleryId = "gallery-2",
-            model = "another-model",
+            modelState = base.modelState.copy(model = "another-model"),
         )
 
         assertEquals(base.toWorkUiState(), unrelatedUpdate.toWorkUiState())
@@ -112,7 +112,7 @@ class LocalHarnessUiStateTest {
     @Test
     fun chatSurfaceProjectionIgnoresWorkOnlyChurn() {
         val base = LocalHarnessState(usageMode = LocalUsageMode.CHAT)
-        val workOnlyUpdate = base.copy(model = "another-model", work = LocalWorkState(planMode = true), safeAutoApprovalEnabled = true, contextChars = 48_000, queuedInputCount = 4)
+        val workOnlyUpdate = base.copy(modelState = base.modelState.copy(model = "another-model"), work = LocalWorkState(planMode = true), safeAutoApprovalEnabled = true, contextChars = 48_000, queuedInputCount = 4)
         assertEquals(base.toChatSurfaceUiState(), workOnlyUpdate.toChatSurfaceUiState())
     }
 
@@ -136,7 +136,7 @@ class LocalHarnessUiStateTest {
 
         assertNotEquals(
             base.toSettingsUiState(),
-            base.copy(model = "another-model").toSettingsUiState(),
+            base.copy(modelState = base.modelState.copy(model = "another-model")).toSettingsUiState(),
         )
         assertNotEquals(
             base.toTaskUiState(),
