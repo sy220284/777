@@ -2131,7 +2131,7 @@ class LocalHarnessEngine @Inject internal constructor(
         cancelChatPostTurn()
         val binding = workRunRegistry[currentSessionId]
         if (binding?.job?.isCompleted == false) {
-            binding.runtimeStateStore.foregroundInteractions.cancelAll()
+            binding.interactions.cancelAll()
             val discarded = binding.pendingInputs.drain()
             if (discarded.isNotEmpty()) {
                 binding.eventLog.append(
@@ -3530,7 +3530,7 @@ class LocalHarnessEngine @Inject internal constructor(
             }
             // TurnFailed has already settled tool side effects and checkpointed model-visible state.
         } finally {
-            if (binding != null) binding.runtimeStateStore.foregroundInteractions.cancelAll() else runtimeStateStore.foregroundInteractions.cancelAll()
+            if (binding != null) binding.interactions.cancelAll() else runtimeStateStore.foregroundInteractions.cancelAll()
             runState.update {
                 it.copy(
                     work = it.work.copy(
@@ -4200,7 +4200,7 @@ class LocalHarnessEngine @Inject internal constructor(
             })
             return true
         }
-        return binding.runtimeStateStore.foregroundInteractions.awaitApproval(
+        return binding.interactions.awaitApproval(
             LocalApproval(
                 callId = call.id,
                 toolName = call.name,
