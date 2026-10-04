@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.automation
 
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.harness.state.RuntimeStateTransition
 import com.labteto.dshmobile.harness.state.RuntimeStateTransitionPolicy
 import com.labteto.dshmobile.harness.state.acceptRuntimeStateTransition
@@ -8,12 +9,22 @@ import com.labteto.dshmobile.harness.state.rejectRuntimeStateTransition
 
 internal data class AutomationPlanningRevision(
     val sessionId: String,
+    val usageMode: LocalUsageMode,
+    val groupChatEnabled: Boolean,
+    val personaId: String,
+    val galleryId: String?,
+    val galleryStoryId: String?,
     val latestDialogueMessageId: String?,
     val chatContextGeneration: Long,
 )
 
 internal fun LocalHarnessState.toAutomationPlanningRevision() = AutomationPlanningRevision(
     sessionId = sessionId,
+    usageMode = usageMode,
+    groupChatEnabled = groupChat.enabled,
+    personaId = personaId,
+    galleryId = galleryId,
+    galleryStoryId = galleryStoryId,
     latestDialogueMessageId = transcriptIndex.latestDialogueMessageId,
     chatContextGeneration = chatContext.generation,
 )
