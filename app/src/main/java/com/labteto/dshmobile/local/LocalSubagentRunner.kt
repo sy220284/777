@@ -3,9 +3,10 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
+import com.labteto.dshmobile.local.agent.boundedSubagentContext
+import com.labteto.dshmobile.local.agent.inheritedHistoryBeforeToolCall
 import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
 import com.labteto.dshmobile.harness.agent.*
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
@@ -18,24 +19,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.*
 
-internal fun boundedSubagentContext(context: String, maxChars: Int = 10_000): String? =
-    context.trim().takeIf(String::isNotEmpty)?.let {
-        truncateWithoutSplittingSurrogatePair(it, maxChars.coerceAtLeast(1))
-    }
-
-internal fun inheritedHistoryBeforeToolCall(
-    history: List<JsonObject>,
-    parentCallId: String?,
-): MutableList<JsonObject> {
-    if (parentCallId.isNullOrBlank()) return history.toMutableList()
-    val boundary = history.indexOfLast { message ->
-        message["role"]?.jsonPrimitive?.contentOrNull == "assistant" &&
-            LocalCanonicalModelCodec.canonicalToolCalls(message).any { call ->
-                call.id == parentCallId
-            }
-    }
-    return if (boundary >= 0) history.take(boundary).toMutableList() else history.toMutableList()
-}
 
 internal class LocalSubagentRunner(
     private val modelGateway: LocalModelGateway,
