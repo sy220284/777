@@ -139,6 +139,68 @@ class ChatPersonaStorageSafetyTest {
     }
 
     @Test
+    fun migrationMarkerDoesNotBlockPersonaRecoveryWhenCurrentFileIsMissing() {
+        val legacyFile = File(temporary.root, "personas-v1-recovery.json")
+        val marker = File(temporary.root, "personas-v1-recovery.done").apply { writeText("v2\n") }
+        legacyFile.writeText(
+            json.encodeToString(
+                LegacyPersonaDocumentV1.serializer(),
+                LegacyPersonaDocumentV1(
+                    personas = listOf(
+                        LegacyPersonaProfileV1(
+                            id = "legacy-recovery",
+                            name = "旧人物恢复",
+                            identity = "旧版仍保留的人物",
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val recovered = ChatPersonaStore(
+            file = File(temporary.root, "missing-current-personas.json"),
+            json = json,
+            legacyFile = legacyFile,
+            migrationMarker = marker,
+        ).get("legacy-recovery")
+
+        assertEquals("旧人物恢复", recovered.name)
+        assertTrue(recovered.portrait.contains("旧版仍保留的人物"))
+    }
+
+    @Test
+    fun migrationMarkerDoesNotBlockGalleryRecoveryWhenCurrentFileIsMissing() {
+        val root = temporary.newFolder("gallery-recovery")
+        val legacyFile = File(root, "persona-gallery.json")
+        File(root, "persona-gallery-v1-v4-to-v5.done").writeText("v5\n")
+        legacyFile.writeText(
+            json.encodeToString(
+                LegacyGalleryDocumentV4.serializer(),
+                LegacyGalleryDocumentV4(
+                    entries = listOf(
+                        LegacyPersonaGalleryEntryV4(
+                            id = "gallery-recovery",
+                            persona = LegacyPersonaProfileV1(
+                                id = "gallery-recovery",
+                                name = "阿青",
+                                identity = "旧档案仍在",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val recovered = ChatPersonaGalleryStore(
+            File(root, "persona-gallery-v5.json"),
+            json,
+        ).list().single()
+
+        assertEquals("阿青", recovered.persona.name)
+        assertTrue(recovered.persona.portrait.contains("旧档案仍在"))
+    }
+
+    @Test
     fun corruptedPersonaPrimaryRecoversBackupBeforeNextWrite() {
         val store = personaStore()
         store.upsert(
