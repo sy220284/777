@@ -15,6 +15,7 @@ internal data class LocalRequestContextProjection(
     val estimatedTokensBefore: Int,
     val estimatedTokensAfter: Int,
     val omittedMessages: Int = 0,
+    val preProjectionAssessment: LocalWorkStepContextAssessment? = null,
 )
 
 internal fun projectLocalRequestContext(
@@ -56,5 +57,6 @@ internal fun projectLocalRequestContext(
         estimatedTokensBefore = projected.estimatedTokensBefore,
         estimatedTokensAfter = projected.estimatedTokensAfter,
         omittedMessages = projected.omittedMessages,
+        preProjectionAssessment = projected.preProjectionAssessment,
     )
 }
