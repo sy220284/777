@@ -110,6 +110,13 @@ jobs:
             fi
           fi
 
+          RELEASE_TAGS="$(
+            gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+              --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' |
+              grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$' || true
+          )"
+          MAX_RELEASE_TAG="$(printf '%s\n' "$RELEASE_TAGS" | sed '/^$/d' | sort -V | tail -n 1)"
+
           if [ "$IS_TAG" = "true" ]; then
             VERSION="${GITHUB_REF_NAME#v}"
             if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" >/dev/null 2>&1; then
@@ -117,31 +124,47 @@ jobs:
               skip_release
               exit 0
             fi
+            if [ -n "$MAX_RELEASE_TAG" ]; then
+              HIGHEST_TAG="$(printf '%s\n%s\n' "$GITHUB_REF_NAME" "$MAX_RELEASE_TAG" | sort -V | tail -n 1)"
+              if [ "$HIGHEST_TAG" != "$GITHUB_REF_NAME" ]; then
+                echo "::error::拒绝发布倒退版本：$GITHUB_REF_NAME < $MAX_RELEASE_TAG"
+                exit 1
+              fi
+            fi
             echo "should_release=true" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          LATEST_RELEASE="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" 2>/dev/null || printf '{}')"
-          LATEST_TAG="$(printf '%s' "$LATEST_RELEASE" | jq -r '.tag_name // empty')"
-          LATEST_TARGET="$(printf '%s' "$LATEST_RELEASE" | jq -r '.target_commitish // empty')"
-
-          if [ -n "$LATEST_TARGET" ] && [ "$LATEST_TARGET" = "$RELEASE_SHA" ]; then
-            echo "当前主线提交已经发布：$RELEASE_SHA"
+          RELEASED_TARGET_TAG="$(
+            gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+              --jq ".[] | select(.draft == false and .prerelease == false and .target_commitish == \"$RELEASE_SHA\") | .tag_name" |
+              head -n 1
+          )"
+          if [ -n "$RELEASED_TARGET_TAG" ]; then
+            echo "当前主线提交已经发布：$RELEASE_SHA -> $RELEASED_TARGET_TAG"
             skip_release
             exit 0
           fi
 
           FALLBACK_VERSION="$(tr -d '\r\n' < .github/release-version)"
-          if [[ "$LATEST_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-777\.)([0-9]+)$ ]]; then
+          if [[ "$MAX_RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-777\.)([0-9]+)$ ]]; then
             VERSION="${BASH_REMATCH[1]}$((BASH_REMATCH[2] + 1))"
           elif [[ "$FALLBACK_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]]; then
             VERSION="$FALLBACK_VERSION"
           else
-            echo "::error::无法从最新正式版或 .github/release-version 推导发布版本。"
+            echo "::error::无法从最高正式 Release 或 .github/release-version 推导发布版本。"
             exit 1
           fi
 
+          CANDIDATE_TAG="v$VERSION"
+          if [ -n "$MAX_RELEASE_TAG" ]; then
+            HIGHEST_TAG="$(printf '%s\n%s\n' "$CANDIDATE_TAG" "$MAX_RELEASE_TAG" | sort -V | tail -n 1)"
+            if [ "$HIGHEST_TAG" != "$CANDIDATE_TAG" ] || [ "$CANDIDATE_TAG" = "$MAX_RELEASE_TAG" ]; then
+              echo "::error::拒绝生成非递增版本：$CANDIDATE_TAG <= $MAX_RELEASE_TAG"
+              exit 1
+            fi
+          fi
           echo "检测到已通过 CI 且尚未发布的主线：$RELEASE_SHA -> v$VERSION"
           echo "should_release=true" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -287,7 +310,13 @@ jobs:
           PATCH_JSON="$RUNNER_TEMP/update-patches.json"
           printf '[]\n' > "$PATCH_JSON"
 
-          PREVIOUS_TAG="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name // empty' 2>/dev/null || true)"
+          PREVIOUS_TAG="$(
+            gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+              --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' 2>/dev/null |
+              grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$' |
+              sort -V |
+              tail -n 1 || true
+          )"
           CURRENT_TAG="${{ steps.version.outputs.tag }}"
 
           if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$CURRENT_TAG" ]; then
