@@ -258,7 +258,7 @@ internal class LocalModelRequestCoordinator(
             }
             put("tool_count", tools.size)
             put("tool_names", toolNames)
-            put("plan_mode", snapshot.planMode)
+            put("plan_mode", snapshot.work.planMode)
             temperature?.let { put("temperature", it) }
         })
         log.append("request/context", buildJsonObject {
