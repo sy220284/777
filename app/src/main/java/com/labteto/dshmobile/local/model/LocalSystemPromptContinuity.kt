@@ -14,6 +14,19 @@ import kotlinx.serialization.json.put
  * routes keep the existing behavior. Startup restoration may still replace the first system message
  * because no provider cache survives the process/session reconstruction boundary.
  */
+internal fun recordRuntimeSystemPromptUpdate(
+    history: LocalModelHistoryBuffer,
+    prompt: String,
+    state: LocalHarnessState,
+    log: LocalSessionEventLog,
+): LocalModelPromptUpdateMode =
+    applyRuntimeSystemPromptUpdate(history, prompt, state).also { mode ->
+        log.append("system/prompt", buildJsonObject {
+            put("content", prompt)
+            put("update_mode", mode.name.lowercase())
+        })
+    }
+
 internal fun applyRuntimeSystemPromptUpdate(
     history: LocalModelHistoryBuffer,
     prompt: String,
