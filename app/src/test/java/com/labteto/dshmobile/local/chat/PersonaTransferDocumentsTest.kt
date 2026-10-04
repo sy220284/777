@@ -225,6 +225,53 @@ class PersonaTransferDocumentsTest {
     }
 
     @Test
+    fun repeatedLongArchiveImportKeepsSingleStoryAndFullHistory() {
+        val longStory = sampleEntry().stories.single().copy(
+            history = (1L..40L).map { index ->
+                LocalHarnessMessage(
+                    id = "long-$index",
+                    role = if (index % 2L == 0L) "assistant" else "user",
+                    content = "第$index 条对话",
+                    createdAt = index,
+                )
+            },
+            historyTotalCount = 40,
+            updatedAt = 40L,
+        )
+        val source = sampleEntry().copy(stories = listOf(longStory), updatedAt = 40L)
+        val document = PersonaTransferDocuments.encode(
+            json = json,
+            entry = source,
+            format = PersonaTransferFormat.JSON,
+        )
+        val target = ChatPersonaGalleryStore(File(temporary.root, "long-repeat.json"), json)
+
+        val first = target.importPersonaDocument(
+            bytes = document.bytes,
+            fileName = "小岚.persona.json",
+            mimeType = "application/json",
+        )
+        val second = target.importPersonaDocument(
+            bytes = document.bytes,
+            fileName = "小岚.persona.json",
+            mimeType = "application/json",
+        )
+
+        assertEquals(first.id, second.id)
+        assertEquals(1, target.list().single().stories.size)
+
+        val exported = target.exportPersonaDocument(second.id, PersonaTransferFormat.JSON)
+        val canonical = PersonaTransferDocuments.decodeToCanonicalJson(
+            bytes = exported.bytes,
+            fileName = "小岚.persona.json",
+            mimeType = "application/json",
+        )
+        val archive = PersonaTransferDocuments.decodeArchive(json, canonical)
+        assertEquals(1, archive.entry.stories.size)
+        assertEquals(40, archive.entry.stories.single().history.size)
+    }
+
+    @Test
     fun currentPersonaShareJsonImportsWithoutStories() {
         val source = ChatPersonaGalleryStore(
             File(temporary.root, "legacy-source.json"),
