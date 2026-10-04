@@ -119,9 +119,16 @@ private val QUESTION_LIKE_CORRECTION_END = Regex("""(?:吗|么|吧|是不是|对
 class ChatPersonaStore internal constructor(
     private val file: File,
     private val json: Json,
+    private val legacyFile: File? = null,
+    private val migrationMarker: File? = null,
 ) {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
-        this(File(context.filesDir, "local-harness/chat/personas-v2.json"), json)
+        this(
+            file = File(context.filesDir, "local-harness/chat/personas-v2.json"),
+            json = json,
+            legacyFile = File(context.filesDir, "local-harness/chat/personas.json"),
+            migrationMarker = File(context.filesDir, "local-harness/chat/personas-v1-to-v2.done"),
+        )
 
     private val durableFile = RecoveringChatDocumentFile(file)
 
@@ -232,6 +239,7 @@ class ChatPersonaStore internal constructor(
             .toList()
 
     private fun read(): PersonaDocument {
+        migrateLegacyIfNeeded()
         val stamp = documentStamp()
         cachedDocument?.takeIf { cachedStamp == stamp }?.let { return it }
         val document = durableFile.read(
@@ -241,6 +249,59 @@ class ChatPersonaStore internal constructor(
         cachedDocument = document
         cachedStamp = documentStamp()
         return document
+    }
+
+    private fun migrateLegacyIfNeeded() {
+        val legacy = legacyFile ?: return
+        val marker = migrationMarker ?: return
+        val currentReadable = listOf(file, backupFile)
+            .asSequence()
+            .filter(File::isFile)
+            .any { candidate ->
+                runCatching { decodeDocument(candidate.readText()) }.isSuccess
+            }
+        if (marker.isFile && currentReadable) return
+        if (!PersonaSchemaMigration.hasDurableSource(legacy)) return
+
+        val current = runCatching {
+            durableFile.read(
+                defaultValue = ::PersonaDocument,
+                decode = ::decodeDocument,
+            )
+        }.getOrElse {
+            // A retained legacy source is a valid recovery source. Fail closed only after both
+            // the current generation and the migration source are unavailable.
+            PersonaDocument()
+        }
+        val legacyDocument = PersonaSchemaMigration.readLegacyPersonaDocument(legacy, json)
+        val merged = current.personas.toMutableList()
+        legacyDocument.personas.forEach { old ->
+            val migrated = sanitize(PersonaSchemaMigration.toCurrent(old))
+            val index = merged.indexOfFirst { it.id == migrated.id }
+            if (index >= 0) {
+                merged[index] = sanitize(
+                    PersonaSchemaMigration.mergeCurrentFirst(merged[index], migrated),
+                )
+            } else {
+                merged += migrated
+            }
+        }
+        write(current.copy(version = 2, personas = merged))
+        markMigrationDone(marker)
+    }
+
+    private fun markMigrationDone(marker: File) {
+        marker.parentFile?.mkdirs()
+        val temporary = File(marker.parentFile, marker.name + ".tmp")
+        temporary.outputStream().use { output ->
+            output.write("v2\n".toByteArray())
+            output.flush()
+            output.fd.sync()
+        }
+        if (!temporary.renameTo(marker)) {
+            temporary.copyTo(marker, overwrite = true)
+            check(temporary.delete()) { "人物迁移标记临时文件无法清理" }
+        }
     }
 
     private fun write(document: PersonaDocument) {

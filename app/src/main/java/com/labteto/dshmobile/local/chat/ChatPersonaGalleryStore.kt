@@ -9,9 +9,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 @Singleton
 class ChatPersonaGalleryStore internal constructor(
@@ -26,6 +23,7 @@ class ChatPersonaGalleryStore internal constructor(
         File(requireNotNull(file.parentFile), "persona-history-v5"),
         json,
     )
+    private val schemaMigration = PersonaGallerySchemaMigrationCoordinator(file, json)
 
     @Synchronized
     fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
@@ -74,20 +72,9 @@ class ChatPersonaGalleryStore internal constructor(
             fileName = fileName,
             mimeType = mimeType,
         )
-        val schema = runCatching {
-            json.parseToJsonElement(canonicalJson)
-                .jsonObject["schema"]
-                ?.jsonPrimitive
-                ?.intOrNull
-        }.getOrElse { error ->
-            throw IllegalArgumentException("人物迁移数据格式不正确", error)
-        }
-        return when (schema) {
-            3 -> importArchivedEntry(
-                PersonaTransferDocuments.decodeArchive(json, canonicalJson).entry,
-            )
-            2 -> importPersona(canonicalJson)
-            else -> throw IllegalArgumentException("人物文件版本不受支持，请使用新版人物生命档案")
+        return when (val decoded = PersonaSchemaMigration.decodeDocumentImport(json, canonicalJson)) {
+            is PersonaDocumentImport.Archive -> importArchivedEntry(decoded.entry)
+            PersonaDocumentImport.Share -> importPersona(canonicalJson)
         }
     }
 
@@ -145,15 +132,10 @@ class ChatPersonaGalleryStore internal constructor(
         require(cleanPayload.isNotEmpty() && cleanPayload.length <= MAX_PERSONA_IMPORT_CHARS) {
             "人物分享数据为空或过大"
         }
-        val envelope = runCatching {
-            json.decodeFromString(PersonaShareEnvelope.serializer(), cleanPayload)
-        }.getOrElse { error ->
-            throw IllegalArgumentException("人物分享数据格式不正确", error)
-        }
-        require(envelope.schema == 2) { "人物文件版本不受支持，请使用新版人物生命档案" }
+        val decodedPersona = PersonaSchemaMigration.decodeShare(json, cleanPayload)
 
         val now = System.currentTimeMillis()
-        val imported = fullSharePersona(envelope.persona).copy(updatedAt = now)
+        val imported = fullSharePersona(decodedPersona).copy(updatedAt = now)
         require(isMeaningfulGalleryPersona(imported)) { "人物设定内容不足，无法导入" }
 
         val doc = readNormalized()
@@ -428,14 +410,17 @@ class ChatPersonaGalleryStore internal constructor(
     }
 
     private fun readNormalized(): GalleryDocument {
+        schemaMigration.migrateIfNeeded()
         val document = documentStore.read()
         require(document.version == 5) {
-            "人物图集版本不受支持；新版角色系统不读取旧人物数据"
+            "人物图集版本不受支持"
         }
         val entries = document.entries.map(history::migrate)
         val normalized = document.copy(entries = entries)
         if (normalized != document) documentStore.write(normalized)
         return normalized
     }
+
+
 
 }
