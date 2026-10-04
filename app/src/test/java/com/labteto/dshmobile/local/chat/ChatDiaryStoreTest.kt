@@ -684,6 +684,66 @@ class ChatDiaryStoreTest {
         assertTrue(memory.listActive("gallery:a").none { it.id == saved.id })
     }
 
+    @Test
+    fun transferRebindsSubjectAndKeepsDiarySemanticsWithoutDeviceSourceLinks() {
+        val source = ChatDiaryStore(File(temporary.root, "source-diary"), json)
+        val target = ChatDiaryStore(File(temporary.root, "target-diary"), json)
+        val first = source.record(request(
+            delta = ChatDiaryDelta(
+                event = "两人约定周六上午十点在南门钟楼见面",
+                feeling = "我把时间认真记下来了",
+                innerThought = "这次见面我不想迟到",
+                importance = 4,
+            ),
+            userId = "u-old",
+            assistantId = "a-old",
+            evidence = "两人约定周六上午十点在南门钟楼见面",
+        ))!!
+        source.record(request(
+            delta = ChatDiaryDelta(
+                event = "两人再次确认周六上午十点在南门钟楼见面",
+                feeling = "再次确认以后我更踏实了",
+                innerThought = "我已经开始按这个时间准备",
+                importance = 5,
+            ),
+            userId = "u-confirm",
+            assistantId = "a-confirm",
+            evidence = "两人再次确认周六上午十点在南门钟楼见面",
+        ))
+        val latest = source.record(request(
+            delta = ChatDiaryDelta(
+                event = "见面安排改为周日下午三点在白桦咖啡馆",
+                feeling = "新安排确定以后我安心了",
+                innerThought = "现在只需要按新时间准备",
+                importance = 5,
+            ),
+            userId = "u-new",
+            assistantId = "a-new",
+            evidence = "见面安排改为周日下午三点在白桦咖啡馆",
+        ))!!
+
+        val transferred = source.listForTransfer("gallery:a")
+        assertTrue(transferred.first { it.id == first.id }.revisions.size >= 2)
+        assertEquals(latest.id, transferred.first { it.id == first.id }.supersededBy)
+
+        assertEquals(
+            transferred.size,
+            target.importForTransfer("gallery:target", "阿青", transferred),
+        )
+        val imported = target.listForTransfer("gallery:target")
+        assertEquals(transferred.map { it.id }.toSet(), imported.map { it.id }.toSet())
+        assertTrue(imported.all { it.subjectKey == "gallery:target" })
+        assertTrue(imported.all { it.personaName == "阿青" })
+        assertTrue(imported.all { it.sources.isEmpty() })
+        assertTrue(imported.flatMap { it.revisions }.all { it.sources.isEmpty() })
+        assertEquals(latest.id, imported.first { it.id == first.id }.supersededBy)
+        assertEquals(
+            transferred.first { it.id == first.id }.revisions.size,
+            imported.first { it.id == first.id }.revisions.size,
+        )
+        assertEquals(0, target.importForTransfer("gallery:target", "阿青", transferred))
+    }
+
     private fun request(
         delta: ChatDiaryDelta,
         sourceMode: ChatDiarySourceMode = ChatDiarySourceMode.DIRECT,
