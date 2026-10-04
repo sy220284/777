@@ -65,8 +65,8 @@ internal object LocalEnvironmentReport {
         }
         workBudget?.let { budget ->
             appendLine(
-                "工作消费护栏：已确认 ${budget.reportedExposureTokens} + 不确定 ${budget.uncertainExposureTokens}" +
-                    " + 待发送 ${budget.pendingExposureTokens} / ${budget.exposureLimitTokens} token；" +
+                "工作请求状态：累计实报 ${budget.reportedExposureTokens} token + 不确定 ${budget.uncertainExposureTokens} token；" +
+                    "当前待发送 ${budget.pendingExposureTokens} token；" +
                     "请求 ${budget.admittedRequests}/${budget.maxRequests}；" +
                     "估算校准 ${budget.estimateCalibrationPermille / 10.0}%（${budget.calibrationSamples} 次实报样本 / " +
                     "${budget.calibrationRoutes} 路由）",

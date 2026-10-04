@@ -225,8 +225,8 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - overflow recovery 后若压缩后的请求成功，缓存连续性必须记录最终实际发送的 `activeMessages` 与对应 generation，禁止把压缩前 `requestMessages` 记成成功基线。
 - 缓存成本诊断必须保留供应商实报的 cache write Token；cache write 属于 miss 子集，只作为成本细分，不能再次增加 input/total Token。
 - 缓存敏感路由必须记录成功请求的前缀连续性：消息只允许尾部追加且工具面保持一致时 generation 不变；历史重写或工具面变化必须开启新 generation；失败请求不得更新成功基线。
-- Work exposure 成功结算以供应商实报 input Token 为准；客户端估算用于准入与未知受理风险，并由实报样本校准。
-- 仅因并发 pending reservation 临时重叠造成的 exposure 超限应等待结算；当前请求在所有 pending 释放后仍无法容纳时才拒绝。
+- Work exposure 成功结算以供应商实报 input Token 为准；累计 exposure 仅用于诊断，不得作为单轮 Work 的硬输入上限；客户端估算用于单请求上下文准入、并发 pending 风险控制与未知受理校准。
+- 并发 pending reservation 只按当前在途估算量做有界等待；已有累计 exposure 不得阻塞后续请求。单个请求仍必须遵守当前路由上下文窗口 / operational limit，pending 释放语义与请求次数护栏保持有效。
 - 本地 preflight 拒绝必须带稳定 code / failure_kind / admission_state / origin，禁止伪装成供应商模型故障。
 - Work 传输层路由健康必须按物理路由指纹跨 run 共享：连续 3 次可归因传输失败进入冷却；冷却结束只允许一个 half-open 探测；成功清零、探测失败指数延长且上限 15 分钟。用户取消、本地预算/上下文拒绝不得累计路由失败；进程级状态必须有容量和空闲淘汰边界。
 - 远程会话异步请求必须绑定发起时的 host/session scope：快速切换会话或主机后，旧请求的成功结果、失败结果、loading 结算和错误横幅都不得写入当前界面；host-scoped plugin/preset/catalog 同样必须拒绝旧 host 结果。

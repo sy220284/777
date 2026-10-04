@@ -21,9 +21,8 @@ class LocalWorkExecutionBudgetTest {
     }
 
     @Test
-    fun largeFirstRequestCanRunButConcurrentExposureWaitsInsteadOfFailing() = runTest {
+    fun largeRequestRunsAndConcurrentPendingExposureWaits() = runTest {
         val budget = LocalWorkExecutionBudget(
-            exposureLimitTokens = 500_000,
             pendingLimitTokens = 200_000,
             maxRequests = 10,
         )
@@ -41,10 +40,30 @@ class LocalWorkExecutionBudgetTest {
     }
 
     @Test
+    fun cumulativeInputDoesNotStopLongWorkRun() = runTest {
+        val budget = LocalWorkExecutionBudget(
+            pendingLimitTokens = 200_000,
+            maxRequests = 10,
+        )
+
+        repeat(6) {
+            budget.reserve(200_000).commit(reportedInputTokens = 200_000)
+        }
+        val next = budget.reserve(200_000)
+        assertEquals(200_000L, budget.snapshot().pendingExposureTokens)
+        next.commit(reportedInputTokens = 200_000)
+
+        val snapshot = budget.snapshot()
+        assertEquals(1_400_000L, snapshot.reportedExposureTokens)
+        assertEquals(1_400_000L, snapshot.committedExposureTokens)
+        assertEquals(7, snapshot.admittedRequests)
+        assertEquals(0L, snapshot.pendingExposureTokens)
+    }
+
+    @Test
     fun explicitPreAdmissionFailureReleasesExposureAndRequestSlot() = runTest {
         val control = LocalWorkExecutionControl(
             budget = LocalWorkExecutionBudget(
-                exposureLimitTokens = 120_000,
                 pendingLimitTokens = 120_000,
                 maxRequests = 1,
             ),
@@ -88,7 +107,6 @@ class LocalWorkExecutionBudgetTest {
     fun maybeAdmittedFailureCommitsExposureAndConsumesRequestSlot() = runTest {
         val control = LocalWorkExecutionControl(
             budget = LocalWorkExecutionBudget(
-                exposureLimitTokens = 500_000,
                 pendingLimitTokens = 500_000,
                 maxRequests = 2,
             ),
@@ -129,7 +147,6 @@ class LocalWorkExecutionBudgetTest {
     @Test
     fun reportedUsageCalibratesLaterUncertainExposure() = runTest {
         val budget = LocalWorkExecutionBudget(
-            exposureLimitTokens = 500_000,
             pendingLimitTokens = 500_000,
             maxRequests = 10,
         )
@@ -148,7 +165,6 @@ class LocalWorkExecutionBudgetTest {
     @Test
     fun calibrationIsIsolatedByModelRoute() = runTest {
         val budget = LocalWorkExecutionBudget(
-            exposureLimitTokens = 500_000,
             pendingLimitTokens = 500_000,
             maxRequests = 10,
         )
@@ -162,9 +178,8 @@ class LocalWorkExecutionBudgetTest {
     }
 
     @Test
-    fun exposureOverlapWaitsWhenOnlyPendingReservationCausesTheLimit() = runTest {
+    fun concurrentPendingExposureWaitsUntilReservationSettles() = runTest {
         val budget = LocalWorkExecutionBudget(
-            exposureLimitTokens = 200_000,
             pendingLimitTokens = 200_000,
             maxRequests = 10,
         )
@@ -187,7 +202,6 @@ class LocalWorkExecutionBudgetTest {
     fun cancellationBeforeRequestBodyIsSentReleasesBudgetAndRequestSlot() = runTest {
         val control = LocalWorkExecutionControl(
             budget = LocalWorkExecutionBudget(
-                exposureLimitTokens = 120_000,
                 pendingLimitTokens = 120_000,
                 maxRequests = 1,
             ),
@@ -227,7 +241,6 @@ class LocalWorkExecutionBudgetTest {
     fun cancellationAfterRequestBodyMayBeAdmittedKeepsUncertainExposure() = runTest {
         val control = LocalWorkExecutionControl(
             budget = LocalWorkExecutionBudget(
-                exposureLimitTokens = 500_000,
                 pendingLimitTokens = 500_000,
                 maxRequests = 2,
             ),

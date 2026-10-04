@@ -25,7 +25,8 @@
 
 - Work 请求超过稳态阈值后，派生“可信检查点 + 近期原文”的有界投影，不再让输入随完整历史无限线性增长。
 - 旧工具结果先衰减，连续 system 前缀和当前运行约束保持原样。
-- 成功请求按供应商真实 input Token 结算；未知受理使用校准后的 uncertain exposure。
+- 成功请求按供应商真实 input Token 结算；未知受理使用校准后的 uncertain exposure。累计 exposure 只用于诊断，不再作为单轮 Work 的硬停止条件。
+- 长 Work 不设置累计 input Token 总量上限；单请求上下文窗口、稳态投影、并发 pending admission、请求次数与超时继续承担真实安全边界。
 - 请求取消携带 admission state，明确未发送取消释放预算，可能已送达才保守计入。
 - Prompt cache comparison baseline 按“会话 + 物理路由指纹”隔离，并输出缓存诊断。
 - 诊断导出有界读取 EventLog / TokenUsage，不另建第二套事实源。
