@@ -313,6 +313,10 @@ if live_rebind_pos < 0 or durable_repair_pos < 0 or live_rebind_pos > durable_re
     violations.append(
         "Live session-bound Work runtime must be rebound before durable interrupted-tail recovery"
     )
+if "syncVisibleWorkRun(sessionId, liveBinding)" not in engine:
+    violations.append(
+        "Live Work re-entry must reuse the captured binding even if the job completes during the UI handoff"
+    )
 if "canStartUnboundQueuedTurn(sessionTransitioning, activeJob?.isCompleted == false, activeWorkRuns[currentSessionId]?.job?.isCompleted == false)" not in engine:
     violations.append(
         "Shared visible queue must stay idle while the current session has a live bound Work runtime"
