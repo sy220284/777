@@ -97,40 +97,36 @@ internal class LocalModelRequestCoordinator(
         val modelContextWindow = documentedContextWindowTokens(
             frozenProfile.model, frozenProfile.baseUrl, frozenProfile.contextWindowTokensOverride,
         )
-        val previousSourcePressure = if (
-            executionControl != null && snapshot.usageMode == LocalUsageMode.WORK
-        ) {
-            pressureStore.latestWorkSource(snapshot.sessionId)
-        } else {
-            null
-        }
+        val previousSourcePressure = pressureStore.latestSource(
+            snapshot.sessionId,
+            snapshot.usageMode,
+        )
         val baselinePressure = LocalPromptPressureMeter.measure(
             messages = messages,
             tools = tools,
             operationalLimitTokens = operationalLimit,
             modelContextWindowTokens = modelContextWindow,
         )
-        val workProjection = if (executionControl != null && snapshot.usageMode == LocalUsageMode.WORK) {
-            projectWorkRequestContext(
-                messages = messages,
-                tools = tools,
-                compactor = historyCompactor,
-                operationalLimitTokens = operationalLimit,
-                measuredPressure = baselinePressure,
-                previousPressure = previousSourcePressure,
-                structuredWorkState = structuredWorkState(snapshot, log),
-                cachePolicy = cachePolicy,
-                allowSemanticProjection = step <= 1,
-            )
-        } else {
-            LocalWorkRequestProjection(
-                messages = messages,
-                projected = false,
-                estimatedTokensBefore = baselinePressure.estimatedInputTokens,
-                estimatedTokensAfter = baselinePressure.estimatedInputTokens,
-            )
-        }
-        val requestMessages = workProjection.messages
+        val contextProjection = projectLocalRequestContext(
+            usageMode = snapshot.usageMode,
+            workProjectionEnabled = executionControl != null,
+            messages = messages,
+            tools = tools,
+            compactor = historyCompactor,
+            operationalLimitTokens = operationalLimit,
+            measuredPressure = baselinePressure,
+            previousSourcePressure = previousSourcePressure,
+            structuredWorkState = if (
+                executionControl != null && snapshot.usageMode == LocalUsageMode.WORK
+            ) {
+                structuredWorkState(snapshot, log)
+            } else {
+                null
+            },
+            cachePolicy = cachePolicy,
+            allowSemanticProjection = step <= 1,
+        )
+        val requestMessages = contextProjection.messages
         val prefixAssessment = if (cachePolicy.mode != LocalPromptCacheMode.NONE) {
             promptCacheContinuity.assess(
                 snapshot.sessionId,
@@ -141,7 +137,7 @@ internal class LocalModelRequestCoordinator(
         } else {
             null
         }
-        val pressure = if (workProjection.projected) {
+        val pressure = if (contextProjection.projected) {
             LocalPromptPressureMeter.measure(
                 messages = requestMessages,
                 tools = tools,
@@ -168,6 +164,8 @@ internal class LocalModelRequestCoordinator(
             pressure = pressure,
             workAssessment = workContextAssessment,
             workSourcePressure = if (workContextAssessment != null) baselinePressure else null,
+            usageMode = snapshot.usageMode,
+            sourcePressure = baselinePressure,
         )
         val contextWindow = pressureStore.window(snapshot.sessionId)
         val previewOwner = if (publishPreviewEnabled) {
@@ -179,17 +177,17 @@ internal class LocalModelRequestCoordinator(
         } else {
             null
         }
-        if (workProjection.projected) {
+        if (contextProjection.projected) {
             log.append("request/history-projection", buildJsonObject {
                 put("step", step)
                 put("mode", snapshot.usageMode.name.lowercase())
                 put("source_message_count", messages.size)
                 put("projected_message_count", requestMessages.size)
-                put("estimated_tokens_before", workProjection.estimatedTokensBefore)
-                put("estimated_tokens_after", workProjection.estimatedTokensAfter)
-                put("omitted_messages", workProjection.omittedMessages)
+                put("estimated_tokens_before", contextProjection.estimatedTokensBefore)
+                put("estimated_tokens_after", contextProjection.estimatedTokensAfter)
+                put("omitted_messages", contextProjection.omittedMessages)
                 put("strategy", "active_work_checkpoint_plus_recent_causal_tail")
-                workProjection.preProjectionAssessment?.let { assessment ->
+                contextProjection.preProjectionAssessment?.let { assessment ->
                     put("context_status_before", assessment.status.name.lowercase())
                     put("effective_projection_trigger_tokens", assessment.effectiveProjectionTriggerTokens)
                     put("history_ratio_permille_before", assessment.historyRatioPermille)
@@ -239,8 +237,8 @@ internal class LocalModelRequestCoordinator(
             put("step", step)
             put("source_message_count", messages.size)
             put("message_count", logMessages.size)
-            put("history_projected", workProjection.projected)
-            put("estimated_input_tokens_before_projection", workProjection.estimatedTokensBefore)
+            put("history_projected", contextProjection.projected)
+            put("estimated_input_tokens_before_projection", contextProjection.estimatedTokensBefore)
             put("context_chars", contextChars)
             put("estimated_input_tokens", pressure.estimatedInputTokens)
             put("operational_input_limit_tokens", pressure.operationalLimitTokens)
@@ -446,7 +444,11 @@ internal class LocalModelRequestCoordinator(
                             operationalLimitTokens = operationalLimit,
                             modelContextWindowTokens = pressure.modelContextWindowTokens,
                         )
-                        pressureStore.record(snapshot.sessionId, activePressure)
+                        pressureStore.record(
+                            snapshot.sessionId,
+                            activePressure,
+                            usageMode = snapshot.usageMode,
+                        )
                         executeWithModelAdmission(
                             control = executionControl,
                             routeFingerprint = routeFingerprint,
@@ -574,11 +576,7 @@ internal class LocalModelRequestCoordinator(
                 }
             } catch (error: Throwable) {
                 if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
-                val summaryMode = if (snapshot.usageMode == LocalUsageMode.CHAT) {
-                    LocalHistorySummaryMode.CHAT
-                } else {
-                    LocalHistorySummaryMode.WORK
-                }
+                val summaryMode = snapshot.usageMode.historySummaryMode()
                 val compacted = historyCompactor.compactForOverflow(
                     history = activeMessages,
                     summaryMode = summaryMode,
