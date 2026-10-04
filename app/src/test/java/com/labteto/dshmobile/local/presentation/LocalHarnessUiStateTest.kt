@@ -25,12 +25,14 @@ class LocalHarnessUiStateTest {
     fun settingsProjectionIgnoresUnrelatedHotRuntimeChanges() {
         val base = LocalHarnessState()
         val hotPathUpdate = base.copy(
-            running = true,
-            resources = base.resources.copy(
-                activeModelRequests = 1,
-                activeAgents = 1,
+            kernel = base.kernel.copy(
+                running = true,
+                resources = base.kernel.resources.copy(
+                    activeModelRequests = 1,
+                    activeAgents = 1,
+                ),
+                contextChars = 42_000,
             ),
-            contextChars = 42_000,
         )
 
         assertEquals(base.toSettingsUiState(), hotPathUpdate.toSettingsUiState())
@@ -40,11 +42,13 @@ class LocalHarnessUiStateTest {
     fun taskProjectionIgnoresUnrelatedHotRuntimeChanges() {
         val base = LocalHarnessState()
         val hotPathUpdate = base.copy(
-            running = true,
-            resources = base.resources.copy(
-                activeModelRequests = 1,
-                activeTerminals = 1,
-                resourcePressure = "medium",
+            kernel = base.kernel.copy(
+                running = true,
+                resources = base.kernel.resources.copy(
+                    activeModelRequests = 1,
+                    activeTerminals = 1,
+                    resourcePressure = "medium",
+                ),
             ),
         )
 
@@ -55,14 +59,16 @@ class LocalHarnessUiStateTest {
     fun shellProjectionIgnoresStreamingAndResourceChurn() {
         val base = LocalHarnessState()
         val hotPathUpdate = base.copy(
-            resources = base.resources.copy(
-                activeModelRequests = 1,
-                activeAgents = 1,
-                activeTerminals = 1,
-                resourcePressure = "high",
+            kernel = base.kernel.copy(
+                resources = base.kernel.resources.copy(
+                    activeModelRequests = 1,
+                    activeAgents = 1,
+                    activeTerminals = 1,
+                    resourcePressure = "high",
+                ),
+                contextChars = 42_000,
+                queuedInputCount = 3,
             ),
-            contextChars = 42_000,
-            queuedInputCount = 3,
         )
 
         assertEquals(base.toShellUiState(), hotPathUpdate.toShellUiState())
@@ -88,7 +94,7 @@ class LocalHarnessUiStateTest {
 
         assertNotEquals(
             base.toWorkUiState(),
-            base.copy(running = true, contextChars = 12_000, queuedInputCount = 2).toWorkUiState(),
+            base.copy(kernel = base.kernel.copy(running = true, contextChars = 12_000, queuedInputCount = 2)).toWorkUiState(),
         )
     }
 
@@ -115,7 +121,12 @@ class LocalHarnessUiStateTest {
     @Test
     fun chatSurfaceProjectionIgnoresWorkOnlyChurn() {
         val base = LocalHarnessState(usageMode = LocalUsageMode.CHAT)
-        val workOnlyUpdate = base.copy(modelState = base.modelState.copy(model = "another-model"), work = LocalWorkState(planMode = true), safeAutoApprovalEnabled = true, contextChars = 48_000, queuedInputCount = 4)
+        val workOnlyUpdate = base.copy(
+            modelState = base.modelState.copy(model = "another-model"),
+            work = LocalWorkState(planMode = true),
+            safeAutoApprovalEnabled = true,
+            kernel = base.kernel.copy(contextChars = 48_000, queuedInputCount = 4),
+        )
         assertEquals(base.toChatSurfaceUiState(), workOnlyUpdate.toChatSurfaceUiState())
     }
 
@@ -134,8 +145,8 @@ class LocalHarnessUiStateTest {
     @Test
     fun conversationSurfaceProjectionsStillTrackSharedHotFields() {
         val base = LocalHarnessState()
-        assertNotEquals(base.toChatSurfaceUiState(), base.copy(running = true).toChatSurfaceUiState())
-        assertNotEquals(base.toWorkSurfaceUiState(), base.copy(running = true).toWorkSurfaceUiState())
+        assertNotEquals(base.toChatSurfaceUiState(), base.copy(kernel = base.kernel.copy(running = true)).toChatSurfaceUiState())
+        assertNotEquals(base.toWorkSurfaceUiState(), base.copy(kernel = base.kernel.copy(running = true)).toWorkSurfaceUiState())
     }
 
     @Test
