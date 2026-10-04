@@ -118,7 +118,11 @@ internal class ChatDiaryTransferStore(
         reserved: MutableSet<String>,
     ): String {
         val direct = existingById[sourceId]
-        if ((direct == null || direct.subjectKey == targetSubjectKey) && reserved.add(sourceId)) {
+        if (
+            sourceId.length <= MAX_TRANSFER_ID_CHARS &&
+            (direct == null || direct.subjectKey == targetSubjectKey) &&
+            reserved.add(sourceId)
+        ) {
             return sourceId
         }
         var attempt = 0
@@ -137,4 +141,8 @@ internal class ChatDiaryTransferStore(
         val document: ChatDiaryDocument,
         val changed: Int,
     )
+
+    private companion object {
+        const val MAX_TRANSFER_ID_CHARS = 160
+    }
 }
