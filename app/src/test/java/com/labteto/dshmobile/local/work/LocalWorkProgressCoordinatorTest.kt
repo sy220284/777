@@ -1,7 +1,9 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.LocalGoal
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalSessionEventLog
+import com.labteto.dshmobile.local.LocalTodoItem
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
@@ -93,6 +95,38 @@ class LocalWorkProgressCoordinatorTest {
         assertEquals(2000, state.value.goal?.note?.length)
         coordinator.updateGoal("paused", null)
         assertNull(state.value.goal?.note)
+    }
+
+    @Test
+    fun goalCompletionRequiresRuntimeTodosToBeClosed() {
+        val state = MutableStateFlow(
+            LocalHarnessState(
+                goal = LocalGoal("收口共享底座"),
+                todos = listOf(
+                    LocalTodoItem("补回归", "pending"),
+                    LocalTodoItem("已完成项", "completed"),
+                ),
+            ),
+        )
+        val log = eventLog(File(temporary.root, "goal-transition.jsonl"))
+        var writes = 0
+        val coordinator = LocalWorkProgressCoordinator(state, log) { writes++ }
+
+        val rejected = runCatching { coordinator.updateGoal("completed", null) }
+
+        assertTrue(rejected.isFailure)
+        assertEquals("active", state.value.goal?.status)
+        assertEquals(0, writes)
+        assertEquals("goal/transition-rejected", log.snapshot().last().type)
+
+        state.value = state.value.copy(
+            todos = state.value.todos.map { it.copy(status = "completed") },
+        )
+        coordinator.updateGoal("completed", "验证通过")
+
+        assertEquals("completed", state.value.goal?.status)
+        assertEquals(1, writes)
+        assertEquals("goal/state", log.snapshot().last().type)
     }
 
     @Test

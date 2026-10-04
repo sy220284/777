@@ -196,6 +196,10 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - 当前 Session 的 run / turn / step / tool / request / retry / continuation / compaction 等持久事件应可按 sequence 串联；分享报告只输出结构化白名单字段和 payload 大小，不复制任意消息、工具结果或凭据正文。
 - Token 诊断复用 `TokenUsageAnalyticsStore` 请求级账本，至少保留 action、run/parent/agent/step、真实 route、input/cache/output/reasoning 与 Prompt 构成；禁止再建第二套 Token 事实源。
 - Work 大上下文在请求前派生“可信检查点 + 近期原文”的有界投影；SessionEventLog 和持久模型历史仍保留完整事实。Chat 不继承 Work 专属稳态投影阈值。
+- Chat / Work 必须通过共享请求上下文治理入口进入模型请求；模式策略可以不同，但请求压力、缓存连续性、overflow 与 checkpoint envelope 不得再各建平行事实源。
+- 新生成的压缩检查点必须携带明确的 chat/work 类型；旧 Work v1 provenance 只允许作为恢复兼容读取，新 Chat 压缩不得写 Work 专属 provenance。
+- 模型候选状态不得直接覆盖运行时事实：Chat 长期人物状态和 Work 目标状态都必须经过运行时 transition policy；Work 仍有 pending/in_progress Todo 时禁止把目标标记为 completed。
+- 输出质量守卫采用共享 inspect/result 契约；Chat 仅做高置信最小修复，Work 完成声明与 Todo/Goal 状态冲突时只记录脱敏诊断，禁止在缺少执行证据时静默改写最终答复。
 - Work 请求投影必须保持工具调用/结果批次合法，投影后 Token 必须实质下降；小上下文不得无意义重写。
 - Work 压力增长必须用 source→source 比较，不能把上一请求的投影后压力与当前完整历史比较；DeepSeek/OpenAI 缓存敏感路由在绝对阈值前不得因该错位触发提前压缩。
 - Work 工具结果超过 2 KiB 时必须先持久 spill，模型可见副本保持约 1 KiB 且可按 `call_id` 恢复；`tool_output_read` 默认分页 4 KiB，禁止默认一次重新灌回 24 KiB。

@@ -85,8 +85,7 @@ internal class LocalWorkProgressCoordinator(
         note: String?,
     ): String {
         require(status in setOf("active", "paused", "completed", "blocked")) { "目标状态无效" }
-        val current = state.value.goal ?: error("当前会话没有目标")
-        val updated = current.copy(status = status, note = note?.take(2_000))
+        val updated = resolveWorkGoalUpdate(state.value, status, note, eventLog)
         state.update { it.copy(goal = updated) }
         eventLog.append("goal/state", buildJsonObject {
             put("description", updated.description)

@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.harness.state.RuntimeStateTransitionPolicy
+import com.labteto.dshmobile.harness.state.acceptRuntimeStateTransition
+import com.labteto.dshmobile.harness.state.rejectRuntimeStateTransition
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -18,17 +21,19 @@ internal fun applyCharacterPostTurnRuntime(
     userMessage: String,
     assistantMessage: String,
 ): ChatCharacterState {
-    val impression = if (significance == "NONE") {
-        previous.currentUserImpression.ifBlank { previous.recentImpression }
-    } else {
-        when {
-            rawState?.containsKey("currentUserImpression") == true ->
-                candidate.currentUserImpression.trim().take(320)
-            rawState?.containsKey("recentImpression") == true ->
-                candidate.recentImpression.trim().take(320)
-            else -> previous.currentUserImpression.ifBlank { previous.recentImpression }
-        }
+    val currentImpression = previous.currentUserImpression.ifBlank { previous.recentImpression }
+    val proposedImpression = when {
+        rawState?.containsKey("currentUserImpression") == true -> candidate.currentUserImpression
+        rawState?.containsKey("recentImpression") == true -> candidate.recentImpression
+        else -> currentImpression
     }
+    val impression = RuntimeStateTransitionPolicy<String> { runtimeOwned, proposed ->
+        if (significance == "NONE") {
+            rejectRuntimeStateTransition(runtimeOwned, "本轮证据不足，不改写长期主观印象")
+        } else {
+            acceptRuntimeStateTransition(proposed.trim().take(320))
+        }
+    }.resolve(currentImpression, proposedImpression).value
     val withImpression = current.copy(
         currentUserImpression = impression,
         recentImpression = impression,

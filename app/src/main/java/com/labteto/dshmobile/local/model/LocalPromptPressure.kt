@@ -98,9 +98,9 @@ internal class LocalRequestPressureStore(
 
     private data class SessionEntry(
         var latest: LocalPromptPressure? = null,
-        var latestWorkRequestPressure: LocalPromptPressure? = null,
-        var latestWorkSourcePressure: LocalPromptPressure? = null,
         var latestWorkAssessment: LocalWorkStepContextAssessment? = null,
+        val latestRequestPressureByMode: MutableMap<LocalUsageMode, LocalPromptPressure> = mutableMapOf(),
+        val latestSourcePressureByMode: MutableMap<LocalUsageMode, LocalPromptPressure> = mutableMapOf(),
         val window: MutableWindow = MutableWindow(),
     )
 
@@ -117,13 +117,19 @@ internal class LocalRequestPressureStore(
         pressure: LocalPromptPressure,
         workAssessment: LocalWorkStepContextAssessment? = null,
         workSourcePressure: LocalPromptPressure? = null,
+        usageMode: LocalUsageMode? = null,
+        sourcePressure: LocalPromptPressure? = null,
     ) {
         val entry = sessions.getOrPut(sessionId) { SessionEntry() }
         entry.latest = pressure
+        usageMode?.let { mode ->
+            entry.latestRequestPressureByMode[mode] = pressure
+            sourcePressure?.let { entry.latestSourcePressureByMode[mode] = it }
+        }
         if (workAssessment != null) {
-            entry.latestWorkRequestPressure = pressure
-            entry.latestWorkSourcePressure = workSourcePressure ?: pressure
             entry.latestWorkAssessment = workAssessment
+            entry.latestRequestPressureByMode[LocalUsageMode.WORK] = pressure
+            entry.latestSourcePressureByMode[LocalUsageMode.WORK] = workSourcePressure ?: pressure
         }
         val window = entry.window
         if (window.prefillTokens <= 0L) window.prefillTokens = pressure.estimatedInputTokens.toLong()
@@ -157,12 +163,20 @@ internal class LocalRequestPressureStore(
     fun latest(sessionId: String): LocalPromptPressure? = sessions[sessionId]?.latest
 
     @Synchronized
+    fun latest(sessionId: String, usageMode: LocalUsageMode): LocalPromptPressure? =
+        sessions[sessionId]?.latestRequestPressureByMode?.get(usageMode)
+
+    @Synchronized
+    fun latestSource(sessionId: String, usageMode: LocalUsageMode): LocalPromptPressure? =
+        sessions[sessionId]?.latestSourcePressureByMode?.get(usageMode)
+
+    @Synchronized
     fun latestWork(sessionId: String): LocalPromptPressure? =
-        sessions[sessionId]?.latestWorkRequestPressure
+        latest(sessionId, LocalUsageMode.WORK)
 
     @Synchronized
     fun latestWorkSource(sessionId: String): LocalPromptPressure? =
-        sessions[sessionId]?.latestWorkSourcePressure
+        latestSource(sessionId, LocalUsageMode.WORK)
 
     @Synchronized
     fun workAssessment(sessionId: String): LocalWorkStepContextAssessment? =

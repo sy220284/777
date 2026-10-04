@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.work.LocalWorkProgressCoordinator
+import com.labteto.dshmobile.local.work.recordWorkCompletionQuality
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendResult
@@ -3354,6 +3355,7 @@ class LocalHarnessEngine @Inject constructor(
                         completedToolCallIds.clear()
                     }
                     is AgentEvent.TurnCompleted -> {
+                        recordWorkCompletionQuality(event.answer, runState.value, runEventLog)
                         runEventLog.append("turn/end", buildJsonObject {
                             put("reason", "completed")
                             put("steps", event.steps)

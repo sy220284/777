@@ -10,20 +10,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-private const val WORK_CHECKPOINT_PROVENANCE_KEY = "_dsh_work_checkpoint_source"
-private const val WORK_CHECKPOINT_PROVENANCE_VALUE = "history_compactor_v1"
-
-internal fun buildTrustedWorkCheckpointModelMessage(content: String): JsonObject = buildJsonObject {
-    put("role", "user")
-    put(WORK_CHECKPOINT_PROVENANCE_KEY, WORK_CHECKPOINT_PROVENANCE_VALUE)
-    put("content", content)
-}
-
-private fun isTrustedWorkCheckpointModelMessage(message: JsonObject): Boolean =
-    (message["role"] as? JsonPrimitive)?.contentOrNull == "user" &&
-        (message[WORK_CHECKPOINT_PROVENANCE_KEY] as? JsonPrimitive)?.contentOrNull ==
-            WORK_CHECKPOINT_PROVENANCE_VALUE
-
 internal data class LocalHistoryCompaction(
     val messages: List<JsonObject>,
     val omittedMessages: Int,
@@ -83,9 +69,7 @@ internal data class LocalWorkCheckpoint(
 
         fun latestFrom(messages: List<JsonObject>): LocalWorkCheckpoint? =
             messages.asReversed().firstNotNullOfOrNull { message ->
-                val role = (message["role"] as? JsonPrimitive)?.contentOrNull
-                val provenance = (message[WORK_CHECKPOINT_PROVENANCE_KEY] as? JsonPrimitive)?.contentOrNull
-                if (role != "user" || provenance != WORK_CHECKPOINT_PROVENANCE_VALUE) {
+                if (!isTrustedContextCheckpointModelMessage(message, LocalContextCheckpointKind.WORK)) {
                     return@firstNotNullOfOrNull null
                 }
                 val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return@firstNotNullOfOrNull null
@@ -248,7 +232,7 @@ internal class LocalHistoryCompactor(
         val compacted = buildList {
             addAll(source.take(firstBodyIndex))
             add(
-                buildTrustedWorkCheckpointModelMessage(
+                buildTrustedContextCheckpointModelMessage(summaryMode,
                     if (workCheckpoint != null) {
                         buildString {
                             append("<compacted-summary>\n")
@@ -262,7 +246,7 @@ internal class LocalHistoryCompactor(
                 ),
             )
             protectedTailSystem?.let(::add)
-            addAll(source.drop(start).filterNot(::isTrustedWorkCheckpointModelMessage))
+            addAll(source.drop(start).filterNot { isTrustedContextCheckpointModelMessage(it) })
         }
         val estimatedTokensBefore = encodedTokens + extraTokens
         val estimatedTokensAfter = compacted.sumOf { estimateModelTokens(it.toString()) } + extraTokens
@@ -369,7 +353,12 @@ internal class LocalHistoryCompactor(
         summaryMode: LocalHistorySummaryMode,
         workCheckpoint: LocalWorkCheckpoint?,
     ): String {
-        val user = recentText(messages, "user", maxItems = 8, maxPerItem = 1_200)
+        val user = recentText(
+            messages.filterNot { isTrustedContextCheckpointModelMessage(it) },
+            "user",
+            maxItems = 8,
+            maxPerItem = 1_200,
+        )
 
         val text = buildString {
             when (summaryMode) {
@@ -430,7 +419,7 @@ internal class LocalHistoryCompactor(
         // previousCheckpoint. Re-extracting its serialized model block as ordinary user text
         // nests <work-checkpoint> markers inside the next checkpoint and corrupts subsequent
         // parsing while also wasting context.
-        val extractionMessages = messages.filterNot(::isTrustedWorkCheckpointModelMessage)
+        val extractionMessages = messages.filterNot { isTrustedContextCheckpointModelMessage(it) }
 
         fun select(
             role: String? = null,
