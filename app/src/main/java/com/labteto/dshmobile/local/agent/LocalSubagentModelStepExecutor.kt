@@ -21,9 +21,7 @@ internal class LocalSubagentModelStepExecutor(
     private val executionControl: LocalWorkExecutionControl? = null,
 ) {
     private val requestBoundary = LocalSubagentModelRequestBoundary(
-        requestRuntime = LocalAgentModelRequestRuntime(modelGateway, resourceScheduler),
-        eventLog = eventLog,
-        executionControl = executionControl,
+        LocalAgentModelRequestRuntime(modelGateway, resourceScheduler), eventLog, executionControl,
     )
 
     suspend fun complete(
