@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.LocalKernelState
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
@@ -134,9 +135,11 @@ internal class LocalSessionLifecycleCoordinator(
         state.update {
             it.copy(
                 loading = true,
-                running = false,
-                pendingApproval = null,
-                pendingQuestion = null,
+                kernel = it.kernel.copy(
+                    running = false,
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                ),
             )
         }
         scope.launch {
@@ -146,7 +149,7 @@ internal class LocalSessionLifecycleCoordinator(
                     // must not tear it down; it simply becomes a background run. Chat still uses the
                     // visible single-session runtime and keeps the old cancellation boundary.
                     val preserveWorkRun =
-                        sourceState.usageMode == LocalUsageMode.WORK && sourceState.running
+                        sourceState.usageMode == LocalUsageMode.WORK && sourceState.kernel.running
                     if (!preserveWorkRun) {
                         cancelActiveRunAndJoin()
                         jobs.stopOwnedNonPersistentAndJoin(setOf(sourceId))
@@ -314,8 +317,10 @@ internal class LocalSessionLifecycleCoordinator(
                             work = LocalWorkState(),
                             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
                             deviceApprovalLease = false,
-                            jobs = projectExecutionJobs(usageMode, nextSessionId, jobs.snapshotInfos()),
-                            resources = resourceScheduler.snapshot().toLocalHarnessResourceState(usageMode),
+                            kernel = LocalKernelState(
+                                jobs = projectExecutionJobs(usageMode, nextSessionId, jobs.snapshotInfos()),
+                                resources = resourceScheduler.snapshot().toLocalHarnessResourceState(usageMode),
+                            ),
                             error = null,
                         )
                     }
@@ -333,7 +338,7 @@ internal class LocalSessionLifecycleCoordinator(
 
     fun switchChatMode(mode: LocalChatMode) {
         val snapshot = state.value
-        if (snapshot.loading || snapshot.running) return
+        if (snapshot.loading || snapshot.kernel.running) return
         if (
             snapshot.usageMode == LocalUsageMode.CHAT &&
             snapshot.chat.groupChat.mode == mode
@@ -368,7 +373,7 @@ internal class LocalSessionLifecycleCoordinator(
         }
         // Work can continue in its session-bound runtime while the user moves to Chat. A running
         // Chat turn still owns the visible runtime and therefore keeps the existing guard.
-        if (snapshot.running && snapshot.usageMode != LocalUsageMode.WORK) return
+        if (snapshot.kernel.running && snapshot.usageMode != LocalUsageMode.WORK) return
         if (mode == LocalUsageMode.CHAT && snapshot.usageMode == LocalUsageMode.CHAT) {
             if (snapshot.chat.groupChat.enabled) switchChatMode(LocalChatMode.SINGLE)
             return
