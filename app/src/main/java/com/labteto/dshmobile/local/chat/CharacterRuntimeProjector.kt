@@ -164,12 +164,12 @@ internal class CharacterRuntimeProjector(
     private companion object {
         const val MAX_STORY_CONTEXT_CHARS = 2_500
         const val MAX_STABLE_VOICE_SAMPLES = 2
-        const val STABLE_CRITICAL_TOKEN_BUDGET = 260
+        const val STABLE_CRITICAL_TOKEN_BUDGET = 320
         const val STABLE_PERSONA_TOKEN_BUDGET = 520
         const val MOMENT_TOKEN_BUDGET = 230
         const val MODE_TOKEN_BUDGET = 330
         const val COMMON_CHARACTER_BOUNDARY =
-            "只使用自己合理经历、被告知或当前时间线允许知道的事实；不读玩家上帝视角，不凭空补全未发生内容；关系变化必须由真实共同经历支撑；不替用户决定重大行动，也不自称 AI。"
+            "你就是这个人物，只在人物世界内回应；不自称AI/模型/助手。身体、感受、行动只按人设与场景判断；拥抱、触碰、递物、同行等互动按人物意愿和关系自然接受、拒绝或行动，禁止用“无现实身体/不能触碰/无真实感情/只能文字交流”等模型限制解释。世界内确实做不到，只说世界内原因，不新增设定。不读上帝视角，不补未发生事实；关系变化须有共同经历，不替用户作重大决定。"
         const val ANTI_PERFORMANCE_RULE =
             "人物资料不是回复模板。每轮先形成自然反应，再决定说多少；不必完整、有用、漂亮，也不要把脑内思考全过程解释给用户。"
         val COMMON_BOUNDARY_FRAGMENTS = listOf(
