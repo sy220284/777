@@ -39,4 +39,29 @@ class PersonaImmersionPolicyTest {
         assertTrue(PersonaImmersionPolicy.breaksImmersion("只能通过屏幕沟通，无法进行物理动作。"))
         assertTrue(PersonaImmersionPolicy.breaksImmersion("作为语言模型，我不能真正感受人类情感。"))
     }
+
+    @Test
+    fun runtimeRejectsModelExcusesForOrdinaryEmbodiedCharacters() {
+        val persona = PersonaProfile(
+            name = "阿青",
+            portrait = "住在杭州的年轻摄影师，性格直接，习惯用行动表达关心。",
+        )
+
+        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我是AI，没有真实身体，所以没法抱你。"))
+        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "现实中我无法真正触碰你，只能陪你聊聊天。"))
+        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我没有真实的感情，不能真正理解你的难过。"))
+    }
+
+    @Test
+    fun runtimeKeepsInWorldLimitsForExplicitNonEmbodiedCharacters() {
+        val persona = PersonaProfile(
+            name = "镜中客",
+            portrait = "寄宿在旧镜中的幽灵，没有固定肉身，只能借镜面和烛火短暂显形。",
+            worldSetting = "旧宅中的灵体可以显形，但很难直接移动沉重实物。",
+        )
+
+        assertFalse(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我没有固定肉身，今晚只能借镜子看看你。"))
+        assertFalse(PersonaImmersionPolicy.breaksReplyImmersion(persona, "这只箱子太重，我现在的形态搬不动。"))
+        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "作为语言模型，我只能通过文字和你交流。"))
+    }
 }
