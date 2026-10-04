@@ -163,8 +163,8 @@ if "withLegacyFallback" in automation_chat:
 
 if "cron: '*/30 * * * *'" not in cleanup_workflow:
     violations.append("Release cleanup must stay on the 30-minute schedule")
-if "keep = releases[:3]" not in cleanup_workflow or "remove = releases[3:]" not in cleanup_workflow:
-    violations.append("Release retention must keep exactly the latest three published releases")
+if "keep = formal_releases[:3]" not in cleanup_workflow or "remove = formal_releases[3:]" not in cleanup_workflow:
+    violations.append("Release retention must keep exactly the three highest formal published versions")
 if "timedelta(" in cleanup_workflow or "cutoff =" in cleanup_workflow:
     violations.append("Release retention must not add an age-based retention window")
 
