@@ -184,6 +184,10 @@ android-17-instrumented
 - Work 压力增长必须用 source→source 比较，不能把上一请求的投影后压力与当前完整历史比较；DeepSeek/OpenAI 缓存敏感路由在绝对阈值前不得因该错位触发提前压缩。
 - Work 工具结果超过 2 KiB 时必须先持久 spill，模型可见副本保持约 1 KiB 且可按 `call_id` 恢复；`tool_output_read` 默认分页 4 KiB，禁止默认一次重新灌回 24 KiB。
 - DeepSeek 官方路由保持共享前缀与工具 schema 顺序稳定，并以供应商实报 hit/miss 验证；OpenAI 官方 GPT-5.6+ API Key Responses 的缓存键/30m TTL 只在能力快照允许时发送，自定义兼容地址不得继承。
+- Work 稳定运行时/长期规则必须位于历史前部且跨 turn 保持字节稳定；按当前 query 召回的记忆、handoff 和其他动态上下文只能出现在当前 user 附近，禁止重新插入 system 后第二条破坏整段前缀。
+- DeepSeek `APPEND_ONLY` system/tool 能力必须被运行时实际消费：system 更新追加，工具新增只追加；工具撤销、schema 变化或无法识别的工具结构必须立即退回完整替换，不能为缓存保留失效能力。
+- 正常 Work turn 在首个模型 step 后不得主动语义压缩；完成、失败、步数耗尽等持久 turn 边界再执行压缩。真正的 provider context overflow 仍允许轮中紧急压缩恢复。
+- overflow recovery 后若压缩后的请求成功，缓存连续性必须记录最终实际发送的 `activeMessages` 与对应 generation，禁止把压缩前 `requestMessages` 记成成功基线。
 - 缓存成本诊断必须保留供应商实报的 cache write Token；cache write 属于 miss 子集，只作为成本细分，不能再次增加 input/total Token。
 - 缓存敏感路由必须记录成功请求的前缀连续性：消息只允许尾部追加且工具面保持一致时 generation 不变；历史重写或工具面变化必须开启新 generation；失败请求不得更新成功基线。
 - Work exposure 成功结算以供应商实报 input Token 为准；客户端估算用于准入与未知受理风险，并由实报样本校准。
