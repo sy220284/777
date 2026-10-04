@@ -11,6 +11,11 @@ import kotlinx.serialization.json.jsonPrimitive
  * One-time compatibility boundary from the pre-V3 persona schema into the current "character life"
  * schema. Legacy fields never participate in the current runtime after this conversion.
  */
+internal sealed interface PersonaDocumentImport {
+    data class Archive(val entry: PersonaGalleryEntry) : PersonaDocumentImport
+    data object Share : PersonaDocumentImport
+}
+
 internal object PersonaSchemaMigration {
     fun hasDurableSource(file: File): Boolean =
         file.isFile || File(file.parentFile, "${file.name}.bak").isFile
@@ -42,6 +47,35 @@ internal object PersonaSchemaMigration {
                 }
             },
         )
+    }
+
+    fun decodeDocumentImport(json: Json, payload: String): PersonaDocumentImport {
+        val root = runCatching { json.parseToJsonElement(payload).jsonObject }
+            .getOrElse { error -> throw IllegalArgumentException("人物迁移数据格式不正确", error) }
+        val schema = root["schema"]?.jsonPrimitive?.intOrNull
+        return when {
+            schema == 3 && "entry" in root -> PersonaDocumentImport.Archive(
+                PersonaTransferDocuments.decodeArchive(json, payload).entry,
+            )
+            schema == 2 && "entry" in root -> PersonaDocumentImport.Archive(
+                decodeLegacyArchiveEntry(json, payload),
+            )
+            (schema == 2 || schema == 1) && "persona" in root -> PersonaDocumentImport.Share
+            else -> throw IllegalArgumentException("人物文件版本不受支持")
+        }
+    }
+
+    fun decodeShare(json: Json, payload: String): PersonaProfile {
+        val root = runCatching { json.parseToJsonElement(payload).jsonObject }
+            .getOrElse { error -> throw IllegalArgumentException("人物分享数据格式不正确", error) }
+        return when (root["schema"]?.jsonPrimitive?.intOrNull) {
+            2 -> runCatching {
+                json.decodeFromString(PersonaShareEnvelope.serializer(), payload).persona
+            }.getOrElse { error -> throw IllegalArgumentException("人物分享数据格式不正确", error) }
+            1 -> runCatching { decodeLegacyShare(json, payload) }
+                .getOrElse { error -> throw IllegalArgumentException("旧人物分享数据无法升级", error) }
+            else -> throw IllegalArgumentException("人物文件版本不受支持")
+        }
     }
 
     fun decodeLegacyShare(json: Json, payload: String): PersonaProfile {
