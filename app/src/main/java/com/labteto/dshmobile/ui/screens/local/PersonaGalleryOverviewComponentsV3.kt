@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -457,10 +458,7 @@ internal fun CompactPersonaRow(
     var dragDistance by remember(entry.id) { mutableFloatStateOf(0f) }
     Surface(
         shape = DsShapes.row,
-        color = DsTheme.colors.wallpaperSurface(
-            WallpaperSurfaceLevel.CARD,
-            base = if (selected) DsTheme.colors.sidebarNavActive else DsTheme.colors.bgBase,
-        ),
+        color = if (selected) DsTheme.colors.accentTertiary else Color.Transparent,
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
@@ -511,6 +509,14 @@ internal fun CompactPersonaRow(
                     color = DsTheme.colors.labelTertiary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (!managing) {
+                Icon(
+                    FeatherIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = DsTheme.colors.labelCaption,
+                    modifier = Modifier.size(18.dp),
                 )
             }
             if (managing) {
