@@ -33,15 +33,6 @@ internal class LocalAutomationWorkCoordinator(
         onApprovalBlocked: (String) -> Unit,
     ) -> LocalSubagentRunner,
 ) {
-    suspend fun runPrompt(
-        text: String,
-        timeoutMillis: Long = 5 * 60_000L,
-    ): String = runWork(
-        text = text,
-        preferredSessionId = null,
-        timeoutMillis = timeoutMillis,
-    ).output
-
     suspend fun prepareWorkSession(
         text: String,
         preferredSessionId: String? = null,
