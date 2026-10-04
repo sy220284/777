@@ -18,11 +18,9 @@ internal class PersonaGallerySchemaMigrationCoordinator(
     private val marker = File(root, "persona-gallery-v1-v4-to-v5.done")
 
     fun migrateIfNeeded() {
-        if (currentFile.name != "persona-gallery-v5.json" || marker.isFile) return
-        if (!PersonaSchemaMigration.hasDurableSource(legacyFile)) {
-            markDone()
-            return
-        }
+        if (currentFile.name != "persona-gallery-v5.json") return
+        if (marker.isFile && PersonaSchemaMigration.hasDurableSource(currentFile)) return
+        if (!PersonaSchemaMigration.hasDurableSource(legacyFile)) return
 
         val documentStore = PersonaGalleryDocumentStore(currentFile, json)
         val history = PersonaGalleryHistoryCoordinator(currentHistoryRoot, json)
