@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.activity.BackEventCompat
 import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.chat.findEstablishedGroupChatSession
 
@@ -31,6 +32,18 @@ internal data class LocalFeatureDrawerOpenResult(
     val originStack: List<String>,
     val stack: List<String>,
 )
+
+internal enum class LocalFeatureBackAction {
+    OPEN_DRAWER,
+    POP_FEATURE,
+}
+
+internal fun localFeatureBackAction(swipeEdge: Int?): LocalFeatureBackAction =
+    if (swipeEdge == BackEventCompat.EDGE_LEFT) {
+        LocalFeatureBackAction.OPEN_DRAWER
+    } else {
+        LocalFeatureBackAction.POP_FEATURE
+    }
 
 internal fun localFeatureOpenFromDrawer(
     stack: List<String>,
