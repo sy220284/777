@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED }
+internal enum class PlannerUiError { SUGGESTIONS_FAILED, SESSION_CHANGED, SAVE_FAILED, PLAN_FAILED }
 internal enum class AutomationCadence { ONCE, DAILY, WEEKLY, CUSTOM }
 data class TasksUiState(
     val tasks: List<AutomationTask> = emptyList(),
@@ -28,7 +29,7 @@ data class TasksUiState(
     val suggestionsLoading: Boolean = false,
     val suggestionSessionId: String? = null,
     val planning: Boolean = false,
-    val plannerError: String? = null,
+    val plannerError: PlannerUiError? = null,
     val saveRevision: Long = 0L,
 )
 @HiltViewModel
@@ -112,7 +113,7 @@ class TasksViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             suggestionsLoading = false,
-                            plannerError = error.userMessage("暂时没生成出合适的互动建议"),
+                            plannerError = PlannerUiError.SUGGESTIONS_FAILED,
                         )
                     }
                 }
@@ -133,7 +134,7 @@ class TasksViewModel @Inject constructor(
                         _state.update {
                             it.copy(
                                 planning = false,
-                                plannerError = "聊天已经切换，请在当前聊天重新安排",
+                                plannerError = PlannerUiError.SESSION_CHANGED,
                             )
                         }
                         return@onSuccess
@@ -150,7 +151,7 @@ class TasksViewModel @Inject constructor(
                         } else {
                             it.copy(
                                 planning = false,
-                                plannerError = "这个事件还不能保存，请换一种时间说法再试",
+                                plannerError = PlannerUiError.SAVE_FAILED,
                             )
                         }
                     }
@@ -160,7 +161,7 @@ class TasksViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             planning = false,
-                            plannerError = error.userMessage("定时事件生成失败，请重试"),
+                            plannerError = PlannerUiError.PLAN_FAILED,
                         )
                     }
                 }
@@ -306,5 +307,3 @@ class TasksViewModel @Inject constructor(
             !snapshot.groupChat.enabled &&
             snapshot.sessionId.isNotBlank()
 }
-private fun Throwable.userMessage(fallback: String): String =
-    message?.takeIf(String::isNotBlank)?.take(180) ?: fallback
