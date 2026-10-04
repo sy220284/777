@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
@@ -274,6 +275,8 @@ internal fun PersonaGalleryAddPanel(
     onRequestHidePreset: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    BackHandler(onBack = onBack)
+
     Column(
         modifier = modifier.fillMaxSize().padding(horizontal = DsSpacing.medium),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
