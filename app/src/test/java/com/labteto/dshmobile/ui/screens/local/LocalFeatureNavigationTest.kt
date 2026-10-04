@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.activity.BackEventCompat
 import com.labteto.dshmobile.local.LocalChatMode
 import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -9,6 +10,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalFeatureNavigationTest {
+    @Test
+    fun leftEdgeBackGestureOpensDrawerWhileOtherBackInputsPopFeature() {
+        assertEquals(
+            LocalFeatureBackAction.OPEN_DRAWER,
+            localFeatureBackAction(BackEventCompat.EDGE_LEFT),
+        )
+        assertEquals(
+            LocalFeatureBackAction.POP_FEATURE,
+            localFeatureBackAction(BackEventCompat.EDGE_RIGHT),
+        )
+        assertEquals(
+            LocalFeatureBackAction.POP_FEATURE,
+            localFeatureBackAction(null),
+        )
+    }
+
     @Test
     fun sessionNavigationOnlyCommitsKnownAcceptedTargets() {
         val session = LocalSessionSummary(
