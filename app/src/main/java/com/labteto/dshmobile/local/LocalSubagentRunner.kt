@@ -157,6 +157,7 @@ internal class LocalSubagentRunner(
         val routeModel = runProfile.model
         val runHistoryBudget = historyBudget?.invoke(runProfile)
         val runCachePolicy = LocalModelPresets.promptCachePolicyFor(runProfile.model, runProfile.baseUrl, runProfile.protocol, runProfile.authKind)
+        val runToolSurface = LocalRunToolSurface()
         val stepLimit = adaptiveAgentStepLimit(
             configuredBase = maxSteps,
             task = task,
@@ -275,10 +276,7 @@ internal class LocalSubagentRunner(
                             put("content", message)
                         })
                     }
-                    historyPolicy.compactHistory(
-                        history, subagentId,
-                        runHistoryBudget?.let { workSteadyStateHistoryBudget(it, history.estimatedTokens, cachePolicy = runCachePolicy) },
-                    )
+                    historyPolicy.compactBeforeModelStep(history, subagentId, modelStep, runHistoryBudget, runCachePolicy)
                     modelStep += 1
                     val durableHistory = history.snapshot()
                     val selectedMode = resolveImageMode(snapshot.imageInputMode, snapshot.baseUrl, routeModel)
@@ -299,7 +297,7 @@ internal class LocalSubagentRunner(
                             baseUrl = snapshot.baseUrl,
                             model = routeModel,
                             history = preparedHistory,
-                            tools = schemas(allowMutation, virtualScreenId != null, enabledOptionalTools),
+                            tools = runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools), snapshot),
                             subagentId = subagentId,
                             step = modelStep,
                             durableHistory = history,
@@ -565,7 +563,7 @@ internal class LocalSubagentRunner(
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
             }
             return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "SUBAGENT_ERROR")
-        }
+        } finally { historyPolicy.compactAtTurnBoundary(history, subagentId, runHistoryBudget, runCachePolicy) }
     }
 
     private fun AgentToolCall.toLocalToolCall() = LocalToolCall(id, name, arguments, rawArguments)
