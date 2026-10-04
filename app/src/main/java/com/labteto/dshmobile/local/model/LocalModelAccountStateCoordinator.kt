@@ -134,7 +134,7 @@ internal class LocalModelAccountStateCoordinator(
 
     suspend fun requestMarkerOrNull(): String? {
         val snapshot = state.value
-        val profileId = snapshot.modelState.modelState.modelSelection.activeProfileId ?: return null
+        val profileId = snapshot.modelState.modelSelection.activeProfileId ?: return null
         return gateway.profileForRoute(
             profileId = profileId,
             model = snapshot.modelState.model,
