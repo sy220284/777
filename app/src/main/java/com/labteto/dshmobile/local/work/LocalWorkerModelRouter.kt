@@ -13,11 +13,11 @@ internal object LocalWorkerModelRouter {
     ): String? {
         explicitSelection?.trim()?.takeIf(String::isNotBlank)?.let { return it }
 
-        snapshot.modelSelection.workerProfile?.id?.let { return it }
+        snapshot.modelState.modelState.modelSelection.workerProfile?.id?.let { return it }
 
-        val parent = snapshot.modelSelection.activeProfile
+        val parent = snapshot.modelState.modelState.modelSelection.activeProfile
         if (parent?.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
-            snapshot.modelSelection.profiles
+            snapshot.modelState.modelState.modelSelection.profiles
                 .filter { it.authKind == LocalModelAuthKind.API_KEY }
                 .singleOrNull()
                 ?.let { return it.id }
