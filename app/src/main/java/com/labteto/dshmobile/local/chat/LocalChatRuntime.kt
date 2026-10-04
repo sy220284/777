@@ -4,12 +4,15 @@ import com.labteto.dshmobile.local.LocalChatMode
 import com.labteto.dshmobile.local.LocalChatUserEditResult
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalImportedAttachment
+import com.labteto.dshmobile.local.session.LocalSessionRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
 /** Chat/persona capability boundary for the local UI. */
 @Singleton
 class LocalChatRuntime @Inject constructor(
-    private val engine: LocalHarnessEngine, private val persistence: LocalChatPersistence,
+    private val engine: LocalHarnessEngine,
+    private val persistence: LocalChatPersistence,
+    private val sessionRuntime: LocalSessionRuntime,
 ) {
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = engine.configureChatPersona(profile)
     internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) =
@@ -23,8 +26,8 @@ class LocalChatRuntime @Inject constructor(
     ) = engine.clearChatGalleryBinding(expectedGalleryId, expectedStoryId, keepCharacter)
     internal suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile =
         engine.syncDefaultChatPersona(profile)
-    internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean = engine.createGroupChatSession(entries)
-    internal fun createSingleChatSession() = engine.createSingleChatSession()
+    internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean = sessionRuntime.createGroupChatSession(entries)
+    internal fun createSingleChatSession() = sessionRuntime.createSingleChatSession()
     internal fun switchChatMode(mode: LocalChatMode) = engine.switchChatMode(mode)
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean =
         engine.configureGroupChatMembers(entries)
