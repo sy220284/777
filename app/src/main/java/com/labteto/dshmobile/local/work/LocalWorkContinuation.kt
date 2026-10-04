@@ -48,8 +48,8 @@ internal fun queueAutomaticWorkContinuation(
     binding.continuationParentRunId = sourceRunId
     binding.state.update {
         it.copy(
+            work = it.work.copy(queuedInputCount = binding.pendingInputs.size()),
             error = null,
-            queuedInputCount = binding.pendingInputs.size(),
         )
     }
     binding.eventLog.append("turn/continuation-queued", buildJsonObject {
