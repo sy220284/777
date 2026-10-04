@@ -162,7 +162,7 @@ fun selectGalleryPersonaForCurrentChat(id: String): Boolean {
 }
 
 suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGalleryEntry> = runCatching {
-    check(!state.value.loading && !state.value.running) { "请在聊天空闲时新建人物" }
+    check(!state.value.loading && !state.value.kernel.running) { "请在聊天空闲时新建人物" }
     require(isMeaningfulGalleryPersona(profile)) { "请填写人物名称和至少一项人物设定" }
     val entry = withContext(Dispatchers.IO) {
         galleryStore.save(
