@@ -12,19 +12,20 @@ internal fun structuredWorkState(
 ): LocalStructuredWorkState {
     if (snapshot.usageMode != LocalUsageMode.WORK) return LocalStructuredWorkState()
 
+    val work = snapshot.work
     val goals = buildList {
-        snapshot.goal?.description?.takeIf(String::isNotBlank)?.let(::add)
-        snapshot.goal?.note?.takeIf(String::isNotBlank)?.let { add("目标备注：$it") }
+        work.goal?.description?.takeIf(String::isNotBlank)?.let(::add)
+        work.goal?.note?.takeIf(String::isNotBlank)?.let { add("目标备注：$it") }
     }
-    val plan = snapshot.plan
+    val plan = work.plan
         .map(String::trim)
         .filter(String::isNotBlank)
         .take(MAX_STRUCTURED_PLAN_ITEMS)
-    val unfinished = snapshot.todos
+    val unfinished = work.todos
         .filter { it.status == "pending" || it.status == "in_progress" }
         .map { todo -> "[${todo.status}] ${todo.content}" }
         .take(MAX_STRUCTURED_TODO_ITEMS)
-    val progress = snapshot.todos
+    val progress = work.todos
         .filter { it.status == "completed" }
         .map { todo -> "[completed] ${todo.content}" }
         .takeLast(MAX_STRUCTURED_TODO_ITEMS)
