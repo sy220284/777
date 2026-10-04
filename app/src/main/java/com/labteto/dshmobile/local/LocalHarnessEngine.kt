@@ -1670,7 +1670,7 @@ class LocalHarnessEngine @Inject constructor(
                 enqueue = { targetPending.offer(queuedInput) },
                 onQueued = {
                     recordUserTranscript(content, modelMessage, true, queuedInput, binding)
-                    targetState.update { it.copy(work = it.work.copy(queuedInputCount = targetPending.size()), error = null) }
+                    targetState.update { it.copy(kernel = it.kernel.copy(queuedInputCount = targetPending.size()), error = null) }
                     if (binding != null) persist(binding) else persist()
                 },
                 onStart = { reservedWorkLease ->
@@ -1704,7 +1704,7 @@ class LocalHarnessEngine @Inject constructor(
             ?: recordUserTranscript(content, durableMessage, queued = false)
         appendUserToModelHistory(durableMessage)
         resumedInput?.let { resumed ->
-            _state.update { it.copy(work = it.work.copy(queuedInputCount = pendingInputs.size())) }
+            _state.update { it.copy(kernel = it.kernel.copy(queuedInputCount = pendingInputs.size())) }
             eventLog.append(
                 LOCAL_AGENT_INBOX_EVENT_TYPE,
                 encodeLocalAgentInboxEvent(
@@ -2225,10 +2225,10 @@ class LocalHarnessEngine @Inject constructor(
             binding.state.update {
                 it.copy(
                     work = it.work.copy(
-                        queuedInputCount = 0,
                         pendingApproval = null,
                         pendingQuestion = null,
                     ),
+                    kernel = it.kernel.copy(queuedInputCount = 0),
                 )
             }
             binding.job?.cancel()
@@ -2248,7 +2248,7 @@ class LocalHarnessEngine @Inject constructor(
                     ),
                 )
             }
-            _state.update { it.copy(work = it.work.copy(queuedInputCount = 0)) }
+            _state.update { it.copy(kernel = it.kernel.copy(queuedInputCount = 0)) }
             activeJob
         }
         running?.cancel()
@@ -2366,7 +2366,7 @@ class LocalHarnessEngine @Inject constructor(
                     ),
                 )
             }
-            _state.update { it.copy(queuedInputCount = 0) }
+            _state.update { it.copy(kernel = it.kernel.copy(queuedInputCount = 0)) }
             activeJob
         }
         job?.cancelAndJoin()
@@ -2420,7 +2420,7 @@ class LocalHarnessEngine @Inject constructor(
             durableMessages += durableMessage
             captureAutoMemoryDirective(input.memoryInput, input.id, binding)
         }
-        targetState.update { it.copy(work = it.work.copy(queuedInputCount = targetPending.size())) }
+        targetState.update { it.copy(kernel = it.kernel.copy(queuedInputCount = targetPending.size())) }
         targetLog.append(
             LOCAL_AGENT_INBOX_EVENT_TYPE,
             encodeLocalAgentInboxEvent(
@@ -2464,7 +2464,7 @@ class LocalHarnessEngine @Inject constructor(
             put("role", "user")
             put("content", next.content)
         }
-        binding.state.update { it.copy(work = it.work.copy(queuedInputCount = binding.pendingInputs.size())) }
+        binding.state.update { it.copy(kernel = it.kernel.copy(queuedInputCount = binding.pendingInputs.size())) }
         appendUserToModelHistory(durableMessage, binding)
         binding.eventLog.append(
             LOCAL_AGENT_INBOX_EVENT_TYPE,
@@ -2521,7 +2521,7 @@ class LocalHarnessEngine @Inject constructor(
                 put("role", "user")
                 put("content", next.content)
             }
-            _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
+            _state.update { it.copy(kernel = it.kernel.copy(queuedInputCount = pendingInputs.size())) }
             appendUserToModelHistory(durableMessage)
             eventLog.append(
                 LOCAL_AGENT_INBOX_EVENT_TYPE,
@@ -3618,9 +3618,11 @@ class LocalHarnessEngine @Inject constructor(
             if (binding != null) binding.interactions.cancelAll() else interactions.cancelAll()
             runState.update {
                 it.copy(
-                    running = false,
-                    pendingApproval = null,
-                    pendingQuestion = null,
+                    work = it.work.copy(
+                        pendingApproval = null,
+                        pendingQuestion = null,
+                    ),
+                    kernel = it.kernel.copy(running = false),
                     deviceApprovalLease = false,
                 )
             }
@@ -4892,12 +4894,12 @@ class LocalHarnessEngine @Inject constructor(
                 goal = projectedControls.goal,
                 planMode = projectedControls.planMode,
                 jobs = projectExecutionJobs(stored.usageMode, stored.id, jobs.snapshotInfos()),
-                queuedInputCount = pendingInputs.size(),
             ),
             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
                 loaded?.legacySafeAutoApproval == true,
             ),
             kernel = com.labteto.dshmobile.local.runtime.LocalKernelState(
+                queuedInputCount = pendingInputs.size(),
                 resources = resourceScheduler.snapshot().toLocalHarnessResourceState(stored.usageMode),
                 contextChars = modelHistory.encodedChars,
                 contextBudgetChars = currentHistoryBudget().maxHistoryChars,
