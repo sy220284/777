@@ -43,9 +43,9 @@ class LocalWorkProgressCoordinatorTest {
         visible.value = visible.value.copy(sessionId = "another-visible")
         coordinator.updateGoal("blocked", "等待依赖")
 
-        assertNull(visible.value.goal)
-        assertEquals("完成任务", run.value.goal?.description)
-        assertEquals("blocked", run.value.goal?.status)
+        assertNull(visible.value.work.goal)
+        assertEquals("完成任务", run.value.work.goal?.description)
+        assertEquals("blocked", run.value.work.goal?.status)
         assertEquals(2, writes)
         assertEquals("blocked", log.snapshot().last().data["status"]?.toString()?.trim('"'))
     }
@@ -66,12 +66,12 @@ class LocalWorkProgressCoordinatorTest {
                 }
             }))
         })
-        assertEquals(20, state.value.plan.size)
+        assertEquals(20, state.value.work.plan.size)
         assertEquals(50, state.value.work.todos.size)
         assertTrue(state.value.work.todos.all { it.content.length == 500 && it.status == "pending" })
 
         coordinator.updatePlan(buildJsonObject { put("plan", "一\n\n二") })
-        assertEquals(listOf("一", "二"), state.value.plan)
+        assertEquals(listOf("一", "二"), state.value.work.plan)
         coordinator.updateTodos(buildJsonObject {})
         assertTrue(state.value.work.todos.isEmpty())
         assertEquals(listOf("plan/state", "todo/state", "plan/state", "todo/state"), log.snapshot().map { it.type })
