@@ -75,6 +75,35 @@ class LocalHistoryCompactorTest {
     }
 
     @Test
+    fun normalCompactionPreservesLatestTailSystemOverride() {
+        val history = buildList {
+            add(message("system", "基础规则"))
+            repeat(4) { index ->
+                add(message("user", "旧任务-$index-" + "旧".repeat(500)))
+                add(message("assistant", "旧处理-$index-" + "答".repeat(500)))
+            }
+            add(message("system", "【系统规则更新；后续以本条为准】\n当前规则"))
+            repeat(5) { index ->
+                add(message("user", "后续任务-$index-" + "新".repeat(500)))
+                add(message("assistant", "后续处理-$index-" + "新".repeat(500)))
+            }
+        }
+
+        val compacted = LocalHistoryCompactor(
+            maxHistoryChars = 1_000,
+            tailChars = 500,
+            maxSummaryChars = 1_000,
+        ).compact(history, summaryMode = LocalHistorySummaryMode.WORK)
+            ?: error("expected compaction")
+
+        assertTrue(compacted.messages.any {
+            it["role"].toString().trim('"') == "system" &&
+                it["content"].toString().contains("当前规则")
+        })
+        assertTrue(compacted.estimatedTokensAfter < compacted.estimatedTokensBefore)
+    }
+
+    @Test
     fun workCompactionBuildsStructuredCheckpointWithoutInventingFacts() {
         val pad = "旧".repeat(2_000)
         val history = listOf(
