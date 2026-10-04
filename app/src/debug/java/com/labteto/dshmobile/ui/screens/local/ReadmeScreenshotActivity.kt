@@ -111,7 +111,6 @@ private fun NavigationScreenshot() {
                     title = "和绫华的日常",
                     updatedAt = 1_799_999_999_000L,
                     usageMode = LocalUsageMode.CHAT,
-            drawerOpen = true,
                     summaryPreview = "今天想去哪里走走？",
                 ),
                 LocalSessionSummary(
@@ -125,6 +124,7 @@ private fun NavigationScreenshot() {
             gallery = emptyList(),
             usageMode = LocalUsageMode.CHAT,
             modeSwitchEnabled = true,
+            drawerOpen = true,
             pinnedSessionIds = setOf("chat-current"),
             sessionTitleOverrides = emptyMap(),
             currentGalleryId = null,
