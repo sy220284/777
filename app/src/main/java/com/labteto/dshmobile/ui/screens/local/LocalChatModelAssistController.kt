@@ -20,7 +20,7 @@ internal class LocalChatModelAssistController(
     suspend fun generateGroupAnnouncement(direction: String): Result<String> =
         try {
             val snapshot = state.value
-            check(!snapshot.loading && !snapshot.running && snapshot.chat.groupChat.enabled) {
+            check(!snapshot.loading && !snapshot.kernel.running && snapshot.chat.groupChat.enabled) {
                 "请在群聊空闲时生成公告"
             }
             check(snapshot.modelState.configured) { "请先配置聊天模型" }
@@ -45,7 +45,7 @@ internal class LocalChatModelAssistController(
         val snapshot = state.value
         if (
             snapshot.loading ||
-            snapshot.running ||
+            snapshot.kernel.running ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
             snapshot.chat.groupChat.enabled
         ) {
