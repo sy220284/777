@@ -61,7 +61,7 @@ data class LocalConversationSurfaceState(
 internal fun LocalHarnessState.toChatSurfaceUiState(): LocalConversationSurfaceState =
     LocalConversationSurfaceState(
         loading = loading,
-        configured = configured,
+        configured = modelState.configured,
         sessionId = sessionId,
         usageMode = LocalUsageMode.CHAT,
         running = running,
@@ -89,11 +89,11 @@ internal fun LocalHarnessState.toWorkSurfaceUiState(): LocalConversationSurfaceS
         running = running,
         messages = messages,
         workspacePath = workspacePath,
-        imageInputMode = imageInputMode,
+        imageInputMode = modelState.imageInputMode,
         error = error,
         sessions = sessions,
-        model = model,
-        baseUrl = baseUrl,
+        model = modelState.model,
+        baseUrl = modelState.baseUrl,
         modelProfiles = modelProfiles,
         planMode = work.planMode,
         safeAutoApprovalEnabled = safeAutoApprovalEnabled,
