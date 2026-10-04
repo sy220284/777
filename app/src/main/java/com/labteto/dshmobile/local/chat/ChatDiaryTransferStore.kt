@@ -36,7 +36,7 @@ internal class ChatDiaryTransferStore(
         } catch (error: Throwable) {
             if (merged.changed > 0) {
                 try {
-                    documents.write(before)
+                    documents.restore(before)
                 } catch (rollbackError: Throwable) {
                     error.addSuppressed(rollbackError)
                 }
