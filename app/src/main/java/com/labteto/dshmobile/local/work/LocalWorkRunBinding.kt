@@ -78,9 +78,11 @@ internal class LocalWorkRunBinding(
                 work = it.work.copy(
                     pendingApproval = null,
                     pendingQuestion = null,
+                ),
+                kernel = it.kernel.copy(
+                    running = false,
                     queuedInputCount = 0,
                 ),
-                kernel = it.kernel.copy(running = false),
             )
         }
         val activeJob = job.also { job = null }
@@ -131,6 +133,7 @@ internal fun mirrorLocalWorkRunState(
                 work = run.work,
                 kernel = visible.kernel.copy(
                     running = run.kernel.running,
+                    queuedInputCount = run.kernel.queuedInputCount,
                     contextChars = run.kernel.contextChars,
                     contextBudgetChars = run.kernel.contextBudgetChars,
                 ),
