@@ -20,13 +20,9 @@ internal object LocalWorkCompletionClaimGuard : LocalOutputQualityGuard {
         text: String,
         context: LocalOutputQualityContext,
     ): LocalOutputQualityResult {
-        if (
-            text.isBlank() ||
-            !COMPLETION_CLAIM.containsMatchIn(text) ||
-            NEGATED_COMPLETION.containsMatchIn(text)
-        ) {
-            return LocalOutputQualityResult(text)
-        }
+        if (text.isBlank()) return LocalOutputQualityResult(text)
+        val corrected = correctGlobalCompletionClaims(text)
+        if (corrected == text) return LocalOutputQualityResult(text)
         val state = context.state ?: return LocalOutputQualityResult(text)
         val findings = mutableListOf<String>()
         val openTodos = state.todos.count { it.status == "pending" || it.status == "in_progress" }
@@ -34,20 +30,40 @@ internal object LocalWorkCompletionClaimGuard : LocalOutputQualityGuard {
         if (state.goal?.status == "blocked") findings += "完成声明与阻塞目标状态冲突"
         if (findings.isEmpty()) return LocalOutputQualityResult(text)
         return LocalOutputQualityResult(
-            text = truthfulIncompleteDeliveryText(openTodos, state.goal?.status == "blocked"),
+            text = truthfulIncompleteDeliveryText(openTodos, state.goal?.status == "blocked") + "\n\n" + corrected,
             findings = findings,
             changed = true,
         )
     }
 
-    private val COMPLETION_CLAIM = Regex(
-        """(?im)(?:^|[。！？!?]\s*)(?:(?:全部|所有|整个任务|本次任务|任务|工作)(?:都|已经|已)?(?:完成|处理完毕)|(?:已经|已)?完成(?:了)?(?=\s*(?:[。！？!?，,]|$))|处理完毕(?=\s*(?:[。！？!?，,]|$))|\b(?:done|completed|finished)\b|(?:可以|可)(?:直接)?交付)""",
-        RegexOption.IGNORE_CASE,
+    private val CLAIM = Regex(
+        """(?:全部|所有(?:任务|工作|事项)?|整个任务|本次任务)(?:都|已经|已|均|全部)*(?:完成|处理完毕)|^\s*(?:[-+]\s*)?(?:任务|工作|修复)(?:都|已经|已)*(?:全部)?(?:完成|处理完毕)|^\s*(?:[-+]\s*)?(?:已经|已)?完成(?:了)?(?=\s*[。！？!?，,\n]|\s*$)|^\s*(?:[-+]\s*)?(?:可以|可)(?:直接)?交付|^\s*(?:done|completed|finished)\b""",
+        setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE),
     )
-    private val NEGATED_COMPLETION = Regex(
-        """(?:未完成|尚未完成|还没完成|没有完成|无法完成|不能完成|not\s+(?:done|completed|finished)|unfinished)""",
-        RegexOption.IGNORE_CASE,
-    )
+    private val NEGATION_PREFIX = Regex("""(?:尚未|还没|没有|无法|不能|未|不|not)\s*$""", RegexOption.IGNORE_CASE)
+
+    internal fun correctGlobalCompletionClaims(text: String): String {
+        // Code and linked artifact names are not the assistant's delivery claim.
+        val protected = Regex("(?s)```.*?```|~~~.*?~~~|`[^`\n]+`|\\[[^\\]\n]*\\]\\([^\\)\n]*\\)").findAll(text)
+            .map { it.range }.toList()
+        return Regex("[^。！？!?，,\n]+[。！？!?，,\n]*|[。！？!?，,\n]+").findAll(text)
+            .joinToString("") { part ->
+                val raw = part.value
+                val offsets = raw.indices.filter { raw[it] !in "*_`#" }
+                val clean = offsets.map { raw[it] }.joinToString("")
+                val matches = CLAIM.findAll(clean).filter { match ->
+                    !NEGATION_PREFIX.containsMatchIn(clean.take(match.range.first)) &&
+                        protected.none { (part.range.first + offsets[match.range.first]) in it }
+                }.toList()
+                var result = raw
+                for (match in matches.asReversed()) {
+                    result = result.replaceRange(offsets[match.range.first], offsets[match.range.last] + 1,
+                        "完成结论待剩余事项闭环确认")
+                }
+                result
+            }
+    }
+
 }
 
 private val WORK_OUTPUT_QUALITY_PIPELINE = LocalOutputQualityPipeline(listOf(LocalWorkCompletionClaimGuard))

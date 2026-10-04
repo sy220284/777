@@ -432,7 +432,8 @@ UI 设计同时受性能约束。
 - Chat / Work 使用独立状态投影。
 - streaming preview 不进入整棵 aggregate state。
 - 使用 `distinctUntilChanged` 避免无关更新。
-- 历史消息分页。
+- 历史消息分页的前台展示额度只按用户真正看到的对话计算：用户消息与最终助手回复计入额度，reasoning、tool、progress、system 等后台/内部消息不得挤占前台对话数量。
+- Runtime 原始消息窗口继续保持有界；前台历史独立从 Session Event 增量补齐，短会话直接补足完整可见对话，长会话向上浏览时自动加载更早对话，只有加载失败才提供显式重试。
 - 长列表不一次物化全部历史。
 - 低频设置不进入高频对话状态。
 - Dialog 自己承担局部状态和装配，避免继续膨胀 `LocalHarnessScreen`。

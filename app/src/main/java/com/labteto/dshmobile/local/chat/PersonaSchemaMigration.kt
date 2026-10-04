@@ -65,18 +65,18 @@ internal object PersonaSchemaMigration {
     fun decodeDocumentImport(json: Json, payload: String): PersonaDocumentImport {
         val root = runCatching { json.parseToJsonElement(payload).jsonObject }
             .getOrElse { error -> throw IllegalArgumentException("人物迁移数据格式不正确", error) }
-        val schema = root["schema"]?.jsonPrimitive?.intOrNull
+        val schema = explicitSchema(root)
         return when {
             schema == 3 && "entry" in root -> PersonaDocumentImport.Archive(
                 PersonaTransferDocuments.decodeArchive(json, payload).entry,
             )
             schema == 2 && "entry" in root -> PersonaDocumentImport.Archive(
-                decodeLegacyArchiveEntry(json, payload),
+                decodeMixedArchive(json, payload),
             )
             schema == null && "entry" in root -> {
                 val persona = root["entry"]?.jsonObject?.get("persona")?.jsonObject
                 if (persona.hasLegacyPersonaFields()) {
-                    PersonaDocumentImport.Archive(decodeLegacyArchiveEntry(json, payload))
+                    PersonaDocumentImport.Archive(decodeMixedArchive(json, payload))
                 } else {
                     PersonaDocumentImport.Archive(
                         PersonaTransferDocuments.decodeArchive(json, payload).entry,
@@ -92,16 +92,16 @@ internal object PersonaSchemaMigration {
     fun decodeShare(json: Json, payload: String): PersonaProfile {
         val root = runCatching { json.parseToJsonElement(payload).jsonObject }
             .getOrElse { error -> throw IllegalArgumentException("人物分享数据格式不正确", error) }
-        return when (root["schema"]?.jsonPrimitive?.intOrNull) {
+        return when (explicitSchema(root)) {
             2 -> runCatching {
                 json.decodeFromString(PersonaShareEnvelope.serializer(), payload).persona
             }.getOrElse { error -> throw IllegalArgumentException("人物分享数据格式不正确", error) }
-            1 -> runCatching { decodeLegacyShare(json, payload) }
+            1 -> runCatching { decodeMixedShare(json, payload) }
                 .getOrElse { error -> throw IllegalArgumentException("旧人物分享数据无法升级", error) }
             null -> {
                 val persona = root["persona"]?.jsonObject
                 if (persona.hasLegacyPersonaFields()) {
-                    runCatching { decodeLegacyShare(json, payload) }
+                    runCatching { decodeMixedShare(json, payload) }
                         .getOrElse { error -> throw IllegalArgumentException("旧人物分享数据无法升级", error) }
                 } else {
                     runCatching {
@@ -262,6 +262,29 @@ internal object PersonaSchemaMigration {
             hardConstraints = mergeLines(userConstraints, latest.hardConstraints, 20),
             bannedPhrases = mergeLines(userBans, latest.bannedPhrases, 30),
         )
+    }
+
+    private fun explicitSchema(root: kotlinx.serialization.json.JsonObject): Int? {
+        val value = root["schema"] ?: return null
+        val primitive = value as? kotlinx.serialization.json.JsonPrimitive
+        require(primitive != null && !primitive.isString && primitive.intOrNull != null) {
+            "人物文件版本字段不合法"
+        }
+        return primitive.intOrNull
+    }
+
+    private fun decodeMixedShare(json: Json, payload: String): PersonaProfile {
+        val legacy = decodeLegacyShare(json, payload)
+        val current = Json(json) { ignoreUnknownKeys = true }
+            .decodeFromString(PersonaShareEnvelope.serializer(), payload).persona
+        return mergeCurrentFirst(current, legacy)
+    }
+
+    private fun decodeMixedArchive(json: Json, payload: String): PersonaGalleryEntry {
+        val legacy = decodeLegacyArchiveEntry(json, payload)
+        val current = Json(json) { ignoreUnknownKeys = true }
+            .decodeFromString(PersonaArchiveEnvelope.serializer(), payload).entry
+        return current.copy(persona = mergeCurrentFirst(current.persona, legacy.persona))
     }
 
     private fun kotlinx.serialization.json.JsonObject?.hasLegacyPersonaFields(): Boolean {

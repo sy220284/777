@@ -272,4 +272,15 @@ class LocalSessionTranscriptProjectionTest {
         toolName = toolName,
         createdAt = createdAt,
     )
+    @Test
+    fun structuredToolOutcomeSurvivesTranscriptRoundTrip() {
+        val original = LocalHarnessMessage(id = "tool", role = "tool", content = "说明：[NETWORK_ERROR] 是错误代码",
+            createdAt = 1L, toolName = "read_file", toolIsError = false)
+        val data = buildJsonObject { put("transcript", encodeTranscriptMessages(listOf(original))) }
+        assertEquals(original, decodeTranscriptMessages(data)!!.single())
+        val failed = original.copy(toolIsError = true, toolErrorCode = "NETWORK_ERROR")
+        assertEquals(failed, decodeTranscriptMessages(buildJsonObject {
+            put("transcript", encodeTranscriptMessages(listOf(failed)))
+        })!!.single())
+    }
 }

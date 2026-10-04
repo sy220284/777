@@ -9,6 +9,7 @@ import com.labteto.dshmobile.harness.state.rejectRuntimeStateTransition
 
 internal data class AutomationPlanningRevision(
     val sessionId: String,
+    val profileId: String? = null,
     val usageMode: LocalUsageMode,
     val groupChatEnabled: Boolean,
     val personaId: String,
@@ -20,6 +21,7 @@ internal data class AutomationPlanningRevision(
 
 internal fun LocalHarnessState.toAutomationPlanningRevision() = AutomationPlanningRevision(
     sessionId = sessionId,
+    profileId = modelSelection.activeProfileId,
     usageMode = usageMode,
     groupChatEnabled = groupChat.enabled,
     personaId = personaId,
@@ -46,3 +48,22 @@ internal fun resolveAutomationPlanningRevision(
     candidate: AutomationPlanningRevision,
 ): RuntimeStateTransition<AutomationPlanningRevision> =
     AUTOMATION_PLANNING_REVISION_POLICY.resolve(current, candidate)
+
+internal fun LocalHarnessState.toAutomationPlanningContext() = AutomationPlanningContext(
+    sessionId = sessionId,
+    revision = toAutomationPlanningRevision(),
+    configured = configured,
+    usageMode = usageMode,
+    groupChatEnabled = groupChat.enabled,
+    model = model,
+    baseUrl = baseUrl,
+    profileId = modelSelection.activeProfileId,
+    personaName = chatPersona.name,
+    recentMessages = messages
+        .asSequence()
+        .filter { it.role == "user" || it.role == "assistant" }
+        .filter { it.content.isNotBlank() }
+        .toList()
+        .takeLast(12)
+        .map { AutomationPlanningMessage(it.role, it.content) },
+)

@@ -121,7 +121,7 @@ class ChatPersonaGalleryStore internal constructor(
                 updatedAt = now,
             )
         }
-        val entry = history.archiveEntry(mergedEntry)
+        val entry = history.archiveEntry(migrateLegacyPersonaGalleryEntry(mergedEntry))
         documentStore.write(doc.copy(version = 5, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return entry
     }
@@ -164,7 +164,7 @@ class ChatPersonaGalleryStore internal constructor(
         sourceSessionId: String,
         history: List<LocalHarnessMessage>,
         chatState: ChatCharacterState,
-        notes: String,
+        notes: String, chatContext: ChatContextState = ChatContextState(),
         existingId: String? = null,
         existingStoryId: String? = null,
         forceNewStory: Boolean = false,
@@ -198,7 +198,8 @@ class ChatPersonaGalleryStore internal constructor(
             baseStory != null ||
             incomingHistory.isNotEmpty() ||
             notes.isNotBlank() ||
-            chatState.updatedAt > 0L
+            chatState.updatedAt > 0L ||
+            chatContext.hasUsefulFacts()
         if (!shouldSaveStory) {
             val entry = baseEntry.copy(
                 persona = mergePersonaProfiles(baseEntry.persona, persona)
@@ -219,7 +220,8 @@ class ChatPersonaGalleryStore internal constructor(
             history = archivedHistory.messages,
             historyTotalCount = archivedHistory.totalCount,
             historyArchived = true,
-            chatState = chatState,
+            chatState = chatState.canonicalizeLegacyCharacterState().withoutLegacyConversationContext(),
+            chatContext = chatContext.normalized(),
             sourceSessionIds = listOf(sourceSessionId).filter(String::isNotBlank),
             excludedMessageKeys = excluded,
             updatedAt = now,
@@ -312,7 +314,7 @@ class ChatPersonaGalleryStore internal constructor(
         val current = doc.entries.firstOrNull { it.id == id } ?: return null
         val now = System.currentTimeMillis()
         val updated = current.copy(
-            groupChatState = chatState,
+            groupChatState = chatState.canonicalizeLegacyCharacterState().withoutLegacyConversationContext(),
             updatedAt = maxOf(current.updatedAt, now),
         )
         documentStore.write(doc.copy(version = 5, entries = doc.entries.map { if (it.id == id) updated else it }))
@@ -323,7 +325,7 @@ class ChatPersonaGalleryStore internal constructor(
     fun updateGroupChatState(id: String, chatState: ChatCharacterState): PersonaGalleryEntry? {
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return null
-        val mergedState = mergeChatState(current.groupChatState, chatState)
+        val mergedState = mergeChatState(current.groupChatState, chatState.canonicalizeLegacyCharacterState().withoutLegacyConversationContext())
         val now = maxOf(System.currentTimeMillis(), mergedState.updatedAt)
         val updated = current.copy(
             groupChatState = mergedState,
@@ -415,7 +417,7 @@ class ChatPersonaGalleryStore internal constructor(
         require(document.version == 5) {
             "人物图集版本不受支持"
         }
-        val entries = document.entries.map(history::migrate)
+        val entries = document.entries.map(history::migrate).map(::migrateLegacyPersonaGalleryEntry)
         val normalized = document.copy(entries = entries)
         if (normalized != document) documentStore.write(normalized)
         return normalized

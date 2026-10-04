@@ -621,6 +621,7 @@ internal class LocalGroupChatTurnExecutor(
             val turnId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId
             var currentGroup = snapshot.groupChat
             var deliveredReplies = 0
+            val delivery = GroupReplyDeliveryLedger(snapshot.sessionId, currentGroup.failedReplyMemberIds, responders.map { it.galleryId }, _state, ::persistNow)
             val repliesForStateUpdate = mutableListOf<GroupReplyForStateUpdate>()
             val baseHistory = boundedGroupChatRequestHistory(modelHistory.snapshot())
 
@@ -652,6 +653,7 @@ internal class LocalGroupChatTurnExecutor(
 
                     val generated = deferred.await()
                     generated.failure?.let { failure ->
+                        currentGroup = delivery.fail(generated.member.galleryId, currentGroup)
                         eventLog.append("group/agent-failed", buildJsonObject {
                             put("gallery_id", generated.member.galleryId)
                             put("persona_id", generated.member.personaId)
@@ -666,6 +668,7 @@ internal class LocalGroupChatTurnExecutor(
 
                     val content = generated.content
                     if (content.isBlank() || content == GROUP_CHAT_SILENT_TOKEN) {
+                        currentGroup = delivery.fail(generated.member.galleryId, currentGroup)
                         eventLog.append("group/agent-empty", buildJsonObject {
                             put("gallery_id", generated.member.galleryId)
                             put("persona_id", generated.member.personaId)
@@ -755,6 +758,7 @@ internal class LocalGroupChatTurnExecutor(
                 }
             }
 
+            currentGroup = delivery.publish(currentGroup)
             require(deliveredReplies > 0) { "群聊角色这一轮都没有给出可用回复" }
 
             val sharedPendingForRefresh = currentGroup.context.loadPendingBatch(
@@ -805,17 +809,14 @@ internal class LocalGroupChatTurnExecutor(
                         groupChat = currentGroup,
                         groupActiveSpeakerName = null,
                         replySuggestions = emptyList(),
+
                     )
                 } else {
                     current
                 }
             }
 
-            eventLog.append("turn/end", buildJsonObject {
-                put("reason", "completed")
-                put("mode", "group-chat")
-                put("replies", deliveredReplies)
-            })
+            delivery.recordCompletedOutcome(eventLog, deliveredReplies)
             if (hasChatBranchAlternatives(_state.value.chatBranches)) {
                 persistChatBranchState("group/branch-completed")
             }

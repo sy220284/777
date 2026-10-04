@@ -40,40 +40,20 @@ internal sealed interface LocalTranscriptItem {
     }
 }
 
-internal data class LocalTranscriptWindow(
-    val messages: List<LocalHarnessMessage>,
-    val hiddenCount: Int,
-)
-
-internal fun localTranscriptWindow(
+internal fun userVisibleDialogueMessageCount(
     messages: List<LocalHarnessMessage>,
-    maxMessages: Int,
-): LocalTranscriptWindow {
-    if (messages.isEmpty()) return LocalTranscriptWindow(emptyList(), 0)
-    val limit = maxMessages.coerceAtLeast(1)
-    val hidden = (messages.size - limit).coerceAtLeast(0)
-    return LocalTranscriptWindow(
-        messages = if (hidden == 0) messages else messages.takeLast(limit),
-        hiddenCount = hidden,
-    )
+): Int = buildLocalTranscript(
+    messages = messages,
+    includeWorkProcess = false,
+).count { item ->
+    item is LocalTranscriptItem.Message &&
+        (item.message.role == "user" || item.message.role == "assistant")
 }
 
-internal fun transcriptHistoryBootstrapLimit(
-    liveMessageCount: Int,
-    maxPageSize: Int,
-): Int = liveMessageCount.coerceAtLeast(1).coerceAtMost(maxPageSize.coerceAtLeast(1))
-
-internal fun transcriptHistoryPageExtras(
-    pageMessages: List<LocalHarnessMessage>,
-    liveMessages: List<LocalHarnessMessage>,
-): List<LocalHarnessMessage> {
-    if (pageMessages.isEmpty()) return emptyList()
-    val liveIds = liveMessages.mapTo(hashSetOf(), LocalHarnessMessage::id)
-    val seen = hashSetOf<String>()
-    return pageMessages.filter { message ->
-        message.id !in liveIds && seen.add(message.id)
-    }
-}
+internal fun needsMoreUserVisibleDialogue(
+    messages: List<LocalHarnessMessage>,
+    target: Int,
+): Boolean = userVisibleDialogueMessageCount(messages) < target.coerceAtLeast(0)
 
 internal fun mergeLocalTranscriptHistory(
     olderMessages: List<LocalHarnessMessage>,

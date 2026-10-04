@@ -48,7 +48,10 @@ internal class SessionCatalogRuntime(
     val permissionCatalog = MutableStateFlow<PermissionCatalog?>(null)
     private var permissionCatalogEpoch = 0L
 
+    private val requests = SessionAsyncRequestRegistry()
+
     fun resetSession() {
+        requests.reset()
         _skills.value = emptyList()
         _skillsLoading.value = true
         _models.value = null
@@ -58,7 +61,7 @@ internal class SessionCatalogRuntime(
 
     suspend fun refreshCommands(sessionId: String?) {
         val sid = sessionId ?: return
-        val scope = SessionAsyncScope(activeHostKey(), sid)
+        val scope = requests.capture("refreshCommands", activeHostKey(), sid)
         val api = apiForHost(scope.hostKey) ?: return
         when (val result = api.commandsList(sid)) {
             is RpcResult.Ok -> if (scope.isCurrent(activeHostKey, currentSessionId)) {
@@ -78,7 +81,7 @@ internal class SessionCatalogRuntime(
     }
 
     suspend fun refreshPlugins() {
-        val scope = SessionAsyncScope(activeHostKey())
+        val scope = requests.capture("refreshPlugins", activeHostKey(), null)
         val api = apiForHost(scope.hostKey) ?: return
         when (val result = api.pluginInventoryList()) {
             is RpcResult.Ok -> if (scope.isCurrent(activeHostKey, currentSessionId)) _plugins.value = result.value
@@ -90,7 +93,7 @@ internal class SessionCatalogRuntime(
     }
 
     suspend fun refreshAgentPresets() {
-        val scope = SessionAsyncScope(activeHostKey())
+        val scope = requests.capture("refreshAgentPresets", activeHostKey(), null)
         val api = apiForHost(scope.hostKey) ?: return
         when (val result = api.agentPresetList()) {
             is RpcResult.Ok -> if (scope.isCurrent(activeHostKey, currentSessionId)) _agentPresets.value = result.value
@@ -101,7 +104,7 @@ internal class SessionCatalogRuntime(
     }
 
     suspend fun loadSkills(sessionId: String) {
-        val scope = SessionAsyncScope(activeHostKey(), sessionId)
+        val scope = requests.capture("loadSkills", activeHostKey(), sessionId)
         val api = apiForHost(scope.hostKey)
         if (api == null) {
             if (scope.isCurrent(activeHostKey, currentSessionId)) _skillsLoading.value = false
@@ -118,7 +121,7 @@ internal class SessionCatalogRuntime(
     }
 
     suspend fun loadModels(sessionId: String) {
-        val scope = SessionAsyncScope(activeHostKey(), sessionId)
+        val scope = requests.capture("loadModels", activeHostKey(), sessionId)
         val api = apiForHost(scope.hostKey)
         if (api == null) {
             if (scope.isCurrent(activeHostKey, currentSessionId)) _modelsLoading.value = false

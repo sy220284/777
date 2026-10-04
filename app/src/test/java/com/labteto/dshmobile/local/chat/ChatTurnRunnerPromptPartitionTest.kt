@@ -38,7 +38,7 @@ class ChatTurnRunnerPromptPartitionTest {
             physicalState = "刚下班，有点累",
             mood = "不高兴",
             relationshipState = "亲近",
-            recentImpression = "还记得刚才的争执",
+            currentUserImpression = "还记得刚才的争执",
             currentAgenda = "在收拾桌上的东西",
         )
         val shared = ChatContextState(

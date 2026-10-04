@@ -87,10 +87,11 @@ New UI and worker code should enter through the relevant capability runtime inst
 
 Work 的计划、待办和目标变更由 `local.work.LocalWorkProgressCoordinator` 统一处理，包括输入规整、数量/长度上限、状态更新、事件 payload 和持久化调用顺序。Engine 只选择本次调用绑定的状态、事件日志和持久化回调；后台 Work 始终使用原 run 的会话，不跟随当前可见会话。
 
+Automation 的顶层执行使用两级所有权：`AutomationExecutionRegistry` 保证同一任务的定时触发与“立即运行”不能并发；`LocalSessionRuntimeRegistry` 统一串行化前台单聊、群聊、Work 和 Automation 的会话执行；普通会话加载跳过活跃事件尾恢复，活跃 owner 时禁止加载流程重写 checkpoint / session 持久结果。租约关闭和取消等待释放引用，空闲 entry 退出；前台 runId 的迟到提交栅栏仍由 `LocalAgentRunCoordinator` 管理。持久任务以 `scheduleGeneration` 作为提交权，修改、暂停或重排会推进 generation，旧 Worker 的成功、失败、通知与后续排程均不得覆盖新状态。Chat 用户活动持续记录 `lastUserActivityAt`，用于裁决 `waiting_user` 与用户回复的并发窗口。Automation 事件规划继续复用 Engine 唯一 `HarnessResourceScheduler` 的 `MODEL_REQUEST` 租约，不创建第二套资源调度事实源。
+
 角色设置的确认保存由 `local.chat.LocalCharacterBehaviorTuningCoordinator` 编排：复用 Engine 的会话转换锁，检查会话和人物归属，等待人物、人物库与会话快照落盘后才返回成功。`CharacterBehaviorTuningPersistence` 只负责调节版本合并与持久副本收敛；单聊/群聊恢复不会借用默认人物的身份回写。界面保存锁按弹窗生命周期保持，不随初始值回显重置。
 
 The Engine has CI-enforced line, dependency and public-surface ratchets. New responsibilities must move outward rather than expanding the central orchestration surface.
-
 
 ### Model accounts and transport
 
@@ -166,7 +167,7 @@ Work 请求由 `LocalWorkRequestContextProjection` 生成：完整历史持久�
 
 Chat 与 Work 继续保留各自领域策略，但高阶运行能力通过共享契约回流：`projectLocalRequestContext` 是统一请求上下文治理入口，当前只由 Work 启用语义稳态投影，Chat 明确保留自身阈值与连续性策略；请求压力按 usage mode 保存 request/source 两套坐标，避免模式专属诊断继续渗入共享请求协调器。
 
-历史压缩使用带 `work/chat` 类型的统一可信 checkpoint envelope；旧 `_dsh_work_checkpoint_source=history_compactor_v1` 继续只读兼容，新 Chat 压缩不再伪装成 Work checkpoint。模型提出的状态变化通过 `RuntimeStateTransitionPolicy` 交给运行时裁决：Chat 的长期人物状态仍由运行时拥有，Work 目标在存在未完成 Todo 时不能直接落为 completed。输出质量守卫也采用共享协议：Chat 可做高置信最小修复，Work 对“完成声明与运行时状态冲突”只记录结构化诊断，不擅自改写模型正文。
+历史压缩使用带 `work/chat` 类型的统一可信 checkpoint envelope；旧 `_dsh_work_checkpoint_source=history_compactor_v1` 继续只读兼容，新 Chat 压缩不再伪装成 Work checkpoint。模型提出的状态变化通过 `RuntimeStateTransitionPolicy` 交给运行时裁决：Chat 的长期人物状态仍由运行时拥有，Work 目标在存在未完成 Todo 时不能直接落为 completed。输出质量守卫也采用共享协议：Chat 可做高置信最小修复，Work 对“完成声明与运行时状态冲突”记录结构化诊断，并在交付时局部修正整体完成结论，保留成果链接、局部进度和剩余阻塞。
 
 Agent 运行时继续向下收敛：一次 Run 的模型身份与能力由 `LocalRunModelSurface` 冻结，主 Agent 与子代理的真实 provider 调用统一经过 `LocalAgentModelRequestRuntime` 获取模型请求资源租约并执行统一 admission；二者的 bounded retry、取消传播与恢复外循环由 `LocalAgentModelStepRuntime` 统一治理，具体 overflow、结构修复和 continuation 含义仍由领域策略决定。Chat 定时事件规划也复用同一 `LocalAgentModelRequestRuntime` 与 Step 生命周期、冻结路由和输入 admission；辅助调用不创建第二套 Engine 资源调度器，设备资源配额仍只有 Engine 一个事实源。Work 与子代理对 post-admission 中断统一使用有界 `LocalAgentContinuationPolicy`，只创建新的 continuation 请求，不重放状态未知的原请求。大工具结果统一通过 `projectRecoverableToolResult` 完成 durable spill、有界模型预览和 `call_id` 恢复提示，避免前台与子代理继续维护两套截断语义。
 
@@ -232,6 +233,7 @@ Important invariants:
 
 - historical reads use paging;
 - runtime transcript windows stay bounded;
+- foreground transcript paging uses user-visible dialogue as its quota; reasoning, tool, progress and system traffic stays inside the bounded runtime/event layer and cannot evict the user/assistant history the UI promises to show;
 - model-history writes go through the dedicated buffer;
 - tool output is bounded in model context, with recoverable spill storage where required;
 - streaming updates do not rebuild aggregate state;
@@ -284,14 +286,13 @@ See [AGENTS.md](../AGENTS.md) for repository-wide engineering and merge rules.
 
 The request-time pending window retains at most 64 turns with 4,000 characters per message. Full pending facts are persisted as `chat/pending-turn` events before eviction; consolidation reads paged events after the processed cursor and selects the oldest unfinished batch with bounded memory. Direct, proactive and group chat use the same store with separate scopes. Legacy active queues are archived before bounding. Continuations copy unfinished facts in bounded batches into the new session log and assign its sequences; old processed cursors are reset. Imported prefix facts remain available across branches in the new conversation. Branch restoration filters archived facts by active message ids when alternatives exist. A consolidation commit preserves newer pending turns and deterministic scene updates and rejects competing cursor changes.
 
-
 ### 人物生命运行时 V3
 
 Chat 人物运行时采用“稳定人物底色 → 独立生活/记忆/关系状态 → 本轮注意力 → 动态模式 → 最终对话”的单一路径。`PersonaProfile` 只保存少量长期人物资料，不保存固定思维/行为/表达模板；`ChatCharacterState` 保存会话内状态和可持续演变；请求时由 `CharacterRuntimeProjector` 统一投影给单聊、群聊和主动互动，禁止各入口维护平行人物 Prompt。
 
 独立生活由 `CharacterLifeRuntime` 基于 `lifeContext`、当前日程、挂念与未完事项推进。时间推进采用请求时 catch-up：即使用户一段时间没有打开聊天，下一次人物被调用时也会按真实时间推进生活节拍；只允许从既有人物生活资料或已发生事件延展低风险日常状态，禁止凭空生成重大人生事件、关系事实或不可逆变化。生活事件有来源、类型、开始/更新时间和过期边界，并可为主动互动提供自然理由。
 
-人物对用户的主观认识使用持久 `currentUserImpression`。它只在出现新证据时修正，不参与短期 TTL；旧 `recentImpression` 仅作为历史数据兼容镜像。人物注意力由 `CharacterAttentionResolver` 每轮从输入中选择最多两个优先关注点，并结合人物盲点形成软倾向；明确问题、边界和重要事实始终优先。`CharacterBehaviorResolver` 现作为动态模式解析器，只根据真实运行时状态与用户显式调节调整联想、推演、情绪驱动、感官、言外敏感、自由度、主动、自我分享、回应覆盖、压缩、玩心与改口等连续倾向；自然人物描述直接由模型理解，不通过“嘴硬/理性/害羞”等关键词表硬映射到固定话术或动作。模式是概率场，不是候选菜单，同一人物可随话题和状态自然切换脑回路。
+人物对用户的主观认识使用持久 `currentUserImpression`。它只在出现新证据时修正，不参与短期 TTL；旧 `recentImpression` 只在存储读取边界做一次迁移，迁入后立即清空，不再参与提示词、状态更新或新数据写入。人物注意力由 `CharacterAttentionResolver` 每轮从输入中选择最多两个优先关注点，并结合人物盲点形成软倾向；明确问题、边界和重要事实始终优先。`CharacterBehaviorResolver` 现作为动态模式解析器，只根据真实运行时状态与用户显式调节调整联想、推演、情绪驱动、感官、言外敏感、自由度、主动、自我分享、回应覆盖、压缩、玩心与改口等连续倾向；自然人物描述直接由模型理解，不通过“嘴硬/理性/害羞”等关键词表硬映射到固定话术或动作。模式是概率场，不是候选菜单，同一人物可随话题和状态自然切换脑回路。
 
 
 长期成长继续保留主动、开放、安全感三个粗粒度基线，同时为 `mutableTraits` 维护独立证据计数、动量、反证和权重。单轮不能改写人格；只有多次真实经历才能缓慢改变可变倾向，稳定特质与硬约束不参与关系热度漂移。关系数值仅作为派生诊断，阶段、共同经历、共同物、真实行为证据优先。
@@ -299,3 +300,9 @@ Chat 人物运行时采用“稳定人物底色 → 独立生活/记忆/关系�
 Token 预算在投影层硬限制：稳定人物前缀最多 520 Token，本轮“此刻”最多 230 Token，本轮动态模式最多 330 Token；硬事实、明确边界与用户纠正优先于模式细节保留。长期事实单独封顶 500 Token，人物日记封顶 800 Token。普通闲聊默认不召回日记，轻相关最多 1 条，明确回忆请求最多 3 条。人物日记、生活流与模式投影均复用现有模型回合，不增加独立模型调用。
 
 角色回复最终仍经过已有字面风格过滤与重复守卫，并增加 `CharacterReplyAnomalyGuard`。异常守卫只对绑定人物启用，只做高置信度、最小结构修复（解释式标题、过度罗列、连续重复等）；正常文本不重写，检测到但无法安全自动修复的结构只记录诊断。
+
+### 审计修复边界
+
+远端异步目录与子代理请求携带会话代次及独立请求序号，关闭、切换与更新后旧回调不能覆盖新状态。Automation 的领域版本变化取消旧规划请求，各加载标记由所属请求的 finally 清理；任务 UI 订阅同一持久 Store 写入后的 StateFlow。工具消息持久携带结构化错误结果，新消息不得从正文猜测失败；旧数据才使用兼容推断。过程聚合中的失败表示“含失败尝试”，不等同于最终任务失败。
+
+压缩事件段由全局有界 LRU 缓存共享解压结果，以文件身份失效，单次解压也必须执行大小上限；分页仍只构造请求范围的行。角色回复链共享两次修复预算，重复诊断不删除用户需要的确认内容。人物生活事件的相同来源不因投影或其他状态更新而续期；故事时间优先于设备时钟，生活习惯只能作为可能性。群聊未交付成员持久记录并展示重试入口，不能把部分成功隐去。

@@ -224,6 +224,7 @@ data class AutomationTask(
     val workSessionId: String? = null,
     val status: String = "scheduled",
     val lastRunAt: Long? = null,
+    val lastUserActivityAt: Long? = null,
     val lastResult: String? = null,
     val lastError: String? = null,
     val runReceipts: List<AutomationRunReceipt> = emptyList(),
@@ -285,6 +286,8 @@ class AutomationStore internal constructor(
     ) : this(File(context.filesDir, "local-harness/automations.json"), json)
 
     private val documents = AutomationDocumentStore(file, json)
+    private val taskState by lazy { kotlinx.coroutines.flow.MutableStateFlow(list()) }
+    val tasks: kotlinx.coroutines.flow.StateFlow<List<AutomationTask>> get() = taskState
 
     @Synchronized
     fun list(): List<AutomationTask> = read().tasks.sortedBy { it.nextRunAt }
@@ -309,12 +312,34 @@ class AutomationStore internal constructor(
     }
 
     @Synchronized
-    fun update(id: String, transform: (AutomationTask) -> AutomationTask): AutomationTask? {
+    fun update(id: String, transform: (AutomationTask) -> AutomationTask): AutomationTask? =
+        updateIf(id, predicate = { true }, transform = transform)
+
+    @Synchronized
+    fun updateIf(
+        id: String,
+        predicate: (AutomationTask) -> Boolean,
+        transform: (AutomationTask) -> AutomationTask,
+    ): AutomationTask? {
         val document = read()
         val task = document.tasks.firstOrNull { it.id == id } ?: return null
+        if (!predicate(task)) return null
         val updated = transform(task)
         write(document.copy(tasks = document.tasks.map { if (it.id == id) updated else it }))
         return updated
+    }
+
+    /** Submit a bounded, non-suspending effect only while the captured generation still owns it. */
+    @Synchronized
+    internal fun withCurrentGeneration(
+        id: String,
+        generation: Long,
+        submit: (AutomationTask) -> Unit,
+    ): Boolean {
+        val current = read().tasks.firstOrNull { it.id == id } ?: return false
+        if (current.scheduleGeneration != generation) return false
+        submit(current)
+        return true
     }
 
     private fun read(): AutomationDocument =
@@ -322,7 +347,10 @@ class AutomationStore internal constructor(
             document.copy(tasks = document.tasks.map(::normalizeAutomationTask))
         }
 
-    private fun write(document: AutomationDocument) = documents.write(document)
+    private fun write(document: AutomationDocument) {
+        documents.write(document)
+        taskState.value = document.tasks.map(::normalizeAutomationTask).sortedBy { it.nextRunAt }
+    }
 
 }
 

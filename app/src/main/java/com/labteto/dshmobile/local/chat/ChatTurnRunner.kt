@@ -108,9 +108,9 @@ class ChatTurnRunner @Inject constructor(
         }
 
         val repetition = ChatRepetitionGuard.filter(content, recentAssistantReplies)
-        if (repetition.repeatedSegments.isNotEmpty() && repetition.text != content) {
-            onGuardEvent("repeat-filter", repetition.repeatedSegments.take(4))
-            content = repetition.text
+        if (repetition.repeatedSegments.isNotEmpty()) {
+            onGuardEvent("repeat-detected", repetition.repeatedSegments.take(4))
+            // Similar wording can be a requested promise or confirmation; preserve meaning.
         }
 
         if (guardEnabled && !persona.isUnboundChatPersona()) {

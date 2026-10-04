@@ -90,14 +90,6 @@ internal fun LocalHarnessState.toSettingsUiState(): LocalHarnessSettingsState =
         error = error,
     )
 
-internal fun LocalHarnessState.toTaskUiState(): LocalHarnessTaskState =
-    LocalHarnessTaskState(
-        sessionId = sessionId,
-        usageMode = usageMode,
-        groupChat = groupChat,
-        chatPersona = chatPersona,
-    )
-
 internal fun LocalHarnessState.toShellUiState(): LocalHarnessShellState =
     LocalHarnessShellState(
         loading = loading,

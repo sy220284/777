@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import com.labteto.dshmobile.R
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.tooling.preview.Preview
@@ -59,7 +63,14 @@ fun StateDot(
         1f
     }
 
-    Canvas(modifier = Modifier.size(size)) {
+    val label = stringResource(when (state) {
+        StateDotState.Idle -> R.string.audit_status_idle
+        StateDotState.Running -> R.string.agent_operation_status_running
+        StateDotState.Done -> R.string.agent_operation_status_done
+        StateDotState.Warning -> R.string.audit_status_warning
+        StateDotState.Error -> R.string.agent_operation_status_failed
+    })
+    Canvas(modifier = Modifier.size(size).semantics { contentDescription = label }) {
         drawHalo(color, alpha)
         drawCircle(
             color = color.copy(alpha = alpha),

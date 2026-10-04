@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -122,7 +123,10 @@ internal class LocalPersistentJobRecoveryCoordinator(
                         "任务恢复失败：不支持的恢复类型 ${snapshot.resumeKind.orEmpty()}",
                     )
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
+                jobs.failInterrupted(snapshot.id, "任务无法恢复：${error.message.orEmpty().take(500)}")
                 recordError(snapshot, sessionId, error)
             }
         }
@@ -136,6 +140,8 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
         return try {
             json.parseToJsonElement(text).jsonObject
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Exception) {
             jobs.failInterrupted(snapshot.id, "任务恢复失败：恢复元数据损坏")
             recordError(snapshot, fallbackSessionId, error)

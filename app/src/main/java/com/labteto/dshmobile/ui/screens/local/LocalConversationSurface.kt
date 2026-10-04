@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,8 +21,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -32,7 +29,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
@@ -200,34 +196,15 @@ internal fun LocalConversationSurface(
     val attachments = remember(state.sessionId) { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
-    var transcriptWindowSize by rememberSaveable(state.sessionId) {
-        mutableStateOf(LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES)
-    }
+    var transcriptInitialPositionReady by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var planReviewBusy by remember(state.pendingQuestion?.callId) { mutableStateOf(false) }
-    var previousTranscriptMessageCount by rememberSaveable(state.sessionId) {
-        mutableStateOf(state.messages.size)
-    }
-    LaunchedEffect(state.messages.size) {
-        val added = (state.messages.size - previousTranscriptMessageCount).coerceAtLeast(0)
-        if (
-            added > 0 &&
-            transcriptHistory.sessionId == state.sessionId &&
-            transcriptHistory.olderMessages.isNotEmpty()
-        ) {
-            transcriptWindowSize += added
-        }
-        previousTranscriptMessageCount = state.messages.size
-    }
-    val transcriptWindow = remember(state.messages, transcriptWindowSize) {
-        localTranscriptWindow(state.messages, transcriptWindowSize)
-    }
     val pagedOlderMessages = if (transcriptHistory.sessionId == state.sessionId) {
         transcriptHistory.olderMessages
     } else {
         emptyList()
     }
-    val transcriptMessages = remember(pagedOlderMessages, transcriptWindow.messages) {
-        mergeLocalTranscriptHistory(pagedOlderMessages, transcriptWindow.messages)
+    val transcriptMessages = remember(pagedOlderMessages, state.messages) {
+        mergeLocalTranscriptHistory(pagedOlderMessages, state.messages)
     }
     val transcriptItems = remember(transcriptMessages, state.usageMode) {
         buildLocalTranscript(
@@ -235,12 +212,15 @@ internal fun LocalConversationSurface(
             includeWorkProcess = state.usageMode == LocalUsageMode.WORK,
         )
     }
-    val hiddenTranscriptCount = (state.messages.size - transcriptMessages.size).coerceAtLeast(0)
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.loading
-    val transcriptPrefixItemCount = if (hiddenTranscriptCount > 0 || hasOlderTranscript) 1 else 0
+    val transcriptHistoryError = transcriptHistory.error
+        ?.takeIf { transcriptHistory.sessionId == state.sessionId }
+    val showTranscriptPagingRow = transcriptHistoryError != null ||
+        (hasOlderTranscript && loadingOlderTranscript)
+    val transcriptPrefixItemCount = if (showTranscriptPagingRow) 1 else 0
     val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
@@ -323,6 +303,7 @@ internal fun LocalConversationSurface(
     }
 
     LaunchedEffect(state.sessionId) {
+        transcriptInitialPositionReady = false
         scrollHint.hide()
         attachments.clear()
         attachmentError = null
@@ -330,7 +311,18 @@ internal fun LocalConversationSurface(
         if (transcriptItems.isNotEmpty()) {
             listState.scrollToItem(transcriptLastListIndex)
         }
+        transcriptInitialPositionReady = true
     }
+
+    LocalTranscriptAutoPager(
+        sessionId = state.sessionId,
+        listState = listState,
+        enabled = transcriptInitialPositionReady &&
+            hasOlderTranscript &&
+            !loadingOlderTranscript &&
+            transcriptHistoryError == null,
+        onLoadOlder = onLoadOlderTranscript,
+    )
 
     LaunchedEffect(state.messages.size, transcriptItems.size) {
         if (transcriptItems.isNotEmpty()) {
@@ -509,6 +501,9 @@ internal fun LocalConversationSurface(
             }
         }
 
+        if (state.groupChat.enabled && state.groupChat.failedReplyMemberIds.isNotEmpty()) {
+            GroupReplyFailureNotice(state.groupChat, state.running) { request -> onSend(request, emptyList()) }
+        }
         Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(scrollConnection)) {
             LazyColumn(
                 state = listState,
@@ -521,27 +516,14 @@ internal fun LocalConversationSurface(
                 ),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
             ) {
-                if (hiddenTranscriptCount > 0 || hasOlderTranscript) {
-                    item(key = "local-transcript-load-older") {
-                        DsButton(
-                            text = when {
-                                loadingOlderTranscript -> stringResource(R.string.tools_processing)
-                                hiddenTranscriptCount > 0 -> stringResource(
-                                    R.string.local_transcript_load_older,
-                                    hiddenTranscriptCount,
-                                )
-                                else -> stringResource(R.string.local_transcript_load_older_unknown)
+                if (showTranscriptPagingRow) {
+                    item(key = "local-transcript-history-status") {
+                        LocalTranscriptPagingStatus(
+                            loading = loadingOlderTranscript,
+                            error = transcriptHistoryError,
+                            onRetry = {
+                                scope.launch { onLoadOlderTranscript(state.sessionId) }
                             },
-                            onClick = {
-                                if (!loadingOlderTranscript) {
-                                    scope.launch {
-                                        onLoadOlderTranscript(state.sessionId)
-                                    }
-                                }
-                            },
-                            enabled = !loadingOlderTranscript,
-                            modifier = Modifier.fillMaxWidth(),
-                            variant = DsButtonVariant.Ghost,
                         )
                     }
                 }

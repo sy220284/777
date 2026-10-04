@@ -20,7 +20,7 @@ internal class CharacterRuntimeProjector(
         storyContext: String?,
     ): CharacterRuntimeProjection {
         val privateState = state.copy(scene = ChatSceneState(), continuity = ChatContinuityState())
-        val lifeState = advanceCharacterLife(persona, privateState)
+        val lifeState = advanceCharacterLife(persona, privateState, storyTime = context.scene.sceneTime)
         val runtimeState = privateState.copy(lifeState = lifeState)
         val attention = resolveCharacterAttention(persona, runtimeState, userInput)
         val mode = resolveCharacterMode(persona, runtimeState, userInput, attention)
@@ -111,7 +111,6 @@ internal class CharacterRuntimeProjector(
         state.immediateConcern.takeIf(String::isNotBlank)?.let { lines += "脑子里还挂着：${it.take(180)}" }
         state.currentFocus.takeIf(String::isNotBlank)?.let { lines += "这一刻容易注意：${it.take(180)}" }
         state.currentUserImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}" }
-            ?: state.recentImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}" }
             ?: persona.initialUserImpression.takeIf(String::isNotBlank)?.let { lines += "你目前怎么看对方：${it.take(240)}" }
         state.internalConflict.takeIf(String::isNotBlank)?.let { lines += "此刻的拉扯：${it.take(180)}" }
         state.dynamics.unresolvedConflict.takeIf(String::isNotBlank)?.let { lines += "关系里还没过去的事：${it.take(180)}" }

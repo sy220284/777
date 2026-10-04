@@ -33,15 +33,6 @@ internal class LocalAutomationWorkCoordinator(
         onApprovalBlocked: (String) -> Unit,
     ) -> LocalSubagentRunner,
 ) {
-    suspend fun runPrompt(
-        text: String,
-        timeoutMillis: Long = 5 * 60_000L,
-    ): String = runWork(
-        text = text,
-        preferredSessionId = null,
-        timeoutMillis = timeoutMillis,
-    ).output
-
     suspend fun prepareWorkSession(
         text: String,
         preferredSessionId: String? = null,
@@ -64,6 +55,11 @@ internal class LocalAutomationWorkCoordinator(
 
         val session = resolveSession(preferredSessionId, prompt)
         val sessionId = session.id
+        val sessionLease = LocalSessionRuntimeRegistry.acquire(
+            sessionId,
+            LocalSessionRuntimeKind.AUTOMATION_WORK,
+        )
+        try {
         val boundState = boundState(session)
         val boundEventLog = eventLogFor(sessionId)
         val recovery = if (recoverInterrupted) {
@@ -169,6 +165,9 @@ internal class LocalAutomationWorkCoordinator(
                 eventLog = boundEventLog,
             )
             throw LocalAutomationWorkException(detail, sessionId, error)
+        }
+        } finally {
+            sessionLease.close()
         }
     }
 

@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import com.labteto.dshmobile.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -43,6 +47,13 @@ fun DsTimeline(
     val colors = DsTheme.colors
     Column(modifier) {
         items.forEachIndexed { index, item ->
+            val statusLabel = stringResource(when (item.state) {
+                DsStatus.Running -> R.string.agent_operation_status_running
+                DsStatus.Done -> R.string.agent_operation_status_done
+                DsStatus.Failed -> R.string.audit_attempt_failed
+                DsStatus.Warning -> R.string.audit_status_warning
+                DsStatus.Neutral -> R.string.audit_status_idle
+            })
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -66,7 +77,7 @@ fun DsTimeline(
                                 strokeWidth = stroke,
                             )
                         }
-                    },
+                    }.semantics(mergeDescendants = true) { stateDescription = statusLabel },
                 verticalAlignment = Alignment.Top,
             ) {
                 Box(
@@ -99,7 +110,8 @@ fun DsTimeline(
                         style = DsType.std14.withReadingWeight(),
                         color = colors.labelPrimary,
                     )
-                    item.detail?.takeIf(String::isNotBlank)?.let { detail ->
+                    listOfNotNull(item.detail?.takeIf(String::isNotBlank), statusLabel)
+                        .joinToString(" · ").let { detail ->
                         Text(
                             detail,
                             style = DsType.caption11.withReadingWeight(),

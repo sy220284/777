@@ -17,6 +17,7 @@ class LocalSessionEventLog(
     private val file: File,
     private val json: Json,
     maxBytes: Long = DEFAULT_MAX_BYTES,
+    private val sessionId: String? = null,
 ) {
     @Serializable
     data class Event(
@@ -100,8 +101,12 @@ class LocalSessionEventLog(
         }
     }
 
-    fun repairInterruptedTail(): SessionRepairResult =
-        SessionRecovery.repairInterruptedTail(delegate)
+    fun repairInterruptedTail(force: Boolean = false): SessionRepairResult =
+        if (!force && sessionId?.let(LocalSessionRuntimeRegistry::hasLiveOwner) == true) {
+            SessionRepairResult()
+        } else {
+            SessionRecovery.repairInterruptedTail(delegate)
+        }
 
     fun search(
         query: String,

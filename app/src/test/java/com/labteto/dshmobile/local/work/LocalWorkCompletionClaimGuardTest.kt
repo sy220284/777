@@ -116,4 +116,18 @@ class LocalWorkCompletionClaimGuardTest {
         )
         assertTrue(result.findings.isEmpty())
     }
+    @Test
+    fun formattedGlobalClaimDoesNotEraseLinksOrHideBehindUnrelatedNegation() {
+        val text = "尚未完成测试。**全部都已完成**。成果：[文件](sandbox:/report.md)"
+        val corrected = LocalWorkCompletionClaimGuard.correctGlobalCompletionClaims(text)
+        assertFalse(corrected.contains("全部都已完成"))
+        assertTrue(corrected.contains("尚未完成测试"))
+        assertTrue(corrected.contains("[文件](sandbox:/report.md)"))
+    }
+
+    @Test
+    fun codeAndArtifactNamesArePreserved() {
+        val text = "```text\n全部完成\n```\n[全部完成](sandbox:/report.md)\n代码修改已完成，测试仍在运行。"
+        assertEquals(text, LocalWorkCompletionClaimGuard.correctGlobalCompletionClaims(text))
+    }
 }

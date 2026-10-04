@@ -28,6 +28,7 @@ import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.capability.ProcessRequest
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
@@ -471,7 +472,10 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runGroupChatTurn(input: String, sourceMessageId: String? = null) =
-        LocalExecutionService.withTurn(context, currentSessionId, { _state.value.error }) { groupChatTurnExecutor.run(input, sourceMessageId) }
+        LocalSessionRuntimeRegistry.withOwner(currentSessionId, LocalSessionRuntimeKind.FOREGROUND) { ownedSessionId ->
+            if (currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
+            LocalExecutionService.withTurn(context, ownedSessionId, { _state.value.error }) { groupChatTurnExecutor.run(input, sourceMessageId) }
+        }
 
     // SupervisorJob keeps one failed child from cancelling unrelated engine work. The handler is the
     // final visibility boundary; operation-specific busy/loading state is still owned by each launch.
@@ -1030,32 +1034,6 @@ class LocalHarnessEngine @Inject constructor(
             )
         }
         if (_state.value.sessionId == snapshot.sessionId) persist()
-    }
-
-    /** A story direction is a user preference for future turns, never a synthetic user message. */
-    internal fun selectChatDirection(direction: String?) {
-        val snapshot = _state.value
-        if (
-            snapshot.loading ||
-            snapshot.running ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.groupChat.enabled
-        ) return
-        val selected = direction?.let { requested ->
-            snapshot.replySuggestions.firstOrNull { it.direction == requested }
-                ?.let { com.labteto.dshmobile.local.chat.ChatNarrativeDirection(it.label, it.direction) }
-                ?: return
-        }
-        _state.update { current ->
-            if (current.sessionId != snapshot.sessionId) current else current.copy(
-                chatState = current.chatState.copy(narrativeDirection = selected),
-            )
-        }
-        eventLog.append("chat/direction", buildJsonObject {
-            put("label", selected?.label.orEmpty())
-            put("guidance", selected?.guidance.orEmpty())
-        })
-        persist()
     }
 
     /**
@@ -1860,10 +1838,8 @@ class LocalHarnessEngine @Inject constructor(
         updateContextMetrics(binding)
     }
 
-    internal suspend fun runAutomationPrompt(
-        text: String,
-        timeoutMillis: Long = 5 * 60_000L,
-    ): String = automationWorkCoordinator.runPrompt(text, timeoutMillis)
+    internal suspend fun <T> withAutomationModelRequestResource(block: suspend () -> T): T =
+        resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST, "automation-planning", block)
 
     internal suspend fun prepareAutomationWorkSession(
         text: String,
@@ -2675,7 +2651,8 @@ class LocalHarnessEngine @Inject constructor(
         input: String,
         replacingMessageId: String? = null,
         sourceMessageId: String? = null,
-    ) {
+    ) = LocalSessionRuntimeRegistry.withOwner(currentSessionId, LocalSessionRuntimeKind.FOREGROUND) { ownedSessionId ->
+        if (currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
         cancelChatPostTurn()
         _state.update {
             it.copy(
@@ -2914,7 +2891,8 @@ class LocalHarnessEngine @Inject constructor(
         memoryInput: String = input,
         sourceMessageId: String? = null,
         binding: LocalWorkRunBinding? = null,
-    ) {
+    ) = LocalSessionRuntimeRegistry.withOwner(binding?.sessionId ?: currentSessionId, LocalSessionRuntimeKind.FOREGROUND) { ownedSessionId ->
+        if (binding == null && currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
         val runState = binding?.state ?: _state
         val runEventLog = binding?.eventLog ?: eventLog
         val runHistory = binding?.modelHistory ?: modelHistory
@@ -3354,6 +3332,8 @@ class LocalHarnessEngine @Inject constructor(
                             content = durableToolResultContent(boundedContent, event.retention),
                             toolName = event.call.name,
                             contentAlreadyBounded = true,
+                            toolIsError = event.isError,
+                            toolErrorCode = event.errorCode,
                         )
                         val toolEvent = runEventLog.append("tool/result", buildJsonObject {
                             put("step", event.step)
@@ -4803,43 +4783,45 @@ class LocalHarnessEngine @Inject constructor(
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
             error = runRecoveryError,
         )
-        var wroteHistoryCheckpoint = false
-        if (_state.value.groupChat.enabled) {
-            projectGroupGalleryState(_state.value.groupChat, chatPersonaGalleryStore).failures.forEach { failure ->
-                AppLog.warn(
-                    "LocalHarnessEngine",
-                    "群聊人物库投影恢复失败 galleryId=${failure.galleryId} detail=${failure.detail}",
+        LocalSessionRuntimeRegistry.submitWhenIdle(sessionId) {
+            var wroteHistoryCheckpoint = false
+            if (_state.value.groupChat.enabled) {
+                projectGroupGalleryState(_state.value.groupChat, chatPersonaGalleryStore).failures.forEach { failure ->
+                    AppLog.warn(
+                        "LocalHarnessEngine",
+                        "群聊人物库投影恢复失败 galleryId=${failure.galleryId} detail=${failure.detail}",
+                    )
+                }
+                // Group model history is already restored from its durable checkpoint/event tail.
+                // Rebuilding it from the bounded UI transcript would silently discard older context.
+                refreshGroupModelSystemPrompt()
+                checkpointModelHistory("load/group-system-refresh")
+                wroteHistoryCheckpoint = true
+            } else if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
+                modelHistory.replaceSystem(
+                    buildJsonObject { put("role", "system"); put("content", systemPrompt()) },
                 )
+                updateContextMetrics()
+                checkpointModelHistory("load/system-refresh")
+                wroteHistoryCheckpoint = true
+            } else if (recovery.repaired || restoredHistory.checkpointRecommended) {
+                checkpointModelHistory(
+                    if (restoredHistory.usedLegacyFallback) "load/legacy-history-migration"
+                    else "load/event-replay",
+                )
+                wroteHistoryCheckpoint = true
             }
-            // Group model history is already restored from its durable checkpoint/event tail.
-            // Rebuilding it from the bounded UI transcript would silently discard older context.
-            refreshGroupModelSystemPrompt()
-            checkpointModelHistory("load/group-system-refresh")
-            wroteHistoryCheckpoint = true
-        } else if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
-            modelHistory.replaceSystem(
-                buildJsonObject { put("role", "system"); put("content", systemPrompt()) },
-            )
-            updateContextMetrics()
-            checkpointModelHistory("load/system-refresh")
-            wroteHistoryCheckpoint = true
-        } else if (recovery.repaired || restoredHistory.checkpointRecommended) {
-            checkpointModelHistory(
-                if (restoredHistory.usedLegacyFallback) "load/legacy-history-migration"
-                else "load/event-replay",
-            )
-            wroteHistoryCheckpoint = true
-        }
-        if (restoredHistory.usedLegacyFallback && !wroteHistoryCheckpoint) {
-            checkpointModelHistory("load/legacy-history-migration")
-        }
-        if (
-            restoredHistory.usedLegacyFallback ||
-            restoredTranscript.needsPersist ||
-            restoredBehavior.changed
-        ) {
-            // Materialize migrated/replayed projections so later restarts only fold the new tail.
-            persist()
+            if (restoredHistory.usedLegacyFallback && !wroteHistoryCheckpoint) {
+                checkpointModelHistory("load/legacy-history-migration")
+            }
+            if (
+                restoredHistory.usedLegacyFallback ||
+                restoredTranscript.needsPersist ||
+                restoredBehavior.changed
+            ) {
+                // Materialize migrated/replayed projections so later restarts only fold the new tail.
+                persist()
+            }
         }
     }
 

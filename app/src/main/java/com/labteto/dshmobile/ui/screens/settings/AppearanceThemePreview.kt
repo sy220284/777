@@ -39,11 +39,10 @@ internal fun ThemePreviewBlock(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    val previewColors = when (themeKey) {
-        "light" -> Color(0xFFF7F7F5) to Color(0xFFFFFFFF)
-        "dark" -> Color(0xFF10100F) to Color(0xFF191918)
-        "matte_black" -> Color(0xFF10100F) to Color(0xFF222220)
-        else -> Color(0xFFF7F7F5) to Color(0xFFFFFFFF)
+    val palette = when (themeKey) {
+        "dark" -> com.labteto.dshmobile.ui.theme.DsThemeTokens.dark
+        "matte_black" -> com.labteto.dshmobile.ui.theme.DsThemeTokens.matteBlack
+        else -> com.labteto.dshmobile.ui.theme.DsThemeTokens.light
     }
     Column(
         modifier = modifier
@@ -59,20 +58,20 @@ internal fun ThemePreviewBlock(
             if (themeKey == "system") {
                 Row(Modifier.fillMaxSize()) {
                     ThemeMiniCanvas(
-                        background = Color(0xFFF7F7F5),
-                        surface = Color(0xFFFFFFFF),
+                        background = com.labteto.dshmobile.ui.theme.DsThemeTokens.light.bgBase,
+                        surface = com.labteto.dshmobile.ui.theme.DsThemeTokens.light.bgLayer1,
                         modifier = Modifier.weight(1f),
                     )
                     ThemeMiniCanvas(
-                        background = Color(0xFF10100F),
-                        surface = Color(0xFF191918),
+                        background = com.labteto.dshmobile.ui.theme.DsThemeTokens.dark.bgBase,
+                        surface = com.labteto.dshmobile.ui.theme.DsThemeTokens.dark.bgLayer1,
                         modifier = Modifier.weight(1f),
                     )
                 }
             } else {
                 ThemeMiniCanvas(
-                    background = previewColors.first,
-                    surface = previewColors.second,
+                    background = palette.bgBase,
+                    surface = palette.bgLayer1,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

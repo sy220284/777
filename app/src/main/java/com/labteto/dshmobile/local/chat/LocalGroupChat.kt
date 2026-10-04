@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
 import com.labteto.dshmobile.local.chat.hasUsefulFacts
 import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
@@ -31,6 +32,8 @@ data class LocalGroupChatState(
     val context: ChatContextState = ChatContextState(),
     /** Public scene premise shared with every group member in this conversation. */
     val announcement: String = "",
+    /** Durable partial delivery notice; cleared only for members whose next response succeeds. */
+    val failedReplyMemberIds: List<String> = emptyList(),
 ) {
     val enabled: Boolean get() = mode == LocalChatMode.GROUP
 }
@@ -45,7 +48,11 @@ internal fun LocalGroupChatState.migrateLegacyConversationContext(): LocalGroupC
     return copy(
         context = migratedContext,
         members = members.map { member ->
-            member.copy(chatState = member.chatState.withoutLegacyConversationContext())
+            member.copy(
+                chatState = member.chatState
+                    .canonicalizeLegacyCharacterState()
+                    .withoutLegacyConversationContext(),
+            )
         },
     )
 }
