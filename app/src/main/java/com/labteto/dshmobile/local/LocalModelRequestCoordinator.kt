@@ -413,6 +413,16 @@ internal class LocalModelRequestCoordinator(
         var activeMessages = requestMessages
         var overflowRound = 0
         while (true) {
+            val activePrefixAssessment = if (cachePolicy.mode != LocalPromptCacheMode.NONE) {
+                promptCacheContinuity.assess(
+                    snapshot.sessionId,
+                    routeFingerprint,
+                    activeMessages,
+                    tools,
+                )
+            } else {
+                null
+            }
             try {
                 return try {
                     executor.execute {
@@ -502,11 +512,11 @@ internal class LocalModelRequestCoordinator(
                             }.also { reply ->
                                 streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
                                 streamPreview.flush()
-                                prefixAssessment?.let { cache ->
+                                activePrefixAssessment?.let { cache ->
                                     promptCacheContinuity.recordSuccess(
                                         snapshot.sessionId,
                                         routeFingerprint,
-                                        requestMessages,
+                                        activeMessages,
                                         tools,
                                         cache.generation,
                                     )
@@ -531,6 +541,12 @@ internal class LocalModelRequestCoordinator(
                                     route?.authKind?.takeIf(String::isNotBlank)?.let { put("auth_kind", it) }
                                     route?.protocol?.takeIf(String::isNotBlank)?.let { put("protocol", it) }
                                     put("route_fingerprint", routeFingerprint)
+                                    activePrefixAssessment?.let { cache ->
+                                        put("cache_series_generation_final", cache.generation)
+                                        put("cache_prefix_continuity_final", cache.continuity.name.lowercase())
+                                        put("cache_tool_surface_stable_final", cache.toolSurfaceStable)
+                                        put("cache_message_prefix_stable_final", cache.messagePrefixStable)
+                                    }
                                     route?.fingerprint?.takeIf(String::isNotBlank)?.let {
                                         put("reply_route_fingerprint", it)
                                     }
