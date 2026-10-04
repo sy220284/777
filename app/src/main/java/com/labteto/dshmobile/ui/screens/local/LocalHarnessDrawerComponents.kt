@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -174,74 +173,84 @@ internal fun DrawerQuickActions(
     onOpenRunCenter: () -> Unit,
     onTools: () -> Unit,
 ) {
-    val colors = DsTheme.colors
-    Surface(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
     ) {
-        Column {
-            if (usageMode == LocalUsageMode.CHAT) {
+        if (usageMode == LocalUsageMode.CHAT) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
                 DrawerQuickAction(
                     icon = FeatherIcons.Users,
                     title = stringResource(R.string.local_group_chat_title),
                     badge = groupMemberCount.takeIf { it > 0 }?.toString(),
                     onClick = onOpenGroupChat,
+                    modifier = Modifier.weight(1f),
                 )
-                DrawerQuickDivider()
                 DrawerQuickAction(
                     icon = FeatherIcons.Image,
                     title = stringResource(R.string.persona_gallery_title),
                     badge = galleryCount.takeIf { it > 0 }?.toString(),
                     onClick = onOpenPersonaGallery,
+                    modifier = Modifier.weight(1f),
                 )
-                DrawerQuickDivider()
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
                 DrawerQuickAction(
                     icon = FeatherIcons.BookOpen,
                     title = stringResource(R.string.chat_diary_title),
                     onClick = onOpenDiary,
+                    modifier = Modifier.weight(1f),
                 )
-                DrawerQuickDivider()
                 DrawerQuickAction(
                     icon = FeatherIcons.Clock,
                     title = stringResource(R.string.tasks_chat_title),
                     onClick = onTasks,
+                    modifier = Modifier.weight(1f),
                 )
-            } else {
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
                 DrawerQuickAction(
                     icon = FeatherIcons.Folder,
                     title = stringResource(R.string.chatlist_workspace_files),
                     onClick = onWorkspaceFiles,
+                    modifier = Modifier.weight(1f),
                 )
-                DrawerQuickDivider()
                 DrawerQuickAction(
                     icon = FeatherIcons.Activity,
                     title = stringResource(R.string.local_run_center),
                     onClick = onOpenRunCenter,
+                    modifier = Modifier.weight(1f),
                 )
-                DrawerQuickDivider()
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+            ) {
                 DrawerQuickAction(
                     icon = FeatherIcons.Clock,
                     title = stringResource(R.string.tasks_title),
                     onClick = onTasks,
+                    modifier = Modifier.weight(1f),
                 )
-                DrawerQuickDivider()
                 DrawerQuickAction(
                     icon = FeatherIcons.Tool,
                     title = stringResource(R.string.tools_title),
                     onClick = onTools,
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
     }
-}
-
-@Composable
-private fun DrawerQuickDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(start = 48.dp),
-        color = DsTheme.colors.borderL1,
-    )
 }
 
 @Composable
@@ -284,7 +293,7 @@ internal fun DrawerQuickAction(
         Icon(
             icon,
             contentDescription = null,
-            tint = colors.accent,
+            tint = colors.labelSecondary,
             modifier = Modifier.size(18.dp),
         )
         Text(
@@ -296,12 +305,6 @@ internal fun DrawerQuickAction(
             modifier = Modifier.weight(1f),
         )
         badge?.let { DsPill(text = it) }
-        Icon(
-            FeatherIcons.ChevronRight,
-            contentDescription = null,
-            tint = colors.labelCaption,
-            modifier = Modifier.size(16.dp),
-        )
     }
 }
 
