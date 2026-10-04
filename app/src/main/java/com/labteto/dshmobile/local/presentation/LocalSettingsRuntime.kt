@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanConnectionTester
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import java.io.OutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,6 +29,7 @@ class LocalSettingsRuntime @Inject constructor(
     chatGptAuth: ChatGptAuthCoordinator,
     chatGptPlanTester: ChatGptPlanConnectionTester,
     private val modelSettings: LocalModelSettingsCoordinator,
+    runtimeStateStore: LocalRuntimeStateStore,
 ) {
     private val chatGpt = ChatGptSettingsController(
         auth = chatGptAuth,
@@ -37,11 +39,12 @@ class LocalSettingsRuntime @Inject constructor(
         removeProfiles = engine::removeChatGptAccountProfiles,
         testAccount = chatGptPlanTester::test,
     )
-    val state: Flow<LocalHarnessSettingsState> = engine.state.map { it.toSettingsUiState() }.distinctUntilChanged()
-    val initialState get() = engine.state.value.toSettingsUiState()
+    private val runtimeState = runtimeStateStore.state
+    val state: Flow<LocalHarnessSettingsState> = runtimeState.map { it.toSettingsUiState() }.distinctUntilChanged()
+    val initialState get() = runtimeState.value.toSettingsUiState()
     val chatGptState: StateFlow<ChatGptUiState> = chatGpt.state
 
-    fun memoryContext(): LocalSettingsMemoryContext = engine.state.value.let {
+    fun memoryContext(): LocalSettingsMemoryContext = runtimeState.value.let {
         LocalSettingsMemoryContext(it.conversationMode, it.projectId, it.lineageId)
     }
     suspend fun refreshChatGpt() = chatGpt.refresh()
