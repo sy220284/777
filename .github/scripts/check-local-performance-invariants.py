@@ -307,8 +307,8 @@ if 'eventLog.append("user/queue"' in engine:
 if "decodeLocalAgentInboxPending" not in engine or "pendingInputs.restore(" not in engine:
     violations.append("LocalHarnessEngine must restore the durable Agent inbox on Session load")
 
-live_capture_pos = engine.find("val capturedLiveWorkBinding = liveWorkRun(sessionId)")
-live_rebind_pos = engine.find("syncVisibleWorkRun(sessionId, capturedLiveWorkBinding)")
+live_capture_pos = engine.find("liveWorkRun(sessionId)?.let { liveBinding ->")
+live_rebind_pos = engine.find("syncVisibleWorkRun(sessionId, liveBinding)")
 durable_read_pos = engine.find("sessionCoordinator.readWithLegacyApproval(sessionId)")
 durable_repair_pos = engine.find("eventLog.repairInterruptedTail()")
 if min(live_capture_pos, live_rebind_pos, durable_read_pos, durable_repair_pos) < 0 or not (
