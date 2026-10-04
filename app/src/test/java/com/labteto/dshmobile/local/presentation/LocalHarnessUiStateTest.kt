@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.work.LocalWorkState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
