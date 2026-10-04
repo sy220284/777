@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 ENGINE_MAX_PUBLIC_METHODS = 0
 ENGINE_MAX_INTERNAL_METHODS = 80
-ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 19
+ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 18
 AGGREGATE_STATE_MAX_FIELDS = 28
 
 HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
@@ -323,6 +323,26 @@ for owned_field in (
 ):
     if not re.search(rf"\bval\s+{owned_field}\s*:", kernel_state):
         die(f"LocalKernelState must own Kernel field: {owned_field}")
+
+work_run_registry = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt")
+)
+work_run_binding = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt")
+)
+token_usage_bridge = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/usage/LocalTokenUsageContextBridge.kt")
+)
+if "private val workRunRegistry: LocalWorkRunRegistry" not in engine:
+    die("LocalHarnessEngine must consume the Work-owned LocalWorkRunRegistry")
+if "activeWorkRuns" in engine or "ConcurrentHashMap<String, LocalWorkRunBinding>" in engine:
+    die("LocalHarnessEngine must not own a second active Work-run map")
+if "ConcurrentHashMap<String, LocalWorkRunBinding>" not in work_run_registry:
+    die("LocalWorkRunRegistry must remain the single in-memory owner of active Work bindings")
+if "LocalWorkRunRegistry" not in work_run_binding:
+    die("Work job projection must consume LocalWorkRunRegistry instead of a raw active-run map")
+if "LocalWorkRunRegistry" not in token_usage_bridge:
+    die("Token usage attribution must resolve active Work state through LocalWorkRunRegistry")
 
 work_progress = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt")
