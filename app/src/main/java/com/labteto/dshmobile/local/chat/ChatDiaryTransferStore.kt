@@ -73,12 +73,11 @@ internal class ChatDiaryTransferStore(
         candidates.forEach { raw ->
             val sourceId = raw.id.trim()
             val targetId = idMap[sourceId] ?: return@forEach
-            val imported = raw.copy(
-                id = targetId,
-                subjectKey = targetSubjectKey,
-                personaName = cleanPersonaName.ifBlank { raw.personaName.trim().take(120) },
-                sources = emptyList(),
-                revisions = raw.revisions.takeLast(8).map { it.copy(sources = emptyList()) },
+            val imported = ChatDiaryTransferSanitizer.sanitize(
+                raw = raw,
+                targetId = targetId,
+                targetSubjectKey = targetSubjectKey,
+                personaName = cleanPersonaName,
                 supersededBy = raw.supersededBy?.trim()?.takeIf(String::isNotBlank)?.let(idMap::get),
             )
             val existingIndex = entries.indexOfFirst {
