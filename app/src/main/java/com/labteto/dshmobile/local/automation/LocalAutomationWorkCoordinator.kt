@@ -234,11 +234,10 @@ internal class LocalAutomationWorkCoordinator(
                 goal = session.goal,
                 planMode = false,
                 jobs = emptyList(),
-                queuedInputCount = 0,
                 pendingApproval = null,
                 pendingQuestion = null,
             ),
-            kernel = runtime.kernel.copy(running = false),
+            kernel = runtime.kernel.copy(running = false, queuedInputCount = 0),
             error = null,
         )
     }
