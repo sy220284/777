@@ -34,6 +34,8 @@ class ContextComposer @Inject constructor(
 ) {
     private val assembler = AgentContextAssembler()
 
+    fun userProfile() = profileStore.read()
+
     fun compose(request: ContextRequest): String = composeParts(request).combined()
 
     fun composeParts(request: ContextRequest): ContextComposition {
