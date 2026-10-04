@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
@@ -201,78 +200,6 @@ internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
                 )
             }
         }
-    }
-}
-
-/** 单个主题预览块：上半段画该主题的底色与卡片条，下半段是名称。 */
-@Composable
-private fun ThemePreviewBlock(
-    themeKey: String,
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = DsTheme.colors
-    // 各主题的示意底色/卡片色（与 Color.kt 语义值一致）
-    val (bg, card) = when (themeKey) {
-        "light" -> Color(0xFFF7F8F6) to Color(0xFFFFFFFF)
-        "dark" -> Color(0xFF0F1514) to Color(0xFF182120)
-        "matte_black" -> Color(0xFF000000) to Color(0xFF111111)
-        else -> Color(0xFFF7F8F6) to Color(0xFF0F1514)
-    }
-    Column(
-        modifier = modifier
-            .clip(DsShapes.cube)
-            .border(
-                width = if (selected) 1.5.dp else 1.dp,
-                color = if (selected) colors.accent else colors.borderL2,
-                shape = DsShapes.cube,
-            )
-            .selectable(
-                selected = selected,
-                role = Role.RadioButton,
-                onClick = onClick,
-            ),
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .background(bg),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            if (themeKey == "system") {
-                Row(Modifier.fillMaxWidth()) {
-                    Box(Modifier.weight(1f).height(52.dp).background(Color(0xFFF7F8F6)))
-                    Box(Modifier.weight(1f).height(52.dp).background(Color(0xFF0F1514)))
-                }
-            }
-            // 卡片条示意
-            Box(
-                Modifier
-                    .padding(start = 10.dp)
-                    .size(width = 64.dp, height = 16.dp)
-                    .background(card, RoundedCornerShape(5.dp)),
-            )
-            if (selected) {
-                Icon(
-                    Icons.Filled.Check,
-                    contentDescription = null,
-                    tint = colors.accent,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(16.dp),
-                )
-            }
-        }
-        Text(
-            label,
-            style = DsType.small13.withReadingWeight(),
-            color = if (selected) colors.accent else colors.labelSecondary,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-        )
     }
 }
 

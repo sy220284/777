@@ -384,10 +384,7 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_page_appearance),
                                 subtitle = stringResource(R.string.settings_appearance_reading_subtitle),
                                 iconFamily = DsIconFamily.Cyan,
-                                value = stringResource(
-                                    R.string.settings_text_scale_value,
-                                    (settings.textScale * 100).toInt(),
-                                ),
+                                value = appearanceThemeLabel(settings.themePreference),
                                 onClick = { page = SettingsDestination.APPEARANCE },
                             )
                             DsCategoryRow(
