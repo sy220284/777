@@ -137,11 +137,16 @@ private fun applyModelHistoryEvent(
     return when (event.type) {
         "system/prompt" -> {
             val content = event.data["content"]?.jsonPrimitive?.contentOrNull ?: return false
+            val updateMode = event.data["update_mode"]?.jsonPrimitive?.contentOrNull
+            val modelContent = event.data["model_content"]?.jsonPrimitive?.contentOrNull ?: content
             val message = buildJsonObject {
                 put("role", "system")
-                put("content", content)
+                put("content", modelContent)
             }
-            if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
+            val hasSystem = history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
+            if (hasSystem && updateMode == LocalModelPromptUpdateMode.APPEND_ONLY.name.lowercase()) {
+                history += message
+            } else if (hasSystem) {
                 history[0] = message
             } else {
                 history.add(0, message)
