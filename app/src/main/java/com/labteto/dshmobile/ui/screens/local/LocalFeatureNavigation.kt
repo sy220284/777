@@ -3,22 +3,13 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.activity.BackEventCompat
 import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.chat.findEstablishedGroupChatSession
+import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
+import com.labteto.dshmobile.local.feature.LocalFeatureRoute
 
-internal enum class LocalFeaturePage {
-    HOME,
-    PERSONA_GALLERY,
-    DIARY,
-    WORKSPACE,
-    RUN_CENTER,
-    TASKS,
-    TOOLS,
-    SETTINGS,
-}
+internal typealias LocalFeaturePage = LocalFeatureRoute
 
 internal fun localFeatureCurrent(stack: List<String>): LocalFeaturePage =
-    stack.lastOrNull()
-        ?.let { runCatching { LocalFeaturePage.valueOf(it) }.getOrNull() }
-        ?: LocalFeaturePage.HOME
+    LocalFeatureCatalog.resolve(stack.lastOrNull()) ?: LocalFeaturePage.HOME
 
 internal fun localFeaturePush(
     stack: List<String>,
