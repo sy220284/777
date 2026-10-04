@@ -2924,7 +2924,7 @@ class LocalHarnessEngine @Inject constructor(
         var finalChatAssistant: LocalHarnessMessage? = null
         var finalChatAssistantSequence: Long? = null
         var modelStep = 0
-        var activeModelToolNames = emptySet<String>()
+        val modelToolStepSurface = LocalModelToolStepSurface()
         var requestPrepared = false
         var workPromptContext = LocalWorkTurnPromptContext()
         var chatStableContext = ""
@@ -3051,8 +3051,9 @@ class LocalHarnessEngine @Inject constructor(
                 drainPendingInputsIntoHistory(binding)
                 val key = modelRequestMarker()
                 val snapshot = runState.value
-                val tools = runToolSurface.next(modelToolSchemas(runPolicy, binding), snapshot)
-                activeModelToolNames = toolSchemaProjection.names(tools).toSet()
+                val tools = modelToolStepSurface.capture(
+                    runToolSurface.next(modelToolSchemas(runPolicy, binding), snapshot),
+                )
                 val productContextTokens = if (snapshot.usageMode == LocalUsageMode.CHAT) {
                     estimateModelTokens(chatStableContext) + estimateModelTokens(chatDynamicContext)
                 } else {
@@ -3185,13 +3186,8 @@ class LocalHarnessEngine @Inject constructor(
                         isError = true,
                         errorCode = "TOOLS_DISABLED",
                     )
-                } else if (!LocalToolPolicy.isVisibleCall(call.name, activeModelToolNames)) {
-                    AgentToolResult(
-                        content = "模型调用了本步骤未暴露的工具：" + call.name,
-                        isError = true,
-                        errorCode = "TOOL_NOT_EXPOSED",
-                        recoveryHint = "先使用 capability_search，等待下一轮工具表更新后再调用。",
-                    )
+                } else if (!modelToolStepSurface.allows(call.name)) {
+                    modelToolStepSurface.hiddenCallResult(call.name)
                 } else {
                     executeSafely(call.toLocalToolCall(), allowMutation = true, binding = binding)
                 }
