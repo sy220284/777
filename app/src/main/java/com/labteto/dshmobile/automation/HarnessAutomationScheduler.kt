@@ -519,6 +519,7 @@ class HarnessAutomationScheduler @Inject constructor(
                     it.targetSessionId == sessionId
             }
             .forEach { task ->
+                var resumedFromWaiting = false
                 val updated = store.update(task.id) { current ->
                     if (
                         current.mode != AutomationMode.CHAT ||
@@ -527,7 +528,8 @@ class HarnessAutomationScheduler @Inject constructor(
                         current
                     } else {
                         val latestActivity = maxOf(current.lastUserActivityAt ?: Long.MIN_VALUE, userMessageAt)
-                        if (current.status == "waiting_user") {
+                        resumedFromWaiting = current.status == "waiting_user"
+                        if (resumedFromWaiting) {
                             current.copy(
                                 status = "scheduled",
                                 nextRunAt = nextAutomationRunAfterUserActivity(current, latestActivity),
@@ -539,7 +541,7 @@ class HarnessAutomationScheduler @Inject constructor(
                         }
                     }
                 } ?: return@forEach
-                if (updated.status != "scheduled" || task.status != "waiting_user") return@forEach
+                if (updated.status != "scheduled" || !resumedFromWaiting) return@forEach
                 if (usesChainedChatScheduling(updated) || updated.recurringMinutes == null) {
                     enqueueOneTime(updated.id, updated.nextRunAt)
                 } else {
