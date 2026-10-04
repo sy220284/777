@@ -416,6 +416,7 @@ internal class LocalSubagentRunner(
                                 put("step", event.step)
                                 put("id", event.call.id)
                                 put("name", event.call.name)
+                                put("arguments", event.call.arguments)
                                 put("execution_started", false)
                             })
                         }

@@ -3326,6 +3326,7 @@ class LocalHarnessEngine @Inject constructor(
                             put("step", event.step)
                             put("id", event.call.id)
                             put("name", event.call.name)
+                            put("arguments", event.call.arguments)
                             put("execution_started", false)
                         })
                     }
@@ -3677,6 +3678,7 @@ class LocalHarnessEngine @Inject constructor(
         log.append("tool/call", buildJsonObject {
             put("id", normalized.id)
             put("name", normalized.name)
+            put("arguments", normalized.arguments)
             put("execution_started", false)
             put("automation", true)
         })
