@@ -24,6 +24,7 @@ internal class LocalWebTools(
         maxBytes: Int,
         format: String,
         timeoutSeconds: Long,
+        allowArtifactWrite: Boolean = true,
     ): String {
         return try {
             formatFetchedWeb(
@@ -34,6 +35,7 @@ internal class LocalWebTools(
                     timeoutSeconds = timeoutSeconds,
                 ),
                 format,
+                allowArtifactWrite,
             )
         } catch (error: LocalWebException) {
             if (error.code !in FALLBACK_WEB_ERRORS) throw error
@@ -51,7 +53,11 @@ internal class LocalWebTools(
             }
         }
     }
-    private fun formatFetchedWeb(result: LocalWebFetchResult, format: String): String {
+    private fun formatFetchedWeb(
+        result: LocalWebFetchResult,
+        format: String,
+        allowArtifactWrite: Boolean,
+    ): String {
         val total = result.totalBytes?.let { "$it 字节" } ?: "服务器未提供 Content-Length"
         val shouldSpill = result.content.length > WEB_FETCH_INLINE_CHARS || result.truncated
         if (!shouldSpill) {
@@ -60,6 +66,23 @@ internal class LocalWebTools(
                 appendLine("Content-Type: ${result.mediaType}")
                 appendLine("读取：${result.bytesRead} 字节；总大小：$total")
                 append(result.content)
+            }.trimEnd()
+        }
+
+        if (!allowArtifactWrite) {
+            return buildString {
+                appendLine("URL: ${result.url}")
+                appendLine("Content-Type: ${result.mediaType}")
+                appendLine("读取：${result.bytesRead} 字节；总大小：$total")
+                appendLine(
+                    if (result.truncated) {
+                        "当前为只读/规划作用域，响应已在 max_bytes 上限处截断，不写入工作区。"
+                    } else {
+                        "当前为只读/规划作用域，完整响应不写入工作区；以下仅返回上下文安全预览。"
+                    },
+                )
+                appendLine()
+                append(result.content.take(WEB_FETCH_INLINE_CHARS))
             }.trimEnd()
         }
 
