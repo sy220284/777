@@ -81,6 +81,7 @@ internal fun projectWorkRequestContext(
     previousPressure: LocalPromptPressure? = null,
     structuredWorkState: LocalStructuredWorkState? = null,
     cachePolicy: LocalPromptCachePolicy = LocalPromptCachePolicy(),
+    allowSemanticProjection: Boolean = true,
 ): LocalWorkRequestProjection {
     val limit = operationalLimitTokens.coerceAtLeast(1)
     val beforePressure = measuredPressure ?: LocalPromptPressureMeter.measure(
@@ -118,7 +119,10 @@ internal fun projectWorkRequestContext(
         allowAdaptiveEarlyCompaction = cachePolicy.allowAdaptiveEarlyCompaction,
     )
     val trigger = assessment.effectiveProjectionTriggerTokens
-    if (!assessment.recommendsCompaction && toolProjectedPressure.estimatedInputTokens < trigger) {
+    if (
+        !allowSemanticProjection ||
+        (!assessment.recommendsCompaction && toolProjectedPressure.estimatedInputTokens < trigger)
+    ) {
         return LocalWorkRequestProjection(
             messages = toolProjectedMessages,
             projected = staleToolProjection != null,

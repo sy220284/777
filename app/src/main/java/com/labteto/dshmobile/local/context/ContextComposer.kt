@@ -18,6 +18,15 @@ data class ContextRequest(
     val handoffSummary: String?,
 )
 
+data class ContextComposition(
+    val stable: String,
+    val dynamic: String,
+) {
+    fun combined(): String = listOf(stable, dynamic)
+        .filter(String::isNotBlank)
+        .joinToString("\n\n")
+}
+
 @Singleton
 class ContextComposer @Inject constructor(
     private val profileStore: UserProfileStore,
@@ -25,7 +34,9 @@ class ContextComposer @Inject constructor(
 ) {
     private val assembler = AgentContextAssembler()
 
-    fun compose(request: ContextRequest): String {
+    fun compose(request: ContextRequest): String = composeParts(request).combined()
+
+    fun composeParts(request: ContextRequest): ContextComposition {
         val profile = profileStore.read()
         val allowedScopes = when (request.mode) {
             LocalConversationMode.INDEPENDENT -> setOf(MemoryScope.GLOBAL)
@@ -46,19 +57,26 @@ class ContextComposer @Inject constructor(
         } else {
             emptyList()
         }
-
-        return assembler.compose(
-            rules = profile.customRules,
-            memories = memories.map { memory ->
-                AgentContextMemory(
-                    scope = memory.scope.name,
-                    kind = memory.kind.name,
-                    content = memory.content,
-                )
-            },
-            handoffSummary = request.handoffSummary.takeIf {
-                request.mode == LocalConversationMode.CONTINUATION
-            },
+        val mappedMemories = memories.map { memory ->
+            AgentContextMemory(
+                scope = memory.scope.name,
+                kind = memory.kind.name,
+                content = memory.content,
+            )
+        }
+        return ContextComposition(
+            stable = assembler.compose(
+                rules = profile.customRules,
+                memories = emptyList(),
+                handoffSummary = null,
+            ),
+            dynamic = assembler.compose(
+                rules = "",
+                memories = mappedMemories,
+                handoffSummary = request.handoffSummary.takeIf {
+                    request.mode == LocalConversationMode.CONTINUATION
+                },
+            ),
         )
     }
 
