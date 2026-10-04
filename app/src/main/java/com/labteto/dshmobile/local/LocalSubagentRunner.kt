@@ -53,7 +53,7 @@ internal class LocalSubagentRunner(
 
     private val modelStepExecutor = LocalSubagentModelStepExecutor(
         modelGateway = modelGateway,
-        modelAttempts = { state.value.modelAttempts },
+        modelAttempts = { state.value.modelState.modelAttempts },
         resourceScheduler = resourceScheduler,
         eventLog = eventLog,
         historyCompactor = historyCompactor,
