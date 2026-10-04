@@ -193,6 +193,7 @@ fun SettingsScreen(
     initialDestination: SettingsDestination = SettingsDestination.ROOT,
     onCheckUpdate: () -> Unit = {},
     updateStatus: String? = null,
+    handleRootSystemBack: Boolean = true,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.state.collectAsStateWithLifecycle()
@@ -279,7 +280,7 @@ fun SettingsScreen(
         }
     }
 
-    BackHandler { navigateBack() }
+    BackHandler(enabled = handleRootSystemBack || page != SettingsDestination.ROOT) { navigateBack() }
     LaunchedEffect(connectionState.phase) {
         viewModel.refreshRemoteSettings()
     }
