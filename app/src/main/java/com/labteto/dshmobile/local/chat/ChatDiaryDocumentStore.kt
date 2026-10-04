@@ -89,8 +89,14 @@ internal class ChatDiaryDocumentStore(private val root: File, private val json: 
     @Synchronized
     fun restore(document: ChatDiaryDocument) {
         write(document)
-        file.copyTo(backup, overwrite = true)
-        check(decode(backup) == document) { "人物日记回滚备份校验失败" }
+        val backupRestored = runCatching {
+            file.copyTo(backup, overwrite = true)
+            decode(backup) == document
+        }.getOrDefault(false)
+        if (!backupRestored) {
+            val staleBackupRemoved = !backup.exists() || backup.delete()
+            check(staleBackupRemoved) { "人物日记回滚备份无法恢复或清除" }
+        }
         cached = document
         cachedStamp = stamp()
     }
