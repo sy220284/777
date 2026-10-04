@@ -60,7 +60,9 @@ jobs:
 
               releases.extend(
                   release for release in batch
-                  if not release.get("draft") and release.get("published_at")
+                  if not release.get("draft")
+                  and not release.get("prerelease")
+                  and release.get("published_at")
               )
               if len(batch) < 100:
                   break
@@ -75,10 +77,14 @@ jobs:
                   return (1, *version, release.get("published_at") or "", release.get("id") or 0)
               return (0, 0, 0, 0, 0, release.get("published_at") or "", release.get("id") or 0)
 
-          releases.sort(key=release_sort_key, reverse=True)
+          formal_releases = [
+              release for release in releases
+              if version_pattern.match(release.get("tag_name") or "")
+          ]
+          formal_releases.sort(key=release_sort_key, reverse=True)
 
-          keep = releases[:3]
-          remove = releases[3:]
+          keep = formal_releases[:3]
+          remove = formal_releases[3:]
 
           print("保留版本号最高的 3 个已发布版本：")
           for release in keep:
