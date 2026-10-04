@@ -73,7 +73,7 @@ class ChatInteractionPlannerTest {
         assertEquals("平静", state.mood)
         assertTrue(state.currentFocus.isBlank())
         assertEquals("还在介意", state.currentUserImpression)
-        assertEquals("还在介意", state.recentImpression)
+        assertTrue(state.recentImpression.isBlank())
         assertTrue(state.activeGoal.isBlank())
         assertTrue(state.currentAgenda.isBlank())
         assertTrue(state.internalConflict.isBlank())
