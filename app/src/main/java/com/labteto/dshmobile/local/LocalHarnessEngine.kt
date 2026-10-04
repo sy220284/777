@@ -3842,7 +3842,7 @@ class LocalHarnessEngine @Inject constructor(
             original = original,
             sessionId = binding.sessionId,
             allowMutation = allowMutation,
-            planModeEnabled = binding.state.value.planMode,
+            planModeEnabled = binding.state.value.work.planMode,
             approval = { call, tool, summary ->
                 approve(binding, call, summary, tool)
             },
@@ -3889,7 +3889,7 @@ class LocalHarnessEngine @Inject constructor(
         val binding = executionSessionId?.let(activeWorkRuns::get)
         val executionState = binding?.state ?: _state
         val boundSessionId = binding?.sessionId ?: currentSessionId
-        if (executionState.value.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
+        if (executionState.value.work.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
             return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
         }
         return when (call.name) {
@@ -3978,7 +3978,7 @@ class LocalHarnessEngine @Inject constructor(
                 val maxBytes = args.int("max_bytes", DEFAULT_WEB_FETCH_BYTES).coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES)
                 val format = args.optionalString("format") ?: "text"
                 val background = args.boolean("run_in_background", false)
-                val readOnlyScope = !allowMutation || executionState.value.planMode
+                val readOnlyScope = !allowMutation || executionState.value.work.planMode
                 if (background && readOnlyScope) {
                     return "当前为只读/规划作用域，不能创建后台网页抓取任务"
                 }
@@ -3997,7 +3997,7 @@ class LocalHarnessEngine @Inject constructor(
             }
             "http_request" -> {
                 if (
-                    (!allowMutation || executionState.value.planMode) &&
+                    (!allowMutation || executionState.value.work.planMode) &&
                     args.string("method").uppercase() !in setOf("GET", "HEAD")
                 ) {
                     return "只读/规划作用域仅允许 GET/HEAD 请求"
@@ -4029,7 +4029,7 @@ class LocalHarnessEngine @Inject constructor(
             "json_query" -> webTools.jsonQuery(
                 path = args.string("path"),
                 query = args.optionalString("query").orEmpty(),
-                allowArtifactWrite = allowMutation && !executionState.value.planMode,
+                allowArtifactWrite = allowMutation && !executionState.value.work.planMode,
             )
             "network_diagnose" -> web.diagnose(args.string("url"))
             "environment_info" -> environmentInfoCoordinator.build(binding)
@@ -4248,7 +4248,7 @@ class LocalHarnessEngine @Inject constructor(
         val targetState = binding?.state ?: _state
         val log = binding?.eventLog ?: eventLog
         val history = binding?.modelHistory ?: modelHistory
-        if (!targetState.value.planMode) return "当前未启用规划模式"
+        if (!targetState.value.work.planMode) return "当前未启用规划模式"
         val answer = askUser(
             call,
             "Harness 已完成计划，是否批准并进入执行模式？\n\n${plan.take(8_000)}",
@@ -4632,7 +4632,7 @@ class LocalHarnessEngine @Inject constructor(
         val snapshot = binding?.state?.value ?: _state.value
         return when {
             snapshot.usageMode != LocalUsageMode.CHAT ->
-                workSystemPrompt(workspace.path, snapshot.planMode)
+                workSystemPrompt(workspace.path, snapshot.work.planMode)
             snapshot.groupChat.enabled -> groupChatSystemPrompt()
             else -> chatSystemPrompt()
         }
