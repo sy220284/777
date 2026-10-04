@@ -32,6 +32,9 @@ class LocalAutomationRuntime @Inject constructor(
         )
     }
 
+    internal fun planningRevision(): AutomationPlanningRevision =
+        engine.state.value.toAutomationPlanningRevision()
+
     internal suspend fun runPrompt(text: String, timeoutMillis: Long = 5 * 60_000L): String =
         engine.runAutomationPrompt(text, timeoutMillis)
 
