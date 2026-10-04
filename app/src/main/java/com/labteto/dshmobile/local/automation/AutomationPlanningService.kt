@@ -30,6 +30,7 @@ internal data class AutomationPlanningMessage(
 
 internal data class AutomationPlanningContext(
     val sessionId: String,
+    val revision: AutomationPlanningRevision,
     val configured: Boolean,
     val usageMode: LocalUsageMode,
     val groupChatEnabled: Boolean,
@@ -42,6 +43,7 @@ internal data class AutomationPlanningContext(
 
 internal data class AutomationPlanDraft(
     val sourceSessionId: String,
+    val sourceRevision: AutomationPlanningRevision,
     val prompt: String,
     val scheduleType: AutomationScheduleType,
     val firstRunAt: Long,
@@ -53,6 +55,7 @@ internal data class AutomationPlanDraft(
 
 internal data class AutomationSuggestionSet(
     val sourceSessionId: String,
+    val sourceRevision: AutomationPlanningRevision,
     val suggestions: List<String>,
 )
 
@@ -90,6 +93,7 @@ class AutomationPlanningService @Inject constructor(
             json = json,
             nowMillis = now,
             sourceSessionId = context.sessionId,
+            sourceRevision = context.revision,
         )
     }
 
@@ -97,7 +101,7 @@ class AutomationPlanningService @Inject constructor(
         val context = runtime.planningContext()
         validateContext(context)
         if (context.recentMessages.isEmpty()) {
-            return AutomationSuggestionSet(context.sessionId, emptyList())
+            return AutomationSuggestionSet(context.sessionId, context.revision, emptyList())
         }
         val reply = complete(
             context = context,
@@ -116,9 +120,16 @@ class AutomationPlanningService @Inject constructor(
         )
         return AutomationSuggestionSet(
             sourceSessionId = context.sessionId,
+            sourceRevision = context.revision,
             suggestions = parseAutomationSuggestions(reply, json),
         )
     }
+
+    internal fun isCurrent(draft: AutomationPlanDraft): Boolean =
+        resolveAutomationPlanningRevision(runtime.planningRevision(), draft.sourceRevision).accepted
+
+    internal fun isCurrent(suggestions: AutomationSuggestionSet): Boolean =
+        resolveAutomationPlanningRevision(runtime.planningRevision(), suggestions.sourceRevision).accepted
 
     private suspend fun complete(
         context: AutomationPlanningContext,
@@ -200,6 +211,11 @@ internal fun parseAutomationPlan(
     json: Json,
     nowMillis: Long,
     sourceSessionId: String,
+    sourceRevision: AutomationPlanningRevision = AutomationPlanningRevision(
+        sessionId = sourceSessionId,
+        latestDialogueMessageId = null,
+        chatContextGeneration = 0L,
+    ),
 ): AutomationPlanDraft {
     val root = json.parseToJsonElement(extractPlannerJson(raw)).jsonObject
     val task = root["task"]?.jsonObject ?: root
@@ -241,6 +257,7 @@ internal fun parseAutomationPlan(
     }
     return AutomationPlanDraft(
         sourceSessionId = sourceSessionId,
+        sourceRevision = sourceRevision,
         prompt = prompt,
         scheduleType = scheduleType,
         firstRunAt = if (
