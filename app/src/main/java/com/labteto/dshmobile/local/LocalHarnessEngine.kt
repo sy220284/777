@@ -2974,7 +2974,7 @@ class LocalHarnessEngine @Inject constructor(
             model = runSnapshot.model,
             baseUrl = runSnapshot.baseUrl,
             routeProfile = runSnapshot.modelSelection.activeProfile,
-            planMode = runSnapshot.planMode,
+            planMode = runSnapshot.work.planMode,
             policy = runPolicy,
             safeAutoApprovalEnabled = runSnapshot.safeAutoApprovalEnabled,
             maxSteps = mainStepLimit,
@@ -4257,10 +4257,12 @@ class LocalHarnessEngine @Inject constructor(
         )
         return if (answer == "批准并进入执行模式") {
             val approvedPlan = plan.lines().map(String::trim).filter(String::isNotEmpty).take(20)
-            targetState.update {
-                it.copy(
-                    planMode = false,
-                    plan = approvedPlan,
+            targetState.update { current ->
+                current.copy(
+                    work = current.work.copy(
+                        planMode = false,
+                        plan = approvedPlan,
+                    ),
                 )
             }
             log.append("plan/state", buildJsonObject {
