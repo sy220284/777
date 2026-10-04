@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,7 +31,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
@@ -57,7 +55,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -127,7 +124,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 @Composable
 internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
@@ -320,29 +316,15 @@ internal fun LocalConversationSurface(
         transcriptInitialPositionReady = true
     }
 
-    LaunchedEffect(
-        state.sessionId,
-        hasOlderTranscript,
-        loadingOlderTranscript,
-        transcriptHistoryError,
-        transcriptInitialPositionReady,
-    ) {
-        if (
-            !transcriptInitialPositionReady ||
-            !hasOlderTranscript ||
-            loadingOlderTranscript ||
-            transcriptHistoryError != null
-        ) {
-            return@LaunchedEffect
-        }
-        snapshotFlow {
-            listState.firstVisibleItemIndex <= LOCAL_TRANSCRIPT_AUTOLOAD_THRESHOLD_ITEMS
-        }
-            .distinctUntilChanged()
-            .collect { nearStart ->
-                if (nearStart) onLoadOlderTranscript(state.sessionId)
-            }
-    }
+    LocalTranscriptAutoPager(
+        sessionId = state.sessionId,
+        listState = listState,
+        enabled = transcriptInitialPositionReady &&
+            hasOlderTranscript &&
+            !loadingOlderTranscript &&
+            transcriptHistoryError == null,
+        onLoadOlder = onLoadOlderTranscript,
+    )
 
     LaunchedEffect(state.messages.size, transcriptItems.size) {
         if (transcriptItems.isNotEmpty()) {
@@ -535,33 +517,13 @@ internal fun LocalConversationSurface(
             ) {
                 if (showTranscriptPagingRow) {
                     item(key = "local-transcript-history-status") {
-                        if (transcriptHistoryError != null) {
-                            DsButton(
-                                text = stringResource(R.string.local_transcript_retry_older),
-                                onClick = {
-                                    scope.launch {
-                                        onLoadOlderTranscript(state.sessionId)
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                variant = DsButtonVariant.Ghost,
-                            )
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth()
-                                    .padding(vertical = DsSpacing.small),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(DsSpacing.small))
-                                Text(
-                                    stringResource(R.string.local_transcript_loading_older),
-                                    style = DsType.small13.withReadingWeight(),
-                                    color = colors.labelSecondary,
-                                )
-                            }
-                        }
+                        LocalTranscriptPagingStatus(
+                            loading = loadingOlderTranscript,
+                            error = transcriptHistoryError,
+                            onRetry = {
+                                scope.launch { onLoadOlderTranscript(state.sessionId) }
+                            },
+                        )
                     }
                 }
                 if (transcriptItems.isEmpty() && state.usageMode == LocalUsageMode.WORK) {
