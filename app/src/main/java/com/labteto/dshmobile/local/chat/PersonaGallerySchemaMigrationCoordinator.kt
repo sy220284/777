@@ -19,12 +19,22 @@ internal class PersonaGallerySchemaMigrationCoordinator(
 
     fun migrateIfNeeded() {
         if (currentFile.name != "persona-gallery-v5.json") return
-        if (marker.isFile && PersonaSchemaMigration.hasDurableSource(currentFile)) return
+        val currentBackup = File(root, "${currentFile.name}.bak")
+        val currentReadable = listOf(currentFile, currentBackup)
+            .asSequence()
+            .filter(File::isFile)
+            .any { candidate ->
+                runCatching {
+                    json.decodeFromString(GalleryDocument.serializer(), candidate.readText())
+                }.getOrNull()?.version == 5
+            }
+        if (marker.isFile && currentReadable) return
         if (!PersonaSchemaMigration.hasDurableSource(legacyFile)) return
 
         val documentStore = PersonaGalleryDocumentStore(currentFile, json)
         val history = PersonaGalleryHistoryCoordinator(currentHistoryRoot, json)
-        val current = documentStore.read()
+        val current = runCatching { documentStore.read() }
+            .getOrElse { GalleryDocument() }
         require(current.version == 5) { "人物图集版本不受支持" }
 
         val legacyDocument = PersonaSchemaMigration.readLegacyGalleryDocument(legacyFile, json)
@@ -44,14 +54,9 @@ internal class PersonaGallerySchemaMigrationCoordinator(
                     )
                 },
             )
-            val indexById = mergedEntries.indexOfFirst { it.id == converted.id }
-            val index = if (indexById >= 0) {
-                indexById
-            } else {
-                mergedEntries.indexOfFirst { candidate ->
-                    samePersonaIdentity(candidate.persona, converted.persona)
-                }
-            }
+            // Migration only auto-merges the same durable identity. Name-based matching is too
+            // risky here because two distinct user-created characters can legitimately share a name.
+            val index = mergedEntries.indexOfFirst { it.id == converted.id }
             val merged = if (index >= 0) {
                 val currentEntry = history.hydrate(history.migrate(mergedEntries[index]))
                 val entryId = currentEntry.id
