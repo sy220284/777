@@ -354,8 +354,7 @@ internal class LocalSubagentRunner(
                     )
                 },
                 tools = AgentToolExecutor { call ->
-                    currentCoroutineContext().ensureActive(); val virtualAllowed =
-                        virtualScreenId != null && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS
+                    currentCoroutineContext().ensureActive(); val virtualAllowed = virtualScreenId != null && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS
                     val requestedScreen = call.arguments["id"]?.jsonPrimitive?.contentOrNull
                     when {
                         !allowMutation && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS && !virtualAllowed ->
