@@ -7,6 +7,7 @@ internal sealed interface PersonaGalleryPreparedImport {
         val baseDocument: GalleryDocument,
         val entry: PersonaGalleryEntry,
         val diaryEntries: List<ChatDiaryEntry>,
+        val rollbackEntry: PersonaGalleryEntry? = null,
     ) : PersonaGalleryPreparedImport
 
     data class Share(val payload: String) : PersonaGalleryPreparedImport

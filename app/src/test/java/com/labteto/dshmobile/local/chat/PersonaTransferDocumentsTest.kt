@@ -161,11 +161,13 @@ class PersonaTransferDocumentsTest {
             entry = secondEntry,
             format = PersonaTransferFormat.MARKDOWN,
         )
-        val merged = target.importPersonaDocument(
+        val prepared = target.preparePersonaDocumentImport(
             bytes = second.bytes,
             fileName = "小岚.persona.md",
             mimeType = "text/markdown",
-        )
+        ) as PersonaGalleryPreparedImport.Archive
+        assertEquals(2, prepared.rollbackEntry?.stories?.single()?.history?.size)
+        val merged = target.commitPersonaDocumentImport(prepared)
 
         assertEquals(imported.id, merged.id)
         assertEquals(2, merged.stories.size)
@@ -194,6 +196,32 @@ class PersonaTransferDocumentsTest {
         val committed = target.commitPersonaDocumentImport(prepared)
         assertEquals("小岚", committed.persona.name)
         assertEquals(1, target.list().size)
+    }
+
+    @Test
+    fun failedGalleryDocumentCommitRemovesNewColdDialogueArchive() {
+        val root = File(temporary.root, "gallery-commit-failure").apply { mkdirs() }
+        val targetFile = File(root, "personas.json")
+        val target = ChatPersonaGalleryStore(targetFile, json)
+        val document = PersonaTransferDocuments.encode(
+            json = json,
+            entry = sampleEntry(),
+            format = PersonaTransferFormat.JSON,
+            diaryEntries = sampleDiaryEntries(),
+        )
+        val prepared = target.preparePersonaDocumentImport(
+            bytes = document.bytes,
+            fileName = "小岚.persona.json",
+            mimeType = "application/json",
+        )
+
+        targetFile.mkdirs()
+        File(targetFile, "block").writeText("block")
+        val result = runCatching { target.commitPersonaDocumentImport(prepared) }
+
+        assertTrue(result.isFailure)
+        val historyRoot = File(root, "persona-history-v5")
+        assertTrue(historyRoot.walkTopDown().none { it.isFile })
     }
 
     @Test

@@ -78,8 +78,15 @@ class ChatPersonaGalleryStore internal constructor(
     ): PersonaGalleryPreparedImport {
         val canonicalJson = PersonaTransferDocuments.decodeToCanonicalJson(bytes, fileName, mimeType)
         return when (val decoded = PersonaSchemaMigration.decodeDocumentImport(json, canonicalJson)) {
-            is PersonaDocumentImport.Archive ->
-                PersonaGalleryImportPlanner.archive(readNormalized(), decoded.entry, decoded.diaryEntries)
+            is PersonaDocumentImport.Archive -> {
+                val current = readNormalized()
+                val planned = PersonaGalleryImportPlanner.archive(current, decoded.entry, decoded.diaryEntries)
+                planned.copy(
+                    rollbackEntry = current.entries
+                        .firstOrNull { it.id == planned.entry.id }
+                        ?.let(history::hydrate),
+                )
+            }
             PersonaDocumentImport.Share -> PersonaGalleryPreparedImport.Share(canonicalJson)
         }
     }
@@ -88,14 +95,27 @@ class ChatPersonaGalleryStore internal constructor(
     internal fun commitPersonaDocumentImport(prepared: PersonaGalleryPreparedImport): PersonaGalleryEntry =
         when (prepared) {
             is PersonaGalleryPreparedImport.Share -> importPersona(prepared.payload)
-            is PersonaGalleryPreparedImport.Archive -> {
-                check(readNormalized() == prepared.baseDocument) { "人物图集在导入期间发生变化，请重试" }
-                val entry = history.archiveEntry(prepared.entry)
-                val base = prepared.baseDocument
-                documentStore.write(base.copy(version = 5, entries = base.entries.filterNot { it.id == entry.id } + entry))
-                entry
-            }
+            is PersonaGalleryPreparedImport.Archive -> commitPreparedArchive(prepared)
         }
+
+    private fun commitPreparedArchive(prepared: PersonaGalleryPreparedImport.Archive): PersonaGalleryEntry {
+        check(readNormalized() == prepared.baseDocument) { "人物图集在导入期间发生变化，请重试" }
+        return try {
+            val entry = history.archiveEntry(prepared.entry)
+            val base = prepared.baseDocument
+            documentStore.write(base.copy(version = 5, entries = base.entries.filterNot { it.id == entry.id } + entry))
+            entry
+        } catch (error: Throwable) {
+            runCatching {
+                history.deleteEntry(prepared.entry.id)
+                prepared.rollbackEntry?.let(history::archiveEntry)
+            }.exceptionOrNull()?.let(error::addSuppressed)
+            runCatching {
+                documentStore.write(prepared.baseDocument)
+            }.exceptionOrNull()?.let(error::addSuppressed)
+            throw error
+        }
+    }
 
     @Synchronized
     fun importPersona(payload: String): PersonaGalleryEntry {
