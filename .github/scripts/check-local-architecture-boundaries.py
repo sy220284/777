@@ -111,6 +111,7 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessResourceProjection.kt": 23,
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalBundledRuntimeManager.kt": 56,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt": 67,
+    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionPersistenceProjection.kt": 55,
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupExecutionModels.kt": 22,
     "app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt": 172,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 64,
