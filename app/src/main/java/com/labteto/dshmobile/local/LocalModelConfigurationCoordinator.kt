@@ -1,12 +1,15 @@
 package com.labteto.dshmobile.local
 
-import android.content.SharedPreferences
+import android.content.Context
 import com.labteto.dshmobile.local.model.resolveLocalModelApiKeyDraft
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelMutationGate
 import com.labteto.dshmobile.local.model.LocalModelProfileStore
 import com.labteto.dshmobile.local.model.LocalModelStartupMigrator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 
 internal data class LocalModelConfigurationResult(
@@ -16,13 +19,15 @@ internal data class LocalModelConfigurationResult(
 )
 
 /** Coordinates model-route mutations; storage, migration and credential resolution stay extracted. */
-internal class LocalModelConfigurationCoordinator(
-    preferences: SharedPreferences,
+@Singleton
+internal class LocalModelConfigurationCoordinator @Inject constructor(
+    @ApplicationContext context: Context,
     private val apiKeys: LocalApiKeyStore,
     private val gateway: LocalModelGateway,
     private val tester: LocalModelConnectionTester,
     json: Json,
 ) {
+    private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
     private val profiles = LocalModelProfileStore(preferences, json)
     private val startup = LocalModelStartupMigrator(preferences, profiles, apiKeys, gateway)
     suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null): LocalModelConfigurationResult =
@@ -106,6 +111,9 @@ internal class LocalModelConfigurationCoordinator(
     }
 
     fun readProfiles(): List<LocalModelProfile> = profiles.read()
+
+    suspend fun resolveDeepSeekSearchCredential(): String? =
+        LocalDeepSeekSearchCredentialResolver(::readProfiles, apiKeys).resolve()
 
     fun activeProfile(model: String, baseUrl: String, all: List<LocalModelProfile> = profiles.read()) =
         profiles.active(model, baseUrl, all)
