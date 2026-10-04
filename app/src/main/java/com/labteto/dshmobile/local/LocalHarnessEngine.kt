@@ -1729,11 +1729,12 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun syncVisibleWorkRun(sessionId: String) {
-        val binding = activeWorkRuns[sessionId]?.takeIf { it.job?.isCompleted == false } ?: return
+    private fun syncVisibleWorkRun(sessionId: String, ownedBinding: LocalWorkRunBinding? = null) {
+        val binding = ownedBinding ?: activeWorkRuns[sessionId]?.takeIf { it.job?.isCompleted == false } ?: return
         val liveState = binding.state.value
         liveState.modelSelection.activeProfile?.takeIf { liveState.configured }?.let(modelGateway::activate)
-        _state.value = liveState.copy(loading = _state.value.loading, usage = usageTracker.state.value, sessions = sessionSummaries())
+        val resources = resourceScheduler.snapshot()
+        _state.value = liveState.copy(loading = _state.value.loading, usage = usageTracker.state.value, sessions = sessionSummaries(), resources = resources.toLocalHarnessResourceState(liveState.usageMode), contextBudgetChars = localHistoryBudgetFor(memoryClassMb, resources.pressure).maxHistoryChars)
         modelHistory.reset(binding.modelHistory.snapshot())
         transcriptProjectionCursor = binding.transcriptProjectionCursor
     }
@@ -4611,7 +4612,7 @@ class LocalHarnessEngine @Inject constructor(
         deferReady: Boolean = false,
     ) {
         val liveBinding = activeWorkRuns[sessionId]?.takeIf { it.job?.isCompleted == false }
-        if (!shouldUseDurableSessionRecovery(liveBinding != null)) { pendingInputs.clear(); syncVisibleWorkRun(sessionId); return }
+        if (!shouldUseDurableSessionRecovery(liveBinding != null)) { pendingInputs.clear(); syncVisibleWorkRun(sessionId, liveBinding); return }
 
         val loaded = try {
             sessionCoordinator.readWithLegacyApproval(sessionId)
