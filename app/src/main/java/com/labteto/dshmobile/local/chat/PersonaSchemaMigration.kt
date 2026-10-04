@@ -17,6 +17,19 @@ internal sealed interface PersonaDocumentImport {
 }
 
 internal object PersonaSchemaMigration {
+    private val LEGACY_PERSONA_FIELD_NAMES = setOf(
+        "identity",
+        "background",
+        "personality",
+        "speechStyle",
+        "relationship",
+        "coreMotivations",
+        "valuePriorities",
+        "behaviorPatterns",
+        "internalContradictions",
+        "exampleDialogues",
+        "signaturePhrases",
+    )
     fun hasDurableSource(file: File): Boolean =
         file.isFile || File(file.parentFile, "${file.name}.bak").isFile
 
@@ -60,7 +73,18 @@ internal object PersonaSchemaMigration {
             schema == 2 && "entry" in root -> PersonaDocumentImport.Archive(
                 decodeLegacyArchiveEntry(json, payload),
             )
-            (schema == 2 || schema == 1) && "persona" in root -> PersonaDocumentImport.Share
+            schema == null && "entry" in root -> {
+                val persona = root["entry"]?.jsonObject?.get("persona")?.jsonObject
+                if (persona.hasLegacyPersonaFields()) {
+                    PersonaDocumentImport.Archive(decodeLegacyArchiveEntry(json, payload))
+                } else {
+                    PersonaDocumentImport.Archive(
+                        PersonaTransferDocuments.decodeArchive(json, payload).entry,
+                    )
+                }
+            }
+            (schema == 2 || schema == 1 || schema == null) && "persona" in root ->
+                PersonaDocumentImport.Share
             else -> throw IllegalArgumentException("人物文件版本不受支持")
         }
     }
@@ -74,6 +98,19 @@ internal object PersonaSchemaMigration {
             }.getOrElse { error -> throw IllegalArgumentException("人物分享数据格式不正确", error) }
             1 -> runCatching { decodeLegacyShare(json, payload) }
                 .getOrElse { error -> throw IllegalArgumentException("旧人物分享数据无法升级", error) }
+            null -> {
+                val persona = root["persona"]?.jsonObject
+                if (persona.hasLegacyPersonaFields()) {
+                    runCatching { decodeLegacyShare(json, payload) }
+                        .getOrElse { error -> throw IllegalArgumentException("旧人物分享数据无法升级", error) }
+                } else {
+                    runCatching {
+                        json.decodeFromString(PersonaShareEnvelope.serializer(), payload).persona
+                    }.getOrElse { error ->
+                        throw IllegalArgumentException("人物分享数据格式不正确", error)
+                    }
+                }
+            }
             else -> throw IllegalArgumentException("人物文件版本不受支持")
         }
     }
@@ -208,6 +245,11 @@ internal object PersonaSchemaMigration {
             hardConstraints = profile.hardConstraints.filterNot { it in legacyPresetConstraints },
             bannedPhrases = profile.bannedPhrases.filterNot { it in legacyPresetMetaBans },
         )
+    }
+
+    private fun kotlinx.serialization.json.JsonObject?.hasLegacyPersonaFields(): Boolean {
+        if (this == null) return false
+        return keys.any { it in LEGACY_PERSONA_FIELD_NAMES }
     }
 
     private fun tolerant(json: Json): Json = Json(json) {
