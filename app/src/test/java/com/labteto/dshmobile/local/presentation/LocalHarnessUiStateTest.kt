@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.presentation
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.work.LocalWorkState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
@@ -90,7 +91,7 @@ class LocalHarnessUiStateTest {
     @Test
     fun chatSurfaceProjectionIgnoresWorkOnlyChurn() {
         val base = LocalHarnessState(usageMode = LocalUsageMode.CHAT)
-        val workOnlyUpdate = base.copy(model = "another-model", planMode = true, safeAutoApprovalEnabled = true, contextChars = 48_000, queuedInputCount = 4)
+        val workOnlyUpdate = base.copy(model = "another-model", work = LocalWorkState(planMode = true), safeAutoApprovalEnabled = true, contextChars = 48_000, queuedInputCount = 4)
         assertEquals(base.toChatSurfaceUiState(), workOnlyUpdate.toChatSurfaceUiState())
     }
 
