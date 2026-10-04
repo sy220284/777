@@ -661,6 +661,11 @@ internal class LocalGroupChatTurnExecutor(
                             put("detail", failure.message.orEmpty().take(1_000))
                         })
                         if (responders.size == 1) {
+                            currentGroup = currentGroup.copy(failedReplyMemberIds = failedMembers.distinct())
+                            _state.update { current ->
+                                if (current.sessionId == snapshot.sessionId) current.copy(groupChat = currentGroup) else current
+                            }
+                            persistNow()
                             throw (failure as? Exception
                                 ?: IllegalStateException(failure.message ?: "群聊角色回复失败", failure))
                         }
@@ -763,6 +768,7 @@ internal class LocalGroupChatTurnExecutor(
             _state.update { current ->
                 if (current.sessionId == snapshot.sessionId) current.copy(groupChat = currentGroup) else current
             }
+            persistNow()
             require(deliveredReplies > 0) { "群聊角色这一轮都没有给出可用回复" }
 
             val sharedPendingForRefresh = currentGroup.context.loadPendingBatch(

@@ -218,4 +218,11 @@ class LocalGroupChatTest {
         assertEquals("开心", migrated.members.first().chatState.mood)
     }
 
+    @Test
+    fun failedReplyMembersSurviveSessionSerializationAndOldStatesDefaultEmpty() {
+        val saved = LocalGroupChatState(failedReplyMemberIds = listOf("member-a"))
+        assertEquals(saved, Json.decodeFromString<LocalGroupChatState>(
+            Json.encodeToString(LocalGroupChatState.serializer(), saved)))
+        assertTrue(Json.decodeFromString<LocalGroupChatState>("""{"mode":"GROUP"}""").failedReplyMemberIds.isEmpty())
+    }
 }

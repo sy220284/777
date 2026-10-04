@@ -12,4 +12,3 @@ internal fun LocalHarnessState.toTaskUiState(): LocalHarnessTaskState =
         groupChat = groupChat,
         chatPersona = chatPersona,
     )
-

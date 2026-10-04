@@ -37,7 +37,7 @@ internal object LocalWorkCompletionClaimGuard : LocalOutputQualityGuard {
     }
 
     private val CLAIM = Regex(
-        """(?:全部|所有(?:任务|工作|事项)?|整个任务|本次任务)(?:都|已经|已|均|全部)*(?:完成|处理完毕)|^(?:任务|工作|修复)(?:都|已经|已)*(?:全部)?(?:完成|处理完毕)|^(?:已经|已)?完成(?:了)?(?=\s*[。！？!?，,\n]|\s*$)|^(?:可以|可)(?:直接)?交付|^\s*(?:done|completed|finished)\b""",
+        """(?:全部|所有(?:任务|工作|事项)?|整个任务|本次任务)(?:都|已经|已|均|全部)*(?:完成|处理完毕)|^\s*(?:[-+]\s*)?(?:任务|工作|修复)(?:都|已经|已)*(?:全部)?(?:完成|处理完毕)|^\s*(?:[-+]\s*)?(?:已经|已)?完成(?:了)?(?=\s*[。！？!?，,\n]|\s*$)|^\s*(?:[-+]\s*)?(?:可以|可)(?:直接)?交付|^\s*(?:done|completed|finished)\b""",
         setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE),
     )
     private val NEGATION_PREFIX = Regex("""(?:尚未|还没|没有|无法|不能|未|不|not)\s*$""", RegexOption.IGNORE_CASE)
