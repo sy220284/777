@@ -215,11 +215,11 @@ private fun ThemePreviewBlock(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    val (bg, card) = when (themeKey) {
+    val previewColors = when (themeKey) {
         "light" -> Color(0xFFF7F7F5) to Color(0xFFFFFFFF)
         "dark" -> Color(0xFF10100F) to Color(0xFF191918)
         "matte_black" -> Color(0xFF10100F) to Color(0xFF222220)
-        else -> Color(0xFFF7F7F5) to Color(0xFF10100F)
+        else -> Color(0xFFF7F7F5) to Color(0xFFFFFFFF)
     }
     Column(
         modifier = modifier
@@ -227,20 +227,26 @@ private fun ThemePreviewBlock(
             .border(if (selected) 1.5.dp else 1.dp, if (selected) colors.accent else colors.borderL2, DsShapes.cube)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
     ) {
-        Box(Modifier.fillMaxWidth().height(72.dp).background(bg)) {
+        Box(Modifier.fillMaxWidth().height(72.dp)) {
             if (themeKey == "system") {
                 Row(Modifier.fillMaxSize()) {
-                    Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFF7F7F5)))
-                    Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFF10100F)))
+                    ThemeMiniCanvas(
+                        background = Color(0xFFF7F7F5),
+                        surface = Color(0xFFFFFFFF),
+                        modifier = Modifier.weight(1f),
+                    )
+                    ThemeMiniCanvas(
+                        background = Color(0xFF10100F),
+                        surface = Color(0xFF191918),
+                        modifier = Modifier.weight(1f),
+                    )
                 }
-            }
-            Column(
-                Modifier.padding(horizontal = 9.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Box(Modifier.size(width = 46.dp, height = 6.dp).background(card, RoundedCornerShape(3.dp)))
-                Box(Modifier.fillMaxWidth().height(30.dp).background(card, RoundedCornerShape(8.dp)))
-                Box(Modifier.fillMaxWidth(0.72f).height(10.dp).background(card, RoundedCornerShape(6.dp)))
+            } else {
+                ThemeMiniCanvas(
+                    background = previewColors.first,
+                    surface = previewColors.second,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
             if (selected) Icon(
                 Icons.Filled.Check,
@@ -255,6 +261,26 @@ private fun ThemePreviewBlock(
             color = if (selected) colors.accent else colors.labelSecondary,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
         )
+    }
+}
+
+@Composable
+private fun ThemeMiniCanvas(
+    background: Color,
+    surface: Color,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier.background(background)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 9.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Box(Modifier.fillMaxWidth(0.42f).height(6.dp).background(surface, RoundedCornerShape(3.dp)))
+            Box(Modifier.fillMaxWidth().height(30.dp).background(surface, RoundedCornerShape(8.dp)))
+            Box(Modifier.fillMaxWidth(0.72f).height(10.dp).background(surface, RoundedCornerShape(6.dp)))
+        }
     }
 }
 
