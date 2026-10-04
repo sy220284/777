@@ -19,6 +19,30 @@ class PersonaGalleryOverviewV3Test {
     }
 
     @Test
+    fun installedPresetStaysVisibleAndBecomesTakenState() {
+        val state = personaPresetAddUiState(
+            presetId = "preset-a",
+            hiddenPresetIds = emptySet(),
+            installedPresetIds = setOf("preset-a"),
+        )
+
+        assertTrue(state.visible)
+        assertTrue(state.installed)
+    }
+
+    @Test
+    fun hiddenPresetRemainsHiddenEvenAfterInstallation() {
+        val state = personaPresetAddUiState(
+            presetId = "preset-a",
+            hiddenPresetIds = setOf("preset-a"),
+            installedPresetIds = setOf("preset-a"),
+        )
+
+        assertFalse(state.visible)
+        assertTrue(state.installed)
+    }
+
+    @Test
     fun moveEntryOnlySwapsInsideRequestedGroup() {
         val order = listOf("pin-a", "regular-a", "pin-b", "regular-b")
 

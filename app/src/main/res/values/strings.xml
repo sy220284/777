@@ -903,7 +903,8 @@
     <string name="persona_gallery_standee_meta">%1$d 条故事线 · %2$d 条对白</string>
     <string name="persona_gallery_presets_title">作品预置</string>
     <string name="persona_gallery_presets_hint">先加入人设图集再开聊。预置只提供无剧透基础人设，故事、关系和记忆仍沿用现有人物系统持续成长。</string>
-    <string name="persona_gallery_preset_add">加入人设图集</string>
+    <string name="persona_gallery_preset_add">快到碗里来</string>
+    <string name="persona_gallery_preset_taken">已抱走</string>
     <string name="persona_gallery_preset_installed">人物预置已加入人设图集</string>
     <string name="persona_gallery_preset_install_failed">人物预置加入失败</string>
     <string name="persona_gallery_preset_long_press_delete_hint">长按作品预置可删除</string>
@@ -1231,7 +1232,7 @@
     <string name="advanced_pinned">置顶</string>
     <string name="settings_notifications_usage_hint">回合完成通知更适合长任务场景；纯聊天时关闭可减少不必要的打扰。</string>
     <string name="persona_gallery_overview_stats">%1$d 个人物 · %2$d 条故事线 · %3$d 条归档对白</string>
-    <string name="persona_gallery_my_characters">我的人物</string>
+    <string name="persona_gallery_my_characters">我的宝贝们</string>
     <string name="local_current_session">当前</string>
     <string name="chatlist_exit_remote_control">退出远程控制</string>
     <string name="local_work_process">工作过程</string>

@@ -252,7 +252,6 @@ internal fun PersonaGalleryScreen(
     val exportFailedText = stringResource(R.string.persona_gallery_export_failed)
     val importFailedText = stringResource(R.string.persona_gallery_import_failed)
     val presetInstallFailedText = stringResource(R.string.persona_gallery_preset_install_failed)
-    val presetInstalledText = stringResource(R.string.persona_gallery_preset_installed)
     val portraitSaveFailedText = stringResource(R.string.persona_gallery_portrait_save_failed)
 
     fun writePendingExport(uri: android.net.Uri?) {
@@ -470,11 +469,6 @@ internal fun PersonaGalleryScreen(
                         notice = null
                         scope.launch {
                             onInstallPreset(presetId)
-                                .onSuccess { entry ->
-                                    notice = presetInstalledText
-                                    selectedId = entry.id
-                                    selectedStoryId = null
-                                }
                                 .onFailure { error = it.message ?: presetInstallFailedText }
                             busy = false
                         }

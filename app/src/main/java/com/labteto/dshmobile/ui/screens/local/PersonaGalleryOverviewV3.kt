@@ -92,6 +92,20 @@ internal fun movePersonaGalleryEntry(
     return mutable
 }
 
+internal data class PersonaPresetAddUiState(
+    val visible: Boolean,
+    val installed: Boolean,
+)
+
+internal fun personaPresetAddUiState(
+    presetId: String,
+    hiddenPresetIds: Set<String>,
+    installedPresetIds: Set<String>,
+): PersonaPresetAddUiState = PersonaPresetAddUiState(
+    visible = presetId !in hiddenPresetIds,
+    installed = presetId in installedPresetIds,
+)
+
 @Composable
 internal fun PersonaGalleryOverviewV3(
     entries: List<PersonaGalleryEntry>,
@@ -117,6 +131,9 @@ internal fun PersonaGalleryOverviewV3(
         context.getSharedPreferences(PERSONA_GALLERY_V3_PREFS, Context.MODE_PRIVATE)
     }
     val currentIds = remember(entries) { entries.map(PersonaGalleryEntry::id) }
+    val installedPresetIds = remember(entries) {
+        entries.mapNotNull { it.persona.presetId }.toSet()
+    }
     var orderIds by remember(prefs) {
         mutableStateOf(
             prefs.getString(PERSONA_GALLERY_ORDER, "")
@@ -231,9 +248,13 @@ internal fun PersonaGalleryOverviewV3(
     if (adding) {
         PersonaGalleryAddPanel(
             presets = presets.filter { preset ->
-                preset.id !in hiddenPresetIds &&
-                    entries.none { it.persona.presetId == preset.id }
+                personaPresetAddUiState(
+                    presetId = preset.id,
+                    hiddenPresetIds = hiddenPresetIds,
+                    installedPresetIds = installedPresetIds,
+                ).visible
             },
+            installedPresetIds = installedPresetIds,
             busy = busy,
             onBack = { adding = false },
             onCreate = onCreate,
