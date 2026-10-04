@@ -25,12 +25,12 @@ internal object LocalWorkCompletionClaimGuard : LocalOutputQualityGuard {
         if (corrected == text) return LocalOutputQualityResult(text)
         val state = context.state ?: return LocalOutputQualityResult(text)
         val findings = mutableListOf<String>()
-        val openTodos = state.todos.count { it.status == "pending" || it.status == "in_progress" }
+        val openTodos = state.work.todos.count { it.status == "pending" || it.status == "in_progress" }
         if (openTodos > 0) findings += "完成声明与未完成任务清单冲突"
-        if (state.goal?.status == "blocked") findings += "完成声明与阻塞目标状态冲突"
+        if (state.work.goal?.status == "blocked") findings += "完成声明与阻塞目标状态冲突"
         if (findings.isEmpty()) return LocalOutputQualityResult(text)
         return LocalOutputQualityResult(
-            text = truthfulIncompleteDeliveryText(openTodos, state.goal?.status == "blocked") + "\n\n" + corrected,
+            text = truthfulIncompleteDeliveryText(openTodos, state.work.goal?.status == "blocked") + "\n\n" + corrected,
             findings = findings,
             changed = true,
         )
@@ -84,8 +84,8 @@ internal fun guardWorkCompletionDelivery(
         put("findings", JsonArray(result.findings.map(::JsonPrimitive)))
         put("changed", true)
         put("delivery_blocked", true)
-        put("open_todos", state.todos.count { it.status == "pending" || it.status == "in_progress" })
-        state.goal?.status?.let { put("goal_status", it) }
+        put("open_todos", state.work.todos.count { it.status == "pending" || it.status == "in_progress" })
+        state.work.goal?.status?.let { put("goal_status", it) }
     })
     val guardedMessage = JsonObject(reply.message + ("content" to JsonPrimitive(result.text)))
     val guardedCanonical = reply.canonicalMessage?.copy(
@@ -126,7 +126,7 @@ internal fun recordWorkCompletionQuality(
     eventLog.append("work/output-quality", buildJsonObject {
         put("findings", JsonArray(result.findings.map(::JsonPrimitive)))
         put("changed", result.changed)
-        put("open_todos", state.todos.count { it.status == "pending" || it.status == "in_progress" })
-        state.goal?.status?.let { put("goal_status", it) }
+        put("open_todos", state.work.todos.count { it.status == "pending" || it.status == "in_progress" })
+        state.work.goal?.status?.let { put("goal_status", it) }
     })
 }
