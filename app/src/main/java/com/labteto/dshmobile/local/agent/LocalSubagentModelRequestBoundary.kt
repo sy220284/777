@@ -1,55 +1,45 @@
 package com.labteto.dshmobile.local.agent
 
-import com.labteto.dshmobile.harness.resource.HarnessResourceKind
-import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
+import com.labteto.dshmobile.local.LocalAgentModelRequestRuntime
 import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.LocalModelReply
+import com.labteto.dshmobile.local.LocalRunModelSurface
 import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.executeWithModelAdmission
-import com.labteto.dshmobile.local.routeFingerprint
-import com.labteto.dshmobile.local.model.LocalModelGateway
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
 /** Owns one admitted subagent provider call and its model-request resource lease. */
 internal class LocalSubagentModelRequestBoundary(
-    private val modelGateway: LocalModelGateway,
-    private val resourceScheduler: HarnessResourceScheduler,
+    private val requestRuntime: LocalAgentModelRequestRuntime,
     private val eventLog: () -> LocalSessionEventLog,
     private val executionControl: LocalWorkExecutionControl?,
 ) {
     suspend fun complete(
-        profile: LocalModelProfile,
-        model: String,
-        baseUrl: String,
+        surface: LocalRunModelSurface,
         messages: List<JsonObject>,
         tools: JsonArray,
         subagentId: String,
         step: Int,
     ): LocalModelReply = executeWithModelAdmission(
         control = executionControl,
-        routeFingerprint = profile.routeFingerprint(),
-        model = model,
-        baseUrl = baseUrl,
-        contextWindowTokensOverride = profile.contextWindowTokensOverride,
+        routeFingerprint = surface.routeFingerprint,
+        model = surface.model,
+        baseUrl = surface.baseUrl,
+        contextWindowTokensOverride = surface.contextWindowTokensOverride,
         messages = messages,
         tools = tools,
     ) {
-        resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-            try {
-                modelGateway.complete(
-                    profile = profile,
-                    model = model,
-                    baseUrl = baseUrl,
-                    messages = messages,
-                    tools = tools,
-                )
-            } catch (error: LocalModelException) {
-                logSubagentProviderError(eventLog(), subagentId, step, error)
-                throw error
-            }
+        try {
+            requestRuntime.complete(
+                surface = surface,
+                messages = messages,
+                tools = tools,
+            )
+        } catch (error: LocalModelException) {
+            logSubagentProviderError(eventLog(), subagentId, step, error)
+            throw error
         }
     }
 }
