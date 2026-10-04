@@ -202,4 +202,3 @@ class PersonaSchemaMigrationTest {
         PersonaSchemaMigration.decodeShare(json, """{"schema":"1","persona":{"name":"阿青","identity":"旧身份"}}""")
     }
 }
-

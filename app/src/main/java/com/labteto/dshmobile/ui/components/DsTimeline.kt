@@ -1,13 +1,9 @@
 package com.labteto.dshmobile.ui.components
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,6 +16,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import com.labteto.dshmobile.R
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -37,7 +35,8 @@ data class DsTimelineItem(
  * Clear Realm vertical timeline.
  *
  * The connector provides order, the semantic dot provides state, and text stays container-less.
- * The rail follows the measured row height so long summaries and large text never break the line.
+ * The rail draws against the row's final measured height, keeping long summaries and large text
+ * continuous without an intrinsic-measurement pass.
  * Only a live running node animates through [StateDot]; settled history is completely still.
  */
 @Composable
@@ -58,41 +57,36 @@ fun DsTimeline(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(IntrinsicSize.Min)
-                    .semantics(mergeDescendants = true) { stateDescription = statusLabel },
-                verticalAlignment = Alignment.Top,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(18.dp)
-                        .fillMaxHeight(),
-                ) {
-                    Canvas(Modifier.fillMaxSize()) {
-                        val centerX = size.width / 2f
+                    .drawBehind {
+                        val centerX = 9.dp.toPx()
                         val dotCenterY = 12.5.dp.toPx()
                         val stroke = 1.5.dp.toPx()
                         if (index > 0) {
                             drawLine(
                                 color = colors.borderL2,
-                                start = androidx.compose.ui.geometry.Offset(centerX, 0f),
-                                end = androidx.compose.ui.geometry.Offset(centerX, dotCenterY),
+                                start = Offset(centerX, 0f),
+                                end = Offset(centerX, dotCenterY),
                                 strokeWidth = stroke,
                             )
                         }
                         if (index < items.lastIndex) {
                             drawLine(
                                 color = colors.borderL2,
-                                start = androidx.compose.ui.geometry.Offset(centerX, dotCenterY),
-                                end = androidx.compose.ui.geometry.Offset(centerX, size.height),
+                                start = Offset(centerX, dotCenterY),
+                                end = Offset(centerX, size.height),
                                 strokeWidth = stroke,
                             )
                         }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 8.dp),
-                    ) {
+                    }.semantics(mergeDescendants = true) { stateDescription = statusLabel },
+                verticalAlignment = Alignment.Top,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(18.dp)
+                        .height(25.dp),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    Box(Modifier.padding(top = 8.dp)) {
                         StateDot(
                             state = when (item.state) {
                                 DsStatus.Running -> StateDotState.Running
@@ -129,4 +123,3 @@ fun DsTimeline(
         }
     }
 }
-

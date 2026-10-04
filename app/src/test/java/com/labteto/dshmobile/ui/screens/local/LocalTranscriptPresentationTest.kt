@@ -300,4 +300,3 @@ class LocalTranscriptPresentationTest {
         assertEquals(DsStatus.Done, workProcessStatus(nodes, running = false))
     }
 }
-

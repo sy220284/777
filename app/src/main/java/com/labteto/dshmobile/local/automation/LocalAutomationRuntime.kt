@@ -12,9 +12,10 @@ import javax.inject.Singleton
 class LocalAutomationRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
 ) {
-    internal val planningRevisions = engine.state.map { it.toAutomationPlanningRevision() }.distinctUntilChanged()
+    private val runtimeState = engine.state
+    internal val planningRevisions = runtimeState.map { it.toAutomationPlanningRevision() }.distinctUntilChanged()
     internal fun planningContext(): AutomationPlanningContext {
-        val snapshot = engine.state.value
+        val snapshot = runtimeState.value
         return AutomationPlanningContext(
             sessionId = snapshot.sessionId,
             revision = snapshot.toAutomationPlanningRevision(),
@@ -35,7 +36,7 @@ class LocalAutomationRuntime @Inject constructor(
         )
     }
     internal fun planningRevision(): AutomationPlanningRevision =
-        engine.state.value.toAutomationPlanningRevision()
+        runtimeState.value.toAutomationPlanningRevision()
     internal suspend fun runPrompt(text: String, timeoutMillis: Long = 5 * 60_000L): String =
         engine.runAutomationPrompt(text, timeoutMillis)
     internal suspend fun prepareWorkSession(text: String, preferredSessionId: String? = null): String =
@@ -74,4 +75,3 @@ class LocalAutomationRuntime @Inject constructor(
         silenceReferenceAt, bypassProactivePolicy,
     )
 }
-

@@ -232,7 +232,6 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - VirtualDisplay 资源隔离。
 - Runtime / APK 布局和实际执行。
 
-
 ### 多模型协议运行时
 
 专项验证必须用同一组语义契约覆盖所有已注册协议，而不是只验证“请求能返回文本”：
@@ -340,7 +339,6 @@ current main + current PR head
 - 官方旧 Sonnet 型号迁移保持 profile id 和凭据归属，代理自定义型号不改写。
 
 - 官方 Vision 文档：https://platform.claude.com/docs/en/build-with-claude/vision；直连 API 与 Bedrock/Google Cloud 的图片限额分别处理，不混用 5 MB 云平台限制。
-
 
 ### 本轮审计修复回归
 

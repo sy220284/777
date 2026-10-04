@@ -621,8 +621,7 @@ internal class LocalGroupChatTurnExecutor(
             val turnId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId
             var currentGroup = snapshot.groupChat
             var deliveredReplies = 0
-            val failedMembers = currentGroup.failedReplyMemberIds
-                .filterNot { id -> responders.any { it.galleryId == id } }.toMutableList()
+            val delivery = GroupReplyDeliveryLedger(snapshot.sessionId, currentGroup.failedReplyMemberIds, responders.map { it.galleryId }, _state, ::persistNow)
             val repliesForStateUpdate = mutableListOf<GroupReplyForStateUpdate>()
             val baseHistory = boundedGroupChatRequestHistory(modelHistory.snapshot())
 
@@ -654,18 +653,13 @@ internal class LocalGroupChatTurnExecutor(
 
                     val generated = deferred.await()
                     generated.failure?.let { failure ->
-                        failedMembers += generated.member.galleryId
+                        currentGroup = delivery.fail(generated.member.galleryId, currentGroup)
                         eventLog.append("group/agent-failed", buildJsonObject {
                             put("gallery_id", generated.member.galleryId)
                             put("persona_id", generated.member.personaId)
                             put("detail", failure.message.orEmpty().take(1_000))
                         })
                         if (responders.size == 1) {
-                            currentGroup = currentGroup.copy(failedReplyMemberIds = failedMembers.distinct())
-                            _state.update { current ->
-                                if (current.sessionId == snapshot.sessionId) current.copy(groupChat = currentGroup) else current
-                            }
-                            persistNow()
                             throw (failure as? Exception
                                 ?: IllegalStateException(failure.message ?: "群聊角色回复失败", failure))
                         }
@@ -674,7 +668,7 @@ internal class LocalGroupChatTurnExecutor(
 
                     val content = generated.content
                     if (content.isBlank() || content == GROUP_CHAT_SILENT_TOKEN) {
-                        failedMembers += generated.member.galleryId
+                        currentGroup = delivery.fail(generated.member.galleryId, currentGroup)
                         eventLog.append("group/agent-empty", buildJsonObject {
                             put("gallery_id", generated.member.galleryId)
                             put("persona_id", generated.member.personaId)
@@ -764,11 +758,7 @@ internal class LocalGroupChatTurnExecutor(
                 }
             }
 
-            currentGroup = currentGroup.copy(failedReplyMemberIds = failedMembers.distinct())
-            _state.update { current ->
-                if (current.sessionId == snapshot.sessionId) current.copy(groupChat = currentGroup) else current
-            }
-            persistNow()
+            currentGroup = delivery.publish(currentGroup)
             require(deliveredReplies > 0) { "群聊角色这一轮都没有给出可用回复" }
 
             val sharedPendingForRefresh = currentGroup.context.loadPendingBatch(
@@ -826,13 +816,7 @@ internal class LocalGroupChatTurnExecutor(
                 }
             }
 
-            eventLog.append("turn/end", buildJsonObject {
-                put("reason", "completed")
-                put("mode", "group-chat")
-                put("replies", deliveredReplies)
-                put("partial_success", failedMembers.isNotEmpty())
-                put("failed_members", kotlinx.serialization.json.JsonArray(failedMembers.map { kotlinx.serialization.json.JsonPrimitive(it) }))
-            })
+            delivery.recordCompletedOutcome(eventLog, deliveredReplies)
             if (hasChatBranchAlternatives(_state.value.chatBranches)) {
                 persistChatBranchState("group/branch-completed")
             }

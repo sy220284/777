@@ -91,7 +91,6 @@ Work 的计划、待办和目标变更由 `local.work.LocalWorkProgressCoordinat
 
 The Engine has CI-enforced line, dependency and public-surface ratchets. New responsibilities must move outward rather than expanding the central orchestration surface.
 
-
 ### Model accounts and transport
 
 本机模型运行时把账户、路由、通用语义和供应商线协议拆成独立边界：
@@ -284,7 +283,6 @@ See [AGENTS.md](../AGENTS.md) for repository-wide engineering and merge rules.
 
 The request-time pending window retains at most 64 turns with 4,000 characters per message. Full pending facts are persisted as `chat/pending-turn` events before eviction; consolidation reads paged events after the processed cursor and selects the oldest unfinished batch with bounded memory. Direct, proactive and group chat use the same store with separate scopes. Legacy active queues are archived before bounding. Continuations copy unfinished facts in bounded batches into the new session log and assign its sequences; old processed cursors are reset. Imported prefix facts remain available across branches in the new conversation. Branch restoration filters archived facts by active message ids when alternatives exist. A consolidation commit preserves newer pending turns and deterministic scene updates and rejects competing cursor changes.
 
-
 ### 人物生命运行时 V3
 
 Chat 人物运行时采用“稳定人物底色 → 独立生活/记忆/关系状态 → 本轮注意力 → 动态模式 → 最终对话”的单一路径。`PersonaProfile` 只保存少量长期人物资料，不保存固定思维/行为/表达模板；`ChatCharacterState` 保存会话内状态和可持续演变；请求时由 `CharacterRuntimeProjector` 统一投影给单聊、群聊和主动互动，禁止各入口维护平行人物 Prompt。
@@ -299,7 +297,6 @@ Chat 人物运行时采用“稳定人物底色 → 独立生活/记忆/关系�
 Token 预算在投影层硬限制：稳定人物前缀最多 520 Token，本轮“此刻”最多 230 Token，本轮动态模式最多 330 Token；硬事实、明确边界与用户纠正优先于模式细节保留。长期事实单独封顶 500 Token，人物日记封顶 800 Token。普通闲聊默认不召回日记，轻相关最多 1 条，明确回忆请求最多 3 条。人物日记、生活流与模式投影均复用现有模型回合，不增加独立模型调用。
 
 角色回复最终仍经过已有字面风格过滤与重复守卫，并增加 `CharacterReplyAnomalyGuard`。异常守卫只对绑定人物启用，只做高置信度、最小结构修复（解释式标题、过度罗列、连续重复等）；正常文本不重写，检测到但无法安全自动修复的结构只记录诊断。
-
 
 ### 审计修复边界
 

@@ -446,4 +446,3 @@ internal data class LegacyPersonaArchiveEnvelopeV2(
     val entry: LegacyPersonaGalleryEntryV4,
     val memorySummaries: List<PersonaTransferMemorySummary> = emptyList(),
 )
-

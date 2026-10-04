@@ -568,4 +568,3 @@ internal fun CompactPersonaRow(
         }
     }
 }
-

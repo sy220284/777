@@ -327,4 +327,3 @@ internal fun WorkProcessRow(
 private fun toolResultFailed(content: String): Boolean =
     "工具执行失败" in content || "[TOOL_TIMEOUT]" in content || "[MODEL_TIMEOUT]" in content ||
         "[NETWORK_ERROR]" in content || "[DNS_FAILED]" in content || "[SSRF_BLOCKED]" in content
-
