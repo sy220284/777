@@ -174,6 +174,29 @@ class PersonaTransferDocumentsTest {
     }
 
     @Test
+    fun archivePreparationDoesNotMutateGalleryBeforeCommit() {
+        val target = ChatPersonaGalleryStore(File(temporary.root, "prepared-target.json"), json)
+        val document = PersonaTransferDocuments.encode(
+            json = json,
+            entry = sampleEntry(),
+            format = PersonaTransferFormat.JSON,
+            diaryEntries = sampleDiaryEntries(),
+        )
+
+        val prepared = target.preparePersonaDocumentImport(
+            bytes = document.bytes,
+            fileName = "小岚.persona.json",
+            mimeType = "application/json",
+        )
+
+        assertTrue(target.list().isEmpty())
+        assertTrue(prepared is PersonaGalleryPreparedImport.Archive)
+        val committed = target.commitPersonaDocumentImport(prepared)
+        assertEquals("小岚", committed.persona.name)
+        assertEquals(1, target.list().size)
+    }
+
+    @Test
     fun currentPersonaShareJsonImportsWithoutStories() {
         val source = ChatPersonaGalleryStore(
             File(temporary.root, "legacy-source.json"),
