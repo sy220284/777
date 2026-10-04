@@ -120,6 +120,7 @@ internal class LocalModelRequestCoordinator(
                 previousPressure = previousSourcePressure,
                 structuredWorkState = structuredWorkState(snapshot, log),
                 cachePolicy = cachePolicy,
+                allowSemanticProjection = step <= 1,
             )
         } else {
             LocalWorkRequestProjection(
