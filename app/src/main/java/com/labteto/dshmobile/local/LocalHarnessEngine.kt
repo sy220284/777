@@ -3139,11 +3139,7 @@ class LocalHarnessEngine @Inject constructor(
                 } else {
                     reply
                 }
-                val deliveryReply = guardWorkCompletionDelivery(
-                    effectiveReply,
-                    runState.value,
-                    runEventLog,
-                )
+                val deliveryReply = guardWorkCompletionDelivery(effectiveReply, runState.value, runEventLog)
                 modelStep += 1
                 repliesByStep[modelStep] = deliveryReply
                 AgentModelReply(
