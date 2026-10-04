@@ -244,6 +244,11 @@ internal fun parseAutomationPlan(
     sourceSessionId: String,
     sourceRevision: AutomationPlanningRevision = AutomationPlanningRevision(
         sessionId = sourceSessionId,
+        usageMode = LocalUsageMode.CHAT,
+        groupChatEnabled = false,
+        personaId = "",
+        galleryId = null,
+        galleryStoryId = null,
         latestDialogueMessageId = null,
         chatContextGeneration = 0L,
     ),
