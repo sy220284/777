@@ -560,15 +560,17 @@ internal class LocalGroupChatTurnExecutor(
     ) {
         _state.update {
             it.copy(
-                running = true,
+                kernel = it.kernel.copy(running = true),
+                work = it.work.copy(
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                ),
                 error = null,
                 chat = it.chat.copy(
                     replySuggestions = emptyList(),
                     groupActiveSpeakerName = null,
                 ),
                 deviceApprovalLease = false,
-                pendingApproval = null,
-                pendingQuestion = null,
             )
         }
         try {
@@ -856,10 +858,12 @@ internal class LocalGroupChatTurnExecutor(
         } finally {
             _state.update {
                 it.copy(
-                    running = false,
+                    kernel = it.kernel.copy(running = false),
+                    work = it.work.copy(
+                        pendingApproval = null,
+                        pendingQuestion = null,
+                    ),
                     chat = it.chat.copy(groupActiveSpeakerName = null),
-                    pendingApproval = null,
-                    pendingQuestion = null,
                     deviceApprovalLease = false,
                 )
             }
