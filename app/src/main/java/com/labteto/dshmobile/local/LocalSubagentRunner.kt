@@ -293,14 +293,13 @@ internal class LocalSubagentRunner(
                         routeModel,
                     )
                     val nativeImagesSent = hasMaterializedImageUrls(preparedHistory)
-                    val stepTools = modelToolStepSurface.capture(
-                        runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools)),
-                    )
                     val reply = try {
                         modelStepExecutor.complete(
                             surface = runSurface,
                             history = preparedHistory,
-                            tools = stepTools,
+                            tools = modelToolStepSurface.capture(
+                                runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools)),
+                            ),
                             subagentId = subagentId,
                             step = modelStep,
                             durableHistory = history,
