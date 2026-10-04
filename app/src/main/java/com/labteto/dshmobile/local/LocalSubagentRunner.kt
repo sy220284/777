@@ -138,7 +138,10 @@ internal class LocalSubagentRunner(
                 "[subagent][$subagentId] ${error.message}", (error as? LocalModelException)?.code ?: "NO_MODEL_CREDENTIAL")
         }
         val runSurface = runProfile.toRunModelSurface()
-        val snapshot = state.value.copy(model = runSurface.model, baseUrl = runSurface.baseUrl)
+        val current = state.value
+        val snapshot = current.copy(
+            modelState = current.modelState.copy(model = runSurface.model, baseUrl = runSurface.baseUrl),
+        )
         val routeModel = runSurface.model
         val runHistoryBudget = historyBudget?.invoke(runProfile)
         val runCachePolicy = runSurface.promptCachePolicy
