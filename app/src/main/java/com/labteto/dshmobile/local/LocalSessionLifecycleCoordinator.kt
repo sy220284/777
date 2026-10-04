@@ -22,6 +22,7 @@ import com.labteto.dshmobile.local.chat.findEstablishedGroupChatSession
 import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
 import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.local.work.LocalWorkState
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
@@ -307,10 +308,7 @@ internal class LocalSessionLifecycleCoordinator(
                             handoffSummary = handoff,
                             messages = emptyList(),
                             transcriptIndex = LocalTranscriptRuntimeIndex(),
-                            plan = emptyList(),
-                            todos = emptyList(),
-                            goal = null,
-                            planMode = false,
+                            work = LocalWorkState(),
                             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
                             deviceApprovalLease = false,
                             jobs = projectExecutionJobs(usageMode, nextSessionId, jobs.snapshotInfos()),
@@ -499,11 +497,11 @@ internal class LocalSessionLifecycleCoordinator(
     private fun buildHandoffSummary(snapshot: LocalHarnessState): String =
         handoffBuilder.build(
             HandoffState(
-                goal = snapshot.goal?.let { goal ->
+                goal = snapshot.work.goal?.let { goal ->
                     HandoffGoal(goal.status, goal.description)
                 },
-                plan = snapshot.plan,
-                todos = snapshot.todos.map { todo ->
+                plan = snapshot.work.plan,
+                todos = snapshot.work.todos.map { todo ->
                     HandoffTodo(todo.status, todo.content)
                 },
                 messages = snapshot.messages.map { message ->
