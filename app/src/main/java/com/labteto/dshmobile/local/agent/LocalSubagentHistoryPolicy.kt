@@ -28,6 +28,36 @@ internal class LocalSubagentHistoryPolicy(
             "\n[已从模型上下文省略 ${retained.omittedBytes} 个 UTF-8 字节；$recovery]"
     }
 
+    fun compactBeforeModelStep(
+        history: LocalModelHistoryBuffer,
+        subagentId: String,
+        completedModelSteps: Int,
+        baseBudget: LocalHistoryBudget?,
+        cachePolicy: LocalPromptCachePolicy,
+    ) {
+        if (!shouldProactivelyCompactBeforeModelStep(LocalUsageMode.WORK, completedModelSteps)) return
+        compactHistory(
+            history,
+            subagentId,
+            baseBudget?.let {
+                workSteadyStateHistoryBudget(it, history.estimatedTokens, cachePolicy = cachePolicy)
+            },
+        )
+    }
+
+    fun compactAtTurnBoundary(
+        history: LocalModelHistoryBuffer,
+        subagentId: String,
+        baseBudget: LocalHistoryBudget?,
+        cachePolicy: LocalPromptCachePolicy,
+    ) = compactHistory(
+        history,
+        subagentId,
+        baseBudget?.let {
+            workSteadyStateHistoryBudget(it, history.estimatedTokens, cachePolicy = cachePolicy)
+        },
+    )
+
     fun compactHistory(
         history: LocalModelHistoryBuffer,
         subagentId: String,
