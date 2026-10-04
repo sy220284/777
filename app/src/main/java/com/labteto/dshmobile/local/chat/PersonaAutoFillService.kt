@@ -338,6 +338,7 @@ class PersonaAutoFillService @Inject constructor(
         val raw = reply.content?.trim().orEmpty()
         if (raw.isBlank()) error("模型没有返回可用的人设")
 
+        var draftSource = raw
         var draft = runCatching { parsePersonaDraft(json, raw) }.getOrElse { firstCause ->
             val repairMessages = listOf(
                 buildJsonObject {
@@ -384,6 +385,8 @@ class PersonaAutoFillService @Inject constructor(
             runCatching { parsePersonaDraft(json, repairedRaw) }.getOrElse { repairedCause ->
                 repairedCause.addSuppressed(firstCause)
                 throw IllegalStateException("AI 返回的人设格式无法解析，请再试一次", repairedCause)
+            }.also {
+                draftSource = repairedRaw
             }
         }
 
@@ -403,7 +406,7 @@ class PersonaAutoFillService @Inject constructor(
                             immersionViolations.forEach { appendLine("- $it") }
                             appendLine()
                             appendLine("原始角色卡：")
-                            append(raw.take(MAX_REPAIR_CHARS))
+                            append(draftSource.take(MAX_REPAIR_CHARS))
                         },
                     )
                 },
