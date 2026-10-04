@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.AgentToolCall
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 internal data class LocalPendingToolSettlement(
     val call: AgentToolCall,
@@ -24,3 +26,18 @@ internal fun pendingToolSettlements(
                 started = call.id in startedCallIds,
             )
         }
+
+
+/** Returns calls whose executor actually started after the current step boundary. */
+internal fun startedToolCallIdsForActiveStep(
+    eventLog: LocalSessionEventLog,
+    calls: List<AgentToolCall>,
+): Set<String> {
+    val stepStartSequence = eventLog.latest("step/start")?.sequence ?: -1L
+    return calls.mapNotNull { call ->
+        val started = eventLog.latestMatching(setOf("tool/execution-started")) { data ->
+            data["id"]?.jsonPrimitive?.contentOrNull == call.id
+        }
+        call.id.takeIf { started != null && started.sequence > stepStartSequence }
+    }.toSet()
+}
