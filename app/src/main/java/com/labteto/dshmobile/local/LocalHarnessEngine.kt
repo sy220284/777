@@ -6,7 +6,6 @@ import com.labteto.dshmobile.local.work.recordWorkCompletionQuality
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendResult
-import com.labteto.dshmobile.local.send.coordinateLocalSend
 import com.labteto.dshmobile.local.send.prepareLocalSend
 import android.app.ActivityManager
 import android.content.Context
@@ -589,6 +588,9 @@ class LocalHarnessEngine @Inject constructor(
                     boundState = boundState,
                     onApprovalBlocked = onApprovalBlocked,
                 )
+            },
+            onSessionReleased = { sessionId ->
+                if (currentSessionId == sessionId && _state.value.sessionId == sessionId) startNextQueuedTurnIfIdle()?.start()
             },
         )
     }
@@ -1608,11 +1610,14 @@ class LocalHarnessEngine @Inject constructor(
             } else null
             val targetPending = binding?.pendingInputs ?: pendingInputs
             val targetState = binding?.state ?: _state
-            val activeRun = binding != null || (state.usageMode != LocalUsageMode.WORK && activeJob?.isCompleted == false)
             val queuedInput = QueuedAgentInput(content, memoryInput, modelMessage, UUID.randomUUID().toString())
-            coordinateLocalSend(
-                state.configured, state.loading, sessionTransitioning, activeRun,
-                targetPending.size(), MAX_PENDING_INPUTS,
+            coordinateOwnedLocalSend(
+                state.usageMode, state.sessionId,
+                workBindingActive = binding != null,
+                visibleJobActive = activeJob?.isCompleted == false,
+                configured = state.configured, loading = state.loading,
+                sessionTransitioning = sessionTransitioning,
+                pendingCount = targetPending.size(), pendingLimit = MAX_PENDING_INPUTS,
                 onRejected = { rejected ->
                     _sendFeedbackState.value = LocalSendFeedbackState(
                         sessionId = state.sessionId,
@@ -1630,29 +1635,48 @@ class LocalHarnessEngine @Inject constructor(
                     targetState.update { it.copy(queuedInputCount = targetPending.size(), error = null) }
                     if (binding != null) persist(binding) else persist()
                 },
-                onStart = {
+                onStart = { reservedWorkLease ->
                     job = if (state.usageMode == LocalUsageMode.WORK) {
-                        queueWorkTurnLocked(content, memoryInput, modelMessage)
-                    } else queueTurnLocked(content, memoryInput, modelMessage)
+                        queueWorkTurnLocked(
+                            content, memoryInput, modelMessage,
+                            requireNotNull(reservedWorkLease) { "Work 启动前必须持有会话运行时租约" },
+                        )
+                    } else {
+                        queueTurnLocked(content, memoryInput, modelMessage)
+                    }
                 },
             )
         }
         job?.start()
         return result
     }
-
     private fun queueWorkTurnLocked(
         content: String,
         memoryInput: String,
         modelMessage: JsonObject?,
+        sessionLease: LocalSessionRuntimeLease,
+        resumedInput: QueuedAgentInput? = null,
     ): Job? {
         val sessionId = currentSessionId
         val durableMessage = modelMessage ?: buildJsonObject {
             put("role", "user")
             put("content", content)
         }
-        val sourceMessageId = recordUserTranscript(content, durableMessage, queued = false)
+        val sourceMessageId = resumedInput?.id
+            ?: recordUserTranscript(content, durableMessage, queued = false)
         appendUserToModelHistory(durableMessage)
+        resumedInput?.let { resumed ->
+            _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
+            eventLog.append(
+                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent(
+                    action = "resumed",
+                    pending = pendingInputs.snapshot(),
+                    affected = listOf(resumed),
+                    modelMessages = listOf(durableMessage),
+                ),
+            )
+        }
         persist()
 
         val binding = LocalWorkRunBinding(
@@ -1667,7 +1691,7 @@ class LocalHarnessEngine @Inject constructor(
         activeWorkRuns[sessionId] = binding
         binding.mirrorJob = scope.launch {
             binding.state.collect {
-                mirrorWorkRunState(binding)
+                mirrorLocalWorkRunState(currentSessionId, _state, binding)
             }
         }
         val job = scope.launch(start = CoroutineStart.LAZY) {
@@ -1676,38 +1700,13 @@ class LocalHarnessEngine @Inject constructor(
                 memoryInput = memoryInput,
                 sourceMessageId = sourceMessageId,
                 binding = binding,
+                preownedLease = sessionLease,
             )
         }
         binding.job = job
         return job
     }
 
-    private fun mirrorWorkRunState(binding: LocalWorkRunBinding) {
-        if (currentSessionId != binding.sessionId || _state.value.sessionId != binding.sessionId) return
-        val run = binding.state.value
-        _state.update { visible ->
-            if (visible.sessionId != binding.sessionId) {
-                visible
-            } else {
-                visible.copy(
-                    messages = run.messages,
-                    transcriptIndex = run.transcriptIndex,
-                    plan = run.plan,
-                    todos = run.todos,
-                    goal = run.goal,
-                    planMode = run.planMode,
-                    running = run.running,
-                    pendingApproval = run.pendingApproval,
-                    pendingQuestion = run.pendingQuestion,
-                    queuedInputCount = run.queuedInputCount,
-                    workflowProgress = run.workflowProgress,
-                    contextChars = run.contextChars,
-                    contextBudgetChars = run.contextBudgetChars,
-                    error = run.error,
-                )
-            }
-        }
-    }
 
     private fun syncVisibleWorkRun(
         sessionId: String,
@@ -2404,7 +2403,7 @@ class LocalHarnessEngine @Inject constructor(
             if (currentSessionId == binding.sessionId && _state.value.sessionId == binding.sessionId) {
                 modelHistory.reset(binding.modelHistory.snapshot())
                 transcriptProjectionCursor = binding.transcriptProjectionCursor
-                mirrorWorkRunState(binding)
+                mirrorLocalWorkRunState(currentSessionId, _state, binding)
             }
             return@synchronized null
         }
@@ -2446,26 +2445,46 @@ class LocalHarnessEngine @Inject constructor(
                 liveWorkOwner = liveWorkOwner,
             )
         ) return@synchronized null
-        val next = pendingInputs.poll() ?: return@synchronized null
-        val durableMessage = next.modelMessage ?: buildJsonObject {
-            put("role", "user")
-            put("content", next.content)
+
+        val workLease = if (_state.value.usageMode == LocalUsageMode.WORK) {
+            LocalSessionRuntimeRegistry.tryAcquire(
+                currentSessionId,
+                LocalSessionRuntimeKind.FOREGROUND,
+            ) ?: return@synchronized null
+        } else {
+            null
         }
-        _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
-        appendUserToModelHistory(durableMessage)
-        eventLog.append(
-            LOCAL_AGENT_INBOX_EVENT_TYPE,
-            encodeLocalAgentInboxEvent(
-                action = "resumed",
-                pending = pendingInputs.snapshot(),
-                affected = listOf(next),
-                modelMessages = listOf(durableMessage),
-            ),
-        )
-        persist()
-        scope.launch(start = CoroutineStart.LAZY) {
-            runTurn(next.content, next.memoryInput, next.id)
-        }.also { activeJob = it }
+        val next = pendingInputs.poll()
+        if (next == null) {
+            workLease?.close()
+            return@synchronized null
+        }
+        if (_state.value.usageMode == LocalUsageMode.WORK) {
+            queueWorkTurnLocked(
+                next.content, next.memoryInput, next.modelMessage,
+                requireNotNull(workLease), resumedInput = next,
+            )
+        } else {
+            val durableMessage = next.modelMessage ?: buildJsonObject {
+                put("role", "user")
+                put("content", next.content)
+            }
+            _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
+            appendUserToModelHistory(durableMessage)
+            eventLog.append(
+                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent(
+                    action = "resumed",
+                    pending = pendingInputs.snapshot(),
+                    affected = listOf(next),
+                    modelMessages = listOf(durableMessage),
+                ),
+            )
+            persist()
+            scope.launch(start = CoroutineStart.LAZY) {
+                runTurn(next.content, next.memoryInput, next.id)
+            }.also { activeJob = it }
+        }
     }
 
     /** Switch between inspection-only planning and normal execution. */
@@ -2889,7 +2908,12 @@ class LocalHarnessEngine @Inject constructor(
         memoryInput: String = input,
         sourceMessageId: String? = null,
         binding: LocalWorkRunBinding? = null,
-    ) = LocalSessionRuntimeRegistry.withOwner(binding?.sessionId ?: currentSessionId, LocalSessionRuntimeKind.FOREGROUND) { ownedSessionId ->
+        preownedLease: LocalSessionRuntimeLease? = null,
+    ) = LocalSessionRuntimeRegistry.withOwner(
+        binding?.sessionId ?: currentSessionId,
+        LocalSessionRuntimeKind.FOREGROUND,
+        preownedLease,
+    ) { ownedSessionId ->
         if (binding == null && currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
         val runState = binding?.state ?: _state
         val runEventLog = binding?.eventLog ?: eventLog

@@ -438,45 +438,57 @@ internal class LocalSessionLifecycleCoordinator(
                 }
                 cancelWorkRunsAndJoin(ids)
                 jobs.removeOwnedAndJoin(ids)
-                if (currentSessionId() in ids) {
-                    val previous = state.value
-                    val replacement = available.firstOrNull {
-                        it.id !in ids && it.usageMode == previous.usageMode
-                    } ?: available.firstOrNull { it.id !in ids }
-                    val nextSessionId = replacement?.id ?: UUID.randomUUID().toString()
-                    activateSession(nextSessionId, null)
-                    loadSession(nextSessionId)
-                    if (replacement == null) {
-                        state.update {
-                            it.copy(
-                                usageMode = previous.usageMode,
-                                personaId = previous.personaId,
-                                chatPersona = previous.chatPersona,
-                            )
+                // Hold the same per-session ownership used by foreground and Automation runs.
+                // This waits for an in-flight Automation owner and prevents a queued one from
+                // entering until durable deletion and the repository tombstone handoff finish.
+                val deletionLeases = LocalSessionRuntimeRegistry.acquireAll(
+                    ids,
+                    LocalSessionRuntimeKind.SESSION_DELETE,
+                )
+                try {
+                    if (currentSessionId() in ids) {
+                        val previous = state.value
+                        val replacement = available.firstOrNull {
+                            it.id !in ids && it.usageMode == previous.usageMode
+                        } ?: available.firstOrNull { it.id !in ids }
+                        val nextSessionId = replacement?.id ?: UUID.randomUUID().toString()
+                        activateSession(nextSessionId, null)
+                        loadSession(nextSessionId)
+                        if (replacement == null) {
+                            state.update {
+                                it.copy(
+                                    usageMode = previous.usageMode,
+                                    personaId = previous.personaId,
+                                    chatPersona = previous.chatPersona,
+                                )
+                            }
                         }
                     }
-                }
-                beforeEventLogsDeleted(ids)
-                withContext(Dispatchers.IO) {
-                    ids.forEach { id ->
-                        sessionCoordinator.delete(id)
-                        toolOutputStore.deleteSession(id)
-                        sessionsRoot.listFiles().orEmpty()
-                            .filter {
-                                it.name == "$id.events.jsonl" ||
-                                    it.name.startsWith("$id.events.jsonl.part-")
-                            }
-                            .forEach(File::delete)
+                    beforeEventLogsDeleted(ids)
+                    withContext(Dispatchers.IO) {
+                        ids.forEach { id ->
+                            sessionCoordinator.delete(id)
+                            toolOutputStore.deleteSession(id)
+                            sessionsRoot.listFiles().orEmpty()
+                                .filter {
+                                    it.name == "$id.events.jsonl" ||
+                                        it.name.startsWith("$id.events.jsonl.part-")
+                                }
+                                .forEach(File::delete)
+                        }
                     }
+                    conversationFilesCoordinator.invalidate(ids)
+                    memoryStore.detachSourceSessions(ids)
+                    diaryStore.detachSourceSessions(ids)
+                    // Every old producer is now outside the deletion barrier; once the tombstone is
+                    // released, future Automation runs must re-resolve the session from storage.
+                    sessionCoordinator.releaseDeletionBarrier(ids)
+                    state.update { it.copy(sessions = sessionSummaries()) }
+                    persist()
+                    ids.size
+                } finally {
+                    deletionLeases.asReversed().forEach(LocalSessionRuntimeLease::close)
                 }
-                conversationFilesCoordinator.invalidate(ids)
-                memoryStore.detachSourceSessions(ids)
-                diaryStore.detachSourceSessions(ids)
-                // All run/job producers are drained and the storage lock deletion has completed.
-                sessionCoordinator.releaseDeletionBarrier(ids)
-                state.update { it.copy(sessions = sessionSummaries()) }
-                persist()
-                ids.size
             }
         } finally {
             endTransition()

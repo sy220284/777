@@ -32,6 +32,7 @@ internal class LocalAutomationWorkCoordinator(
         boundState: LocalHarnessState,
         onApprovalBlocked: (String) -> Unit,
     ) -> LocalSubagentRunner,
+    private val onSessionReleased: (String) -> Unit = {},
 ) {
     suspend fun prepareWorkSession(
         text: String,
@@ -53,13 +54,12 @@ internal class LocalAutomationWorkCoordinator(
         require(prompt.isNotEmpty()) { "后台任务提示词不能为空" }
         awaitReady()
 
-        val session = resolveSession(preferredSessionId, prompt)
-        val sessionId = session.id
-        val sessionLease = LocalSessionRuntimeRegistry.acquire(
-            sessionId,
-            LocalSessionRuntimeKind.AUTOMATION_WORK,
-        )
+        val sessionId = resolveSession(preferredSessionId, prompt).id
+        val budget = LocalAutomationTimeoutBudget(timeoutMillis, 15 * 60_000L)
+        val sessionLease = budget.acquireSession(sessionId, LocalSessionRuntimeKind.AUTOMATION_WORK)
         try {
+        // Re-read after ownership so deletion cannot be undone by a stale preflight snapshot.
+        val session = requireAutomationWorkSession(sessionCoordinator.read(sessionId))
         val boundState = boundState(session)
         val boundEventLog = eventLogFor(sessionId)
         val recovery = if (recoverInterrupted) {
@@ -107,7 +107,7 @@ internal class LocalAutomationWorkCoordinator(
         }
 
         return try {
-            val result = withTimeout(timeoutMillis.coerceIn(5_000L, 15 * 60_000L)) {
+            val result = withTimeout(budget.remainingMillis()) {
                 val execute: suspend () -> LocalSubagentResult = {
                     runner.runResult(
                         task = executionTask,
@@ -168,6 +168,7 @@ internal class LocalAutomationWorkCoordinator(
         }
         } finally {
             sessionLease.close()
+            onSessionReleased(sessionId)
         }
     }
 

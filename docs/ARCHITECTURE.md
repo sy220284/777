@@ -87,7 +87,11 @@ New UI and worker code should enter through the relevant capability runtime inst
 
 Work 的计划、待办和目标变更由 `local.work.LocalWorkProgressCoordinator` 统一处理，包括输入规整、数量/长度上限、状态更新、事件 payload 和持久化调用顺序。Engine 只选择本次调用绑定的状态、事件日志和持久化回调；后台 Work 始终使用原 run 的会话，不跟随当前可见会话。
 
-Automation 的顶层执行使用两级所有权：`AutomationExecutionRegistry` 保证同一任务的定时触发与“立即运行”不能并发；`LocalSessionRuntimeRegistry` 统一串行化前台单聊、群聊、Work 和 Automation 的会话执行；普通会话加载跳过活跃事件尾恢复，活跃 owner 时禁止加载流程重写 checkpoint / session 持久结果。租约关闭和取消等待释放引用，空闲 entry 退出；前台 runId 的迟到提交栅栏仍由 `LocalAgentRunCoordinator` 管理。持久任务以 `scheduleGeneration` 作为提交权，修改、暂停或重排会推进 generation，旧 Worker 的成功、失败、通知与后续排程均不得覆盖新状态。Chat 用户活动持续记录 `lastUserActivityAt`，用于裁决 `waiting_user` 与用户回复的并发窗口。Automation 事件规划继续复用 Engine 唯一 `HarnessResourceScheduler` 的 `MODEL_REQUEST` 租约，不创建第二套资源调度事实源。
+Automation 的顶层执行使用两级所有权：`AutomationExecutionRegistry` 保证同一任务的定时触发与“立即运行”不能并发；租约冲突时“立即运行”保留为 WorkManager 重试，不能以成功状态静默丢弃。Worker 在抢任务租约前先校验 `scheduleGeneration`，拿到租约后再复核一次；修改、暂停或删除会取消旧 Worker，模型与工具边界在新副作用开始前及迟到结果提交前继续检查协程取消。已经发送到外部且不可逆的动作不声明可回滚，但取消后不得继续开启新的副作用或提交旧结果。
+
+`LocalSessionRuntimeRegistry` 统一串行化前台单聊、群聊、Work、Automation、维护写和会话删除。前台 Work 在用户消息落盘、模型历史捕获和 `LocalWorkRunBinding` 创建之前就原子预占 Session owner，并把同一租约交给整轮执行；Automation 占用时前台输入只进入持久队列，待 owner 释放后基于最新状态创建 binding。Automation Chat 与前台统一按“可见 turn → Session owner”的顺序取锁，等待 Session owner 的时间计入该次 Automation 总超时；主动消息在提交前复核本轮生成期间的用户消息/持久 inbox 序号，有新用户活动则丢弃旧上下文生成结果。会话删除使用 `SESSION_DELETE` owner 等待并封锁所有运行者，直到 Session、EventLog 和删除 tombstone 交接全部完成；Automation 拿到 owner 后必须重新读取 Session，不能使用等待前的旧快照复活已删除会话。
+
+普通会话加载跳过活跃事件尾恢复，活跃 owner 时禁止加载流程重写 checkpoint / session 持久结果；`submitWhenIdle` 通过单 Session 维护租约执行实际写入，不能在 Registry 全局 monitor 内执行 IO。前台 runId 的迟到提交栅栏仍由 `LocalAgentRunCoordinator` 管理。Chat 用户活动持续记录 `lastUserActivityAt`，用于裁决 `waiting_user` 与用户回复的并发窗口。Automation 事件规划继续复用 Engine 唯一 `HarnessResourceScheduler` 的 `MODEL_REQUEST` 租约，不创建第二套资源调度事实源。
 
 角色设置的确认保存由 `local.chat.LocalCharacterBehaviorTuningCoordinator` 编排：复用 Engine 的会话转换锁，检查会话和人物归属，等待人物、人物库与会话快照落盘后才返回成功。`CharacterBehaviorTuningPersistence` 只负责调节版本合并与持久副本收敛；单聊/群聊恢复不会借用默认人物的身份回写。界面保存锁按弹窗生命周期保持，不随初始值回显重置。
 
@@ -235,7 +239,7 @@ Important invariants:
 
 - historical reads use paging;
 - runtime transcript windows stay bounded;
-- foreground transcript paging uses user-visible dialogue as its quota; reasoning, tool, progress and system traffic stays inside the bounded runtime/event layer and cannot evict the user/assistant history the UI promises to show;
+- foreground transcript paging uses user-visible dialogue as its quota; reasoning, tool, progress and system traffic stays inside the bounded runtime/event layer and cannot evict the user/assistant history the UI promises to show; each bootstrap/older batch also has a total page/raw-message scan budget and preserves its cursor for later continuation when that budget is reached;
 - model-history writes go through the dedicated buffer;
 - tool output is bounded in model context, with recoverable spill storage where required;
 - streaming updates do not rebuild aggregate state;

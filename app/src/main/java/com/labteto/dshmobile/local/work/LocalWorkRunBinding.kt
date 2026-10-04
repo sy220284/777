@@ -102,3 +102,35 @@ internal fun projectJobSnapshotToSessionStates(
         }
     }
 }
+
+
+internal fun mirrorLocalWorkRunState(
+    currentSessionId: String,
+    visibleState: MutableStateFlow<LocalHarnessState>,
+    binding: LocalWorkRunBinding,
+) {
+    if (currentSessionId != binding.sessionId || visibleState.value.sessionId != binding.sessionId) return
+    val run = binding.state.value
+    visibleState.update { visible ->
+        if (visible.sessionId != binding.sessionId) {
+            visible
+        } else {
+            visible.copy(
+                messages = run.messages,
+                transcriptIndex = run.transcriptIndex,
+                plan = run.plan,
+                todos = run.todos,
+                goal = run.goal,
+                planMode = run.planMode,
+                running = run.running,
+                pendingApproval = run.pendingApproval,
+                pendingQuestion = run.pendingQuestion,
+                queuedInputCount = run.queuedInputCount,
+                workflowProgress = run.workflowProgress,
+                contextChars = run.contextChars,
+                contextBudgetChars = run.contextBudgetChars,
+                error = run.error,
+            )
+        }
+    }
+}

@@ -484,7 +484,7 @@
     <string name="tasks_mode_work">工作自动化</string>
     <string name="tasks_mode_chat">角色互动</string>
     <string name="tasks_chat_mode_unavailable">当前不在单人角色聊天中，只能查看已有互动任务。返回 Chat 模式并进入单人角色会话后即可新建。</string>
-    <string name="tasks_run_started">任务已开始执行</string>
+    <string name="tasks_run_started">任务已提交；若当前正在运行，会在其结束后继续执行</string>
     <string name="tasks_run_now_failed">任务当前无法立即执行</string>
     <string name="tasks_background_task">后台任务</string>
     <string name="tasks_once">一次性任务</string>

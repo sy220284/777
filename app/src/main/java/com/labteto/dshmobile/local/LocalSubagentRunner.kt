@@ -13,6 +13,7 @@ import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.*
@@ -268,9 +269,9 @@ internal class LocalSubagentRunner(
                 })
             }
             history.append(buildJsonObject { put("role", "user"); put("content", task) })
-
             val loop = AgentLoop(
                 model = AgentModel {
+                    currentCoroutineContext().ensureActive()
                     backgroundJobId?.let(jobs::drainMessages).orEmpty().forEach { message ->
                         history.append(buildJsonObject {
                             put("role", "user")
@@ -321,6 +322,7 @@ internal class LocalSubagentRunner(
                             throw error
                         }
                     }
+                    currentCoroutineContext().ensureActive()
                     val usageAction = if (runKind == LocalAgentRunKind.AUTOMATION) {
                         TokenUsageAction.AUTOMATION
                     } else {
@@ -352,7 +354,7 @@ internal class LocalSubagentRunner(
                     )
                 },
                 tools = AgentToolExecutor { call ->
-                    val virtualAllowed = virtualScreenId != null && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS
+                    currentCoroutineContext().ensureActive(); val virtualAllowed = virtualScreenId != null && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS
                     val requestedScreen = call.arguments["id"]?.jsonPrimitive?.contentOrNull
                     when {
                         !allowMutation && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS && !virtualAllowed ->
@@ -377,7 +379,9 @@ internal class LocalSubagentRunner(
                                 recoveryHint = "使用系统上下文中提供的虚拟屏 id。",
                             )
                         else -> withContext(LocalModelRunContext(runProfile)) {
+                            currentCoroutineContext().ensureActive()
                             execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
+                                .also { currentCoroutineContext().ensureActive() }
                         }
                     }
                 },
