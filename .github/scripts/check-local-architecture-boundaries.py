@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 ENGINE_MAX_PUBLIC_METHODS = 0
 ENGINE_MAX_INTERNAL_METHODS = 80
-ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 18
+ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
 
 HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
@@ -186,6 +186,8 @@ constructor = re.search(
 )
 if constructor is None:
     die("unable to locate LocalHarnessEngine constructor")
+if "private val settingsCoordinator: LocalHarnessSettingsCoordinator" in constructor.group(1):
+    die("LocalHarnessEngine must not depend on the Settings capability")
 dependency_count = len(re.findall(r"private val\s+[A-Za-z0-9_]+\s*:", constructor.group(1)))
 if dependency_count > ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES:
     die(
