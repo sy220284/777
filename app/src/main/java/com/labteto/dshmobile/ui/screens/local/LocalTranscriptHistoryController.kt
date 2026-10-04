@@ -40,7 +40,9 @@ internal class LocalTranscriptHistoryController(
         try {
             var olderMessages = emptyList<LocalHarnessMessage>()
             var pageCursor: LocalTranscriptPageCursor? = null
-            var nextCursor: LocalTranscriptPageCursor?
+            var nextCursor: LocalTranscriptPageCursor? = null
+            var needsMoreVisibleDialogue = true
+            var cursorAdvanced = true
 
             do {
                 val page = readPage(sessionId, pageCursor)
@@ -55,11 +57,11 @@ internal class LocalTranscriptHistoryController(
                 nextCursor = page.nextCursor
 
                 val visibleTranscript = mergeLocalTranscriptHistory(olderMessages, live)
-                val needsMoreVisibleDialogue = needsMoreUserVisibleDialogue(
+                needsMoreVisibleDialogue = needsMoreUserVisibleDialogue(
                     messages = visibleTranscript,
                     target = LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES,
                 )
-                val cursorAdvanced = nextCursor != pageCursor
+                cursorAdvanced = nextCursor != pageCursor
                 pageCursor = nextCursor
             } while (nextCursor != null && needsMoreVisibleDialogue && cursorAdvanced)
 
@@ -100,6 +102,8 @@ internal class LocalTranscriptHistoryController(
             val initialVisibleCount = userVisibleDialogueMessageCount(
                 mergeLocalTranscriptHistory(olderMessages, liveMessages()),
             )
+            var addedVisibleDialogue = 0
+            var cursorAdvanced = true
 
             do {
                 val requestedCursor = nextCursor
@@ -118,8 +122,8 @@ internal class LocalTranscriptHistoryController(
                 val visibleCount = userVisibleDialogueMessageCount(
                     mergeLocalTranscriptHistory(olderMessages, liveMessages()),
                 )
-                val addedVisibleDialogue = (visibleCount - initialVisibleCount).coerceAtLeast(0)
-                val cursorAdvanced = nextCursor != requestedCursor
+                addedVisibleDialogue = (visibleCount - initialVisibleCount).coerceAtLeast(0)
+                cursorAdvanced = nextCursor != requestedCursor
             } while (
                 nextCursor != null &&
                 addedVisibleDialogue < LOCAL_TRANSCRIPT_HISTORY_VISIBLE_DIALOGUE_BATCH_MESSAGES &&
