@@ -79,8 +79,7 @@ internal class LocalAutomationChatCoordinator(
         require(!initialSession.groupChat.enabled) { "群聊暂不支持定时角色互动" }
 
         val sessionLease = LocalSessionRuntimeRegistry.acquire(
-            targetSessionId,
-            LocalSessionRuntimeKind.AUTOMATION_CHAT,
+            targetSessionId, LocalSessionRuntimeKind.AUTOMATION_CHAT,
         )
         try {
         if (recoverInterrupted) {
@@ -502,9 +501,7 @@ internal class LocalAutomationChatCoordinator(
                 releaseVisibleTurn(targetSessionId, automationJob)
             }
         }
-        } finally {
-            sessionLease.close()
-        }
+        } finally { sessionLease.close() }
     }
 
     private suspend fun completeAutomationChat(
