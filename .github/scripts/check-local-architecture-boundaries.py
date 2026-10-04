@@ -481,6 +481,9 @@ automation_planning = strip_comments(
 automation_runtime = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt")
 )
+automation_session_transaction = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationSessionTransaction.kt")
+)
 automation_worker = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationWorker.kt")
 )
@@ -490,6 +493,15 @@ automation_settlement = strip_comments(
 session_event_log = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt")
 )
+session_runtime_registry = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntimeRegistry.kt")
+)
+session_lifecycle = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt")
+)
+transcript_history_loader = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryLoader.kt")
+)
 if "runtime.withModelRequestResource" not in automation_planning:
     die("Automation planning provider calls must use the Engine-owned model request resource lease")
 if "engine.withAutomationModelRequestResource(block)" not in automation_runtime:
@@ -498,10 +510,32 @@ if 'resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST, "automatio
     die("Automation planning must reuse the Engine-owned HarnessResourceScheduler")
 if "AutomationExecutionRegistry.tryAcquire(id)" not in automation_worker:
     die("Automation scheduled/manual execution must share one task runtime lease")
+if "AutomationExecutionRegistry.tryAcquire(id) ?: return Result.retry()" not in automation_worker:
+    die("Manual Automation execution must queue/retry on lease contention instead of reporting false success")
+generation_preflight = automation_worker.find("preflightTask.scheduleGeneration != requestedGeneration")
+task_lease_pos = automation_worker.find("AutomationExecutionRegistry.tryAcquire(id)")
+if generation_preflight < 0 or task_lease_pos < 0 or generation_preflight > task_lease_pos:
+    die("Stale Automation generations must be rejected before acquiring the task execution lease")
 if "predicate = { it.scheduleGeneration == requestedGeneration }" not in automation_settlement:
     die("Automation Worker terminal writes must be guarded by schedule generation")
 if "LocalSessionRuntimeRegistry::hasLiveOwner" not in session_event_log:
     die("Session crash-tail repair must respect live in-process session owners")
+if "LocalSessionRuntimeKind.SESSION_DELETE" not in session_lifecycle or ".acquireAll(" not in session_lifecycle:
+    die("Session deletion must hold runtime ownership until durable deletion is complete")
+visible_turn_pos = automation_session_transaction.find("acquireVisibleTurn(targetSessionId, automationJob)")
+session_owner_pos = automation_session_transaction.find("budget.acquireSession(targetSessionId, LocalSessionRuntimeKind.AUTOMATION_CHAT)")
+if visible_turn_pos < 0 or session_owner_pos < 0 or visible_turn_pos > session_owner_pos:
+    die("Automation Chat must acquire the visible turn before session ownership to preserve lock ordering")
+if "user_activity_during_generation" not in automation_session_transaction:
+    die("Automation Chat must reject a proactive reply when user activity arrives during generation")
+if "fun submitWhenIdle(" not in session_runtime_registry or "tryAcquire(sessionId, LocalSessionRuntimeKind.MAINTENANCE)" not in session_runtime_registry:
+    die("Load-time session maintenance must use a per-session lease outside the registry monitor")
+for budget_name in (
+    "LOCAL_TRANSCRIPT_HISTORY_MAX_PAGES_PER_LOAD",
+    "LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD",
+):
+    if budget_name not in transcript_history_loader:
+        die(f"Foreground transcript history must keep bounded total-load budget: {budget_name}")
 
 for helper_path in (
     "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaAutoFillService.kt",

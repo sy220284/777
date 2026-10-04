@@ -74,12 +74,13 @@ internal class LocalAutomationChatCoordinator(
         }
         require(state.value.configured) { "本机 Harness 尚未配置模型" }
 
-        val initialSession = sessionCoordinator.read(targetSessionId) ?: error("定时互动绑定的聊天已不存在")
-        require(initialSession.usageMode == LocalUsageMode.CHAT) { "定时互动只能绑定聊天模式会话" }
-        require(!initialSession.groupChat.enabled) { "群聊暂不支持定时角色互动" }
-
-        val sessionLease = LocalSessionRuntimeRegistry.acquire(targetSessionId, LocalSessionRuntimeKind.AUTOMATION_CHAT)
+        var initialSession = requireAutomationChatSession(sessionCoordinator.read(targetSessionId))
+        val budget = LocalAutomationTimeoutBudget(timeoutMillis, 10 * 60_000L)
+        val ownership = acquireAutomationChatOwnership(
+            targetSessionId, currentCoroutineContext()[Job], budget, acquireVisibleTurn, releaseVisibleTurn,
+        )
         try {
+        initialSession = requireAutomationChatSession(sessionCoordinator.read(targetSessionId))
         if (recoverInterrupted) {
             recoverAutomationChatOutput(
                 eventLog = eventLogFor(targetSessionId),
@@ -160,11 +161,7 @@ internal class LocalAutomationChatCoordinator(
             }
         }
 
-        val automationJob = currentCoroutineContext()[Job]
-        val ownsVisibleTurn = acquireVisibleTurn(targetSessionId, automationJob)
-
-        try {
-            return withTimeout(timeoutMillis.coerceIn(5_000L, 10 * 60_000L)) {
+        return withTimeout(budget.remainingMillis()) {
                 val session = sessionCoordinator.read(targetSessionId)
                     ?: error("定时互动绑定的聊天已不存在")
                 require(session.usageMode == LocalUsageMode.CHAT) { "目标会话已不在聊天模式" }
@@ -323,6 +320,8 @@ internal class LocalAutomationChatCoordinator(
                     put("proactive", true)
                     put("persona_id", persona.id)
                 })
+                val userActivitySequenceAtGenerationStart =
+                    boundEventLog.latestAutomationUserActivitySequence()
                 val rawReply = completeAutomationChat(
                     snapshot = boundState,
                     messages = requestMessages,
@@ -398,6 +397,10 @@ internal class LocalAutomationChatCoordinator(
                 )
                 content = reply.content.orEmpty().trim()
                 require(content.isNotEmpty()) { "角色主动消息连续性重写后为空" }
+
+                rejectStaleAutomationProactiveReply(
+                    boundEventLog, userActivitySequenceAtGenerationStart, session.id, persona.id,
+                )?.let { return@withTimeout it }
 
                 val proactiveMessage = LocalHarnessMessage(
                     id = java.util.UUID.randomUUID().toString(),
@@ -495,11 +498,8 @@ internal class LocalAutomationChatCoordinator(
                 LocalAutomationRunResult(sessionId = session.id, output = content)
             }
         } finally {
-            if (ownsVisibleTurn) {
-                releaseVisibleTurn(targetSessionId, automationJob)
-            }
+            ownership.close()
         }
-        } finally { sessionLease.close() }
     }
 
     private suspend fun completeAutomationChat(

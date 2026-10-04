@@ -127,4 +127,37 @@ class LocalSessionRuntimeRegistryTest {
         assertTrue(LocalSessionRuntimeRegistry.submitWhenIdle("load-write") { writes++ })
         assertEquals(1, writes)
     }
+    @Test
+    fun deletionOwnershipWaitsForAutomationAndBlocksNewOwners() = runTest {
+        val sessionId = "delete-owned-session"
+        val automation = LocalSessionRuntimeRegistry.acquire(
+            sessionId,
+            LocalSessionRuntimeKind.AUTOMATION_WORK,
+        )
+        var deletionLeases: List<LocalSessionRuntimeLease>? = null
+        val waiter = launch {
+            deletionLeases = LocalSessionRuntimeRegistry.acquireAll(
+                listOf(sessionId),
+                LocalSessionRuntimeKind.SESSION_DELETE,
+            )
+        }
+
+        runCurrent()
+        assertNull(deletionLeases)
+        automation.close()
+        waiter.join()
+
+        assertNotNull(deletionLeases)
+        assertTrue(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
+        assertNull(
+            LocalSessionRuntimeRegistry.tryAcquire(
+                sessionId,
+                LocalSessionRuntimeKind.AUTOMATION_CHAT,
+            ),
+        )
+
+        deletionLeases!!.asReversed().forEach(LocalSessionRuntimeLease::close)
+        assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
+    }
+
 }

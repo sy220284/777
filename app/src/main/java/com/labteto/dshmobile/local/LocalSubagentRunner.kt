@@ -13,6 +13,7 @@ import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.*
@@ -271,6 +272,7 @@ internal class LocalSubagentRunner(
 
             val loop = AgentLoop(
                 model = AgentModel {
+                    currentCoroutineContext().ensureActive()
                     backgroundJobId?.let(jobs::drainMessages).orEmpty().forEach { message ->
                         history.append(buildJsonObject {
                             put("role", "user")
@@ -321,6 +323,9 @@ internal class LocalSubagentRunner(
                             throw error
                         }
                     }
+                    // Provider transports may finish after WorkManager cancellation. Do not let a
+                    // stale generation turn that late reply into a new tool step or durable result.
+                    currentCoroutineContext().ensureActive()
                     val usageAction = if (runKind == LocalAgentRunKind.AUTOMATION) {
                         TokenUsageAction.AUTOMATION
                     } else {
@@ -352,6 +357,7 @@ internal class LocalSubagentRunner(
                     )
                 },
                 tools = AgentToolExecutor { call ->
+                    currentCoroutineContext().ensureActive()
                     val virtualAllowed = virtualScreenId != null && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS
                     val requestedScreen = call.arguments["id"]?.jsonPrimitive?.contentOrNull
                     when {
@@ -377,7 +383,12 @@ internal class LocalSubagentRunner(
                                 recoveryHint = "使用系统上下文中提供的虚拟屏 id。",
                             )
                         else -> withContext(LocalModelRunContext(runProfile)) {
-                            execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
+                            currentCoroutineContext().ensureActive()
+                            execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools).also {
+                                // Irreversible external effects cannot be rolled back, but a
+                                // cancelled/stale worker must not commit their late result locally.
+                                currentCoroutineContext().ensureActive()
+                            }
                         }
                     }
                 },

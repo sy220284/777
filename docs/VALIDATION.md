@@ -192,6 +192,13 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 
 ### 运行诊断与 Work 上下文
 
+- 同一 Session 的前台 Work、Automation Chat / Work、会话删除必须做对抗时序验证：前台 Work 在用户消息落盘和 binding 快照前取得 Session owner；Automation 占用时只允许持久排队；删除必须等待既有 Automation owner 并在 durable 删除完成前阻止新 owner 进入。
+- Automation Chat 必须保持“可见 turn → Session owner”的唯一锁顺序，并把可见 turn / Session owner 等待计入该次任务总超时；不得恢复反向取锁。
+- “立即运行”撞上同任务已有执行时必须保留为重试/排队，禁止返回成功但实际不执行；旧 `scheduleGeneration` 必须在抢任务执行租约前淘汰，拿到租约后再次复核。
+- Automation Worker 取消或 generation 失效后，模型和工具边界在开启下一次副作用前及迟到结果提交前都必须检查取消状态。已经发送到外部且不可逆的动作不声明可回滚，但不得继续开启新的副作用或把迟到结果提交到本地运行链。
+- 主动互动生成期间出现新的真实用户活动时，无论活动落在 `user/message` 还是持久 Agent inbox，本轮旧上下文生成结果都必须在助手消息落盘前作废。
+- 前台 transcript bootstrap / older batch 除单页大小外必须保留整个调用的页数与原始消息扫描预算；预算耗尽时保留 `nextCursor`，后续继续分页，禁止通过一次调用重新形成无界历史扫描。
+
 - 分享诊断必须区分当前导出版本与持久日志真实来源版本/进程，旧版本日志不得被误包装成当前版本事实。
 - 当前 Session 的 run / turn / step / tool / request / retry / continuation / compaction 等持久事件应可按 sequence 串联；分享报告只输出结构化白名单字段和 payload 大小，不复制任意消息、工具结果或凭据正文。
 - Token 诊断复用 `TokenUsageAnalyticsStore` 请求级账本，至少保留 action、run/parent/agent/step、真实 route、input/cache/output/reasoning 与 Prompt 构成；禁止再建第二套 Token 事实源。

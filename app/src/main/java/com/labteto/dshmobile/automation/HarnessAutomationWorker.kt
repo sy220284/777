@@ -73,20 +73,37 @@ class HarnessAutomationWorker(
         val id = inputData.getString(HarnessAutomationScheduler.KEY_TASK_ID)
             ?: return Result.failure()
         val manualRun = inputData.getBoolean(HarnessAutomationScheduler.KEY_MANUAL_RUN, false)
-        val lease = AutomationExecutionRegistry.tryAcquire(id)
-            ?: return if (manualRun) Result.success() else Result.retry()
+        val entry = EntryPointAccessors.fromApplication(
+            applicationContext,
+            WorkerEntryPoint::class.java,
+        )
+        val store = entry.automationStore()
+        val preflightTask = store.get(id) ?: return Result.success()
+        val requestedGeneration = inputData.getLong(
+            HarnessAutomationScheduler.KEY_SCHEDULE_GENERATION,
+            preflightTask.scheduleGeneration,
+        )
+        if (
+            preflightTask.scheduleGeneration != requestedGeneration ||
+            (preflightTask.status in setOf("paused", "waiting_user") && !manualRun)
+        ) return Result.success()
+
+        // A manual request is a real user action, not a disposable probe. If another trigger owns
+        // the task, keep this WorkManager request pending instead of reporting a false success.
+        val lease = AutomationExecutionRegistry.tryAcquire(id) ?: return Result.retry()
         return try {
-            doOwnedWork(id, manualRun)
+            doOwnedWork(id, manualRun, entry, requestedGeneration)
         } finally {
             lease.close()
         }
     }
 
-    private suspend fun doOwnedWork(id: String, manualRun: Boolean): Result {
-        val entry = EntryPointAccessors.fromApplication(
-            applicationContext,
-            WorkerEntryPoint::class.java,
-        )
+    private suspend fun doOwnedWork(
+        id: String,
+        manualRun: Boolean,
+        entry: WorkerEntryPoint,
+        requestedGeneration: Long,
+    ): Result {
         val store = entry.automationStore()
         val scheduler = entry.automationScheduler()
         val settlement = AutomationWorkerSettlementCoordinator(
@@ -96,11 +113,9 @@ class HarnessAutomationWorker(
             notifications = entry.notifications(),
             hostsStore = entry.hostsStore(),
         )
+        // Re-check after acquiring the task lease. Editing/pausing can race the preflight read;
+        // an old generation must release ownership before it creates sessions or starts side effects.
         var task = store.get(id) ?: return Result.success()
-        val requestedGeneration = inputData.getLong(
-            HarnessAutomationScheduler.KEY_SCHEDULE_GENERATION,
-            task.scheduleGeneration,
-        )
         if (
             task.scheduleGeneration != requestedGeneration ||
             (task.status in setOf("paused", "waiting_user") && !manualRun)

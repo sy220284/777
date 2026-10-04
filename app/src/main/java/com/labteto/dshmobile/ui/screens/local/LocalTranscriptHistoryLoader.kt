@@ -30,9 +30,13 @@ internal class LocalTranscriptHistoryLoader(
         var nextCursor: LocalTranscriptPageCursor? = null
         var needsMoreVisibleDialogue = true
         var cursorAdvanced = true
+        var loadedPages = 0
+        var loadedRawMessages = 0
 
         do {
             val page = readPage(sessionId, pageCursor)
+            loadedPages++
+            loadedRawMessages += page.messages.size
             if (currentSessionId() != sessionId) return null
 
             val live = liveMessages()
@@ -44,11 +48,18 @@ internal class LocalTranscriptHistoryLoader(
             )
             cursorAdvanced = nextCursor != pageCursor
             pageCursor = nextCursor
-        } while (nextCursor != null && needsMoreVisibleDialogue && cursorAdvanced)
+        } while (
+            nextCursor != null &&
+            needsMoreVisibleDialogue &&
+            cursorAdvanced &&
+            loadedPages < LOCAL_TRANSCRIPT_HISTORY_MAX_PAGES_PER_LOAD &&
+            loadedRawMessages < LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD
+        )
 
         return LocalTranscriptHistoryLoadResult(
             olderMessages = olderMessages,
             nextCursor = nextCursor,
+            loadedRawMessages = loadedRawMessages,
         )
     }
 
@@ -65,19 +76,20 @@ internal class LocalTranscriptHistoryLoader(
         )
         var addedVisibleDialogue = 0
         var cursorAdvanced = true
+        var loadedPages = 0
 
         do {
             val requestedCursor = nextCursor ?: break
             val page = readPage(sessionId, requestedCursor)
+            loadedPages++
+            loadedRawMessages += page.messages.size
             if (currentSessionId() != sessionId) return null
 
-            val beforeSize = accumulated.size
             accumulated = prependUniqueOlderMessages(
                 pageMessages = page.messages,
                 olderMessages = accumulated,
                 liveMessages = liveMessages(),
             )
-            loadedRawMessages += accumulated.size - beforeSize
             nextCursor = page.nextCursor
             addedVisibleDialogue = (
                 userVisibleDialogueMessageCount(
@@ -88,7 +100,9 @@ internal class LocalTranscriptHistoryLoader(
         } while (
             nextCursor != null &&
             addedVisibleDialogue < LOCAL_TRANSCRIPT_HISTORY_VISIBLE_DIALOGUE_BATCH_MESSAGES &&
-            cursorAdvanced
+            cursorAdvanced &&
+            loadedPages < LOCAL_TRANSCRIPT_HISTORY_MAX_PAGES_PER_LOAD &&
+            loadedRawMessages < LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD
         )
 
         return LocalTranscriptHistoryLoadResult(
