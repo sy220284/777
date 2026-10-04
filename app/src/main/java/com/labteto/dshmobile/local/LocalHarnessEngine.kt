@@ -2972,7 +2972,7 @@ class LocalHarnessEngine @Inject constructor(
 
         fun ensureRunOwnership() {
             if (!agentRunCoordinator.isCurrentForegroundRun(runContext)) {
-                throw CancellationException("当前 Work 运行已由新的执行或恢复流程接管")
+                throw CancellationException("当前运行已由新的执行或恢复流程接管")
             }
         }
 
