@@ -1,148 +1,212 @@
 package com.labteto.dshmobile.ui.screens.tasks
-
-import android.app.DatePickerDialog
-import android.app.TimePickerDialog
-import android.content.Context
-import android.text.format.DateFormat as AndroidDateFormat
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.labteto.dshmobile.R
 import com.labteto.dshmobile.automation.AutomationMode
-import com.labteto.dshmobile.automation.AutomationRunReceipt
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
-import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
-import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.ui.components.DsButton
-import com.labteto.dshmobile.ui.components.DsButtonSize
-import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsGroupCard
-import com.labteto.dshmobile.ui.components.DsPill
-import com.labteto.dshmobile.ui.components.DsStatus
-import com.labteto.dshmobile.ui.components.DsStatusPill
-import com.labteto.dshmobile.ui.components.DsTimeline
-import com.labteto.dshmobile.ui.components.DsTimelineItem
-import com.labteto.dshmobile.ui.components.DsToastHost
-import com.labteto.dshmobile.ui.components.DsTopBar
-import com.labteto.dshmobile.ui.components.EmptyHero
-import com.labteto.dshmobile.ui.components.rememberDsToast
-import com.labteto.dshmobile.ui.theme.DsSpacing
-import com.labteto.dshmobile.ui.theme.DsTheme
-import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.withReadingWeight
-import com.labteto.dshmobile.ui.theme.rootSurface
+import com.labteto.dshmobile.local.automation.AutomationPlanDraft
+import com.labteto.dshmobile.local.automation.AutomationPlanningService
+import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
+import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.text.DateFormat
-import java.util.Calendar
-import java.util.Date
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
-
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED }
-
-internal enum class AutomationCadence { ONCE, DAILY, WEEKLY, CUSTOM, SILENCE, WINDOW }
-
+internal enum class AutomationCadence { ONCE, DAILY, WEEKLY, CUSTOM }
 data class TasksUiState(
     val tasks: List<AutomationTask> = emptyList(),
     val notice: TasksNotice? = null,
+    val plannerSuggestions: List<String> = emptyList(),
+    val suggestionsLoading: Boolean = false,
+    val suggestionSessionId: String? = null,
+    val planning: Boolean = false,
+    val plannerError: String? = null,
+    val saveRevision: Long = 0L,
 )
-
 @HiltViewModel
 class TasksViewModel @Inject constructor(
     private val scheduler: HarnessAutomationScheduler,
     private val localRuntime: LocalTaskRuntime,
+    private val planningService: AutomationPlanningService,
 ) : ViewModel() {
-    val harnessState: StateFlow<LocalHarnessTaskState> = localRuntime.state
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = localRuntime.initialState,
-        )
-    private val _state = MutableStateFlow(TasksUiState())
+    val harnessState: StateFlow<LocalHarnessTaskState> = localRuntime.state.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = localRuntime.initialState,
+    )
+    private val _state = MutableStateFlow(TasksUiState(tasks = scheduler.list()))
     val state: StateFlow<TasksUiState> = _state.asStateFlow()
-
-    init {
-        refresh()
-    }
-
     fun acknowledgeNotice(notice: TasksNotice) {
-        if (_state.value.notice == notice) {
-            _state.value = _state.value.copy(notice = null)
-        }
+        if (_state.value.notice == notice) _state.update { it.copy(notice = null) }
     }
-
-    fun refresh() {
-        _state.value = _state.value.copy(tasks = scheduler.list(), notice = null)
-    }
-
+    fun refresh() = _state.update { it.copy(tasks = scheduler.list(), notice = null) }
     fun cancel(id: String) {
         val removed = scheduler.cancelTask(id)
-        _state.value = TasksUiState(
-            tasks = scheduler.list(),
-            notice = if (removed) TasksNotice.CANCELLED else TasksNotice.MISSING,
-        )
+        _state.update {
+            it.copy(
+                tasks = scheduler.list(),
+                notice = if (removed) TasksNotice.CANCELLED else TasksNotice.MISSING,
+            )
+        }
     }
-
-    fun pause(id: String) {
-        scheduler.pauseTask(id)
-        refresh()
-    }
-
-    fun resume(id: String) {
-        scheduler.resumeTask(id)
-        refresh()
-    }
-
+    fun pause(id: String) { scheduler.pauseTask(id); refresh() }
+    fun resume(id: String) { scheduler.resumeTask(id); refresh() }
     fun runNow(id: String): Boolean {
         val started = scheduler.runTaskNow(id)
-        _state.value = TasksUiState(
-            tasks = scheduler.list(),
-            notice = if (started) TasksNotice.RUN_STARTED else TasksNotice.RUN_FAILED,
-        )
+        _state.update {
+            it.copy(
+                tasks = scheduler.list(),
+                notice = if (started) TasksNotice.RUN_STARTED else TasksNotice.RUN_FAILED,
+            )
+        }
         return started
     }
-
+    fun loadChatSuggestions(force: Boolean = false) {
+        val snapshot = localRuntime.snapshot()
+        if (!canPlanChat(snapshot)) {
+            _state.update {
+                it.copy(
+                    plannerSuggestions = emptyList(),
+                    suggestionsLoading = false,
+                    suggestionSessionId = snapshot.sessionId.takeIf(String::isNotBlank),
+                )
+            }
+            return
+        }
+        val current = _state.value
+        if (!force && current.suggestionSessionId == snapshot.sessionId &&
+            (current.suggestionsLoading || current.plannerSuggestions.isNotEmpty())
+        ) return
+        val expectedSessionId = snapshot.sessionId
+        _state.update {
+            it.copy(
+                suggestionsLoading = true,
+                plannerError = null,
+                suggestionSessionId = expectedSessionId,
+            )
+        }
+        viewModelScope.launch {
+            runCatching { planningService.suggestions() }
+                .onSuccess { result ->
+                    if (localRuntime.snapshot().sessionId != expectedSessionId ||
+                        result.sourceSessionId != expectedSessionId
+                    ) return@onSuccess
+                    _state.update {
+                        it.copy(
+                            plannerSuggestions = result.suggestions,
+                            suggestionsLoading = false,
+                            suggestionSessionId = expectedSessionId,
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    if (localRuntime.snapshot().sessionId != expectedSessionId) return@onFailure
+                    _state.update {
+                        it.copy(
+                            suggestionsLoading = false,
+                            plannerError = error.userMessage("暂时没生成出合适的互动建议"),
+                        )
+                    }
+                }
+        }
+    }
+    fun submitChatPlan(input: String, editingTaskId: String? = null) {
+        val snapshot = localRuntime.snapshot()
+        if (!canPlanChat(snapshot) || input.isBlank() || _state.value.planning) return
+        val expectedSessionId = snapshot.sessionId
+        _state.update { it.copy(planning = true, plannerError = null) }
+        viewModelScope.launch {
+            runCatching { planningService.plan(input) }
+                .onSuccess { draft ->
+                    val latest = localRuntime.snapshot()
+                    if (latest.sessionId != expectedSessionId ||
+                        draft.sourceSessionId != expectedSessionId
+                    ) {
+                        _state.update {
+                            it.copy(
+                                planning = false,
+                                plannerError = "聊天已经切换，请在当前聊天重新安排",
+                            )
+                        }
+                        return@onSuccess
+                    }
+                    val saved = saveChatDraft(draft, editingTaskId, expectedSessionId)
+                    _state.update {
+                        if (saved) {
+                            it.copy(
+                                tasks = scheduler.list(),
+                                planning = false,
+                                plannerError = null,
+                                saveRevision = it.saveRevision + 1L,
+                            )
+                        } else {
+                            it.copy(
+                                planning = false,
+                                plannerError = "这个事件还不能保存，请换一种时间说法再试",
+                            )
+                        }
+                    }
+                }
+                .onFailure { error ->
+                    if (localRuntime.snapshot().sessionId != expectedSessionId) return@onFailure
+                    _state.update {
+                        it.copy(
+                            planning = false,
+                            plannerError = error.userMessage("定时事件生成失败，请重试"),
+                        )
+                    }
+                }
+        }
+    }
+    private fun saveChatDraft(
+        draft: AutomationPlanDraft,
+        editingTaskId: String?,
+        sessionId: String,
+    ): Boolean {
+        if (editingTaskId == null) {
+            return createAt(
+                prompt = draft.prompt,
+                firstRunAt = draft.firstRunAt,
+                recurringMinutes = draft.recurringMinutes,
+                mode = AutomationMode.CHAT,
+                scheduleType = draft.scheduleType,
+                silenceMinutes = draft.silenceMinutes,
+                windowStartMinuteOfDay = draft.windowStartMinuteOfDay,
+                windowEndMinuteOfDay = draft.windowEndMinuteOfDay,
+                quietHoursEnabled = true,
+            )
+        }
+        val existing = scheduler.list().firstOrNull {
+            it.id == editingTaskId &&
+                it.mode == AutomationMode.CHAT &&
+                it.targetSessionId == sessionId
+        } ?: return false
+        return updateTask(
+            id = existing.id,
+            prompt = draft.prompt,
+            firstRunAt = draft.firstRunAt,
+            recurringMinutes = draft.recurringMinutes,
+            scheduleType = draft.scheduleType,
+            silenceMinutes = draft.silenceMinutes,
+            windowStartMinuteOfDay = draft.windowStartMinuteOfDay,
+            windowEndMinuteOfDay = draft.windowEndMinuteOfDay,
+            quietHoursEnabled = existing.quietHoursEnabled,
+            quietStartHour = existing.quietStartHour,
+            quietStartMinute = existing.quietStartMinute,
+            quietEndHour = existing.quietEndHour,
+            quietEndMinute = existing.quietEndMinute,
+            proactiveMinGapMinutes = existing.proactiveMinGapMinutes,
+            proactiveMaxUnanswered = existing.proactiveMaxUnanswered,
+        )
+    }
     fun updateTask(
         id: String,
         prompt: String,
@@ -161,26 +225,12 @@ class TasksViewModel @Inject constructor(
         proactiveMaxUnanswered: Int,
     ): Boolean = runCatching {
         scheduler.updateTask(
-            id = id,
-            prompt = prompt,
-            firstRunAtMillis = firstRunAt,
-            recurringMinutes = recurringMinutes,
-            scheduleType = scheduleType,
-            silenceMinutes = silenceMinutes,
-            windowStartMinuteOfDay = windowStartMinuteOfDay,
-            windowEndMinuteOfDay = windowEndMinuteOfDay,
-            quietHoursEnabled = quietHoursEnabled,
-            quietStartHour = quietStartHour,
-            quietStartMinute = quietStartMinute,
-            quietEndHour = quietEndHour,
-            quietEndMinute = quietEndMinute,
-            proactiveMinGapMinutes = proactiveMinGapMinutes,
-            proactiveMaxUnanswered = proactiveMaxUnanswered,
+            id, prompt, firstRunAt, recurringMinutes, scheduleType, silenceMinutes,
+            windowStartMinuteOfDay, windowEndMinuteOfDay, quietHoursEnabled,
+            quietStartHour, quietStartMinute, quietEndHour, quietEndMinute,
+            proactiveMinGapMinutes, proactiveMaxUnanswered,
         )
-    }.getOrDefault(false).also {
-        if (it) refresh()
-    }
-
+    }.getOrDefault(false).also { if (it) refresh() }
     fun createAt(
         prompt: String,
         firstRunAt: Long,
@@ -200,37 +250,22 @@ class TasksViewModel @Inject constructor(
     ): Boolean {
         val now = System.currentTimeMillis()
         if (prompt.isBlank()) return false
-        if (
-            scheduleType !in setOf(
-                AutomationScheduleType.SILENCE,
-                AutomationScheduleType.WINDOW,
-            ) &&
+        if (scheduleType !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW) &&
             firstRunAt <= now
         ) return false
         val minimumRecurringMinutes = if (mode == AutomationMode.CHAT) 60L else 15L
         if (recurringMinutes != null && recurringMinutes < minimumRecurringMinutes) return false
-        if (
-            scheduleType == AutomationScheduleType.SILENCE &&
+        if (scheduleType == AutomationScheduleType.SILENCE &&
             (silenceMinutes == null || silenceMinutes < 60L)
         ) return false
-        if (
-            scheduleType == AutomationScheduleType.WINDOW &&
-            (
-                windowStartMinuteOfDay == null ||
-                    windowEndMinuteOfDay == null ||
-                    windowStartMinuteOfDay !in 0 until 24 * 60 ||
-                    windowEndMinuteOfDay !in 0 until 24 * 60 ||
-                    windowStartMinuteOfDay == windowEndMinuteOfDay
-            )
+        if (scheduleType == AutomationScheduleType.WINDOW &&
+            (windowStartMinuteOfDay == null || windowEndMinuteOfDay == null ||
+                windowStartMinuteOfDay !in 0 until 24 * 60 ||
+                windowEndMinuteOfDay !in 0 until 24 * 60 ||
+                windowStartMinuteOfDay == windowEndMinuteOfDay)
         ) return false
         val snapshot = localRuntime.snapshot()
-        if (mode == AutomationMode.CHAT) {
-            if (
-                snapshot.usageMode != LocalUsageMode.CHAT ||
-                snapshot.groupChat.enabled ||
-                snapshot.sessionId.isBlank()
-            ) return false
-        }
+        if (mode == AutomationMode.CHAT && !canPlanChat(snapshot)) return false
         return runCatching {
             val id = "ui-" + System.currentTimeMillis()
             val targetSessionId = snapshot.sessionId.takeIf { mode == AutomationMode.CHAT }
@@ -239,77 +274,37 @@ class TasksViewModel @Inject constructor(
             }
             when {
                 scheduleType == AutomationScheduleType.WINDOW -> scheduler.scheduleWindow(
-                    id = id,
-                    prompt = prompt.trim(),
-                    startMinuteOfDay = requireNotNull(windowStartMinuteOfDay),
-                    endMinuteOfDay = requireNotNull(windowEndMinuteOfDay),
-                    notify = true,
-                    targetSessionId = requireNotNull(targetSessionId),
-                    actorName = actorName,
-                    quietHoursEnabled = quietHoursEnabled,
-                    quietStartHour = quietStartHour,
-                    quietStartMinute = quietStartMinute,
-                    quietEndHour = quietEndHour,
-                    quietEndMinute = quietEndMinute,
-                    proactiveMinGapMinutes = proactiveMinGapMinutes,
-                    proactiveMaxUnanswered = proactiveMaxUnanswered,
+                    id, prompt.trim(), requireNotNull(windowStartMinuteOfDay),
+                    requireNotNull(windowEndMinuteOfDay), true, requireNotNull(targetSessionId),
+                    actorName, quietHoursEnabled, quietStartHour, quietStartMinute,
+                    quietEndHour, quietEndMinute, proactiveMinGapMinutes, proactiveMaxUnanswered,
                 )
                 scheduleType == AutomationScheduleType.SILENCE -> scheduler.scheduleSilence(
-                    id = id,
-                    prompt = prompt.trim(),
-                    silenceMinutes = requireNotNull(silenceMinutes),
-                    notify = true,
-                    targetSessionId = requireNotNull(targetSessionId),
-                    actorName = actorName,
-                    quietHoursEnabled = quietHoursEnabled,
-                    quietStartHour = quietStartHour,
-                    quietStartMinute = quietStartMinute,
-                    quietEndHour = quietEndHour,
-                    quietEndMinute = quietEndMinute,
-                    proactiveMinGapMinutes = proactiveMinGapMinutes,
-                    proactiveMaxUnanswered = proactiveMaxUnanswered,
+                    id, prompt.trim(), requireNotNull(silenceMinutes), true,
+                    requireNotNull(targetSessionId), actorName, quietHoursEnabled,
+                    quietStartHour, quietStartMinute, quietEndHour, quietEndMinute,
+                    proactiveMinGapMinutes, proactiveMaxUnanswered,
                 )
                 recurringMinutes == null -> scheduler.scheduleOnce(
-                    id = id,
-                    prompt = prompt.trim(),
-                    triggerAtMillis = firstRunAt,
-                    notify = true,
-                    mode = mode,
-                    targetSessionId = targetSessionId,
-                    actorName = actorName,
-                    quietHoursEnabled = quietHoursEnabled,
-                    quietStartHour = quietStartHour,
-                    quietStartMinute = quietStartMinute,
-                    quietEndHour = quietEndHour,
-                    quietEndMinute = quietEndMinute,
-                    proactiveMinGapMinutes = proactiveMinGapMinutes,
-                    proactiveMaxUnanswered = proactiveMaxUnanswered,
+                    id, prompt.trim(), firstRunAt, true, mode, targetSessionId, actorName,
+                    quietHoursEnabled, quietStartHour, quietStartMinute, quietEndHour,
+                    quietEndMinute, proactiveMinGapMinutes, proactiveMaxUnanswered,
                 )
                 else -> scheduler.schedulePeriodic(
-                    id = id,
-                    prompt = prompt.trim(),
-                    intervalMinutes = recurringMinutes,
-                    firstRunAtMillis = firstRunAt,
-                    notify = true,
-                    mode = mode,
-                    targetSessionId = targetSessionId,
-                    actorName = actorName,
-                    quietHoursEnabled = quietHoursEnabled,
-                    quietStartHour = quietStartHour,
-                    quietStartMinute = quietStartMinute,
-                    quietEndHour = quietEndHour,
-                    quietEndMinute = quietEndMinute,
-                    proactiveMinGapMinutes = proactiveMinGapMinutes,
-                    proactiveMaxUnanswered = proactiveMaxUnanswered,
-                    scheduleType = if (mode == AutomationMode.CHAT) {
-                        scheduleType
-                    } else {
-                        AutomationScheduleType.LEGACY
-                    },
+                    id, prompt.trim(), recurringMinutes, firstRunAt, true, mode,
+                    targetSessionId, actorName, quietHoursEnabled, quietStartHour,
+                    quietStartMinute, quietEndHour, quietEndMinute, proactiveMinGapMinutes,
+                    proactiveMaxUnanswered,
+                    if (mode == AutomationMode.CHAT) scheduleType else AutomationScheduleType.LEGACY,
                 )
             }
             refresh()
         }.isSuccess
     }
-
+    private fun canPlanChat(snapshot: LocalHarnessTaskState): Boolean =
+        snapshot.usageMode == LocalUsageMode.CHAT &&
+            !snapshot.groupChat.enabled &&
+            snapshot.sessionId.isNotBlank()
 }
+private fun Throwable.userMessage(fallback: String): String =
+    message?.takeIf(String::isNotBlank)?.take(180) ?: fallback
