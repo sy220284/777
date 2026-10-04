@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
+import com.labteto.dshmobile.local.chat.hasUsefulFacts
 import com.labteto.dshmobile.local.chat.normalized
 import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
@@ -42,12 +43,14 @@ internal fun LocalChatBranchState.canonicalizeLegacyChatBranchState(): LocalChat
     copy(
         nodes = nodes.map { node ->
             val legacyState = node.chatStateAfter ?: return@map node
+            val migratedContext = node.chatContextAfter
+                ?.withLegacyFallback(legacyState)
+                ?: ChatContextState().withLegacyFallback(legacyState).takeIf { it.hasUsefulFacts() }
             node.copy(
                 chatStateAfter = legacyState
                     .canonicalizeLegacyCharacterState()
                     .withoutLegacyConversationContext(),
-                chatContextAfter = (node.chatContextAfter ?: ChatContextState())
-                    .withLegacyFallback(legacyState),
+                chatContextAfter = migratedContext,
             )
         },
     )
