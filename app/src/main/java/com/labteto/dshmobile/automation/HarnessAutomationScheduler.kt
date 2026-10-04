@@ -48,6 +48,30 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+internal fun nextAutomationRunAfterUserActivity(
+    task: AutomationTask,
+    userMessageAt: Long,
+): Long = when {
+    task.scheduleType == AutomationScheduleType.SILENCE ->
+        checkedAutomationFutureMillis(
+            userMessageAt,
+            requireNotNull(task.silenceMinutes),
+            "沉默触发间隔",
+        )
+    usesChainedChatScheduling(task) ->
+        nextAnchoredAutomationRun(task, userMessageAt) ?: userMessageAt
+    task.recurringMinutes != null ->
+        maxOf(
+            task.nextRunAt,
+            checkedAutomationFutureMillis(
+                userMessageAt,
+                task.recurringMinutes,
+                "任务周期",
+            ),
+        )
+    else -> userMessageAt
+}
+
 @Singleton
 class HarnessAutomationScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -67,6 +91,7 @@ class HarnessAutomationScheduler @Inject constructor(
         val task = store.get(id)
         store.remove(id)
         workManager.cancelUniqueWork(workName(id, task?.scheduleGeneration ?: 0L))
+        workManager.cancelUniqueWork(manualWorkName(id))
     }
 
     fun scheduleOnce(
@@ -309,9 +334,19 @@ class HarnessAutomationScheduler @Inject constructor(
     fun pauseTask(id: String): Boolean {
         val task = store.get(id) ?: return false
         if (task.status == "paused") return true
-        store.update(id) { it.copy(status = "paused") } ?: return false
+        require(task.scheduleGeneration < Long.MAX_VALUE) { "自动任务排程 generation 已耗尽" }
+        val paused = store.updateIf(
+            id,
+            predicate = { it.scheduleGeneration == task.scheduleGeneration },
+        ) {
+            it.copy(
+                status = "paused",
+                scheduleGeneration = it.scheduleGeneration + 1L,
+            )
+        } ?: return false
         workManager.cancelUniqueWork(workName(id, task.scheduleGeneration))
-        return true
+        workManager.cancelUniqueWork(manualWorkName(id))
+        return paused.status == "paused"
     }
 
     fun resumeTask(id: String): Boolean {
@@ -349,6 +384,7 @@ class HarnessAutomationScheduler @Inject constructor(
                 Data.Builder()
                     .putString(KEY_TASK_ID, id)
                     .putBoolean(KEY_MANUAL_RUN, true)
+                    .putLong(KEY_SCHEDULE_GENERATION, task.scheduleGeneration)
                     .build(),
             )
             .addTag(WORK_TAG)
@@ -433,35 +469,38 @@ class HarnessAutomationScheduler @Inject constructor(
             )
             else -> firstRunAtMillis.coerceAtLeast(now)
         }
-        val wasPaused = current.status == "paused"
         require(current.scheduleGeneration < Long.MAX_VALUE) { "自动任务排程 generation 已耗尽" }
-        val updated = current.copy(
-            prompt = prompt.trim(),
-            nextRunAt = nextRun,
-            recurringMinutes = recurring,
-            scheduleType = scheduleType,
-            scheduleAnchorAt = if (scheduleType == AutomationScheduleType.SILENCE) now else nextRun,
-            scheduleGeneration = current.scheduleGeneration + 1L,
-            silenceMinutes = if (scheduleType == AutomationScheduleType.SILENCE) silenceMinutes else null,
-            windowStartMinuteOfDay = if (scheduleType == AutomationScheduleType.WINDOW) {
-                windowStartMinuteOfDay
-            } else null,
-            windowEndMinuteOfDay = if (scheduleType == AutomationScheduleType.WINDOW) {
-                windowEndMinuteOfDay
-            } else null,
-            quietHoursEnabled = quietHoursEnabled,
-            quietStartHour = quietStartHour,
-            quietStartMinute = quietStartMinute,
-            quietEndHour = quietEndHour,
-            quietEndMinute = quietEndMinute,
-            proactiveMinGapMinutes = proactiveMinGapMinutes,
-            proactiveMaxUnanswered = proactiveMaxUnanswered,
-            status = if (wasPaused) "paused" else "scheduled",
-            lastError = null,
-            failureStreak = 0,
-        )
-        store.upsert(updated)
-        if (!wasPaused) {
+        val updated = store.updateIf(
+            id,
+            predicate = { it.scheduleGeneration == current.scheduleGeneration },
+        ) { latest ->
+            latest.copy(
+                prompt = prompt.trim(),
+                nextRunAt = nextRun,
+                recurringMinutes = recurring,
+                scheduleType = scheduleType,
+                scheduleAnchorAt = if (scheduleType == AutomationScheduleType.SILENCE) now else nextRun,
+                scheduleGeneration = latest.scheduleGeneration + 1L,
+                silenceMinutes = if (scheduleType == AutomationScheduleType.SILENCE) silenceMinutes else null,
+                windowStartMinuteOfDay = if (scheduleType == AutomationScheduleType.WINDOW) {
+                    windowStartMinuteOfDay
+                } else null,
+                windowEndMinuteOfDay = if (scheduleType == AutomationScheduleType.WINDOW) {
+                    windowEndMinuteOfDay
+                } else null,
+                quietHoursEnabled = quietHoursEnabled,
+                quietStartHour = quietStartHour,
+                quietStartMinute = quietStartMinute,
+                quietEndHour = quietEndHour,
+                quietEndMinute = quietEndMinute,
+                proactiveMinGapMinutes = proactiveMinGapMinutes,
+                proactiveMaxUnanswered = proactiveMaxUnanswered,
+                status = if (latest.status == "paused") "paused" else "scheduled",
+                lastError = null,
+                failureStreak = 0,
+            )
+        } ?: return false
+        if (updated.status != "paused") {
             if (usesChainedChatScheduling(updated) || updated.recurringMinutes == null) {
                 enqueueOneTime(id, nextRun)
             } else {
@@ -469,6 +508,7 @@ class HarnessAutomationScheduler @Inject constructor(
             }
         }
         workManager.cancelUniqueWork(workName(id, current.scheduleGeneration))
+        workManager.cancelUniqueWork(manualWorkName(id))
         return true
     }
 
@@ -476,44 +516,37 @@ class HarnessAutomationScheduler @Inject constructor(
         store.list()
             .filter {
                 it.mode == AutomationMode.CHAT &&
-                    it.targetSessionId == sessionId &&
-                    it.status == "waiting_user"
+                    it.targetSessionId == sessionId
             }
             .forEach { task ->
-                val runAt = when {
-                    task.scheduleType == AutomationScheduleType.SILENCE ->
-                        checkedAutomationFutureMillis(
-                            userMessageAt,
-                            requireNotNull(task.silenceMinutes),
-                            "沉默触发间隔",
-                        )
-                    usesChainedChatScheduling(task) ->
-                        nextAnchoredAutomationRun(task, userMessageAt) ?: userMessageAt
-                    task.recurringMinutes != null ->
-                        maxOf(
-                            task.nextRunAt,
-                            checkedAutomationFutureMillis(
-                                userMessageAt,
-                                task.recurringMinutes,
-                                "任务周期",
-                            ),
-                        )
-                    else -> userMessageAt
-                }
-                val resumed = store.update(task.id) {
-                    it.copy(
-                        status = "scheduled",
-                        nextRunAt = runAt,
-                        lastError = null,
-                    )
+                val updated = store.update(task.id) { current ->
+                    if (
+                        current.mode != AutomationMode.CHAT ||
+                        current.targetSessionId != sessionId
+                    ) {
+                        current
+                    } else {
+                        val latestActivity = maxOf(current.lastUserActivityAt ?: Long.MIN_VALUE, userMessageAt)
+                        if (current.status == "waiting_user") {
+                            current.copy(
+                                status = "scheduled",
+                                nextRunAt = nextAutomationRunAfterUserActivity(current, latestActivity),
+                                lastUserActivityAt = latestActivity,
+                                lastError = null,
+                            )
+                        } else {
+                            current.copy(lastUserActivityAt = latestActivity)
+                        }
+                    }
                 } ?: return@forEach
-                if (usesChainedChatScheduling(resumed) || resumed.recurringMinutes == null) {
-                    enqueueOneTime(resumed.id, runAt)
+                if (updated.status != "scheduled" || task.status != "waiting_user") return@forEach
+                if (usesChainedChatScheduling(updated) || updated.recurringMinutes == null) {
+                    enqueueOneTime(updated.id, updated.nextRunAt)
                 } else {
                     enqueuePeriodic(
-                        resumed.id,
-                        requireNotNull(resumed.recurringMinutes),
-                        runAt,
+                        updated.id,
+                        requireNotNull(updated.recurringMinutes),
+                        updated.nextRunAt,
                     )
                 }
             }
