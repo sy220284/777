@@ -64,9 +64,9 @@ internal class LocalModelRequestCoordinator(
         val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
         val log = requestLog ?: defaultEventLog()
         val frozenProfile = profile ?: modelGateway.profileForRoute(
-            snapshot.modelSelection.activeProfileId,
-            snapshot.model,
-            snapshot.baseUrl,
+            snapshot.modelState.modelState.modelSelection.activeProfileId,
+            snapshot.modelState.model,
+            snapshot.modelState.baseUrl,
         )
         val runSurface = frozenProfile.toRunModelSurface()
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
@@ -202,8 +202,8 @@ internal class LocalModelRequestCoordinator(
             }
         }
         log.append("request/header", buildJsonObject {
-            put("model", snapshot.model)
-            put("base_url", snapshot.baseUrl)
+            put("model", snapshot.modelState.model)
+            put("base_url", snapshot.modelState.baseUrl)
             put("profile_id", frozenProfile.id)
             put("provider", frozenProfile.provider)
             put("auth_kind", frozenProfile.authKind.name)
@@ -263,7 +263,7 @@ internal class LocalModelRequestCoordinator(
         })
         log.append("request/context", buildJsonObject {
             put("step", step)
-            put("model", snapshot.model)
+            put("model", snapshot.modelState.model)
             put("message_count", logMessages.size)
             put("context_chars", contextChars)
             put("estimated_input_tokens", pressure.estimatedInputTokens)
@@ -276,7 +276,7 @@ internal class LocalModelRequestCoordinator(
         var lastProviderError: LocalModelException? = null
         var attemptStartedNanos = System.nanoTime()
         val executor = modelStepRuntime.requestExecutor(
-            maxAttempts = (maxAttemptsOverride ?: snapshot.modelAttempts).coerceIn(1, 5),
+            maxAttempts = (maxAttemptsOverride ?: snapshot.modelState.modelState.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
                 (error as? LocalModelException)?.let { lastProviderError = it }
                 (error as? LocalModelException)?.retryable == true || error is java.io.IOException
@@ -311,7 +311,7 @@ internal class LocalModelRequestCoordinator(
                             "LocalModelRequest",
                             buildString {
                                 append(if (localPreflight) "模型请求本地拒绝 " else "模型请求失败 ")
-                                append("model=${snapshot.model} step=$step attempt=${event.attempt} ")
+                                append("model=${snapshot.modelState.model} step=$step attempt=${event.attempt} ")
                                 append("duration_ms=$durationMs session_id=${snapshot.sessionId} ")
                                 providerError?.code?.let { append("code=$it ") }
                                 providerError?.let {
@@ -432,7 +432,7 @@ internal class LocalModelRequestCoordinator(
                         log.append("request/context-overflow-recovery", buildJsonObject {
                             put("step", step)
                             put("round", overflowRound)
-                            put("model", snapshot.model)
+                            put("model", snapshot.modelState.model)
                             put("estimated_tokens_before", compacted.estimatedTokensBefore)
                             put("estimated_tokens_after", compacted.estimatedTokensAfter)
                             put("omitted_messages", compacted.omittedMessages)
