@@ -26,10 +26,12 @@ class LocalWorkCompletionClaimGuardTest {
     fun completionClaimIsDiagnosedWhenRuntimeStateStillHasOpenWork() {
         val state = LocalHarnessState(
             usageMode = LocalUsageMode.WORK,
-            goal = LocalGoal("完成重构", status = "blocked"),
-            todos = listOf(
-                LocalTodoItem("补测试", "pending"),
-                LocalTodoItem("已处理", "completed"),
+            work = LocalWorkState(
+                goal = LocalGoal("完成重构", status = "blocked"),
+                todos = listOf(
+                    LocalTodoItem("补测试", "pending"),
+                    LocalTodoItem("已处理", "completed"),
+                ),
             ),
         )
         val result = LocalWorkCompletionClaimGuard.inspect(
@@ -49,7 +51,9 @@ class LocalWorkCompletionClaimGuardTest {
     fun localProgressClaimIsNotMistakenForWholeTaskCompletion() {
         val state = LocalHarnessState(
             usageMode = LocalUsageMode.WORK,
-            todos = listOf(LocalTodoItem("继续测试", "pending")),
+            work = LocalWorkState(
+                todos = listOf(LocalTodoItem("继续测试", "pending")),
+            ),
         )
         val result = LocalWorkCompletionClaimGuard.inspect(
             "代码修改已完成，测试仍在运行。",
@@ -68,8 +72,10 @@ class LocalWorkCompletionClaimGuardTest {
             val log = LocalSessionEventLog(File(root, "events.jsonl"), Json)
             val state = LocalHarnessState(
                 usageMode = LocalUsageMode.WORK,
-                goal = LocalGoal("完成发布", status = "active"),
-                todos = listOf(LocalTodoItem("跑完整 CI", "in_progress")),
+                work = LocalWorkState(
+                    goal = LocalGoal("完成发布", status = "active"),
+                    todos = listOf(LocalTodoItem("跑完整 CI", "in_progress")),
+                ),
             )
             val reply = LocalModelReply(
                 message = buildJsonObject {
@@ -108,7 +114,9 @@ class LocalWorkCompletionClaimGuardTest {
     fun negativeCompletionStatementDoesNotProduceFalseFinding() {
         val state = LocalHarnessState(
             usageMode = LocalUsageMode.WORK,
-            todos = listOf(LocalTodoItem("继续处理", "pending")),
+            work = LocalWorkState(
+                todos = listOf(LocalTodoItem("继续处理", "pending")),
+            ),
         )
         val result = LocalWorkCompletionClaimGuard.inspect(
             "尚未完成，还要继续处理。",
