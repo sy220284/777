@@ -237,6 +237,7 @@ fun ToolsScreen(
     onClose: () -> Unit,
     onOpenTasks: () -> Unit = {},
     onOpenSettings: (SettingsDestination) -> Unit = {},
+    handleRootSystemBack: Boolean = true,
     viewModel: ToolsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -264,7 +265,7 @@ fun ToolsScreen(
         )
     }
 
-    BackHandler(onBack = onClose)
+    BackHandler(enabled = handleRootSystemBack, onBack = onClose)
     LaunchedEffect(state.notice, noticeMessage) {
         when (state.notice) {
             ToolsNotice.CONNECTED -> {

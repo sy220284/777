@@ -124,6 +124,7 @@ private fun NavigationScreenshot() {
             gallery = emptyList(),
             usageMode = LocalUsageMode.CHAT,
             modeSwitchEnabled = true,
+            drawerOpen = true,
             pinnedSessionIds = setOf("chat-current"),
             sessionTitleOverrides = emptyMap(),
             currentGalleryId = null,

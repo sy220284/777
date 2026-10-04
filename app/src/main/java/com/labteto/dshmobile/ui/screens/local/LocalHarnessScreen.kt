@@ -298,6 +298,7 @@ fun LocalHarnessScreen(
                 usageMode = localHarnessDrawerUsageMode(shell.usageMode, pendingUsageMode),
                 modeSwitchEnabled = !shell.loading &&
                     localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
+                drawerOpen = drawerState.isOpen,
                 pinnedSessionIds = pinnedSessionIds,
                 sessionTitleOverrides = sessionTitleOverrides,
                 currentGalleryId = shell.galleryId,
@@ -310,7 +311,6 @@ fun LocalHarnessScreen(
                 groupChatEnabled = shell.groupChat.enabled,
                 running = shell.running,
                 onUsageModeChange = {
-                    resetFeatureNavigation()
                     switchUsageMode(it)
                 },
                 onNewSession = {

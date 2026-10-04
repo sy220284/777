@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import java.text.DateFormat
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -179,7 +178,6 @@ internal fun CharacterDiaryScreen(
         filterCharacterDiaryEntries(entries, query, selectedFilter)
     }
 
-    BackHandler(onBack = onDismiss)
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             DsTopBar(

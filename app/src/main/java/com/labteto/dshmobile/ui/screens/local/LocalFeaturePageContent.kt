@@ -118,9 +118,11 @@ internal fun LocalFeaturePageContent(
                     }
                 },
                 initialMode = taskMode,
+                handleRootSystemBack = false,
             )
             LocalFeaturePage.TOOLS -> ToolsScreen(
                 onClose = onPopFeature,
+                handleRootSystemBack = false,
                 onOpenTasks = {
                     onTaskModeChange(AutomationMode.WORK)
                     onPushFeature(LocalFeaturePage.TASKS)
@@ -138,6 +140,7 @@ internal fun LocalFeaturePageContent(
                 initialDestination = settingsDestination,
                 onCheckUpdate = onCheckUpdate,
                 updateStatus = updateStatus,
+                handleRootSystemBack = false,
             )
             LocalFeaturePage.HOME -> LocalConversationSurface(
                 state = state,
