@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.work.LocalWorkProgressCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.local.work.guardWorkCompletionDelivery
 import com.labteto.dshmobile.local.work.recordWorkCompletionQuality
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendResult
@@ -339,7 +340,7 @@ class LocalHarnessEngine @Inject constructor(
     private var transcriptProjectionCursor: Long? = null
     private val modelHistory = LocalModelHistoryBuffer()
     private var turnsSinceModelHistoryCheckpoint = 0
-    private val _state = MutableStateFlow(
+    private val _state = runtimeStateStore.initialize(
         LocalHarnessState(
             workspacePath = workspace.path,
             sessionId = currentSessionId,
@@ -353,7 +354,7 @@ class LocalHarnessEngine @Inject constructor(
         ),
     )
     private val _sendFeedbackState = MutableStateFlow(LocalSendFeedbackState())
-    internal val state: StateFlow<LocalHarnessState> = _state.asStateFlow()
+    internal val state: StateFlow<LocalHarnessState> = runtimeStateStore.state
     internal val streamingState: StateFlow<LocalHarnessStreamingState> = streamingPreviewStore.state
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
 
