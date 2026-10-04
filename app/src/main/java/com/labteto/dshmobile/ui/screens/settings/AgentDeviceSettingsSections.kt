@@ -1,11 +1,15 @@
 package com.labteto.dshmobile.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -36,6 +40,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
@@ -43,6 +50,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
@@ -50,6 +59,7 @@ import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.DeepSeekBillingSchedule
 import com.labteto.dshmobile.local.DeepSeekPricePeriod
 import com.labteto.dshmobile.local.DeepSeekPricingState
+import com.labteto.dshmobile.local.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.LocalModelCapability
 import com.labteto.dshmobile.local.LocalModelAuthKind
@@ -93,65 +103,105 @@ internal fun LocalAgentSettingsCard(
     report: (String) -> Unit,
 ) {
     val agentSavedMessage = stringResource(R.string.advanced_agent_saved)
-
-    // 步进即保存：不再积攒草稿等“保存”按钮，误触也不可能（有边界钳制）
-    fun clampUpdate(current: Int, delta: Int, min: Int, max: Int, apply: (Int) -> Unit) {
-        val next = (current + delta).coerceIn(min, max)
-        if (next != current) {
-            apply(next)
-            report(agentSavedMessage)
-        }
-    }
+    val maximumLabel = stringResource(R.string.common_maximum)
+    val reportSaved = { report(agentSavedMessage) }
 
     SettingsCard(stringResource(R.string.advanced_agent_settings), Icons.Outlined.Tune) {
         StepperRow(
             label = stringResource(R.string.advanced_main_steps),
             hint = stringResource(R.string.advanced_agent_limits_hint),
             value = local.mainMaxSteps,
-            range = 4..128,
-            onDelta = { delta ->
-                clampUpdate(local.mainMaxSteps, delta, 4, 128) {
-                    viewModel.configureLocalAgent(it, local.subagentMaxSteps, local.modelAttempts, local.modelSelection.workerProfileId)
-                }
+            range = LocalAgentRuntimeLimits.MAIN_MIN_STEPS..LocalAgentRuntimeLimits.MAX_CONFIGURED_STEPS,
+            maximumLabel = maximumLabel,
+            onValueChange = {
+                viewModel.configureLocalAgent(
+                    it,
+                    local.subagentMaxSteps,
+                    local.modelAttempts,
+                    local.modelSelection.workerProfileId,
+                )
             },
+            onCommitted = reportSaved,
         )
         StepperRow(
             label = stringResource(R.string.advanced_subagent_steps),
             hint = null,
             value = local.subagentMaxSteps,
-            range = 1..128,
-            onDelta = { delta ->
-                clampUpdate(local.subagentMaxSteps, delta, 1, 128) {
-                    viewModel.configureLocalAgent(local.mainMaxSteps, it, local.modelAttempts, local.modelSelection.workerProfileId)
-                }
+            range = LocalAgentRuntimeLimits.SUBAGENT_MIN_STEPS..LocalAgentRuntimeLimits.MAX_CONFIGURED_STEPS,
+            maximumLabel = maximumLabel,
+            onValueChange = {
+                viewModel.configureLocalAgent(
+                    local.mainMaxSteps,
+                    it,
+                    local.modelAttempts,
+                    local.modelSelection.workerProfileId,
+                )
             },
+            onCommitted = reportSaved,
         )
         StepperRow(
             label = stringResource(R.string.advanced_model_attempts),
             hint = null,
             value = local.modelAttempts,
-            range = 1..5,
-            onDelta = { delta ->
-                clampUpdate(local.modelAttempts, delta, 1, 5) {
-                    viewModel.configureLocalAgent(local.mainMaxSteps, local.subagentMaxSteps, it, local.modelSelection.workerProfileId)
-                }
+            range = LocalAgentRuntimeLimits.MODEL_ATTEMPTS_MIN..LocalAgentRuntimeLimits.MODEL_ATTEMPTS_MAX,
+            onValueChange = {
+                viewModel.configureLocalAgent(
+                    local.mainMaxSteps,
+                    local.subagentMaxSteps,
+                    it,
+                    local.modelSelection.workerProfileId,
+                )
             },
+            onCommitted = reportSaved,
         )
 
-        AgentWorkerModelSettingRow(local) { viewModel.configureLocalAgent(local.mainMaxSteps, local.subagentMaxSteps, local.modelAttempts, it) }
+        AgentWorkerModelSettingRow(local) {
+            viewModel.configureLocalAgent(
+                local.mainMaxSteps,
+                local.subagentMaxSteps,
+                local.modelAttempts,
+                it,
+            )
+        }
     }
 }
 
-/** 数值行：标签 + 说明在左，−/值/＋ 在右。 */
+/** 数值行：支持单击、长按连续步进、直接输入；步数项可一键设为最大值。 */
 @Composable
 private fun StepperRow(
     label: String,
     hint: String?,
     value: Int,
     range: IntRange,
-    onDelta: (Int) -> Unit,
+    maximumLabel: String? = null,
+    onValueChange: (Int) -> Unit,
+    onCommitted: () -> Unit,
 ) {
     val colors = DsTheme.colors
+    val focusManager = LocalFocusManager.current
+    var draft by remember(value) { mutableStateOf(value.toString()) }
+
+    fun applyValue(candidate: Int, announce: Boolean) {
+        val next = candidate.coerceIn(range.first, range.last)
+        if (next == value) return
+        onValueChange(next)
+        if (announce) onCommitted()
+    }
+
+    fun commitDraft() {
+        val parsed = draft.toIntOrNull()
+        if (parsed == null) {
+            draft = value.toString()
+            return
+        }
+        val next = parsed.coerceIn(range.first, range.last)
+        draft = next.toString()
+        if (next != value) {
+            onValueChange(next)
+            onCommitted()
+        }
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.xsmall),
         verticalAlignment = Alignment.CenterVertically,
@@ -164,25 +214,65 @@ private fun StepperRow(
         }
         DsButton(
             text = "−",
-            onClick = { onDelta(-1) },
+            onClick = { applyValue(value - 1, announce = true) },
+            onHoldRepeat = { applyValue(value - 1, announce = false) },
             enabled = value > range.first,
             size = DsButtonSize.Small,
             variant = DsButtonVariant.Ghost,
         )
-        Text(
-            value.toString(),
-            style = DsType.std14Strong.withReadingWeight(),
-            color = colors.labelPrimary,
-            modifier = Modifier.widthIn(min = 30.dp),
-            textAlign = TextAlign.Center,
-        )
+        Surface(
+            modifier = Modifier.width(64.dp),
+            shape = DsShapes.buttonSmall,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, base = colors.bgLayer2),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth().heightIn(min = DsSpacing.touchTarget),
+                contentAlignment = Alignment.Center,
+            ) {
+                BasicTextField(
+                    value = draft,
+                    onValueChange = { next ->
+                        if (next.length <= 9 && next.all(Char::isDigit)) draft = next
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { focus ->
+                            if (!focus.isFocused) commitDraft()
+                        }
+                        .padding(horizontal = DsSpacing.xsmall),
+                    singleLine = true,
+                    textStyle = DsType.std14Strong.withReadingWeight().copy(
+                        color = colors.labelPrimary,
+                        textAlign = TextAlign.Center,
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { focusManager.clearFocus() },
+                    ),
+                    cursorBrush = SolidColor(colors.accent),
+                )
+            }
+        }
         DsButton(
             text = "＋",
-            onClick = { onDelta(1) },
+            onClick = { applyValue(value + 1, announce = true) },
+            onHoldRepeat = { applyValue(value + 1, announce = false) },
             enabled = value < range.last,
             size = DsButtonSize.Small,
             variant = DsButtonVariant.Ghost,
         )
+        maximumLabel?.let { labelText ->
+            DsButton(
+                text = labelText,
+                onClick = { applyValue(range.last, announce = true) },
+                enabled = value < range.last,
+                size = DsButtonSize.Small,
+                variant = DsButtonVariant.Ghost,
+            )
+        }
     }
 }
 
