@@ -66,7 +66,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) = engine.saveModelConfiguration(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
     fun selectModel(id: String) = modelRuntime.selectModel(id)
     fun removeModel(id: String) = engine.removeModelProfile(id)
-    suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null) = engine.testModelConfiguration(apiKey, model, baseUrl, protocol, profileId)
+    suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null) = modelRuntime.testConfiguration(apiKey, model, baseUrl, protocol, profileId)
     fun configureImageInputMode(mode: LocalImageInputMode) = modelSettings.configureImageInputMode(mode)
     fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int, workerProfileId: String?) =
         settingsCoordinator.configureRuntimeLimits(main, subagent, attempts).also {
