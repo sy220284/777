@@ -13,6 +13,8 @@ import com.labteto.dshmobile.local.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.LocalWorkspaceFile
 import com.labteto.dshmobile.local.LocalWorkspaceFilePreview
+import com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_MEMBERS
+import com.labteto.dshmobile.local.chat.MIN_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -34,6 +36,7 @@ class LocalSessionRuntime @Inject constructor(
         galleryStoryId: String? = null,
         freshGalleryStory: Boolean = false,
         chatMode: LocalChatMode? = null,
+        groupEntries: List<PersonaGalleryEntry> = emptyList(),
     ) = engine.createSession(
         mode = mode,
         usageMode = usageMode,
@@ -41,6 +44,28 @@ class LocalSessionRuntime @Inject constructor(
         galleryStoryId = galleryStoryId,
         freshGalleryStory = freshGalleryStory,
         chatMode = chatMode,
+        groupEntries = groupEntries,
+    )
+
+    internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean {
+        val selected = entries
+            .distinctBy(PersonaGalleryEntry::id)
+            .take(MAX_GROUP_CHAT_MEMBERS)
+        if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
+        val snapshot = state.value
+        if (snapshot.loading || snapshot.kernel.running) return false
+        return createSession(
+            mode = LocalConversationMode.INDEPENDENT,
+            usageMode = LocalUsageMode.CHAT,
+            chatMode = LocalChatMode.GROUP,
+            groupEntries = selected,
+        )
+    }
+
+    internal fun createSingleChatSession(): Boolean = createSession(
+        mode = LocalConversationMode.INDEPENDENT,
+        usageMode = LocalUsageMode.CHAT,
+        chatMode = LocalChatMode.SINGLE,
     )
 
     internal fun switchUsageMode(mode: LocalUsageMode) = engine.switchUsageMode(mode)
