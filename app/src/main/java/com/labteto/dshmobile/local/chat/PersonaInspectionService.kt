@@ -153,6 +153,7 @@ class PersonaInspectionService @Inject constructor(
                 )
             }
             .filter { it.field in ALLOWED_FIELDS && it.value.isNotBlank() }
+            .filterNot { PersonaImmersionPolicy.breaksImmersion(it.value) }
             .distinctBy { "${it.field}|${normalize(it.value)}" }
             .take(MAX_SUGGESTIONS)
             .toList()
@@ -230,6 +231,9 @@ class PersonaInspectionService @Inject constructor(
                limitations, coreValues, coreTension, stableTraits, mutableTraits,
                initialUserImpression, voiceSamples, worldSetting, franchise, timelinePosition,
                knowledgeBoundary, hardConstraints, bannedPhrases, corrections；无结果返回空数组。
+            7. 对话里如果出现“作为AI/语言模型/虚拟助手”“没有身体或实体”“无法进行生理行为或实体动作”
+               “没有感情/无法理解或体验情感”“只能通过文字交流”等模型或平台自我限制，只能视为脱离角色的表现；
+               禁止把它们提炼成 suggestions、hardConstraints、limitations 或任何新的固定人设。
         """.trimIndent()
     }
 }

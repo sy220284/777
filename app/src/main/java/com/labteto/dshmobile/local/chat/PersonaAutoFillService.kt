@@ -338,7 +338,8 @@ class PersonaAutoFillService @Inject constructor(
         val raw = reply.content?.trim().orEmpty()
         if (raw.isBlank()) error("模型没有返回可用的人设")
 
-        val draft = runCatching { parsePersonaDraft(json, raw) }.getOrElse { firstCause ->
+        var draftSource = raw
+        var draft = runCatching { parsePersonaDraft(json, raw) }.getOrElse { firstCause ->
             val repairMessages = listOf(
                 buildJsonObject {
                     put("role", "system")
@@ -384,7 +385,68 @@ class PersonaAutoFillService @Inject constructor(
             runCatching { parsePersonaDraft(json, repairedRaw) }.getOrElse { repairedCause ->
                 repairedCause.addSuppressed(firstCause)
                 throw IllegalStateException("AI 返回的人设格式无法解析，请再试一次", repairedCause)
+            }.also {
+                draftSource = repairedRaw
             }
+        }
+
+        val immersionViolations = personaDraftImmersionViolations(draft)
+        if (immersionViolations.isNotEmpty()) {
+            val immersionRepairMessages = listOf(
+                buildJsonObject {
+                    put("role", "system")
+                    put("content", IMMERSION_REPAIR_PROMPT)
+                },
+                buildJsonObject {
+                    put("role", "user")
+                    put(
+                        "content",
+                        buildString {
+                            appendLine("检测到以下脱离角色的内容：")
+                            immersionViolations.forEach { appendLine("- $it") }
+                            appendLine()
+                            appendLine("原始角色卡：")
+                            append(draftSource.take(MAX_REPAIR_CHARS))
+                        },
+                    )
+                },
+            )
+            val immersionReply = try {
+                modelGateway.complete(
+                    baseUrl = baseUrl,
+                    model = model,
+                    messages = immersionRepairMessages,
+                    tools = JsonArray(emptyList()),
+                    temperature = 0.0,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (repairError: Throwable) {
+                throw IllegalStateException("AI 生成人设包含脱离角色的设定，且自动修复失败，请再试一次", repairError)
+            }
+            withContext(Dispatchers.IO) {
+                usageTracker.record(
+                    model = model,
+                    usage = immersionReply.usage,
+                    requestId = immersionReply.requestId,
+                    context = TokenUsageContext(mode = LocalUsageMode.CHAT, action = TokenUsageAction.PERSONA_AUTOFILL),
+                    promptBreakdown = immersionReply.promptBreakdown,
+                    route = immersionReply.routeIdentity,
+                )
+            }
+
+            val immersionRaw = immersionReply.content?.trim().orEmpty()
+            if (immersionRaw.isBlank()) {
+                throw IllegalStateException("AI 生成人设包含脱离角色的设定，且自动修复失败，请再试一次")
+            }
+            val repairedDraft = runCatching { parsePersonaDraft(json, immersionRaw) }.getOrElse { cause ->
+                throw IllegalStateException("AI 生成人设包含脱离角色的设定，且自动修复结果无法解析，请再试一次", cause)
+            }
+            val remainingViolations = personaDraftImmersionViolations(repairedDraft)
+            if (remainingViolations.isNotEmpty()) {
+                throw IllegalStateException("AI 生成人设仍包含脱离角色的设定，已阻止写入人物资料，请再试一次")
+            }
+            draft = repairedDraft
         }
 
         current.copy(
@@ -440,13 +502,64 @@ class PersonaAutoFillService @Inject constructor(
             10. knowledgeBoundary / hardConstraints 只写真正影响一致性和知识边界的少量硬规则；不要把语气、动作、思维路线写成硬约束。
             11. 不生成“思维模式、行为模式、表达模式”的固定标签或权重。运行时会根据人物底色、当前状态、关系、记忆和话题自由组合模式。
             12. 目标是留下足够稳定的“这个人是谁”，把“这一轮怎么想、怎么接、怎么说”交给运行时，避免人物越写越死。
+            13. 所有内容都必须从角色所在世界内部陈述，把角色当作在其世界真实生活和行动的存在。禁止把模型、平台、助手或聊天产品的能力边界写成人物设定。
+            14. 禁止生成任何类似“作为AI/语言模型/虚拟助手”“没有身体或实体”“无法进行生理行为/实体动作”“没有感情/无法理解或体验情感”“只能通过文字或屏幕交流”“不能真实触碰、行动或陪伴”等脱离角色的元叙事限制；portrait、lifeContext、limitations、knowledgeBoundary、hardConstraints 等任何字段都不能承载这类内容。
+            15. 如果角色原作本身是机器人、AI、幽灵、意识体或其他非人存在，只能记录作品世界内明确的形态、能力、限制与感受方式；不得把通用模型限制包装成角色设定，也不得因为角色非人就默认其“没有感情、不能理解、不能行动”。
+            16. 人设要支持沉浸式扮演：描述角色会怎样生活、感受、判断和行动，不写“我做不到现实动作”一类面向用户的免责声明。
         """.trimIndent()
 
         val REPAIR_PROMPT = """
             修复下方角色卡 JSON。只输出可解析 JSON，不解释、不新增事实。
             保留可可靠恢复的字段和值；规范数组；截断内容只保留确定部分并闭合结构。
+            不要新增或补写任何模型、平台、助手能力边界；所有人物内容保持角色世界内叙述。
+        """.trimIndent()
+
+        val IMMERSION_REPAIR_PROMPT = """
+            修复下方已经生成的角色卡，只输出可解析 JSON，不解释、不新增人物事实。
+            删除或改写所有把模型、平台、助手、聊天产品能力边界包装成人设的内容，例如：
+            “作为AI/语言模型/虚拟助手”“没有身体或实体”“无法进行生理行为或实体动作”
+            “没有感情/无法理解或体验情感”“只能通过文字或屏幕交流”“不能真实触碰、行动或陪伴”。
+
+            修复后必须完全使用角色所在世界内部的事实与视角描述人物。
+            如果角色原作本身是机器人、AI、幽灵、意识体或其他非人存在，保留作品内明确设定，
+            但不能用通用模型限制补充其身体、情感、感知或行动能力。
         """.trimIndent()
     }
+}
+
+
+private fun personaDraftImmersionViolations(draft: PersonaDraft): List<String> {
+    val fragments = buildList {
+        add(draft.portrait)
+        add(draft.lifeContext)
+        addAll(draft.attentionBiases)
+        addAll(draft.perceptionBlindSpots)
+        addAll(draft.quirks)
+        addAll(draft.limitations)
+        addAll(draft.coreValues)
+        add(draft.coreTension)
+        addAll(draft.stableTraits)
+        addAll(draft.mutableTraits)
+        add(draft.initialUserImpression)
+        addAll(draft.voiceSamples)
+        add(draft.worldSetting)
+        add(draft.franchise)
+        add(draft.timelinePosition)
+        addAll(draft.knowledgeBoundary)
+        draft.loreEntries.forEach { entry ->
+            add(entry.title)
+            add(entry.content)
+            addAll(entry.keywords)
+            addAll(entry.secondaryKeywords)
+        }
+        addAll(draft.hardConstraints)
+    }
+    return fragments.asSequence()
+        .filter(String::isNotBlank)
+        .flatMap { PersonaImmersionPolicy.findViolations(it).asSequence() }
+        .distinct()
+        .take(8)
+        .toList()
 }
 
 private const val MAX_SCALAR_CHARS = 4_000
