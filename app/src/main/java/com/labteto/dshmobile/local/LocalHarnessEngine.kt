@@ -317,7 +317,7 @@ class LocalHarnessEngine @Inject constructor(
             usageContextProvider = { sessionId, callId -> tokenUsageBridge.resolve(sessionId, callId, TokenUsageAction.VISION) },
         )
     }
-    private var currentSessionId = preferences.getString(KEY_SESSION_ID, null)
+    private val initialSessionId = preferences.getString(KEY_SESSION_ID, null)
         ?: UUID.randomUUID().toString()
     // Opening the log scans its latest segment. The startup coroutine initializes it after any
     // legacy migration, before the loading screen admits session actions.
@@ -336,7 +336,7 @@ class LocalHarnessEngine @Inject constructor(
     private val _state = runtimeStateStore.initialize(
         LocalHarnessState(
             workspacePath = workspace.path,
-            sessionId = currentSessionId,
+            sessionId = initialSessionId,
             usage = usageTracker.state.value,
             chatStyleGuardEnabled = preferences.getBoolean(
                 LocalHarnessSettingsCoordinator.KEY_CHAT_STYLE_GUARD,
@@ -350,6 +350,9 @@ class LocalHarnessEngine @Inject constructor(
     internal val state: StateFlow<LocalHarnessState> = runtimeStateStore.state
     internal val streamingState: StateFlow<LocalHarnessStreamingState> = streamingPreviewStore.state
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
+
+    private val currentSessionId: String
+        get() = runtimeStateStore.currentSessionId
 
     private val modelAccountStateCoordinator by lazy {
         LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isModelIdentityLocked)
@@ -751,7 +754,7 @@ class LocalHarnessEngine @Inject constructor(
             diaryStore = chatDiaryStore,
             currentSessionId = { currentSessionId },
             activateSession = { id, transcriptCursor ->
-                currentSessionId = id
+                runtimeStateStore.activateSession(id)
                 preferences.edit().putString(KEY_SESSION_ID, id).apply()
                 eventLog = eventLogFor(id)
                 transcriptProjectionCursor = transcriptCursor
