@@ -30,48 +30,62 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 
 ```text
 纯文档 / 仓库说明
-→ scope + merge-gate
+→ scope → merge-gate
 
-普通 GitHub Actions / 自动化脚本
-→ automation-check + merge-gate
-
-CI 控制面 / 静态门禁脚本
-→ automation-check（含分类器自测、YAML / Python / Shell、静态门禁行为）+ merge-gate
+普通 GitHub Actions / 自动化脚本 / CI 控制面
+→ static-gates → merge-gate
 
 纯 JVM / 单元测试 / Reference Validation / Mock Harness
-→ preflight + merge-gate
+→ static-gates → unit-tests → merge-gate
+
+官方 fixture / 上游锁定来源变化
+→ static-gates + fixture-provenance + unit-tests → merge-gate
 
 纯 androidTest
-→ Android 16 + Android 17 + merge-gate
+→ static-gates
+→ device-artifacts-x86
+→ Android 16 + Android 17（并行，共用同一组 APK）
+→ merge-gate
 
 产品源码 / 资源 / Gradle / Runtime / 未知路径
-→ preflight + build + Android 16 + Android 17 + merge-gate
+→ static-gates
+→ unit-tests + build-arm64 + device-artifacts-x86（三路并行）
+→ Android 16 + Android 17（并行，共用 device-artifacts-x86）
+→ merge-gate
 ```
 
-修改 APK 结构校验或 Android 启动 smoke 脚本仍归入完整 CI。`workflow_dispatch` 始终强制完整 CI。
+`.github/release-version` 直接参与 `versionName/versionCode` 计算，因此按完整产品变更处理，main push 不得忽略。修改 APK 结构校验或 Android 启动 smoke 脚本仍归入完整 CI。手动 `workflow_dispatch` 始终强制完整 CI，并包含 fixture provenance。
 
-主线 `push` 对纯文档、自动化和测试-only 改动不重复启动产品 CI，避免仅仓库维护变更触发 APK 发布链；产品改动仍执行主线完整组合验证。
+主线 `push` 对纯文档、普通自动化和测试-only 改动不重复启动产品 CI；产品、构建、Runtime 与版本身份变化仍执行完整组合验证。
 
-### automation-check
+### static-gates
+
+该阶段优先快速失败，避免明显错误继续消耗 Gradle / 模拟器 Runner：
 
 - CI 范围分类器自测。
-- 所有 workflow YAML 语法解析。
-- `.github/scripts` Python / Shell 语法检查。
-- UI / Kotlin / 性能 / 架构等静态门禁实际执行。
-- `.github/release-version` 格式检查。
+- actionlint 工作流语义校验；下载版本和 SHA-256 固定。
+- 所有外部 GitHub Actions 必须固定到 40 位提交 SHA。
+- Python / Shell 语法校验。
+- Gradle Wrapper distribution SHA、依赖 verification metadata、版本目录禁止动态版本。
+- 新增 Gradle 模块如存在单元测试，必须被 CI 显式覆盖。
+- Android Manifest / exported component / FileProvider / 模型 HTTPS-or-loopback 安全边界。
+- UI 硬编码、Design System、通知、Kotlin 风险、性能、架构门禁。
+- Runtime 压缩器自测。
+- 发布版本格式。
+- 防止重新引入 Android 16/17 各自 `connectedDebugAndroidTest` 重复构建。
 
-### preflight
+### fixture-provenance
 
-1. 刷新并核验官方黄金 fixture 来源。
-2. UI 硬编码中文门禁。
-3. Design System 边界门禁。
-4. Kotlin 风险模式门禁。
-5. 本机性能不变量门禁。
-6. 本机架构边界门禁。
-7. 全模块单元测试。
-8. 官方 Harness conformance。
+只有官方 fixture 来源、刷新脚本或上游锁定发生变化时才执行：
 
-单元测试覆盖：
+1. 使用 Node 22 / corepack 刷新锁定官方黄金 fixture。
+2. 要求刷新结果与仓库中的黄金结果完全一致。
+
+普通产品代码变化继续运行 `:reference-validation:test`，但不再每次额外联网刷新固定 fixture。
+
+### unit-tests
+
+一次 Gradle invocation 覆盖全部 JVM / Android unit tests 与 Harness conformance：
 
 ```text
 :core:test
@@ -81,19 +95,16 @@ CI 控制面 / 静态门禁脚本
 :harness-device-android:testDebugUnitTest
 :mock-harness:test
 :app:testDebugUnitTest
-```
-
-一致性：
-
-```text
 :reference-validation:test
 ```
 
-### build
+### build-arm64
+
+同一次 Gradle invocation 执行：
 
 - `:app:lintDebug`
 - `:app:assembleOptimized`
-- Android APK 结构 / 16 KB 对齐验证
+- arm64-v8a APK 结构 / ABI / ELF / 16 KiB 对齐 / 签名验证
 - optimized APK 体积预算
 
 当前 CI APK 上限：
@@ -102,38 +113,43 @@ CI 控制面 / 静态门禁脚本
 94371840 bytes（90 MiB）
 ```
 
-体积预算属于硬门禁；优化应降低实际体积，不通过提高预算解决失败。
+Runtime 下载使用按 OS + ABI + Runtime 脚本哈希隔离的 Actions Cache；仍由原脚本执行版本与 SHA 校验，缓存不替代完整性验证。
 
-### Android 16
+### device-artifacts-x86
 
-x86_64 模拟器：
+一次构建生成：
 
-- connected Android tests
-- debug APK 安装和启动
-- optimized APK 安装和启动
-- 运行时使用 `DSH_RUNTIME_ABIS=x86_64`
+- `app-debug.apk`
+- `app-debug-androidTest.apk`
+- `app-optimized.apk`
 
-### Android 17
+并先对 x86_64 optimized APK 执行结构 / ABI / ELF / 16 KiB 校验，再作为短期 Artifact 交给两套 Android 模拟器。Android 16 / 17 因而验证同一套二进制，不再分别调用 Gradle 重建 App。
 
-Android 37 / 16 KB page-size 模拟器：
+### Android 16 / Android 17
 
-- connected Android tests
-- debug APK 安装和启动
-- optimized APK 安装和启动
-- 失败时输出 connected test XML
+两条 lane 在 `device-artifacts-x86` 成功后并行：
+
+- 下载同一 `android-x86_64-test-apks`。
+- 安装 debug + androidTest APK。
+- 直接调用 `AndroidJUnitRunner` 执行 instrumentation。
+- 验证 debug 启动。
+- 安装相同 optimized APK 并执行 startup smoke。
+- Android 17 继续使用 Android 37 / 16 KiB page-size 系统镜像。
 
 ### merge-gate
 
-`merge-gate` 只有在以下全部成功时通过：
+`merge-gate` 根据 scope 只要求本次选中的 lane 必须成功；未选择 lane 可以合法 skipped，失败或取消不能放行。完整产品改动要求：
 
 ```text
-preflight
-build
+static-gates
+unit-tests
+build-arm64
+device-artifacts-x86
 android-16-instrumented
 android-17-instrumented
 ```
 
-失败、取消或跳过任何必需 lane 都不能放行。
+fixture 来源变化再额外要求 `fixture-provenance`。
 
 ## 官方差分验证
 

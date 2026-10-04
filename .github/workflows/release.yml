@@ -1,7 +1,7 @@
 name: Release APK
 
 'on':
-  # 主线 CI 成功后直接发布；每 30 分钟定时任务做漏触发补偿。
+  # 主线 CI 成功后直接发布；每 6 小时低频兜底检查漏触发。
   workflow_run:
     workflows: ['CI']
     types: [completed]
@@ -10,7 +10,7 @@ name: Release APK
     tags:
       - 'v*'
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '17 */6 * * *'
   workflow_dispatch:
 
 permissions:
@@ -49,7 +49,6 @@ jobs:
 
           if [ "$GITHUB_EVENT_NAME" = "workflow_run" ]; then
             RELEASE_SHA="$WORKFLOW_RUN_SHA"
-            echo "release_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
             if [ "$WORKFLOW_RUN_CONCLUSION" != "success" ]; then
               echo "CI 未成功，本次不进入发布：$WORKFLOW_RUN_CONCLUSION"
               skip_release
@@ -57,7 +56,6 @@ jobs:
             fi
           else
             RELEASE_SHA="$(git rev-parse HEAD)"
-            echo "release_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
           fi
 
           IS_TAG=false
@@ -78,37 +76,61 @@ jobs:
               return 1
             fi
 
-            blocking_files="$(
-              printf '%s' "$comparison" |
-                jq -r '.files[]?.filename' |
-                grep -Ev '(^docs/|\.md$|^screen\.png$)' || true
-            )"
-            [ -z "$blocking_files" ]
+            changes="$RUNNER_TEMP/release-change-files.txt"
+            printf '%s' "$comparison" | jq -r '.files[]?.filename' > "$changes"
+            python3 "$RUNNER_TEMP/classify-ci-scope.py" --paths-file "$changes" --release-safe
+          }
+
+          successful_ci_count() {
+            candidate_sha="$1"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$candidate_sha&status=success&per_page=100" \
+              --jq '[.workflow_runs[] | select(.name == "CI" and .conclusion == "success")] | length'
           }
 
           if [ "$IS_TAG" = "false" ]; then
             MAIN_SHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+            git fetch --no-tags origin main --depth=1 >/dev/null 2>&1
+            git show FETCH_HEAD:.github/scripts/classify-ci-scope.py > "$RUNNER_TEMP/classify-ci-scope.py"
+
+            if [ "$GITHUB_EVENT_NAME" != "workflow_run" ] && [ "$(successful_ci_count "$RELEASE_SHA")" -eq 0 ]; then
+              echo "当前 main 没有直接对应的成功 CI，向后寻找最近的发布等价已验证候选。"
+              FOUND_CANDIDATE=false
+              while IFS= read -r candidate_sha; do
+                [ -n "$candidate_sha" ] || continue
+                if release_equivalent_to_main "$candidate_sha" "$MAIN_SHA"; then
+                  RELEASE_SHA="$candidate_sha"
+                  FOUND_CANDIDATE=true
+                  echo "找到最近发布等价候选：$RELEASE_SHA -> $MAIN_SHA"
+                  break
+                fi
+              done < <(
+                gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?branch=main&status=success&per_page=100" \
+                  --jq '.workflow_runs[] | select(.name == "CI" and .event == "push" and .conclusion == "success") | .head_sha' |
+                  awk '!seen[$0]++' |
+                  head -n 50
+              )
+              if [ "$FOUND_CANDIDATE" != "true" ]; then
+                echo "当前 main 与最近成功 CI 之间没有发布等价候选，本次不发布。"
+                skip_release
+                exit 0
+              fi
+            fi
+
             if ! release_equivalent_to_main "$RELEASE_SHA" "$MAIN_SHA"; then
-              echo "候选提交已经被影响构建的 main 变更淘汰：$RELEASE_SHA != $MAIN_SHA"
+              echo "候选提交已经被影响发布产物的 main 变更淘汰：$RELEASE_SHA != $MAIN_SHA"
               skip_release
               exit 0
             fi
             if [ "$RELEASE_SHA" != "$MAIN_SHA" ]; then
-              echo "main 仅有 CI 忽略的文档变更，继续发布已验证候选：$RELEASE_SHA -> $MAIN_SHA"
+              echo "main 仅有不影响发布产物的变更，继续发布已验证候选：$RELEASE_SHA -> $MAIN_SHA"
             fi
+          elif [ "$GITHUB_EVENT_NAME" != "workflow_run" ] && [ "$(successful_ci_count "$RELEASE_SHA")" -eq 0 ]; then
+            echo "标签提交尚无成功 CI 记录，跳过发布：$RELEASE_SHA"
+            skip_release
+            exit 0
           fi
 
-          if [ "$GITHUB_EVENT_NAME" != "workflow_run" ]; then
-            SUCCESSFUL_CI_COUNT="$(
-              gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$RELEASE_SHA&status=success&per_page=100" \
-                --jq '[.workflow_runs[] | select(.name == "CI" and .conclusion == "success")] | length'
-            )"
-            if [ "$SUCCESSFUL_CI_COUNT" -eq 0 ]; then
-              echo "提交尚无成功 CI 记录，跳过发布：$RELEASE_SHA"
-              skip_release
-              exit 0
-            fi
-          fi
+          echo "release_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
 
           RELEASE_TAGS="$(
             gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
@@ -188,6 +210,10 @@ jobs:
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .gradle/runtime-cache
+          key: runtime-${{ runner.os }}-arm64-v8a-${{ hashFiles('tools/runtime/prepare-termux-*.sh', 'tools/runtime/prepare-hdiffpatch.sh') }}
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
 
       - name: Validate release signing material
@@ -444,18 +470,17 @@ jobs:
 
           comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/$RELEASE_SHA...$MAIN_SHA" 2>/dev/null || true)"
           status="$(printf '%s' "$comparison" | jq -r '.status // empty')"
-          blocking_files="$(
-            printf '%s' "$comparison" |
-              jq -r '.files[]?.filename' |
-              grep -Ev '(^docs/|\.md$|^screen\.png$)' || true
-          )"
+          changes="$RUNNER_TEMP/release-change-files.txt"
+          printf '%s' "$comparison" | jq -r '.files[]?.filename' > "$changes"
+          git fetch --no-tags origin main --depth=1 >/dev/null 2>&1
+          git show FETCH_HEAD:.github/scripts/classify-ci-scope.py > "$RUNNER_TEMP/classify-ci-scope.py"
 
-          if [ "$status" = "ahead" ] && [ -z "$blocking_files" ]; then
+          if [ "$status" = "ahead" ] && python3 "$RUNNER_TEMP/classify-ci-scope.py" --paths-file "$changes" --release-safe; then
             echo "current=true" >> "$GITHUB_OUTPUT"
-            echo "构建期间 main 仅增加 CI 忽略的文档变更，继续发布已验证候选。"
+            echo "构建期间 main 仅增加不影响发布产物的变更，继续发布已验证候选。"
           else
             echo "current=false" >> "$GITHUB_OUTPUT"
-            echo "构建期间 main 已出现影响构建的变更：$MAIN_SHA，本次旧版本不发布。"
+            echo "构建期间 main 已出现影响发布产物的变更：$MAIN_SHA，本次旧版本不发布。"
           fi
 
       - name: Publish GitHub Release

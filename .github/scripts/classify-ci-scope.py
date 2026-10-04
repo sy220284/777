@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Classify changed paths into the minimum safe CI lanes."""
+"""Classify changed paths into the minimum safe CI lanes and release impact."""
 
 from __future__ import annotations
 
@@ -12,19 +12,25 @@ from typing import Iterable
 @dataclass(frozen=True)
 class CiPlan:
     scope: str
-    run_automation: bool
-    run_preflight: bool
+    run_static: bool
+    run_unit: bool
     run_build: bool
+    run_device: bool
     run_android: bool
+    run_fixture: bool
+    affects_release: bool
 
     def as_outputs(self) -> dict[str, str]:
         return {
             "scope": self.scope,
-            "run_automation": str(self.run_automation).lower(),
-            "run_preflight": str(self.run_preflight).lower(),
+            "run_static": str(self.run_static).lower(),
+            "run_unit": str(self.run_unit).lower(),
             "run_build": str(self.run_build).lower(),
+            "run_device": str(self.run_device).lower(),
             "run_android16": str(self.run_android).lower(),
             "run_android17": str(self.run_android).lower(),
+            "run_fixture": str(self.run_fixture).lower(),
+            "affects_release": str(self.affects_release).lower(),
         }
 
 
@@ -39,6 +45,19 @@ FULL_VALIDATION_SCRIPTS = {
     ".github/scripts/verify-android16-apk.sh",
     ".github/scripts/smoke-test-android-startup.sh",
     ".github/scripts/check-apk-runtime-layout.py",
+}
+FIXTURE_PROVENANCE_PATHS = {
+    "upstream/deepseek-harness.lock.json",
+    "tools/reference-validation/official-runner.ts",
+    "tools/reference-validation/refresh-official-fixtures.sh",
+    "tools/reference-validation/package.json",
+    "tools/reference-validation/package-lock.json",
+}
+CI_CONTROL_FILES = {
+    ".github/workflows/ci.yml",
+    ".github/scripts/classify-ci-scope.py",
+    ".github/scripts/check-ci-repository-integrity.py",
+    ".github/scripts/check-android-security-boundaries.py",
 }
 
 
@@ -77,19 +96,13 @@ def is_test_tooling(path: str) -> bool:
 
 
 def is_ci_control(path: str) -> bool:
-    return (
-        path == ".github/workflows/ci.yml"
-        or path == ".github/scripts/classify-ci-scope.py"
-        or (path.startswith(".github/scripts/check-") and path.endswith(".py"))
+    return path in CI_CONTROL_FILES or (
+        path.startswith(".github/scripts/check-") and path.endswith(".py")
     )
 
 
 def is_automation(path: str) -> bool:
-    return (
-        path.startswith(".github/workflows/")
-        or path.startswith(".github/scripts/")
-        or path == ".github/release-version"
-    )
+    return path.startswith(".github/workflows/") or path.startswith(".github/scripts/")
 
 
 def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
@@ -97,7 +110,9 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
     ci_control = False
     unit = False
     android = False
+    fixture = force_full
     full = force_full
+    affects_release = force_full
 
     for raw in paths:
         path = normalize(raw)
@@ -105,6 +120,17 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
             continue
 
         if is_documentation(path) or is_repository_metadata(path):
+            continue
+
+        if path == ".github/release-version":
+            # versionName/versionCode are read directly by app/build.gradle.kts.
+            full = True
+            affects_release = True
+            continue
+
+        if path in FIXTURE_PROVENANCE_PATHS:
+            unit = True
+            fixture = True
             continue
 
         if path in FULL_VALIDATION_SCRIPTS:
@@ -129,12 +155,15 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
             unit = True
             continue
 
-        # Any product/build/runtime/unknown path falls back to the full matrix.
+        # Product/build/runtime/unknown files conservatively receive the full matrix.
         full = True
+        affects_release = True
 
-    run_preflight = full or unit
+    run_static = automation or unit or android or full
+    run_unit = unit or full
     run_build = full
-    run_android = full or android
+    run_device = android or full
+    run_android = android or full
 
     if full:
         scope = "full"
@@ -155,41 +184,73 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
 
     return CiPlan(
         scope=scope,
-        run_automation=automation,
-        run_preflight=run_preflight,
+        run_static=run_static,
+        run_unit=run_unit,
         run_build=run_build,
+        run_device=run_device,
         run_android=run_android,
+        run_fixture=fixture,
+        affects_release=affects_release,
     )
 
 
 def self_test() -> None:
     cases = [
-        (["README.md"], CiPlan("docs", False, False, False, False)),
-        (["docs/VALIDATION.md", "screen.png"], CiPlan("docs", False, False, False, False)),
-        ([".github/workflows/release.yml"], CiPlan("automation", True, False, False, False)),
-        ([".github/workflows/ci.yml"], CiPlan("ci-control", True, False, False, False)),
+        (
+            ["README.md"],
+            CiPlan("docs", False, False, False, False, False, False, False),
+        ),
+        (
+            ["docs/VALIDATION.md", "screen.png"],
+            CiPlan("docs", False, False, False, False, False, False, False),
+        ),
+        (
+            [".github/workflows/release.yml"],
+            CiPlan("automation", True, False, False, False, False, False, False),
+        ),
+        (
+            [".github/workflows/ci.yml"],
+            CiPlan("ci-control", True, False, False, False, False, False, False),
+        ),
         (
             [".github/scripts/check-local-performance-invariants.py"],
-            CiPlan("ci-control", True, False, False, False),
+            CiPlan("ci-control", True, False, False, False, False, False, False),
         ),
-        (["app/src/test/java/example/Test.kt"], CiPlan("unit-test", False, True, False, False)),
+        (
+            [".github/release-version"],
+            CiPlan("full", True, True, True, True, True, False, True),
+        ),
+        (
+            ["app/src/test/java/example/Test.kt"],
+            CiPlan("unit-test", True, True, False, False, False, False, False),
+        ),
         (
             ["app/src/androidTest/java/example/Test.kt"],
-            CiPlan("android-test", False, False, False, True),
+            CiPlan("android-test", True, False, False, True, True, False, False),
         ),
-        (["app/src/main/java/example/App.kt"], CiPlan("full", False, True, True, True)),
-        (["build.gradle.kts"], CiPlan("full", False, True, True, True)),
+        (
+            ["upstream/deepseek-harness.lock.json"],
+            CiPlan("unit-test", True, True, False, False, False, True, False),
+        ),
+        (
+            ["app/src/main/java/example/App.kt"],
+            CiPlan("full", True, True, True, True, True, False, True),
+        ),
+        (
+            ["build.gradle.kts"],
+            CiPlan("full", True, True, True, True, True, False, True),
+        ),
         (
             ["README.md", "app/src/main/java/example/App.kt"],
-            CiPlan("full", False, True, True, True),
+            CiPlan("full", True, True, True, True, True, False, True),
         ),
         (
             [".github/workflows/release.yml", "app/src/test/java/example/Test.kt"],
-            CiPlan("mixed-light", True, True, False, False),
+            CiPlan("mixed-light", True, True, False, False, False, False, False),
         ),
         (
             [".github/scripts/verify-android16-apk.sh"],
-            CiPlan("full", True, True, True, True),
+            CiPlan("full", True, True, True, True, True, False, False),
         ),
     ]
     for paths, expected in cases:
@@ -203,6 +264,7 @@ def main() -> None:
     parser.add_argument("--paths-file", type=Path)
     parser.add_argument("--github-output", type=Path)
     parser.add_argument("--force-full", action="store_true")
+    parser.add_argument("--release-safe", action="store_true")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
 
@@ -216,8 +278,15 @@ def main() -> None:
 
     paths = args.paths_file.read_text(encoding="utf-8").splitlines()
     plan = classify(paths, force_full=args.force_full)
-    outputs = plan.as_outputs()
 
+    if args.release_safe:
+        if plan.affects_release:
+            print(f"Release-impacting scope: {plan.scope}")
+            raise SystemExit(1)
+        print(f"Release-equivalent scope: {plan.scope}")
+        return
+
+    outputs = plan.as_outputs()
     print(f"CI scope: {plan.scope}")
     for key, value in outputs.items():
         print(f"{key}={value}")
