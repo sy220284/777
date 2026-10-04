@@ -12,34 +12,34 @@ import javax.inject.Singleton
  * capabilities may query it, but they do not own a second map or lifecycle.
  */
 @Singleton
-internal class LocalWorkRunRegistry @Inject constructor() {
+class LocalWorkRunRegistry @Inject constructor() {
     private val bindings = java.util.concurrent.ConcurrentHashMap<String, LocalWorkRunBinding>()
 
-    operator fun get(sessionId: String): LocalWorkRunBinding? = bindings[sessionId]
+    internal operator fun get(sessionId: String): LocalWorkRunBinding? = bindings[sessionId]
 
-    fun state(sessionId: String): LocalHarnessState? = bindings[sessionId]?.state?.value
+    internal fun state(sessionId: String): LocalHarnessState? = bindings[sessionId]?.state?.value
 
-    fun live(sessionId: String): LocalWorkRunBinding? =
+    internal fun live(sessionId: String): LocalWorkRunBinding? =
         bindings[sessionId]?.takeIf { it.job?.isCompleted == false }
 
-    fun attach(binding: LocalWorkRunBinding): LocalWorkRunBinding? =
+    internal fun attach(binding: LocalWorkRunBinding): LocalWorkRunBinding? =
         bindings.put(binding.sessionId, binding)
 
-    fun detach(sessionId: String): LocalWorkRunBinding? = bindings.remove(sessionId)
+    internal fun detach(sessionId: String): LocalWorkRunBinding? = bindings.remove(sessionId)
 
-    fun detach(binding: LocalWorkRunBinding): Boolean =
+    internal fun detach(binding: LocalWorkRunBinding): Boolean =
         bindings.remove(binding.sessionId, binding)
 
-    fun detachAll(sessionIds: Set<String>): List<LocalWorkRunBinding> =
+    internal fun detachAll(sessionIds: Set<String>): List<LocalWorkRunBinding> =
         sessionIds.mapNotNull(bindings::remove)
 
-    fun anyLive(): Boolean = bindings.values.any { it.job?.isCompleted == false }
+    internal fun anyLive(): Boolean = bindings.values.any { it.job?.isCompleted == false }
 
-    fun forEachBinding(block: (LocalWorkRunBinding) -> Unit) {
+    internal fun forEachBinding(block: (LocalWorkRunBinding) -> Unit) {
         bindings.values.toList().forEach(block)
     }
 
-    fun forEachEntry(block: (String, LocalWorkRunBinding) -> Unit) {
+    internal fun forEachEntry(block: (String, LocalWorkRunBinding) -> Unit) {
         bindings.entries.toList().forEach { (sessionId, binding) -> block(sessionId, binding) }
     }
 }
