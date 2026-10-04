@@ -224,6 +224,7 @@ data class AutomationTask(
     val workSessionId: String? = null,
     val status: String = "scheduled",
     val lastRunAt: Long? = null,
+    val lastUserActivityAt: Long? = null,
     val lastResult: String? = null,
     val lastError: String? = null,
     val runReceipts: List<AutomationRunReceipt> = emptyList(),
@@ -309,9 +310,18 @@ class AutomationStore internal constructor(
     }
 
     @Synchronized
-    fun update(id: String, transform: (AutomationTask) -> AutomationTask): AutomationTask? {
+    fun update(id: String, transform: (AutomationTask) -> AutomationTask): AutomationTask? =
+        updateIf(id, predicate = { true }, transform = transform)
+
+    @Synchronized
+    fun updateIf(
+        id: String,
+        predicate: (AutomationTask) -> Boolean,
+        transform: (AutomationTask) -> AutomationTask,
+    ): AutomationTask? {
         val document = read()
         val task = document.tasks.firstOrNull { it.id == id } ?: return null
+        if (!predicate(task)) return null
         val updated = transform(task)
         write(document.copy(tasks = document.tasks.map { if (it.id == id) updated else it }))
         return updated
