@@ -20,7 +20,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
 }
 
 RUNTIME_ENGINE_REFERENCE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 15,
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 14,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 12,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 15,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 4,
@@ -148,6 +148,44 @@ if dependency_count > ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES:
         f"LocalHarnessEngine constructor has {dependency_count} dependencies "
         f"(ratchet: {ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES})"
     )
+
+runtime_state_store = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt")
+)
+if "MutableStateFlow(LocalHarnessState())" not in runtime_state_store:
+    die("LocalRuntimeStateStore must own the aggregate runtime MutableStateFlow")
+if "check(!initialized)" not in runtime_state_store:
+    die("LocalRuntimeStateStore initialization must remain single-owner")
+if "runtimeStateStore.initialize(" not in engine:
+    die("LocalHarnessEngine must initialize state through LocalRuntimeStateStore")
+if "private val runtimeStateStore: LocalRuntimeStateStore" not in constructor.group(1):
+    die("LocalHarnessEngine must receive the shared LocalRuntimeStateStore by injection")
+
+session_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt")
+)
+if "internal val state: StateFlow<LocalHarnessState> = runtimeStateStore.state" not in session_runtime_source:
+    die("LocalSessionRuntime must consume aggregate state from LocalRuntimeStateStore")
+if "engine.state" in session_runtime_source:
+    die("LocalSessionRuntime must not reach through LocalHarnessEngine for aggregate state")
+
+chat_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt")
+)
+if "sessionRuntime.switchChatMode(mode)" not in chat_runtime_source:
+    die("Chat mode switching must route through Session capability")
+if "engine.createGroupChatSession" in chat_runtime_source or "engine.createSingleChatSession" in chat_runtime_source:
+    die("Chat session creation must route through Session capability")
+
+model_configuration = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt")
+)
+if "@Inject constructor(" not in model_configuration or "@Singleton" not in model_configuration:
+    die("LocalModelConfigurationCoordinator must remain an injected Model capability")
+if "LocalDeepSeekSearchCredentialResolver(::readProfiles, apiKeys).resolve()" not in model_configuration:
+    die("DeepSeek search credential resolution must stay inside Model configuration capability")
+if "private val apiKeys: LocalApiKeyStore" in constructor.group(1) or "private val modelConnectionTester: LocalModelConnectionTester" in constructor.group(1):
+    die("LocalHarnessEngine must not re-own Model configuration dependencies")
 
 public_method_count = len(
     re.findall(
