@@ -10,11 +10,6 @@ import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-internal data class PersonaGalleryImportOutcome(
-    val entry: PersonaGalleryEntry,
-    val diaryEntries: List<ChatDiaryEntry> = emptyList(),
-)
-
 @Singleton
 class ChatPersonaGalleryStore internal constructor(
     private val file: File,
@@ -64,12 +59,7 @@ class ChatPersonaGalleryStore internal constructor(
     ): PersonaTransferDocument {
         val entry = readNormalized().entries.firstOrNull { it.id == id }
             ?: error("人物档案不存在")
-        return PersonaTransferDocuments.encode(
-            json = json,
-            entry = history.hydrate(entry),
-            format = format,
-            diaryEntries = diaryEntries,
-        )
+        return PersonaTransferDocuments.encode(json, history.hydrate(entry), format, diaryEntries)
     }
 
     @Synchronized
