@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.LocalHarnessSettingsCoordinator
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionStorageStatus
 import com.labteto.dshmobile.local.LocalWebProvider
+import com.labteto.dshmobile.local.model.LocalModelRuntime
 import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanConnectionTester
@@ -30,6 +31,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val engine: LocalHarnessEngine,
     chatGptAuth: ChatGptAuthCoordinator,
     chatGptPlanTester: ChatGptPlanConnectionTester,
+    private val modelRuntime: LocalModelRuntime,
     private val modelSettings: LocalModelSettingsCoordinator,
     private val settingsCoordinator: LocalHarnessSettingsCoordinator,
     private val web: LocalWebProvider,
@@ -60,9 +62,9 @@ class LocalSettingsRuntime @Inject internal constructor(
     suspend fun selectChatGptAccount(id: String) = chatGpt.select(id)
     suspend fun disconnectChatGptAccount(id: String): String? = chatGpt.disconnect(id)
     suspend fun removeChatGptAccount(id: String): String? = chatGpt.remove(id)
-    fun configureModel(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)
+    fun configureModel(apiKey: String, model: String, baseUrl: String) = modelRuntime.configure(apiKey, model, baseUrl)
     suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) = engine.saveModelConfiguration(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
-    fun selectModel(id: String) = engine.selectModel(id)
+    fun selectModel(id: String) = modelRuntime.selectModel(id)
     fun removeModel(id: String) = engine.removeModelProfile(id)
     suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null) = engine.testModelConfiguration(apiKey, model, baseUrl, protocol, profileId)
     fun configureImageInputMode(mode: LocalImageInputMode) = modelSettings.configureImageInputMode(mode)
@@ -82,5 +84,5 @@ class LocalSettingsRuntime @Inject internal constructor(
     suspend fun exportSessionStorage(output: OutputStream) = engine.exportSessionStorageForUi(output)
     suspend fun environmentInfo() = engine.environmentInfoForUi()
     suspend fun diagnosticReport() = engine.diagnosticReportForUi()
-    fun clearCredential() = engine.clearCredential()
+    fun clearCredential() = modelRuntime.clearCredential()
 }
