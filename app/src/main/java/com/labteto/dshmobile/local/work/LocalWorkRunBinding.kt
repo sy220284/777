@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import kotlinx.coroutines.Job
@@ -96,7 +97,7 @@ internal class LocalWorkRunBinding(
 internal fun projectJobSnapshotToSessionStates(
     jobs: List<LocalJobInfo>,
     visibleState: MutableStateFlow<LocalHarnessState>,
-    activeRuns: java.util.concurrent.ConcurrentHashMap<String, LocalWorkRunBinding>,
+    activeRuns: LocalWorkRunRegistry,
 ) {
     visibleState.update { current ->
         current.copy(
@@ -105,7 +106,7 @@ internal fun projectJobSnapshotToSessionStates(
             ),
         )
     }
-    activeRuns.forEach { (sessionId, binding) ->
+    activeRuns.forEachEntry { sessionId, binding ->
         binding.state.update { current ->
             current.copy(
                 work = current.work.copy(
