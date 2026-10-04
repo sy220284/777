@@ -183,7 +183,7 @@ suspend fun autoFillNewPersona(description: String): Result<PersonaProfile> = ru
     check(!snapshot.loading && !snapshot.running && snapshot.modelState.configured) { "请先配置模型并等待当前回复结束" }
     personaAutoFillService.generate(
         model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
-        profileId = snapshot.modelState.modelState.modelSelection.activeProfileId,
+        profileId = snapshot.modelState.modelSelection.activeProfileId,
         current = PersonaProfile(name = ""),
         recentMessages = emptyList(),
         description = description,
@@ -220,7 +220,7 @@ suspend fun inspectGalleryPersona(
     return runSuspendResult {
         personaInspectionService.inspect(
             model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
-            profileId = snapshot.modelState.modelState.modelSelection.activeProfileId,
+            profileId = snapshot.modelState.modelSelection.activeProfileId,
             persona = entry.persona,
             messages = dialogue,
         )
