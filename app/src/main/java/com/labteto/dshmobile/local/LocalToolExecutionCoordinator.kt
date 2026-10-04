@@ -26,7 +26,7 @@ internal class LocalToolExecutionCoordinator(
     private val registry: ToolRegistry,
     private val currentSessionId: () -> String,
     private val planMode: () -> Boolean,
-    private val enabledOptionalTools: MutableSet<String>,
+    private val enabledOptionalTools: MutableSet<String> = linkedSetOf(),
     private val requestApproval: suspend (
         call: LocalToolCall,
         tool: HarnessTool,
