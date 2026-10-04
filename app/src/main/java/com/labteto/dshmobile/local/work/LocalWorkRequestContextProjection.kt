@@ -27,7 +27,7 @@ internal fun workSteadyStateHistoryBudget(
     extraTokens: Int,
     state: LocalHarnessState,
 ): LocalHistoryBudget {
-    val profile = state.modelState.modelState.modelSelection.activeProfile
+    val profile = state.modelState.modelSelection.activeProfile
     return workSteadyStateHistoryBudget(
         base = base,
         currentHistoryTokens = currentHistoryTokens,
