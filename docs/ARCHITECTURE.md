@@ -403,7 +403,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 状态：**进行中。**
 
-已完成第一块：
+当前已落地的状态迁移（仍须以完整 CI 确认本阶段闭环）：
 
 - 新增 `local/work/LocalWorkState`，由 Work 领域独占 `plan / todos / goal / planMode` 运行态；
 - `LocalHarnessState` 删除上述四个平铺字段，只组合 `work: LocalWorkState`；
@@ -414,10 +414,12 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 继续推进：
 
 - 拆分 Chat 领域运行态；
-- 拆分 Model 配置/选择运行态；
+- Model 已引入 `local/model/LocalModelState`，集中 `configured / model / baseUrl / modelSelection / modelAttempts / imageInputMode`；模型切换、账户、前台与后台执行、子代理、自动任务、能力判断和 UI 投影改读此状态，关联测试同步迁移。
 - 拆分 Kernel 生命周期与资源运行态；
 - UI projection 继续改为组合领域状态；
 - 全程不保留长期双写。
+
+本轮迁移审计修复：Session 快照通过延迟状态读取，确保先捕获日志游标再读取前台状态；回归测试与静态门禁同时覆盖调用边界，防止“旧状态 + 新游标”导致恢复遗漏。Model 迁移中的旧字段读写与重复嵌套访问已逐链收敛；完整编译、单测和 Android 验证仍以最新 Head 的实际 CI 为准。
 
 ### 阶段 3：ChatFeature / WorkFeature 接管业务所有权
 
