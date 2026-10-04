@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionStorageStatus
+import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanConnectionTester
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
@@ -26,6 +27,7 @@ class LocalSettingsRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
     chatGptAuth: ChatGptAuthCoordinator,
     chatGptPlanTester: ChatGptPlanConnectionTester,
+    private val modelSettings: LocalModelSettingsCoordinator,
 ) {
     private val chatGpt = ChatGptSettingsController(
         auth = chatGptAuth,
@@ -56,7 +58,7 @@ class LocalSettingsRuntime @Inject constructor(
     fun selectModel(id: String) = engine.selectModel(id)
     fun removeModel(id: String) = engine.removeModelProfile(id)
     suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null) = engine.testModelConfiguration(apiKey, model, baseUrl, protocol, profileId)
-    fun configureImageInputMode(mode: LocalImageInputMode) = engine.configureImageInputMode(mode)
+    fun configureImageInputMode(mode: LocalImageInputMode) = modelSettings.configureImageInputMode(mode)
     fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int, workerProfileId: String?) = engine.configureRuntimeLimits(main, subagent, attempts).also { engine.configureWorkerProfile(workerProfileId) }
     fun configurePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean) =
         engine.configurePersonalization(rules, autoRecall, autoMemory)
