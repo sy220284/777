@@ -425,7 +425,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 ### 阶段 6：LocalHarnessEngine 收缩为 Runtime Kernel
 
 - 业务规则全部退出 Engine；
-- 收紧构造依赖、方法数、行数和直接消费者门禁；
+- 收紧构造依赖、方法数和直接消费者门禁；
 - 最终按职责更名/替换为 `LocalRuntimeKernel`。
 
 ## 13. 迁移约束
@@ -446,7 +446,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 - 双写；
 - 新旧状态互相同步；
 - Feature 和 Engine 同时拥有同一业务事实；
-- 为通过行数预算只移动代码不移动所有权。
+- 为通过门禁只移动代码不移动所有权。
 
 ## 14. 当前必须保留的系统不变量
 
@@ -469,7 +469,6 @@ CI 必须逐步从“控制热点不继续变大”升级为“证明 3.0 边界
 
 阶段 1 已增加：
 
-- Feature Catalog 文件预算；
 - Chat / Work / Automation / Tools / Settings 一级模块存在性；
 - 重复路由注册拒绝；
 - 所有路由必须唯一归属；
@@ -482,7 +481,7 @@ CI 必须逐步从“控制热点不继续变大”升级为“证明 3.0 边界
 - UI 禁止引用领域 Store / Coordinator；
 - Runtime 对 Engine 的代理引用预算持续下降直至清零；
 - `LocalHarnessState` 字段预算持续下降；
-- Engine 构造依赖 / internal API / 行数预算持续下降。
+- Engine 构造依赖 / internal API / 直接消费者约束持续收紧。
 
 ## 16. 验证与完成标准
 
