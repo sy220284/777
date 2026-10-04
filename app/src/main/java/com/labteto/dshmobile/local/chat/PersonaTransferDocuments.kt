@@ -47,25 +47,30 @@ internal data class PersonaTransferMemorySummary(
 
 @Serializable
 internal data class PersonaArchiveEnvelope(
-    val schema: Int = 3,
+    val schema: Int = 4,
     val source: String = "神言神语",
     val entry: PersonaGalleryEntry,
     val memorySummaries: List<PersonaTransferMemorySummary> = emptyList(),
+    val diaryEntries: List<ChatDiaryEntry> = emptyList(),
 )
 
 internal object PersonaTransferDocuments {
-    private const val MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V3_BASE64"
-    private const val MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V3_BASE64_END -->"
-    private const val LEGACY_MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V2_BASE64"
-    private const val LEGACY_MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V2_BASE64_END -->"
-    private const val WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V3_BASE64:"
-    private const val LEGACY_WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V2_BASE64:"
+    private const val MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V4_BASE64"
+    private const val MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V4_BASE64_END -->"
+    private const val LEGACY_V3_MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V3_BASE64"
+    private const val LEGACY_V3_MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V3_BASE64_END -->"
+    private const val LEGACY_V2_MARKDOWN_PAYLOAD_BEGIN = "<!-- SHENYU_PERSONA_ARCHIVE_V2_BASE64"
+    private const val LEGACY_V2_MARKDOWN_PAYLOAD_END = "SHENYU_PERSONA_ARCHIVE_V2_BASE64_END -->"
+    private const val WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V4_BASE64:"
+    private const val LEGACY_V3_WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V3_BASE64:"
+    private const val LEGACY_V2_WORD_PAYLOAD_PREFIX = "SHENYU_PERSONA_ARCHIVE_V2_BASE64:"
     private const val CUSTOM_XML_ENTRY = "customXml/persona-transfer.xml"
 
     fun encode(
         json: Json,
         entry: PersonaGalleryEntry,
         format: PersonaTransferFormat,
+        diaryEntries: List<ChatDiaryEntry> = emptyList(),
     ): PersonaTransferDocument {
         val portable = portableEntry(entry)
         val archive = PersonaArchiveEnvelope(
@@ -73,6 +78,9 @@ internal object PersonaTransferDocuments {
             memorySummaries = portable.stories.map { story ->
                 memorySummary(story, portable.persona.name)
             },
+            diaryEntries = diaryEntries
+                .take(MAX_CHAT_DIARY_ENTRIES)
+                .map(::portableDiaryEntry),
         )
         val canonicalJson = json.encodeToString(PersonaArchiveEnvelope.serializer(), archive)
         val bytes = when (format) {
@@ -113,7 +121,7 @@ internal object PersonaTransferDocuments {
 
     fun decodeArchive(json: Json, canonicalJson: String): PersonaArchiveEnvelope =
         json.decodeFromString(PersonaArchiveEnvelope.serializer(), canonicalJson).also {
-            require(it.schema == 3) { "人物文件版本不受支持，请使用新版人物生命档案" }
+            require(it.schema == 3 || it.schema == 4) { "人物文件版本不受支持，请使用新版人物生命档案" }
         }
 
     private fun portableEntry(entry: PersonaGalleryEntry): PersonaGalleryEntry =
@@ -125,6 +133,15 @@ internal object PersonaTransferDocuments {
                     excludedMessageKeys = emptyList(),
                     history = story.history.filter { it.role == "user" || it.role == "assistant" },
                 )
+            },
+        )
+
+    private fun portableDiaryEntry(entry: ChatDiaryEntry): ChatDiaryEntry =
+        entry.copy(
+            subjectKey = "",
+            sources = emptyList(),
+            revisions = entry.revisions.map { revision ->
+                revision.copy(sources = emptyList())
             },
         )
 
@@ -178,7 +195,8 @@ internal object PersonaTransferDocuments {
     private fun extractMarkdownPayload(text: String): String {
         val markers = listOf(
             MARKDOWN_PAYLOAD_BEGIN to MARKDOWN_PAYLOAD_END,
-            LEGACY_MARKDOWN_PAYLOAD_BEGIN to LEGACY_MARKDOWN_PAYLOAD_END,
+            LEGACY_V3_MARKDOWN_PAYLOAD_BEGIN to LEGACY_V3_MARKDOWN_PAYLOAD_END,
+            LEGACY_V2_MARKDOWN_PAYLOAD_BEGIN to LEGACY_V2_MARKDOWN_PAYLOAD_END,
         )
         val (begin, endMarker) = markers.firstOrNull { (candidate, _) ->
             text.indexOf(candidate) >= 0
@@ -203,8 +221,8 @@ internal object PersonaTransferDocuments {
         val persona = entry.persona
         return buildList {
             add(DocLine("人物档案：${persona.name}", 1))
-            add(DocLine("神言神语人物生命档案 · 版本 3"))
-            add(DocLine("包含人物生命资料、记忆摘要与完整已归档对话记录。"))
+            add(DocLine("神言神语人物生命档案 · 版本 4"))
+            add(DocLine("包含人物生命资料、记忆摘要、人物日记与完整已归档对话记录。"))
 
             add(DocLine("人物生命资料", 2))
             addField("姓名", persona.name)
@@ -262,6 +280,34 @@ internal object PersonaTransferDocuments {
                     addList("共同物/共同梗/小约定", summary.sharedObjects)
                     addList("未完线索", summary.unresolvedThreads)
                 }
+            }
+
+            add(DocLine("人物日记", 2))
+            if (archive.diaryEntries.isEmpty()) {
+                add(DocLine("暂无人物日记。"))
+            } else {
+                archive.diaryEntries
+                    .sortedWith(compareBy<ChatDiaryEntry>(ChatDiaryEntry::createdAt).thenBy(ChatDiaryEntry::id))
+                    .forEachIndexed { index, diary ->
+                        val status = if (diary.active) "" else "（已失效）"
+                        add(DocLine("日记 ${index + 1}$status", 3))
+                        addField("经历", diary.event)
+                        addField("感受", diary.feeling)
+                        addField("心里没说出口的话", diary.innerThought)
+                        addField("关系意义", diary.relationshipMeaning)
+                        addField("未散余波", diary.unresolvedEcho)
+                        addField("披露范围", when (diary.disclosure) {
+                            ChatDiaryDisclosure.PRIVATE -> "私密"
+                            ChatDiaryDisclosure.SHAREABLE -> "仅单聊"
+                            ChatDiaryDisclosure.PUBLIC -> "可公开"
+                        })
+                        addField("来源模式", when (diary.sourceMode) {
+                            ChatDiarySourceMode.DIRECT -> "单聊"
+                            ChatDiarySourceMode.GROUP -> "群聊"
+                        })
+                        if (diary.supersededBy != null) add(DocLine("状态：已有后续日记替代"))
+                        if (diary.revisions.size > 1) add(DocLine("修订次数：${diary.revisions.size}"))
+                    }
             }
 
             add(DocLine("对话记录", 2))
@@ -327,7 +373,7 @@ internal object PersonaTransferDocuments {
             zip.putUtf8(
                 CUSTOM_XML_ENTRY,
                 "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
-                    "<personaTransfer xmlns=\"urn:shenyu:persona-transfer:v2\">" +
+                    "<personaTransfer xmlns=\"urn:shenyu:persona-transfer:v4\">" +
                     "<payload>$payload</payload></personaTransfer>",
             )
         }
@@ -361,7 +407,10 @@ internal object PersonaTransferDocuments {
                     hiddenPayload = plain.substringAfter(WORD_PAYLOAD_PREFIX, "")
                         .takeIf(String::isNotBlank)
                         ?.filterNot(Char::isWhitespace)
-                        ?: plain.substringAfter(LEGACY_WORD_PAYLOAD_PREFIX, "")
+                        ?: plain.substringAfter(LEGACY_V3_WORD_PAYLOAD_PREFIX, "")
+                            .takeIf(String::isNotBlank)
+                            ?.filterNot(Char::isWhitespace)
+                        ?: plain.substringAfter(LEGACY_V2_WORD_PAYLOAD_PREFIX, "")
                             .takeIf(String::isNotBlank)
                             ?.filterNot(Char::isWhitespace)
                 }
