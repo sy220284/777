@@ -23,7 +23,7 @@ internal class LocalCharacterBehaviorTuningCoordinator(
         transitionMutex.withLock {
             val snapshot = state.value
             check(
-                !snapshot.running && !snapshot.loading &&
+                !snapshot.kernel.running && !snapshot.loading &&
                     snapshot.usageMode == LocalUsageMode.CHAT && !snapshot.chat.groupChat.enabled
             ) { "请在单人聊天空闲时保存角色设置" }
             val personaId = snapshot.chat.personaId.takeUnless {
