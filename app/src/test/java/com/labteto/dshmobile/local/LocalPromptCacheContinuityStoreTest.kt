@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+// 全量回归触发标记：不改变测试或运行时行为。
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
