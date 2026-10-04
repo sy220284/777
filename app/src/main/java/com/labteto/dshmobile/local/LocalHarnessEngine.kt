@@ -4688,8 +4688,11 @@ class LocalHarnessEngine @Inject constructor(
         // visible/global queue or start those inputs as a second foreground run.
         pendingInputs.restore(if (liveWorkBinding == null) restoredInbox else emptyList())
         val modelProfiles = modelConfiguration.readProfiles()
-        val recoveryDecision = liveWorkBinding?.let { null }
-            ?: agentRunCoordinator.recoveryDecision(sessionId, recovery)
+        val recoveryDecision = if (liveWorkBinding == null) {
+            agentRunCoordinator.recoveryDecision(sessionId, recovery)
+        } else {
+            null
+        }
         val recoveryState = foregroundRecoveryCoordinator.restore(
             sessionId, recoveryDecision, modelProfiles, pendingInputs, eventLog,
         )
