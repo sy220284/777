@@ -221,7 +221,6 @@ for owned_field in (
     "planMode",
     "jobs",
     "workflowProgress",
-    "queuedInputCount",
     "pendingApproval",
     "pendingQuestion",
 ):
