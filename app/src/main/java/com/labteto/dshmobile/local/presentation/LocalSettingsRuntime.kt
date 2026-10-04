@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalHarnessSettingsCoordinator
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionStorageStatus
+import com.labteto.dshmobile.local.LocalWebProvider
 import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanConnectionTester
@@ -31,6 +32,7 @@ class LocalSettingsRuntime @Inject constructor(
     chatGptPlanTester: ChatGptPlanConnectionTester,
     private val modelSettings: LocalModelSettingsCoordinator,
     private val settingsCoordinator: LocalHarnessSettingsCoordinator,
+    private val web: LocalWebProvider,
     runtimeStateStore: LocalRuntimeStateStore,
 ) {
     private val chatGpt = ChatGptSettingsController(
@@ -74,7 +76,7 @@ class LocalSettingsRuntime @Inject constructor(
     fun addChatStyleGuardPhrase(value: String) = settingsCoordinator.addChatStyleGuardPhrase(value)
     fun removeChatStyleGuardPhrase(value: String) = settingsCoordinator.removeChatStyleGuardPhrase(value)
     fun clearChatStyleGuardHits() = settingsCoordinator.clearChatStyleGuardHits()
-    suspend fun diagnoseNetwork(target: String) = engine.diagnoseNetwork(target)
+    suspend fun diagnoseNetwork(target: String) = web.diagnose(target)
     suspend fun sessionStorageStatus(): LocalSessionStorageStatus = engine.sessionStorageStatusForUi()
     suspend fun compactSessionStorage(): LocalSessionStorageStatus = engine.compactSessionStorageForUi()
     suspend fun exportSessionStorage(output: OutputStream) = engine.exportSessionStorageForUi(output)
