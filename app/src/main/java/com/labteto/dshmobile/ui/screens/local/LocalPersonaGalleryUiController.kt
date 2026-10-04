@@ -180,10 +180,10 @@ suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGallery
 }
 suspend fun autoFillNewPersona(description: String): Result<PersonaProfile> = runSuspendResult {
     val snapshot = state.value
-    check(!snapshot.loading && !snapshot.running && snapshot.configured) { "请先配置模型并等待当前回复结束" }
+    check(!snapshot.loading && !snapshot.running && snapshot.modelState.configured) { "请先配置模型并等待当前回复结束" }
     personaAutoFillService.generate(
-        model = snapshot.model, baseUrl = snapshot.baseUrl,
-        profileId = snapshot.modelSelection.activeProfileId,
+        model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
+        profileId = snapshot.modelState.modelState.modelSelection.activeProfileId,
         current = PersonaProfile(name = ""),
         recentMessages = emptyList(),
         description = description,
@@ -198,7 +198,7 @@ suspend fun inspectGalleryPersona(
     if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) {
         return Result.failure(IllegalStateException("请在聊天空闲时检查人物"))
     }
-    if (!snapshot.configured) {
+    if (!snapshot.modelState.configured) {
         return Result.failure(IllegalStateException("请先配置聊天模型"))
     }
     val entry = gallery.value.firstOrNull { it.id == id }
@@ -219,8 +219,8 @@ suspend fun inspectGalleryPersona(
     }
     return runSuspendResult {
         personaInspectionService.inspect(
-            model = snapshot.model, baseUrl = snapshot.baseUrl,
-            profileId = snapshot.modelSelection.activeProfileId,
+            model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
+            profileId = snapshot.modelState.modelState.modelSelection.activeProfileId,
             persona = entry.persona,
             messages = dialogue,
         )
