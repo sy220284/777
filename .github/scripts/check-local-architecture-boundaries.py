@@ -180,7 +180,7 @@ for removed_engine_proxy in (
         die("LocalHarnessEngine must not reintroduce Settings proxy API: " + removed_engine_proxy)
 
 constructor = re.search(
-    r"class LocalHarnessEngine @Inject constructor\((.*?)\n\) \{",
+    r"class LocalHarnessEngine @Inject\s+(?:internal\s+)?constructor\((.*?)\n\) \{",
     engine,
     re.DOTALL,
 )
