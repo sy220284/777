@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.work.LocalWorkState
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
@@ -231,10 +232,12 @@ internal class LocalAutomationWorkCoordinator(
             handoffSummary = session.handoffSummary,
             messages = recentTranscript,
             transcriptIndex = localTranscriptIndexForSession(session),
-            plan = session.plan,
-            todos = session.todos,
-            goal = session.goal,
-            planMode = false,
+            work = LocalWorkState(
+                plan = session.plan,
+                todos = session.todos,
+                goal = session.goal,
+                planMode = false,
+            ),
             jobs = emptyList(),
             queuedInputCount = 0,
             running = false,
