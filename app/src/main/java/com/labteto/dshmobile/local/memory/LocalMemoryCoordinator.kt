@@ -120,9 +120,9 @@ internal class LocalMemoryCoordinator(
         val subjectLabel = viewerName?.trim()?.takeIf(String::isNotBlank)
             ?: snapshot.chatPersona.name
         val contextWindow = documentedContextWindowTokens(
-            snapshot.model,
-            snapshot.baseUrl,
-            snapshot.modelSelection.activeProfile?.contextWindowTokensOverride,
+            snapshot.modelState.model,
+            snapshot.modelState.baseUrl,
+            snapshot.modelState.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
         )
         val budget = chatLongTermMemoryBudget(contextWindow)
         val blocks = mutableListOf<String>()
