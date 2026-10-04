@@ -314,7 +314,7 @@ class LocalHarnessEngine @Inject constructor(
             resourceScheduler = resourceScheduler,
             routeProvider = {
                 val current = _state.value
-                current.modelState.modelState.modelSelection.activeProfile?.takeIf { current.modelState.modelState.configured }
+                current.modelState.modelSelection.activeProfile?.takeIf { current.modelState.configured }
                     ?.let { LocalVisionRoute(it.baseUrl, it.model, profile = it) }
             },
             imageSupportProvider = { route ->
@@ -901,7 +901,7 @@ class LocalHarnessEngine @Inject constructor(
                                 configured = result.configured,
                                 model = result.model,
                                 baseUrl = result.baseUrl,
-                                modelSelection = state.modelState.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+                                modelSelection = state.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
                                 error = null,
                             )
                         }
@@ -1210,7 +1210,7 @@ class LocalHarnessEngine @Inject constructor(
     internal fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = synchronized(runStateLock) {
         val requestedText = replacement.trim()
         val state = _state.value
-        if (!state.modelState.modelState.configured) return@synchronized LocalChatUserEditResult.UNAVAILABLE
+        if (!state.modelState.configured) return@synchronized LocalChatUserEditResult.UNAVAILABLE
         if (
             state.loading ||
             state.running ||
@@ -1478,7 +1478,7 @@ class LocalHarnessEngine @Inject constructor(
     /** Re-run the latest answer against the same turn; never re-execute work tools. */
     internal fun regenerateReply(messageId: String): Boolean = synchronized(runStateLock) {
         val state = _state.value
-        if (!state.modelState.modelState.configured || state.loading ||
+        if (!state.modelState.configured || state.loading ||
             state.groupChat.enabled ||
             sessionTransitioning || activeJob?.isCompleted == false || pendingInputs.size() != 0
         ) return@synchronized false
@@ -1626,7 +1626,7 @@ class LocalHarnessEngine @Inject constructor(
                 state.usageMode, state.sessionId,
                 workBindingActive = binding != null,
                 visibleJobActive = activeJob?.isCompleted == false,
-                configured = state.modelState.modelState.configured, loading = state.loading,
+                configured = state.modelState.configured, loading = state.loading,
                 sessionTransitioning = sessionTransitioning,
                 pendingCount = targetPending.size(), pendingLimit = MAX_PENDING_INPUTS,
                 onRejected = { rejected ->
@@ -2857,7 +2857,7 @@ class LocalHarnessEngine @Inject constructor(
                     expectedSessionId = snapshot.sessionId,
                     expectedAssistantMessageId = assistantTranscript.id,
                     expectedBaseState = _state.value.chatState,
-                    profile = snapshot.modelState.modelState.modelSelection.activeProfile,
+                    profile = snapshot.modelState.modelSelection.activeProfile,
                     sourceUserMessageId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
                     assistantEventSequence = assistantEvent.sequence,
                 )
@@ -2960,7 +2960,7 @@ class LocalHarnessEngine @Inject constructor(
         var chatDynamicContext = ""
         val runSnapshot = runState.value
         val runToolSurface = LocalRunToolSurface(
-            runSnapshot.modelState.modelState.modelSelection.activeProfile?.toRunModelSurface(),
+            runSnapshot.modelState.modelSelection.activeProfile?.toRunModelSurface(),
         )
         val mainMaxSteps = runSnapshot.mainMaxSteps
         val mainStepLimit = if (runPolicy.allowToolExecution) {
@@ -2980,7 +2980,7 @@ class LocalHarnessEngine @Inject constructor(
             usageMode = runSnapshot.usageMode,
             model = runSnapshot.modelState.model,
             baseUrl = runSnapshot.modelState.baseUrl,
-            routeProfile = runSnapshot.modelState.modelState.modelSelection.activeProfile,
+            routeProfile = runSnapshot.modelState.modelSelection.activeProfile,
             planMode = runSnapshot.work.planMode,
             policy = runPolicy,
             safeAutoApprovalEnabled = runSnapshot.safeAutoApprovalEnabled,
@@ -3109,7 +3109,7 @@ class LocalHarnessEngine @Inject constructor(
                     withWorkTurnContext(runHistory.snapshot(), workPromptContext.stable, workPromptContext.dynamic)
                 }
                 val selectedMode = resolveLocalImageInputMode(
-                    snapshot.modelState.modelState.imageInputMode,
+                    snapshot.modelState.imageInputMode,
                     imageCapabilities,
                     snapshot.modelState.baseUrl,
                     snapshot.modelState.model,
@@ -3499,7 +3499,7 @@ class LocalHarnessEngine @Inject constructor(
         try {
             withTimeout(FOREGROUND_TURN_TIMEOUT_MILLIS) {
                 modelGateway.withFrozenRoute(
-                    profileId = runSnapshot.modelState.modelState.modelSelection.activeProfileId,
+                    profileId = runSnapshot.modelState.modelSelection.activeProfileId,
                     model = runSnapshot.modelState.model,
                     baseUrl = runSnapshot.modelState.baseUrl,
                 ) { loop.run(input) }
@@ -3514,7 +3514,7 @@ class LocalHarnessEngine @Inject constructor(
                         expectedSessionId = postTurnSnapshot.sessionId,
                         expectedAssistantMessageId = assistantMessage.id,
                         expectedBaseState = postTurnSnapshot.chatState,
-                        profile = runSnapshot.modelState.modelState.modelSelection.activeProfile,
+                        profile = runSnapshot.modelState.modelSelection.activeProfile,
                         sourceUserMessageId = sourceMessageId ?: runSnapshot.transcriptIndex.latestUserMessageId,
                         assistantEventSequence = finalChatAssistantSequence,
                     )
@@ -4519,7 +4519,7 @@ class LocalHarnessEngine @Inject constructor(
             pressure = resourceScheduler.snapshot().pressure,
             model = snapshot.modelState.model,
             baseUrl = snapshot.modelState.baseUrl,
-            contextWindowTokensOverride = snapshot.modelState.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
+            contextWindowTokensOverride = snapshot.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
         )
     }
 
