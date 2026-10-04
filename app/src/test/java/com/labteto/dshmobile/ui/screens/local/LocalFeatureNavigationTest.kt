@@ -161,6 +161,33 @@ class LocalFeatureNavigationTest {
     }
 
     @Test
+    fun everySidebarFeatureKeepsDrawerAndBackFlowConsistent() {
+        val pages = LocalFeaturePage.entries.filter { it != LocalFeaturePage.HOME }
+
+        pages.forEach { page ->
+            val opened = localFeatureOpenFromDrawer(
+                stack = localFeatureHome(),
+                originStack = null,
+                page = page,
+            )
+
+            assertEquals(
+                listOf(LocalFeaturePage.HOME.name, page.name),
+                opened.stack,
+            )
+            assertEquals(
+                LocalFeatureBackAction.OPEN_DRAWER,
+                localFeatureBackAction(BackEventCompat.EDGE_LEFT),
+            )
+            assertEquals(page, localFeatureCurrent(opened.stack))
+            assertEquals(
+                LocalFeaturePage.HOME,
+                localFeatureCurrent(localFeaturePop(opened.stack)),
+            )
+        }
+    }
+
+    @Test
     fun onlyGroupWithConfiguredMembersCountsAsEstablished() {
         val emptyGroup = LocalSessionSummary(
             id = "group-empty",
