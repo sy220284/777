@@ -25,8 +25,8 @@ class SidebarSystemBackRegressionTest {
                     onBack = { backCount.incrementAndGet() },
                     onCreate = {},
                     onImport = {},
-                    onInstallPreset = {},
-                    onRequestHidePreset = {},
+                    onInstallPreset = { _ -> },
+                    onRequestHidePreset = { _ -> },
                 )
             }
         }
