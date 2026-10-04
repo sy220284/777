@@ -28,6 +28,41 @@ class LocalSessionLifecyclePolicyTest {
     }
 
     @Test
+    fun liveWorkRuntimeSkipsDurableRecoveryAndBlocksSharedQueue() {
+        assertFalse(shouldUseDurableSessionRecovery(liveWorkRuntimeActive = true))
+        assertTrue(shouldUseDurableSessionRecovery(liveWorkRuntimeActive = false))
+
+        assertFalse(
+            canStartUnboundQueuedTurn(
+                sessionTransitioning = false,
+                visibleRunActive = false,
+                liveWorkRuntimeActive = true,
+            ),
+        )
+        assertTrue(
+            canStartUnboundQueuedTurn(
+                sessionTransitioning = false,
+                visibleRunActive = false,
+                liveWorkRuntimeActive = false,
+            ),
+        )
+        assertFalse(
+            canStartUnboundQueuedTurn(
+                sessionTransitioning = true,
+                visibleRunActive = false,
+                liveWorkRuntimeActive = false,
+            ),
+        )
+        assertFalse(
+            canStartUnboundQueuedTurn(
+                sessionTransitioning = false,
+                visibleRunActive = true,
+                liveWorkRuntimeActive = false,
+            ),
+        )
+    }
+
+    @Test
     fun independentChatDoesNotCarryCurrentCharacterBinding() {
         assertFalse(
             shouldContinueSingleChatBinding(

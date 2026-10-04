@@ -56,6 +56,27 @@ internal fun localSessionNavigationBusy(
     visibleRunActive: Boolean,
 ): Boolean = sessionTransitioning || visibleRunActive
 
+/**
+ * Durable recovery is only allowed when this process no longer owns a live Work runtime.
+ *
+ * Re-entering a conversation with a still-running session-bound Work job is a UI rebind, not a
+ * crash/restart recovery. Treating it as recovery would close the live event tail and could start a
+ * duplicate run beside the original job.
+ */
+internal fun shouldUseDurableSessionRecovery(
+    liveWorkRuntimeActive: Boolean,
+): Boolean = !liveWorkRuntimeActive
+
+/**
+ * The shared visible-run queue must stay idle while a session-bound Work runtime owns this session.
+ * Its pending inputs belong to [LocalWorkRunBinding.pendingInputs] and are resumed by that binding.
+ */
+internal fun canStartUnboundQueuedTurn(
+    sessionTransitioning: Boolean,
+    visibleRunActive: Boolean,
+    liveWorkRuntimeActive: Boolean,
+): Boolean = !sessionTransitioning && !visibleRunActive && !liveWorkRuntimeActive
+
 internal class LocalSessionLifecycleCoordinator(
     private val scope: CoroutineScope,
     private val state: MutableStateFlow<LocalHarnessState>,
