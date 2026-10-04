@@ -102,16 +102,6 @@ for relative, maximum in RUNTIME_ENGINE_REFERENCE_BUDGETS.items():
         f"{references}/{maximum} direct engine references"
     )
 
-if "internal val state: StateFlow<LocalHarnessState>" in engine:
-    die("LocalHarnessEngine must not expose aggregate runtime state")
-
-for relative in ENGINE_CONSUMER_ALLOWLIST:
-    if relative == engine_path:
-        continue
-    consumer_source = strip_comments(read(relative))
-    if "engine.state" in consumer_source:
-        die(f"{relative} must consume LocalRuntimeStateStore instead of LocalHarnessEngine.state")
-
 # Diary privacy is a security/knowledge-boundary invariant, not a tuning preference.
 # Group prompts may receive PUBLIC diary entries only. Do not relax this to "anything except PRIVATE"
 # and do not bypass the central policy with a second group-memory path.
@@ -144,6 +134,17 @@ if "!groupAudience && ChatMemorySelector.shouldRecall(query)" in memory_coordina
 
 engine_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
 engine = read(engine_path)
+
+if "internal val state: StateFlow<LocalHarnessState>" in engine:
+    die("LocalHarnessEngine must not expose aggregate runtime state")
+
+for relative in ENGINE_CONSUMER_ALLOWLIST:
+    if relative == engine_path:
+        continue
+    consumer_source = strip_comments(read(relative))
+    if "engine.state" in consumer_source:
+        die(f"{relative} must consume LocalRuntimeStateStore instead of LocalHarnessEngine.state")
+
 constructor = re.search(
     r"class LocalHarnessEngine @Inject constructor\((.*?)\n\) \{",
     engine,
