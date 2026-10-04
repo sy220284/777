@@ -417,7 +417,7 @@ internal class LocalAutomationChatCoordinator(
                     put("transcript", encodeTranscriptMessages(listOf(proactiveMessage)))
                 })
 
-                if (ownsVisibleTurn && state.value.sessionId == session.id) {
+                if (ownership.visibleTurnOwned && state.value.sessionId == session.id) {
                     commitVisibleReply(
                         session,
                         reply,

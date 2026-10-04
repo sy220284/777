@@ -45,7 +45,7 @@ internal fun LocalSessionEventLog.latestAutomationUserActivitySequence(): Long? 
 
 internal class LocalAutomationChatOwnership(
     private val sessionLease: LocalSessionRuntimeLease,
-    private val visibleTurnOwned: Boolean,
+    val visibleTurnOwned: Boolean,
     private val targetSessionId: String,
     private val automationJob: Job?,
     private val releaseVisibleTurn: (String, Job?) -> Unit,
