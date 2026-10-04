@@ -401,9 +401,23 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 ### 阶段 2：领域状态拆分
 
-- 将 Chat / Work / Kernel / Model 状态从 `LocalHarnessState` 分离；
-- UI projection 改为组合领域状态；
-- 不保留长期双写。
+状态：**进行中。**
+
+已完成第一块：
+
+- 新增 `local/work/LocalWorkState`，由 Work 领域独占 `plan / todos / goal / planMode` 运行态；
+- `LocalHarnessState` 删除上述四个平铺字段，只组合 `work: LocalWorkState`；
+- Work 写入、目标迁移、模型/工具策略、Session 快照、Automation、UI projection 与输出质量判断全部切到新的单一事实源；
+- `LocalHarnessSession` 继续保持稳定的持久化投影结构，不把运行时聚合结构直接写入存储；
+- 架构门禁禁止重新向 `LocalHarnessState` 写回这四个 Work 字段。
+
+继续推进：
+
+- 拆分 Chat 领域运行态；
+- 拆分 Model 配置/选择运行态；
+- 拆分 Kernel 生命周期与资源运行态；
+- UI projection 继续改为组合领域状态；
+- 全程不保留长期双写。
 
 ### 阶段 3：ChatFeature / WorkFeature 接管业务所有权
 
