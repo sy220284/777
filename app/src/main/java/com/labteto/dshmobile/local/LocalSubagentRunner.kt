@@ -153,10 +153,11 @@ internal class LocalSubagentRunner(
             return LocalSubagentResult(LocalSubagentStatus.FAILED,
                 "[subagent][$subagentId] ${error.message}", (error as? LocalModelException)?.code ?: "NO_MODEL_CREDENTIAL")
         }
-        val snapshot = state.value.copy(model = runProfile.model, baseUrl = runProfile.baseUrl)
-        val routeModel = runProfile.model
+        val runSurface = runProfile.toRunModelSurface()
+        val snapshot = state.value.copy(model = runSurface.model, baseUrl = runSurface.baseUrl)
+        val routeModel = runSurface.model
         val runHistoryBudget = historyBudget?.invoke(runProfile)
-        val runCachePolicy = LocalModelPresets.promptCachePolicyFor(runProfile.model, runProfile.baseUrl, runProfile.protocol, runProfile.authKind)
+        val runCachePolicy = runSurface.promptCachePolicy
         val runToolSurface = LocalRunToolSurface()
         val stepLimit = adaptiveAgentStepLimit(
             configuredBase = maxSteps,
@@ -293,9 +294,7 @@ internal class LocalSubagentRunner(
                     val nativeImagesSent = hasMaterializedImageUrls(preparedHistory)
                     val reply = try {
                         modelStepExecutor.complete(
-                            profile = runProfile,
-                            baseUrl = snapshot.baseUrl,
-                            model = routeModel,
+                            surface = runSurface,
                             history = preparedHistory,
                             tools = runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools), snapshot),
                             subagentId = subagentId,
