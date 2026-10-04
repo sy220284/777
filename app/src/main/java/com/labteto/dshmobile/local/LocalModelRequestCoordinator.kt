@@ -2,8 +2,10 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
-import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
+import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
+import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecovery
+import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecoveryPolicy
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.LocalModelGateway
@@ -40,6 +42,7 @@ internal class LocalModelRequestCoordinator(
     private val streamPreviewIntervalMs: Long = 50L,
 ) {
     private val requestRuntime = LocalAgentModelRequestRuntime(modelGateway, resourceScheduler)
+    private val modelStepRuntime = LocalAgentModelStepRuntime()
 
     suspend fun complete(
         snapshot: LocalHarnessState,
@@ -272,7 +275,7 @@ internal class LocalModelRequestCoordinator(
         var failureContextDiagnosticLogged = false
         var lastProviderError: LocalModelException? = null
         var attemptStartedNanos = System.nanoTime()
-        val executor = AgentRequestExecutor(
+        val executor = modelStepRuntime.requestExecutor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
                 (error as? LocalModelException)?.let { lastProviderError = it }
@@ -458,6 +461,7 @@ internal class LocalModelRequestCoordinator(
                                     promptCacheComparisonResponseId = cacheComparisonResponseId,
                                     promptCacheKey = promptCacheKey,
                                     promptCacheTtl = promptCacheTtl,
+                                    admissionHandledExternally = true,
                                     onDelta = { delta ->
                                         val visible = streamFilter?.append(delta.content)?.text ?: delta.content
                                         streamPreview.append(visible)
