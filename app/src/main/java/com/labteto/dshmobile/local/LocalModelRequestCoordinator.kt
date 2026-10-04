@@ -64,7 +64,7 @@ internal class LocalModelRequestCoordinator(
         val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
         val log = requestLog ?: defaultEventLog()
         val frozenProfile = profile ?: modelGateway.profileForRoute(
-            snapshot.modelState.modelState.modelSelection.activeProfileId,
+            snapshot.modelState.modelSelection.activeProfileId,
             snapshot.modelState.model,
             snapshot.modelState.baseUrl,
         )
@@ -276,7 +276,7 @@ internal class LocalModelRequestCoordinator(
         var lastProviderError: LocalModelException? = null
         var attemptStartedNanos = System.nanoTime()
         val executor = modelStepRuntime.requestExecutor(
-            maxAttempts = (maxAttemptsOverride ?: snapshot.modelState.modelState.modelAttempts).coerceIn(1, 5),
+            maxAttempts = (maxAttemptsOverride ?: snapshot.modelState.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
                 (error as? LocalModelException)?.let { lastProviderError = it }
                 (error as? LocalModelException)?.retryable == true || error is java.io.IOException
