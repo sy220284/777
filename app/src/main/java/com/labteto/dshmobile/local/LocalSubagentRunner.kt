@@ -269,7 +269,6 @@ internal class LocalSubagentRunner(
                 })
             }
             history.append(buildJsonObject { put("role", "user"); put("content", task) })
-
             val loop = AgentLoop(
                 model = AgentModel {
                     currentCoroutineContext().ensureActive()
@@ -323,8 +322,6 @@ internal class LocalSubagentRunner(
                             throw error
                         }
                     }
-                    // Provider transports may finish after WorkManager cancellation. Do not let a
-                    // stale generation turn that late reply into a new tool step or durable result.
                     currentCoroutineContext().ensureActive()
                     val usageAction = if (runKind == LocalAgentRunKind.AUTOMATION) {
                         TokenUsageAction.AUTOMATION
@@ -357,8 +354,8 @@ internal class LocalSubagentRunner(
                     )
                 },
                 tools = AgentToolExecutor { call ->
-                    currentCoroutineContext().ensureActive()
-                    val virtualAllowed = virtualScreenId != null && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS
+                    currentCoroutineContext().ensureActive(); val virtualAllowed =
+                        virtualScreenId != null && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS
                     val requestedScreen = call.arguments["id"]?.jsonPrimitive?.contentOrNull
                     when {
                         !allowMutation && call.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS && !virtualAllowed ->
@@ -384,11 +381,8 @@ internal class LocalSubagentRunner(
                             )
                         else -> withContext(LocalModelRunContext(runProfile)) {
                             currentCoroutineContext().ensureActive()
-                            execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools).also {
-                                // Irreversible external effects cannot be rolled back, but a
-                                // cancelled/stale worker must not commit their late result locally.
-                                currentCoroutineContext().ensureActive()
-                            }
+                            execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
+                                .also { currentCoroutineContext().ensureActive() }
                         }
                     }
                 },
