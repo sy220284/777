@@ -37,7 +37,6 @@ ENGINE_CONSUMER_ALLOWLIST = {
     "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt",
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTaskRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt",
@@ -203,6 +202,14 @@ if "engine.configureImageInputMode" in model_runtime_source:
     die("LocalModelRuntime must not route image input settings through LocalHarnessEngine")
 if "KEY_IMAGE_INPUT_MODE" not in model_settings_source or "runtimeStateStore.mutableState.update" not in model_settings_source:
     die("LocalModelSettingsCoordinator must own image input persistence and ModelState projection")
+
+task_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTaskRuntime.kt")
+)
+if "LocalRuntimeStateStore" not in task_runtime_source or "runtimeStateStore.state" not in task_runtime_source:
+    die("LocalTaskRuntime must consume task projection from LocalRuntimeStateStore")
+if "LocalHarnessEngine" in task_runtime_source or "engine." in task_runtime_source:
+    die("LocalTaskRuntime must not depend on LocalHarnessEngine")
 
 settings_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt")
