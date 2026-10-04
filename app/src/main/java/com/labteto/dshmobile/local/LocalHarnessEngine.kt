@@ -224,25 +224,13 @@ class LocalHarnessEngine @Inject constructor(
     }
     private val toolRegistry
         get() = pluginComposition.tools
-    private val enabledOptionalTools = linkedSetOf<String>()
     private val toolExecutionCoordinator by lazy {
-        LocalToolExecutionCoordinator(
-            registry = toolRegistry,
-            currentSessionId = { currentSessionId },
-            planMode = { _state.value.planMode },
-            enabledOptionalTools = enabledOptionalTools,
-            requestApproval = { call, tool, summary -> approve(call, summary, tool) },
-            recordExecutionStarted = { sessionId, call ->
-                eventLogFor(sessionId).append("tool/execution-started", buildJsonObject {
-                    put("id", call.id)
-                    put("name", call.name)
-                })
-            },
+        createLocalToolExecutionCoordinator(
+            toolRegistry, { currentSessionId }, { _state.value.planMode },
+            { call, tool, summary -> approve(call, summary, tool) }, ::eventLogFor,
         )
     }
-    private val toolSchemaProjection by lazy {
-        LocalToolSchemaProjection(toolRegistry, toolExecutionCoordinator)
-    }
+    private val toolSchemaProjection get() = toolExecutionCoordinator.schemaProjection
     private val runtimeProcess = AndroidProcessRuntime(
         defaultWorkingDirectory = File(workspace.path),
         dynamicSearchPaths = bundledRuntimeManager::searchPaths,

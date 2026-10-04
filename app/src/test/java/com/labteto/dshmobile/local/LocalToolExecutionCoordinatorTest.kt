@@ -645,7 +645,6 @@ class LocalToolExecutionCoordinatorTest {
         registry = registry,
         currentSessionId = { "s1" },
         planMode = { planMode },
-        enabledOptionalTools = linkedSetOf(),
         requestApproval = { _, _, _ -> true },
         recordExecutionStarted = recordExecutionStarted,
     )

@@ -14,6 +14,8 @@ import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Owns the model-visible tool surface and the common permission/error boundary for foreground runs.
@@ -26,7 +28,6 @@ internal class LocalToolExecutionCoordinator(
     private val registry: ToolRegistry,
     private val currentSessionId: () -> String,
     private val planMode: () -> Boolean,
-    private val enabledOptionalTools: MutableSet<String>,
     private val requestApproval: suspend (
         call: LocalToolCall,
         tool: HarnessTool,
@@ -34,6 +35,9 @@ internal class LocalToolExecutionCoordinator(
     ) -> Boolean,
     private val recordExecutionStarted: suspend (String, LocalToolCall) -> Unit = { _, _ -> },
 ) {
+    private val enabledOptionalTools = linkedSetOf<String>()
+    val schemaProjection by lazy { LocalToolSchemaProjection(registry, this) }
+
     fun clearTurnCapabilities(target: MutableSet<String> = enabledOptionalTools) {
         synchronized(target) { target.clear() }
     }
@@ -330,6 +334,25 @@ internal class LocalToolExecutionCoordinator(
         )
     }
 }
+
+internal fun createLocalToolExecutionCoordinator(
+    registry: ToolRegistry,
+    currentSessionId: () -> String,
+    planMode: () -> Boolean,
+    requestApproval: suspend (LocalToolCall, HarnessTool, String) -> Boolean,
+    eventLogFor: (String) -> LocalSessionEventLog,
+): LocalToolExecutionCoordinator = LocalToolExecutionCoordinator(
+    registry = registry,
+    currentSessionId = currentSessionId,
+    planMode = planMode,
+    requestApproval = requestApproval,
+    recordExecutionStarted = { sessionId, call ->
+        eventLogFor(sessionId).append("tool/execution-started", buildJsonObject {
+            put("id", call.id)
+            put("name", call.name)
+        })
+    },
+)
 
 private fun JsonObject.optionalStringForCoordinator(key: String): String? =
     (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
