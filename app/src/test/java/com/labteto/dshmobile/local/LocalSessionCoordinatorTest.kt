@@ -4,6 +4,8 @@ import com.labteto.dshmobile.local.work.LocalWorkState
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.LocalChatState
+import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -122,6 +124,52 @@ class LocalSessionCoordinatorTest {
         assertTrue(snapshot.planMode)
         assertEquals(8L, snapshot.controlProjectedThroughSequence)
         assertEquals(7L, snapshot.transcriptProjectedThroughSequence)
+    }
+
+    @Test
+    fun nestedDomainStateSurvivesDurableSessionRoundTrip() = runTest {
+        val json = Json { ignoreUnknownKeys = true }
+        val sessions = temporary.newFolder("domain-round-trip")
+        val repository = LocalSessionRepository(sessions, json, backgroundScope, {}, {})
+        val coordinator = LocalSessionCoordinator(
+            repository, { id -> LocalSessionEventLog(File(sessions, "$id.events.jsonl"), json) }, 2,
+        )
+        val context = ChatContextState(scene = ChatSceneState(location = "庭院"), generation = 7L)
+        val suggestions = listOf(ChatReplySuggestion("继续", "然后呢？"))
+        val chat = LocalChatState(
+            personaId = "persona", galleryId = "gallery", galleryStoryId = "story",
+            gallerySaveSuppressedThrough = 42L,
+            chatState = ChatCharacterState(mood = "专注"), chatContext = context,
+            replySuggestions = suggestions,
+            chatBranches = LocalChatBranchState(nodes = listOf(LocalChatBranchNode(
+                message = message("reply", "assistant", "回复"),
+                chatStateAfter = ChatCharacterState(mood = "专注"),
+                chatContextAfter = context, replySuggestionsAfter = suggestions,
+            ))),
+            groupChat = LocalGroupChatState(
+                mode = LocalChatMode.GROUP,
+                members = listOf(LocalGroupChatMember("gallery", "persona", "成员")),
+                context = context, announcement = "共同探索", failedReplyMemberIds = listOf("gallery"),
+            ),
+        )
+        val work = LocalWorkState(
+            plan = listOf("检查"), todos = listOf(LocalTodoItem("恢复", "in_progress")),
+            goal = LocalGoal("完整恢复"), planMode = true,
+        )
+        val snapshot = coordinator.snapshot(
+            "round-trip", LocalHarnessState(chat = chat, work = work), 11L, 10L,
+        )
+        coordinator.writeNow(snapshot)
+
+        val restored = requireNotNull(coordinator.read("round-trip"))
+        assertEquals(snapshot, restored)
+        assertEquals(chat.chatBranches, restored.chatBranches)
+        assertEquals(chat.groupChat, restored.groupChat)
+        assertEquals(chat.gallerySaveSuppressedThrough, restored.gallerySaveSuppressedThrough)
+        // Durable storage keeps the stable Session schema while runtime state is domain-owned.
+        val encoded = json.encodeToString(LocalHarnessSession.serializer(), restored)
+        assertTrue(encoded.contains("\"personaId\""))
+        assertTrue(!encoded.contains("\"chat\":") && !encoded.contains("\"work\":"))
     }
 
     @Test
