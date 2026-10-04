@@ -254,11 +254,8 @@ class ChatPersonaStore internal constructor(
     private fun migrateLegacyIfNeeded() {
         val legacy = legacyFile ?: return
         val marker = migrationMarker ?: return
-        if (marker.isFile) return
-        if (!PersonaSchemaMigration.hasDurableSource(legacy)) {
-            markMigrationDone(marker)
-            return
-        }
+        if (marker.isFile && PersonaSchemaMigration.hasDurableSource(file)) return
+        if (!PersonaSchemaMigration.hasDurableSource(legacy)) return
 
         val current = durableFile.read(
             defaultValue = ::PersonaDocument,
