@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
+import com.labteto.dshmobile.local.canonicalizeLegacyChatBranchState
 import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import kotlinx.serialization.json.buildJsonObject
@@ -156,6 +157,7 @@ internal class LocalSessionCoordinator(
         copy(
             chatState = chatState.canonicalizeLegacyCharacterState().withoutLegacyConversationContext(),
             chatContext = chatContext.withLegacyFallback(chatState),
+            chatBranches = chatBranches.canonicalizeLegacyChatBranchState(),
             groupChat = groupChat.migrateLegacyConversationContext(),
         )
 

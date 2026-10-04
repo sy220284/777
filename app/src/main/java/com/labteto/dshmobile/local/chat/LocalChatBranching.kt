@@ -5,7 +5,10 @@ import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.applySceneTurn
+import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
 import com.labteto.dshmobile.local.chat.normalized
+import com.labteto.dshmobile.local.chat.withLegacyFallback
+import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -34,6 +37,20 @@ data class LocalChatBranchState(
     val nodes: List<LocalChatBranchNode> = emptyList(),
     val selectedChildByParent: Map<String, String> = emptyMap(),
 )
+
+internal fun LocalChatBranchState.canonicalizeLegacyChatBranchState(): LocalChatBranchState =
+    copy(
+        nodes = nodes.map { node ->
+            val legacyState = node.chatStateAfter ?: return@map node
+            node.copy(
+                chatStateAfter = legacyState
+                    .canonicalizeLegacyCharacterState()
+                    .withoutLegacyConversationContext(),
+                chatContextAfter = (node.chatContextAfter ?: ChatContextState())
+                    .withLegacyFallback(legacyState),
+            )
+        },
+    )
 
 data class LocalChatBranchInfo(
     val index: Int,
@@ -428,6 +445,7 @@ internal fun decodeChatBranchStateEvent(data: JsonObject): LocalChatBranchState?
     runCatching {
         val encoded = data["state"]?.jsonObject ?: return@runCatching null
         chatBranchJson.decodeFromJsonElement(LocalChatBranchState.serializer(), encoded)
+            .canonicalizeLegacyChatBranchState()
     }.getOrNull()
 
 private fun branchParentKey(parentId: String?): String = parentId ?: CHAT_BRANCH_ROOT
