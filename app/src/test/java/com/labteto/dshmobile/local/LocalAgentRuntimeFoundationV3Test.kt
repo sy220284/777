@@ -34,15 +34,18 @@ class LocalAgentRuntimeFoundationV3Test {
             retryable = { it.message == "retry" },
             backoffMillis = { _, _ -> 0L },
             recoveryPolicy = LocalAgentModelStepRecoveryPolicy { error, active, _ ->
-                if (error.message != "recover") return@LocalAgentModelStepRecoveryPolicy null
-                recoveries += 1
-                LocalAgentModelStepRecovery(
-                    messages = active + buildJsonObject {
-                        put("role", "user")
-                        put("content", "恢复后继续")
-                    },
-                    reason = "test",
-                )
+                if (error.message != "recover") {
+                    null
+                } else {
+                    recoveries += 1
+                    LocalAgentModelStepRecovery(
+                        messages = active + buildJsonObject {
+                            put("role", "user")
+                            put("content", "恢复后继续")
+                        },
+                        reason = "test",
+                    )
+                }
             },
         ) { active ->
             calls += 1
