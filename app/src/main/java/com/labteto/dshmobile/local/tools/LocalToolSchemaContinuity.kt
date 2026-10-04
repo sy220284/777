@@ -29,7 +29,10 @@ internal fun stableRunToolSchemas(
         authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
     )
     if (capabilities.toolUpdateMode != LocalModelPromptUpdateMode.APPEND_ONLY) return current
+    return appendOnlyToolSchemas(previous, current)
+}
 
+internal fun appendOnlyToolSchemas(previous: JsonArray, current: JsonArray): JsonArray {
     val previousByName = previous.mapNotNull { element ->
         toolSchemaName(element)?.let { it to element }
     }.toMap()
