@@ -76,7 +76,6 @@ import com.labteto.dshmobile.local.model.LocalModelAccountStateCoordinator
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.memory.MemoryStore
-import com.labteto.dshmobile.local.profile.UserProfileStore
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -138,7 +137,7 @@ class LocalHarnessEngine @Inject constructor(
     private val json: Json,
     private val automationScheduler: HarnessAutomationScheduler,
     private val pluginCompositionFactory: LocalPluginCompositionFactory,
-    private val userProfileStore: UserProfileStore,
+    private val settingsCoordinator: LocalHarnessSettingsCoordinator,
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
     private val contextComposer: ContextComposer,
@@ -482,16 +481,6 @@ class LocalHarnessEngine @Inject constructor(
                 }
             },
     )
-    private val settingsCoordinator by lazy {
-        LocalHarnessSettingsCoordinator(
-            preferences = preferences,
-            userProfileStore = userProfileStore,
-            scope = scope,
-            state = { _state.value },
-            updateState = { transform -> _state.update(transform) },
-        )
-    }
-
     private val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
     private val imageCapabilities = LocalImageCapabilityRegistry()
     private val imageRequestBudget = localImageRequestBudgetForModelConcurrency(resourceBudget.maxModelRequests)
@@ -933,30 +922,6 @@ class LocalHarnessEngine @Inject constructor(
 
     internal suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): String =
         modelConfiguration.test(apiKey, model, baseUrl, protocol, profileId)
-
-    /** Persist execution limits exposed from Settings. */
-    internal fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) =
-        settingsCoordinator.configureRuntimeLimits(mainMaxSteps, subagentMaxSteps, modelAttempts)
-
-    internal fun configureWorkerProfile(profileId: String?) =
-        settingsCoordinator.configureWorkerProfile(profileId)
-
-    /** Persist user-authored behavioral rules and memory recall preference. */
-    internal fun configurePersonalization(customRules: String, autoRecall: Boolean, autoMemory: Boolean) =
-        settingsCoordinator.configurePersonalization(customRules, autoRecall, autoMemory)
-
-    /** Master switch for local chat output filtering. */
-    internal fun configureChatStyleGuard(enabled: Boolean) =
-        settingsCoordinator.configureChatStyleGuard(enabled)
-
-    internal fun addChatStyleGuardPhrase(value: String): Boolean =
-        settingsCoordinator.addChatStyleGuardPhrase(value)
-
-    internal fun removeChatStyleGuardPhrase(value: String) =
-        settingsCoordinator.removeChatStyleGuardPhrase(value)
-
-    internal fun clearChatStyleGuardHits() =
-        settingsCoordinator.clearChatStyleGuardHits()
 
     private fun chatStreamFilterPhrases(
         snapshot: LocalHarnessState,
@@ -4764,7 +4729,7 @@ class LocalHarnessEngine @Inject constructor(
         )
         val recoveredRunProfile = recoveryState.profile
         val runRecoveryError = recoveryState.error
-        val profile = userProfileStore.read()
+        val profile = settingsCoordinator.readUserProfile()
         val restoredBehavior = withContext(Dispatchers.IO) {
             reconcileCharacterBehaviorTuning(
                 chatPersonaStore,
