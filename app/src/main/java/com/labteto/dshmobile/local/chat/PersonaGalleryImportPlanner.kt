@@ -25,11 +25,8 @@ internal object PersonaGalleryImportPlanner {
         require(isMeaningfulGalleryPersona(importedPersona)) { "人物设定内容不足，无法导入" }
 
         val seenStoryIds = hashSetOf<String>()
-        val importedStories = source.stories.map { raw ->
-            val sourceId = raw.id.trim().take(120)
-            val storyId = sourceId
-                .takeIf { it.isNotBlank() && seenStoryIds.add(it) }
-                ?: "story-${UUID.randomUUID()}".also { seenStoryIds.add(it) }
+        val importedStories = source.stories.mapIndexed { index, raw ->
+            val storyId = transferStoryId(raw.id, index, seenStoryIds)
             raw.copy(
                 id = storyId,
                 title = raw.title.trim().take(160),
@@ -67,4 +64,23 @@ internal object PersonaGalleryImportPlanner {
             diaryEntries = diaryEntries,
         )
     }
+
+    private fun transferStoryId(
+        rawId: String,
+        index: Int,
+        seen: MutableSet<String>,
+    ): String {
+        val sourceId = rawId.trim().take(120)
+        if (SAFE_STORY_ID.matches(sourceId) && seen.add(sourceId)) return sourceId
+
+        var attempt = 0
+        while (true) {
+            val seed = "777:persona-story:$index:$sourceId:$attempt"
+            val candidate = "story-${UUID.nameUUIDFromBytes(seed.toByteArray(Charsets.UTF_8))}"
+            if (seen.add(candidate)) return candidate
+            attempt++
+        }
+    }
+
+    private val SAFE_STORY_ID = Regex("[A-Za-z0-9._-]{1,120}")
 }
