@@ -26,7 +26,7 @@ data class LocalSettingsMemoryContext(
 )
 
 @Singleton
-class LocalSettingsRuntime @Inject constructor(
+class LocalSettingsRuntime @Inject internal constructor(
     private val engine: LocalHarnessEngine,
     chatGptAuth: ChatGptAuthCoordinator,
     chatGptPlanTester: ChatGptPlanConnectionTester,
