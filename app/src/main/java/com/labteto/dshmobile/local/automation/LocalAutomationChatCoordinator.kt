@@ -270,10 +270,7 @@ internal class LocalAutomationChatCoordinator(
                     messages = recentTranscript,
                     transcriptIndex = sessionTranscriptIndex,
                     work = LocalWorkState(),
-                    jobs = emptyList(),
-                    queuedInputCount = 0,
-                    pendingApproval = null,
-                    pendingQuestion = null,
+                    kernel = snapshot.kernel.copy(running = false),
                     error = null,
                 )
                 val chatContext = chatTurnCoordinator.prepareProfile(
