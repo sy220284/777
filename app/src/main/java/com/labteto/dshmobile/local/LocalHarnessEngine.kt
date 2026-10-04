@@ -126,7 +126,7 @@ import kotlinx.serialization.json.put
  * Keystore. Remote mode remains separate and unchanged.
  */
 @Singleton
-class LocalHarnessEngine @Inject constructor(
+class LocalHarnessEngine @Inject internal constructor(
     @ApplicationContext private val context: Context,
     private val modelGateway: LocalModelGateway,
     private val modelConfiguration: LocalModelConfigurationCoordinator,
