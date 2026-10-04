@@ -35,6 +35,7 @@ jobs:
           python3 - <<'PY'
           import json
           import os
+          import re
           import urllib.request
 
           token = os.environ["GH_TOKEN"]
@@ -65,19 +66,21 @@ jobs:
                   break
               page += 1
 
-          releases.sort(
-              key=lambda release: (
-                  release.get("published_at") or "",
-                  release.get("created_at") or "",
-                  release.get("id") or 0,
-              ),
-              reverse=True,
-          )
+          version_pattern = re.compile(r"^v(\d+)\.(\d+)\.(\d+)-777\.(\d+)$")
+
+          def release_sort_key(release):
+              match = version_pattern.match(release.get("tag_name") or "")
+              if match:
+                  version = tuple(int(part) for part in match.groups())
+                  return (1, *version, release.get("published_at") or "", release.get("id") or 0)
+              return (0, 0, 0, 0, 0, release.get("published_at") or "", release.get("id") or 0)
+
+          releases.sort(key=release_sort_key, reverse=True)
 
           keep = releases[:3]
           remove = releases[3:]
 
-          print("保留最新 3 个已发布版本：")
+          print("保留版本号最高的 3 个已发布版本：")
           for release in keep:
               print(f"  - {release['tag_name']} ({release['published_at']})")
 
