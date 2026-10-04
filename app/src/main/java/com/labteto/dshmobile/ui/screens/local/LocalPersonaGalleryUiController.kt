@@ -22,7 +22,7 @@ import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.chat.galleryEntryHasUnsavedChanges
 import com.labteto.dshmobile.local.chat.isMeaningfulGalleryPersona
 import com.labteto.dshmobile.local.chat.samePersonaIdentity
-import com.labteto.dshmobile.local.chat.withLegacyConversationContext
+import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -89,8 +89,9 @@ suspend fun saveCurrentToGallery(
             persona = snapshot.chatPersona,
             sourceSessionId = snapshot.sessionId,
             history = archiveHistory,
-            chatState = snapshot.chatState.withLegacyConversationContext(snapshot.chatContext),
+            chatState = snapshot.chatState.withoutLegacyConversationContext(),
             notes = notes,
+            chatContext = snapshot.chatContext,
             existingId = existingId ?: snapshot.galleryId,
             existingStoryId = existingStoryId ?: snapshot.galleryStoryId,
             forceNewStory = forceNewStory,

@@ -28,7 +28,7 @@ internal class ChatInteractionPromptBuilder {
             )
         }
         state.currentFocus.takeIf(String::isNotBlank)?.let { appendLine("当前注意：$it") }
-        state.currentUserImpression.ifBlank { state.recentImpression }.takeIf(String::isNotBlank)?.let { appendLine("对用户的主观印象：$it") }
+        state.currentUserImpression.takeIf(String::isNotBlank)?.let { appendLine("对用户的主观印象：$it") }
         state.activeGoal.takeIf(String::isNotBlank)?.let { appendLine("目标：$it") }
         state.currentAgenda.takeIf(String::isNotBlank)?.let { appendLine("正在做：$it") }
         state.internalConflict.takeIf(String::isNotBlank)?.let { appendLine("此刻拉扯：$it") }
@@ -76,7 +76,7 @@ internal class ChatInteractionPromptBuilder {
         }
         appendLine("输出：{\"state\":{仅写变化字段},\"suggestions\":[],\"turnSignificance\":\"NONE|MINOR|MAJOR\",\"diaryDelta\":null}")
         appendLine(
-            "state字段：physicalState, mood, relationshipState, currentFocus, recentImpression, activeGoal, " +
+            "state字段：physicalState, mood, relationshipState, currentFocus, activeGoal, " +
                 "currentAgenda, internalConflict, immediateConcern, unresolvedThreads, currentUserImpression, initiative, shareDesire；" +
                 "dynamics(stage,warmth,trust,reciprocity,tension,stability,unresolvedConflict,facts,hypotheses,unknowns,sharedMoments,sharedObjects)；" +
                 "userPattern(replyLength,directness,playfulness,initiative,emojiStyle,preferredTone)；continuity(recentEvents,decisions,unfinished)。",
@@ -111,7 +111,7 @@ internal class ChatInteractionPromptBuilder {
                 "人物当前情绪=${state.mood}｜用户习惯：长度=${state.userPattern.replyLength}｜" +
                 "直接=${state.userPattern.directness}｜玩笑=${state.userPattern.playfulness}｜主动=${state.userPattern.initiative}",
         )
-        state.currentUserImpression.ifBlank { state.recentImpression }.takeIf(String::isNotBlank)?.let { appendLine("人物目前对用户的印象：$it") }
+        state.currentUserImpression.takeIf(String::isNotBlank)?.let { appendLine("人物目前对用户的印象：$it") }
         if (state.interactionIntensity > 0 || state.recentVerbalTags.isNotEmpty() || state.recentActionTags.isNotEmpty()) {
             appendLine(
                 "互动状态：意图=${state.interactionIntent}｜强度=${state.interactionIntensity}/5｜" +

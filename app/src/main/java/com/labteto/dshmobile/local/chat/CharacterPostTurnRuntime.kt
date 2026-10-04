@@ -21,11 +21,11 @@ internal fun applyCharacterPostTurnRuntime(
     userMessage: String,
     assistantMessage: String,
 ): ChatCharacterState {
-    val currentImpression = previous.currentUserImpression.ifBlank { previous.recentImpression }
-    val proposedImpression = when {
-        rawState?.containsKey("currentUserImpression") == true -> candidate.currentUserImpression
-        rawState?.containsKey("recentImpression") == true -> candidate.recentImpression
-        else -> currentImpression
+    val currentImpression = previous.currentUserImpression
+    val proposedImpression = if (rawState?.containsKey("currentUserImpression") == true) {
+        candidate.currentUserImpression
+    } else {
+        currentImpression
     }
     val impression = RuntimeStateTransitionPolicy<String> { runtimeOwned, proposed ->
         if (significance == "NONE") {
@@ -36,7 +36,7 @@ internal fun applyCharacterPostTurnRuntime(
     }.resolve(currentImpression, proposedImpression).value
     val withImpression = current.copy(
         currentUserImpression = impression,
-        recentImpression = impression,
+        recentImpression = "",
     )
     return withImpression.copy(
         lifeState = advanceCharacterLife(persona, withImpression),
