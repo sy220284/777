@@ -161,8 +161,10 @@ if "withLegacyFallback" in engine:
 if "withLegacyFallback" in automation_chat:
     violations.append("Automation Chat must consume canonical ChatContextState from LocalSessionCoordinator")
 
-if "cron: '*/30 * * * *'" not in cleanup_workflow:
-    violations.append("Release cleanup must stay on the 30-minute schedule")
+if "release:" not in cleanup_workflow or "types: [published]" not in cleanup_workflow:
+    violations.append("Release cleanup must stay event-driven from published releases")
+if "cron: '23 3 * * *'" not in cleanup_workflow or "*/30 * * * *" in cleanup_workflow:
+    violations.append("Release cleanup fallback must stay daily rather than every 30 minutes")
 if "keep = formal_releases[:3]" not in cleanup_workflow or "remove = formal_releases[3:]" not in cleanup_workflow:
     violations.append("Release retention must keep exactly the three highest formal published versions")
 if "timedelta(" in cleanup_workflow or "cutoff =" in cleanup_workflow:

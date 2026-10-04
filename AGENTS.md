@@ -422,14 +422,20 @@ CI 必须先根据本次变更的任务性质确定验证范围，再由统一 `
 当前验证分配：
 
 - 纯文档 / 仓库说明：只做范围识别和轻量差异检查，不运行 Gradle、APK 构建或模拟器。
-- Release / Cleanup / 截图等 GitHub Actions 与普通自动化脚本：运行 workflow YAML、Python / Shell 语法、自动化策略和版本格式检查，不运行产品构建。
+- Release / Cleanup / 截图等 GitHub Actions 与普通自动化脚本：运行静态门禁，包括 Action 语义、Python / Shell、供应链固定、权限和版本规则，不运行产品构建。
 - `ci.yml` 与静态门禁脚本：运行 CI 控制面专项验证和各静态门禁本身，不因修改门禁配置而构建 APK 或启动模拟器。
-- 纯 JVM / 单元测试、Reference Validation、Mock Harness、上游测试夹具：运行 preflight、全模块单元测试与 Harness conformance，不运行 APK / 模拟器。
-- 纯 `androidTest`：运行 Android 16 / Android 17 仪器验证；无需重复跑与本次无关的 optimized APK build lane。
-- 产品源码、资源、Gradle / 构建配置、Runtime、未知路径：运行完整 CI，包括静态门禁、单元测试、Harness、一致性、Lint、optimized APK、Android 16 / 17。
-- APK 结构校验和启动 smoke 脚本本身属于产品发布验证边界，修改它们时仍走完整 CI。
+- 纯 JVM / 单元测试、Reference Validation、Mock Harness：运行静态门禁 + 全模块单元测试与 Harness conformance。
+- 官方 fixture / 上游锁定来源变化：额外刷新并核验黄金 fixture provenance；普通产品改动不重复联网刷新。
+- 纯 `androidTest`：先统一构建一套 x86_64 debug / androidTest / optimized APK，再由 Android 16 与 Android 17 并行复用同一产物执行仪器与启动验证。
+- 产品源码、资源、Gradle / 构建配置、Runtime、未知路径：静态门禁先行，随后单元测试、arm64 Lint/optimized 构建、x86_64 设备测试产物三路并行；Android 16 / 17 在共享 x86_64 产物完成后并行验证。
+- `.github/release-version` 直接影响 versionName / versionCode，必须按完整产品构建验证，且 main 不得忽略该变更。
+- APK 结构校验和启动 smoke 脚本属于产品发布验证边界，修改它们时仍走完整 CI。
 
-手动 `workflow_dispatch` 始终强制完整 CI。专项功能在上述通用范围外继续增加对应专项验证。
+完整 CI 必须保留架构、性能、UI、Kotlin、Android 安全边界、CI/构建供应链、全部单元测试、Harness conformance、Lint、arm64 optimized APK、x86_64 设备产物、Android 16、Android 17、APK 结构/16 KiB/体积与启动 smoke。优化只能减少重复构建、重复下载、无关等待和空转，不得删除验证能力。
+
+Runtime 下载缓存只缓存已由固定版本与 SHA 校验约束的下载内容；Android 16 / 17 必须验证同一套 x86_64 二进制，避免不同 Runner 各自重新构建造成浪费和产物漂移。
+
+手动 `workflow_dispatch` 始终强制完整 CI，并包含官方 fixture provenance。专项功能在上述通用范围外继续增加对应专项验证。
 
 涉及模型、网络、后台状态、工具或全局 UI 时，专项回归至少覆盖与本次修改相关的对抗场景：
 
