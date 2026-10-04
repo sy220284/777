@@ -13,7 +13,7 @@ internal fun optionalToolPromptBudgetForRoute(
     state: LocalHarnessState,
     history: List<JsonObject>,
 ): Int {
-    val profile = state.modelState.modelState.modelSelection.activeProfile
+    val profile = state.modelState.modelSelection.activeProfile
     val cachePolicy = LocalModelPresets.promptCachePolicyFor(
         model = state.modelState.model,
         baseUrl = state.modelState.baseUrl,
