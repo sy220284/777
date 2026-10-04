@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.work.LocalWorkProgressCoordinator
+import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.local.work.guardWorkCompletionDelivery
 import com.labteto.dshmobile.local.work.recordWorkCompletionQuality
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
@@ -45,7 +46,6 @@ import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.LocalChatState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
-import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.chatPostTurnModelMessages
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.canonicalFactLines
@@ -56,7 +56,6 @@ import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.chat.saveGroupChatAnnouncement
 import com.labteto.dshmobile.local.chat.LocalChatPersistence
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
-import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.LocalReplySuggestionCoordinator
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
@@ -83,7 +82,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.OutputStream
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -146,8 +144,8 @@ class LocalHarnessEngine @Inject constructor(
     private val memoryManager: MemoryManager,
     private val contextComposer: ContextComposer,
     private val chatPersistence: LocalChatPersistence,
-    private val chatTurnRunner: ChatTurnRunner,
-    private val chatInteractionPlanner: ChatInteractionPlanner,
+    private val chatTurnCoordinator: LocalChatTurnCoordinator,
+    private val workRunRegistry: LocalWorkRunRegistry,
 ) {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val chatPersonaStore get() = chatPersistence.personaStore
@@ -191,10 +189,6 @@ class LocalHarnessEngine @Inject constructor(
         json = json,
     )
     private val approvalPreferences = LocalApprovalPreferences(preferences)
-    private val chatTurnCoordinator = LocalChatTurnCoordinator(
-        runner = chatTurnRunner,
-        interactionPlanner = chatInteractionPlanner,
-    )
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
     private val eventLogRegistry by lazy { LocalSessionEventLogRegistry(sessionsRoot, json) }
     private val sessionStorageManager by lazy { LocalSessionStorageManager(sessionsRoot, json) }
@@ -216,7 +210,7 @@ class LocalHarnessEngine @Inject constructor(
             summaries = ::sessionSummaries,
             currentSessionId = { currentSessionId },
             currentState = { _state.value },
-            activeState = { id -> activeWorkRuns[id]?.state?.value },
+            activeState = workRunRegistry::state,
             eventLogFor = ::eventLogFor,
         )
     }
@@ -286,7 +280,7 @@ class LocalHarnessEngine @Inject constructor(
             foregroundPendingInputs = { pendingInputs.size() },
             pendingInputLimit = MAX_PENDING_INPUTS,
             foregroundWorkBudget = { sessionId ->
-                activeWorkRuns[sessionId]?.executionControl?.budget?.snapshot()
+                workRunRegistry[sessionId]?.executionControl?.budget?.snapshot()
             },
         )
     }
@@ -305,7 +299,7 @@ class LocalHarnessEngine @Inject constructor(
             streamPreviewIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
         )
     }
-    private val tokenUsageBridge by lazy { LocalTokenUsageContextBridge(_state, activeWorkRuns, ::eventLogFor) { currentSessionId } }
+    private val tokenUsageBridge by lazy { LocalTokenUsageContextBridge(_state, workRunRegistry, ::eventLogFor) { currentSessionId } }
     private val pluginComposition by lazy {
         pluginCompositionFactory.create(
             workspaceRoot = File(workspace.path),
@@ -523,13 +517,10 @@ class LocalHarnessEngine @Inject constructor(
             }
         },
     )
-    /** Work runs are session-owned and may outlive whichever conversation is currently visible. */
-    private val activeWorkRuns = ConcurrentHashMap<String, LocalWorkRunBinding>()
-
     private fun liveWorkRun(sessionId: String): LocalWorkRunBinding? =
-        activeWorkRuns[sessionId]?.takeIf { it.job?.isCompleted == false }
+        workRunRegistry.live(sessionId)
     private val jobs = LocalJobManager(scope, persistentJobStore) { snapshot ->
-        projectJobSnapshotToSessionStates(snapshot, _state, activeWorkRuns)
+        projectJobSnapshotToSessionStates(snapshot, _state, workRunRegistry)
         syncForegroundJobs(context, snapshot) { message ->
             _state.update { it.copy(error = message) }
         }
@@ -684,7 +675,7 @@ class LocalHarnessEngine @Inject constructor(
             )
         },
         historySnapshot = historySnapshot,
-        executionControl = activeWorkRuns[sessionId]?.executionControl ?: LocalWorkExecutionControl(),
+        executionControl = workRunRegistry[sessionId]?.executionControl ?: LocalWorkExecutionControl(),
     )
     /**
      * Detached work runner for scheduled/webhook work.
@@ -1214,7 +1205,7 @@ class LocalHarnessEngine @Inject constructor(
             state.kernel.running ||
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
-            activeWorkRuns[state.sessionId]?.job?.isCompleted == false ||
+            workRunRegistry[state.sessionId]?.job?.isCompleted == false ||
             pendingInputs.size() != 0
         ) return@synchronized LocalChatUserEditResult.BUSY
         recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
@@ -1623,7 +1614,7 @@ class LocalHarnessEngine @Inject constructor(
         val result = synchronized(runStateLock) {
             val state = _state.value
             val binding = if (state.usageMode == LocalUsageMode.WORK) {
-                activeWorkRuns[state.sessionId]?.takeIf { it.job?.isCompleted == false }
+                workRunRegistry[state.sessionId]?.takeIf { it.job?.isCompleted == false }
             } else null
             val targetPending = binding?.pendingInputs ?: pendingInputs
             val targetState = binding?.state ?: _state
@@ -1707,7 +1698,7 @@ class LocalHarnessEngine @Inject constructor(
             maxPendingInputs = MAX_PENDING_INPUTS,
             pruneToolResult = ::pruneToolResult,
         )
-        activeWorkRuns[sessionId] = binding
+        workRunRegistry[sessionId] = binding
         binding.mirrorJob = scope.launch {
             binding.state.collect {
                 mirrorLocalWorkRunState(currentSessionId, _state, binding)
@@ -2108,24 +2099,24 @@ class LocalHarnessEngine @Inject constructor(
 
     /** Resolve the approval owned by the currently visible conversation. */
     internal fun answerApproval(callId: String, approved: Boolean) {
-        val binding = activeWorkRuns[currentSessionId]
+        val binding = workRunRegistry[currentSessionId]
         if (binding?.interactions?.answerApproval(callId, approved) == true) return
         approvalCoordinator.answerApproval(callId, approved)
     }
 
     internal fun enableAutoApproval() {
         approvalCoordinator.enableAutoApproval()
-        activeWorkRuns.values.forEach { run ->
+        workRunRegistry.forEachBinding { run ->
             run.state.update { it.copy(safeAutoApprovalEnabled = true) }
         }
     }
 
     internal fun enableAutoApprovalForPending(callId: String) {
-        val binding = activeWorkRuns[currentSessionId]
+        val binding = workRunRegistry[currentSessionId]
         val pending = binding?.state?.value?.work?.pendingApproval?.takeIf { it.callId == callId }
         if (binding != null && pending != null) {
             approvalCoordinator.enableAutoApproval()
-            activeWorkRuns.values.forEach { run ->
+            workRunRegistry.forEachBinding { run ->
                 run.state.update { it.copy(safeAutoApprovalEnabled = true) }
             }
             binding.eventLog.append("approval/mode", buildJsonObject {
@@ -2139,7 +2130,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     internal fun enableDeviceApprovalLease(callId: String) {
-        val binding = activeWorkRuns[currentSessionId]
+        val binding = workRunRegistry[currentSessionId]
         val pending = binding?.state?.value?.work?.pendingApproval?.takeIf { it.callId == callId }
         if (binding != null && pending != null) {
             if (pending.canApproveDeviceTurn) {
@@ -2158,7 +2149,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     internal fun disableDeviceApprovalLease() {
-        activeWorkRuns[currentSessionId]?.let { binding ->
+        workRunRegistry[currentSessionId]?.let { binding ->
             binding.state.update { it.copy(deviceApprovalLease = false) }
             binding.eventLog.append("approval/device-lease", buildJsonObject { put("active", false) })
         }
@@ -2167,21 +2158,21 @@ class LocalHarnessEngine @Inject constructor(
 
     internal fun disableAutoApproval() {
         approvalCoordinator.disableAutoApproval()
-        activeWorkRuns.values.forEach { run ->
+        workRunRegistry.forEachBinding { run ->
             run.state.update { it.copy(safeAutoApprovalEnabled = false) }
         }
     }
 
     /** Resolve the model-authored question owned by the currently visible conversation. */
     internal fun answerQuestion(callId: String, answer: String) {
-        val binding = activeWorkRuns[currentSessionId]
+        val binding = workRunRegistry[currentSessionId]
         if (binding?.interactions?.answerQuestion(callId, answer) == true) return
         approvalCoordinator.answerQuestion(callId, answer)
     }
 
     /** Resolve a dismissed ask-user request with one stable model-visible semantic. */
     internal fun cancelQuestion(callId: String) {
-        val binding = activeWorkRuns[currentSessionId]
+        val binding = workRunRegistry[currentSessionId]
         if (binding?.interactions?.cancelQuestion(callId) == true) return
         approvalCoordinator.cancelQuestion(callId)
     }
@@ -2189,7 +2180,7 @@ class LocalHarnessEngine @Inject constructor(
     /** Stop only the run owned by the currently visible conversation. */
     internal fun stop() {
         cancelChatPostTurn()
-        val binding = activeWorkRuns[currentSessionId]
+        val binding = workRunRegistry[currentSessionId]
         if (binding?.job?.isCompleted == false) {
             binding.interactions.cancelAll()
             val discarded = binding.pendingInputs.drain()
@@ -2309,7 +2300,7 @@ class LocalHarnessEngine @Inject constructor(
     private fun isRunBusy(): Boolean = synchronized(runStateLock) {
         sessionTransitioning ||
             activeJob?.isCompleted == false ||
-            activeWorkRuns.values.any { it.job?.isCompleted == false }
+            workRunRegistry.anyLive()
     }
 
     private fun beginSessionTransition(): Boolean {
@@ -2328,7 +2319,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private suspend fun cancelWorkRunsAndJoin(sessionIds: Set<String>) {
         val cancelled = synchronized(runStateLock) {
-            sessionIds.mapNotNull(activeWorkRuns::remove)
+            workRunRegistry.detachAll(sessionIds)
         }
         cancelled.forEach { it.cancelAndJoin() }
     }
@@ -2430,7 +2421,7 @@ class LocalHarnessEngine @Inject constructor(
         val next = binding.pendingInputs.poll()
         if (next == null) {
             binding.job = null
-            activeWorkRuns.remove(binding.sessionId, binding)
+            workRunRegistry.detach(binding)
             binding.mirrorJob?.cancel()
             binding.mirrorJob = null
             if (currentSessionId == binding.sessionId && _state.value.sessionId == binding.sessionId) {
@@ -2525,7 +2516,7 @@ class LocalHarnessEngine @Inject constructor(
         if (
             _state.value.usageMode == LocalUsageMode.CHAT ||
             isRunBusy() ||
-            activeWorkRuns[currentSessionId]?.job?.isCompleted == false
+            workRunRegistry[currentSessionId]?.job?.isCompleted == false
         ) return
         _state.update { it.copy(work = it.work.copy(planMode = enabled)) }
         eventLog.append("plan/mode", buildJsonObject { put("active", enabled) })
@@ -3941,7 +3932,7 @@ class LocalHarnessEngine @Inject constructor(
         executionSessionId: String?,
     ): String {
         val args = call.arguments
-        val binding = executionSessionId?.let(activeWorkRuns::get)
+        val binding = executionSessionId?.let(workRunRegistry::get)
         val executionState = binding?.state ?: _state
         val boundSessionId = binding?.sessionId ?: currentSessionId
         if (executionState.value.work.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
