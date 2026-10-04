@@ -1733,11 +1733,7 @@ class LocalHarnessEngine @Inject constructor(
         val binding = activeWorkRuns[sessionId]?.takeIf { it.job?.isCompleted == false } ?: return
         val liveState = binding.state.value
         liveState.modelSelection.activeProfile?.takeIf { liveState.configured }?.let(modelGateway::activate)
-        _state.value = liveState.copy(
-            loading = _state.value.loading,
-            usage = usageTracker.state.value,
-            sessions = sessionSummaries(),
-        )
+        _state.value = liveState.copy(loading = _state.value.loading, usage = usageTracker.state.value, sessions = sessionSummaries())
         modelHistory.reset(binding.modelHistory.snapshot())
         transcriptProjectionCursor = binding.transcriptProjectionCursor
     }
@@ -3017,7 +3013,6 @@ class LocalHarnessEngine @Inject constructor(
 
         val loop = AgentLoop(
             model = AgentModel {
-                agentRunCoordinator.ensureCurrentForegroundRun(runContext)
                 // Persistent history stays compact; user rules, recalled memory and handoff are
                 // assembled per request and are deliberately never written back into runHistory.
                 if (!requestPrepared) {
@@ -3122,7 +3117,6 @@ class LocalHarnessEngine @Inject constructor(
                         throw error
                     }
                 }
-                agentRunCoordinator.ensureCurrentForegroundRun(runContext)
                 val reply = enforceChatStyle(
                     key = key,
                     snapshot = snapshot,
@@ -3168,7 +3162,6 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             tools = AgentToolExecutor { call ->
-                agentRunCoordinator.ensureCurrentForegroundRun(runContext)
                 if (!runPolicy.allowToolExecution) {
                     AgentToolResult(
                         content = "聊天模式不提供工具执行能力。",
@@ -3180,7 +3173,6 @@ class LocalHarnessEngine @Inject constructor(
                 }
             },
             toolBatch = AgentToolBatchExecutor { calls ->
-                agentRunCoordinator.ensureCurrentForegroundRun(runContext)
                 if (!runPolicy.allowToolExecution) {
                     calls.map {
                         AgentToolResult(
@@ -4619,11 +4611,7 @@ class LocalHarnessEngine @Inject constructor(
         deferReady: Boolean = false,
     ) {
         val liveBinding = activeWorkRuns[sessionId]?.takeIf { it.job?.isCompleted == false }
-        if (!shouldUseDurableSessionRecovery(liveBinding != null)) {
-            pendingInputs.clear()
-            syncVisibleWorkRun(sessionId)
-            return
-        }
+        if (!shouldUseDurableSessionRecovery(liveBinding != null)) { pendingInputs.clear(); syncVisibleWorkRun(sessionId); return }
 
         val loaded = try {
             sessionCoordinator.readWithLegacyApproval(sessionId)
