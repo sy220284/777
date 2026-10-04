@@ -28,11 +28,6 @@ data class PersonaTransferDocument(
     val bytes: ByteArray,
 )
 
-internal data class PersonaGalleryImportOutcome(
-    val entry: PersonaGalleryEntry,
-    val diaryEntries: List<ChatDiaryEntry> = emptyList(),
-)
-
 @Serializable
 internal data class PersonaTransferMemorySummary(
     val storyId: String,
