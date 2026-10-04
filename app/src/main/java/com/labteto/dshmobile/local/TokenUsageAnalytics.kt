@@ -310,7 +310,7 @@ internal fun DeepSeekUsageTracker.record(
     context: TokenUsageContext,
 ) {
     record(
-        model = snapshot.model,
+        model = snapshot.modelState.model,
         usage = reply.usage,
         requestId = reply.requestId,
         context = context,
