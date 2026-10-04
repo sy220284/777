@@ -7,11 +7,9 @@ import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.hasChatBranchAlternatives
-import com.labteto.dshmobile.local.updateChatBranchNodeSnapshot
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -62,7 +60,7 @@ internal class LocalReplySuggestionCoordinator(
             throw cancelled
         } catch (error: Throwable) {
             updateError(
-                expectedSessionId,
+                snapshot,
                 expectedAssistantMessageId,
                 error.message?.takeIf(String::isNotBlank) ?: "回复建议需要可用的模型账户或 API Key",
             )
@@ -90,7 +88,7 @@ internal class LocalReplySuggestionCoordinator(
                 put("detail", error.message.orEmpty().take(1_000))
             })
             updateError(
-                expectedSessionId,
+                snapshot,
                 expectedAssistantMessageId,
                 error.message?.takeIf(String::isNotBlank) ?: "回复建议生成失败，请重试",
             )
@@ -104,40 +102,11 @@ internal class LocalReplySuggestionCoordinator(
                 put("status", "parse-failed")
                 put("content", reply.content.orEmpty().take(2_000))
             })
-            updateError(expectedSessionId, expectedAssistantMessageId, "回复建议返回格式异常，请重试")
+            updateError(snapshot, expectedAssistantMessageId, "回复建议返回格式异常，请重试")
             return false
         }
 
-        var applied = false
-        state.update { current ->
-            if (
-                current.sessionId != expectedSessionId ||
-                current.usageMode != LocalUsageMode.CHAT ||
-                current.chat.groupChat.enabled ||
-                current.transcriptIndex.latestDialogueMessageId != expectedAssistantMessageId
-            ) {
-                current
-            } else {
-                applied = true
-                current.copy(
-                    chat = current.chat.copy(
-                        replySuggestions = suggestions,
-                        chatBranches = if (current.transcriptIndex.branchingEligible) {
-                            updateChatBranchNodeSnapshot(
-                                state = current.chat.chatBranches,
-                                messageId = expectedAssistantMessageId,
-                                chatState = current.chat.chatState,
-                                chatContext = current.chat.chatContext,
-                                replySuggestions = suggestions,
-                            )
-                        } else {
-                            current.chat.chatBranches
-                        },
-                    ),
-                    error = null,
-                )
-            }
-        }
+        val applied = commitReplySuggestions(state, snapshot, expectedAssistantMessageId, suggestions)
         if (!applied) {
             boundEventLog.append("chat/reply-suggestions", buildJsonObject {
                 put("status", "stale-discarded")
@@ -159,19 +128,8 @@ internal class LocalReplySuggestionCoordinator(
     }
 
     private fun updateError(
-        expectedSessionId: String,
+        snapshot: LocalHarnessState,
         expectedAssistantMessageId: String,
         message: String,
-    ) {
-        state.update { current ->
-            if (
-                current.sessionId == expectedSessionId &&
-                current.transcriptIndex.latestDialogueMessageId == expectedAssistantMessageId
-            ) {
-                current.copy(error = message)
-            } else {
-                current
-            }
-        }
-    }
+    ) = commitReplySuggestionError(state, snapshot, expectedAssistantMessageId, message)
 }

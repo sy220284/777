@@ -504,14 +504,12 @@ class LocalHarnessEngine @Inject constructor(
     private val resourceScheduler = HarnessResourceScheduler(
         budget = resourceBudget,
         onChanged = { snapshot ->
-            _state.update { current ->
-                current.copy(
-                    kernel = current.kernel.copy(
-                        resources = snapshot.toLocalHarnessResourceState(current.usageMode),
-                        contextBudgetChars = localHistoryBudgetFor(memoryClassMb, snapshot.pressure).maxHistoryChars,
-                    ),
-                )
-            }
+            projectResourceSnapshotToSessionStates(
+                snapshot = snapshot,
+                contextBudgetChars = localHistoryBudgetFor(memoryClassMb, snapshot.pressure).maxHistoryChars,
+                visibleState = _state,
+                activeRuns = workRunRegistry,
+            )
         },
     )
     private fun liveWorkRun(sessionId: String): LocalWorkRunBinding? =

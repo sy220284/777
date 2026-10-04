@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.presentation.toWorkSurfaceUiState
 import com.labteto.dshmobile.local.runtime.LocalKernelState
 import com.labteto.dshmobile.local.work.LocalWorkState
+import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
+import com.labteto.dshmobile.harness.resource.HarnessResourceBudget
+import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -60,6 +63,34 @@ class LocalWorkRunBindingTest {
         assertFalse(binding.state.value.kernel.running)
         assertEquals(0, binding.state.value.kernel.queuedInputCount)
         assertNull(binding.state.value.work.pendingQuestion)
+    }
+
+    @Test fun schedulerChangeUpdatesDetachedWorkWithoutCopyingItsExecutionIntoChat() {
+        val visible = MutableStateFlow(LocalHarnessState(sessionId = "chat", usageMode = LocalUsageMode.CHAT))
+        val binding = binding(LocalHarnessState(
+            sessionId = "work",
+            kernel = LocalKernelState(running = true, queuedInputCount = 2, contextChars = 32_000),
+        ))
+        val registry = LocalWorkRunRegistry().apply { attach(binding) }
+        val resources = HarnessResourceSnapshot(
+            activeModelRequests = 1, activeAgents = 3, activeTerminals = 0,
+            activeVirtualDisplays = 0, activeLanguageServers = 0,
+            budget = HarnessResourceBudget(maxModelRequests = 2, maxAgents = 4),
+        )
+
+        projectResourceSnapshotToSessionStates(resources, 48_000, visible, registry)
+
+        assertEquals(0, visible.value.kernel.resources.activeAgents)
+        assertEquals(3, binding.state.value.kernel.resources.activeAgents)
+        assertEquals(48_000, binding.state.value.kernel.contextBudgetChars)
+        assertEquals(48_000, visible.value.kernel.contextBudgetChars)
+        assertTrue(binding.state.value.kernel.running)
+        assertFalse(visible.value.kernel.running)
+        assertEquals(2, binding.state.value.kernel.queuedInputCount)
+        assertEquals(32_000, binding.state.value.kernel.contextChars)
+        mirrorLocalWorkRunState("chat", visible, binding)
+        assertEquals("chat", visible.value.sessionId)
+        assertFalse(visible.value.kernel.running)
     }
 
     private fun binding(initial: LocalHarnessState) = LocalWorkRunBinding(
