@@ -158,7 +158,7 @@ internal class LocalSubagentRunner(
         val routeModel = runSurface.model
         val runHistoryBudget = historyBudget?.invoke(runProfile)
         val runCachePolicy = runSurface.promptCachePolicy
-        val runToolSurface = LocalRunToolSurface()
+        val runToolSurface = LocalRunToolSurface(runSurface)
         val stepLimit = adaptiveAgentStepLimit(
             configuredBase = maxSteps,
             task = task,
@@ -296,7 +296,7 @@ internal class LocalSubagentRunner(
                         modelStepExecutor.complete(
                             surface = runSurface,
                             history = preparedHistory,
-                            tools = runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools), snapshot),
+                            tools = runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools)),
                             subagentId = subagentId,
                             step = modelStep,
                             durableHistory = history,
