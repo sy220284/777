@@ -175,7 +175,8 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val credentialRef = payload["credential_ref"]?.jsonPrimitive?.contentOrNull
         val fingerprint = payload.requiredString("route_fingerprint")
         val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
-            ?.coerceIn(1, 128) ?: currentState().subagentMaxSteps
+            ?.let(LocalAgentRuntimeLimits::normalizeSubagentSteps)
+            ?: currentState().subagentMaxSteps
         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
         val runner = subagentRunner(sessionId, currentState(), defaultHistory)
 
