@@ -116,6 +116,7 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 64,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 24,
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiRuntime.kt": 17,
+    "app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt": 90,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt": 150,
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalConversationSurfaceState.kt": 140,
     "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStateContent.kt": 24,
@@ -413,6 +414,31 @@ if "LocalHarnessStateContent(" in screen_source or "state: LocalHarnessState" in
     die("Local conversation UI must use mode-specific Chat/Work surface projections, not aggregate state")
 if "LocalConversationStateContent(viewModel, shell.usageMode)" not in screen_source:
     die("LocalHarnessScreen must select the Chat/Work conversation projection from shell usage mode")
+
+feature_catalog_path = "app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt"
+feature_catalog = strip_comments(read(feature_catalog_path))
+feature_navigation = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureNavigation.kt")
+)
+for required_feature_owner in (
+    "LocalFeatureModuleId.CHAT",
+    "LocalFeatureModuleId.WORK",
+    "LocalFeatureModuleId.AUTOMATION",
+    "LocalFeatureModuleId.TOOLS",
+    "LocalFeatureModuleId.SETTINGS",
+):
+    if required_feature_owner not in feature_catalog:
+        die(f"Architecture 3.0 feature catalog is missing owner: {required_feature_owner}")
+if "check(put(route, module.id) == null)" not in feature_catalog:
+    die("feature catalog must reject duplicate subfeature route ownership")
+if "ownerByRoute.keys == LocalFeatureRoute.entries.toSet()" not in feature_catalog:
+    die("feature catalog must require every route to have exactly one owner")
+if "LocalFeatureCatalog.resolve(stack.lastOrNull())" not in feature_navigation:
+    die("local navigation must resolve routes through LocalFeatureCatalog")
+if "LocalFeatureRoute.valueOf" in feature_navigation or "LocalFeaturePage.valueOf" in feature_navigation:
+    die("local navigation must not bypass LocalFeatureCatalog with enum valueOf")
+if "LocalFeatureCatalog.routes" not in screen_source:
+    die("LocalHarnessScreen must enumerate registered feature routes through LocalFeatureCatalog")
 
 local_root = ROOT / "app/src/main/java/com/labteto/dshmobile/local"
 local_root_files = list(local_root.glob("*.kt"))
