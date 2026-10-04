@@ -118,10 +118,7 @@ internal fun mirrorLocalWorkRunState(
             visible.copy(
                 messages = run.messages,
                 transcriptIndex = run.transcriptIndex,
-                plan = run.plan,
-                todos = run.todos,
-                goal = run.goal,
-                planMode = run.planMode,
+                work = run.work,
                 running = run.running,
                 pendingApproval = run.pendingApproval,
                 pendingQuestion = run.pendingQuestion,
