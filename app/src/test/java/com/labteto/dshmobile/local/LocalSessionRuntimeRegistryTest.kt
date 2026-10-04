@@ -160,4 +160,35 @@ class LocalSessionRuntimeRegistryTest {
         assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
     }
 
+    @Test
+    fun nonBlockingAcquireDoesNotBypassQueuedReservation() = runTest {
+        val sessionId = "fair-handoff-session"
+        val first = LocalSessionRuntimeRegistry.acquire(
+            sessionId,
+            LocalSessionRuntimeKind.AUTOMATION_CHAT,
+        )
+        var waiterLease: LocalSessionRuntimeLease? = null
+        val waiter = launch {
+            waiterLease = LocalSessionRuntimeRegistry.acquire(
+                sessionId,
+                LocalSessionRuntimeKind.AUTOMATION_WORK,
+            )
+        }
+        runCurrent()
+        first.close()
+
+        assertNull(
+            LocalSessionRuntimeRegistry.tryAcquire(
+                sessionId,
+                LocalSessionRuntimeKind.MAINTENANCE,
+            ),
+        )
+        runCurrent()
+        assertNotNull(waiterLease)
+
+        waiterLease!!.close()
+        waiter.join()
+        assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
+    }
+
 }
