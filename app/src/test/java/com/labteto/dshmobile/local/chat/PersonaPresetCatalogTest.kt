@@ -77,6 +77,7 @@ class PersonaPresetCatalogTest {
         val modelMetaBans = setOf("作为AI", "根据设定我应该", "身为一个语言模型")
 
         PersonaPresetCatalog.presets.forEach { preset ->
+            assertTrue(preset.persona.coreTension.isNotBlank())
             assertTrue(preset.persona.coreTension != genericTension)
             assertTrue(preset.persona.coreValues.none { it in genericValues })
             assertTrue(preset.persona.bannedPhrases.none { it in modelMetaBans })
