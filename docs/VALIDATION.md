@@ -216,7 +216,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - 输出质量守卫通过统一 `LocalOutputQualityPipeline` 调度，共享 inspect/result 契约但保留领域规则；Chat 仅做高置信最小修复，Work 完成声明与 Todo/Goal 状态冲突时必须在最终交付前改为真实未完成状态，并记录脱敏诊断。
 - Work 请求投影必须保持工具调用/结果批次合法，投影后 Token 必须实质下降；小上下文不得无意义重写。
 - Work 压力增长必须用 source→source 比较，不能把上一请求的投影后压力与当前完整历史比较；DeepSeek/OpenAI 缓存敏感路由在绝对阈值前不得因该错位触发提前压缩。
-- Work 工具结果超过 2 KiB 时必须先持久 spill，模型可见副本保持约 1 KiB 且可按 `call_id` 恢复；`tool_output_read` 默认分页 4 KiB，禁止默认一次重新灌回 24 KiB。
+- Work 工具结果超过 4 KiB 时必须先持久 spill；模型可见额度必须只有一处事实源（写时保留、请求投影、恢复分页共用同一数值），新鲜结果保持 4 KiB 原样、陈旧结果压缩到约 1 KiB，均可按 `call_id` 恢复；`tool_output_read` 默认分页 4 KiB，单页交付不得超过该可见额度，禁止默认一次重新灌回 24 KiB。
 - DeepSeek 官方路由保持共享前缀与工具 schema 顺序稳定，并以供应商实报 hit/miss 验证；OpenAI 官方 GPT-5.6+ API Key Responses 的缓存键/30m TTL 只在能力快照允许时发送，自定义兼容地址不得继承。
 - Work 稳定运行时/长期规则必须位于历史前部且跨 turn 保持字节稳定；按当前 query 召回的记忆、handoff 和其他动态上下文只能出现在当前 user 附近，禁止重新插入 system 后第二条破坏整段前缀。
 - DeepSeek `APPEND_ONLY` system/tool 能力必须被运行时实际消费：system 更新追加，工具新增只追加；工具撤销、schema 变化或无法识别的工具结构必须立即退回完整替换，不能为缓存保留失效能力。
