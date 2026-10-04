@@ -13,19 +13,19 @@ internal fun optionalToolPromptBudgetForRoute(
     state: LocalHarnessState,
     history: List<JsonObject>,
 ): Int {
-    val profile = state.modelSelection.activeProfile
+    val profile = state.modelState.modelState.modelSelection.activeProfile
     val cachePolicy = LocalModelPresets.promptCachePolicyFor(
-        model = state.model,
-        baseUrl = state.baseUrl,
-        protocol = profile?.protocol ?: LocalModelPresets.protocolFor(state.model, state.baseUrl),
+        model = state.modelState.model,
+        baseUrl = state.modelState.baseUrl,
+        protocol = profile?.protocol ?: LocalModelPresets.protocolFor(state.modelState.model, state.modelState.baseUrl),
         authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
     )
     if (cachePolicy.preserveToolSurface) {
         return LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS
     }
     val operationalLimit = operationalInputLimitTokens(
-        state.model,
-        state.baseUrl,
+        state.modelState.model,
+        state.modelState.baseUrl,
         profile?.contextWindowTokensOverride,
     )
     val pressure = LocalPromptPressureMeter.measure(
@@ -33,8 +33,8 @@ internal fun optionalToolPromptBudgetForRoute(
         tools = JsonArray(emptyList()),
         operationalLimitTokens = operationalLimit,
         modelContextWindowTokens = documentedContextWindowTokens(
-            state.model,
-            state.baseUrl,
+            state.modelState.model,
+            state.modelState.baseUrl,
             profile?.contextWindowTokensOverride,
         ),
     )
