@@ -32,8 +32,8 @@ internal fun localForegroundStepLimitExtender(
             currentLimit = currentLimit,
             configuredBase = configuredBase,
             task = task,
-            contextChars = current.contextChars,
-            contextBudgetChars = current.contextBudgetChars,
+            contextChars = current.kernel.contextChars,
+            contextBudgetChars = current.kernel.contextBudgetChars,
             pressure = livePressure,
             kind = LocalAgentRunKind.FOREGROUND,
         )
@@ -44,8 +44,8 @@ internal fun localForegroundStepLimitExtender(
                     put("steps_used", stepsUsed)
                     put("previous_limit", currentLimit)
                     put("next_limit", boundedNext)
-                    put("context_chars", current.contextChars)
-                    put("context_budget_chars", current.contextBudgetChars)
+                    put("context_chars", current.kernel.contextChars)
+                    put("context_budget_chars", current.kernel.contextBudgetChars)
                     put("resource_pressure", livePressure.name.lowercase())
                 },
             )
