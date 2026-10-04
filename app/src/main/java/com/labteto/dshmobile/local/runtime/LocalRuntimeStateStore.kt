@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,10 +17,12 @@ import kotlinx.coroutines.flow.asStateFlow
 @Singleton
 class LocalRuntimeStateStore @Inject constructor() {
     private val mutable = MutableStateFlow(LocalHarnessState())
+    private val sendFeedbackMutable = MutableStateFlow(LocalSendFeedbackState())
     @Volatile private var initialized = false
     @Volatile private var foregroundSessionId: String? = null
 
     internal val state: StateFlow<LocalHarnessState> = mutable.asStateFlow()
+    internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = sendFeedbackMutable.asStateFlow()
     internal val mutableState: MutableStateFlow<LocalHarnessState>
         get() = mutable
 
@@ -34,6 +37,14 @@ class LocalRuntimeStateStore @Inject constructor() {
         mutable.value = initialState
         initialized = true
         return mutable
+    }
+
+    internal fun publishSendFeedback(feedback: LocalSendFeedbackState) {
+        sendFeedbackMutable.value = feedback
+    }
+
+    internal fun clearSendFeedback() {
+        sendFeedbackMutable.value = LocalSendFeedbackState()
     }
 
     @Synchronized
