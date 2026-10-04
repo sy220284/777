@@ -17,7 +17,7 @@ internal class LocalHarnessSettingsCoordinator(
 ) {
     fun configureImageInputMode(mode: LocalImageInputMode) {
         preferences.edit().putString(KEY_IMAGE_INPUT_MODE, mode.name).apply()
-        updateState { it.copy(imageInputMode = mode) }
+        updateState { it.copy(modelState = it.modelState.copy(imageInputMode = mode)) }
     }
 
     fun configureRuntimeLimits(
@@ -37,7 +37,7 @@ internal class LocalHarnessSettingsCoordinator(
             it.copy(
                 mainMaxSteps = main,
                 subagentMaxSteps = subagent,
-                modelAttempts = attempts,
+                modelState = it.modelState.copy(modelAttempts = attempts),
             )
         }
     }
@@ -45,14 +45,14 @@ internal class LocalHarnessSettingsCoordinator(
     fun configureWorkerProfile(profileId: String?) {
         val normalized = profileId?.trim()?.takeIf(String::isNotBlank)
         val current = state()
-        require(normalized == null || current.modelSelection.profiles.any { it.id == normalized }) {
+        require(normalized == null || current.modelState.modelSelection.profiles.any { it.id == normalized }) {
             "子代理工作模型已不存在，请重新选择"
         }
         preferences.edit().apply {
             if (normalized == null) remove(KEY_WORKER_PROFILE_ID) else putString(KEY_WORKER_PROFILE_ID, normalized)
         }.apply()
         updateState {
-            it.copy(modelSelection = it.modelSelection.copy(workerProfileId = normalized))
+            it.copy(modelState = it.modelState.copy(modelSelection = it.modelState.modelSelection.copy(workerProfileId = normalized)))
         }
     }
 
