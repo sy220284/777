@@ -25,6 +25,7 @@ class LocalAutomationRuntime @Inject constructor(
                 .asSequence()
                 .filter { it.role == "user" || it.role == "assistant" }
                 .filter { it.content.isNotBlank() }
+                .toList()
                 .takeLast(12)
                 .map { AutomationPlanningMessage(it.role, it.content) },
         )
