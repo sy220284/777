@@ -704,7 +704,6 @@ class LocalHarnessEngine @Inject internal constructor(
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job? = null
-    private val interactions = LocalInteractionCoordinator(_state)
     private val memoryCoordinator by lazy {
         LocalMemoryCoordinator(
             state = _state,
@@ -720,7 +719,7 @@ class LocalHarnessEngine @Inject internal constructor(
         LocalApprovalCoordinator(
             state = _state,
             approvalPreferences = approvalPreferences,
-            interactions = interactions,
+            interactions = runtimeStateStore.foregroundInteractions,
             eventLog = { eventLog },
             persist = ::persist,
         )
@@ -2057,13 +2056,6 @@ class LocalHarnessEngine @Inject internal constructor(
 
     internal fun stopBackgroundJobForUi(jobId: String): String = jobs.kill(jobId, currentSessionId)
 
-    /** Resolve the approval owned by the currently visible conversation. */
-    internal fun answerApproval(callId: String, approved: Boolean) {
-        val binding = workRunRegistry[currentSessionId]
-        if (binding?.interactions?.answerApproval(callId, approved) == true) return
-        approvalCoordinator.answerApproval(callId, approved)
-    }
-
     internal fun enableAutoApproval() {
         approvalCoordinator.enableAutoApproval()
         workRunRegistry.forEachBinding { run ->
@@ -2123,26 +2115,12 @@ class LocalHarnessEngine @Inject internal constructor(
         }
     }
 
-    /** Resolve the model-authored question owned by the currently visible conversation. */
-    internal fun answerQuestion(callId: String, answer: String) {
-        val binding = workRunRegistry[currentSessionId]
-        if (binding?.interactions?.answerQuestion(callId, answer) == true) return
-        approvalCoordinator.answerQuestion(callId, answer)
-    }
-
-    /** Resolve a dismissed ask-user request with one stable model-visible semantic. */
-    internal fun cancelQuestion(callId: String) {
-        val binding = workRunRegistry[currentSessionId]
-        if (binding?.interactions?.cancelQuestion(callId) == true) return
-        approvalCoordinator.cancelQuestion(callId)
-    }
-
     /** Stop only the run owned by the currently visible conversation. */
     internal fun stop() {
         cancelChatPostTurn()
         val binding = workRunRegistry[currentSessionId]
         if (binding?.job?.isCompleted == false) {
-            binding.interactions.cancelAll()
+            binding.runtimeStateStore.foregroundInteractions.cancelAll()
             val discarded = binding.pendingInputs.drain()
             if (discarded.isNotEmpty()) {
                 binding.eventLog.append(
@@ -2167,7 +2145,7 @@ class LocalHarnessEngine @Inject internal constructor(
             return
         }
 
-        interactions.cancelAll()
+        runtimeStateStore.foregroundInteractions.cancelAll()
         val running = synchronized(runStateLock) {
             val discarded = pendingInputs.drain()
             if (discarded.isNotEmpty()) {
@@ -2285,7 +2263,7 @@ class LocalHarnessEngine @Inject internal constructor(
     }
 
     private suspend fun cancelActiveRunAndJoin() {
-        interactions.cancelAll()
+        runtimeStateStore.foregroundInteractions.cancelAll()
         val job = synchronized(runStateLock) {
             val discarded = pendingInputs.drain()
             if (discarded.isNotEmpty()) {
@@ -3547,7 +3525,7 @@ class LocalHarnessEngine @Inject internal constructor(
             }
             // TurnFailed has already settled tool side effects and checkpointed model-visible state.
         } finally {
-            if (binding != null) binding.interactions.cancelAll() else interactions.cancelAll()
+            if (binding != null) binding.runtimeStateStore.foregroundInteractions.cancelAll() else runtimeStateStore.foregroundInteractions.cancelAll()
             runState.update {
                 it.copy(
                     work = it.work.copy(
@@ -4177,7 +4155,7 @@ class LocalHarnessEngine @Inject internal constructor(
             })
             return true
         }
-        return interactions.awaitApproval(
+        return runtimeStateStore.foregroundInteractions.awaitApproval(
             LocalApproval(
                 callId = call.id,
                 toolName = call.name,
@@ -4217,7 +4195,7 @@ class LocalHarnessEngine @Inject internal constructor(
             })
             return true
         }
-        return binding.interactions.awaitApproval(
+        return binding.runtimeStateStore.foregroundInteractions.awaitApproval(
             LocalApproval(
                 callId = call.id,
                 toolName = call.name,
