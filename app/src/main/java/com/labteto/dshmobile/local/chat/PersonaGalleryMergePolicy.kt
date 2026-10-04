@@ -19,6 +19,7 @@ internal fun isMeaningfulGalleryPersona(persona: PersonaProfile): Boolean {
     return persona.portrait.isNotBlank() ||
         persona.lifeContext.isNotBlank() ||
         persona.attentionBiases.isNotEmpty() ||
+        persona.attentionKeywords.isNotEmpty() ||
         persona.coreValues.isNotEmpty() ||
         persona.stableTraits.isNotEmpty() ||
         persona.worldSetting.isNotBlank() ||
@@ -55,6 +56,7 @@ internal fun mergePersonaProfiles(base: PersonaProfile, incoming: PersonaProfile
         portrait = mergePersonaText(base.portrait, incoming.portrait, 4_000),
         lifeContext = mergePersonaText(base.lifeContext, incoming.lifeContext, 4_000),
         attentionBiases = mergePersonaLines(base.attentionBiases, incoming.attentionBiases, 8),
+        attentionKeywords = mergePersonaLines(base.attentionKeywords, incoming.attentionKeywords, 12),
         perceptionBlindSpots = mergePersonaLines(base.perceptionBlindSpots, incoming.perceptionBlindSpots, 8),
         quirks = mergePersonaLines(base.quirks, incoming.quirks, 12),
         limitations = mergePersonaLines(base.limitations, incoming.limitations, 8),
@@ -89,6 +91,7 @@ internal fun applyPersonaSuggestions(
             "portrait" -> result.copy(portrait = mergePersonaText(result.portrait, value, 4_000))
             "lifeContext" -> result.copy(lifeContext = mergePersonaText(result.lifeContext, value, 4_000))
             "attentionBiases" -> result.copy(attentionBiases = mergePersonaLines(result.attentionBiases, listOf(value), 8))
+            "attentionKeywords" -> result.copy(attentionKeywords = mergePersonaLines(result.attentionKeywords, listOf(value), 12))
             "perceptionBlindSpots" -> result.copy(perceptionBlindSpots = mergePersonaLines(result.perceptionBlindSpots, listOf(value), 8))
             "quirks" -> result.copy(quirks = mergePersonaLines(result.quirks, listOf(value), 12))
             "limitations" -> result.copy(limitations = mergePersonaLines(result.limitations, listOf(value), 8))
@@ -208,6 +211,7 @@ private fun personaContentSignature(persona: PersonaProfile): String = listOf(
     persona.portrait,
     persona.lifeContext,
     persona.attentionBiases.joinToString("\u0000"),
+    persona.attentionKeywords.joinToString("\u0000"),
     persona.perceptionBlindSpots.joinToString("\u0000"),
     persona.quirks.joinToString("\u0000"),
     persona.limitations.joinToString("\u0000"),
@@ -370,4 +374,3 @@ private val DEFAULT_PERSONA_NAMES = setOf(
     normalizePersonaText("default"),
     normalizePersonaText("default角色"),
 )
-
