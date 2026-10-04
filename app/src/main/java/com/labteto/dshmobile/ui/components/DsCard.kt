@@ -40,6 +40,7 @@ fun DsCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(DsSpacing.tiny),
+    elevated: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = DsTheme.colors
@@ -61,7 +62,7 @@ fun DsCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(1.dp, DsShapes.block, clip = false)
+            .then(if (elevated) Modifier.shadow(1.dp, DsShapes.block, clip = false) else Modifier)
             .clip(DsShapes.block)
             .background(background)
             .border(1.dp, colors.borderL1, DsShapes.block)

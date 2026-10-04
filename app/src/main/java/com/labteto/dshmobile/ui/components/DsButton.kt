@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -57,22 +58,24 @@ fun DsButton(
     variant: DsButtonVariant = DsButtonVariant.Primary,
     size: DsButtonSize = DsButtonSize.Normal,
     icon: ImageVector? = null,
+    loading: Boolean = false,
 ) {
     val colors = DsTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
+    val interactionEnabled = enabled && !loading
     
     // Animate scale on press for tactile feedback
     val scale by animateFloatAsState(
-        targetValue = if (pressed && enabled) DsAnimations.Scale.pressed else DsAnimations.Scale.normal,
+        targetValue = if (pressed && interactionEnabled) DsAnimations.Scale.pressed else DsAnimations.Scale.normal,
         animationSpec = DsAnimations.pressScale,
         label = "buttonScale"
     )
     
     val (fill, content) = when (variant) {
-        DsButtonVariant.Primary -> colors.brandPrimary to colors.onBrandPrimary
-        DsButtonVariant.Info -> colors.buttonInfoFill to colors.onAccent
+        DsButtonVariant.Primary -> colors.accent to colors.onAccent
+        DsButtonVariant.Info -> colors.accentTertiary to colors.accent
         DsButtonVariant.Ghost -> Color.Transparent to colors.labelPrimary
         DsButtonVariant.Outline -> Color.Transparent to colors.labelPrimary
         DsButtonVariant.Danger -> colors.error to colors.onAccent
@@ -83,8 +86,8 @@ fun DsButton(
             else -> fill.copy(alpha = 0.4f)
         }
         hovered -> when (variant) {
-            DsButtonVariant.Primary -> colors.buttonPrimaryHover
-            DsButtonVariant.Info -> colors.buttonInfoHover
+            DsButtonVariant.Primary -> colors.accentHover
+            DsButtonVariant.Info -> colors.hoverAccent
             DsButtonVariant.Ghost, DsButtonVariant.Outline -> colors.hover
             DsButtonVariant.Danger -> lerp(colors.error, Color.Black, 0.15f)
         }
@@ -101,7 +104,7 @@ fun DsButton(
                 scaleX = scale
                 scaleY = scale
             },
-        enabled = enabled,
+        enabled = interactionEnabled,
         shape = if (normal) DsShapes.buttonCapsule else DsShapes.buttonSmall,
         color = background,
         contentColor = contentColor,
@@ -117,7 +120,14 @@ fun DsButton(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (icon != null) {
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(if (normal) 16.dp else 14.dp),
+                    color = contentColor,
+                    strokeWidth = 2.dp,
+                )
+                if (text.isNotEmpty()) Spacer(Modifier.width(6.dp))
+            } else if (icon != null) {
                 Icon(
                     icon,
                     contentDescription = null,

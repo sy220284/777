@@ -257,9 +257,9 @@
     <string name="settings_surface_clearer">更清晰</string>
     <string name="settings_surface_airier">更通透</string>
     <string name="settings_component_transparency_hint">调整自定义背景上的卡片、输入区、侧栏、弹窗与菜单；主操作按钮保持清晰实色，各组件仍保留可读性安全范围。</string>
-    <string name="settings_appearance_light">浅色</string>
-    <string name="settings_appearance_dark">深色</string>
-    <string name="settings_appearance_matte_black">磨砂黑</string>
+    <string name="settings_appearance_light">澄境 · 明</string>
+    <string name="settings_appearance_dark">澄境 · 夜</string>
+    <string name="settings_appearance_matte_black">澄境 · 墨</string>
     <string name="settings_appearance_system">跟随系统</string>
     <string name="settings_background_image">背景图</string>
     <string name="settings_background_image_none">使用纯色主题背景</string>

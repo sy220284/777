@@ -31,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -75,7 +74,6 @@ fun DisclosureRow(
     val colors = DsTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val running = state == DisclosureState.Running
     Column(modifier = modifier) {
         Row(
             modifier = Modifier
@@ -118,6 +116,8 @@ fun DisclosureRow(
             }
             // The leading slot: the terminal state outranks the glyph, a running row keeps it.
             when {
+                state == DisclosureState.Running ->
+                    LeadingSlot { StateDot(StateDotState.Running, size = 8.dp) }
                 state == DisclosureState.Error ->
                     LeadingSlot { StateDot(StateDotState.Error, size = 8.dp) }
                 state == DisclosureState.Stopped ->
@@ -135,14 +135,13 @@ fun DisclosureRow(
                 else -> Unit
             }
             Spacer(Modifier.width(8.dp))
-            val titleModifier = if (running) Modifier.shimmer(runningBrush(colors)) else Modifier
             Text(
                 title,
                 style = DsType.std14.withReadingWeight(),
                 color = colors.labelSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false).then(titleModifier),
+                modifier = Modifier.weight(1f, fill = false),
             )
             if (summary != null) {
                 Spacer(Modifier.width(6.dp))
@@ -175,11 +174,6 @@ fun DisclosureRow(
 private fun LeadingSlot(content: @Composable () -> Unit) {
     Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) { content() }
 }
-
-/** Glare band used for the running-state shimmer sweep. */
-private fun runningBrush(colors: DsColors): Brush = Brush.linearGradient(
-    colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.5f), Color.Transparent),
-)
 
 /** Tiny 2x2 dot grid used as a title/summary separator. */
 @Composable

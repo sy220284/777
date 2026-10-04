@@ -46,6 +46,7 @@ fun DsIconButton(
     iconSize: Dp = 20.dp,
     containerColor: Color = Color.Transparent,
     shadowElevation: Dp = 0.dp,
+    selected: Boolean = false,
 ) {
     val colors = DsTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
@@ -58,11 +59,13 @@ fun DsIconButton(
         label = "iconButtonScale"
     )
     
+    val restingBackground = if (selected) colors.accentTertiary else containerColor
+    val resolvedTint = if (selected) colors.accent else tint
     val targetBackground = when {
         !enabled -> Color.Transparent
-        isPressed -> colors.hover.compositeOver(containerColor)
-        isHovered -> colors.hover.copy(alpha = 0.5f).compositeOver(containerColor)
-        else -> containerColor
+        isPressed -> colors.hover.compositeOver(restingBackground)
+        isHovered -> colors.hover.copy(alpha = 0.5f).compositeOver(restingBackground)
+        else -> restingBackground
     }
     val background by animateColorAsState(
         targetValue = targetBackground,
@@ -83,7 +86,7 @@ fun DsIconButton(
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = if (enabled) tint else tint.copy(alpha = 0.4f),
+                tint = if (enabled) resolvedTint else resolvedTint.copy(alpha = 0.4f),
                 modifier = Modifier
                     .requiredSize(iconSize)
                     .graphicsLayer {

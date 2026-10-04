@@ -20,8 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -150,10 +148,10 @@ fun DsCategoryRow(
         } else if (onClick != null) {
             Spacer(Modifier.width(DsSpacing.small))
             Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                FeatherIcons.ChevronRight,
                 contentDescription = null,
                 tint = colors.labelCaption,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(18.dp),
             )
         }
     }

@@ -78,7 +78,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
-
 @Composable
 fun TasksScreen(
     onClose: () -> Unit,
@@ -198,6 +197,7 @@ fun TasksScreen(
                 ),
                 onBack = navigateBack,
                 backContentDescription = stringResource(R.string.common_back),
+                largeTitle = true,
                 actionIcon = if (
                     showCreate || (chatMode && !canCreateChatInteraction)
                 ) null else FeatherIcons.Plus,

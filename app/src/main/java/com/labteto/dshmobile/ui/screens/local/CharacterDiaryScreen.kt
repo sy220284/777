@@ -187,6 +187,7 @@ internal fun CharacterDiaryScreen(
                 subtitle = stringResource(R.string.chat_diary_subtitle),
                 onBack = onDismiss,
                 backContentDescription = stringResource(R.string.common_back),
+                largeTitle = true,
             )
 
             if (subjects.isEmpty()) {

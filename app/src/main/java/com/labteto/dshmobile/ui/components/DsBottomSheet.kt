@@ -53,7 +53,7 @@ fun DsBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = state,
         modifier = modifier,
-        shape = DsShapes.dialog,
+        shape = DsShapes.sheet,
         containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.SHEET, BackgroundRegion.BOTTOM),
         scrimColor = colors.overlayMask,
         dragHandle = null,

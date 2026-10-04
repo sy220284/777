@@ -433,6 +433,7 @@ internal fun PersonaGalleryScreen(
                 title = if (selected == null) stringResource(R.string.persona_gallery_title) else selected.persona.name,
                 onBack = ::navigateBack,
                 backContentDescription = stringResource(R.string.common_back),
+                largeTitle = selected == null,
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),
             )
             if (selected == null) {

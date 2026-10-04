@@ -101,11 +101,11 @@ object Ds {
 object DsLight {
     // Paper canvas with white floating surfaces, matching the mobile-first hierarchy used
     // across the refreshed home, drawer and settings screens.
-    val bgBase = Color(0xFFF7F8F6)
+    val bgBase = Color(0xFFF7F7F5)
     val bgLayer1 = Color(0xFFFFFFFF)
     val bgLayer2 = Color(0xFFFFFFFF)
     val bgLayer3 = Color(0xFFFFFFFF)
-    val bgModulePlatform = Color(0xFFF2F4F2)
+    val bgModulePlatform = Color(0xFFF1F1EF)
     val borderL1 = Color(0x08000000) // rgba(0,0,0,.03)
     val borderL2 = Color(0x12000000) // rgba(0,0,0,.07)
     val borderL3 = Color(0x1F000000) // rgba(0,0,0,.12)
@@ -121,7 +121,7 @@ object DsLight {
     val accentTertiary = Ds.Celadon100
     val accentHover = Ds.Celadon500
     val hover = Color(0x0F1E3230) // rgba(30,50,48,.06)
-    val hoverSolid = Color(0xFFF2F4F2)
+    val hoverSolid = Color(0xFFF1F1EF)
     val hoverAccent = Color(0x241E3230) // rgba(30,50,48,.14)
     val active = Color(0x1A1E3230) // rgba(30,50,48,.10)
     val dangerHover = Color(0x0DEC1313) // rgba(236,19,19,.05)
@@ -153,10 +153,10 @@ object DsLight {
     val userBubble = Ds.Celadon100
     val userBubbleHighlight = Ds.Celadon200
     val composerCard = Color(0xFFFFFFFF)
-    val sidebar = Color(0xFFF7F8F6)
-    val sidebarNavActive = Ds.Bluish100
+    val sidebar = Color(0xFFF7F7F5)
+    val sidebarNavActive = Color(0xFFE9E9E6)
     val sidebarNavAccent = Ds.Celadon100
-    val sidebarNavHover = Ds.Bluish75
+    val sidebarNavHover = Color(0xFFF1F1EF)
     val tipSurface = Ds.Bluish60
     val codeBlockBg = Ds.Bluish50
     val codeBlockBanner = Ds.Bluish50
@@ -168,19 +168,19 @@ object DsLight {
 
 /** Semantic alias tokens for the dark theme. */
 object DsDark {
-    val bgBase = Ds.Bluish950
-    val bgLayer1 = Ds.Bluish875
-    val bgLayer2 = Ds.Bluish850
-    val bgLayer3 = Ds.Bluish800
-    val bgModulePlatform = Ds.Bluish800
+    val bgBase = Color(0xFF10100F)
+    val bgLayer1 = Color(0xFF191918)
+    val bgLayer2 = Color(0xFF222220)
+    val bgLayer3 = Color(0xFF2B2B28)
+    val bgModulePlatform = Color(0xFF222220)
     val borderL1 = Color(0x0FFFFFFF) // rgba(255,255,255,.06)
     val borderL2 = Color(0x1FFFFFFF) // rgba(255,255,255,.12)
     val borderL3 = Color(0x29FFFFFF) // rgba(255,255,255,.16)
     val brandPrimary = Ds.Bluish50 // inverted ink button fill
     val onBrandPrimary = Ds.Bluish1000
-    val labelPrimary = Ds.Bluish50
-    val labelSecondary = Ds.Bluish300
-    val labelTertiary = Ds.Bluish400
+    val labelPrimary = Color(0xFFF4F3EF)
+    val labelSecondary = Color(0xFFCAC8C1)
+    val labelTertiary = Color(0xFF92908A)
     val labelCaption = Ds.Bluish600
     val labelDimmed = Ds.Bluish750
     val accent = Ds.Celadon400
@@ -210,11 +210,11 @@ object DsDark {
     val tooltipBg = Ds.Bluish750
     val userBubble = Ds.Bluish850
     val userBubbleHighlight = Ds.Bluish750
-    val composerCard = Ds.Bluish850
-    val sidebar = Ds.Bluish900
-    val sidebarNavActive = Ds.Bluish750
+    val composerCard = Color(0xFF222220)
+    val sidebar = Color(0xFF151514)
+    val sidebarNavActive = Color(0xFF2B2B28)
     val sidebarNavAccent = Ds.Bluish800
-    val sidebarNavHover = Ds.Bluish850
+    val sidebarNavHover = Color(0xFF222220)
     val tipSurface = Ds.Bluish800
     val codeBlockBg = Ds.Bluish900
     val codeBlockBanner = Ds.Bluish875

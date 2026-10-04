@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -44,41 +45,104 @@ fun DsTopBar(
     actionContentDescription: String? = null,
     actionEnabled: Boolean = true,
     onAction: (() -> Unit)? = null,
+    largeTitle: Boolean = false,
 ) {
     val colors = DsTheme.colors
     val floating = colors.wallpaperSurface(
         WallpaperSurfaceLevel.FLOATING,
         BackgroundRegion.TOP,
     )
-    Row(
-        modifier = modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        DsIconButton(
-            icon = FeatherIcons.ArrowLeft,
-            contentDescription = backContentDescription,
-            onClick = onBack,
-            containerColor = floating,
-        )
-        Column(
-            modifier = Modifier.weight(1f).padding(horizontal = DsSpacing.medium),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(title, style = DsType.titleSerif20.withReadingWeight(), color = colors.labelPrimary, maxLines = 1)
-            subtitle?.takeIf(String::isNotBlank)?.let {
-                Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary, maxLines = 1)
+
+    if (largeTitle) {
+        Column(modifier = modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = DsSpacing.touchTarget),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DsIconButton(
+                    icon = FeatherIcons.ArrowLeft,
+                    contentDescription = backContentDescription,
+                    onClick = onBack,
+                    containerColor = floating,
+                )
+                Spacer(Modifier.weight(1f))
+                if (actionIcon != null && onAction != null) {
+                    DsIconButton(
+                        icon = actionIcon,
+                        contentDescription = actionContentDescription,
+                        onClick = onAction,
+                        enabled = actionEnabled,
+                        containerColor = floating,
+                    )
+                } else {
+                    Box(Modifier.size(DsSpacing.touchTarget))
+                }
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(
+                    start = DsSpacing.small,
+                    end = DsSpacing.small,
+                    bottom = DsSpacing.small,
+                ),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    title,
+                    style = DsType.largeTitle28.withReadingWeight(),
+                    color = colors.labelPrimary,
+                    maxLines = 2,
+                )
+                subtitle?.takeIf(String::isNotBlank)?.let {
+                    Text(
+                        it,
+                        style = DsType.small13.withReadingWeight(),
+                        color = colors.labelTertiary,
+                        maxLines = 2,
+                    )
+                }
             }
         }
-        if (actionIcon != null && onAction != null) {
+    } else {
+        Row(
+            modifier = modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             DsIconButton(
-                icon = actionIcon,
-                contentDescription = actionContentDescription,
-                onClick = onAction,
-                enabled = actionEnabled,
+                icon = FeatherIcons.ArrowLeft,
+                contentDescription = backContentDescription,
+                onClick = onBack,
                 containerColor = floating,
             )
-        } else {
-            Box(Modifier.size(DsSpacing.touchTarget))
+            Column(
+                modifier = Modifier.weight(1f).padding(horizontal = DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    title,
+                    style = DsType.headline17.withReadingWeight(),
+                    color = colors.labelPrimary,
+                    maxLines = 1,
+                )
+                subtitle?.takeIf(String::isNotBlank)?.let {
+                    Text(
+                        it,
+                        style = DsType.caption11.withReadingWeight(),
+                        color = colors.labelTertiary,
+                        maxLines = 1,
+                    )
+                }
+            }
+            if (actionIcon != null && onAction != null) {
+                DsIconButton(
+                    icon = actionIcon,
+                    contentDescription = actionContentDescription,
+                    onClick = onAction,
+                    enabled = actionEnabled,
+                    containerColor = floating,
+                )
+            } else {
+                Box(Modifier.size(DsSpacing.touchTarget))
+            }
         }
     }
 }
@@ -93,7 +157,7 @@ fun DsSegmentedTabs(
 ) {
     val colors = DsTheme.colors
     val background = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
-    val selectedBackground = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING)
+    val selectedBackground = colors.accentTertiary
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -126,7 +190,7 @@ fun DsSegmentedTabs(
                 Text(
                     label,
                     style = (if (selected) DsType.small13Strong else DsType.small13).withReadingWeight(),
-                    color = if (selected) colors.labelPrimary else colors.labelSecondary,
+                    color = if (selected) colors.accent else colors.labelSecondary,
                     maxLines = 1,
                 )
             }

@@ -27,6 +27,10 @@ object DsType {
     val mdCode = TextStyle(fontFamily = codeFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 22.sp)
 
     // UI roles
+    // Clear Realm navigation hierarchy. General UI is sans-serif; serif stays literary-only.
+    val largeTitle28 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 34.sp)
+    val title22 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 30.sp)
+    val headline17 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 24.sp)
     val display24 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 32.sp)
     val hero26 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 32.sp)
     val large20 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
@@ -72,9 +76,9 @@ fun TextStyle.withReadingWeight(): TextStyle =
 
 /** Material 3 mapping: sizes follow DsType and weight follows the app-wide reading preference. */
 fun dsTypography(textWeightAdjustment: Int): Typography = Typography(
-    displayLarge = DsType.display24.adjustedReadingWeight(textWeightAdjustment),
-    headlineMedium = DsType.large20.adjustedReadingWeight(textWeightAdjustment),
-    titleMedium = DsType.std14Strong.adjustedReadingWeight(textWeightAdjustment),
+    displayLarge = DsType.largeTitle28.adjustedReadingWeight(textWeightAdjustment),
+    headlineMedium = DsType.title22.adjustedReadingWeight(textWeightAdjustment),
+    titleMedium = DsType.headline17.adjustedReadingWeight(textWeightAdjustment),
     bodyLarge = DsType.base16.adjustedReadingWeight(textWeightAdjustment),
     bodyMedium = DsType.std14.adjustedReadingWeight(textWeightAdjustment),
     bodySmall = DsType.small13.adjustedReadingWeight(textWeightAdjustment),

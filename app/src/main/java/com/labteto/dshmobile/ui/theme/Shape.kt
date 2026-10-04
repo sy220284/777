@@ -15,6 +15,7 @@ object DsShapes {
     val composer = RoundedCornerShape(20.dp)
     val approvalCard = RoundedCornerShape(20.dp)
     val dialog = RoundedCornerShape(20.dp)
+    val sheet = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     val menu = RoundedCornerShape(16.dp)
     val toast = RoundedCornerShape(12.dp)
     val tooltip = RoundedCornerShape(8.dp)

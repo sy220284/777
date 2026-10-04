@@ -21,7 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -76,7 +75,6 @@ internal fun ChatSurfaceHeader(
                     .weight(1f)
                     .heightIn(min = DsSpacing.touchTarget)
                     .clip(DsShapes.row)
-                    .alpha(if (running) 0.55f else 1f)
                     .clickable(enabled = !running, role = Role.Button, onClick = onContextClick)
                     .semantics(mergeDescendants = true) { }
                     .padding(horizontal = DsSpacing.small),
@@ -193,7 +191,6 @@ internal fun WorkSurfaceHeader(
                 .weight(1f)
                 .heightIn(min = DsSpacing.touchTarget)
                 .clip(DsShapes.row)
-                .alpha(if (running) 0.55f else 1f)
                 .clickable(enabled = !running, role = Role.Button, onClick = onModelClick)
                 .semantics(mergeDescendants = true) { }
                 .padding(horizontal = DsSpacing.small),

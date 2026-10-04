@@ -133,6 +133,7 @@ fun PairScreen(
                 subtitle = stringResource(R.string.pair_subtitle),
                 onBack = onClose,
                 backContentDescription = stringResource(R.string.common_back),
+                largeTitle = true,
                 modifier = Modifier.padding(
                     horizontal = DsSpacing.large,
                     vertical = DsSpacing.medium,

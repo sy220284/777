@@ -295,6 +295,7 @@ fun ToolsScreen(
                     subtitle = stringResource(R.string.tools_subtitle),
                     onBack = onClose,
                     backContentDescription = stringResource(R.string.common_back),
+                largeTitle = true,
                     actionIcon = FeatherIcons.RefreshCw,
                     actionContentDescription = stringResource(R.string.tools_refresh),
                     actionEnabled = !state.loading,
