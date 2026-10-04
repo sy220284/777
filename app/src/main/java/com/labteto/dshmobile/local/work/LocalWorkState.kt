@@ -1,0 +1,12 @@
+package com.labteto.dshmobile.local.work
+
+import com.labteto.dshmobile.local.LocalGoal
+import com.labteto.dshmobile.local.LocalTodoItem
+
+/** Work-owned runtime state. Session persistence remains a separate projection boundary. */
+data class LocalWorkState(
+    val plan: List<String> = emptyList(),
+    val todos: List<LocalTodoItem> = emptyList(),
+    val goal: LocalGoal? = null,
+    val planMode: Boolean = false,
+)
