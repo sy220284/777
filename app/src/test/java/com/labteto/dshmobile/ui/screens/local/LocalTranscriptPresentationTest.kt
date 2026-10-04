@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.ui.AgentOperationKind
+import com.labteto.dshmobile.ui.components.DsStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -189,6 +190,23 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
+    fun workProcessAggregateStatusKeepsFailureVisibleAfterRunStops() {
+        val failed = LocalWorkProcessNode(
+            operationKinds = listOf(AgentOperationKind.Execute),
+            failed = true,
+            count = 1,
+        )
+        val completed = LocalWorkProcessNode(
+            operationKinds = listOf(AgentOperationKind.Search),
+            count = 1,
+        )
+
+        assertEquals(DsStatus.Running, workProcessStatus(listOf(failed, completed), running = true))
+        assertEquals(DsStatus.Failed, workProcessStatus(listOf(failed, completed), running = false))
+        assertEquals(DsStatus.Done, workProcessStatus(listOf(completed), running = false))
+    }
+
+    @Test
     fun workProcessShowsRecentNodesUntilUserRequestsEverything() {
         val nodes = (1..12).map { index ->
             LocalWorkProcessNode(
@@ -276,3 +294,4 @@ class LocalTranscriptPresentationTest {
         createdAt = 1L,
     )
 }
+

@@ -14,6 +14,7 @@ class LocalAutomationRuntime @Inject constructor(
         val snapshot = engine.state.value
         return AutomationPlanningContext(
             sessionId = snapshot.sessionId,
+            revision = snapshot.toAutomationPlanningRevision(),
             configured = snapshot.configured,
             usageMode = snapshot.usageMode,
             groupChatEnabled = snapshot.groupChat.enabled,
@@ -30,6 +31,9 @@ class LocalAutomationRuntime @Inject constructor(
                 .map { AutomationPlanningMessage(it.role, it.content) },
         )
     }
+
+    internal fun planningRevision(): AutomationPlanningRevision =
+        engine.state.value.toAutomationPlanningRevision()
 
     internal suspend fun runPrompt(text: String, timeoutMillis: Long = 5 * 60_000L): String =
         engine.runAutomationPrompt(text, timeoutMillis)
@@ -72,3 +76,4 @@ class LocalAutomationRuntime @Inject constructor(
         silenceReferenceAt, bypassProactivePolicy,
     )
 }
+

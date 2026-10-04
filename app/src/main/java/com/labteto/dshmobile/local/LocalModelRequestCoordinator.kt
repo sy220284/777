@@ -2,8 +2,10 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
-import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
+import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
+import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecovery
+import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecoveryPolicy
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.LocalModelGateway
@@ -40,6 +42,7 @@ internal class LocalModelRequestCoordinator(
     private val streamPreviewIntervalMs: Long = 50L,
 ) {
     private val requestRuntime = LocalAgentModelRequestRuntime(modelGateway, resourceScheduler)
+    private val modelStepRuntime = LocalAgentModelStepRuntime()
 
     suspend fun complete(
         snapshot: LocalHarnessState,
@@ -272,7 +275,7 @@ internal class LocalModelRequestCoordinator(
         var failureContextDiagnosticLogged = false
         var lastProviderError: LocalModelException? = null
         var attemptStartedNanos = System.nanoTime()
-        val executor = AgentRequestExecutor(
+        val executor = modelStepRuntime.requestExecutor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
                 (error as? LocalModelException)?.let { lastProviderError = it }
@@ -399,9 +402,49 @@ internal class LocalModelRequestCoordinator(
             },
         )
 
-        var activeMessages = requestMessages
         var overflowRound = 0
-        while (true) {
+        return modelStepRuntime.recover(
+            initialMessages = requestMessages,
+            recoveryPolicy = LocalAgentModelStepRecoveryPolicy { error, activeMessages, _ ->
+                if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) {
+                    null
+                } else {
+                    val summaryMode = snapshot.usageMode.historySummaryMode()
+                    val compacted = historyCompactor.compactForOverflow(
+                        history = activeMessages,
+                        summaryMode = summaryMode,
+                        structuredWorkState = if (summaryMode == LocalHistorySummaryMode.WORK) {
+                            structuredWorkState(snapshot, log)
+                        } else {
+                            null
+                        },
+                    )
+                    val madeProgress = compacted != null &&
+                        compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
+                        compacted.messages != activeMessages
+                    if (!madeProgress || compacted == null) {
+                        null
+                    } else {
+                        overflowRound += 1
+                        if (persistOverflowHistory) {
+                            (overflowPersister ?: persistOverflowCompaction)(snapshot, summaryMode)
+                        }
+                        log.append("request/context-overflow-recovery", buildJsonObject {
+                            put("step", step)
+                            put("round", overflowRound)
+                            put("model", snapshot.model)
+                            put("estimated_tokens_before", compacted.estimatedTokensBefore)
+                            put("estimated_tokens_after", compacted.estimatedTokensAfter)
+                            put("omitted_messages", compacted.omittedMessages)
+                        })
+                        LocalAgentModelStepRecovery(
+                            messages = compacted.messages,
+                            reason = "context_overflow",
+                        )
+                    }
+                }
+            },
+        ) { activeMessages ->
             val activePrefixAssessment = if (cachePolicy.mode != LocalPromptCacheMode.NONE) {
                 promptCacheContinuity.assess(
                     snapshot.sessionId,
@@ -413,187 +456,159 @@ internal class LocalModelRequestCoordinator(
                 null
             }
             try {
-                return try {
-                    executor.execute {
-                        val streamPreview = LocalStreamPreview(
-                            maxChars = maxStreamPreviewChars,
-                            minIntervalMs = streamPreviewIntervalMs,
-                            clockMs = { System.nanoTime() / 1_000_000 },
-                            publish = { preview ->
-                                previewOwner
-                                    ?.takeIf { previewGuard() }
-                                    ?.let { streamingPreviewStore.publishAssistant(it, preview) }
-                            },
-                        )
-                        val streamFilter = streamFilterPhrases
-                            .takeIf { it.isNotEmpty() }
-                            ?.let(::ChatStreamFilter)
-                        val activePressure = LocalPromptPressureMeter.measure(
-                            messages = activeMessages,
-                            tools = tools,
-                            operationalLimitTokens = operationalLimit,
-                            modelContextWindowTokens = pressure.modelContextWindowTokens,
-                        )
-                        pressureStore.record(
-                            snapshot.sessionId,
-                            activePressure,
-                            usageMode = snapshot.usageMode,
-                        )
-                        executeWithModelAdmission(
-                            control = executionControl,
-                            routeFingerprint = routeFingerprint,
-                            model = frozenProfile.model,
-                            baseUrl = frozenProfile.baseUrl,
-                            contextWindowTokensOverride = frozenProfile.contextWindowTokensOverride,
-                            messages = activeMessages,
-                            tools = tools,
-                        ) {
-                            try {
-                                requestRuntime.complete(
-                                    surface = runSurface,
-                                    messages = activeMessages,
-                                    tools = tools,
-                                    streaming = true,
-                                    temperature = temperature,
-                                    promptCacheComparisonResponseId = cacheComparisonResponseId,
-                                    promptCacheKey = promptCacheKey,
-                                    promptCacheTtl = promptCacheTtl,
-                                    onDelta = { delta ->
-                                        val visible = streamFilter?.append(delta.content)?.text ?: delta.content
-                                        streamPreview.append(visible)
-                                    },
-                                )
-                                } catch (cancelled: CancellationException) {
-                                    val admission =
-                                        (cancelled as? LocalModelCancellationException)?.admissionState
-                                    log.append("request/cancelled", buildJsonObject {
-                                        put("step", step)
-                                        admission?.let {
-                                            put("admission_state", it.name.lowercase())
-                                            put(
-                                                "budget_settlement",
-                                                if (it == com.labteto.dshmobile.local.model.LocalModelAdmissionState.NOT_SENT) {
-                                                    "released"
-                                                } else {
-                                                    "uncertain_exposure"
-                                                },
-                                            )
-                                        }
-                                    })
-                                    throw cancelled
-                                } catch (error: LocalModelException) {
-                                    lastProviderError = error
-                                    log.append("request/provider-error", buildJsonObject {
-                                        put("step", step)
-                                        put("code", error.code)
-                                        error.status?.let { put("status", it) }
-                                        error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
-                                        error.requestId?.let { put("request_id", it) }
-                                        error.providerCode?.let { put("provider_code", it) }
-                                        error.providerParam?.let { put("provider_param", it) }
-                                        put("failure_kind", modelFailureKind(error))
-                                        put("admission_state", error.admissionState.name.lowercase())
-                                        put("continuation_eligible", error.continuationEligible)
-                                        error.cause?.message?.takeIf(String::isNotBlank)?.let {
-                                            put("cause_detail", it.take(800))
-                                        }
-                                    })
-                                    throw error
-                                }.also { reply ->
-                                streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
-                                streamPreview.flush()
-                                activePrefixAssessment?.let { cache ->
-                                    promptCacheContinuity.recordSuccess(
-                                        snapshot.sessionId,
-                                        routeFingerprint,
-                                        activeMessages,
-                                        tools,
-                                        cache.generation,
+                executor.execute {
+                    val streamPreview = LocalStreamPreview(
+                        maxChars = maxStreamPreviewChars,
+                        minIntervalMs = streamPreviewIntervalMs,
+                        clockMs = { System.nanoTime() / 1_000_000 },
+                        publish = { preview ->
+                            previewOwner
+                                ?.takeIf { previewGuard() }
+                                ?.let { streamingPreviewStore.publishAssistant(it, preview) }
+                        },
+                    )
+                    val streamFilter = streamFilterPhrases
+                        .takeIf { it.isNotEmpty() }
+                        ?.let(::ChatStreamFilter)
+                    val activePressure = LocalPromptPressureMeter.measure(
+                        messages = activeMessages,
+                        tools = tools,
+                        operationalLimitTokens = operationalLimit,
+                        modelContextWindowTokens = pressure.modelContextWindowTokens,
+                    )
+                    pressureStore.record(
+                        snapshot.sessionId,
+                        activePressure,
+                        usageMode = snapshot.usageMode,
+                    )
+                    executeWithModelAdmission(
+                        control = executionControl,
+                        routeFingerprint = routeFingerprint,
+                        model = frozenProfile.model,
+                        baseUrl = frozenProfile.baseUrl,
+                        contextWindowTokensOverride = frozenProfile.contextWindowTokensOverride,
+                        messages = activeMessages,
+                        tools = tools,
+                    ) {
+                        try {
+                            requestRuntime.complete(
+                                surface = runSurface,
+                                messages = activeMessages,
+                                tools = tools,
+                                streaming = true,
+                                temperature = temperature,
+                                promptCacheComparisonResponseId = cacheComparisonResponseId,
+                                promptCacheKey = promptCacheKey,
+                                promptCacheTtl = promptCacheTtl,
+                                admissionHandledExternally = true,
+                                onDelta = { delta ->
+                                    val visible = streamFilter?.append(delta.content)?.text ?: delta.content
+                                    streamPreview.append(visible)
+                                },
+                            )
+                        } catch (cancelled: CancellationException) {
+                            val admission =
+                                (cancelled as? LocalModelCancellationException)?.admissionState
+                            log.append("request/cancelled", buildJsonObject {
+                                put("step", step)
+                                admission?.let {
+                                    put("admission_state", it.name.lowercase())
+                                    put(
+                                        "budget_settlement",
+                                        if (it == com.labteto.dshmobile.local.model.LocalModelAdmissionState.NOT_SENT) {
+                                            "released"
+                                        } else {
+                                            "uncertain_exposure"
+                                        },
                                     )
                                 }
-                                if (reply.usage.reported) {
-                                    pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
+                            })
+                            throw cancelled
+                        } catch (error: LocalModelException) {
+                            lastProviderError = error
+                            log.append("request/provider-error", buildJsonObject {
+                                put("step", step)
+                                put("code", error.code)
+                                error.status?.let { put("status", it) }
+                                error.providerRetryAfterMs?.let { put("retry_after_ms", it) }
+                                error.requestId?.let { put("request_id", it) }
+                                error.providerCode?.let { put("provider_code", it) }
+                                error.providerParam?.let { put("provider_param", it) }
+                                put("failure_kind", modelFailureKind(error))
+                                put("admission_state", error.admissionState.name.lowercase())
+                                put("continuation_eligible", error.continuationEligible)
+                                error.cause?.message?.takeIf(String::isNotBlank)?.let {
+                                    put("cause_detail", it.take(800))
                                 }
-                                log.append("request/completed", buildJsonObject {
-                                    put("step", step)
-                                    put("request_id", reply.requestId)
-                                    put("reported", reply.usage.reported)
-                                    put("prompt_tokens", reply.usage.promptTokens)
-                                    put("cache_hit_tokens", reply.usage.cacheHitTokens)
-                                    put("cache_miss_tokens", reply.usage.cacheMissTokens)
-                                    put("cache_write_tokens", reply.usage.cacheWriteTokens)
-                                    put("completion_tokens", reply.usage.completionTokens)
-                                    put("reasoning_tokens", reply.usage.reasoningTokens)
-                                    put("total_tokens", reply.usage.totalTokens)
-                                    val route = reply.routeIdentity
-                                    route?.profileId?.let { put("profile_id", it) }
-                                    route?.provider?.takeIf(String::isNotBlank)?.let { put("provider", it) }
-                                    route?.authKind?.takeIf(String::isNotBlank)?.let { put("auth_kind", it) }
-                                    route?.protocol?.takeIf(String::isNotBlank)?.let { put("protocol", it) }
-                                    put("route_fingerprint", routeFingerprint)
-                                    activePrefixAssessment?.let { cache ->
-                                        put("cache_series_generation_final", cache.generation)
-                                        put("cache_prefix_continuity_final", cache.continuity.name.lowercase())
-                                        put("cache_tool_surface_stable_final", cache.toolSurfaceStable)
-                                        put("cache_message_prefix_stable_final", cache.messagePrefixStable)
-                                    }
-                                    route?.fingerprint?.takeIf(String::isNotBlank)?.let {
-                                        put("reply_route_fingerprint", it)
-                                    }
-                                })
-                                if (runtimeCapabilities.promptCacheDiagnostics && reply.requestId.isNotBlank()) {
-                                    promptCacheBaselines.put(snapshot.sessionId, routeFingerprint, reply.requestId)
-                                    reply.promptCacheDiagnostic?.let { diagnostic ->
-                                        log.append("request/cache-diagnostic", buildJsonObject {
-                                            put("step", step)
-                                            put("type", diagnostic.type)
-                                            diagnostic.reason?.let { put("reason", it) }
-                                            diagnostic.comparisonReusableTokens?.let { put("comparison_reusable_tokens", it) }
-                                            diagnostic.cacheMissedTokens?.let { put("cache_missed_tokens", it) }
-                                            cacheComparisonResponseId?.let { put("comparison_response_id", it) }
-                                            put("response_id", reply.requestId)
-                                        })
-                                    }
+                            })
+                            throw error
+                        }.also { reply ->
+                            streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
+                            streamPreview.flush()
+                            activePrefixAssessment?.let { cache ->
+                                promptCacheContinuity.recordSuccess(
+                                    snapshot.sessionId,
+                                    routeFingerprint,
+                                    activeMessages,
+                                    tools,
+                                    cache.generation,
+                                )
+                            }
+                            if (reply.usage.reported) {
+                                pressureStore.recordReportedUsage(snapshot.sessionId, reply.usage.promptTokens)
+                            }
+                            log.append("request/completed", buildJsonObject {
+                                put("step", step)
+                                put("request_id", reply.requestId)
+                                put("reported", reply.usage.reported)
+                                put("prompt_tokens", reply.usage.promptTokens)
+                                put("cache_hit_tokens", reply.usage.cacheHitTokens)
+                                put("cache_miss_tokens", reply.usage.cacheMissTokens)
+                                put("cache_write_tokens", reply.usage.cacheWriteTokens)
+                                put("completion_tokens", reply.usage.completionTokens)
+                                put("reasoning_tokens", reply.usage.reasoningTokens)
+                                put("total_tokens", reply.usage.totalTokens)
+                                val route = reply.routeIdentity
+                                route?.profileId?.let { put("profile_id", it) }
+                                route?.provider?.takeIf(String::isNotBlank)?.let { put("provider", it) }
+                                route?.authKind?.takeIf(String::isNotBlank)?.let { put("auth_kind", it) }
+                                route?.protocol?.takeIf(String::isNotBlank)?.let { put("protocol", it) }
+                                put("route_fingerprint", routeFingerprint)
+                                activePrefixAssessment?.let { cache ->
+                                    put("cache_series_generation_final", cache.generation)
+                                    put("cache_prefix_continuity_final", cache.continuity.name.lowercase())
+                                    put("cache_tool_surface_stable_final", cache.toolSurfaceStable)
+                                    put("cache_message_prefix_stable_final", cache.messagePrefixStable)
+                                }
+                                route?.fingerprint?.takeIf(String::isNotBlank)?.let {
+                                    put("reply_route_fingerprint", it)
+                                }
+                            })
+                            if (runtimeCapabilities.promptCacheDiagnostics && reply.requestId.isNotBlank()) {
+                                promptCacheBaselines.put(snapshot.sessionId, routeFingerprint, reply.requestId)
+                                reply.promptCacheDiagnostic?.let { diagnostic ->
+                                    log.append("request/cache-diagnostic", buildJsonObject {
+                                        put("step", step)
+                                        put("type", diagnostic.type)
+                                        diagnostic.reason?.let { put("reason", it) }
+                                        diagnostic.comparisonReusableTokens?.let {
+                                            put("comparison_reusable_tokens", it)
+                                        }
+                                        diagnostic.cacheMissedTokens?.let { put("cache_missed_tokens", it) }
+                                        cacheComparisonResponseId?.let { put("comparison_response_id", it) }
+                                        put("response_id", reply.requestId)
+                                    })
                                 }
                             }
                         }
                     }
-                } finally {
-                    previewOwner?.let(streamingPreviewStore::clear)
                 }
-            } catch (error: Throwable) {
-                if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
-                val summaryMode = snapshot.usageMode.historySummaryMode()
-                val compacted = historyCompactor.compactForOverflow(
-                    history = activeMessages,
-                    summaryMode = summaryMode,
-                    structuredWorkState = if (summaryMode == LocalHistorySummaryMode.WORK) {
-                        structuredWorkState(snapshot, log)
-                    } else {
-                        null
-                    },
-                ) ?: throw error
-                val madeProgress =
-                    compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
-                        compacted.messages != activeMessages
-                if (!madeProgress) throw error
-
-                overflowRound += 1
-                if (persistOverflowHistory) {
-                    (overflowPersister ?: persistOverflowCompaction)(snapshot, summaryMode)
-                }
-                log.append("request/context-overflow-recovery", buildJsonObject {
-                    put("step", step)
-                    put("round", overflowRound)
-                    put("model", snapshot.model)
-                    put("estimated_tokens_before", compacted.estimatedTokensBefore)
-                    put("estimated_tokens_after", compacted.estimatedTokensAfter)
-                    put("omitted_messages", compacted.omittedMessages)
-                })
-                activeMessages = compacted.messages
+            } finally {
+                previewOwner?.let(streamingPreviewStore::clear)
             }
         }
     }
+
     private fun stablePromptCacheKey(sessionId: String, routeFingerprint: String): String {
         val raw = sessionId + "\u0000" + routeFingerprint
         return MessageDigest.getInstance("SHA-256")

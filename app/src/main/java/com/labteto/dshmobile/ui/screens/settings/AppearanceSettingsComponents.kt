@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -204,7 +205,7 @@ internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
     }
 }
 
-/** 单个主题预览块：上半段画该主题的底色与卡片条，下半段是名称。 */
+/** Miniature Clear Realm preview: canvas, grouped surface, content hierarchy and composer. */
 @Composable
 private fun ThemePreviewBlock(
     themeKey: String,
@@ -214,58 +215,39 @@ private fun ThemePreviewBlock(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    // 各主题的示意底色/卡片色（与 Color.kt 语义值一致）
     val (bg, card) = when (themeKey) {
-        "light" -> Color(0xFFF7F8F6) to Color(0xFFFFFFFF)
-        "dark" -> Color(0xFF0F1514) to Color(0xFF182120)
-        "matte_black" -> Color(0xFF000000) to Color(0xFF111111)
-        else -> Color(0xFFF7F8F6) to Color(0xFF0F1514)
+        "light" -> Color(0xFFF7F7F5) to Color(0xFFFFFFFF)
+        "dark" -> Color(0xFF10100F) to Color(0xFF191918)
+        "matte_black" -> Color(0xFF10100F) to Color(0xFF222220)
+        else -> Color(0xFFF7F7F5) to Color(0xFF10100F)
     }
     Column(
         modifier = modifier
             .clip(DsShapes.cube)
-            .border(
-                width = if (selected) 1.5.dp else 1.dp,
-                color = if (selected) colors.accent else colors.borderL2,
-                shape = DsShapes.cube,
-            )
-            .selectable(
-                selected = selected,
-                role = Role.RadioButton,
-                onClick = onClick,
-            ),
+            .border(if (selected) 1.5.dp else 1.dp, if (selected) colors.accent else colors.borderL2, DsShapes.cube)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
     ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .background(bg),
-            contentAlignment = Alignment.CenterStart,
-        ) {
+        Box(Modifier.fillMaxWidth().height(72.dp).background(bg)) {
             if (themeKey == "system") {
-                Row(Modifier.fillMaxWidth()) {
-                    Box(Modifier.weight(1f).height(52.dp).background(Color(0xFFF7F8F6)))
-                    Box(Modifier.weight(1f).height(52.dp).background(Color(0xFF0F1514)))
+                Row(Modifier.fillMaxSize()) {
+                    Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFF7F7F5)))
+                    Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFF10100F)))
                 }
             }
-            // 卡片条示意
-            Box(
-                Modifier
-                    .padding(start = 10.dp)
-                    .size(width = 64.dp, height = 16.dp)
-                    .background(card, RoundedCornerShape(5.dp)),
-            )
-            if (selected) {
-                Icon(
-                    Icons.Filled.Check,
-                    contentDescription = null,
-                    tint = colors.accent,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(16.dp),
-                )
+            Column(
+                Modifier.padding(horizontal = 9.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Box(Modifier.size(width = 46.dp, height = 6.dp).background(card, RoundedCornerShape(3.dp)))
+                Box(Modifier.fillMaxWidth().height(30.dp).background(card, RoundedCornerShape(8.dp)))
+                Box(Modifier.fillMaxWidth(0.72f).height(10.dp).background(card, RoundedCornerShape(6.dp)))
             }
+            if (selected) Icon(
+                Icons.Filled.Check,
+                contentDescription = null,
+                tint = colors.accent,
+                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(16.dp),
+            )
         }
         Text(
             label,

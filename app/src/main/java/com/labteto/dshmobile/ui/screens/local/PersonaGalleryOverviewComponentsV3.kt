@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -60,6 +61,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -455,12 +457,16 @@ internal fun CompactPersonaRow(
     onMove: (Int) -> Unit,
 ) {
     var dragDistance by remember(entry.id) { mutableFloatStateOf(0f) }
+    val colors = DsTheme.colors
+    val backgroundState = LocalAppBackgroundState.current
+    val rowColor = when {
+        selected -> colors.accentTertiary
+        backgroundState.hasImage -> colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
+        else -> Color.Transparent
+    }
     Surface(
         shape = DsShapes.row,
-        color = DsTheme.colors.wallpaperSurface(
-            WallpaperSurfaceLevel.CARD,
-            base = if (selected) DsTheme.colors.sidebarNavActive else DsTheme.colors.bgBase,
-        ),
+        color = rowColor,
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
@@ -513,6 +519,14 @@ internal fun CompactPersonaRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            if (!managing) {
+                Icon(
+                    FeatherIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = DsTheme.colors.labelCaption,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
             if (managing) {
                 DsIconButton(
                     icon = FeatherIcons.Pin,
@@ -554,3 +568,4 @@ internal fun CompactPersonaRow(
         }
     }
 }
+

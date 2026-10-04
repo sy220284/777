@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -102,7 +103,9 @@ internal fun DrawerContextCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING),
+        border = BorderStroke(1.dp, colors.borderL1),
+        shadowElevation = 1.dp,
     ) {
         Row(
             modifier = Modifier
@@ -273,7 +276,8 @@ internal fun DrawerQuickAction(
     )
     Row(
         modifier = modifier
-            .heightIn(min = 56.dp)
+            .fillMaxWidth()
+            .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.row)
             .background(feedbackColor)
             .hoverable(interaction)
@@ -290,7 +294,7 @@ internal fun DrawerQuickAction(
             icon,
             contentDescription = null,
             tint = colors.labelSecondary,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(18.dp),
         )
         Text(
             title,
@@ -432,10 +436,11 @@ internal fun LocalSessionDrawerRow(
                 .clip(DsShapes.row)
                 .background(
                     animateColorAsState(
-                        targetValue = colors.wallpaperSurface(
-                            level = WallpaperSurfaceLevel.CARD,
-                            base = if (current || selected) colors.sidebarNavActive else colors.sidebar,
-                        ),
+                        targetValue = when {
+                            selected -> colors.accentTertiary
+                            current -> colors.sidebarNavActive
+                            else -> Color.Transparent
+                        },
                         animationSpec = DsAnimations.interactionColor,
                         label = "sessionRowBackground",
                     ).value,
@@ -444,6 +449,15 @@ internal fun LocalSessionDrawerRow(
                 .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (current && !selectionOpen) {
+                Box(
+                    Modifier
+                        .size(width = 3.dp, height = 24.dp)
+                        .clip(DsShapes.pillFull)
+                        .background(colors.accent),
+                )
+                Spacer(Modifier.width(DsSpacing.xsmall))
+            }
             if (selectionOpen) {
                 Checkbox(checked = selected, onCheckedChange = { onClick() })
             }
@@ -529,3 +543,4 @@ internal fun LocalSessionDrawerRow(
         }
     }
 }
+
