@@ -2918,9 +2918,11 @@ class LocalHarnessEngine @Inject constructor(
         var workPromptContext = LocalWorkTurnPromptContext()
         var chatStableContext = ""
         var chatDynamicContext = ""
-        val runToolSurface = LocalRunToolSurface()
-        val mainMaxSteps = runState.value.mainMaxSteps
         val runSnapshot = runState.value
+        val runToolSurface = LocalRunToolSurface(
+            runSnapshot.modelSelection.activeProfile?.toRunModelSurface(),
+        )
+        val mainMaxSteps = runSnapshot.mainMaxSteps
         val mainStepLimit = if (runPolicy.allowToolExecution) {
             adaptiveAgentStepLimit(
                 configuredBase = mainMaxSteps,
