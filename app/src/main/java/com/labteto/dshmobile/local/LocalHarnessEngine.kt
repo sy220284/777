@@ -4691,45 +4691,45 @@ class LocalHarnessEngine @Inject constructor(
         var runRecoveryError: String? = null
         if (liveWorkBinding == null) {
             agentRunCoordinator.recoveryDecision(sessionId, recovery)?.let { decision ->
-            val route = decision.route
-            val exactRecoveryProfile = route?.let { identity ->
-                resolveRecoveryModelProfile(modelProfiles, identity)
-            }
-            val routeMismatch = route != null &&
-                (exactRecoveryProfile == null || !modelGateway.hasCredential(exactRecoveryProfile))
-            val blocked = when {
-                decision.blockedReason != null -> decision.blockedReason
-                routeMismatch -> "上次任务绑定的模型账户或凭据身份已变化，已停止自动续跑。请恢复原模型配置后再继续。"
-                else -> null
-            }
-            if (blocked != null) {
-                runRecoveryError = blocked
-                agentRunCoordinator.markRecoveryBlocked(sessionId, decision.runId, blocked)
-            } else {
-                recoveredRunProfile = exactRecoveryProfile
-                val queued = decision.queuedInput
-                if (queued != null && pendingInputs.snapshot().none { it.id == queued.id }) {
-                    if (pendingInputs.offer(queued)) {
-                        eventLog.append(
-                            LOCAL_AGENT_INBOX_EVENT_TYPE,
-                            encodeLocalAgentInboxEvent(
-                                action = "recovered-run",
-                                pending = pendingInputs.snapshot(),
-                                affected = listOf(queued),
-                            ),
-                        )
-                        agentRunCoordinator.markRecoveryQueued(sessionId, decision.runId)
-                    } else {
-                        runRecoveryError = "上次任务可以安全续跑，但待处理输入队列已满，请先处理现有任务。"
-                        agentRunCoordinator.markRecoveryBlocked(
-                            sessionId,
-                            decision.runId,
-                            runRecoveryError.orEmpty(),
-                        )
+                val route = decision.route
+                val exactRecoveryProfile = route?.let { identity ->
+                    resolveRecoveryModelProfile(modelProfiles, identity)
+                }
+                val routeMismatch = route != null &&
+                    (exactRecoveryProfile == null || !modelGateway.hasCredential(exactRecoveryProfile))
+                val blocked = when {
+                    decision.blockedReason != null -> decision.blockedReason
+                    routeMismatch -> "上次任务绑定的模型账户或凭据身份已变化，已停止自动续跑。请恢复原模型配置后再继续。"
+                    else -> null
+                }
+                if (blocked != null) {
+                    runRecoveryError = blocked
+                    agentRunCoordinator.markRecoveryBlocked(sessionId, decision.runId, blocked)
+                } else {
+                    recoveredRunProfile = exactRecoveryProfile
+                    val queued = decision.queuedInput
+                    if (queued != null && pendingInputs.snapshot().none { it.id == queued.id }) {
+                        if (pendingInputs.offer(queued)) {
+                            eventLog.append(
+                                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                                encodeLocalAgentInboxEvent(
+                                    action = "recovered-run",
+                                    pending = pendingInputs.snapshot(),
+                                    affected = listOf(queued),
+                                ),
+                            )
+                            agentRunCoordinator.markRecoveryQueued(sessionId, decision.runId)
+                        } else {
+                            runRecoveryError = "上次任务可以安全续跑，但待处理输入队列已满，请先处理现有任务。"
+                            agentRunCoordinator.markRecoveryBlocked(
+                                sessionId,
+                                decision.runId,
+                                runRecoveryError.orEmpty(),
+                            )
+                        }
                     }
                 }
             }
-        }
         }
         val profile = userProfileStore.read()
         val restoredBehavior = withContext(Dispatchers.IO) {
