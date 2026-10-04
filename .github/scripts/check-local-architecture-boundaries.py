@@ -26,7 +26,7 @@ RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 4,
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 9,
+    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 8,
 }
 PROJECTION_FIELD_BUDGETS = {
     "LocalHarnessSettingsState": 17,
@@ -268,6 +268,8 @@ model_settings_source = strip_comments(
 )
 if "settings.configureImageInputMode(mode)" not in model_runtime_source:
     die("LocalModelRuntime image input mode must be owned by LocalModelSettingsCoordinator")
+if "configuration.test(apiKey, model, baseUrl, protocol, profileId)" not in model_runtime_source:
+    die("LocalModelRuntime must own model connection testing through Model configuration capability")
 if "engine.configureImageInputMode" in model_runtime_source:
     die("LocalModelRuntime must not route image input settings through LocalHarnessEngine")
 if "KEY_IMAGE_INPUT_MODE" not in model_settings_source or "runtimeStateStore.mutableState.update" not in model_settings_source:
@@ -294,6 +296,7 @@ for forbidden_model_proxy in (
     "engine.configure(apiKey, model, baseUrl)",
     "engine.selectModel(id)",
     "engine.clearCredential()",
+    "engine.testModelConfiguration",
 ):
     if forbidden_model_proxy in settings_runtime_source:
         die("LocalSettingsRuntime must route model operations through LocalModelRuntime: " + forbidden_model_proxy)
