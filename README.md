@@ -261,81 +261,28 @@ Android 界面
 
 ## 架构
 
-这是一个 **8 模块 Gradle 工程 + app 内模块化单体**。
+777 采用 **架构 3.0：模块化单体 + 层级化 Feature 组合 + 共享能力契约 + 极薄运行内核**。
 
-Gradle 模块负责真正的二进制 / 平台边界；高频产品能力留在 `app` 中，通过 capability package、窄 Runtime、Projection 和 Coordinator 拆分，避免为了拆文件不断增加 Gradle 配置和 DI 表面积。
-
-### 模块边界
-
-| 模块 | 职责 |
-|---|---|
-| `app/` | Android 组合根：聊天 / 工作 UI、本机 Harness 编排、远程连接、通知、更新、Webhook |
-| `core/` | 纯 JVM 远程协议核心：DTO、RPC、WebSocket mux、重连、事件折叠、通知分类 |
-| `harness-core/` | 平台无关 Agent 内核：AgentLoop、工具、任务、资源调度、上下文、事件与插件契约 |
-| `harness-runtime-android/` | Android 进程运行时：持久终端、托管进程 |
-| `harness-interop/` | MCP HTTP / stdio 与 LSP 互通 |
-| `harness-device-android/` | Android 设备能力：无障碍、通知、虚拟屏 |
-| `mock-harness/` | Ktor Harness 模拟服务端，用于协议和行为测试 |
-| `reference-validation/` | 官方 Harness 黄金结果与原生一致性验证 |
-
-依赖保持单向：
+产品能力不再继续围绕一个越来越大的 Engine 横向扩张，而是按所有权组织：子功能注册到所属 Feature，Feature 在启动期注册到不可变 `LocalFeatureCatalog`；Chat / Work / Automation 等跨域协作只能通过共享能力或明确 Port。
 
 ```text
-app
-├─ harness-device-android
-├─ harness-interop
-├─ harness-runtime-android
-└─ harness-core
-
-core   ← 远程 Harness 协议链，和本机 Agent 内核保持独立
+Application Shell
+      ↓
+LocalFeatureCatalog
+      ↓
+ChatFeature / WorkFeature / AutomationFeature / ToolsFeature / ...
+      ↓
+Shared Capabilities
+Session / Model / Agent / Tool / Memory / Resource / Usage / Event
+      ↓
+Local Runtime Kernel
+      ↓
+harness-core / Android runtime / MCP / LSP / device
 ```
 
-### app 内能力架构
+当前正按阶段从旧的 `LocalHarnessEngine` 中迁移真实业务所有权：第一阶段已经建立 Feature Catalog 与子功能唯一归属，后续依次拆领域状态、Chat/Work 所有权、Automation Port、Feature 驱动 UI，最终把 Engine 收缩为纯运行内核。
 
-本机 UI 不再直接把所有能力压到一个 Engine 上。
-
-```text
-Compose UI / ViewModels
-        │
-        ▼
-presentation
-  ├─ LocalUiRuntime
-  ├─ Chat / Work Surface Projection
-  └─ Settings / Task Projection
-        │
-        ▼
-capability runtimes
-  ├─ local.chat
-  ├─ local.work
-  ├─ local.session
-  ├─ local.model
-  ├─ local.tools
-  ├─ local.automation
-  └─ local.usage
-        │
-        ▼
-LocalHarnessEngine
-  只负责跨能力回合一致性与编排
-        │
-        ▼
-Coordinators / Stores / Repositories
-        │
-        ▼
-harness-core / Android runtime / MCP / device
-```
-
-几个关键边界：
-
-- **UI 状态投影**：Chat 与 Work 从同一运行态投影出各自的 `LocalConversationSurfaceState`，另一模式的状态保持稳定默认值；`distinctUntilChanged` 避免无关状态唤醒 UI。
-- **流式输出独立**：高频 streaming preview 不反复重写完整 aggregate state，降低 Compose 热路径更新成本。
-- **发送协调**：`LocalSendCoordinator` 统一处理启动、排队和拒绝，避免 UI 与 Engine 各自维护一套发送规则。
-- **运行上下文**：`LocalAgentRunCoordinator` 为前台、子代理、Automation 建立统一 checkpoint；未知副作用不会在恢复时盲目重试。
-- **插件组合**：Android / MCP / Vision 等平台能力由 `LocalPluginCompositionFactory` 组装，Engine 不直接持有 PluginRegistry。
-- **Token 可观测**：`TokenUsageAnalyticsStore` 记录请求级账本，`LocalTokenUsageContextBridge` 把 Web / Vision 等内部调用重新归属到触发它们的任务。
-- **聊天记忆**：人物关系记忆有稳定 subject key；人物连续性、关系证据和行为调节分别处理，避免“调参数 = 改历史事实”。
-- **历史与性能**：会话事件采用追加式账本、分页与有界 transcript window；热路径禁止重新物化整个历史。
-
-`LocalHarnessEngine`、`LocalHarnessScreen`、`SessionStore` 等热点文件受 CI 行数与职责 ratchet 约束：新功能必须优先向独立能力边界下沉。
+完整边界、禁止依赖、迁移阶段和完成标准见 **[架构 3.0 权威文档](docs/ARCHITECTURE.md)**。
 
 ## 验证体系
 
