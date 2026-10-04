@@ -204,6 +204,8 @@ if "foregroundInteractions = LocalInteractionCoordinator(mutable)" not in runtim
     die("LocalRuntimeStateStore must own the foreground interaction coordinator")
 if "private val interactions = LocalInteractionCoordinator" in engine:
     die("LocalHarnessEngine must not own a second foreground interaction coordinator")
+if "binding.runtimeStateStore.foregroundInteractions" in engine:
+    die("Work-bound interactions must resolve through LocalWorkRunBinding.interactions")
 if "?: interactions" in engine or "else interactions." in engine:
     die("LocalHarnessEngine must resolve foreground interactions through LocalRuntimeStateStore")
 work_runtime_source = strip_comments(
