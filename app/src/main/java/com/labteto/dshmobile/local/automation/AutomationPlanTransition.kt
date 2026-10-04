@@ -21,7 +21,7 @@ internal data class AutomationPlanningRevision(
 
 internal fun LocalHarnessState.toAutomationPlanningRevision() = AutomationPlanningRevision(
     sessionId = sessionId,
-    profileId = modelSelection.activeProfileId,
+    profileId = modelState.modelSelection.activeProfileId,
     usageMode = usageMode,
     groupChatEnabled = groupChat.enabled,
     personaId = personaId,
@@ -52,12 +52,12 @@ internal fun resolveAutomationPlanningRevision(
 internal fun LocalHarnessState.toAutomationPlanningContext() = AutomationPlanningContext(
     sessionId = sessionId,
     revision = toAutomationPlanningRevision(),
-    configured = configured,
+    configured = modelState.configured,
     usageMode = usageMode,
     groupChatEnabled = groupChat.enabled,
-    model = model,
-    baseUrl = baseUrl,
-    profileId = modelSelection.activeProfileId,
+    model = modelState.model,
+    baseUrl = modelState.baseUrl,
+    profileId = modelState.modelSelection.activeProfileId,
     personaName = chatPersona.name,
     recentMessages = messages
         .asSequence()
