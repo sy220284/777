@@ -2,6 +2,10 @@ package com.labteto.dshmobile.local.automation
 
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.local.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
+import com.labteto.dshmobile.local.executeWithModelAdmission
+import com.labteto.dshmobile.local.toRunModelSurface
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageContext
@@ -66,6 +70,7 @@ class AutomationPlanningService @Inject constructor(
     private val usageTracker: DeepSeekUsageTracker,
     private val json: Json,
 ) {
+    private val modelStepRuntime = LocalAgentModelStepRuntime()
     internal suspend fun plan(input: String): AutomationPlanDraft {
         val context = runtime.planningContext()
         validateContext(context)
@@ -135,27 +140,53 @@ class AutomationPlanningService @Inject constructor(
         context: AutomationPlanningContext,
         system: String,
         user: String,
-    ): String = modelGateway.withFrozenRoute(
-        context.profileId,
-        context.model,
-        context.baseUrl,
-    ) {
-        val reply = modelGateway.complete(
-            model = context.model,
-            baseUrl = context.baseUrl,
-            messages = listOf(
-                buildJsonObject {
-                    put("role", "system")
-                    put("content", system)
-                },
-                buildJsonObject {
-                    put("role", "user")
-                    put("content", user)
-                },
-            ),
-            tools = JsonArray(emptyList()),
-            temperature = 0.35,
+    ): String {
+        val profile = modelGateway.profileForRoute(
+            context.profileId,
+            context.model,
+            context.baseUrl,
         )
+        val surface = profile.toRunModelSurface()
+        val messages = listOf(
+            buildJsonObject {
+                put("role", "system")
+                put("content", system)
+            },
+            buildJsonObject {
+                put("role", "user")
+                put("content", user)
+            },
+        )
+        val reply = modelStepRuntime.execute(
+            initialMessages = messages,
+            maxAttempts = 2,
+            retryable = { error ->
+                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
+            },
+            backoffMillis = { failedAttempt, error ->
+                (error as? LocalModelException)?.providerRetryAfterMs?.coerceIn(0L, 30_000L)
+                    ?: (750L shl (failedAttempt - 1).coerceIn(0, 10))
+            },
+        ) { activeMessages ->
+            executeWithModelAdmission(
+                control = null,
+                routeFingerprint = surface.routeFingerprint,
+                model = surface.model,
+                baseUrl = surface.baseUrl,
+                contextWindowTokensOverride = surface.contextWindowTokensOverride,
+                messages = activeMessages,
+                tools = JsonArray(emptyList()),
+            ) {
+                modelGateway.complete(
+                    model = surface.model,
+                    baseUrl = surface.baseUrl,
+                    messages = activeMessages,
+                    tools = JsonArray(emptyList()),
+                    temperature = 0.35,
+                    profile = surface.profile,
+                )
+            }
+        }
         withContext(Dispatchers.IO) {
             usageTracker.record(
                 model = context.model,
@@ -171,7 +202,7 @@ class AutomationPlanningService @Inject constructor(
                 route = reply.routeIdentity,
             )
         }
-        reply.content?.trim()?.takeIf(String::isNotBlank)
+        return reply.content?.trim()?.takeIf(String::isNotBlank)
             ?: error("模型没有生成可用的定时事件")
     }
 
