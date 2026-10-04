@@ -686,8 +686,11 @@ class ChatDiaryStoreTest {
 
     @Test
     fun transferRebindsSubjectAndKeepsDiarySemanticsWithoutDeviceSourceLinks() {
-        val source = ChatDiaryStore(File(temporary.root, "source-diary"), json)
-        val target = ChatDiaryStore(File(temporary.root, "target-diary"), json)
+        val sourceRoot = File(temporary.root, "source-diary")
+        val targetRoot = File(temporary.root, "target-diary")
+        val source = ChatDiaryStore(sourceRoot, json)
+        val sourceTransfer = ChatDiaryTransferCoordinator(sourceRoot, json)
+        val targetTransfer = ChatDiaryTransferCoordinator(targetRoot, json)
         val first = source.record(request(
             delta = ChatDiaryDelta(
                 event = "两人约定周六上午十点在南门钟楼见面",
@@ -722,15 +725,15 @@ class ChatDiaryStoreTest {
             evidence = "见面安排改为周日下午三点在白桦咖啡馆",
         ))!!
 
-        val transferred = source.listForTransfer("gallery:a")
+        val transferred = sourceTransfer.list("gallery:a")
         assertTrue(transferred.first { it.id == first.id }.revisions.size >= 2)
         assertEquals(latest.id, transferred.first { it.id == first.id }.supersededBy)
 
         assertEquals(
             transferred.size,
-            target.importForTransfer("gallery:target", "阿青", transferred),
+            targetTransfer.import("gallery:target", "阿青", transferred),
         )
-        val imported = target.listForTransfer("gallery:target")
+        val imported = targetTransfer.list("gallery:target")
         assertEquals(transferred.map { it.id }.toSet(), imported.map { it.id }.toSet())
         assertTrue(imported.all { it.subjectKey == "gallery:target" })
         assertTrue(imported.all { it.personaName == "阿青" })
@@ -741,7 +744,7 @@ class ChatDiaryStoreTest {
             transferred.first { it.id == first.id }.revisions.size,
             imported.first { it.id == first.id }.revisions.size,
         )
-        assertEquals(0, target.importForTransfer("gallery:target", "阿青", transferred))
+        assertEquals(0, targetTransfer.import("gallery:target", "阿青", transferred))
     }
 
     private fun request(
