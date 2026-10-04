@@ -82,10 +82,10 @@ class ChatPersonaStorageSafetyTest {
 
     @Test
     fun oldGallerySchemaMigratesPersonaAndFullColdHistory() {
-        val legacyFile = File(temporary.root, "persona-gallery-v4.json")
-        val marker = File(temporary.root, "persona-gallery-v4-to-v5.done")
+        val currentFile = File(temporary.root, "persona-gallery-v5.json")
+        val legacyFile = File(temporary.root, "persona-gallery.json")
+        val marker = File(temporary.root, "persona-gallery-v1-v4-to-v5.done")
         val legacyHistoryRoot = File(temporary.root, "persona-history")
-        val currentHistoryRoot = File(temporary.root, "persona-history-v5")
         val messages = (1..48).map { index ->
             LocalHarnessMessage(
                 id = "m$index",
@@ -124,14 +124,7 @@ class ChatPersonaStorageSafetyTest {
             ),
         )
 
-        val store = ChatPersonaGalleryStore(
-            file = galleryFile,
-            json = json,
-            historyRoot = currentHistoryRoot,
-            legacyFile = legacyFile,
-            legacyHistoryRoot = legacyHistoryRoot,
-            migrationMarker = marker,
-        )
+        val store = ChatPersonaGalleryStore(currentFile, json)
         val migrated = store.list().single()
         val full = store.loadStoryHistory(migrated.id, "story-1", 100)
 
