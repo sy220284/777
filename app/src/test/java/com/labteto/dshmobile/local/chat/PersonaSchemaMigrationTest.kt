@@ -57,6 +57,7 @@ class PersonaSchemaMigrationTest {
                 valuePriorities = listOf("重要关系与现实责任", "用户自己补过：守住承诺"),
                 internalContradictions = listOf(
                     "既有身份与个人愿望可能发生拉扯，具体变化必须由当前故事中的真实事件推动。",
+                    "用户自己补过：职责和私人约定偶尔冲突",
                 ),
                 behaviorPatterns = listOf("用户自己补过：紧张时会先整理袖口"),
                 hardConstraints = listOf(
@@ -80,10 +81,7 @@ class PersonaSchemaMigrationTest {
         assertTrue(migrated.stableTraits.isNotEmpty())
         assertTrue("用户自己补过：守住承诺" in migrated.coreValues)
         assertTrue("重要关系与现实责任" !in migrated.coreValues)
-        assertEquals(
-            requireNotNull(PersonaPresetCatalog.find("genshin-kamisato-ayaka")).persona.coreTension,
-            migrated.coreTension,
-        )
+        assertEquals("用户自己补过：职责和私人约定偶尔冲突", migrated.coreTension)
         assertTrue("用户自己补过：绝不会失约" in migrated.hardConstraints)
         assertTrue("不读取玩家上帝视角，不凭空知道未发生或未获知的剧情。" !in migrated.hardConstraints)
         assertTrue("作为AI" !in migrated.bannedPhrases)
