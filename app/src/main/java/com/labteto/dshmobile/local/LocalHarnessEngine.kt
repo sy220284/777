@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.work.LocalWorkProgressCoordinator
+import com.labteto.dshmobile.local.work.guardWorkCompletionDelivery
 import com.labteto.dshmobile.local.work.recordWorkCompletionQuality
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
@@ -3138,12 +3139,13 @@ class LocalHarnessEngine @Inject constructor(
                 } else {
                     reply
                 }
+                val deliveryReply = guardWorkCompletionDelivery(effectiveReply, runState.value, runEventLog)
                 modelStep += 1
-                repliesByStep[modelStep] = effectiveReply
+                repliesByStep[modelStep] = deliveryReply
                 AgentModelReply(
-                    content = effectiveReply.content.orEmpty(),
+                    content = deliveryReply.content.orEmpty(),
                     toolCalls = if (runPolicy.allowToolExecution) {
-                        effectiveReply.toolCalls.map { call ->
+                        deliveryReply.toolCalls.map { call ->
                             AgentToolCall(
                                 id = call.id,
                                 name = call.name,
