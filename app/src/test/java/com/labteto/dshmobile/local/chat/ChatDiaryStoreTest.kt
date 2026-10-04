@@ -773,7 +773,7 @@ class ChatDiaryStoreTest {
         val longText = "超".repeat(2_000)
         val transferred = listOf(
             ChatDiaryEntry(
-                id = "external-diary",
+                id = "external-diary-".repeat(40),
                 subjectKey = "foreign",
                 personaName = longText,
                 event = longText,
@@ -809,6 +809,7 @@ class ChatDiaryStoreTest {
         assertEquals(5, imported.importance)
         assertEquals(ChatDiaryBounds.MAX_REFINEMENT_REVISIONS, imported.revisions.size)
         assertTrue(imported.revisions.all { it.sources.isEmpty() })
+        assertTrue(imported.id.length <= 160)
     }
 
     @Test
