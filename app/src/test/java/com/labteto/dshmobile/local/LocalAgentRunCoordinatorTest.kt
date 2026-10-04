@@ -12,6 +12,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -314,6 +315,42 @@ class LocalAgentRunCoordinatorTest {
             assertNotNull(decision)
             assertNotNull(decision!!.queuedInput)
             assertNull(decision.blockedReason)
+        }
+    }
+
+    @Test
+    fun recoveryQueuedForegroundRunRejectsLateEvents() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false,
+                maxSteps = 8,
+                input = "后台继续执行",
+                memoryInput = "后台继续执行",
+            )
+            assertTrue(coordinator.isCurrentOwner(context))
+
+            coordinator.markRecoveryQueued("s1", context.runId)
+            assertFalse(coordinator.isCurrentOwner(context))
+            val recoveryCheckpoint = requireNotNull(log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT))
+            assertEquals(
+                LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase(),
+                recoveryCheckpoint.data["status"]?.toString()?.trim('"'),
+            )
+
+            coordinator.recordEvent(context, AgentEvent.StepStarted(context.runId, 2))
+
+            val afterLateEvent = requireNotNull(log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT))
+            assertEquals(recoveryCheckpoint.sequence, afterLateEvent.sequence)
+            assertEquals(
+                LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase(),
+                afterLateEvent.data["status"]?.toString()?.trim('"'),
+            )
         }
     }
 
