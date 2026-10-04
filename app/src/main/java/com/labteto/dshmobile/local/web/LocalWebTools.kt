@@ -154,10 +154,17 @@ internal class LocalWebTools(
         }
     }
 
-    fun jsonQuery(path: String, query: String): String {
+    fun jsonQuery(
+        path: String,
+        query: String,
+        allowArtifactWrite: Boolean = true,
+    ): String {
         val root = json.parseToJsonElement(workspace.readRaw(path))
         val output = resolveJsonPath(root, query).toString()
         if (output.length <= MAX_TOOL_RESULT_CHARS) return output
+        if (!allowArtifactWrite) {
+            return "JSON 查询结果过大；当前为只读/规划作用域，不写入工作区。\n字符数：${output.length}\n预览：\n${output.take(WEB_FETCH_PREVIEW_CHARS)}"
+        }
         val saved = workspace.writeToolArtifact(
             ".dsh/queries/query-${System.currentTimeMillis()}-${UUID.randomUUID().toString().take(8)}.json",
             output,

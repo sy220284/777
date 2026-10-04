@@ -203,7 +203,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - durable 大工具结果必须复用统一 recoverable projection：完整结果可恢复、模型侧预览有界、EPHEMERAL 结果不得伪装成可恢复落盘结果。
 - 每个模型 step 只能执行该 step 实际发送给模型的工具集合；可选工具经 capability_search 启用后只能从下一次工具面更新开始调用，模型幻觉或兼容供应商返回未暴露工具时必须 fail closed。
 - 工具声明、审批与实际执行开始必须分开验证：审批前中断应恢复为 TOOL_NOT_STARTED；只有持久化 execution-started 后无结果才允许判定 TOOL_OUTCOME_UNKNOWN。修改类工具一旦进入执行器，异常/超时不得再标记为安全自动重试。
-- 计划模式和只读子代理必须按本次调用参数判断副作用；web_fetch 前台读取不得落盘工具产物，run_in_background 不得在只读/规划作用域创建持久任务。
+- 计划模式和只读子代理必须按本次调用参数判断副作用；web_fetch 前台读取与大型 json_query 结果不得落盘工具产物，run_in_background 不得在只读/规划作用域创建持久任务。
 - 新生成的压缩检查点必须携带明确的 chat/work 类型；旧 Work v1 provenance 只允许作为恢复兼容读取，新 Chat 压缩不得写 Work 专属 provenance。
 - 模型候选状态不得直接覆盖运行时事实：Chat 长期人物状态和 Work 目标状态都必须经过运行时 transition policy；Work 仍有 pending/in_progress Todo 时禁止把目标标记为 completed。
 - 输出质量守卫通过统一 `LocalOutputQualityPipeline` 调度，共享 inspect/result 契约但保留领域规则；Chat 仅做高置信最小修复，Work 完成声明与 Todo/Goal 状态冲突时必须在最终交付前改为真实未完成状态，并记录脱敏诊断。

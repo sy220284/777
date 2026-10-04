@@ -4005,6 +4005,7 @@ class LocalHarnessEngine @Inject constructor(
             "json_query" -> webTools.jsonQuery(
                 path = args.string("path"),
                 query = args.optionalString("query").orEmpty(),
+                allowArtifactWrite = allowMutation && !executionState.value.planMode,
             )
             "network_diagnose" -> web.diagnose(args.string("url"))
             "environment_info" -> environmentInfoCoordinator.build(binding)
