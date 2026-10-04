@@ -17,23 +17,16 @@ import kotlinx.serialization.json.jsonPrimitive
 class ChatPersonaGalleryStore internal constructor(
     private val file: File,
     private val json: Json,
-    private val historyRoot: File = File(requireNotNull(file.parentFile), "persona-history-v5"),
-    private val legacyFile: File? = null,
-    private val legacyHistoryRoot: File? = null,
-    private val migrationMarker: File? = null,
 ) {
     @Inject constructor(@ApplicationContext context: Context, json: Json) :
-        this(
-            file = File(context.filesDir, "local-harness/chat/persona-gallery-v5.json"),
-            json = json,
-            historyRoot = File(context.filesDir, "local-harness/chat/persona-history-v5"),
-            legacyFile = File(context.filesDir, "local-harness/chat/persona-gallery.json"),
-            legacyHistoryRoot = File(context.filesDir, "local-harness/chat/persona-history"),
-            migrationMarker = File(context.filesDir, "local-harness/chat/persona-gallery-v1-v4-to-v5.done"),
-        )
+        this(File(context.filesDir, "local-harness/chat/persona-gallery-v5.json"), json)
 
     private val documentStore = PersonaGalleryDocumentStore(file, json)
-    private val history = PersonaGalleryHistoryCoordinator(historyRoot, json)
+    private val history = PersonaGalleryHistoryCoordinator(
+        File(requireNotNull(file.parentFile), "persona-history-v5"),
+        json,
+    )
+    private val schemaMigration = PersonaGallerySchemaMigrationCoordinator(file, json)
 
     @Synchronized
     fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
@@ -450,7 +443,7 @@ class ChatPersonaGalleryStore internal constructor(
     }
 
     private fun readNormalized(): GalleryDocument {
-        migrateLegacyIfNeeded()
+        schemaMigration.migrateIfNeeded()
         val document = documentStore.read()
         require(document.version == 5) {
             "人物图集版本不受支持"
@@ -461,104 +454,6 @@ class ChatPersonaGalleryStore internal constructor(
         return normalized
     }
 
-    private fun migrateLegacyIfNeeded() {
-        val legacy = legacyFile ?: return
-        val marker = migrationMarker ?: return
-        if (marker.isFile) return
-        if (!PersonaSchemaMigration.hasDurableSource(legacy)) {
-            markMigrationDone(marker)
-            return
-        }
 
-        val current = documentStore.read()
-        require(current.version == 5) { "人物图集版本不受支持" }
-        val legacyDocument = PersonaSchemaMigration.readLegacyGalleryDocument(legacy, json)
-        val oldHistory = legacyHistoryRoot?.let { root ->
-            PersonaGalleryHistoryStore(root, json)
-        }
-        val mergedEntries = current.entries.toMutableList()
-
-        legacyDocument.entries.forEach { oldEntry ->
-            val convertedBase = PersonaSchemaMigration.toCurrent(oldEntry)
-            val converted = convertedBase.copy(
-                stories = convertedBase.stories.map { story ->
-                    val archived = oldHistory?.all(oldEntry.id, story.id).orEmpty()
-                    val fullHistory = if (archived.isNotEmpty()) archived else story.history
-                    story.copy(
-                        history = fullHistory,
-                        historyTotalCount = maxOf(story.historyTotalCount, fullHistory.size),
-                        historyArchived = false,
-                    )
-                },
-            )
-            val indexById = mergedEntries.indexOfFirst { it.id == converted.id }
-            val index = if (indexById >= 0) {
-                indexById
-            } else {
-                mergedEntries.indexOfFirst { candidate ->
-                    samePersonaIdentity(candidate.persona, converted.persona)
-                }
-            }
-
-            val merged = if (index >= 0) {
-                val currentEntry = history.hydrate(history.migrate(mergedEntries[index]))
-                val entryId = currentEntry.id
-                currentEntry.copy(
-                    persona = PersonaSchemaMigration.mergeCurrentFirst(
-                        currentEntry.persona,
-                        converted.persona,
-                    ).copy(id = entryId),
-                    portraitPath = currentEntry.portraitPath.ifBlank { converted.portraitPath },
-                    groupChatState = mergeChatState(currentEntry.groupChatState, converted.groupChatState),
-                    stories = mergeMigratedStories(currentEntry.stories, converted.stories),
-                    updatedAt = maxOf(currentEntry.updatedAt, converted.updatedAt),
-                )
-            } else {
-                converted
-            }
-
-            val archivedMerged = history.archiveEntry(merged)
-            if (index >= 0) {
-                mergedEntries[index] = archivedMerged
-            } else {
-                mergedEntries += archivedMerged
-            }
-        }
-
-        documentStore.write(current.copy(version = 5, entries = mergedEntries))
-        markMigrationDone(marker)
-    }
-
-    private fun mergeMigratedStories(
-        current: List<PersonaGalleryStory>,
-        legacy: List<PersonaGalleryStory>,
-    ): List<PersonaGalleryStory> {
-        val merged = current.toMutableList()
-        legacy.forEach { old ->
-            val sameId = merged.indexOfFirst { it.id == old.id }
-            if (sameId >= 0) {
-                merged[sameId] = mergeGalleryStories(merged[sameId], old)
-            } else {
-                val combined = mergeGalleryStoryLists(merged, listOf(old))
-                merged.clear()
-                merged += combined
-            }
-        }
-        return merged.sortedByDescending(PersonaGalleryStory::updatedAt)
-    }
-
-    private fun markMigrationDone(marker: File) {
-        marker.parentFile?.mkdirs()
-        val temporary = File(marker.parentFile, marker.name + ".tmp")
-        temporary.outputStream().use { output ->
-            output.write("v5\n".toByteArray())
-            output.flush()
-            output.fd.sync()
-        }
-        if (!temporary.renameTo(marker)) {
-            temporary.copyTo(marker, overwrite = true)
-            check(temporary.delete()) { "人物图集迁移标记临时文件无法清理" }
-        }
-    }
 
 }
