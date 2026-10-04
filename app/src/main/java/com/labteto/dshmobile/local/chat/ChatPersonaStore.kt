@@ -254,13 +254,25 @@ class ChatPersonaStore internal constructor(
     private fun migrateLegacyIfNeeded() {
         val legacy = legacyFile ?: return
         val marker = migrationMarker ?: return
-        if (marker.isFile && PersonaSchemaMigration.hasDurableSource(file)) return
+        val currentReadable = listOf(file, backupFile)
+            .asSequence()
+            .filter(File::isFile)
+            .any { candidate ->
+                runCatching { decodeDocument(candidate.readText()) }.isSuccess
+            }
+        if (marker.isFile && currentReadable) return
         if (!PersonaSchemaMigration.hasDurableSource(legacy)) return
 
-        val current = durableFile.read(
-            defaultValue = ::PersonaDocument,
-            decode = ::decodeDocument,
-        )
+        val current = runCatching {
+            durableFile.read(
+                defaultValue = ::PersonaDocument,
+                decode = ::decodeDocument,
+            )
+        }.getOrElse {
+            // A retained legacy source is a valid recovery source. Fail closed only after both
+            // the current generation and the migration source are unavailable.
+            PersonaDocument()
+        }
         val legacyDocument = PersonaSchemaMigration.readLegacyPersonaDocument(legacy, json)
         val merged = current.personas.toMutableList()
         legacyDocument.personas.forEach { old ->
