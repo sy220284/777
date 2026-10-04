@@ -177,7 +177,7 @@ internal class LocalAutomationWorkCoordinator(
         withTimeout(15_000L) {
             while (state.value.loading) delay(50)
         }
-        require(state.value.configured) { "本机 Harness 尚未配置模型" }
+        require(state.value.modelState.configured) { "本机 Harness 尚未配置模型" }
     }
 
     private fun resolveSession(
