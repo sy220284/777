@@ -8,11 +8,23 @@ on:
       - '**/*.md'
       - 'docs/**'
       - 'screen.png'
+      - 'LICENSE'
+      - '.editorconfig'
+      - '.gitignore'
+      - '.gitattributes'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/workflows/**'
+      - '.github/scripts/**'
+      - '.github/release-version'
+      - '**/src/test/**'
+      - '**/src/testFixtures/**'
+      - '**/src/androidTest/**'
+      - 'tools/reference-validation/**'
+      - 'tools/capture/**'
+      - 'reference-validation/**'
+      - 'mock-harness/**'
+      - 'upstream/**'
   pull_request:
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - 'screen.png'
 
 permissions:
   contents: read
@@ -22,7 +34,89 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      scope: ${{ steps.classify.outputs.scope }}
+      run_automation: ${{ steps.classify.outputs.run_automation }}
+      run_preflight: ${{ steps.classify.outputs.run_preflight }}
+      run_build: ${{ steps.classify.outputs.run_build }}
+      run_android16: ${{ steps.classify.outputs.run_android16 }}
+      run_android17: ${{ steps.classify.outputs.run_android17 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Collect changed files
+        id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            git ls-files > changed-files.txt
+            echo "手动执行：强制完整 CI"
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            git diff --name-only --diff-filter=ACMRD "$BASE_SHA" "$HEAD_SHA" > changed-files.txt
+            git diff --check "$BASE_SHA" "$HEAD_SHA"
+          else
+            base="$BEFORE_SHA"
+            if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+              base="$(git rev-parse "$CURRENT_SHA^")"
+            fi
+            git diff --name-only --diff-filter=ACMRD "$base" "$CURRENT_SHA" > changed-files.txt
+            git diff --check "$base" "$CURRENT_SHA"
+          fi
+          echo "本次变更文件："
+          cat changed-files.txt
+      - name: Classify CI scope
+        id: classify
+        run: |
+          args=(--paths-file changed-files.txt --github-output "$GITHUB_OUTPUT")
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            args+=(--force-full)
+          fi
+          python3 .github/scripts/classify-ci-scope.py "${args[@]}"
+
+  automation-check:
+    needs: scope
+    if: ${{ needs.scope.outputs.run_automation == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Validate CI scope policy
+        run: python3 .github/scripts/classify-ci-scope.py --self-test
+      - name: Validate workflow YAML syntax
+        run: |
+          ruby -rpsych -e 'ARGV.each { |file| Psych.parse_file(file); puts "YAML OK: #{file}" }' .github/workflows/*.yml
+      - name: Validate Python and shell automation syntax
+        run: |
+          python3 -m compileall -q .github/scripts
+          while IFS= read -r -d '' file; do
+            bash -n "$file"
+          done < <(find .github/scripts -type f -name '*.sh' -print0)
+      - name: Validate static guard behavior
+        run: |
+          python3 .github/scripts/check-ui-hardcoded-cjk.py
+          python3 .github/scripts/check-ui-design-system-boundaries.py
+          python3 .github/scripts/check-notification-presentation.py
+          python3 .github/scripts/check-kotlin-risk-patterns.py
+          python3 .github/scripts/check-local-performance-invariants.py
+          python3 .github/scripts/check-local-architecture-boundaries.py
+      - name: Validate release version format
+        run: |
+          value="$(tr -d '\r\n' < .github/release-version)"
+          [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]]
+
   preflight:
+    needs: scope
+    if: ${{ needs.scope.outputs.run_preflight == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -63,7 +157,8 @@ jobs:
         run: ./gradlew :reference-validation:test --stacktrace
 
   build:
-    needs: preflight
+    needs: [scope, preflight]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_build == 'true' && needs.preflight.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -105,7 +200,8 @@ jobs:
           retention-days: 3
 
   android-16-instrumented:
-    needs: preflight
+    needs: [scope, preflight]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android16 == 'true' && (needs.preflight.result == 'success' || needs.preflight.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -145,7 +241,8 @@ jobs:
             bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
   android-17-instrumented:
-    needs: preflight
+    needs: [scope, preflight]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_android17 == 'true' && (needs.preflight.result == 'success' || needs.preflight.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -196,11 +293,13 @@ jobs:
           adb install -r app/build/outputs/apk/optimized/app-optimized.apk
           bash .github/scripts/smoke-test-android-startup.sh com.sy220284.dshmobile.debug
 
-  # 统一合并门禁：main 分支保护只需依赖这一项状态检查。
-  # 仓库设置需将 “CI / merge-gate” 设为必需检查；任何失败、取消或跳过都会在这里收口为失败。
+  # 统一合并门禁：根据 scope 只要求本次任务需要的 lane 成功。
+  # 若仓库启用分支保护，应只要求 “CI / merge-gate”。
   merge-gate:
     if: always()
     needs:
+      - scope
+      - automation-check
       - preflight
       - build
       - android-16-instrumented
@@ -208,18 +307,48 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require every CI lane to complete successfully
+      - name: Require all selected CI lanes to succeed
         env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          SCOPE_NAME: ${{ needs.scope.outputs.scope }}
+          REQUIRE_AUTOMATION: ${{ needs.scope.outputs.run_automation }}
+          REQUIRE_PREFLIGHT: ${{ needs.scope.outputs.run_preflight }}
+          REQUIRE_BUILD: ${{ needs.scope.outputs.run_build }}
+          REQUIRE_ANDROID16: ${{ needs.scope.outputs.run_android16 }}
+          REQUIRE_ANDROID17: ${{ needs.scope.outputs.run_android17 }}
+          AUTOMATION_RESULT: ${{ needs.automation-check.result }}
           PREFLIGHT_RESULT: ${{ needs.preflight.result }}
           BUILD_RESULT: ${{ needs.build.result }}
           ANDROID16_RESULT: ${{ needs['android-16-instrumented'].result }}
           ANDROID17_RESULT: ${{ needs['android-17-instrumented'].result }}
         run: |
           set -eu
-          for result in "$PREFLIGHT_RESULT" "$BUILD_RESULT" "$ANDROID16_RESULT" "$ANDROID17_RESULT"; do
-            if [ "$result" != "success" ]; then
-              echo "::error::CI 未通过：存在失败、取消或跳过的必需验证任务（结果：$result）"
+
+          if [ "$SCOPE_RESULT" != "success" ]; then
+            echo "::error::CI 范围识别失败：$SCOPE_RESULT"
+            exit 1
+          fi
+
+          check_lane() {
+            required="$1"
+            result="$2"
+            lane="$3"
+
+            if [ "$required" = "true" ]; then
+              if [ "$result" != "success" ]; then
+                echo "::error::$lane 为本次任务必需检查，但结果为 $result"
+                exit 1
+              fi
+            elif [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+              echo "::error::$lane 虽非本次必需检查，但出现异常结果：$result"
               exit 1
             fi
-          done
-          echo "CI 合并门禁通过：所有必需验证任务均成功"
+          }
+
+          check_lane "$REQUIRE_AUTOMATION" "$AUTOMATION_RESULT" "automation-check"
+          check_lane "$REQUIRE_PREFLIGHT" "$PREFLIGHT_RESULT" "preflight"
+          check_lane "$REQUIRE_BUILD" "$BUILD_RESULT" "build"
+          check_lane "$REQUIRE_ANDROID16" "$ANDROID16_RESULT" "android-16-instrumented"
+          check_lane "$REQUIRE_ANDROID17" "$ANDROID17_RESULT" "android-17-instrumented"
+
+          echo "CI 合并门禁通过：scope=$SCOPE_NAME，所有本次必需检查均成功"
