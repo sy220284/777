@@ -78,12 +78,16 @@ class LocalWorkRunBindingTest {
             budget = HarnessResourceBudget(maxModelRequests = 2, maxAgents = 4),
         )
 
-        projectResourceSnapshotToSessionStates(resources, 48_000, visible, registry)
+        projectResourceSnapshotToSessionStates(
+            resources,
+            contextBudgetFor = { if (it.sessionId == "work") 48_000 else 24_000 },
+            visibleState = visible, activeRuns = registry,
+        )
 
         assertEquals(0, visible.value.kernel.resources.activeAgents)
         assertEquals(3, binding.state.value.kernel.resources.activeAgents)
         assertEquals(48_000, binding.state.value.kernel.contextBudgetChars)
-        assertEquals(48_000, visible.value.kernel.contextBudgetChars)
+        assertEquals(24_000, visible.value.kernel.contextBudgetChars)
         assertTrue(binding.state.value.kernel.running)
         assertFalse(visible.value.kernel.running)
         assertEquals(2, binding.state.value.kernel.queuedInputCount)

@@ -506,7 +506,15 @@ class LocalHarnessEngine @Inject constructor(
         onChanged = { snapshot ->
             projectResourceSnapshotToSessionStates(
                 snapshot = snapshot,
-                contextBudgetChars = localHistoryBudgetFor(memoryClassMb, snapshot.pressure).maxHistoryChars,
+                contextBudgetFor = { current ->
+                    localHistoryBudgetFor(
+                        memoryClassMb = memoryClassMb,
+                        pressure = snapshot.pressure,
+                        model = current.modelState.model,
+                        baseUrl = current.modelState.baseUrl,
+                        contextWindowTokensOverride = current.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
+                    ).maxHistoryChars
+                },
                 visibleState = _state,
                 activeRuns = workRunRegistry,
             )

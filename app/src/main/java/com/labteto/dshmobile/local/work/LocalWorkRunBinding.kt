@@ -123,7 +123,7 @@ internal fun projectJobSnapshotToSessionStates(
 /** Shared scheduler facts must reach detached runs as well as the visible session. */
 internal fun projectResourceSnapshotToSessionStates(
     snapshot: HarnessResourceSnapshot,
-    contextBudgetChars: Int,
+    contextBudgetFor: (LocalHarnessState) -> Int,
     visibleState: MutableStateFlow<LocalHarnessState>,
     activeRuns: LocalWorkRunRegistry,
 ) {
@@ -131,7 +131,7 @@ internal fun projectResourceSnapshotToSessionStates(
         state.update { current ->
             current.copy(kernel = current.kernel.copy(
                 resources = snapshot.toLocalHarnessResourceState(current.usageMode),
-                contextBudgetChars = contextBudgetChars,
+                contextBudgetChars = contextBudgetFor(current),
             ))
         }
     }
