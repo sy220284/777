@@ -4009,7 +4009,9 @@ class LocalHarnessEngine @Inject constructor(
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
                 val model = LocalWorkerModelRouter.resolve(args.optionalString("model"), executionState.value)
-                val maxSteps = args.int("max_steps", executionState.value.subagentMaxSteps).coerceIn(1, 128)
+                val maxSteps = LocalAgentRuntimeLimits.normalizeSubagentSteps(
+                    args.int("max_steps", executionState.value.subagentMaxSteps),
+                )
                 val virtualScreen = args.boolean("virtual_screen", false)
                 if (args.boolean("run_in_background", false)) {
                     persistentJobRecoveryCoordinator.startReadonlySubagent(
@@ -4738,9 +4740,15 @@ class LocalHarnessEngine @Inject constructor(
                 modelProfiles, activeModelProfile?.id,
                 preferences.getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null),
             ),
-            mainMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS).coerceIn(4, 128),
-            subagentMaxSteps = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS).coerceIn(1, 128),
-            modelAttempts = preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS).coerceIn(1, 5),
+            mainMaxSteps = LocalAgentRuntimeLimits.normalizeMainSteps(
+                preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS),
+            ),
+            subagentMaxSteps = LocalAgentRuntimeLimits.normalizeSubagentSteps(
+                preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS),
+            ),
+            modelAttempts = LocalAgentRuntimeLimits.normalizeModelAttempts(
+                preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS),
+            ),
             imageInputMode = runCatching {
                 LocalImageInputMode.valueOf(
                     preferences.getString(LocalHarnessSettingsCoordinator.KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)

@@ -155,7 +155,7 @@ object LocalToolCatalog {
         add(tool("subagent", "启动一个只读子代理处理独立子任务；同一工具块中的多个子代理可并行且互不级联取消", properties(
             "task" to string("交给子代理的完整任务"),
             "model" to string("可选；使用 list_subagent_models 返回的 profileId，或无歧义的模型名；留空继承父代理模型"),
-            "max_steps" to integer("最大模型/工具循环步数，默认 20，可配置 1 到 128"),
+            "max_steps" to integer("最大模型/工具循环步数，默认 20，可配置 1 到 512"),
             "virtual_screen" to boolean("是否为子代理分配独立虚拟屏；用于并行操作 Android 界面，默认 false"),
             "run_in_background" to boolean("是否转为后台任务，默认 false"),
         ), listOf("task")))

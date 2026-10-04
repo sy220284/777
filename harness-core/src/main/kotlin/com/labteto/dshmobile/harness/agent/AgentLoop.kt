@@ -182,7 +182,7 @@ class AgentLoop(
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
 ) {
     init {
-        require(maxSteps in 1..MAX_ALLOWED_STEPS) { "代理步数必须在 1..$MAX_ALLOWED_STEPS 之间" }
+        require(maxSteps >= 1) { "代理步数必须大于 0" }
     }
 
     suspend fun run(
@@ -334,6 +334,5 @@ class AgentLoop(
 
     private companion object {
         const val DEFAULT_MAX_STEPS = 32
-        const val MAX_ALLOWED_STEPS = 128
     }
 }

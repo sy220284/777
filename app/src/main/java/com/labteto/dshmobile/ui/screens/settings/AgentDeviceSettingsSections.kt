@@ -19,7 +19,6 @@ import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -85,106 +84,6 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
-
-@Composable
-internal fun LocalAgentSettingsCard(
-    local: LocalHarnessSettingsState,
-    viewModel: SettingsViewModel,
-    report: (String) -> Unit,
-) {
-    val agentSavedMessage = stringResource(R.string.advanced_agent_saved)
-
-    // 步进即保存：不再积攒草稿等“保存”按钮，误触也不可能（有边界钳制）
-    fun clampUpdate(current: Int, delta: Int, min: Int, max: Int, apply: (Int) -> Unit) {
-        val next = (current + delta).coerceIn(min, max)
-        if (next != current) {
-            apply(next)
-            report(agentSavedMessage)
-        }
-    }
-
-    SettingsCard(stringResource(R.string.advanced_agent_settings), Icons.Outlined.Tune) {
-        StepperRow(
-            label = stringResource(R.string.advanced_main_steps),
-            hint = stringResource(R.string.advanced_agent_limits_hint),
-            value = local.mainMaxSteps,
-            range = 4..128,
-            onDelta = { delta ->
-                clampUpdate(local.mainMaxSteps, delta, 4, 128) {
-                    viewModel.configureLocalAgent(it, local.subagentMaxSteps, local.modelAttempts, local.modelSelection.workerProfileId)
-                }
-            },
-        )
-        StepperRow(
-            label = stringResource(R.string.advanced_subagent_steps),
-            hint = null,
-            value = local.subagentMaxSteps,
-            range = 1..128,
-            onDelta = { delta ->
-                clampUpdate(local.subagentMaxSteps, delta, 1, 128) {
-                    viewModel.configureLocalAgent(local.mainMaxSteps, it, local.modelAttempts, local.modelSelection.workerProfileId)
-                }
-            },
-        )
-        StepperRow(
-            label = stringResource(R.string.advanced_model_attempts),
-            hint = null,
-            value = local.modelAttempts,
-            range = 1..5,
-            onDelta = { delta ->
-                clampUpdate(local.modelAttempts, delta, 1, 5) {
-                    viewModel.configureLocalAgent(local.mainMaxSteps, local.subagentMaxSteps, it, local.modelSelection.workerProfileId)
-                }
-            },
-        )
-
-        AgentWorkerModelSettingRow(local) { viewModel.configureLocalAgent(local.mainMaxSteps, local.subagentMaxSteps, local.modelAttempts, it) }
-    }
-}
-
-/** 数值行：标签 + 说明在左，−/值/＋ 在右。 */
-@Composable
-private fun StepperRow(
-    label: String,
-    hint: String?,
-    value: Int,
-    range: IntRange,
-    onDelta: (Int) -> Unit,
-) {
-    val colors = DsTheme.colors
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.xsmall),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(label, style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
-            hint?.let {
-                Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
-            }
-        }
-        DsButton(
-            text = "−",
-            onClick = { onDelta(-1) },
-            enabled = value > range.first,
-            size = DsButtonSize.Small,
-            variant = DsButtonVariant.Ghost,
-        )
-        Text(
-            value.toString(),
-            style = DsType.std14Strong.withReadingWeight(),
-            color = colors.labelPrimary,
-            modifier = Modifier.widthIn(min = 30.dp),
-            textAlign = TextAlign.Center,
-        )
-        DsButton(
-            text = "＋",
-            onClick = { onDelta(1) },
-            enabled = value < range.last,
-            size = DsButtonSize.Small,
-            variant = DsButtonVariant.Ghost,
-        )
-    }
-}
 
 @Composable
 internal fun DeviceCapabilitiesCard(
