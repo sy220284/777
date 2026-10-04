@@ -768,6 +768,50 @@ class ChatDiaryStoreTest {
     }
 
     @Test
+    fun transferBoundsUntrustedDiaryTextAndRevisionPayloads() {
+        val target = ChatDiaryStore(File(temporary.root, "bounded-transfer"), json)
+        val longText = "超".repeat(2_000)
+        val transferred = listOf(
+            ChatDiaryEntry(
+                id = "external-diary",
+                subjectKey = "foreign",
+                personaName = longText,
+                event = longText,
+                feeling = longText,
+                innerThought = longText,
+                relationshipMeaning = longText,
+                unresolvedEcho = longText,
+                importance = 99,
+                revisions = List(20) { index ->
+                    ChatDiaryRevision(
+                        event = "$index$longText",
+                        feeling = longText,
+                        innerThought = longText,
+                        relationshipMeaning = longText,
+                        unresolvedEcho = longText,
+                        importance = 99,
+                        updatedAt = index.toLong(),
+                    )
+                },
+                createdAt = 1L,
+                updatedAt = 2L,
+            ),
+        )
+
+        target.importForTransfer("gallery:target", "阿青", transferred) { Unit }
+        val imported = target.listForTransfer("gallery:target").single()
+
+        assertEquals(ChatDiaryBounds.MAX_EVENT_CHARS, imported.event.length)
+        assertEquals(ChatDiaryBounds.MAX_FEELING_CHARS, imported.feeling.length)
+        assertEquals(ChatDiaryBounds.MAX_THOUGHT_CHARS, imported.innerThought.length)
+        assertEquals(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS, imported.relationshipMeaning.length)
+        assertEquals(ChatDiaryBounds.MAX_ECHO_CHARS, imported.unresolvedEcho.length)
+        assertEquals(5, imported.importance)
+        assertEquals(ChatDiaryBounds.MAX_REFINEMENT_REVISIONS, imported.revisions.size)
+        assertTrue(imported.revisions.all { it.sources.isEmpty() })
+    }
+
+    @Test
     fun failedGalleryCommitRollsBackDiaryImportBeforeReleasingWriterLock() {
         val source = ChatDiaryStore(File(temporary.root, "rollback-source"), json)
         val target = ChatDiaryStore(File(temporary.root, "rollback-target"), json)
