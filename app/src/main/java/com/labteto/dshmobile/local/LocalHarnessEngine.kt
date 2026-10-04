@@ -3211,7 +3211,9 @@ class LocalHarnessEngine @Inject constructor(
                 }
             },
             isParallelTool = { call ->
-                runPolicy.allowToolExecution && call.name in PARALLEL_SUBAGENT_TOOLS
+                runPolicy.allowToolExecution &&
+                    modelToolStepSurface.allows(call.name) &&
+                    call.name in PARALLEL_SUBAGENT_TOOLS
             },
             eventSink = AgentEventSink { event ->
                 agentRunCoordinator.ensureCurrentOwner(runContext)
