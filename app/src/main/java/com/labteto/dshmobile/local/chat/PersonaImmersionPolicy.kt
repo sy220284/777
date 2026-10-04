@@ -17,6 +17,65 @@ internal object PersonaImmersionPolicy {
 
     fun breaksImmersion(text: String): Boolean = findViolations(text).isNotEmpty()
 
+    fun findReplyViolations(persona: PersonaProfile, text: String): List<String> {
+        if (text.isBlank()) return emptyList()
+
+        val always = RUNTIME_ALWAYS_OUT_OF_ROLE_PATTERNS
+            .mapNotNull { pattern -> pattern.find(text)?.value?.trim() }
+
+        val contextual = if (personaMayHaveNonEmbodiedForm(persona)) {
+            emptyList()
+        } else {
+            RUNTIME_EMBODIED_CHARACTER_PATTERNS
+                .mapNotNull { pattern -> pattern.find(text)?.value?.trim() } +
+                findViolations(text)
+        }
+
+        return (always + contextual).distinct()
+    }
+
+    fun breaksReplyImmersion(persona: PersonaProfile, text: String): Boolean =
+        findReplyViolations(persona, text).isNotEmpty()
+
+    private fun personaMayHaveNonEmbodiedForm(persona: PersonaProfile): Boolean {
+        val source = buildString {
+            appendLine(persona.portrait)
+            appendLine(persona.lifeContext)
+            appendLine(persona.worldSetting)
+            appendLine(persona.franchise)
+            persona.limitations.forEach(::appendLine)
+            persona.hardConstraints.forEach(::appendLine)
+            persona.loreEntries.forEach { entry ->
+                appendLine(entry.title)
+                appendLine(entry.content)
+                entry.keywords.forEach(::appendLine)
+            }
+        }
+        return NON_EMBODIED_CHARACTER_MARKERS.any { marker ->
+            source.contains(marker, ignoreCase = true)
+        }
+    }
+
+    private val RUNTIME_ALWAYS_OUT_OF_ROLE_PATTERNS = listOf(
+        Regex("""(?i)(?:语言模型|大语言模型|ChatGPT|聊天模型|模型本身|系统提示|系统限制|平台限制|聊天产品).{0,40}"""),
+        Regex("""(?i)(?:作为|身为|我是|我只是)\s*(?:一个|一名)?\s*(?:语言模型|大语言模型|ChatGPT|聊天机器人|虚拟助手|智能助手)"""),
+        Regex("""(?i)(?:现实中|现实世界(?:里|中)?).{0,24}(?:无法|不能|做不到).{0,36}(?:拥抱|触碰|碰到|陪伴|见面|行动|走动|拿起|递给|身体|实体|物理)"""),
+        Regex("""(?i)(?:只能|仅能)\s*(?:通过|用)?\s*(?:文字|文本|屏幕|对话框).{0,20}(?:交流|沟通|互动|陪伴)"""),
+    )
+
+    private val RUNTIME_EMBODIED_CHARACTER_PATTERNS = listOf(
+        Regex("""(?i)(?:我是|我只是|作为|身为)\s*(?:一个|一名)?\s*(?:AI|人工智能)\b"""),
+        Regex("""(?i)(?:我)?\s*(?:没有|不具备)\s*(?:真实的)?\s*(?:身体|实体|肉体|物理形态)"""),
+        Regex("""(?i)(?:我)?\s*(?:无法|不能|做不到)\s*(?:真正)?\s*(?:拥抱|触碰|碰到|陪伴|走到|走过去|拿起|递给|进行实体动作|进行物理动作)"""),
+        Regex("""(?i)(?:我)?\s*(?:没有|不具备|无法产生|不能产生)\s*(?:真正的|真实的)?\s*(?:感情|情感|感受)"""),
+    )
+
+    private val NON_EMBODIED_CHARACTER_MARKERS = listOf(
+        "幽灵", "灵体", "意识体", "机器人", "仿生人", "机械生命", "人工智能", "AI",
+        "程序生命", "数字生命", "虚拟生命", "全息投影", "投影形态", "无实体", "没有固定肉身",
+        "寄宿", "机体",
+    )
+
     private val OUT_OF_ROLE_PATTERNS = listOf(
         Regex("""(?i)(?:作为|身为)\s*(?:一个|一名)?\s*(?:AI|人工智能|语言模型|大语言模型|聊天机器人|虚拟助手|智能助手)"""),
         Regex("""(?i)(?:AI|人工智能|语言模型|大语言模型|聊天机器人|虚拟助手|智能助手).{0,32}(?:没有|不具备|无法|不能).{0,32}(?:身体|实体|肉体|生理|感情|情感|感受|体验|触碰|行动)"""),
