@@ -5,7 +5,6 @@ import com.labteto.dshmobile.harness.state.RuntimeStateTransitionPolicy
 import com.labteto.dshmobile.harness.state.acceptRuntimeStateTransition
 import com.labteto.dshmobile.harness.state.rejectRuntimeStateTransition
 import com.labteto.dshmobile.local.LocalGoal
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.LocalTodoItem
 import kotlinx.serialization.json.buildJsonObject
@@ -30,7 +29,7 @@ internal fun resolveWorkGoalTransition(
 
 
 internal fun resolveWorkGoalUpdate(
-    snapshot: LocalHarnessState,
+    snapshot: LocalWorkState,
     status: String,
     note: String?,
     eventLog: LocalSessionEventLog,
