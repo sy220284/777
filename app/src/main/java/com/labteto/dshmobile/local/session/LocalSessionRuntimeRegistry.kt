@@ -86,14 +86,15 @@ internal object LocalSessionRuntimeRegistry {
         require(sessionId.isNotBlank()) { "会话编号不能为空" }
         val entry = synchronized(this) {
             val candidate = entries.getOrPut(sessionId, ::Entry)
-            candidate.reservations++
-            if (!candidate.mutex.tryLock()) {
-                candidate.reservations--
+            // Never barge ahead of an existing owner or suspended acquirer. reservations covers
+            // both, including the hand-off window after unlock but before the waiter resumes.
+            if (candidate.reservations > 0 || !candidate.mutex.tryLock()) {
                 if (candidate.reservations == 0 && entries[sessionId] === candidate) {
                     entries.remove(sessionId)
                 }
                 return null
             }
+            candidate.reservations = 1
             candidate.owner = kind
             candidate
         }
