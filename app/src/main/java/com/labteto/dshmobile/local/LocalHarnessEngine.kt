@@ -1762,8 +1762,10 @@ class LocalHarnessEngine @Inject constructor(
             loading = _state.value.loading,
             usage = usageTracker.state.value,
             sessions = sessionSummaries(),
-            resources = resources.toLocalHarnessResourceState(liveState.usageMode),
-            contextBudgetChars = localHistoryBudgetFor(memoryClassMb, resources.pressure).maxHistoryChars,
+            kernel = liveState.kernel.copy(
+                resources = resources.toLocalHarnessResourceState(liveState.usageMode),
+                contextBudgetChars = localHistoryBudgetFor(memoryClassMb, resources.pressure).maxHistoryChars,
+            ),
         )
         modelHistory.reset(binding.modelHistory.snapshot())
         transcriptProjectionCursor = binding.transcriptProjectionCursor
