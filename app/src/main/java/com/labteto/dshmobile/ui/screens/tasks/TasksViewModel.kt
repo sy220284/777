@@ -98,8 +98,12 @@ class TasksViewModel @Inject constructor(
             runCatching { planningService.suggestions() }
                 .onSuccess { result ->
                     if (localRuntime.snapshot().sessionId != expectedSessionId ||
-                        result.sourceSessionId != expectedSessionId
-                    ) return@onSuccess
+                        result.sourceSessionId != expectedSessionId ||
+                        !planningService.isCurrent(result)
+                    ) {
+                        _state.update { it.copy(suggestionsLoading = false) }
+                        return@onSuccess
+                    }
                     _state.update {
                         it.copy(
                             plannerSuggestions = result.suggestions,
@@ -129,7 +133,8 @@ class TasksViewModel @Inject constructor(
                 .onSuccess { draft ->
                     val latest = localRuntime.snapshot()
                     if (latest.sessionId != expectedSessionId ||
-                        draft.sourceSessionId != expectedSessionId
+                        draft.sourceSessionId != expectedSessionId ||
+                        !planningService.isCurrent(draft)
                     ) {
                         _state.update {
                             it.copy(
