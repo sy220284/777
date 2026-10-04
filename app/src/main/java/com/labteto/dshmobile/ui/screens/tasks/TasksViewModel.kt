@@ -47,9 +47,7 @@ class TasksViewModel @Inject constructor(
     fun acknowledgeNotice(notice: TasksNotice) {
         if (_state.value.notice == notice) _state.update { it.copy(notice = null) }
     }
-    fun refresh() {
-        _state.update { it.copy(tasks = scheduler.list(), notice = null) }
-    }
+    fun refresh() = _state.update { it.copy(tasks = scheduler.list(), notice = null) }
     fun cancel(id: String) {
         val removed = scheduler.cancelTask(id)
         _state.update {
@@ -59,14 +57,8 @@ class TasksViewModel @Inject constructor(
             )
         }
     }
-    fun pause(id: String) {
-        scheduler.pauseTask(id)
-        refresh()
-    }
-    fun resume(id: String) {
-        scheduler.resumeTask(id)
-        refresh()
-    }
+    fun pause(id: String) { scheduler.pauseTask(id); refresh() }
+    fun resume(id: String) { scheduler.resumeTask(id); refresh() }
     fun runNow(id: String): Boolean {
         val started = scheduler.runTaskNow(id)
         _state.update {
