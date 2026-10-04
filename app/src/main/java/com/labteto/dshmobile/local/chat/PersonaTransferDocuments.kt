@@ -141,7 +141,7 @@ internal object PersonaTransferDocuments {
             sharedObjects = story.chatState.dynamics.sharedObjects,
             unresolvedThreads = story.chatState.unresolvedThreads,
             currentFocus = story.chatState.currentFocus,
-            recentImpression = story.chatState.currentUserImpression.ifBlank { story.chatState.recentImpression },
+            recentImpression = story.chatState.currentUserImpression,
             activeGoal = story.chatState.activeGoal,
         )
 
