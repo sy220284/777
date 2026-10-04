@@ -4,6 +4,9 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolMetadata
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 
 internal enum class LocalAutoApprovalScope {
     NONE,
@@ -205,7 +208,32 @@ internal object LocalToolPolicy {
         }
     }
 
+    fun isVisibleCall(name: String, allowedToolNames: Set<String>): Boolean {
+        val canonical = canonical(name)
+        return name in allowedToolNames || canonical in allowedToolNames
+    }
+
+    fun isReadOnlyInvocation(
+        name: String,
+        access: ToolAccess,
+        arguments: JsonObject,
+    ): Boolean = when (canonical(name)) {
+        "web_fetch" -> (arguments["run_in_background"] as? JsonPrimitive)?.booleanOrNull != true
+        else -> access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+    }
+
     fun allowedInPlan(name: String, access: ToolAccess): Boolean =
         access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
             canonical(name) in setOf("update_plan", "exit_plan_mode", "ask_user_question")
+
+    fun allowedInPlan(
+        name: String,
+        access: ToolAccess,
+        arguments: JsonObject,
+    ): Boolean =
+        allowedInPlan(name, access) &&
+            (
+                canonical(name) in setOf("update_plan", "exit_plan_mode", "ask_user_question") ||
+                    isReadOnlyInvocation(name, access, arguments)
+            )
 }

@@ -40,6 +40,60 @@ class SessionRecoveryTest {
     }
 
     @Test
+    fun newToolDeclarationWithoutExecutorAdmissionIsNotStarted() {
+        val directory = Files.createTempDirectory("session-recovery-declared-only").toFile()
+        try {
+            val log = SessionEventLog(directory.resolve("events.jsonl"), json, maxBytes = 4_096, clock = { 1L })
+            log.append("turn/start", buildJsonObject { })
+            log.append("step/start", buildJsonObject { put("step", 2) })
+            log.append("assistant/message", assistantWithTool("declared", "write"))
+            log.append("tool/call", buildJsonObject {
+                put("step", 2)
+                put("id", "declared")
+                put("name", "write")
+                put("execution_started", false)
+            })
+
+            val recovered = SessionRecovery.repairInterruptedTail(log).toolResults.single()
+
+            assertEquals(SessionRecovery.TOOL_NOT_STARTED, recovered.code)
+            assertTrue(recovered.modelContent.contains("\"retryable\":true"))
+            assertTrue(recovered.modelContent.contains("\"side_effect\":\"none\""))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun executorAdmissionAfterDeclarationBecomesOutcomeUnknown() {
+        val directory = Files.createTempDirectory("session-recovery-admitted").toFile()
+        try {
+            val log = SessionEventLog(directory.resolve("events.jsonl"), json, maxBytes = 4_096, clock = { 1L })
+            log.append("turn/start", buildJsonObject { })
+            log.append("step/start", buildJsonObject { put("step", 2) })
+            log.append("assistant/message", assistantWithTool("admitted", "write"))
+            log.append("tool/call", buildJsonObject {
+                put("step", 2)
+                put("id", "admitted")
+                put("name", "write")
+                put("execution_started", false)
+            })
+            log.append("tool/execution-started", buildJsonObject {
+                put("id", "admitted")
+                put("name", "write")
+            })
+
+            val recovered = SessionRecovery.repairInterruptedTail(log).toolResults.single()
+
+            assertEquals(SessionRecovery.TOOL_OUTCOME_UNKNOWN, recovered.code)
+            assertTrue(recovered.modelContent.contains("\"retryable\":false"))
+            assertTrue(recovered.modelContent.contains("\"side_effect\":\"possible\""))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun assistantDeclaredToolThatNeverStartedBecomesNotStarted() {
         val directory = Files.createTempDirectory("session-recovery-not-started").toFile()
         try {

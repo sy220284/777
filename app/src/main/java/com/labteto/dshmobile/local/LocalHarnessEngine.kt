@@ -232,6 +232,12 @@ class LocalHarnessEngine @Inject constructor(
             planMode = { _state.value.planMode },
             enabledOptionalTools = enabledOptionalTools,
             requestApproval = { call, tool, summary -> approve(call, summary, tool) },
+            recordExecutionStarted = { sessionId, call ->
+                eventLogFor(sessionId).append("tool/execution-started", buildJsonObject {
+                    put("id", call.id)
+                    put("name", call.name)
+                })
+            },
         )
     }
     private val toolSchemaProjection by lazy {
@@ -2940,6 +2946,7 @@ class LocalHarnessEngine @Inject constructor(
         var finalChatAssistant: LocalHarnessMessage? = null
         var finalChatAssistantSequence: Long? = null
         var modelStep = 0
+        val modelToolStepSurface = LocalModelToolStepSurface()
         var requestPrepared = false
         var workPromptContext = LocalWorkTurnPromptContext()
         var chatStableContext = ""
@@ -2989,13 +2996,19 @@ class LocalHarnessEngine @Inject constructor(
         val progressTracker = LocalAgentProgressTracker()
         var activeStep: Int? = null
         var activeToolCalls = emptyList<AgentToolCall>()
-        val startedToolCallIds = linkedSetOf<String>()
         val completedToolCallIds = linkedSetOf<String>()
 
         fun settlePendingTools(reason: String) {
+            val stepStartSequence = runEventLog.latest("step/start")?.sequence ?: -1L
+            val actuallyStarted = activeToolCalls.mapNotNull { call ->
+                val started = runEventLog.latestMatching(setOf("tool/execution-started")) { data ->
+                    data["id"]?.jsonPrimitive?.contentOrNull == call.id
+                }
+                call.id.takeIf { started != null && started.sequence > stepStartSequence }
+            }.toSet()
             val settlements = pendingToolSettlements(
                 calls = activeToolCalls,
-                startedCallIds = startedToolCallIds,
+                startedCallIds = actuallyStarted,
                 completedCallIds = completedToolCallIds,
             )
             if (settlements.isEmpty()) return
@@ -3060,7 +3073,9 @@ class LocalHarnessEngine @Inject constructor(
                 drainPendingInputsIntoHistory(binding)
                 val key = modelRequestMarker()
                 val snapshot = runState.value
-                val tools = runToolSurface.next(modelToolSchemas(runPolicy, binding), snapshot)
+                val tools = modelToolStepSurface.capture(
+                    runToolSurface.next(modelToolSchemas(runPolicy, binding), snapshot),
+                )
                 val productContextTokens = if (snapshot.usageMode == LocalUsageMode.CHAT) {
                     estimateModelTokens(chatStableContext) + estimateModelTokens(chatDynamicContext)
                 } else {
@@ -3193,6 +3208,8 @@ class LocalHarnessEngine @Inject constructor(
                         isError = true,
                         errorCode = "TOOLS_DISABLED",
                     )
+                } else if (!modelToolStepSurface.allows(call.name)) {
+                    modelToolStepSurface.hiddenCallResult(call.name)
                 } else {
                     executeSafely(call.toLocalToolCall(), allowMutation = true, binding = binding)
                 }
@@ -3216,7 +3233,9 @@ class LocalHarnessEngine @Inject constructor(
                 }
             },
             isParallelTool = { call ->
-                runPolicy.allowToolExecution && call.name in PARALLEL_SUBAGENT_TOOLS
+                runPolicy.allowToolExecution &&
+                    modelToolStepSurface.allows(call.name) &&
+                    call.name in PARALLEL_SUBAGENT_TOOLS
             },
             eventSink = AgentEventSink { event ->
                 agentRunCoordinator.ensureCurrentOwner(runContext)
@@ -3230,7 +3249,6 @@ class LocalHarnessEngine @Inject constructor(
                         activeStep = event.step
                         LocalExecutionService.holdTurn(context, foregroundSessionId, event.step)
                         activeToolCalls = emptyList()
-                        startedToolCallIds.clear()
                         completedToolCallIds.clear()
                         runEventLog.append("step/start", buildJsonObject {
                             put("step", event.step)
@@ -3257,7 +3275,6 @@ class LocalHarnessEngine @Inject constructor(
                             }
                         }
                         activeToolCalls = event.toolCalls
-                        startedToolCallIds.clear()
                         completedToolCallIds.clear()
                         val assistantEvent = runEventLog.append(
                             "assistant/message", runTranscript.withTranscript(reply.message, transcriptMessages)
@@ -3325,12 +3342,12 @@ class LocalHarnessEngine @Inject constructor(
                         persist(binding)
                     }
                     is AgentEvent.ToolStarted -> {
-                        startedToolCallIds += event.call.id
                         runEventLog.append("tool/call", buildJsonObject {
                             put("step", event.step)
                             put("id", event.call.id)
                             put("name", event.call.name)
                             put("arguments", event.call.arguments)
+                            put("execution_started", false)
                         })
                     }
                     is AgentEvent.ToolFinished -> {
@@ -3388,7 +3405,6 @@ class LocalHarnessEngine @Inject constructor(
                         })
                         activeStep = null
                         activeToolCalls = emptyList()
-                        startedToolCallIds.clear()
                         completedToolCallIds.clear()
                     }
                     is AgentEvent.TurnCompleted -> {
@@ -3625,26 +3641,6 @@ class LocalHarnessEngine @Inject constructor(
                         ),
                     ),
                 )
-                "web_fetch" -> {
-                    val background = canonical.arguments.boolean("run_in_background", false)
-                    if (!background) {
-                        executePersistentRegistered(canonical, allowMutation, sessionId)
-                    } else {
-                        val input = canonical.arguments.string("url")
-                        val maxBytes = canonical.arguments.int("max_bytes", DEFAULT_WEB_FETCH_BYTES)
-                            .coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES)
-                        val format = canonical.arguments.optionalString("format") ?: "text"
-                        AgentToolResult(
-                            startPersistentWebFetch(
-                                url = input,
-                                maxBytes = maxBytes,
-                                format = format,
-                                timeoutSeconds = BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
-                                sessionId = sessionId,
-                            ),
-                        )
-                    }
-                }
                 else -> executePersistentRegistered(canonical, allowMutation, sessionId)
             }
         } catch (cancelled: CancellationException) {
@@ -3703,6 +3699,7 @@ class LocalHarnessEngine @Inject constructor(
             put("id", normalized.id)
             put("name", normalized.name)
             put("arguments", normalized.arguments)
+            put("execution_started", false)
             put("automation", true)
         })
         val result = try {
@@ -3981,16 +3978,29 @@ class LocalHarnessEngine @Inject constructor(
                 val maxBytes = args.int("max_bytes", DEFAULT_WEB_FETCH_BYTES).coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES)
                 val format = args.optionalString("format") ?: "text"
                 val background = args.boolean("run_in_background", false)
+                val readOnlyScope = !allowMutation || executionState.value.planMode
+                if (background && readOnlyScope) {
+                    return "当前为只读/规划作用域，不能创建后台网页抓取任务"
+                }
                 val timeout = if (background) BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS else FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS
                 if (background) {
                     startPersistentWebFetch(input, maxBytes, format, timeout, boundSessionId)
                 } else {
-                    webTools.fetch(input, maxBytes, format, timeout)
+                    webTools.fetch(
+                        input,
+                        maxBytes,
+                        format,
+                        timeout,
+                        allowArtifactWrite = !readOnlyScope,
+                    )
                 }
             }
             "http_request" -> {
-                if (!allowMutation && args.string("method").uppercase() !in setOf("GET", "HEAD")) {
-                    return "只读子任务仅允许 GET/HEAD 请求"
+                if (
+                    (!allowMutation || executionState.value.planMode) &&
+                    args.string("method").uppercase() !in setOf("GET", "HEAD")
+                ) {
+                    return "只读/规划作用域仅允许 GET/HEAD 请求"
                 }
                 val headers = args["headers"]?.jsonObject?.mapValues { (_, value) ->
                     value.jsonPrimitive.content
@@ -4019,6 +4029,7 @@ class LocalHarnessEngine @Inject constructor(
             "json_query" -> webTools.jsonQuery(
                 path = args.string("path"),
                 query = args.optionalString("query").orEmpty(),
+                allowArtifactWrite = allowMutation && !executionState.value.planMode,
             )
             "network_diagnose" -> web.diagnose(args.string("url"))
             "environment_info" -> environmentInfoCoordinator.build(binding)

@@ -6,6 +6,7 @@ import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -131,12 +132,24 @@ object SessionRecovery {
                         val id = event.data["id"]?.jsonPrimitive?.contentOrNull ?: return@forEachAfter
                         val name = event.data["name"]?.jsonPrimitive?.contentOrNull
                         val step = event.data["step"]?.jsonPrimitive?.intOrNull ?: openStep
+                        val legacyOrStarted = event.data["execution_started"]?.jsonPrimitive?.booleanOrNull ?: true
                         val existing = pending[id]
                         if (existing == null) {
-                            pending[id] = PendingCall(id, name, step, started = true)
+                            pending[id] = PendingCall(id, name, step, started = legacyOrStarted)
                         } else {
                             existing.name = name ?: existing.name
                             existing.step = step ?: existing.step
+                            existing.started = existing.started || legacyOrStarted
+                        }
+                    }
+                    "tool/execution-started" -> {
+                        val id = event.data["id"]?.jsonPrimitive?.contentOrNull ?: return@forEachAfter
+                        val name = event.data["name"]?.jsonPrimitive?.contentOrNull
+                        val existing = pending[id]
+                        if (existing == null) {
+                            pending[id] = PendingCall(id, name, openStep, started = true)
+                        } else {
+                            existing.name = name ?: existing.name
                             existing.started = true
                         }
                     }

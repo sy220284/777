@@ -108,6 +108,6 @@ internal object LocalEnvironmentReport {
                 appendLine()
             }
         }
-        append("替代路径：优先使用内置 read/write/edit/glob/grep/web_* 与 json_query；web_fetch 大响应会自动落盘。外部文件可从输入栏附件导入工作区。")
+        append("替代路径：优先使用内置 read/write/edit/glob/grep/web_* 与 json_query；执行模式下大结果可落盘，计划/只读模式只返回预览。外部文件可从输入栏附件导入工作区。")
     }
 }

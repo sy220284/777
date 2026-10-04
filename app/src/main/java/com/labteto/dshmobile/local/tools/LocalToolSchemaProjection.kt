@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import kotlinx.serialization.json.JsonArray
@@ -29,7 +30,10 @@ internal class LocalToolSchemaProjection(
                     tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
                     (allowVirtualScreen && tool.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS)
             }
-        return LocalToolRouter.visibleSchemas(tools, enabled)
+        return LocalToolRouter.visibleSchemas(
+            if (allowMutation) tools else tools.map(HarnessTool::forReadOnlyModelScope),
+            enabled,
+        )
     }
 
     fun modelSchemas(
@@ -47,7 +51,7 @@ internal class LocalToolSchemaProjection(
                 !state.planMode || LocalToolPolicy.allowedInPlan(tool.name, tool.access)
             }
         return LocalToolRouter.visibleSchemas(
-            tools = tools,
+            tools = if (state.planMode) tools.map(HarnessTool::forReadOnlyModelScope) else tools,
             enabledOptional = enabled,
             maxOptionalDefinitionTokens = promptBudget,
         )

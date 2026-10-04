@@ -12,6 +12,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
@@ -206,14 +207,9 @@ internal class LocalAgentRunCoordinator(
                 step = event.step,
                 toolCallCount = event.toolCalls.size,
             )
-            is AgentEvent.ToolStarted -> append(
-                context,
-                LocalAgentRunCheckpointStatus.RUNNING,
-                LocalAgentRunPhase.TOOL_STARTED,
-                step = event.step,
-                callId = event.call.id,
-                toolName = event.call.name,
-            )
+            // AgentLoop reports the model-declared call here. Actual executor admission is
+            // persisted as tool/execution-started by the execution coordinator.
+            is AgentEvent.ToolStarted -> Unit
             is AgentEvent.ToolFinished -> append(
                 context,
                 LocalAgentRunCheckpointStatus.RUNNING,
@@ -517,20 +513,36 @@ internal class LocalAgentRunCoordinator(
         checkpointType: String,
         runId: String,
     ): Boolean = log.withEvents { events ->
+        var insideRun = false
         val startedCalls = linkedSetOf<String>()
         for (event in events) {
-            if (event.type != checkpointType) continue
-            val data = event.data
-            if (data["run_id"]?.jsonPrimitive?.contentOrNull != runId) continue
-            val callId = data["call_id"]?.jsonPrimitive?.contentOrNull
-            when (data["phase"]?.jsonPrimitive?.contentOrNull) {
-                LocalAgentRunPhase.TOOL_STARTED.name.lowercase() -> {
-                    if (!callId.isNullOrBlank()) startedCalls += callId
+            if (event.type == checkpointType) {
+                val data = event.data
+                if (data["run_id"]?.jsonPrimitive?.contentOrNull == runId) {
+                    insideRun = true
+                    if (
+                        data["phase"]?.jsonPrimitive?.contentOrNull == LocalAgentRunPhase.TOOL_FINISHED.name.lowercase() &&
+                        data["side_effect"]?.jsonPrimitive?.contentOrNull != "none"
+                    ) {
+                        return@withEvents true
+                    }
+                } else if (insideRun) {
+                    break
                 }
-                LocalAgentRunPhase.TOOL_FINISHED.name.lowercase() -> {
-                    if (!callId.isNullOrBlank()) startedCalls -= callId
-                    if (data["side_effect"]?.jsonPrimitive?.contentOrNull != "none") return@withEvents true
+                continue
+            }
+            if (!insideRun) continue
+            when (event.type) {
+                "tool/call" -> {
+                    // Legacy tool/call rows meant "started"; new rows explicitly say false.
+                    if (event.data["execution_started"]?.jsonPrimitive?.booleanOrNull != false) {
+                        event.data["id"]?.jsonPrimitive?.contentOrNull?.let(startedCalls::add)
+                    }
                 }
+                "tool/execution-started" ->
+                    event.data["id"]?.jsonPrimitive?.contentOrNull?.let(startedCalls::add)
+                "tool/result" ->
+                    event.data["id"]?.jsonPrimitive?.contentOrNull?.let(startedCalls::remove)
             }
         }
         startedCalls.isNotEmpty()

@@ -9,6 +9,7 @@ import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.observability.AppLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -31,6 +32,7 @@ internal class LocalToolExecutionCoordinator(
         tool: HarnessTool,
         summary: String,
     ) -> Boolean,
+    private val recordExecutionStarted: suspend (String, LocalToolCall) -> Unit = { _, _ -> },
 ) {
     fun clearTurnCapabilities(target: MutableSet<String> = enabledOptionalTools) {
         synchronized(target) { target.clear() }
@@ -179,7 +181,7 @@ internal class LocalToolExecutionCoordinator(
                 recoveryHint = "先使用 capability_search 或检查工具名称。",
             )
 
-        if (planModeEnabled && !LocalToolPolicy.allowedInPlan(call.name, registered.access)) {
+        if (planModeEnabled && !LocalToolPolicy.allowedInPlan(call.name, registered.access, call.arguments)) {
             return AgentToolResult(
                 content = "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。",
                 isError = true,
@@ -188,7 +190,8 @@ internal class LocalToolExecutionCoordinator(
             )
         }
 
-        if (!allowMutation && registered.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)) {
+        val readLike = LocalToolPolicy.isReadOnlyInvocation(call.name, registered.access, call.arguments)
+        if (!allowMutation && !readLike) {
             return AgentToolResult(
                 content = "当前子任务是只读作用域，不能执行会改变状态的工具：" + call.name,
                 isError = true,
@@ -198,60 +201,68 @@ internal class LocalToolExecutionCoordinator(
         }
 
         var approvalDenied = false
-        val invocation = registry.executeTracked(
-            name = call.name,
-            input = call.arguments,
-            rawArguments = call.rawArguments,
-            context = ToolContext(
-                sessionId = sessionId,
-                allowMutation = allowMutation,
-                attributes = buildMap {
-                    put("call_id", call.id)
-                    currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
-                },
-                approval = { tool ->
-                    val granted = approval(call, tool, approvalSummary(call, tool))
-                    if (!granted) approvalDenied = true
-                    granted
-                },
-            ),
-        )
+        var executionStarted = false
+        val invocation = try {
+            registry.executeTracked(
+                name = call.name,
+                input = call.arguments,
+                rawArguments = call.rawArguments,
+                context = ToolContext(
+                    sessionId = sessionId,
+                    allowMutation = allowMutation,
+                    attributes = buildMap {
+                        put("call_id", call.id)
+                        currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
+                    },
+                    approval = { tool ->
+                        val granted = approval(call, tool, approvalSummary(call, tool))
+                        if (!granted) approvalDenied = true
+                        granted
+                    },
+                    onExecutionStarted = {
+                        recordExecutionStarted(sessionId, call)
+                        executionStarted = true
+                    },
+                ),
+            )
+        } catch (cancelled: CancellationException) {
+            if (!currentCoroutineContext().isActive) throw cancelled
+            return thrownFailure(call, registered, "TASK_CANCELLED", cancelled.message ?: "子任务自身被取消", executionStarted)
+        } catch (error: LocalWebException) {
+            return thrownFailure(call, registered, error.code, error.message ?: "网页工具失败", executionStarted)
+        } catch (error: LocalModelException) {
+            return thrownFailure(call, registered, error.code, error.message ?: "模型请求失败", executionStarted)
+        } catch (error: Exception) {
+            return thrownFailure(call, registered, "TOOL_ERROR", error.message ?: error::class.java.simpleName, executionStarted)
+        }
+        executionStarted = executionStarted || invocation.executionStarted
         val result = invocation.result
 
         if (!result.isError) {
             return AgentToolResult(
                 content = result.content,
                 retention = result.retention,
-                sideEffect = if (registered.access in MUTATING_ACCESSES) {
-                    AgentToolSideEffect.POSSIBLE
-                } else {
-                    AgentToolSideEffect.NONE
-                },
+                sideEffect = if (executionStarted && !readLike) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
             )
         }
 
         val providerCode = result.errorCode?.takeIf(String::isNotBlank)
         val timedOut = providerCode == "TOOL_TIMEOUT" ||
             (providerCode == null && result.content.startsWith("工具执行超时："))
-        val readLike = registered.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
         val errorCode = when {
             approvalDenied -> "APPROVAL_DENIED"
             providerCode != null -> providerCode
             timedOut -> "TOOL_TIMEOUT"
             else -> "TOOL_REPORTED_ERROR"
         }
-        val mutationMayHaveSideEffect =
-            registered.access in MUTATING_ACCESSES && invocation.executionStarted
-        // Registry is the authority for whether the executor actually started. Provider error codes
-        // are descriptive only and cannot downgrade a mutating call to a pre-execution failure.
+        val mutationMayHaveSideEffect = executionStarted && !readLike
         val retryable = when {
-            !invocation.executionStarted -> result.retryable
+            !executionStarted -> result.retryable
             readLike -> result.retryable || (providerCode == null && timedOut)
             else -> false
         }
         val recoveryHint = when {
-            mutationMayHaveSideEffect ->
-                "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
+            mutationMayHaveSideEffect -> "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
             else -> result.recoveryHint ?: when {
                 approvalDenied -> "该工具没有获得批准；不要重复调用，改用已授权能力或等待用户调整权限。"
                 timedOut && readLike -> "只读工具超时，可缩小范围后重试一次。"
@@ -259,22 +270,41 @@ internal class LocalToolExecutionCoordinator(
                 else -> "根据工具返回内容检查前置条件；确认状态后再决定下一步。"
             }
         }
-        AppLog.warn(
-            "LocalToolExecution",
-            "工具执行失败 tool=${call.name} code=$errorCode retryable=$retryable",
-        )
+        AppLog.warn("LocalToolExecution", "工具执行失败 tool=${call.name} code=$errorCode retryable=$retryable")
         return AgentToolResult(
             content = result.content,
             isError = true,
             errorCode = errorCode,
             retryable = retryable,
-            sideEffect = if (mutationMayHaveSideEffect) {
-                AgentToolSideEffect.POSSIBLE
-            } else {
-                AgentToolSideEffect.NONE
-            },
+            sideEffect = if (mutationMayHaveSideEffect) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
             recoveryHint = recoveryHint,
             retention = result.retention,
+        )
+    }
+
+    private fun thrownFailure(
+        call: LocalToolCall,
+        tool: HarnessTool,
+        code: String,
+        message: String,
+        executionStarted: Boolean,
+    ): AgentToolResult {
+        val readLike = LocalToolPolicy.isReadOnlyInvocation(call.name, tool.access, call.arguments)
+        val possibleSideEffect = executionStarted && !readLike
+        val retryable = !possibleSideEffect && code.isRetryableTransportFailure()
+        val recoveryHint = when {
+            possibleSideEffect -> "工具可能已经产生副作用；先检查当前状态，不要直接重试。"
+            retryable -> "当前调用没有不可确认的副作用，可在检查前置条件后重试一次。"
+            else -> "根据失败原因检查前置条件后再决定下一步。"
+        }
+        AppLog.warn("LocalToolExecution", "工具执行异常 tool=${call.name} code=$code started=$executionStarted retryable=$retryable")
+        return AgentToolResult(
+            content = message,
+            isError = true,
+            errorCode = code,
+            retryable = retryable,
+            sideEffect = if (possibleSideEffect) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
+            recoveryHint = recoveryHint,
         )
     }
 
@@ -303,3 +333,9 @@ internal class LocalToolExecutionCoordinator(
 
 private fun JsonObject.optionalStringForCoordinator(key: String): String? =
     (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+private fun String.isRetryableTransportFailure(): Boolean =
+    this in setOf("TIMEOUT", "NETWORK_ERROR", "DNS_FAILED", "TOOL_TIMEOUT", "TOOL_LIFECYCLE_UNAVAILABLE") ||
+        startsWith("MODEL_HTTP_5") ||
+        contains("TIMEOUT") ||
+        contains("NETWORK")

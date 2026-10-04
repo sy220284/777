@@ -170,6 +170,7 @@ internal class LocalSubagentRunner(
         )
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var modelStep = 0
+        val modelToolStepSurface = LocalModelToolStepSurface()
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
         // runtime capability must never make that capability appear in its parent or sibling run.
         val enabledOptionalTools = linkedSetOf<String>()
@@ -297,7 +298,7 @@ internal class LocalSubagentRunner(
                         modelStepExecutor.complete(
                             surface = runSurface,
                             history = preparedHistory,
-                            tools = runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools)),
+                            tools = modelToolStepSurface.capture(runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools))),
                             subagentId = subagentId,
                             step = modelStep,
                             durableHistory = history,
@@ -378,6 +379,8 @@ internal class LocalSubagentRunner(
                                 errorCode = "SUBAGENT_VIRTUAL_SCREEN_MISMATCH",
                                 recoveryHint = "使用系统上下文中提供的虚拟屏 id。",
                             )
+                        !modelToolStepSurface.allows(call.name) ->
+                            modelToolStepSurface.hiddenCallResult(call.name)
                         else -> withContext(LocalModelRunContext(runProfile)) {
                             currentCoroutineContext().ensureActive()
                             execute(call.toLocalToolCall(), allowMutation, enabledOptionalTools)
@@ -406,6 +409,7 @@ internal class LocalSubagentRunner(
                                 put("id", event.call.id)
                                 put("name", event.call.name)
                                 put("arguments", event.call.arguments)
+                                put("execution_started", false)
                             })
                         }
                         is AgentEvent.ToolFinished -> {

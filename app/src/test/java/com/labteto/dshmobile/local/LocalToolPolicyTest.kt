@@ -101,6 +101,28 @@ class LocalToolPolicyTest {
         assertFalse(LocalToolPolicy.allowedInPlan("subagent_fork", ToolAccess.AGENT_CONTROL))
     }
 
+    @Test fun invocationSemanticsKeepBackgroundFetchOutOfReadOnlyAndPlanScopes() {
+        val foreground = buildJsonObject {
+            put("url", "https://example.com")
+            put("run_in_background", false)
+        }
+        val background = buildJsonObject {
+            put("url", "https://example.com")
+            put("run_in_background", true)
+        }
+
+        assertTrue(LocalToolPolicy.isReadOnlyInvocation("web_fetch", ToolAccess.NETWORK, foreground))
+        assertFalse(LocalToolPolicy.isReadOnlyInvocation("web_fetch", ToolAccess.NETWORK, background))
+        assertTrue(LocalToolPolicy.allowedInPlan("web_fetch", ToolAccess.NETWORK, foreground))
+        assertFalse(LocalToolPolicy.allowedInPlan("web_fetch", ToolAccess.NETWORK, background))
+    }
+
+    @Test fun modelToolCallMustBelongToTheExactVisibleStepSurface() {
+        assertTrue(LocalToolPolicy.isVisibleCall("read", setOf("read", "grep")))
+        assertTrue(LocalToolPolicy.isVisibleCall("read_file", setOf("read")))
+        assertFalse(LocalToolPolicy.isVisibleCall("process_exec", setOf("read", "grep")))
+    }
+
     @Test fun shellRemainsHighRiskWhileGlobalAutoApprovalMayApproveIt() {
         assertEquals(ToolApprovalPolicy.ALWAYS, LocalToolPolicy.approval("bash"))
         assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("bash"))

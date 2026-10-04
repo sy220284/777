@@ -68,8 +68,9 @@ internal val PLAN_MODE_BLOCKED_TOOLS = setOf(
     "create_goal", "update_goal", "subagent", "spawn_subagent", "subagent_fork", "fork_subagent",
     "workflow", "present", "send_message", "interrupt_agent",
 )
-
 internal val PLAN_MODE_PROMPT = """
     当前为规划模式：只读、搜索和分析，不执行改变状态的操作。
+    规划过程中，每一轮读取、搜索、检查或分析都必须先用一句具体中文说明这一轮正在核对什么、比较什么或判断什么；不得使用“处理当前步骤”“检查相关内容”“查找相关信息”“运行任务步骤”等模板文案，也不得只显示工具类别。
+    即使当前模型或工具协议允许 assistant.content 为空，也不能省略规划过程说明；reasoning_content 不能替代用户可见的规划进度。
     计划充分后，仅调用 exit_plan_mode 提交完整计划审批。
 """.trimIndent()

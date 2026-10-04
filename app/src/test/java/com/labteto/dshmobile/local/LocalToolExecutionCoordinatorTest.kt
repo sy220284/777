@@ -15,6 +15,8 @@ import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -129,6 +131,112 @@ class LocalToolExecutionCoordinatorTest {
 
         assertTrue(result.isError)
         assertEquals("PLAN_MODE_BLOCKED", result.errorCode)
+        assertFalse(executed)
+    }
+
+    @Test
+    fun readonlyAndPlanScopesRejectBackgroundWebFetchBeforeExecution() = runBlocking {
+        var executed = 0
+        val registry = ToolRegistry().apply {
+            register(webFetchTool {
+                executed += 1
+                ToolResult("ok")
+            })
+        }
+        val arguments = buildJsonObject {
+            put("url", "https://example.com")
+            put("run_in_background", true)
+        }
+        val call = LocalToolCall(
+            id = "fetch-bg",
+            name = "web_fetch",
+            arguments = arguments,
+            rawArguments = arguments.toString(),
+        )
+
+        val readonly = coordinator(registry).executeScoped(
+            original = call,
+            sessionId = "readonly",
+            allowMutation = false,
+            planModeEnabled = false,
+            approval = { _, _, _ -> true },
+        )
+        val planning = coordinator(registry).executeScoped(
+            original = call,
+            sessionId = "planning",
+            allowMutation = true,
+            planModeEnabled = true,
+            approval = { _, _, _ -> true },
+        )
+
+        assertEquals("MUTATION_SCOPE_BLOCKED", readonly.errorCode)
+        assertEquals("PLAN_MODE_BLOCKED", planning.errorCode)
+        assertEquals(0, executed)
+    }
+
+    @Test
+    fun executorThrowAfterAdmissionIsNeverMarkedSafeToRetry() = runBlocking {
+        var executionStarts = 0
+        val registry = ToolRegistry().apply {
+            register(
+                tool(
+                    name = "write",
+                    access = ToolAccess.WORKSPACE_WRITE,
+                    approval = ToolApprovalPolicy.MUTATION,
+                ) {
+                    throw IllegalStateException("写入后的连接中断")
+                },
+            )
+        }
+        val coordinator = coordinator(
+            registry = registry,
+            recordExecutionStarted = { _, _ -> executionStarts += 1 },
+        )
+
+        val result = coordinator.execute(
+            LocalToolCall("c-throw", "write", JsonObject(emptyMap()), "{}"),
+            allowMutation = true,
+        )
+
+        assertTrue(result.isError)
+        assertEquals("TOOL_ERROR", result.errorCode)
+        assertFalse(result.retryable)
+        assertEquals(AgentToolSideEffect.POSSIBLE, result.sideEffect)
+        assertEquals(1, executionStarts)
+        assertTrue(result.recoveryHint.orEmpty().contains("不要直接重试"))
+    }
+
+    @Test
+    fun deniedApprovalNeverRecordsExecutorStart() = runBlocking {
+        var executionStarts = 0
+        var executed = false
+        val registry = ToolRegistry().apply {
+            register(
+                tool(
+                    name = "write",
+                    access = ToolAccess.WORKSPACE_WRITE,
+                    approval = ToolApprovalPolicy.ALWAYS,
+                ) {
+                    executed = true
+                    ToolResult("ok")
+                },
+            )
+        }
+        val coordinator = coordinator(
+            registry = registry,
+            recordExecutionStarted = { _, _ -> executionStarts += 1 },
+        )
+
+        val result = coordinator.executeScoped(
+            original = LocalToolCall("c-denied", "write", JsonObject(emptyMap()), "{}"),
+            sessionId = "s1",
+            allowMutation = true,
+            planModeEnabled = false,
+            approval = { _, _, _ -> false },
+        )
+
+        assertEquals("APPROVAL_DENIED", result.errorCode)
+        assertEquals(0, executionStarts)
         assertFalse(executed)
     }
 
@@ -473,6 +581,36 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun readonlyAndPlanToolSchemasHideBackgroundWebFetchOption() {
+        val registry = ToolRegistry().apply { register(webFetchTool { ToolResult("ok") }) }
+        val projection = LocalToolSchemaProjection(registry, coordinator(registry))
+
+        val readonly = projection.subagentSchemas(
+            allowMutation = false,
+            allowVirtualScreen = false,
+            enabledOptional = emptySet(),
+        ).single().jsonObject
+        val planning = projection.modelSchemas(
+            policy = localAgentRunPolicy(LocalUsageMode.WORK),
+            state = LocalHarnessState(planMode = true),
+            history = emptyList(),
+        ).single().jsonObject
+        val writable = projection.subagentSchemas(
+            allowMutation = true,
+            allowVirtualScreen = false,
+            enabledOptional = emptySet(),
+        ).single().jsonObject
+
+        fun properties(schema: JsonObject): JsonObject =
+            schema["function"]!!.jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+
+        assertFalse("run_in_background" in properties(readonly))
+        assertFalse("run_in_background" in properties(planning))
+        assertTrue("run_in_background" in properties(writable))
+        assertTrue(readonly["function"]!!.jsonObject["description"]!!.jsonPrimitive.content.contains("不写入工作区"))
+    }
+
+    @Test
     fun planModeSchemaProjectionOmitsToolsThatExecutionWouldReject() {
         val registry = ToolRegistry().apply {
             register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { ToolResult("ok") })
@@ -502,12 +640,26 @@ class LocalToolExecutionCoordinatorTest {
     private fun coordinator(
         registry: ToolRegistry,
         planMode: Boolean = false,
+        recordExecutionStarted: suspend (String, LocalToolCall) -> Unit = { _, _ -> },
     ) = LocalToolExecutionCoordinator(
         registry = registry,
         currentSessionId = { "s1" },
         planMode = { planMode },
         enabledOptionalTools = linkedSetOf(),
         requestApproval = { _, _, _ -> true },
+        recordExecutionStarted = recordExecutionStarted,
+    )
+
+    private fun webFetchTool(execute: suspend () -> ToolResult) = HarnessTool(
+        name = "web_fetch",
+        schema = LocalToolCatalog.specs.first { schema ->
+            schema.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content == "web_fetch"
+        }.jsonObject,
+        access = ToolAccess.NETWORK,
+        approvalPolicy = ToolApprovalPolicy.NEVER,
+        exposure = ToolExposure.CORE,
+        metadata = ToolMetadata("网络"),
+        executor = HarnessToolExecutor { _, _, _ -> execute() },
     )
 
     private fun tool(

@@ -35,6 +35,7 @@ data class ToolContext(
     val allowMutation: Boolean = true,
     val attributes: Map<String, Any?> = emptyMap(),
     val approval: (suspend (HarnessTool) -> Boolean)? = null,
+    val onExecutionStarted: (suspend (HarnessTool) -> Unit)? = null,
 )
 
 enum class ToolResultRetention {
@@ -196,6 +197,7 @@ class ToolRegistry private constructor(
             )
         }
 
+        context.onExecutionStarted?.invoke(tool)
         val timeoutMillis = tool.timeoutMillis
         if (timeoutMillis == null) {
             return ToolInvocationResult(
