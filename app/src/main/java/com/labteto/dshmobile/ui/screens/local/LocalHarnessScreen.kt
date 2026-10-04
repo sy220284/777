@@ -89,6 +89,7 @@ import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.isUnboundChatPersona
@@ -207,7 +208,7 @@ fun LocalHarnessScreen(
 
     fun resetFeatureNavigation() {
         drawerFeatureOriginStack = null
-        LocalFeaturePage.entries
+        LocalFeatureCatalog.routes
             .filterNot { it == LocalFeaturePage.HOME }
             .forEach { featureStateHolder.removeState(it.name) }
         featureStack = localFeatureHome()
