@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.work.LocalWorkState
+import com.labteto.dshmobile.local.chat.LocalChatState
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
@@ -219,12 +220,7 @@ internal class LocalAutomationWorkCoordinator(
         return runtime.copy(
             sessionId = session.id,
             usageMode = LocalUsageMode.WORK,
-            personaId = PersonaProfile.DEFAULT_PERSONA_ID,
-            galleryId = null,
-            galleryStoryId = null,
-            chatPersona = PersonaProfile(),
-            chatState = ChatCharacterState(),
-            replySuggestions = emptyList(),
+            chat = LocalChatState(),
             conversationMode = session.conversationMode,
             parentSessionId = session.parentSessionId,
             lineageId = session.lineageId.ifBlank { session.id },

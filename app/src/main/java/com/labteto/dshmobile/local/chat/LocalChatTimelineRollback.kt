@@ -22,9 +22,9 @@ internal fun persistChatTimelineBaseline(
 ) {
     if (state.usageMode != LocalUsageMode.CHAT) return
     eventLog.append("chat/state-baseline", buildJsonObject {
-        put("state", json.encodeToJsonElement(ChatCharacterState.serializer(), state.chatState))
-        if (state.groupChat.enabled) {
-            put("group_state", json.encodeToJsonElement(LocalGroupChatState.serializer(), state.groupChat))
+        put("state", json.encodeToJsonElement(ChatCharacterState.serializer(), state.chat.chatState))
+        if (state.chat.groupChat.enabled) {
+            put("group_state", json.encodeToJsonElement(LocalGroupChatState.serializer(), state.chat.groupChat))
         }
     })
 }

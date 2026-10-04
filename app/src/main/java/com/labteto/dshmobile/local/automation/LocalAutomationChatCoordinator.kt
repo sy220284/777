@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.work.LocalWorkState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
+import com.labteto.dshmobile.local.chat.LocalChatState
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.enqueuePending
 import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
@@ -249,16 +250,18 @@ internal class LocalAutomationChatCoordinator(
                     sessionId = session.id,
                     modelState = runtime.modelState.copy(model = runProfile.model, baseUrl = runProfile.baseUrl),
                     usageMode = LocalUsageMode.CHAT,
-                    personaId = session.personaId,
-                    galleryId = session.galleryId,
-                    galleryStoryId = session.galleryStoryId,
-                    gallerySaveSuppressedThrough = session.gallerySaveSuppressedThrough,
-                    chatPersona = persona,
-                    chatState = sessionCharacterState,
-                    chatContext = sessionContext,
-                    replySuggestions = session.replySuggestions,
-                    chatBranches = session.chatBranches,
-                    groupChat = session.groupChat,
+                    chat = LocalChatState(
+                        personaId = session.personaId,
+                        galleryId = session.galleryId,
+                        galleryStoryId = session.galleryStoryId,
+                        gallerySaveSuppressedThrough = session.gallerySaveSuppressedThrough,
+                        chatPersona = persona,
+                        chatState = sessionCharacterState,
+                        chatContext = sessionContext,
+                        replySuggestions = session.replySuggestions,
+                        chatBranches = session.chatBranches,
+                        groupChat = session.groupChat,
+                    ),
                     conversationMode = session.conversationMode,
                     parentSessionId = session.parentSessionId,
                     lineageId = session.lineageId.ifBlank { session.id },

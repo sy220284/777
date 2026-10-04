@@ -25,23 +25,23 @@ internal class LocalChatTurnCoordinator(
         input: String,
         relationshipMemory: String = "",
     ): LocalPreparedChatTurn {
-        val sharedContext = if (snapshot.groupChat.enabled) {
-            snapshot.groupChat.context
+        val sharedContext = if (snapshot.chat.groupChat.enabled) {
+            snapshot.chat.groupChat.context
         } else {
-            snapshot.chatContext
+            snapshot.chat.chatContext
         }
-        val context = if (snapshot.chatPersona.isUnboundChatPersona()) {
+        val context = if (snapshot.chat.chatPersona.isUnboundChatPersona()) {
             runner.prepareProfile(
-                persona = snapshot.chatPersona,
-                state = snapshot.chatState,
+                persona = snapshot.chat.chatPersona,
+                state = snapshot.chat.chatState,
                 context = sharedContext,
                 userInput = input,
                 storyContext = snapshot.handoffSummary,
             )
         } else {
             runner.prepare(
-                personaId = snapshot.personaId,
-                state = snapshot.chatState,
+                personaId = snapshot.chat.personaId,
+                state = snapshot.chat.chatState,
                 context = sharedContext,
                 userInput = input,
                 storyContext = snapshot.handoffSummary,
@@ -49,7 +49,7 @@ internal class LocalChatTurnCoordinator(
         }
         val recentAssistantReplies = recentRoleReplies(
             messages = snapshot.messages,
-            groupEnabled = snapshot.groupChat.enabled,
+            groupEnabled = snapshot.chat.groupChat.enabled,
             persona = context.persona,
         )
         return LocalPreparedChatTurn(
@@ -91,14 +91,14 @@ internal class LocalChatTurnCoordinator(
         additionalBannedPhrases = snapshot.chatStyleGuardCustomPhrases,
         recentAssistantReplies = recentRoleReplies(
             messages = snapshot.messages,
-            groupEnabled = snapshot.groupChat.enabled,
+            groupEnabled = snapshot.chat.groupChat.enabled,
             persona = persona,
         ),
         onGuardEvent = onGuardEvent,
     )
 
     fun persona(snapshot: LocalHarnessState): PersonaProfile =
-        runner.prepare(snapshot.personaId, snapshot.chatState).persona
+        runner.prepare(snapshot.chat.personaId, snapshot.chat.chatState).persona
 
     fun postTurnPrompt(
         persona: PersonaProfile,

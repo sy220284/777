@@ -403,23 +403,28 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 状态：**进行中。**
 
-当前已落地的状态迁移（仍须以完整 CI 确认本阶段闭环）：
+当前已落地的状态迁移：
 
+- Work / Model 基线已通过完整 CI：静态门禁、单测、arm64、x86、Android 16/17 设备测试与 merge-gate 全部成功；
 - 新增 `local/work/LocalWorkState`，由 Work 领域独占 `plan / todos / goal / planMode` 运行态；
 - `LocalHarnessState` 删除上述四个平铺字段，只组合 `work: LocalWorkState`；
 - Work 写入、目标迁移、模型/工具策略、Session 快照、Automation、UI projection 与输出质量判断全部切到新的单一事实源；
 - `LocalHarnessSession` 继续保持稳定的持久化投影结构，不把运行时聚合结构直接写入存储；
 - 架构门禁禁止重新向 `LocalHarnessState` 写回这四个 Work 字段。
 
+- Model 已引入 `local/model/LocalModelState`，集中 `configured / model / baseUrl / modelSelection / modelAttempts / imageInputMode`；模型切换、账户、前台与后台执行、子代理、自动任务、能力判断和 UI 投影改读此状态，关联测试同步迁移；
+- Chat 已引入 `local/chat/LocalChatState`，集中人物/图集绑定、人物状态、会话上下文、回复建议、分支、群聊、当前发言人和人物纠正提示；Session 持久化仍保持稳定扁平投影格式，运行态不保留双写；
+- Chat 多字段变更通过一次 `chat.copy(...)` 原子提交，避免人物状态、上下文、分支或群聊出现中间态不一致；
+- 架构门禁禁止 Work / Model / Chat 已迁字段重新平铺回 `LocalHarnessState`。
+
 继续推进：
 
-- 拆分 Chat 领域运行态；
-- Model 已引入 `local/model/LocalModelState`，集中 `configured / model / baseUrl / modelSelection / modelAttempts / imageInputMode`；模型切换、账户、前台与后台执行、子代理、自动任务、能力判断和 UI 投影改读此状态，关联测试同步迁移。
+- 以最新 Chat 状态迁移 Head 完成完整 CI 验证；
 - 拆分 Kernel 生命周期与资源运行态；
 - UI projection 继续改为组合领域状态；
 - 全程不保留长期双写。
 
-本轮迁移审计修复：Session 快照通过延迟状态读取，确保先捕获日志游标再读取前台状态；回归测试与静态门禁同时覆盖调用边界，防止“旧状态 + 新游标”导致恢复遗漏。Model 迁移中的旧字段读写与重复嵌套访问已逐链收敛；完整编译、单测和 Android 验证仍以最新 Head 的实际 CI 为准。
+本轮迁移审计修复：Session 快照通过延迟状态读取，确保先捕获日志游标再读取前台状态；回归测试与静态门禁同时覆盖调用边界，防止“旧状态 + 新游标”导致恢复遗漏。Model 迁移中的旧字段读写与重复嵌套访问已逐链收敛，并已通过完整 CI。Chat 运行态拆分已完成代码迁移与存储投影回归保护，最终结论以 Chat 新 Head 的完整 CI 为准。
 
 ### 阶段 3：ChatFeature / WorkFeature 接管业务所有权
 

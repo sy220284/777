@@ -67,10 +67,10 @@ internal fun editAndResendWorkUserMessage(
             todos = restoredControls.todos,
             goal = restoredControls.goal,
             planMode = restoredControls.planMode,
-            chatState = state.chatState,
-            chatContext = state.chatContext,
+            chatState = state.chat.chatState,
+            chatContext = state.chat.chatContext,
             chatBranches = LocalChatBranchState(),
-            groupChat = state.groupChat,
+            groupChat = state.chat.groupChat,
         ),
         projection = LocalTimelineRewriteProjectionInput(
             sourceSessionId = state.sessionId,

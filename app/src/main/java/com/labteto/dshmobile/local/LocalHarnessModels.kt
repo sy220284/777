@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.model.LocalModelState
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.LocalChatState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.model.LocalCanonicalMessage
@@ -251,17 +252,7 @@ data class LocalHarnessState(
     val workspacePath: String = "",
     val sessionId: String = "",
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
-    val personaId: String = PersonaProfile.DEFAULT_PERSONA_ID,
-    val galleryId: String? = null,
-    val galleryStoryId: String? = null,
-    val gallerySaveSuppressedThrough: Long = 0L,
-    val chatPersona: PersonaProfile = PersonaProfile(),
-    val chatState: ChatCharacterState = ChatCharacterState(),
-    val chatContext: ChatContextState = ChatContextState(),
-    val replySuggestions: List<ChatReplySuggestion> = emptyList(),
-    val chatBranches: LocalChatBranchState = LocalChatBranchState(),
-    val groupChat: LocalGroupChatState = LocalGroupChatState(),
-    val groupActiveSpeakerName: String? = null,
+    val chat: LocalChatState = LocalChatState(),
     val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
     val parentSessionId: String? = null,
     val lineageId: String = "",
@@ -273,7 +264,6 @@ data class LocalHarnessState(
     val chatStyleGuardEnabled: Boolean = true,
     val chatStyleGuardCustomPhrases: List<String> = emptyList(),
     val styleGuardHits: List<String> = emptyList(),
-    val personaCorrectionNotice: ChatPersonaCorrectionNotice? = null,
     val sessions: List<LocalSessionSummary> = emptyList(),
     val messages: List<LocalHarnessMessage> = emptyList(),
     val transcriptIndex: LocalTranscriptRuntimeIndex = LocalTranscriptRuntimeIndex(),

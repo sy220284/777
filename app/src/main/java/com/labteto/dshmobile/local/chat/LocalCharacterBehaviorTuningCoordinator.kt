@@ -24,33 +24,35 @@ internal class LocalCharacterBehaviorTuningCoordinator(
             val snapshot = state.value
             check(
                 !snapshot.running && !snapshot.loading &&
-                    snapshot.usageMode == LocalUsageMode.CHAT && !snapshot.groupChat.enabled
+                    snapshot.usageMode == LocalUsageMode.CHAT && !snapshot.chat.groupChat.enabled
             ) { "请在单人聊天空闲时保存角色设置" }
-            val personaId = snapshot.personaId.takeUnless {
+            val personaId = snapshot.chat.personaId.takeUnless {
                 it == PersonaProfile.DEFAULT_PERSONA_ID
             } ?: "persona-${UUID.randomUUID()}"
             val persisted = withContext(Dispatchers.IO) {
                 persistCharacterBehaviorTuning(
-                    personaStore, galleryStore, snapshot.chatPersona,
-                    personaId, snapshot.galleryId, profile,
+                    personaStore, galleryStore, snapshot.chat.chatPersona,
+                    personaId, snapshot.chat.galleryId, profile,
                 )
             }
             val durablePersona = persisted.persona
             val sameBoundCharacter = persisted.sameBoundCharacter
             state.update { state ->
-                check(state.sessionId == snapshot.sessionId && state.personaId == snapshot.personaId &&
-                    state.galleryId == snapshot.galleryId) { "会话已切换，请重新保存角色设置" }
+                check(state.sessionId == snapshot.sessionId && state.chat.personaId == snapshot.chat.personaId &&
+                    state.chat.galleryId == snapshot.chat.galleryId) { "会话已切换，请重新保存角色设置" }
                 state.copy(
-                    personaId = durablePersona.id,
-                    galleryId = state.galleryId.takeIf { sameBoundCharacter },
-                    galleryStoryId = state.galleryStoryId.takeIf { sameBoundCharacter },
-                    gallerySaveSuppressedThrough = if (sameBoundCharacter) state.gallerySaveSuppressedThrough
-                    else state.transcriptIndex.latestCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
-                    chatPersona = durablePersona,
-                    chatState = if (sameBoundCharacter) {
-                        state.chatState.copy(behaviorTuning = durablePersona.behaviorTuning)
-                    } else ChatCharacterState(behaviorTuning = durablePersona.behaviorTuning),
-                    replySuggestions = if (sameBoundCharacter) state.replySuggestions else emptyList(),
+                    chat = state.chat.copy(
+                        personaId = durablePersona.id,
+                        galleryId = state.chat.galleryId.takeIf { sameBoundCharacter },
+                        galleryStoryId = state.chat.galleryStoryId.takeIf { sameBoundCharacter },
+                        gallerySaveSuppressedThrough = if (sameBoundCharacter) state.chat.gallerySaveSuppressedThrough
+                        else state.transcriptIndex.latestCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
+                        chatPersona = durablePersona,
+                        chatState = if (sameBoundCharacter) {
+                            state.chat.chatState.copy(behaviorTuning = durablePersona.behaviorTuning)
+                        } else ChatCharacterState(behaviorTuning = durablePersona.behaviorTuning),
+                        replySuggestions = if (sameBoundCharacter) state.chat.replySuggestions else emptyList(),
+                    ),
                     handoffSummary = if (sameBoundCharacter) state.handoffSummary else null,
                 )
             }

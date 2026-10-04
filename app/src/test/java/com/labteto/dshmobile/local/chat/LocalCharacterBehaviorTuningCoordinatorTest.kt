@@ -31,7 +31,11 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
         personas.upsert(original)
         val state = MutableStateFlow(LocalHarnessState(
             loading = false, usageMode = LocalUsageMode.CHAT, sessionId = "session",
-            personaId = original.id, chatPersona = original, galleryId = entry.id,
+            chat = LocalChatState(
+                personaId = original.id,
+                chatPersona = original,
+                galleryId = entry.id,
+            ),
         ))
         val tuning = CharacterBehaviorTuning(intimacy = 75, updatedAt = 200)
         val reached = CompletableDeferred<Unit>()
@@ -40,7 +44,7 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
         val coordinator = LocalCharacterBehaviorTuningCoordinator(state, personas, gallery, lock) {
             assertEquals(tuning, personas.get(original.id).behaviorTuning)
             assertEquals(tuning, ChatPersonaGalleryStore(galleryFile, Json).list().single().persona.behaviorTuning)
-            assertEquals(tuning, state.value.chatState.behaviorTuning)
+            assertEquals(tuning, state.value.chat.chatState.behaviorTuning)
             reached.complete(Unit)
             release.await()
         }
@@ -65,7 +69,7 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
         val result = coordinator.configure(PersonaProfile(behaviorTuning = CharacterBehaviorTuning(openness = 75)))
         assertTrue(result.exceptionOrNull() is IOException)
         assertFalse(lock.isLocked)
-        assertFalse(state.value.personaId == PersonaProfile.DEFAULT_PERSONA_ID)
+        assertFalse(state.value.chat.personaId == PersonaProfile.DEFAULT_PERSONA_ID)
         assertEquals(CharacterBehaviorTuning(), personas.get(PersonaProfile.DEFAULT_PERSONA_ID).behaviorTuning)
     }
 

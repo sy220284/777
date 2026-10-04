@@ -20,19 +20,19 @@ internal class LocalChatModelAssistController(
     suspend fun generateGroupAnnouncement(direction: String): Result<String> =
         try {
             val snapshot = state.value
-            check(!snapshot.loading && !snapshot.running && snapshot.groupChat.enabled) {
+            check(!snapshot.loading && !snapshot.running && snapshot.chat.groupChat.enabled) {
                 "请在群聊空闲时生成公告"
             }
             check(snapshot.modelState.configured) { "请先配置聊天模型" }
-            check(snapshot.groupChat.members.size >= 2) { "请先添加至少两位群聊人物" }
+            check(snapshot.chat.groupChat.members.size >= 2) { "请先添加至少两位群聊人物" }
             Result.success(
                 groupAnnouncementService.generate(
                     model = snapshot.modelState.model,
                     baseUrl = snapshot.modelState.baseUrl,
                     profileId = snapshot.modelState.modelSelection.activeProfileId,
-                    members = snapshot.groupChat.members,
+                    members = snapshot.chat.groupChat.members,
                     direction = direction,
-                    current = snapshot.groupChat.announcement,
+                    current = snapshot.chat.groupChat.announcement,
                 ),
             )
         } catch (cancelled: CancellationException) {
@@ -47,7 +47,7 @@ internal class LocalChatModelAssistController(
             snapshot.loading ||
             snapshot.running ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.groupChat.enabled
+            snapshot.chat.groupChat.enabled
         ) {
             return Result.failure(IllegalStateException("persona_autofill_busy"))
         }
@@ -62,7 +62,7 @@ internal class LocalChatModelAssistController(
                 model = snapshot.modelState.model,
                 baseUrl = snapshot.modelState.baseUrl,
                 profileId = snapshot.modelState.modelSelection.activeProfileId,
-                current = snapshot.chatPersona,
+                current = snapshot.chat.chatPersona,
                 recentMessages = recentMessages,
                 description = description,
             )
@@ -70,11 +70,11 @@ internal class LocalChatModelAssistController(
             check(
                 current.sessionId == snapshot.sessionId &&
                     current.modelState.modelSelection.activeProfileId == snapshot.modelState.modelSelection.activeProfileId &&
-                    current.chatPersona == snapshot.chatPersona &&
+                    current.chat.chatPersona == snapshot.chat.chatPersona &&
                     !current.loading &&
                     !current.running &&
                     current.usageMode == LocalUsageMode.CHAT &&
-                    !current.groupChat.enabled
+                    !current.chat.groupChat.enabled
             ) {
                 "persona_autofill_stale"
             }

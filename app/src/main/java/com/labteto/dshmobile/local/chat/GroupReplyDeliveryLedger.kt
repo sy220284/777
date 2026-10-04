@@ -27,7 +27,7 @@ internal class GroupReplyDeliveryLedger(
         var accepted = false
         state.update { current ->
             accepted = current.sessionId == sessionId
-            if (accepted) current.copy(groupChat = candidate) else current
+            if (accepted) current.copy(chat = current.chat.copy(groupChat = candidate)) else current
         }
         if (accepted) persist()
         return candidate

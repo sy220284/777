@@ -29,17 +29,17 @@ internal suspend fun saveGroupChatAnnouncement(
         before.running ||
         before.sessionId != sessionId ||
         before.usageMode != LocalUsageMode.CHAT ||
-        !before.groupChat.enabled
+        !before.chat.groupChat.enabled
     ) {
         return Result.failure(IllegalStateException("当前状态暂时无法保存群公告"))
     }
 
     val announcement = text.trim().take(2_000)
-    if (announcement == before.groupChat.announcement) return Result.success(Unit)
+    if (announcement == before.chat.groupChat.announcement) return Result.success(Unit)
 
     state.update { current ->
-        if (current.sessionId == sessionId && current.groupChat.enabled) {
-            current.copy(groupChat = current.groupChat.copy(announcement = announcement))
+        if (current.sessionId == sessionId && current.chat.groupChat.enabled) {
+            current.copy(chat = current.chat.copy(groupChat = current.chat.groupChat.copy(announcement = announcement)))
         } else {
             current
         }
@@ -47,7 +47,7 @@ internal suspend fun saveGroupChatAnnouncement(
     // Match the common persistence boundary: capture the durable cursor before mutable state.
     val controlProjectedThroughSequence = eventLog.latestSequence()
     val updated = state.value
-    if (updated.sessionId != sessionId || updated.groupChat.announcement != announcement) {
+    if (updated.sessionId != sessionId || updated.chat.groupChat.announcement != announcement) {
         return Result.failure(IllegalStateException("会话状态已变化，请重新保存群公告"))
     }
 
@@ -78,11 +78,13 @@ private fun rollbackGroupAnnouncement(
     state.update { current ->
         if (
             current.sessionId == before.sessionId &&
-            current.groupChat.announcement == failedAnnouncement
+            current.chat.groupChat.announcement == failedAnnouncement
         ) {
             current.copy(
-                groupChat = current.groupChat.copy(
-                    announcement = before.groupChat.announcement,
+                chat = current.chat.copy(
+                    groupChat = current.chat.groupChat.copy(
+                        announcement = before.chat.groupChat.announcement,
+                    ),
                 ),
             )
         } else {

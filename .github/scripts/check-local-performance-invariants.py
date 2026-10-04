@@ -149,8 +149,8 @@ for name, source in (
         )
 
 for forbidden_runtime_fallback in (
-    ".withLegacyFallback(snapshot.chatState)",
-    ".withLegacyFallback(beforeAssistant.chatState)",
+    ".withLegacyFallback(snapshot.chat.chatState)",
+    ".withLegacyFallback(beforeAssistant.chat.chatState)",
     ".withLegacyFallback(nextChatState)",
 ):
     if forbidden_runtime_fallback in engine:
@@ -445,7 +445,7 @@ if "chatReplyCoordinator.finalizeGroup(" not in group_chat_executor:
 if "chatReplyCoordinator.guardProactive(" not in automation_chat:
     violations.append("Proactive Chat replies must pass the pre-commit scene continuity guard")
 
-if "before.chatBranches.nodes.isNotEmpty()" not in engine or "appendMaterializedChatBranchMessage(" not in engine:
+if "before.chat.chatBranches.nodes.isNotEmpty()" not in engine or "appendMaterializedChatBranchMessage(" not in engine:
     violations.append("Chat branch continuation must only materialize after a real branch already exists")
 
 if violations:

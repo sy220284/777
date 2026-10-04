@@ -91,7 +91,7 @@ internal class LocalChatReplyCoordinator(
             },
         )
 
-        val scene = snapshot.chatContext.scene
+        val scene = snapshot.chat.chatContext.scene
         return ChatReplyContinuityGuard.enforce(
             previous = scene,
             userMessage = userMessage,

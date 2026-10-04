@@ -43,7 +43,7 @@ internal class LocalReplySuggestionCoordinator(
             !snapshot.modelState.configured ||
             snapshot.running ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.groupChat.enabled
+            snapshot.chat.groupChat.enabled
         ) return false
 
         val assistantMessage = snapshot.messages.lastOrNull { message ->
@@ -70,8 +70,8 @@ internal class LocalReplySuggestionCoordinator(
         }
 
         val prompt = chatTurnCoordinator.replySuggestionsPrompt(
-            persona = snapshot.chatPersona,
-            state = snapshot.chatState,
+            persona = snapshot.chat.chatPersona,
+            state = snapshot.chat.chatState,
             messages = snapshot.messages,
             latestAssistantMessageId = expectedAssistantMessageId,
         )
@@ -113,26 +113,28 @@ internal class LocalReplySuggestionCoordinator(
             if (
                 current.sessionId != expectedSessionId ||
                 current.usageMode != LocalUsageMode.CHAT ||
-                current.groupChat.enabled ||
+                current.chat.groupChat.enabled ||
                 current.transcriptIndex.latestDialogueMessageId != expectedAssistantMessageId
             ) {
                 current
             } else {
                 applied = true
                 current.copy(
-                    replySuggestions = suggestions,
+                    chat = current.chat.copy(
+                        replySuggestions = suggestions,
+                        chatBranches = if (current.transcriptIndex.branchingEligible) {
+                            updateChatBranchNodeSnapshot(
+                                state = current.chat.chatBranches,
+                                messageId = expectedAssistantMessageId,
+                                chatState = current.chat.chatState,
+                                chatContext = current.chat.chatContext,
+                                replySuggestions = suggestions,
+                            )
+                        } else {
+                            current.chat.chatBranches
+                        },
+                    ),
                     error = null,
-                    chatBranches = if (current.transcriptIndex.branchingEligible) {
-                        updateChatBranchNodeSnapshot(
-                            state = current.chatBranches,
-                            messageId = expectedAssistantMessageId,
-                            chatState = current.chatState,
-                            chatContext = current.chatContext,
-                            replySuggestions = suggestions,
-                        )
-                    } else {
-                        current.chatBranches
-                    },
                 )
             }
         }
@@ -149,7 +151,7 @@ internal class LocalReplySuggestionCoordinator(
             put("assistant_message_id", expectedAssistantMessageId)
             put("suggestion_count", suggestions.size)
         })
-        if (hasChatBranchAlternatives(state.value.chatBranches)) {
+        if (hasChatBranchAlternatives(state.value.chat.chatBranches)) {
             persistBranchState("chat/reply-suggestions-updated")
         }
         persist()

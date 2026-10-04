@@ -40,7 +40,7 @@ internal class LocalMemoryCoordinator(
             ?: snapshot.transcriptIndex.latestUserMessageId
 
         val remembered = if (snapshot.usageMode == LocalUsageMode.CHAT) {
-            if (snapshot.groupChat.enabled) {
+            if (snapshot.chat.groupChat.enabled) {
                 null
             } else {
                 runCatching {
@@ -49,13 +49,13 @@ internal class LocalMemoryCoordinator(
                         lineageId = snapshot.lineageId,
                         sourceSessionId = currentSessionId(),
                         sourceMessageId = sourceMessageId,
-                        subjectLabel = snapshot.chatPersona.name
+                        subjectLabel = snapshot.chat.chatPersona.name
                             .takeUnless {
                                 it == PersonaProfile.DEFAULT_PERSONA_ID || it == "默认角色"
                             },
                         subjectKey = chatRelationshipSubjectKey(
-                            snapshot.galleryId,
-                            snapshot.personaId,
+                            snapshot.chat.galleryId,
+                            snapshot.chat.personaId,
                         ),
                     )
                 }.getOrNull()
@@ -103,22 +103,22 @@ internal class LocalMemoryCoordinator(
         snapshot: LocalHarnessState,
         viewerSubjectKey: String? = null,
         viewerName: String? = null,
-        groupAudience: Boolean = snapshot.groupChat.enabled,
+        groupAudience: Boolean = snapshot.chat.groupChat.enabled,
     ): String {
         if (!snapshot.autoRecall) return ""
         val subjectKey = viewerSubjectKey ?: chatRelationshipSubjectKey(
-            snapshot.galleryId,
-            snapshot.personaId,
+            snapshot.chat.galleryId,
+            snapshot.chat.personaId,
         )
         if (subjectKey.isNullOrBlank()) return ""
-        if (viewerSubjectKey == null && snapshot.chatPersona.isUnboundChatPersona()) return ""
+        if (viewerSubjectKey == null && snapshot.chat.chatPersona.isUnboundChatPersona()) return ""
 
         val recallFacts = ChatMemorySelector.shouldRecall(query)
         val searchDiary = shouldSearchDiary(query)
         if (!recallFacts && !searchDiary) return ""
 
         val subjectLabel = viewerName?.trim()?.takeIf(String::isNotBlank)
-            ?: snapshot.chatPersona.name
+            ?: snapshot.chat.chatPersona.name
         val contextWindow = documentedContextWindowTokens(
             snapshot.modelState.model,
             snapshot.modelState.baseUrl,
@@ -205,10 +205,10 @@ internal class LocalMemoryCoordinator(
         if (
             snapshot.usageMode != LocalUsageMode.CHAT ||
             !snapshot.autoRecall ||
-            snapshot.chatState.updatedAt != 0L
+            snapshot.chat.chatState.updatedAt != 0L
         ) return
 
-        val subject = snapshot.chatPersona.name.trim()
+        val subject = snapshot.chat.chatPersona.name.trim()
             .takeIf { it.isNotBlank() && it != "默认角色" }
             ?: return
         val prefix = "关系状态：我和$subject｜"
@@ -223,11 +223,11 @@ internal class LocalMemoryCoordinator(
                     relationshipMemoryMatchesSubject(
                         memory = it,
                         currentSubjectKey = chatRelationshipSubjectKey(
-                            snapshot.galleryId,
-                            snapshot.personaId,
+                            snapshot.chat.galleryId,
+                            snapshot.chat.personaId,
                         ),
                         currentLineageId = snapshot.lineageId,
-                        subjectLabel = snapshot.chatPersona.name,
+                        subjectLabel = snapshot.chat.chatPersona.name,
                     ) &&
                     it.content.startsWith(prefix)
             }
@@ -249,24 +249,26 @@ internal class LocalMemoryCoordinator(
             "CONFLICT" -> "矛盾期"
             "SEPARATED" -> "已分开"
             "REPAIRING" -> "修复中"
-            else -> snapshot.chatState.relationshipState
+            else -> snapshot.chat.chatState.relationshipState
         }
         if (
-            snapshot.chatState.dynamics.stage == stage &&
-            snapshot.chatState.relationshipState == label
+            snapshot.chat.chatState.dynamics.stage == stage &&
+            snapshot.chat.chatState.relationshipState == label
         ) return
 
         state.update { current ->
             if (
                 current.sessionId != snapshot.sessionId ||
-                current.chatState.updatedAt != 0L
+                current.chat.chatState.updatedAt != 0L
             ) {
                 current
             } else {
                 current.copy(
-                    chatState = current.chatState.copy(
-                        relationshipState = label,
-                        dynamics = current.chatState.dynamics.copy(stage = stage),
+                    chat = current.chat.copy(
+                        chatState = current.chat.chatState.copy(
+                            relationshipState = label,
+                            dynamics = current.chat.chatState.dynamics.copy(stage = stage),
+                        ),
                     ),
                 )
             }
@@ -276,8 +278,8 @@ internal class LocalMemoryCoordinator(
             put(
                 "subject_key",
                 chatRelationshipSubjectKey(
-                    snapshot.galleryId,
-                    snapshot.personaId,
+                    snapshot.chat.galleryId,
+                    snapshot.chat.personaId,
                 ).orEmpty(),
             )
             put("state", stored)

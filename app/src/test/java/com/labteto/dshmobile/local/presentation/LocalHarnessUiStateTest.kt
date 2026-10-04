@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.presentation
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.LocalChatState
 import com.labteto.dshmobile.local.work.LocalWorkState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -71,8 +72,10 @@ class LocalHarnessUiStateTest {
     fun workProjectionIgnoresChatChurn() {
         val base = LocalHarnessState()
         val unrelatedUpdate = base.copy(
-            chatPersona = base.chatPersona.copy(name = "另一人物"),
-            galleryId = "gallery-2",
+            chat = base.chat.copy(
+                chatPersona = base.chat.chatPersona.copy(name = "另一人物"),
+                galleryId = "gallery-2",
+            ),
             modelState = base.modelState.copy(model = "another-model"),
         )
 
@@ -119,7 +122,12 @@ class LocalHarnessUiStateTest {
     @Test
     fun workSurfaceProjectionIgnoresChatOnlyChurn() {
         val base = LocalHarnessState(usageMode = LocalUsageMode.WORK)
-        val chatOnlyUpdate = base.copy(chatPersona = base.chatPersona.copy(name = "另一人物"), galleryId = "gallery-2")
+        val chatOnlyUpdate = base.copy(
+            chat = base.chat.copy(
+                chatPersona = base.chat.chatPersona.copy(name = "另一人物"),
+                galleryId = "gallery-2",
+            ),
+        )
         assertEquals(base.toWorkSurfaceUiState(), chatOnlyUpdate.toWorkSurfaceUiState())
     }
 

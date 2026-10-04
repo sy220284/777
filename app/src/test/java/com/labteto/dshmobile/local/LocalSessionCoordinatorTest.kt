@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.work.LocalWorkState
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatSceneState
+import com.labteto.dshmobile.local.chat.LocalChatState
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -88,6 +89,11 @@ class LocalSessionCoordinatorTest {
                 latestCreatedAt = 123_456L,
                 totalMessageCount = 3L,
             ),
+            chat = LocalChatState(
+                personaId = "persona-test",
+                galleryId = "gallery-test",
+                chatState = ChatCharacterState(mood = "专注"),
+            ),
             work = LocalWorkState(
                 plan = listOf("检查边界"),
                 todos = listOf(LocalTodoItem("补回归", "in_progress")),
@@ -107,6 +113,9 @@ class LocalSessionCoordinatorTest {
         assertEquals(listOf("m2", "m3"), snapshot.transcriptWindow.map { it.id })
         assertEquals(3L, snapshot.transcriptIndex.totalMessageCount)
         assertEquals(123_456L, snapshot.updatedAt)
+        assertEquals("persona-test", snapshot.personaId)
+        assertEquals("gallery-test", snapshot.galleryId)
+        assertEquals("专注", snapshot.chatState.mood)
         assertEquals(listOf("检查边界"), snapshot.plan)
         assertEquals(listOf(LocalTodoItem("补回归", "in_progress")), snapshot.todos)
         assertEquals(LocalGoal("完成架构迁移"), snapshot.goal)

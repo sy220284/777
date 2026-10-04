@@ -218,14 +218,14 @@ internal class LocalChatContextRefreshCoordinator(
         val job = scope.launch(start = CoroutineStart.LAZY) {
             delay(RETRY_BASE_DELAY_MS * (retryAttempt + 1L))
             val latest = state.value
-            val stillPending = latest.chatContext.pendingTurns.any { pending ->
-                pending.sequence > latest.chatContext.processedThroughSequence &&
+            val stillPending = latest.chat.chatContext.pendingTurns.any { pending ->
+                pending.sequence > latest.chat.chatContext.processedThroughSequence &&
                     pending.generation == expectedGeneration
             }
             if (
                 latest.usageMode != LocalUsageMode.CHAT ||
                 latest.sessionId != expectedSessionId ||
-                latest.chatContext.generation != expectedGeneration ||
+                latest.chat.chatContext.generation != expectedGeneration ||
                 !stillPending
             ) return@launch
 
@@ -237,7 +237,7 @@ internal class LocalChatContextRefreshCoordinator(
             refresh(
                 persona = persona,
                 expectedSessionId = expectedSessionId,
-                expectedBaseState = latest.chatState,
+                expectedBaseState = latest.chat.chatState,
                 expectedGeneration = expectedGeneration,
                 boundEventLog = boundEventLog,
                 profile = profile,
@@ -291,7 +291,7 @@ internal class LocalChatContextRefreshCoordinator(
             if (current.sessionId != expectedSessionId) {
                 current
             } else {
-                val baseContext = current.chatContext
+                val baseContext = current.chat.chatContext
                     .applySceneTurn(
                         userMessage = userMessage,
                         assistantMessage = assistantMessage,
@@ -312,25 +312,27 @@ internal class LocalChatContextRefreshCoordinator(
                 generation = nextContext.generation
                 val nextBranches = if (current.transcriptIndex.branchingEligible) {
                     updateChatBranchNodeSnapshot(
-                        state = current.chatBranches,
+                        state = current.chat.chatBranches,
                         messageId = expectedAssistantMessageId,
-                        chatState = current.chatState,
-                        replySuggestions = current.replySuggestions,
+                        chatState = current.chat.chatState,
+                        replySuggestions = current.chat.replySuggestions,
                         chatContext = nextContext,
                     ).also { updated ->
-                        branchSnapshotUpdated = updated != current.chatBranches
+                        branchSnapshotUpdated = updated != current.chat.chatBranches
                     }
                 } else {
-                    current.chatBranches
+                    current.chat.chatBranches
                 }
                 current.copy(
-                    chatContext = nextContext,
-                    chatBranches = nextBranches,
+                    chat = current.chat.copy(
+                        chatContext = nextContext,
+                        chatBranches = nextBranches,
+                    ),
                 )
             }
         }
         if (generation != null) {
-            if (branchSnapshotUpdated && hasChatBranchAlternatives(state.value.chatBranches)) {
+            if (branchSnapshotUpdated && hasChatBranchAlternatives(state.value.chat.chatBranches)) {
                 persistBranchState("chat/pending-enqueued")
             }
             persist()
@@ -349,18 +351,18 @@ internal class LocalChatContextRefreshCoordinator(
     ) {
         val before = state.value
         if (before.usageMode != LocalUsageMode.CHAT || before.sessionId != expectedSessionId) return
-        val baseContext = before.chatContext
+        val baseContext = before.chat.chatContext
         if (baseContext.generation != expectedGeneration) return
 
         val pending = baseContext.loadPendingBatch(
             boundEventLog, PENDING_BATCH,
-            activeBranchMessageIds = if (hasChatBranchAlternatives(before.chatBranches)) {
-                activeChatBranchMessages(before.chatBranches).mapTo(hashSetOf()) { it.id }
+            activeBranchMessageIds = if (hasChatBranchAlternatives(before.chat.chatBranches)) {
+                activeChatBranchMessages(before.chat.chatBranches).mapTo(hashSetOf()) { it.id }
             } else null,
         )
         if (pending.isEmpty()) return
 
-        val plannerState = before.chatState.withContextForPlanner(baseContext)
+        val plannerState = before.chat.chatState.withContextForPlanner(baseContext)
         val orderedTranscript = renderPendingTurnsForPlanner(pending)
         val userEvidenceBatch = pending.joinToString("\n") { turn -> turn.userMessage }
         val assistantEvidenceBatch = pending.joinToString("\n") { turn -> turn.assistantMessage }
@@ -431,11 +433,11 @@ internal class LocalChatContextRefreshCoordinator(
         var applied = false
         state.update { current ->
             applied = false
-            val currentContext = current.chatContext
+            val currentContext = current.chat.chatContext
             if (
                 current.sessionId != expectedSessionId ||
                 currentContext.generation != expectedGeneration ||
-                current.chatState != expectedBaseState ||
+                current.chat.chatState != expectedBaseState ||
                 currentContext.processedThroughSequence != baseContext.processedThroughSequence
             ) {
                 current
@@ -447,21 +449,23 @@ internal class LocalChatContextRefreshCoordinator(
                     throughSequence = throughSequence,
                 )
                 current.copy(
-                    // The legacy mirror keeps old gallery/session data readable. Generation uses
-                    // conversation-scoped chatContext as the canonical continuity state.
-                    chatState = deterministicState,
-                    chatContext = nextContext,
-                    chatBranches = if (current.transcriptIndex.branchingEligible) {
-                        updateChatBranchNodeSnapshot(
-                            state = current.chatBranches,
-                            messageId = pending.last().assistantMessageId,
-                            chatState = deterministicState,
-                            replySuggestions = current.replySuggestions,
-                            chatContext = nextContext,
-                        )
-                    } else {
-                        current.chatBranches
-                    },
+                    chat = current.chat.copy(
+                        // The legacy mirror keeps old gallery/session data readable. Generation uses
+                        // conversation-scoped chatContext as the canonical continuity state.
+                        chatState = deterministicState,
+                        chatContext = nextContext,
+                        chatBranches = if (current.transcriptIndex.branchingEligible) {
+                            updateChatBranchNodeSnapshot(
+                                state = current.chat.chatBranches,
+                                messageId = pending.last().assistantMessageId,
+                                chatState = deterministicState,
+                                replySuggestions = current.chat.replySuggestions,
+                                chatContext = nextContext,
+                            )
+                        } else {
+                            current.chat.chatBranches
+                        },
+                    ),
                 )
             }
         }
@@ -477,7 +481,7 @@ internal class LocalChatContextRefreshCoordinator(
             return
         }
 
-        if (before.autoMemory) chatRelationshipSubjectKey(before.galleryId, before.personaId)?.let { subjectKey ->
+        if (before.autoMemory) chatRelationshipSubjectKey(before.chat.galleryId, before.chat.personaId)?.let { subjectKey ->
             runCatching {
                 diaryStore.record(
                     ChatDiaryWriteRequest(
@@ -521,7 +525,7 @@ internal class LocalChatContextRefreshCoordinator(
             put("processed_through_sequence", throughSequence)
             put("remaining_pending", nextContext.pendingTurns.size)
         })
-        if (hasChatBranchAlternatives(state.value.chatBranches)) {
+        if (hasChatBranchAlternatives(state.value.chat.chatBranches)) {
             persistBranchState("chat/post-turn-updated")
         }
         persist()

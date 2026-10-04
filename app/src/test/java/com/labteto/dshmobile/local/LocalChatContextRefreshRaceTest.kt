@@ -41,7 +41,7 @@ class LocalChatContextRefreshRaceTest {
         val context = ChatContextState(scene = ChatSceneState(location = "old")).enqueuePendingDurably(
             ChatPendingTurn(event.sequence, assistantMessageId = "a", branchHeadId = "a", assistantMessage = "reply"), log,
         )
-        val state = InterceptedFlow(MutableStateFlow(LocalHarnessState(sessionId = "s", usageMode = LocalUsageMode.CHAT, chatContext = context)))
+        val state = InterceptedFlow(MutableStateFlow(LocalHarnessState(sessionId = "s", usageMode = LocalUsageMode.CHAT, chat = LocalChatState(chatContext = context))))
         val turns = LocalChatTurnCoordinator(
             ChatTurnRunner(ChatPersonaStore(File(temporary.root, "personas.json"), json), ChatRelationshipEngine(), CharacterLoreEngine()),
             ChatInteractionPlanner(json),
@@ -65,9 +65,9 @@ class LocalChatContextRefreshRaceTest {
         val fixture = fixture(backgroundScope)
         val before = fixture.state.value
         fixture.state.beforeCompare = { fixture.state.delegate.value = before.copy(sessionId = "other") }
-        fixture.coordinator.refresh(PersonaProfile(), "s", before.chatState, before.chatContext.generation, fixture.log, fixture.profile)
+        fixture.coordinator.refresh(PersonaProfile(), "s", before.chat.chatState, before.chat.chatContext.generation, fixture.log, fixture.profile)
         assertEquals("other", fixture.state.value.sessionId)
-        assertEquals(before.chatContext.processedThroughSequence, fixture.state.value.chatContext.processedThroughSequence)
+        assertEquals(before.chat.chatContext.processedThroughSequence, fixture.state.value.chat.chatContext.processedThroughSequence)
         assertEquals("stale-discarded", fixture.log.latest("chat/post-turn")?.data?.get("status")?.jsonPrimitive?.content)
         assertEquals(0, fixture.persisted())
     }
@@ -76,22 +76,22 @@ class LocalChatContextRefreshRaceTest {
         val before = fixture.state.value
         fixture.state.beforeCompare = {
             val event = fixture.log.append("assistant/message", buildJsonObject {})
-            val context = before.chatContext.enqueuePendingDurably(
+            val context = before.chat.chatContext.enqueuePendingDurably(
                 ChatPendingTurn(event.sequence, assistantMessageId = "new", assistantMessage = "new fact"), fixture.log,
             ).copy(scene = ChatSceneState(location = "new"))
-            fixture.state.delegate.value = before.copy(chatContext = context)
+            fixture.state.delegate.value = before.copy(chat = before.chat.copy(chatContext = context))
         }
-        fixture.coordinator.refresh(PersonaProfile(), "s", before.chatState, before.chatContext.generation, fixture.log, fixture.profile)
-        assertEquals("new", fixture.state.value.chatContext.scene.location)
-        assertEquals(listOf("new"), fixture.state.value.chatContext.pendingTurns.map { it.assistantMessageId })
-        assertEquals(0L, fixture.state.value.chatContext.processedThroughSequence)
+        fixture.coordinator.refresh(PersonaProfile(), "s", before.chat.chatState, before.chat.chatContext.generation, fixture.log, fixture.profile)
+        assertEquals("new", fixture.state.value.chat.chatContext.scene.location)
+        assertEquals(listOf("new"), fixture.state.value.chat.chatContext.pendingTurns.map { it.assistantMessageId })
+        assertEquals(0L, fixture.state.value.chat.chatContext.processedThroughSequence)
         assertEquals(1, fixture.persisted())
     }
     @Test fun refreshPassesTheFrozenProfileToThePlanner() = runTest {
         val fixture = fixture(backgroundScope)
         val before = fixture.state.value
         fixture.coordinator.refresh(
-            PersonaProfile(), "s", before.chatState, before.chatContext.generation,
+            PersonaProfile(), "s", before.chat.chatState, before.chat.chatContext.generation,
             fixture.log, fixture.profile,
         )
         assertEquals(listOf("profile-a"), fixture.observedProfiles)
@@ -100,7 +100,7 @@ class LocalChatContextRefreshRaceTest {
     @Test fun remainingPendingContinuationCannotResetTheRetryBudgetForever() = runTest {
         val fixture = fixture(backgroundScope)
         val before = fixture.state.value
-        var context = before.chatContext
+        var context = before.chat.chatContext
         repeat(39) { index ->
             val id = "extra-$index"
             val message = LocalHarnessMessage(id, "assistant", "reply-$index", createdAt = index + 2L)
@@ -120,7 +120,7 @@ class LocalChatContextRefreshRaceTest {
         fixture.state.delegate.value = before.copy(chatContext = context)
 
         fixture.coordinator.refresh(
-            PersonaProfile(), "s", before.chatState, context.generation, fixture.log, fixture.profile,
+            PersonaProfile(), "s", before.chat.chatState, context.generation, fixture.log, fixture.profile,
         )
         advanceUntilIdle()
 

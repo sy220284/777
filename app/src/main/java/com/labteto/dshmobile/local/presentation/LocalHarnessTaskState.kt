@@ -9,6 +9,6 @@ internal fun LocalHarnessState.toTaskUiState(): LocalHarnessTaskState =
     LocalHarnessTaskState(
         sessionId = sessionId,
         usageMode = usageMode,
-        groupChat = groupChat,
-        chatPersona = chatPersona,
+        groupChat = chat.groupChat,
+        chatPersona = chat.chatPersona,
     )

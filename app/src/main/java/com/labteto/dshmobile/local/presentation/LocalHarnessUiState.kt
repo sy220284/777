@@ -85,7 +85,7 @@ internal fun LocalHarnessState.toSettingsUiState(): LocalHarnessSettingsState =
         chatStyleGuardEnabled = chatStyleGuardEnabled,
         chatStyleGuardCustomPhrases = chatStyleGuardCustomPhrases,
         styleGuardHits = styleGuardHits,
-        chatPersona = chatPersona,
+        chatPersona = chat.chatPersona,
         usage = usage,
         error = error,
     )
@@ -97,10 +97,10 @@ internal fun LocalHarnessState.toShellUiState(): LocalHarnessShellState =
         sessions = sessions,
         usageMode = usageMode,
         running = running,
-        groupChat = groupChat,
+        groupChat = chat.groupChat,
         chatPersona = chatPersona,
-        galleryId = galleryId,
-        galleryStoryId = galleryStoryId,
+        galleryId = chat.galleryId,
+        galleryStoryId = chat.galleryStoryId,
         workspacePath = workspacePath,
     )
 

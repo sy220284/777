@@ -107,7 +107,7 @@ internal class LocalHarnessSettingsCoordinator(
 
     fun chatStreamFilterPhrases(
         snapshot: LocalHarnessState,
-        persona: PersonaProfile = snapshot.chatPersona,
+        persona: PersonaProfile = snapshot.chat.chatPersona,
     ): List<String> = ChatStyleGuard.activePhrases(
         customPhrases = snapshot.chatStyleGuardCustomPhrases,
         personaPhrases = persona.bannedPhrases,

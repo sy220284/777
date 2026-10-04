@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ENGINE_MAX_PUBLIC_METHODS = 0
 ENGINE_MAX_INTERNAL_METHODS = 80
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 19
-AGGREGATE_STATE_MAX_FIELDS = 55
+AGGREGATE_STATE_MAX_FIELDS = 36
 
 HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": ("LocalGroupChatTurnExecutor", 26),
@@ -237,6 +237,47 @@ for owned_field in (
 ):
     if not re.search(rf"\bval\s+{owned_field}\s*:", model_state):
         die(f"LocalModelState must own Model field: {owned_field}")
+
+if "val chat: LocalChatState = LocalChatState()" not in aggregate_state_source:
+    die("LocalHarnessState must compose Chat runtime state through LocalChatState")
+for legacy_chat_field in (
+    "personaId",
+    "galleryId",
+    "galleryStoryId",
+    "gallerySaveSuppressedThrough",
+    "chatPersona",
+    "chatState",
+    "chatContext",
+    "replySuggestions",
+    "chatBranches",
+    "groupChat",
+    "groupActiveSpeakerName",
+    "personaCorrectionNotice",
+):
+    if re.search(rf"^\s*val\s+{legacy_chat_field}\s*:", aggregate_state_source, re.MULTILINE):
+        die(
+            f"LocalHarnessState must not reintroduce flattened Chat field: {legacy_chat_field}"
+        )
+
+chat_state = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatState.kt")
+)
+for owned_field in (
+    "personaId",
+    "galleryId",
+    "galleryStoryId",
+    "gallerySaveSuppressedThrough",
+    "chatPersona",
+    "chatState",
+    "chatContext",
+    "replySuggestions",
+    "chatBranches",
+    "groupChat",
+    "groupActiveSpeakerName",
+    "personaCorrectionNotice",
+):
+    if not re.search(rf"\bval\s+{owned_field}\s*:", chat_state):
+        die(f"LocalChatState must own Chat field: {owned_field}")
 
 work_progress = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt")

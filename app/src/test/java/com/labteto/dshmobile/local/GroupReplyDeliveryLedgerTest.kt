@@ -11,7 +11,7 @@ class GroupReplyDeliveryLedgerTest {
         var writes = 0
         val ledger = GroupReplyDeliveryLedger("session", listOf("previous", "retried"), listOf("retried"), state) { writes++ }
         ledger.fail("retried", LocalGroupChatState())
-        assertEquals(listOf("previous", "retried"), state.value.groupChat.failedReplyMemberIds)
+        assertEquals(listOf("previous", "retried"), state.value.chat.groupChat.failedReplyMemberIds)
         assertEquals(1, writes)
     }
     @Test fun anotherSessionCannotReceiveOrPersistOldFailure() = runTest {
@@ -19,7 +19,7 @@ class GroupReplyDeliveryLedgerTest {
         var writes = 0
         val ledger = GroupReplyDeliveryLedger("old-session", emptyList(), listOf("member"), state) { writes++ }
         ledger.fail("member", LocalGroupChatState())
-        assertEquals(emptyList<String>(), state.value.groupChat.failedReplyMemberIds)
+        assertEquals(emptyList<String>(), state.value.chat.groupChat.failedReplyMemberIds)
         assertEquals(0, writes)
     }
 }
