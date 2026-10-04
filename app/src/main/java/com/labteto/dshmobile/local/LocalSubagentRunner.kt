@@ -297,9 +297,7 @@ internal class LocalSubagentRunner(
                         modelStepExecutor.complete(
                             surface = runSurface,
                             history = preparedHistory,
-                            tools = modelToolStepSurface.capture(
-                                runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools)),
-                            ),
+                            tools = modelToolStepSurface.capture(runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools))),
                             subagentId = subagentId,
                             step = modelStep,
                             durableHistory = history,
