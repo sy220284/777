@@ -63,7 +63,7 @@ class AutomationPlanningService @Inject constructor(
     private val usageTracker: DeepSeekUsageTracker,
     private val json: Json,
 ) {
-    suspend fun plan(input: String): AutomationPlanDraft {
+    internal suspend fun plan(input: String): AutomationPlanDraft {
         val context = runtime.planningContext()
         validateContext(context)
         val request = input
@@ -93,7 +93,7 @@ class AutomationPlanningService @Inject constructor(
         )
     }
 
-    suspend fun suggestions(): AutomationSuggestionSet {
+    internal suspend fun suggestions(): AutomationSuggestionSet {
         val context = runtime.planningContext()
         validateContext(context)
         if (context.recentMessages.isEmpty()) {
