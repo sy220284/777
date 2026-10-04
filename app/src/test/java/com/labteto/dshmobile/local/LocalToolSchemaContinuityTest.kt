@@ -32,6 +32,22 @@ class LocalToolSchemaContinuityTest {
     }
 
     @Test
+    fun deepSeekConsumesAppendOnlyCapabilityWhileUnknownRouteKeepsReplacement() {
+        val previous = JsonArray(listOf(tool("a"), tool("b")))
+        val reordered = JsonArray(listOf(tool("b"), tool("a"), tool("c")))
+
+        val deepSeek = stableRunToolSchemas(previous, reordered, LocalHarnessState())
+        val unknown = stableRunToolSchemas(
+            previous,
+            reordered,
+            LocalHarnessState(model = "custom", baseUrl = "https://proxy.example/v1"),
+        )
+
+        assertEquals(listOf("a", "b", "c"), names(deepSeek))
+        assertEquals(reordered, unknown)
+    }
+
+    @Test
     fun removalOrSchemaMutationBreaksAppendOnlySeriesImmediately() {
         val previous = JsonArray(listOf(tool("a"), tool("b")))
         val removed = JsonArray(listOf(tool("a")))
