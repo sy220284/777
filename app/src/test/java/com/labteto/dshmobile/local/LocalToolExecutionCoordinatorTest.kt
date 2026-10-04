@@ -579,6 +579,36 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun readonlyAndPlanToolSchemasHideBackgroundWebFetchOption() {
+        val registry = ToolRegistry().apply { register(webFetchTool { ToolResult("ok") }) }
+        val projection = LocalToolSchemaProjection(registry, coordinator(registry))
+
+        val readonly = projection.subagentSchemas(
+            allowMutation = false,
+            allowVirtualScreen = false,
+            enabledOptional = emptySet(),
+        ).single().jsonObject
+        val planning = projection.modelSchemas(
+            policy = localAgentRunPolicy(LocalUsageMode.WORK),
+            state = LocalHarnessState(planMode = true),
+            history = emptyList(),
+        ).single().jsonObject
+        val writable = projection.subagentSchemas(
+            allowMutation = true,
+            allowVirtualScreen = false,
+            enabledOptional = emptySet(),
+        ).single().jsonObject
+
+        fun properties(schema: JsonObject): JsonObject =
+            schema["function"]!!.jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+
+        assertFalse("run_in_background" in properties(readonly))
+        assertFalse("run_in_background" in properties(planning))
+        assertTrue("run_in_background" in properties(writable))
+        assertTrue(readonly["function"]!!.jsonObject["description"]!!.jsonPrimitive.content.contains("不写入工作区"))
+    }
+
+    @Test
     fun planModeSchemaProjectionOmitsToolsThatExecutionWouldReject() {
         val registry = ToolRegistry().apply {
             register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { ToolResult("ok") })
