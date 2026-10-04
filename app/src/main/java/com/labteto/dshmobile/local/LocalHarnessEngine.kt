@@ -1735,7 +1735,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun syncVisibleWorkRun(sessionId: String) {
-        val binding = liveWorkRun(sessionId) ?: return
+        val binding = activeWorkRuns[sessionId] ?: return
         modelHistory.reset(binding.modelHistory.snapshot())
         transcriptProjectionCursor = binding.transcriptProjectionCursor
         mirrorWorkRunState(binding)
