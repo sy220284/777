@@ -190,7 +190,7 @@ internal class LocalSubagentRunner(
             model = routeModel,
             baseUrl = snapshot.baseUrl,
             routeProfile = runProfile,
-            planMode = snapshot.planMode,
+            planMode = snapshot.work.planMode,
             policy = localAgentRunPolicy(LocalUsageMode.WORK),
             safeAutoApprovalEnabled = snapshot.safeAutoApprovalEnabled,
             maxSteps = stepLimit,
