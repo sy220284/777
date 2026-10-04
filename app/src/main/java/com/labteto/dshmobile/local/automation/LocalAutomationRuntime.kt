@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.automation
 
 import com.labteto.dshmobile.local.LocalAutomationRunResult
 import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import javax.inject.Inject
@@ -11,8 +12,9 @@ import javax.inject.Singleton
 @Singleton
 class LocalAutomationRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
+    runtimeStateStore: LocalRuntimeStateStore,
 ) {
-    private val runtimeState = engine.state
+    private val runtimeState = runtimeStateStore.state
     internal val planningRevisions = runtimeState.map { it.toAutomationPlanningRevision() }.distinctUntilChanged()
 
 
