@@ -8,15 +8,15 @@ import kotlinx.coroutines.delay
 import kotlin.math.ceil
 
 /**
- * Work-run-local model exposure budget.
+ * Work-run-local model admission guard.
  *
  * Reservations are provisional until the transport can classify the attempt. Only requests that
  * may actually have reached provider inference become committed exposure. Explicit HTTP rejection
  * and failures proven to occur before the full request body is sent release both exposure and the
- * request slot. Estimated exposure is safety-only and never enters user token accounting.
+ * request slot. Cumulative exposure is diagnostic only and never blocks a long-running Work run.
+ * Estimated exposure only bounds concurrently pending requests and never enters user token accounting.
  */
 internal class LocalWorkExecutionBudget(
-    private val exposureLimitTokens: Long = DEFAULT_EXPOSURE_LIMIT_TOKENS,
     private val pendingLimitTokens: Long = DEFAULT_PENDING_LIMIT_TOKENS,
     private val maxRequests: Int = DEFAULT_MAX_REQUESTS,
 ) {
@@ -47,19 +47,7 @@ internal class LocalWorkExecutionBudget(
                     throw budgetExceeded("模型请求次数已达到 $maxRequests 次")
                 }
                 reservedEstimate = calibratedEstimate(rawEstimate, normalizedCalibrationKey)
-                val committed = committedExposureTokens()
-                if (saturatingAdd(committed, reservedEstimate) > exposureLimitTokens) {
-                    throw budgetExceeded("本轮预计模型输入已达到安全上限")
-                }
                 if (
-                    pendingExposureTokens > 0L &&
-                    saturatingAdd(saturatingAdd(committed, pendingExposureTokens), reservedEstimate) >
-                    exposureLimitTokens
-                ) {
-                    // The current request itself still fits. Wait for in-flight reservations to
-                    // settle instead of failing merely because temporary pending exposure overlaps.
-                    false
-                } else if (
                     pendingExposureTokens == 0L ||
                     saturatingAdd(pendingExposureTokens, reservedEstimate) <= pendingLimitTokens
                 ) {
@@ -83,7 +71,6 @@ internal class LocalWorkExecutionBudget(
         reportedExposureTokens = reportedExposureTokens,
         uncertainExposureTokens = uncertainExposureTokens,
         pendingExposureTokens = pendingExposureTokens,
-        exposureLimitTokens = exposureLimitTokens,
         admittedRequests = admittedRequests,
         reservedRequests = reservedRequests,
         maxRequests = maxRequests,
@@ -181,7 +168,6 @@ internal class LocalWorkExecutionBudget(
         val reportedExposureTokens: Long,
         val uncertainExposureTokens: Long,
         val pendingExposureTokens: Long,
-        val exposureLimitTokens: Long,
         val admittedRequests: Int,
         val reservedRequests: Int,
         val maxRequests: Int,
@@ -196,7 +182,6 @@ internal class LocalWorkExecutionBudget(
     }
 
     private companion object {
-        const val DEFAULT_EXPOSURE_LIMIT_TOKENS = 1_000_000L
         const val DEFAULT_PENDING_LIMIT_TOKENS = 256_000L
         const val DEFAULT_MAX_REQUESTS = 64
         const val PENDING_RECHECK_MILLIS = 100L
