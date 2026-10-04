@@ -143,13 +143,15 @@ class LocalToolExecutionCoordinatorTest {
                 ToolResult("ok")
             })
         }
+        val arguments = buildJsonObject {
+            put("url", "https://example.com")
+            put("run_in_background", true)
+        }
         val call = LocalToolCall(
-            "fetch-bg",
-            "web_fetch",
-            buildJsonObject {
-                put("url", "https://example.com")
-                put("run_in_background", true)
-            },
+            id = "fetch-bg",
+            name = "web_fetch",
+            arguments = arguments,
+            rawArguments = arguments.toString(),
         )
 
         val readonly = coordinator(registry).executeScoped(
