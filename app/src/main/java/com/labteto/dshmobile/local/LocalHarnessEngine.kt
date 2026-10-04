@@ -220,8 +220,9 @@ class LocalHarnessEngine @Inject constructor(
             eventLogFor = ::eventLogFor,
         )
     }
-    private val agentRunCoordinator by lazy {
-        LocalAgentRunCoordinator(eventLogFor = ::eventLogFor)
+    private val agentRunCoordinator by lazy { LocalAgentRunCoordinator(eventLogFor = ::eventLogFor) }
+    private val foregroundRecoveryCoordinator by lazy {
+        LocalForegroundRecoveryCoordinator(agentRunCoordinator, modelGateway::hasCredential)
     }
     private val toolRegistry
         get() = pluginComposition.tools
@@ -471,7 +472,10 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun runGroupChatTurn(input: String, sourceMessageId: String? = null) =
-        LocalExecutionService.withTurn(context, currentSessionId, { _state.value.error }) { groupChatTurnExecutor.run(input, sourceMessageId) }
+        LocalSessionRuntimeRegistry.withOwner(currentSessionId, LocalSessionRuntimeKind.FOREGROUND) { ownedSessionId ->
+            if (currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
+            LocalExecutionService.withTurn(context, ownedSessionId, { _state.value.error }) { groupChatTurnExecutor.run(input, sourceMessageId) }
+        }
 
     // SupervisorJob keeps one failed child from cancelling unrelated engine work. The handler is the
     // final visibility boundary; operation-specific busy/loading state is still owned by each launch.
@@ -513,6 +517,9 @@ class LocalHarnessEngine @Inject constructor(
     )
     /** Work runs are session-owned and may outlive whichever conversation is currently visible. */
     private val activeWorkRuns = ConcurrentHashMap<String, LocalWorkRunBinding>()
+
+    private fun liveWorkRun(sessionId: String): LocalWorkRunBinding? =
+        activeWorkRuns[sessionId]?.takeIf { it.job?.isCompleted == false }
     private val jobs = LocalJobManager(scope, persistentJobStore) { snapshot ->
         projectJobSnapshotToSessionStates(snapshot, _state, activeWorkRuns)
         syncForegroundJobs(context, snapshot) { message ->
@@ -1027,32 +1034,6 @@ class LocalHarnessEngine @Inject constructor(
             )
         }
         if (_state.value.sessionId == snapshot.sessionId) persist()
-    }
-
-    /** A story direction is a user preference for future turns, never a synthetic user message. */
-    internal fun selectChatDirection(direction: String?) {
-        val snapshot = _state.value
-        if (
-            snapshot.loading ||
-            snapshot.running ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.groupChat.enabled
-        ) return
-        val selected = direction?.let { requested ->
-            snapshot.replySuggestions.firstOrNull { it.direction == requested }
-                ?.let { com.labteto.dshmobile.local.chat.ChatNarrativeDirection(it.label, it.direction) }
-                ?: return
-        }
-        _state.update { current ->
-            if (current.sessionId != snapshot.sessionId) current else current.copy(
-                chatState = current.chatState.copy(narrativeDirection = selected),
-            )
-        }
-        eventLog.append("chat/direction", buildJsonObject {
-            put("label", selected?.label.orEmpty())
-            put("guidance", selected?.guidance.orEmpty())
-        })
-        persist()
     }
 
     /**
@@ -1730,11 +1711,25 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun syncVisibleWorkRun(sessionId: String) {
-        val binding = activeWorkRuns[sessionId] ?: return
+    private fun syncVisibleWorkRun(
+        sessionId: String,
+        ownedBinding: LocalWorkRunBinding? = null,
+    ) {
+        val binding = ownedBinding ?: liveWorkRun(sessionId) ?: return
+        val liveState = binding.state.value
+        liveState.modelSelection.activeProfile
+            ?.takeIf { liveState.configured }
+            ?.let(modelGateway::activate)
+        val resources = resourceScheduler.snapshot()
+        _state.value = liveState.copy(
+            loading = _state.value.loading,
+            usage = usageTracker.state.value,
+            sessions = sessionSummaries(),
+            resources = resources.toLocalHarnessResourceState(liveState.usageMode),
+            contextBudgetChars = localHistoryBudgetFor(memoryClassMb, resources.pressure).maxHistoryChars,
+        )
         modelHistory.reset(binding.modelHistory.snapshot())
         transcriptProjectionCursor = binding.transcriptProjectionCursor
-        mirrorWorkRunState(binding)
     }
 
     private fun queueTurn(
@@ -2445,7 +2440,14 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun startNextQueuedTurnIfIdle(): Job? = synchronized(runStateLock) {
-        if (sessionTransitioning || activeJob?.isCompleted == false) return@synchronized null
+        val liveWorkOwner = liveWorkRun(currentSessionId) != null
+        if (
+            !LocalRuntimeOwnershipPolicy.allowVisibleQueuedTurn(
+                sessionTransitioning = sessionTransitioning,
+                visibleRunActive = activeJob?.isCompleted == false,
+                liveWorkOwner = liveWorkOwner,
+            )
+        ) return@synchronized null
         val next = pendingInputs.poll() ?: return@synchronized null
         val durableMessage = next.modelMessage ?: buildJsonObject {
             put("role", "user")
@@ -2649,7 +2651,8 @@ class LocalHarnessEngine @Inject constructor(
         input: String,
         replacingMessageId: String? = null,
         sourceMessageId: String? = null,
-    ) {
+    ) = LocalSessionRuntimeRegistry.withOwner(currentSessionId, LocalSessionRuntimeKind.FOREGROUND) { ownedSessionId ->
+        if (currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
         cancelChatPostTurn()
         _state.update {
             it.copy(
@@ -2888,7 +2891,8 @@ class LocalHarnessEngine @Inject constructor(
         memoryInput: String = input,
         sourceMessageId: String? = null,
         binding: LocalWorkRunBinding? = null,
-    ) {
+    ) = LocalSessionRuntimeRegistry.withOwner(binding?.sessionId ?: currentSessionId, LocalSessionRuntimeKind.FOREGROUND) { ownedSessionId ->
+        if (binding == null && currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
         val runState = binding?.state ?: _state
         val runEventLog = binding?.eventLog ?: eventLog
         val runHistory = binding?.modelHistory ?: modelHistory
@@ -3009,6 +3013,7 @@ class LocalHarnessEngine @Inject constructor(
 
         val loop = AgentLoop(
             model = AgentModel {
+                agentRunCoordinator.ensureCurrentOwner(runContext)
                 // Persistent history stays compact; user rules, recalled memory and handoff are
                 // assembled per request and are deliberately never written back into runHistory.
                 if (!requestPrepared) {
@@ -3077,6 +3082,7 @@ class LocalHarnessEngine @Inject constructor(
                     maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.model, snapshot.baseUrl),
                 )
                 val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
+                agentRunCoordinator.ensureCurrentOwner(runContext)
                 val rawReply = try {
                     completeWithRetry(
                         key = key,
@@ -3158,6 +3164,7 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             tools = AgentToolExecutor { call ->
+                agentRunCoordinator.ensureCurrentOwner(runContext)
                 if (!runPolicy.allowToolExecution) {
                     AgentToolResult(
                         content = "聊天模式不提供工具执行能力。",
@@ -3165,10 +3172,11 @@ class LocalHarnessEngine @Inject constructor(
                         errorCode = "TOOLS_DISABLED",
                     )
                 } else {
-                    executeSafely(call.toLocalToolCall(), allowMutation = true)
+                    executeSafely(call.toLocalToolCall(), allowMutation = true, binding = binding)
                 }
             },
             toolBatch = AgentToolBatchExecutor { calls ->
+                agentRunCoordinator.ensureCurrentOwner(runContext)
                 if (!runPolicy.allowToolExecution) {
                     calls.map {
                         AgentToolResult(
@@ -3181,6 +3189,7 @@ class LocalHarnessEngine @Inject constructor(
                     executeToolBatch(
                         calls = calls.map { it.toLocalToolCall() },
                         allowMutation = true,
+                        binding = binding,
                     ).map { (_, result) -> result }
                 }
             },
@@ -3188,6 +3197,7 @@ class LocalHarnessEngine @Inject constructor(
                 runPolicy.allowToolExecution && call.name in PARALLEL_SUBAGENT_TOOLS
             },
             eventSink = AgentEventSink { event ->
+                agentRunCoordinator.ensureCurrentOwner(runContext)
                 when (event) {
                     is AgentEvent.TurnStarted -> {
                         runEventLog.append("turn/start", buildJsonObject {
@@ -4610,6 +4620,12 @@ class LocalHarnessEngine @Inject constructor(
         baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
         deferReady: Boolean = false,
     ) {
+        liveWorkRun(sessionId)?.let { liveBinding ->
+            pendingInputs.clear()
+            syncVisibleWorkRun(sessionId, liveBinding)
+            return
+        }
+
         val loaded = try {
             sessionCoordinator.readWithLegacyApproval(sessionId)
         } catch (future: FutureSessionVersionException) {
@@ -4622,8 +4638,6 @@ class LocalHarnessEngine @Inject constructor(
             }
             return
         }
-        // Only mutate the durable event tail after the persisted session format is accepted.
-        // A future-version session must remain completely untouched.
         val recovery = eventLog.repairInterruptedTail()
         recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
@@ -4662,48 +4676,12 @@ class LocalHarnessEngine @Inject constructor(
             .orEmpty()
         pendingInputs.restore(restoredInbox)
         val modelProfiles = modelConfiguration.readProfiles()
-        var recoveredRunProfile: LocalModelProfile? = null
-        var runRecoveryError: String? = null
-        agentRunCoordinator.recoveryDecision(sessionId, recovery)?.let { decision ->
-            val route = decision.route
-            val exactRecoveryProfile = route?.let { identity ->
-                resolveRecoveryModelProfile(modelProfiles, identity)
-            }
-            val routeMismatch = route != null &&
-                (exactRecoveryProfile == null || !modelGateway.hasCredential(exactRecoveryProfile))
-            val blocked = when {
-                decision.blockedReason != null -> decision.blockedReason
-                routeMismatch -> "上次任务绑定的模型账户或凭据身份已变化，已停止自动续跑。请恢复原模型配置后再继续。"
-                else -> null
-            }
-            if (blocked != null) {
-                runRecoveryError = blocked
-                agentRunCoordinator.markRecoveryBlocked(sessionId, decision.runId, blocked)
-            } else {
-                recoveredRunProfile = exactRecoveryProfile
-                val queued = decision.queuedInput
-                if (queued != null && pendingInputs.snapshot().none { it.id == queued.id }) {
-                    if (pendingInputs.offer(queued)) {
-                        eventLog.append(
-                            LOCAL_AGENT_INBOX_EVENT_TYPE,
-                            encodeLocalAgentInboxEvent(
-                                action = "recovered-run",
-                                pending = pendingInputs.snapshot(),
-                                affected = listOf(queued),
-                            ),
-                        )
-                        agentRunCoordinator.markRecoveryQueued(sessionId, decision.runId)
-                    } else {
-                        runRecoveryError = "上次任务可以安全续跑，但待处理输入队列已满，请先处理现有任务。"
-                        agentRunCoordinator.markRecoveryBlocked(
-                            sessionId,
-                            decision.runId,
-                            runRecoveryError.orEmpty(),
-                        )
-                    }
-                }
-            }
-        }
+        val recoveryDecision = agentRunCoordinator.recoveryDecision(sessionId, recovery)
+        val recoveryState = foregroundRecoveryCoordinator.restore(
+            sessionId, recoveryDecision, modelProfiles, pendingInputs, eventLog,
+        )
+        val recoveredRunProfile = recoveryState.profile
+        val runRecoveryError = recoveryState.error
         val profile = userProfileStore.read()
         val restoredBehavior = withContext(Dispatchers.IO) {
             reconcileCharacterBehaviorTuning(
@@ -4805,6 +4783,7 @@ class LocalHarnessEngine @Inject constructor(
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
             error = runRecoveryError,
         )
+        LocalSessionRuntimeRegistry.submitWhenIdle(sessionId) {
         var wroteHistoryCheckpoint = false
         if (_state.value.groupChat.enabled) {
             projectGroupGalleryState(_state.value.groupChat, chatPersonaGalleryStore).failures.forEach { failure ->
@@ -4842,6 +4821,7 @@ class LocalHarnessEngine @Inject constructor(
         ) {
             // Materialize migrated/replayed projections so later restarts only fold the new tail.
             persist()
+        }
         }
     }
 

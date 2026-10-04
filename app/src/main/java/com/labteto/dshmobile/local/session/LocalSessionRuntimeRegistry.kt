@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.sync.Mutex
 
 internal enum class LocalSessionRuntimeKind {
+    FOREGROUND,
     AUTOMATION_CHAT,
     AUTOMATION_WORK,
 }
@@ -33,6 +34,27 @@ internal object LocalSessionRuntimeRegistry {
 
     @Synchronized
     internal fun retainedSessionCount(): Int = entries.size
+
+    /** Projection reads are allowed during a run, but load-time durable rewrites are not. */
+    @Synchronized
+    fun submitWhenIdle(sessionId: String, submit: () -> Unit): Boolean {
+        if (hasLiveOwner(sessionId)) return false
+        submit()
+        return true
+    }
+
+    suspend fun <T> withOwner(
+        sessionId: String,
+        kind: LocalSessionRuntimeKind,
+        block: suspend (String) -> T,
+    ): T {
+        val lease = acquire(sessionId, kind)
+        try {
+            return block(sessionId)
+        } finally {
+            lease.close()
+        }
+    }
 
     suspend fun acquire(
         sessionId: String,

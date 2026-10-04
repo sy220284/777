@@ -102,4 +102,29 @@ class LocalSessionRuntimeRegistryTest {
         assertTrue(acquired)
         assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("handoff-session"))
     }
+    @Test
+    fun foregroundAndAutomationShareOneSessionOwner() = runTest {
+        var automationStarted = false
+        val foreground = LocalSessionRuntimeRegistry.acquire("shared-owner", LocalSessionRuntimeKind.FOREGROUND)
+        val automation = launch {
+            LocalSessionRuntimeRegistry.withOwner("shared-owner", LocalSessionRuntimeKind.AUTOMATION_WORK) {
+                automationStarted = true
+            }
+        }
+        runCurrent()
+        assertFalse(automationStarted)
+        foreground.close()
+        automation.join()
+        assertTrue(automationStarted)
+        assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("shared-owner"))
+    }
+    @Test
+    fun activeRuntimePreventsLoadTimeDurableRewrite() = runTest {
+        val lease = LocalSessionRuntimeRegistry.acquire("load-write", LocalSessionRuntimeKind.AUTOMATION_CHAT)
+        var writes = 0
+        assertFalse(LocalSessionRuntimeRegistry.submitWhenIdle("load-write") { writes++ })
+        lease.close()
+        assertTrue(LocalSessionRuntimeRegistry.submitWhenIdle("load-write") { writes++ })
+        assertEquals(1, writes)
+    }
 }

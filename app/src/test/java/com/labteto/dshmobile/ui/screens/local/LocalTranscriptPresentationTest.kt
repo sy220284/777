@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.components.DsStatus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -223,44 +224,63 @@ class LocalTranscriptPresentationTest {
     }
 
     @Test
-    fun transcriptWindowKeepsOnlyNewestMessagesAndReportsHiddenCount() {
-        val messages = (1..500).map { index ->
-            message("m$index", if (index % 2 == 0) "assistant" else "user", "message-$index")
+    fun visibleDialogueQuotaIgnoresBackgroundWorkMessages() {
+        val messages = buildList {
+            repeat(10) { turn ->
+                add(message("u$turn", "user", "问题-$turn"))
+                repeat(12) { step ->
+                    val role = when (step % 3) {
+                        0 -> "reasoning"
+                        1 -> "progress"
+                        else -> "tool"
+                    }
+                    add(message("bg-$turn-$step", role, "后台-$turn-$step", toolName = "read"))
+                }
+                add(message("a$turn", "assistant", "回答-$turn"))
+            }
         }
 
-        val initial = localTranscriptWindow(messages, 200)
-        assertEquals(200, initial.messages.size)
-        assertEquals(300, initial.hiddenCount)
-        assertEquals("m301", initial.messages.first().id)
-        assertEquals("m500", initial.messages.last().id)
-
-        val expanded = localTranscriptWindow(messages, 400)
-        assertEquals(400, expanded.messages.size)
-        assertEquals(100, expanded.hiddenCount)
-        assertEquals("m101", expanded.messages.first().id)
+        assertEquals(20, userVisibleDialogueMessageCount(messages))
+        assertTrue(needsMoreUserVisibleDialogue(messages, target = 200))
     }
 
     @Test
-    fun historyBootstrapConsumesOnlyTheLiveWindowBeforePagingOlderRows() {
-        assertEquals(28, transcriptHistoryBootstrapLimit(liveMessageCount = 28, maxPageSize = 200))
-        assertEquals(1, transcriptHistoryBootstrapLimit(liveMessageCount = 0, maxPageSize = 200))
-        assertEquals(200, transcriptHistoryBootstrapLimit(liveMessageCount = 500, maxPageSize = 200))
+    fun olderDialogueBackfillRestoresVisibleQuotaWithoutCountingToolNoise() {
+        val live = buildList {
+            repeat(10) { turn ->
+                add(message("live-u$turn", "user", "当前问题-$turn"))
+                repeat(16) { step ->
+                    add(message("live-tool-$turn-$step", "tool", "结果", toolName = "read"))
+                }
+                add(message("live-a$turn", "assistant", "当前回答-$turn"))
+            }
+        }
+        val older = buildList {
+            repeat(90) { turn ->
+                add(message("old-u$turn", "user", "旧问题-$turn"))
+                repeat(4) { step ->
+                    add(message("old-bg-$turn-$step", "progress", "旧后台-$turn-$step"))
+                }
+                add(message("old-a$turn", "assistant", "旧回答-$turn"))
+            }
+        }
+
+        assertEquals(20, userVisibleDialogueMessageCount(live))
+        val merged = mergeLocalTranscriptHistory(older, live)
+        assertEquals(200, userVisibleDialogueMessageCount(merged))
+        assertFalse(needsMoreUserVisibleDialogue(merged, target = 200))
     }
 
     @Test
-    fun historyBootstrapKeepsPageRowsThatAreMissingFromLiveWindow() {
-        val page = (1..5).map { index ->
-            message("m$index", "user", "page-$index")
-        } + message("m3", "user", "duplicate-page-3")
-        val live = listOf(
-            message("m4", "assistant", "live-4"),
-            message("m5", "user", "live-5"),
+    fun legacyToolAssistantDoesNotConsumeVisibleDialogueQuota() {
+        val messages = listOf(
+            message("u1", "user", "帮我检查"),
+            message("a-process", "assistant", "我先读取文件"),
+            message("t1", "tool", "raw", toolName = "read"),
+            message("a-final", "assistant", "检查完成"),
         )
 
-        val extras = transcriptHistoryPageExtras(pageMessages = page, liveMessages = live)
-
-        assertEquals(listOf("m1", "m2", "m3"), extras.map { it.id })
-        assertEquals("page-3", extras.last().content)
+        assertEquals(2, userVisibleDialogueMessageCount(messages))
     }
 
     @Test

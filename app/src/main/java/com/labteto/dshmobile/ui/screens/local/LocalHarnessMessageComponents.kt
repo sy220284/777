@@ -387,7 +387,6 @@ internal fun ChatThinkingRow(
     }
 }
 
-internal const val LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES = 200
 internal const val MAX_LOCAL_IMAGE_SELECTION = 20
 
 

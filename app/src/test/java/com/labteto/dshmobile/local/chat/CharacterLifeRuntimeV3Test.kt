@@ -33,7 +33,7 @@ class CharacterLifeRuntimeV3Test {
         }
 
         assertEquals("用户最近很忙", state.currentUserImpression)
-        assertEquals("用户最近很忙", state.recentImpression)
+        assertTrue(state.recentImpression.isBlank())
     }
 
     @Test

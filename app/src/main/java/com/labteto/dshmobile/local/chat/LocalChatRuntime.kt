@@ -21,7 +21,6 @@ class LocalChatRuntime @Inject constructor(
         expectedStoryId: String? = null,
         keepCharacter: Boolean = false,
     ) = engine.clearChatGalleryBinding(expectedGalleryId, expectedStoryId, keepCharacter)
-    internal fun selectChatDirection(direction: String?) = engine.selectChatDirection(direction)
     internal suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile =
         engine.syncDefaultChatPersona(profile)
     internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean = engine.createGroupChatSession(entries)

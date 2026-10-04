@@ -81,6 +81,28 @@ class CharacterBehaviorTuningTest {
     }
 
     @Test
+    fun v3ModeConsumesLoreAndRelationshipPaceWithoutRewritingRelationshipFacts() {
+        val attention = CharacterAttentionProjection()
+        val naturalState = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.FLIRTING.name,
+            behaviorTuning = CharacterBehaviorTuning(),
+        )
+        val tunedState = naturalState.copy(
+            behaviorTuning = CharacterBehaviorTuning(
+                loreAdherence = 0,
+                relationshipPace = 100,
+            ),
+        )
+
+        val natural = resolveCharacterMode(PersonaProfile(), naturalState, "靠近一点", attention).vector
+        val tuned = resolveCharacterMode(PersonaProfile(), tunedState, "靠近一点", attention).vector
+
+        assertTrue(tuned.freedom > natural.freedom)
+        assertTrue(tuned.initiative > natural.initiative)
+        assertEquals(naturalState.dynamics, tunedState.dynamics)
+    }
+
+    @Test
     fun staleImportedTuningCannotOverwriteNewerLocalChoice() {
         val local = CharacterBehaviorTuning(intimacy = 90, updatedAt = 200)
         val stale = CharacterBehaviorTuning(intimacy = 10, updatedAt = 100)

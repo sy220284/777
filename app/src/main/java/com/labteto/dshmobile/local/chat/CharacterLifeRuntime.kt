@@ -9,7 +9,7 @@ internal fun advanceCharacterLife(
     persona: PersonaProfile,
     state: ChatCharacterState,
     now: Long = System.currentTimeMillis(),
-    storyTime: String = state.scene.sceneTime,
+    storyTime: String = "",
 ): CharacterLifeState {
     val previous = state.lifeState
     val events = linkedMapOf<String, CharacterLifeEvent>()

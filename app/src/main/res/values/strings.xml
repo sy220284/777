@@ -1257,8 +1257,8 @@
     <string name="tasks_chat_quiet_hours_hint">在你设置的时段内暂缓主动消息，不占聊天回合，也不调用模型。</string>
     <string name="tasks_chat_notification_title">%1$s 发来一条消息</string>
 
-    <string name="local_transcript_load_older">加载更早消息 · 还有 %1$d 条</string>
-    <string name="local_transcript_load_older_unknown">加载更早消息</string>
+    <string name="local_transcript_loading_older">正在加载更早对话…</string>
+    <string name="local_transcript_retry_older">更早对话加载失败，点击重试</string>
     <string name="advanced_project_risk_notice">此区块直接修改 Harness 侧 settings 命名空间。部分配置立即生效，部分需要重启；修改生产配置前建议与 Harness 管理员确认。</string>
     <string name="advanced_user_rules_count">%1$d / %2$d 字</string>
     <string name="advanced_memory_filter_count">%1$s %2$d</string>

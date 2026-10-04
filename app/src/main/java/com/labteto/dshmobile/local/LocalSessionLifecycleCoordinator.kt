@@ -10,6 +10,7 @@ import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatDiaryStore
+import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
 import com.labteto.dshmobile.local.chat.continuePendingInSession
 import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
@@ -214,7 +215,7 @@ internal class LocalSessionLifecycleCoordinator(
                         !freshGalleryStory
                     ) {
                         selectedGalleryStory?.chatState?.let { storyState ->
-                            storyState.copy(
+                            storyState.canonicalizeLegacyCharacterState().copy(
                                 behaviorTuning = resolveCharacterBehaviorTuning(
                                     storyState.behaviorTuning, chatPersona.behaviorTuning,
                                 ),
@@ -241,7 +242,8 @@ internal class LocalSessionLifecycleCoordinator(
                     val chatContext = when {
                         resolvedChatMode == LocalChatMode.GROUP -> ChatContextState()
                         galleryEntry != null && usageMode == LocalUsageMode.CHAT && !freshGalleryStory ->
-                            ChatContextState().withLegacyFallback(chatState)
+                            selectedGalleryStory?.chatContext?.withLegacyFallback(chatState)
+                                ?: ChatContextState().withLegacyFallback(chatState)
                         continueSingleChatBinding -> sourceState.chatContext.continuePendingInSession(
                             sessionsRoot, sourceId, nextSessionId, "direct",
                             if (hasChatBranchAlternatives(sourceState.chatBranches)) {

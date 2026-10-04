@@ -502,17 +502,17 @@ private fun BehaviorSlider(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                valueLabel,
+                "$valueLabel · $clean",
                 style = DsType.small13Strong.withReadingWeight(),
                 color = colors.characterAccent,
             )
         }
         Slider(
             value = clean.toFloat(),
-            onValueChange = { onValueChange((it / 25f).roundToInt().coerceIn(0, 4) * 25) },
+            onValueChange = { onValueChange(it.roundToInt().coerceIn(0, 100)) },
             enabled = enabled,
             valueRange = 0f..100f,
-            steps = 3,
+            steps = 99,
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics { contentDescription = title },
