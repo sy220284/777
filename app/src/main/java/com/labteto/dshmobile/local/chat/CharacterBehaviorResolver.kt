@@ -75,6 +75,17 @@ internal fun resolveCharacterMode(
     disclosure += tuningDelta(tuning.intimacy, 8)
     affect += tuningDelta(tuning.intimacy, 6)
     freedom += tuningDelta(tuning.novelty, 12)
+    freedom -= tuningDelta(tuning.loreAdherence, 18)
+    if (
+        state.interactionIntent == ChatInteractionIntent.FLIRTING.name ||
+        state.interactionIntent == ChatInteractionIntent.INTIMATE.name ||
+        state.interactionIntent == ChatInteractionIntent.RELATIONSHIP_PROGRESS.name
+    ) {
+        val pace = tuningDelta(tuning.relationshipPace, 8)
+        initiative += pace
+        affect += pace / 2
+        subtext += pace / 2
+    }
     initiative += tuningDelta(state.initiative, 14)
     disclosure += tuningDelta(state.shareDesire, 14)
 
@@ -141,7 +152,7 @@ internal fun resolveCharacterMode(
         repair += 8
         freedom += 8
     }
-    if (state.currentUserImpression.isNotBlank() || state.recentImpression.isNotBlank()) subtext += 5
+    if (state.currentUserImpression.isNotBlank()) subtext += 5
 
     val cues = buildList {
         persona.coreTension.takeIf(String::isNotBlank)?.let(::add)

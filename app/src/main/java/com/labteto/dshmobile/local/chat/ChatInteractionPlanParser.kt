@@ -44,8 +44,6 @@ internal class ChatInteractionPlanParser(
                     text = suggestion.text.trim().take(320),
                     style = style,
                     bold = suggestion.bold || style == "放飞",
-                    direction = suggestion.direction.trim().take(200),
-                    impact = suggestion.impact.trim().take(120),
                 )
             }
             .filter { it.label.isNotBlank() && it.text.isNotBlank() }

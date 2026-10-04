@@ -127,7 +127,31 @@ internal fun mergeChatState(base: ChatCharacterState, incoming: ChatCharacterSta
             sharedMoments = mergePersonaLines(older.dynamics.sharedMoments, newer.dynamics.sharedMoments, 30),
             sharedObjects = mergePersonaLines(older.dynamics.sharedObjects, newer.dynamics.sharedObjects, 30),
         ),
-    )
+    ).canonicalizeLegacyCharacterState().withoutLegacyConversationContext()
+}
+
+private fun mergeGalleryChatContext(
+    base: ChatContextState,
+    incoming: ChatContextState,
+): ChatContextState {
+    val left = base.normalized()
+    val right = incoming.normalized()
+    if (!left.hasUsefulFacts()) return right
+    if (!right.hasUsefulFacts()) return left
+    return right.copy(
+        scene = right.scene.copy(
+            sceneTime = right.scene.sceneTime.ifBlank { left.scene.sceneTime },
+            location = right.scene.location.ifBlank { left.scene.location },
+        ),
+        continuity = right.continuity.copy(
+            recentEvents = mergePersonaLines(left.continuity.recentEvents, right.continuity.recentEvents, 5),
+            decisions = mergePersonaLines(left.continuity.decisions, right.continuity.decisions, 4),
+            unfinished = mergePersonaLines(left.continuity.unfinished, right.continuity.unfinished, 4),
+        ),
+        pendingTurns = emptyList(),
+        pendingThroughSequence = -1L,
+        pendingArchiveReady = false,
+    ).normalized()
 }
 
 internal fun mergeGalleryStories(
@@ -141,6 +165,7 @@ internal fun mergeGalleryStories(
         history = mergeHistory(base.history, incoming.history)
             .filterNot { galleryMessageArchiveKey(it) in excluded },
         chatState = mergeChatState(base.chatState, incoming.chatState),
+        chatContext = mergeGalleryChatContext(base.chatContext, incoming.chatContext),
         sourceSessionIds = mergePersonaLines(base.sourceSessionIds, incoming.sourceSessionIds, 40),
         excludedMessageKeys = excluded,
         updatedAt = maxOf(base.updatedAt, incoming.updatedAt),

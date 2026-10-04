@@ -65,6 +65,7 @@ data class ChatCharacterState(
     val mood: String = "自然",
     val relationshipState: String = "熟悉中",
     val currentFocus: String = "",
+    /** Legacy decode-only field. Storage boundaries migrate it once, then clear it. */
     val recentImpression: String = "",
     /** Durable subjective impression; unlike transient mood/focus it does not expire by turn count. */
     val currentUserImpression: String = "",
@@ -82,7 +83,6 @@ data class ChatCharacterState(
     val userPattern: UserChatPattern = UserChatPattern(),
     val scene: ChatSceneState = ChatSceneState(),
     val continuity: ChatContinuityState = ChatContinuityState(),
-    val narrativeDirection: ChatNarrativeDirection? = null,
     val interactionIntent: String = ChatInteractionIntent.NORMAL.name,
     val interactionIntentStrength: Int = 0,
     val interactionIntensity: Int = 0,
@@ -98,11 +98,17 @@ data class ChatCharacterState(
     val updatedAt: Long = 0L,
 )
 
-@Serializable
-data class ChatNarrativeDirection(
-    val label: String,
-    val guidance: String,
-)
+internal fun ChatCharacterState.canonicalizeLegacyCharacterState(): ChatCharacterState {
+    val migratedImpression = currentUserImpression.ifBlank { recentImpression }
+    return if (recentImpression.isBlank() && migratedImpression == currentUserImpression) {
+        this
+    } else {
+        copy(
+            currentUserImpression = migratedImpression,
+            recentImpression = "",
+        )
+    }
+}
 
 @Serializable
 data class ChatReplySuggestion(
@@ -111,9 +117,6 @@ data class ChatReplySuggestion(
     val text: String = "",
     val style: String = "",
     val bold: Boolean = false,
-    // Legacy story-direction fields are retained only for session compatibility.
-    val direction: String = "",
-    val impact: String = "",
 )
 
 @Serializable

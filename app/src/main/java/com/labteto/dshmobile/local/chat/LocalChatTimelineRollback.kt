@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -77,6 +78,7 @@ internal fun restoreChatStateBefore(
         if (encoded != null) {
             runCatching {
                 json.decodeFromJsonElement(ChatCharacterState.serializer(), encoded)
+                    .canonicalizeLegacyCharacterState()
             }.getOrNull()
         } else {
             // Compatibility with old post-turn events that only persisted these two fields.
@@ -116,6 +118,7 @@ internal fun restoreGroupStateBefore(
         val encoded = event.data[key] as? JsonObject ?: return@mapNotNull null
         runCatching {
             json.decodeFromJsonElement(LocalGroupChatState.serializer(), encoded)
+                .migrateLegacyConversationContext()
         }.getOrNull()
     }
     .lastOrNull()
@@ -192,6 +195,7 @@ internal fun restoreGroupStateBefore(
     val encoded = event.data[key] as? JsonObject ?: return@scanTimelineBackward null
     runCatching {
         json.decodeFromJsonElement(LocalGroupChatState.serializer(), encoded)
+            .migrateLegacyConversationContext()
     }.getOrNull()
 }
 
@@ -203,6 +207,7 @@ private fun decodeChatStateEvent(
     if (encoded != null) {
         return runCatching {
             json.decodeFromJsonElement(ChatCharacterState.serializer(), encoded)
+                .canonicalizeLegacyCharacterState()
         }.getOrNull()
     }
 
