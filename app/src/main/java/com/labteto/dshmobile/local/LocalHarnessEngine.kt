@@ -57,7 +57,6 @@ import com.labteto.dshmobile.local.chat.saveGroupChatAnnouncement
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.ChatDiaryStore
-import com.labteto.dshmobile.local.chat.ChatDiaryTransferCoordinator
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.LocalReplySuggestionCoordinator
@@ -154,7 +153,6 @@ class LocalHarnessEngine @Inject constructor(
 ) {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val chatDiaryStore = ChatDiaryStore(File(root, "chat-diary"), json)
-    private val chatDiaryTransfer = ChatDiaryTransferCoordinator(File(root, "chat-diary"), json)
     private val memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
     private val persistentJobStore = LocalPersistentJobStore(
         file = File(root, "jobs.json"),
@@ -1184,12 +1182,6 @@ class LocalHarnessEngine @Inject constructor(
     internal suspend fun generateReplySuggestions(): Boolean =
         replySuggestionCoordinator.generate()
     internal fun chatDiaryEntries(subjectKey: String, limit: Int) = chatDiaryStore.listActive(subjectKey, limit)
-    internal fun chatDiaryEntriesForTransfer(subjectKey: String) = chatDiaryTransfer.list(subjectKey)
-    internal fun importChatDiaryEntriesForTransfer(
-        subjectKey: String,
-        personaName: String,
-        entries: List<com.labteto.dshmobile.local.chat.ChatDiaryEntry>,
-    ): Int = chatDiaryTransfer.import(subjectKey, personaName, entries)
 
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult {
