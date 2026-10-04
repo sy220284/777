@@ -1,8 +1,6 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
-import com.labteto.dshmobile.harness.session.SessionRepairResult
-
 internal data class LocalForegroundRecoveryResult(
     val profile: LocalModelProfile? = null,
     val error: String? = null,
@@ -15,13 +13,12 @@ internal class LocalForegroundRecoveryCoordinator(
 ) {
     fun restore(
         sessionId: String,
-        repair: SessionRepairResult,
+        decision: LocalAgentRunRecoveryDecision?,
         profiles: List<LocalModelProfile>,
         pendingInputs: AgentInputQueue,
         eventLog: LocalSessionEventLog,
     ): LocalForegroundRecoveryResult {
-        val decision = agentRunCoordinator.recoveryDecision(sessionId, repair)
-            ?: return LocalForegroundRecoveryResult()
+        decision ?: return LocalForegroundRecoveryResult()
         val route = decision.route
         val exactProfile = route?.let { resolveRecoveryModelProfile(profiles, it) }
         val blocked = when {
