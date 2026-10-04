@@ -134,7 +134,7 @@ class ChatPersonaGalleryStore internal constructor(
                 updatedAt = now,
             )
         }
-        val entry = history.archiveEntry(normalizeEntry(mergedEntry))
+        val entry = history.archiveEntry(migrateLegacyPersonaGalleryEntry(mergedEntry))
         documentStore.write(doc.copy(version = 5, entries = doc.entries.filterNot { it.id == entryId } + entry))
         return entry
     }
@@ -182,8 +182,7 @@ class ChatPersonaGalleryStore internal constructor(
         sourceSessionId: String,
         history: List<LocalHarnessMessage>,
         chatState: ChatCharacterState,
-        notes: String,
-        chatContext: ChatContextState = ChatContextState(),
+        notes: String, chatContext: ChatContextState = ChatContextState(),
         existingId: String? = null,
         existingStoryId: String? = null,
         forceNewStory: Boolean = false,
@@ -344,10 +343,7 @@ class ChatPersonaGalleryStore internal constructor(
     fun updateGroupChatState(id: String, chatState: ChatCharacterState): PersonaGalleryEntry? {
         val doc = readNormalized()
         val current = doc.entries.firstOrNull { it.id == id } ?: return null
-        val mergedState = mergeChatState(
-            current.groupChatState,
-            chatState.canonicalizeLegacyCharacterState().withoutLegacyConversationContext(),
-        )
+        val mergedState = mergeChatState(current.groupChatState, chatState.canonicalizeLegacyCharacterState().withoutLegacyConversationContext())
         val now = maxOf(System.currentTimeMillis(), mergedState.updatedAt)
         val updated = current.copy(
             groupChatState = mergedState,
@@ -433,25 +429,12 @@ class ChatPersonaGalleryStore internal constructor(
         return true
     }
 
-    private fun normalizeEntry(entry: PersonaGalleryEntry): PersonaGalleryEntry = entry.copy(
-        groupChatState = entry.groupChatState
-            .canonicalizeLegacyCharacterState()
-            .withoutLegacyConversationContext(),
-        stories = entry.stories.map { story ->
-            val legacyState = story.chatState.canonicalizeLegacyCharacterState()
-            story.copy(
-                chatState = legacyState.withoutLegacyConversationContext(),
-                chatContext = story.chatContext.withLegacyFallback(legacyState),
-            )
-        },
-    )
-
     private fun readNormalized(): GalleryDocument {
         val document = documentStore.read()
         require(document.version == 5) {
             "人物图集版本不受支持；新版角色系统不读取旧人物数据"
         }
-        val entries = document.entries.map(history::migrate).map(::normalizeEntry)
+        val entries = document.entries.map(history::migrate).map(::migrateLegacyPersonaGalleryEntry)
         val normalized = document.copy(entries = entries)
         if (normalized != document) documentStore.write(normalized)
         return normalized
