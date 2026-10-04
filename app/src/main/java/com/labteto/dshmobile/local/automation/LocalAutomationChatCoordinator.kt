@@ -247,7 +247,7 @@ internal class LocalAutomationChatCoordinator(
                 val sessionTranscriptIndex = localTranscriptIndexForSession(session)
                 val boundState = runtime.copy(
                     sessionId = session.id,
-                    model = runProfile.model, baseUrl = runProfile.baseUrl,
+                    modelState = runtime.modelState.copy(model = runProfile.model, baseUrl = runProfile.baseUrl),
                     usageMode = LocalUsageMode.CHAT,
                     personaId = session.personaId,
                     galleryId = session.galleryId,
@@ -315,7 +315,7 @@ internal class LocalAutomationChatCoordinator(
                     dynamicContext = dynamicContext,
                 )
                 boundEventLog.append("turn/start", buildJsonObject {
-                    put("model", boundState.model)
+                    put("model", boundState.modelState.model)
                     put("mode", "chat")
                     put("automation", true)
                     put("proactive", true)
