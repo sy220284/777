@@ -7,14 +7,15 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
 /**
- * Shared admitted provider-call boundary for foreground agents and subagents.
+ * Shared admitted provider-call boundary for foreground agents, subagents and bounded auxiliary work.
  *
- * Route identity, context admission, Work exposure budget, resource lease and provider invocation
- * are one operation. Retry/recovery orchestration is owned by LocalAgentModelStepRuntime.
+ * Foreground/subagent callers pass the Engine-owned resource scheduler. Auxiliary calls may omit it;
+ * they still share frozen route, context admission and provider invocation without creating a second
+ * resource-scheduling fact source.
  */
 internal class LocalAgentModelRequestRuntime(
     private val modelGateway: LocalModelGateway,
-    private val resourceScheduler: HarnessResourceScheduler,
+    private val resourceScheduler: HarnessResourceScheduler? = null,
 ) {
     suspend fun complete(
         surface: LocalRunModelSurface,
@@ -29,34 +30,40 @@ internal class LocalAgentModelRequestRuntime(
         admissionHandledExternally: Boolean = false,
         onDelta: (LocalModelDelta) -> Unit = {},
     ): LocalModelReply {
+        val completeProvider: suspend () -> LocalModelReply = {
+            if (streaming) {
+                modelGateway.completeStreaming(
+                    model = surface.model,
+                    baseUrl = surface.baseUrl,
+                    messages = messages,
+                    tools = tools,
+                    temperature = temperature,
+                    profile = surface.profile,
+                    promptCacheComparisonResponseId = promptCacheComparisonResponseId,
+                    promptCacheKey = promptCacheKey,
+                    promptCacheTtl = promptCacheTtl,
+                    onDelta = onDelta,
+                )
+            } else {
+                modelGateway.complete(
+                    model = surface.model,
+                    baseUrl = surface.baseUrl,
+                    messages = messages,
+                    tools = tools,
+                    temperature = temperature,
+                    profile = surface.profile,
+                    promptCacheComparisonResponseId = promptCacheComparisonResponseId,
+                    promptCacheKey = promptCacheKey,
+                    promptCacheTtl = promptCacheTtl,
+                )
+            }
+        }
         val invokeProvider: suspend () -> LocalModelReply = {
-            resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                if (streaming) {
-                    modelGateway.completeStreaming(
-                        model = surface.model,
-                        baseUrl = surface.baseUrl,
-                        messages = messages,
-                        tools = tools,
-                        temperature = temperature,
-                        profile = surface.profile,
-                        promptCacheComparisonResponseId = promptCacheComparisonResponseId,
-                        promptCacheKey = promptCacheKey,
-                        promptCacheTtl = promptCacheTtl,
-                        onDelta = onDelta,
-                    )
-                } else {
-                    modelGateway.complete(
-                        model = surface.model,
-                        baseUrl = surface.baseUrl,
-                        messages = messages,
-                        tools = tools,
-                        temperature = temperature,
-                        profile = surface.profile,
-                        promptCacheComparisonResponseId = promptCacheComparisonResponseId,
-                        promptCacheKey = promptCacheKey,
-                        promptCacheTtl = promptCacheTtl,
-                    )
-                }
+            val scheduler = resourceScheduler
+            if (scheduler != null) {
+                scheduler.withResource(HarnessResourceKind.MODEL_REQUEST) { completeProvider() }
+            } else {
+                completeProvider()
             }
         }
         if (admissionHandledExternally) return invokeProvider()
