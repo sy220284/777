@@ -64,6 +64,11 @@ internal class LocalAutomationWorkCoordinator(
 
         val session = resolveSession(preferredSessionId, prompt)
         val sessionId = session.id
+        val sessionLease = LocalSessionRuntimeRegistry.acquire(
+            sessionId,
+            LocalSessionRuntimeKind.AUTOMATION_WORK,
+        )
+        try {
         val boundState = boundState(session)
         val boundEventLog = eventLogFor(sessionId)
         val recovery = if (recoverInterrupted) {
@@ -169,6 +174,9 @@ internal class LocalAutomationWorkCoordinator(
                 eventLog = boundEventLog,
             )
             throw LocalAutomationWorkException(detail, sessionId, error)
+        }
+        } finally {
+            sessionLease.close()
         }
     }
 
