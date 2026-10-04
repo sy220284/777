@@ -146,7 +146,7 @@ internal class LocalGroupChatTurnExecutor(
     ): GroupGeneratedReply {
         val persona = chatPersonaStore.get(member.personaId)
         val startedAtNanos = System.nanoTime()
-        val interactiveAttempts = snapshot.modelState.modelState.modelAttempts.coerceIn(1, 2)
+        val interactiveAttempts = snapshot.modelState.modelAttempts.coerceIn(1, 2)
 
         return try {
             val turnContext = chatReplyCoordinator.buildGroupTurnContext(
@@ -167,7 +167,7 @@ internal class LocalGroupChatTurnExecutor(
                 dynamicContext = turnContext.dynamicPrompt,
             )
             val groupImageMode = resolveLocalImageInputMode(
-                snapshot.modelState.modelState.imageInputMode,
+                snapshot.modelState.imageInputMode,
                 imageCapabilities,
                 snapshot.modelState.baseUrl,
                 snapshot.modelState.model,
@@ -858,7 +858,7 @@ internal class LocalGroupChatTurnExecutor(
     private suspend fun modelRequestMarkerOrNull(snapshot: LocalHarnessState): String? =
         try {
             modelGateway.profileForRoute(
-                profileId = snapshot.modelState.modelState.modelSelection.activeProfileId,
+                profileId = snapshot.modelState.modelSelection.activeProfileId,
                 model = snapshot.modelState.model,
                 baseUrl = snapshot.modelState.baseUrl,
             ).id
