@@ -13,7 +13,7 @@ internal fun prepareAutomationWorkRecovery(
     profiles: List<LocalModelProfile>,
     agentRunCoordinator: LocalAgentRunCoordinator,
 ): LocalAutomationWorkRecoveryPlan {
-    val repair = eventLog.repairInterruptedTail()
+    val repair = eventLog.repairInterruptedTail(force = true)
     val decision = agentRunCoordinator.recoveryDecision(
         sessionId = sessionId,
         repair = repair,
