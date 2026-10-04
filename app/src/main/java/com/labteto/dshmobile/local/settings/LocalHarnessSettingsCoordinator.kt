@@ -1,20 +1,35 @@
 package com.labteto.dshmobile.local
 
-import android.content.SharedPreferences
+import android.content.Context
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.model.LOCAL_WORKER_PROFILE_ID_PREFERENCE
 import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-internal class LocalHarnessSettingsCoordinator(
-    private val preferences: SharedPreferences,
+@Singleton
+internal class LocalHarnessSettingsCoordinator @Inject constructor(
+    @ApplicationContext context: Context,
     private val userProfileStore: UserProfileStore,
-    private val scope: CoroutineScope,
-    private val state: () -> LocalHarnessState,
-    private val updateState: ((LocalHarnessState) -> LocalHarnessState) -> Unit,
+    private val runtimeStateStore: LocalRuntimeStateStore,
 ) {
+    private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val state get() = runtimeStateStore.state.value
+
+    internal fun readUserProfile(): UserProfile = userProfileStore.read()
+
+    private fun updateState(transform: (LocalHarnessState) -> LocalHarnessState) {
+        runtimeStateStore.mutableState.update(transform)
+    }
     fun configureRuntimeLimits(
         mainMaxSteps: Int,
         subagentMaxSteps: Int,
@@ -39,7 +54,7 @@ internal class LocalHarnessSettingsCoordinator(
 
     fun configureWorkerProfile(profileId: String?) {
         val normalized = profileId?.trim()?.takeIf(String::isNotBlank)
-        val current = state()
+        val current = state
         require(normalized == null || current.modelState.modelSelection.profiles.any { it.id == normalized }) {
             "子代理工作模型已不存在，请重新选择"
         }
@@ -68,7 +83,14 @@ internal class LocalHarnessSettingsCoordinator(
                 autoMemory = profile.autoMemory,
             )
         }
-        scope.launch { userProfileStore.write(profile) }
+        scope.launch {
+            runCatching { userProfileStore.write(profile) }
+                .onFailure { error ->
+                    updateState { current ->
+                        current.copy(error = error.message ?: "个性化设置保存失败")
+                    }
+                }
+        }
     }
 
     fun configureChatStyleGuard(enabled: Boolean) {
@@ -78,7 +100,7 @@ internal class LocalHarnessSettingsCoordinator(
 
     fun addChatStyleGuardPhrase(value: String): Boolean {
         val phrase = normalizeChatStyleGuardPhrase(value) ?: return false
-        val current = state().chatStyleGuardCustomPhrases
+        val current = state.chatStyleGuardCustomPhrases
         if (phrase in current || current.size >= MAX_CUSTOM_CHAT_FILTERS) return false
         val updated = current + phrase
         persistChatStyleGuardPhrases(updated)
@@ -89,7 +111,7 @@ internal class LocalHarnessSettingsCoordinator(
     fun removeChatStyleGuardPhrase(value: String) {
         val phrase = value.trim()
         if (phrase.isEmpty()) return
-        val current = state().chatStyleGuardCustomPhrases
+        val current = state.chatStyleGuardCustomPhrases
         val updated = current.filterNot { it == phrase }
         if (updated == current) return
         persistChatStyleGuardPhrases(updated)
