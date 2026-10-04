@@ -10,6 +10,12 @@ internal fun nextAutomationRunAfterUserActivity(
             requireNotNull(task.silenceMinutes),
             "沉默触发间隔",
         )
+    task.scheduleType == AutomationScheduleType.INTERVAL ->
+        checkedAutomationFutureMillis(
+            userMessageAt,
+            requireNotNull(task.recurringMinutes),
+            "任务周期",
+        )
     usesChainedChatScheduling(task) ->
         nextAnchoredAutomationRun(task, userMessageAt) ?: userMessageAt
     task.recurringMinutes != null ->
