@@ -41,7 +41,7 @@ internal class LocalReplySuggestionCoordinator(
         if (
             snapshot.loading ||
             !snapshot.modelState.configured ||
-            snapshot.running ||
+            snapshot.kernel.running ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
             snapshot.chat.groupChat.enabled
         ) return false
