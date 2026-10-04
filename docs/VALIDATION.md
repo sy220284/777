@@ -24,7 +24,41 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 
 ## CI
 
-`.github/workflows/ci.yml` 的必需路径：
+`.github/workflows/ci.yml` 先由 `scope` 根据改动文件分配最低且完整的验证集合，最终统一由 `merge-gate` 放行。混合改动取检查并集，未知路径保守回退到完整 CI。
+
+当前任务类型：
+
+```text
+纯文档 / 仓库说明
+→ scope + merge-gate
+
+普通 GitHub Actions / 自动化脚本
+→ automation-check + merge-gate
+
+CI 控制面 / 静态门禁脚本
+→ automation-check（含分类器自测、YAML / Python / Shell、静态门禁行为）+ merge-gate
+
+纯 JVM / 单元测试 / Reference Validation / Mock Harness
+→ preflight + merge-gate
+
+纯 androidTest
+→ Android 16 + Android 17 + merge-gate
+
+产品源码 / 资源 / Gradle / Runtime / 未知路径
+→ preflight + build + Android 16 + Android 17 + merge-gate
+```
+
+修改 APK 结构校验或 Android 启动 smoke 脚本仍归入完整 CI。`workflow_dispatch` 始终强制完整 CI。
+
+主线 `push` 对纯文档、自动化和测试-only 改动不重复启动产品 CI，避免仅仓库维护变更触发 APK 发布链；产品改动仍执行主线完整组合验证。
+
+### automation-check
+
+- CI 范围分类器自测。
+- 所有 workflow YAML 语法解析。
+- `.github/scripts` Python / Shell 语法检查。
+- UI / Kotlin / 性能 / 架构等静态门禁实际执行。
+- `.github/release-version` 格式检查。
 
 ### preflight
 
