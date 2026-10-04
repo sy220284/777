@@ -467,6 +467,8 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 CI 必须逐步从“控制热点不继续变大”升级为“证明 3.0 边界真的成立”。
 
+架构 3.0 不设置 Kotlin 文件数量门禁，也不设置单文件行数门禁。拆成几个文件、每个文件多少行都不能证明所有权正确；CI 只约束真实的架构边界、依赖方向、状态归属和运行不变量。
+
 阶段 1 已增加：
 
 - Chat / Work / Automation / Tools / Settings 一级模块存在性；
