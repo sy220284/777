@@ -183,94 +183,110 @@ private fun StepperRow(
 
     fun applyValue(candidate: Int, announce: Boolean) {
         val next = candidate.coerceIn(range.first, range.last)
+        draft = next.toString()
         if (next == value) return
         onValueChange(next)
         if (announce) onCommitted()
     }
 
-    fun commitDraft() {
+    fun applyDelta(delta: Int, announce: Boolean) {
+        val base = draft.toIntOrNull()?.coerceIn(range.first, range.last) ?: value
+        applyValue(base + delta, announce)
+    }
+
+    fun commitDraft(announce: Boolean) {
         val parsed = draft.toIntOrNull()
         if (parsed == null) {
             draft = value.toString()
             return
         }
-        val next = parsed.coerceIn(range.first, range.last)
-        draft = next.toString()
-        if (next != value) {
-            onValueChange(next)
-            onCommitted()
-        }
+        applyValue(parsed, announce)
     }
 
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = DsSpacing.xsmall),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(label, style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
-            hint?.let {
-                Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
-            }
-        }
-        DsButton(
-            text = "−",
-            onClick = { applyValue(value - 1, announce = true) },
-            onHoldRepeat = { applyValue(value - 1, announce = false) },
-            enabled = value > range.first,
-            size = DsButtonSize.Small,
-            variant = DsButtonVariant.Ghost,
-        )
-        Surface(
-            modifier = Modifier.width(64.dp),
-            shape = DsShapes.buttonSmall,
-            color = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, base = colors.bgLayer2),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier.fillMaxWidth().heightIn(min = DsSpacing.touchTarget),
-                contentAlignment = Alignment.Center,
-            ) {
-                BasicTextField(
-                    value = draft,
-                    onValueChange = { next ->
-                        if (next.length <= 9 && next.all(Char::isDigit)) draft = next
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { focus ->
-                            if (!focus.isFocused) commitDraft()
-                        }
-                        .padding(horizontal = DsSpacing.xsmall),
-                    singleLine = true,
-                    textStyle = DsType.std14Strong.withReadingWeight().copy(
-                        color = colors.labelPrimary,
-                        textAlign = TextAlign.Center,
-                    ),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number,
-                        imeAction = ImeAction.Done,
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = { focusManager.clearFocus() },
-                    ),
-                    cursorBrush = SolidColor(colors.accent),
-                )
-            }
-        }
-        DsButton(
-            text = "＋",
-            onClick = { applyValue(value + 1, announce = true) },
-            onHoldRepeat = { applyValue(value + 1, announce = false) },
-            enabled = value < range.last,
-            size = DsButtonSize.Small,
-            variant = DsButtonVariant.Ghost,
-        )
-        maximumLabel?.let { labelText ->
+            Text(
+                label,
+                style = DsType.small13Strong.withReadingWeight(),
+                color = colors.labelPrimary,
+                modifier = Modifier.weight(1f),
+            )
             DsButton(
-                text = labelText,
-                onClick = { applyValue(range.last, announce = true) },
+                text = "−",
+                onClick = { applyDelta(-1, announce = true) },
+                onHoldRepeat = { applyDelta(-1, announce = false) },
+                enabled = value > range.first,
+                size = DsButtonSize.Small,
+                variant = DsButtonVariant.Ghost,
+            )
+            Surface(
+                modifier = Modifier.width(64.dp),
+                shape = DsShapes.buttonSmall,
+                color = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, base = colors.bgLayer2),
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = DsSpacing.touchTarget),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    BasicTextField(
+                        value = draft,
+                        onValueChange = { next ->
+                            if (next.length <= 9 && next.all(Char::isDigit)) draft = next
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { focus ->
+                                if (!focus.isFocused) commitDraft(announce = false)
+                            }
+                            .padding(horizontal = DsSpacing.xsmall),
+                        singleLine = true,
+                        textStyle = DsType.std14Strong.withReadingWeight().copy(
+                            color = colors.labelPrimary,
+                            textAlign = TextAlign.Center,
+                        ),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Done,
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                commitDraft(announce = true)
+                                focusManager.clearFocus()
+                            },
+                        ),
+                        cursorBrush = SolidColor(colors.accent),
+                    )
+                }
+            }
+            DsButton(
+                text = "＋",
+                onClick = { applyDelta(1, announce = true) },
+                onHoldRepeat = { applyDelta(1, announce = false) },
                 enabled = value < range.last,
                 size = DsButtonSize.Small,
                 variant = DsButtonVariant.Ghost,
+            )
+            maximumLabel?.let { labelText ->
+                DsButton(
+                    text = labelText,
+                    onClick = { applyValue(range.last, announce = true) },
+                    enabled = value < range.last,
+                    size = DsButtonSize.Small,
+                    variant = DsButtonVariant.Ghost,
+                )
+            }
+        }
+        hint?.let {
+            Text(
+                it,
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelTertiary,
+                modifier = Modifier.padding(top = DsSpacing.tiny),
             )
         }
     }
