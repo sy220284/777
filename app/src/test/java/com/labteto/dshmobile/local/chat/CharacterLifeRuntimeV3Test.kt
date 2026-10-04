@@ -219,6 +219,9 @@ class CharacterLifeRuntimeV3Test {
         assertTrue(estimateModelTokens(projection.stablePrompt) <= 600)
         assertTrue(projection.stablePrompt.contains("绝不替用户做重大决定"))
         assertTrue(projection.stablePrompt.contains("不知道未经历的后续剧情"))
+        assertTrue(projection.stablePrompt.contains("只在人物世界内回应"))
+        assertTrue(projection.stablePrompt.contains("禁止用“无现实身体/不能触碰"))
+        assertTrue(projection.stablePrompt.contains("人物意愿和关系"))
     }
 
     @Test
