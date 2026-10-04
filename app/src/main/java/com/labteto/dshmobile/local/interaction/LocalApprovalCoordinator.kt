@@ -25,7 +25,7 @@ internal class LocalApprovalCoordinator(
     }
 
     fun enableDeviceApprovalLease(callId: String) {
-        val pending = state.value.pendingApproval?.takeIf { it.callId == callId }
+        val pending = state.value.work.pendingApproval?.takeIf { it.callId == callId }
         if (pending?.canApproveDeviceTurn != true) {
             eventLog().append("approval/device-lease-rejected", buildJsonObject {
                 put("reason", "pending-tool-requires-explicit-approval")
@@ -59,7 +59,7 @@ internal class LocalApprovalCoordinator(
     }
 
     private fun enableAutoApprovalInternal(expectedCallId: String?) {
-        val pending = state.value.pendingApproval
+        val pending = state.value.work.pendingApproval
         if (expectedCallId != null && pending?.callId != expectedCallId) return
         approvalPreferences.setSafeAutoApprovalEnabled(true)
         state.update { it.copy(safeAutoApprovalEnabled = true) }
