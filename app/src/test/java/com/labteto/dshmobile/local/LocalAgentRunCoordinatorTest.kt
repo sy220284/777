@@ -10,6 +10,7 @@ import com.labteto.dshmobile.harness.session.SessionRecovery
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -314,6 +315,54 @@ class LocalAgentRunCoordinatorTest {
             assertNotNull(decision)
             assertNotNull(decision!!.queuedInput)
             assertNull(decision.blockedReason)
+        }
+    }
+
+    @Test
+    fun lateForegroundEventsCannotReviveRecoveryQueuedRun() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                sessionId = "s1",
+                usageMode = LocalUsageMode.WORK,
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                planMode = false,
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false,
+                maxSteps = 8,
+                input = "后台继续任务",
+                memoryInput = "后台继续任务",
+            )
+            coordinator.recordEvent(context, AgentEvent.StepStarted(context.runId, 1))
+            coordinator.markRecoveryQueued(
+                sessionId = "s1",
+                runId = context.runId,
+                reason = "durable_session_recovery",
+            )
+
+            assertTrue(!coordinator.isCurrentForegroundRun(context))
+            coordinator.recordEvent(
+                context,
+                AgentEvent.ToolStarted(
+                    turnId = context.runId,
+                    step = 1,
+                    call = AgentToolCall(
+                        id = "late-tool",
+                        name = "write_file",
+                        arguments = buildJsonObject { put("path", "late.txt") },
+                    ),
+                ),
+            )
+
+            val checkpoint = requireNotNull(log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT))
+            assertEquals(
+                LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase(),
+                checkpoint.data["status"]?.jsonPrimitive?.content,
+            )
+            assertEquals(
+                "durable_session_recovery",
+                checkpoint.data["reason"]?.jsonPrimitive?.content,
+            )
         }
     }
 
