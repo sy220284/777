@@ -220,8 +220,9 @@ class LocalHarnessEngine @Inject constructor(
             eventLogFor = ::eventLogFor,
         )
     }
-    private val agentRunCoordinator by lazy {
-        LocalAgentRunCoordinator(eventLogFor = ::eventLogFor)
+    private val agentRunCoordinator by lazy { LocalAgentRunCoordinator(eventLogFor = ::eventLogFor) }
+    private val foregroundRecoveryCoordinator by lazy {
+        LocalForegroundRecoveryCoordinator(agentRunCoordinator, modelGateway::hasCredential)
     }
     private val toolRegistry
         get() = pluginComposition.tools
@@ -4687,50 +4688,13 @@ class LocalHarnessEngine @Inject constructor(
         // visible/global queue or start those inputs as a second foreground run.
         pendingInputs.restore(if (liveWorkBinding == null) restoredInbox else emptyList())
         val modelProfiles = modelConfiguration.readProfiles()
-        var recoveredRunProfile: LocalModelProfile? = null
-        var runRecoveryError: String? = null
-        if (liveWorkBinding == null) {
-            agentRunCoordinator.recoveryDecision(sessionId, recovery)?.let { decision ->
-                val route = decision.route
-                val exactRecoveryProfile = route?.let { identity ->
-                    resolveRecoveryModelProfile(modelProfiles, identity)
-                }
-                val routeMismatch = route != null &&
-                    (exactRecoveryProfile == null || !modelGateway.hasCredential(exactRecoveryProfile))
-                val blocked = when {
-                    decision.blockedReason != null -> decision.blockedReason
-                    routeMismatch -> "上次任务绑定的模型账户或凭据身份已变化，已停止自动续跑。请恢复原模型配置后再继续。"
-                    else -> null
-                }
-                if (blocked != null) {
-                    runRecoveryError = blocked
-                    agentRunCoordinator.markRecoveryBlocked(sessionId, decision.runId, blocked)
-                } else {
-                    recoveredRunProfile = exactRecoveryProfile
-                    val queued = decision.queuedInput
-                    if (queued != null && pendingInputs.snapshot().none { it.id == queued.id }) {
-                        if (pendingInputs.offer(queued)) {
-                            eventLog.append(
-                                LOCAL_AGENT_INBOX_EVENT_TYPE,
-                                encodeLocalAgentInboxEvent(
-                                    action = "recovered-run",
-                                    pending = pendingInputs.snapshot(),
-                                    affected = listOf(queued),
-                                ),
-                            )
-                            agentRunCoordinator.markRecoveryQueued(sessionId, decision.runId)
-                        } else {
-                            runRecoveryError = "上次任务可以安全续跑，但待处理输入队列已满，请先处理现有任务。"
-                            agentRunCoordinator.markRecoveryBlocked(
-                                sessionId,
-                                decision.runId,
-                                runRecoveryError.orEmpty(),
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        val recoveryDecision = liveWorkBinding?.let { null }
+            ?: agentRunCoordinator.recoveryDecision(sessionId, recovery)
+        val recoveryState = foregroundRecoveryCoordinator.restore(
+            sessionId, recoveryDecision, modelProfiles, pendingInputs, eventLog,
+        )
+        val recoveredRunProfile = recoveryState.profile
+        val runRecoveryError = recoveryState.error
         val profile = userProfileStore.read()
         val restoredBehavior = withContext(Dispatchers.IO) {
             reconcileCharacterBehaviorTuning(
