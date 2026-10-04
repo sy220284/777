@@ -294,7 +294,7 @@ harness-core / Android runtime / MCP / LSP / device
 4. **模拟对手**——`mock-harness` 提供常驻 Ktor 测试服务端。
 5. **CI 门禁**——先按改动性质分配验证范围；产品 / 构建 / Runtime 变更执行架构、性能、UI、Kotlin、单元测试、Harness、Lint、optimized APK 与 Android 16 / 17 完整验证，文档、自动化和测试-only 改动只运行对应检查，最终统一由 merge-gate 放行。
 
-除了“测试通过”，仓库还对热点文件大小、热路径实现、会话分页、流式输出、工具边界、恢复语义等设置了 ratchet。新增功能不能靠把责任重新塞回核心文件通过。
+除了“测试通过”，仓库还对热路径实现、会话分页、流式输出、工具边界、恢复语义等设置了 ratchet。新增功能不能靠把责任重新塞回核心文件通过。
 
 当前验证闭环见 [VALIDATION.md](docs/VALIDATION.md)，本机 Harness 实现边界见
 [Android 原生 Harness 当前状态](docs/ANDROID-HARNESS-STATUS.zh-CN.md)。
