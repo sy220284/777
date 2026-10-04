@@ -8,6 +8,8 @@ internal object ChatReplyImmersionGuard {
         retry: suspend (repairHint: String) -> T,
         onEvent: (action: String, violations: List<String>) -> Unit = { _, _ -> },
     ): T {
+        if (persona.isUnboundChatPersona()) return initial
+
         val initialViolations = PersonaImmersionPolicy.findReplyViolations(
             persona = persona,
             text = contentOf(initial),
