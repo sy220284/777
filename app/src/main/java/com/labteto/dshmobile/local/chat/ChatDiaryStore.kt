@@ -15,6 +15,7 @@ internal class ChatDiaryStore(
     json: Json,
 ) {
     private val documents = ChatDiaryDocumentStore(root, json)
+    private val transfer = ChatDiaryTransferStore(documents)
 
     @Synchronized
     fun record(request: ChatDiaryWriteRequest): ChatDiaryEntry? {
@@ -187,4 +188,10 @@ internal class ChatDiaryStore(
             .take(limit.coerceIn(1, MAX_CHAT_DIARY_ENTRIES))
             .toList()
 
+    @Synchronized
+    internal fun listForTransfer(subjectKey: String): List<ChatDiaryEntry> = transfer.list(subjectKey)
+
+    @Synchronized
+    internal fun <T> importForTransfer(subjectKey: String, personaName: String, entries: List<ChatDiaryEntry>, commit: () -> T): T =
+        transfer.import(subjectKey, personaName, entries, commit)
 }
