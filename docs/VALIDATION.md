@@ -165,6 +165,8 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 
 ## 架构门禁
 
+架构门禁不以 Kotlin 文件数量或单文件行数作为放行条件，重点验证真实边界和系统不变量。
+
 架构门禁至少保护：
 
 - `LocalHarnessEngine` public surface。
