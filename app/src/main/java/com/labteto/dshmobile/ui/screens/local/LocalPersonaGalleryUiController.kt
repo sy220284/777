@@ -20,6 +20,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.chat.galleryEntryHasUnsavedChanges
+import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
 import com.labteto.dshmobile.local.chat.isMeaningfulGalleryPersona
 import com.labteto.dshmobile.local.chat.samePersonaIdentity
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
@@ -328,7 +329,15 @@ internal suspend fun exportGalleryPersona(
     id: String,
     format: PersonaTransferFormat,
 ): Result<PersonaTransferDocument> = runCatching {
-    withContext(Dispatchers.IO) { galleryStore.exportPersonaDocument(id, format) }
+    withContext(Dispatchers.IO) {
+        val entry = galleryStore.list().firstOrNull { it.id == id }
+            ?: error("人物档案不存在")
+        val subjectKey = chatRelationshipSubjectKey(entry.id, entry.persona.id)
+        val diaryEntries = subjectKey
+            ?.let(runtime.chat::diaryEntriesForTransfer)
+            .orEmpty()
+        galleryStore.exportPersonaDocument(id, format, diaryEntries)
+    }
 }
 
 internal suspend fun importGalleryPersona(
@@ -337,8 +346,17 @@ internal suspend fun importGalleryPersona(
     mimeType: String?,
 ): Result<PersonaGalleryEntry> = runCatching {
     withContext(Dispatchers.IO) {
-        galleryStore.importPersonaDocument(bytes, fileName, mimeType)
-            .also { _gallery.value = galleryStore.list() }
+        val outcome = galleryStore.importPersonaDocumentWithDiary(bytes, fileName, mimeType)
+        if (outcome.diaryEntries.isNotEmpty()) {
+            val subjectKey = chatRelationshipSubjectKey(outcome.entry.id, outcome.entry.persona.id)
+                ?: error("人物日记无法绑定到导入人物")
+            runtime.chat.importDiaryEntriesForTransfer(
+                subjectKey = subjectKey,
+                personaName = outcome.entry.persona.name,
+                entries = outcome.diaryEntries,
+            )
+        }
+        outcome.entry.also { _gallery.value = galleryStore.list() }
     }
 }
 
