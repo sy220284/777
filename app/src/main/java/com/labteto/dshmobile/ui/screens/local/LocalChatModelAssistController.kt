@@ -29,7 +29,7 @@ internal class LocalChatModelAssistController(
                 groupAnnouncementService.generate(
                     model = snapshot.modelState.model,
                     baseUrl = snapshot.modelState.baseUrl,
-                    profileId = snapshot.modelState.modelState.modelSelection.activeProfileId,
+                    profileId = snapshot.modelState.modelSelection.activeProfileId,
                     members = snapshot.groupChat.members,
                     direction = direction,
                     current = snapshot.groupChat.announcement,
@@ -61,7 +61,7 @@ internal class LocalChatModelAssistController(
             val generated = personaAutoFillService.generate(
                 model = snapshot.modelState.model,
                 baseUrl = snapshot.modelState.baseUrl,
-                profileId = snapshot.modelState.modelState.modelSelection.activeProfileId,
+                profileId = snapshot.modelState.modelSelection.activeProfileId,
                 current = snapshot.chatPersona,
                 recentMessages = recentMessages,
                 description = description,
@@ -69,7 +69,7 @@ internal class LocalChatModelAssistController(
             val current = state.value
             check(
                 current.sessionId == snapshot.sessionId &&
-                    current.modelState.modelState.modelSelection.activeProfileId == snapshot.modelState.modelState.modelSelection.activeProfileId &&
+                    current.modelState.modelSelection.activeProfileId == snapshot.modelState.modelSelection.activeProfileId &&
                     current.chatPersona == snapshot.chatPersona &&
                     !current.loading &&
                     !current.running &&
