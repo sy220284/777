@@ -51,6 +51,31 @@ class LocalWorkRequestContextProjectionTest {
     }
 
     @Test
+    fun laterWorkStepDefersSemanticProjectionUntilOverflowRecovery() {
+        val history = buildList {
+            add(message("system", "系统规则"))
+            repeat(20) { index ->
+                add(message("user", "旧任务-$index-" + "旧".repeat(2_500)))
+                add(message("assistant", "旧进展-$index-" + "进".repeat(2_500)))
+            }
+            add(message("user", "当前继续处理最新任务"))
+        }
+
+        val projected = projectWorkRequestContext(
+            messages = history,
+            tools = JsonArray(emptyList()),
+            compactor = LocalHistoryCompactor(),
+            operationalLimitTokens = 678_464,
+            allowSemanticProjection = false,
+        )
+
+        assertFalse(projected.projected)
+        assertEquals(0, projected.omittedMessages)
+        assertEquals(history, projected.messages)
+        assertTrue(projected.estimatedTokensBefore > workRequestProjectionTriggerTokens(678_464))
+    }
+
+    @Test
     fun requestProjectionPreservesLeadingRuntimeSystemContextVerbatim() {
         val runtimeContext = "当前运行上下文：必须保留本轮约束与工作区状态"
         val history = buildList {
