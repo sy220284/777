@@ -23,7 +23,7 @@ RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 14,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 12,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 12,
-    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 4,
+    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 4,
 }
@@ -190,6 +190,19 @@ if "private val streamingPreviewStore = LocalStreamingPreviewStore()" in engine:
     die("LocalHarnessEngine must not own the process-wide streaming preview store")
 if "MutableStateFlow(LocalSendFeedbackState())" in engine:
     die("LocalHarnessEngine must not own send feedback state")
+
+model_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt")
+)
+model_settings_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/model/LocalModelSettingsCoordinator.kt")
+)
+if "settings.configureImageInputMode(mode)" not in model_runtime_source:
+    die("LocalModelRuntime image input mode must be owned by LocalModelSettingsCoordinator")
+if "engine.configureImageInputMode" in model_runtime_source:
+    die("LocalModelRuntime must not route image input settings through LocalHarnessEngine")
+if "KEY_IMAGE_INPUT_MODE" not in model_settings_source or "runtimeStateStore.mutableState.update" not in model_settings_source:
+    die("LocalModelSettingsCoordinator must own image input persistence and ModelState projection")
 
 automation_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt")
