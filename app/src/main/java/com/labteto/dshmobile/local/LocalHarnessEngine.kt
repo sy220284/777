@@ -3060,7 +3060,7 @@ class LocalHarnessEngine @Inject constructor(
                 } else {
                     estimateModelTokens(workStableContext) + estimateModelTokens(workDynamicContext)
                 }
-                if (snapshot.usageMode != LocalUsageMode.WORK || modelStep == 0) {
+                if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
                     compactHistoryIfNeeded(
                         extraTokens = productContextTokens + estimateModelTokens(tools.toString()),
                         binding = binding,
