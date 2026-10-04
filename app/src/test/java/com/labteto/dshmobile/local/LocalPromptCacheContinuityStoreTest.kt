@@ -67,6 +67,25 @@ class LocalPromptCacheContinuityStoreTest {
     }
 
     @Test
+    fun overflowRewriteBecomesTheSuccessfulBaselineForTheNextRequest() {
+        val store = LocalPromptCacheContinuityStore()
+        val tools = JsonArray(emptyList())
+        val original = listOf(message("system", "固定规则"), message("user", "很长历史"))
+        val cold = store.assess("s", "route", original, tools)
+        store.recordSuccess("s", "route", original, tools, cold.generation)
+
+        val compacted = listOf(message("system", "固定规则"), message("user", "压缩后状态"))
+        val rewritten = store.assess("s", "route", compacted, tools)
+        assertEquals(LocalPromptPrefixContinuity.BROKEN, rewritten.continuity)
+        assertEquals(2, rewritten.generation)
+        store.recordSuccess("s", "route", compacted, tools, rewritten.generation)
+
+        val next = store.assess("s", "route", compacted + message("assistant", "继续"), tools)
+        assertEquals(LocalPromptPrefixContinuity.CONTINUOUS, next.continuity)
+        assertEquals(2, next.generation)
+    }
+
+    @Test
     fun failedUncommittedRequestCannotBecomeNextPrefixBaseline() {
         val store = LocalPromptCacheContinuityStore()
         val tools = JsonArray(emptyList())
