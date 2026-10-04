@@ -137,7 +137,6 @@ class LocalHarnessEngine @Inject internal constructor(
     private val json: Json,
     private val automationScheduler: HarnessAutomationScheduler,
     private val pluginCompositionFactory: LocalPluginCompositionFactory,
-    private val settingsCoordinator: LocalHarnessSettingsCoordinator,
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
     private val contextComposer: ContextComposer,
@@ -925,10 +924,24 @@ class LocalHarnessEngine @Inject internal constructor(
     private fun chatStreamFilterPhrases(
         snapshot: LocalHarnessState,
         persona: PersonaProfile = snapshot.chat.chatPersona,
-    ): List<String> = settingsCoordinator.chatStreamFilterPhrases(snapshot, persona)
+    ): List<String> = ChatStyleGuard.activePhrases(
+        customPhrases = snapshot.chatStyleGuardCustomPhrases,
+        personaPhrases = persona.bannedPhrases,
+        enabled = snapshot.usageMode == LocalUsageMode.CHAT && snapshot.chatStyleGuardEnabled,
+    )
 
-    private fun recordStyleGuardHits(violations: List<String>) =
-        settingsCoordinator.recordStyleGuardHits(violations)
+    private fun recordStyleGuardHits(violations: List<String>) {
+        if (violations.isEmpty()) return
+        _state.update { current ->
+            current.copy(
+                styleGuardHits = (current.styleGuardHits + violations)
+                    .map(String::trim)
+                    .filter(String::isNotBlank)
+                    .distinct()
+                    .takeLast(LocalHarnessSettingsCoordinator.MAX_STYLE_GUARD_HITS),
+            )
+        }
+    }
 
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> =
         LocalCharacterBehaviorTuningCoordinator(
@@ -4707,7 +4720,7 @@ class LocalHarnessEngine @Inject internal constructor(
         )
         val recoveredRunProfile = recoveryState.profile
         val runRecoveryError = recoveryState.error
-        val profile = settingsCoordinator.readUserProfile()
+        val profile = contextComposer.userProfile()
         val restoredBehavior = withContext(Dispatchers.IO) {
             reconcileCharacterBehaviorTuning(
                 chatPersonaStore,
