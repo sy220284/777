@@ -229,7 +229,7 @@ class LocalHarnessEngine @Inject constructor(
         LocalToolExecutionCoordinator(
             registry = toolRegistry,
             currentSessionId = { currentSessionId },
-            planMode = { _state.value.planMode },
+            planMode = { _state.value.work.planMode },
             enabledOptionalTools = enabledOptionalTools,
             requestApproval = { call, tool, summary -> approve(call, summary, tool) },
             recordExecutionStarted = { sessionId, call ->
@@ -1338,10 +1338,10 @@ class LocalHarnessEngine @Inject constructor(
             activeTranscript = rewritten,
             modelHistory = rewrittenHistory,
             state = LocalTimelineRewriteState(
-                plan = state.plan,
-                todos = state.todos,
-                goal = state.goal,
-                planMode = state.planMode,
+                plan = state.work.plan,
+                todos = state.work.todos,
+                goal = state.work.goal,
+                planMode = state.work.planMode,
                 chatState = committedChatState,
                 chatContext = committedChatContext,
                 chatBranches = LocalChatBranchState(),
@@ -2500,7 +2500,7 @@ class LocalHarnessEngine @Inject constructor(
             isRunBusy() ||
             activeWorkRuns[currentSessionId]?.job?.isCompleted == false
         ) return
-        _state.update { it.copy(planMode = enabled) }
+        _state.update { it.copy(work = it.work.copy(planMode = enabled)) }
         eventLog.append("plan/mode", buildJsonObject { put("active", enabled) })
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             val prompt = systemPrompt()
@@ -4802,10 +4802,12 @@ class LocalHarnessEngine @Inject constructor(
             sessions = sessionSummaries(),
             messages = restoredTranscript.messages,
             transcriptIndex = restoredTranscript.index,
-            plan = projectedControls.plan,
-            todos = projectedControls.todos,
-            goal = projectedControls.goal,
-            planMode = projectedControls.planMode,
+            work = com.labteto.dshmobile.local.work.LocalWorkState(
+                plan = projectedControls.plan,
+                todos = projectedControls.todos,
+                goal = projectedControls.goal,
+                planMode = projectedControls.planMode,
+            ),
             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
                 loaded?.legacySafeAutoApproval == true,
             ),
