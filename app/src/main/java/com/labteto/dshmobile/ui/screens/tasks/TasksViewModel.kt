@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED }
-internal enum class PlannerUiError { SUGGESTIONS_FAILED, SESSION_CHANGED, SAVE_FAILED, PLAN_FAILED }
+enum class PlannerUiError { SUGGESTIONS_FAILED, SESSION_CHANGED, SAVE_FAILED, PLAN_FAILED }
 internal enum class AutomationCadence { ONCE, DAILY, WEEKLY, CUSTOM }
 data class TasksUiState(
     val tasks: List<AutomationTask> = emptyList(),
