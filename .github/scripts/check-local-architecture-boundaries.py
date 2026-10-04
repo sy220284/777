@@ -21,7 +21,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
 
 RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 14,
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 12,
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 9,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 12,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
@@ -198,6 +198,27 @@ runtime_state_store = strip_comments(
 )
 if "MutableStateFlow(LocalHarnessState())" not in runtime_state_store:
     die("LocalRuntimeStateStore must own the aggregate runtime MutableStateFlow")
+if "foregroundInteractions = LocalInteractionCoordinator(mutable)" not in runtime_state_store:
+    die("LocalRuntimeStateStore must own the foreground interaction coordinator")
+if "private val interactions = LocalInteractionCoordinator" in engine:
+    die("LocalHarnessEngine must not own a second foreground interaction coordinator")
+work_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt")
+)
+for forbidden_proxy in (
+    "engine.answerApproval",
+    "engine.answerQuestion",
+    "engine.cancelQuestion",
+):
+    if forbidden_proxy in work_runtime_source:
+        die("LocalWorkRuntime must route interaction responses without Engine: " + forbidden_proxy)
+for removed_engine_proxy in (
+    "internal fun answerApproval",
+    "internal fun answerQuestion",
+    "internal fun cancelQuestion",
+):
+    if removed_engine_proxy in engine:
+        die("LocalHarnessEngine must not reintroduce Work interaction proxy API: " + removed_engine_proxy)
 if "check(!initialized)" not in runtime_state_store:
     die("LocalRuntimeStateStore initialization must remain single-owner")
 if "runtimeStateStore.initialize(" not in engine:
