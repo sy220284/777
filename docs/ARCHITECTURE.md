@@ -250,7 +250,7 @@ HTTPS relay
 → Compose UI
 ```
 
-`SessionStore` remains the single remote stream/fold owner. The live assistant attempt is presentation data; durable settlement retires it, while reconnect restores partial output from the follow baseline.
+`SessionStore` remains the single remote stream/fold owner. The live assistant attempt is presentation data; durable settlement retires it, while reconnect restores partial output from the follow baseline. Session/host-scoped catalog and subagent RPC results are published only when the captured host/session scope is still current; late success and late failure are both discarded. Remembered landing-session writes are serialized so an older slow write cannot overwrite a newer session selection on the same host.
 
 The current **remote protocol baseline** is `0.1.6-alpha.1` at
 `0d1f50007f9bca3f52b06e1c3074fa14d5fb0720` (`DshCore.PROTOCOL_BASELINE`).
