@@ -258,4 +258,115 @@ class ChatPersonaStorageSafetyTest {
         )
         assertEquals(setOf("阿青", "小岚"), store.list().map { it.persona.name }.toSet())
     }
+
+
+    @Test
+    fun migrationMarkerFallsBackToLegacyWhenCurrentPersonaAndBackupAreCorrupt() {
+        val currentFile = File(temporary.root, "personas-v2-corrupt.json")
+        val legacyFile = File(temporary.root, "personas-v1-corrupt-recovery.json")
+        val marker = File(temporary.root, "personas-v1-corrupt-recovery.done").apply { writeText("v2\n") }
+        currentFile.writeText("{broken-primary")
+        File(temporary.root, "${currentFile.name}.bak").writeText("{broken-backup")
+        legacyFile.writeText(
+            json.encodeToString(
+                LegacyPersonaDocumentV1.serializer(),
+                LegacyPersonaDocumentV1(
+                    personas = listOf(
+                        LegacyPersonaProfileV1(
+                            id = "legacy-corrupt-recovery",
+                            name = "旧人物恢复",
+                            identity = "仍可从旧源恢复",
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val recovered = ChatPersonaStore(
+            file = currentFile,
+            json = json,
+            legacyFile = legacyFile,
+            migrationMarker = marker,
+        ).get("legacy-corrupt-recovery")
+
+        assertEquals("旧人物恢复", recovered.name)
+        assertTrue(recovered.portrait.contains("仍可从旧源恢复"))
+        assertTrue(currentFile.isFile)
+    }
+
+    @Test
+    fun migrationMarkerFallsBackToLegacyWhenCurrentGalleryAndBackupAreCorrupt() {
+        val root = temporary.newFolder("gallery-corrupt-recovery")
+        val currentFile = File(root, "persona-gallery-v5.json").apply { writeText("{broken-primary") }
+        File(root, "persona-gallery-v5.json.bak").writeText("{broken-backup")
+        File(root, "persona-gallery-v1-v4-to-v5.done").writeText("v5\n")
+        File(root, "persona-gallery.json").writeText(
+            json.encodeToString(
+                LegacyGalleryDocumentV4.serializer(),
+                LegacyGalleryDocumentV4(
+                    entries = listOf(
+                        LegacyPersonaGalleryEntryV4(
+                            id = "legacy-gallery-recovery",
+                            persona = LegacyPersonaProfileV1(
+                                id = "legacy-gallery-recovery",
+                                name = "阿青",
+                                identity = "旧图集仍可恢复",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val recovered = ChatPersonaGalleryStore(currentFile, json).list().single()
+
+        assertEquals("legacy-gallery-recovery", recovered.id)
+        assertTrue(recovered.persona.portrait.contains("旧图集仍可恢复"))
+    }
+
+    @Test
+    fun galleryMigrationDoesNotMergeDifferentIdsOnlyBecauseNamesMatch() {
+        val root = temporary.newFolder("gallery-same-name")
+        val currentFile = File(root, "persona-gallery-v5.json")
+        currentFile.writeText(
+            json.encodeToString(
+                GalleryDocument.serializer(),
+                GalleryDocument(
+                    entries = listOf(
+                        PersonaGalleryEntry(
+                            id = "current-aqing",
+                            persona = PersonaProfile(
+                                id = "current-aqing",
+                                name = "阿青",
+                                portrait = "城里长大的医者",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        File(root, "persona-gallery.json").writeText(
+            json.encodeToString(
+                LegacyGalleryDocumentV4.serializer(),
+                LegacyGalleryDocumentV4(
+                    entries = listOf(
+                        LegacyPersonaGalleryEntryV4(
+                            id = "legacy-aqing",
+                            persona = LegacyPersonaProfileV1(
+                                id = "legacy-aqing",
+                                name = "阿青",
+                                identity = "江湖剑客",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val entries = ChatPersonaGalleryStore(currentFile, json).list()
+
+        assertEquals(setOf("current-aqing", "legacy-aqing"), entries.map { it.id }.toSet())
+        assertEquals(2, entries.size)
+    }
+
 }
