@@ -48,7 +48,7 @@ internal class LocalInteractionCoordinator(
                 }
                 approvalWaiter = ApprovalWaiter(approval.callId, response)
             }
-            state.update { it.copy(kernel = it.kernel.copy(pendingApproval = approval)) }
+            state.update { it.copy(work = it.work.copy(pendingApproval = approval)) }
             return try {
                 response.await()
             } finally {
@@ -56,8 +56,8 @@ internal class LocalInteractionCoordinator(
                     if (approvalWaiter?.callId == approval.callId) approvalWaiter = null
                 }
                 state.update { current ->
-                    if (current.kernel.pendingApproval?.callId == approval.callId) {
-                        current.copy(kernel = current.kernel.copy(pendingApproval = null))
+                    if (current.work.pendingApproval?.callId == approval.callId) {
+                        current.copy(work = current.work.copy(pendingApproval = null))
                     } else {
                         current
                     }
@@ -82,7 +82,7 @@ internal class LocalInteractionCoordinator(
                 }
                 questionWaiter = QuestionWaiter(question.callId, response)
             }
-            state.update { it.copy(kernel = it.kernel.copy(pendingQuestion = question)) }
+            state.update { it.copy(work = it.work.copy(pendingQuestion = question)) }
             return try {
                 response.await().trim().ifBlank { LOCAL_QUESTION_EMPTY_RESPONSE }
             } finally {
@@ -90,8 +90,8 @@ internal class LocalInteractionCoordinator(
                     if (questionWaiter?.callId == question.callId) questionWaiter = null
                 }
                 state.update { current ->
-                    if (current.kernel.pendingQuestion?.callId == question.callId) {
-                        current.copy(kernel = current.kernel.copy(pendingQuestion = null))
+                    if (current.work.pendingQuestion?.callId == question.callId) {
+                        current.copy(work = current.work.copy(pendingQuestion = null))
                     } else {
                         current
                     }
@@ -122,7 +122,7 @@ internal class LocalInteractionCoordinator(
     fun cancelAll() {
         synchronized(waiterLock) {
             cancellationGeneration += 1L
-            state.update { it.copy(kernel = it.kernel.copy(pendingApproval = null, pendingQuestion = null)) }
+            state.update { it.copy(work = it.work.copy(pendingApproval = null, pendingQuestion = null)) }
             approvalWaiter?.response?.complete(false)
             questionWaiter?.response?.cancel()
         }
