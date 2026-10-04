@@ -1,14 +1,21 @@
 package com.labteto.dshmobile.local.chat
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 
 /** Owns portable diary export/import projection and destination identity rebinding. */
-internal class ChatDiaryTransferCoordinator(
+@Singleton
+internal class ChatDiaryTransferCoordinator internal constructor(
     root: File,
     json: Json,
 ) {
+    @Inject constructor(@ApplicationContext context: Context, json: Json) :
+        this(File(context.filesDir, "local-harness/chat-diary"), json)
     private val documents = ChatDiaryDocumentStore(root, json)
 
     @Synchronized
