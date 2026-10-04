@@ -87,6 +87,8 @@ New UI and worker code should enter through the relevant capability runtime inst
 
 Work 的计划、待办和目标变更由 `local.work.LocalWorkProgressCoordinator` 统一处理，包括输入规整、数量/长度上限、状态更新、事件 payload 和持久化调用顺序。Engine 只选择本次调用绑定的状态、事件日志和持久化回调；后台 Work 始终使用原 run 的会话，不跟随当前可见会话。
 
+Automation 的顶层执行使用两级所有权：`AutomationExecutionRegistry` 保证同一任务的定时触发与“立即运行”不能并发；`LocalSessionRuntimeRegistry` 保证 Automation Chat / Work 在实际执行期间独占其目标会话，并让普通会话加载跳过仍由当前进程持有的事件尾恢复。持久任务以 `scheduleGeneration` 作为提交权，修改、暂停或重排会推进 generation，旧 Worker 的成功、失败、通知与后续排程均不得覆盖新状态。Chat 用户活动持续记录 `lastUserActivityAt`，用于裁决 `waiting_user` 与用户回复的并发窗口。Automation 事件规划继续复用 Engine 唯一 `HarnessResourceScheduler` 的 `MODEL_REQUEST` 租约，不创建第二套资源调度事实源。
+
 角色设置的确认保存由 `local.chat.LocalCharacterBehaviorTuningCoordinator` 编排：复用 Engine 的会话转换锁，检查会话和人物归属，等待人物、人物库与会话快照落盘后才返回成功。`CharacterBehaviorTuningPersistence` 只负责调节版本合并与持久副本收敛；单聊/群聊恢复不会借用默认人物的身份回写。界面保存锁按弹窗生命周期保持，不随初始值回显重置。
 
 The Engine has CI-enforced line, dependency and public-surface ratchets. New responsibilities must move outward rather than expanding the central orchestration surface.

@@ -32,7 +32,11 @@ internal class LocalSessionEventLogRegistry(
     @Synchronized
     fun get(sessionId: String): LocalSessionEventLog =
         logs.getOrPut(sessionId) {
-            LocalSessionEventLog(File(sessionsRoot, "$sessionId.events.jsonl"), json)
+            LocalSessionEventLog(
+                File(sessionsRoot, "$sessionId.events.jsonl"),
+                json,
+                sessionId = sessionId,
+            )
         }
 
     /**

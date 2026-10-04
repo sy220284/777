@@ -112,4 +112,23 @@ class AutomationStoreRecoveryTest {
             assertTrue(store.tasks.value.isEmpty())
         } finally { directory.deleteRecursively() }
     }
+
+    @Test
+    fun generationOwnershipRejectsEffectsAfterEditOrRemoval() {
+        val directory = Files.createTempDirectory("automation-effect-ownership").toFile()
+        try {
+            val store = AutomationStore(directory.resolve("automations.json"), json)
+            store.upsert(task("effect", 1_000L).copy(scheduleGeneration = 4L))
+            var submissions = 0
+            assertTrue(store.withCurrentGeneration("effect", 4L) { submissions++ })
+            store.update("effect") { it.copy(scheduleGeneration = 5L, status = "paused") }
+            assertEquals(false, store.withCurrentGeneration("effect", 4L) { submissions++ })
+            store.remove("effect")
+            assertEquals(false, store.withCurrentGeneration("effect", 5L) { submissions++ })
+            assertEquals(1, submissions)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
 }

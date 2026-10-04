@@ -28,6 +28,7 @@ import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.capability.ProcessRequest
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
@@ -1842,10 +1843,8 @@ class LocalHarnessEngine @Inject constructor(
         updateContextMetrics(binding)
     }
 
-    internal suspend fun runAutomationPrompt(
-        text: String,
-        timeoutMillis: Long = 5 * 60_000L,
-    ): String = automationWorkCoordinator.runPrompt(text, timeoutMillis)
+    internal suspend fun <T> withAutomationModelRequestResource(block: suspend () -> T): T =
+        resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST, "automation-planning", block)
 
     internal suspend fun prepareAutomationWorkSession(
         text: String,
