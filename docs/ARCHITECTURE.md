@@ -232,6 +232,7 @@ Important invariants:
 
 - historical reads use paging;
 - runtime transcript windows stay bounded;
+- foreground transcript paging uses user-visible dialogue as its quota; reasoning, tool, progress and system traffic stays inside the bounded runtime/event layer and cannot evict the user/assistant history the UI promises to show;
 - model-history writes go through the dedicated buffer;
 - tool output is bounded in model context, with recoverable spill storage where required;
 - streaming updates do not rebuild aggregate state;
