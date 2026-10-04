@@ -26,8 +26,41 @@ internal class LocalAgentModelRequestRuntime(
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
         executionControl: LocalWorkExecutionControl? = null,
+        admissionHandledExternally: Boolean = false,
         onDelta: (LocalModelDelta) -> Unit = {},
-    ): LocalModelReply = executeWithModelAdmission(
+    ): LocalModelReply {
+        val invokeProvider: suspend () -> LocalModelReply = {
+            resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
+                if (streaming) {
+                    modelGateway.completeStreaming(
+                        model = surface.model,
+                        baseUrl = surface.baseUrl,
+                        messages = messages,
+                        tools = tools,
+                        temperature = temperature,
+                        profile = surface.profile,
+                        promptCacheComparisonResponseId = promptCacheComparisonResponseId,
+                        promptCacheKey = promptCacheKey,
+                        promptCacheTtl = promptCacheTtl,
+                        onDelta = onDelta,
+                    )
+                } else {
+                    modelGateway.complete(
+                        model = surface.model,
+                        baseUrl = surface.baseUrl,
+                        messages = messages,
+                        tools = tools,
+                        temperature = temperature,
+                        profile = surface.profile,
+                        promptCacheComparisonResponseId = promptCacheComparisonResponseId,
+                        promptCacheKey = promptCacheKey,
+                        promptCacheTtl = promptCacheTtl,
+                    )
+                }
+            }
+        }
+        if (admissionHandledExternally) return invokeProvider()
+        return executeWithModelAdmission(
         control = executionControl,
         routeFingerprint = surface.routeFingerprint,
         model = surface.model,
@@ -36,33 +69,7 @@ internal class LocalAgentModelRequestRuntime(
         messages = messages,
         tools = tools,
     ) {
-        resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-            if (streaming) {
-                modelGateway.completeStreaming(
-                    model = surface.model,
-                    baseUrl = surface.baseUrl,
-                    messages = messages,
-                    tools = tools,
-                    temperature = temperature,
-                    profile = surface.profile,
-                    promptCacheComparisonResponseId = promptCacheComparisonResponseId,
-                    promptCacheKey = promptCacheKey,
-                    promptCacheTtl = promptCacheTtl,
-                    onDelta = onDelta,
-                )
-            } else {
-                modelGateway.complete(
-                    model = surface.model,
-                    baseUrl = surface.baseUrl,
-                    messages = messages,
-                    tools = tools,
-                    temperature = temperature,
-                    profile = surface.profile,
-                    promptCacheComparisonResponseId = promptCacheComparisonResponseId,
-                    promptCacheKey = promptCacheKey,
-                    promptCacheTtl = promptCacheTtl,
-                )
-            }
+            invokeProvider()
         }
     }
 }
