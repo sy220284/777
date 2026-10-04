@@ -130,9 +130,8 @@ import kotlinx.serialization.json.put
 @Singleton
 class LocalHarnessEngine @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val apiKeys: LocalApiKeyStore,
     private val modelGateway: LocalModelGateway,
-    private val modelConnectionTester: LocalModelConnectionTester,
+    private val modelConfiguration: LocalModelConfigurationCoordinator,
     private val usageTracker: DeepSeekUsageTracker,
     private val githubCredentials: LocalGitHubCredentialStore,
     private val bundledRuntimeManager: LocalBundledRuntimeManager,
@@ -147,6 +146,7 @@ class LocalHarnessEngine @Inject constructor(
     private val chatPersistence: LocalChatPersistence,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
     private val workRunRegistry: LocalWorkRunRegistry,
+    private val runtimeStateStore: LocalRuntimeStateStore,
 ) {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val chatPersonaStore get() = chatPersistence.personaStore
@@ -176,16 +176,9 @@ class LocalHarnessEngine @Inject constructor(
         File(context.noBackupFilesDir, "local-harness/tool-output"),
     )
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
-    private val modelConfiguration = LocalModelConfigurationCoordinator(
-        preferences = preferences,
-        apiKeys = apiKeys,
-        gateway = modelGateway,
-        tester = modelConnectionTester,
-        json = json,
-    )
     private val webTools = LocalWebTools(
         web = web,
-        searchKeyProvider = LocalDeepSeekSearchCredentialResolver(modelConfiguration::readProfiles, apiKeys)::resolve,
+        searchKeyProvider = modelConfiguration::resolveDeepSeekSearchCredential,
         workspace = workspace,
         json = json,
     )
