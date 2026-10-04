@@ -203,7 +203,6 @@ for legacy_work_field in (
     "planMode",
     "jobs",
     "workflowProgress",
-    "queuedInputCount",
     "pendingApproval",
     "pendingQuestion",
 ):
@@ -303,6 +302,7 @@ if "val kernel: LocalKernelState = LocalKernelState()" not in aggregate_state_so
     die("LocalHarnessState must compose Kernel runtime state through LocalKernelState")
 for legacy_kernel_field in (
     "running",
+    "queuedInputCount",
     "resources",
     "contextChars",
     "contextBudgetChars",
@@ -317,6 +317,7 @@ kernel_state = strip_comments(
 )
 for owned_field in (
     "running",
+    "queuedInputCount",
     "resources",
     "contextChars",
     "contextBudgetChars",
