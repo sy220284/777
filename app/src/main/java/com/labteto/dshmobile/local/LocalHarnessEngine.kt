@@ -515,8 +515,10 @@ class LocalHarnessEngine @Inject constructor(
         onChanged = { snapshot ->
             _state.update { current ->
                 current.copy(
-                    resources = snapshot.toLocalHarnessResourceState(current.usageMode),
-                    contextBudgetChars = localHistoryBudgetFor(memoryClassMb, snapshot.pressure).maxHistoryChars,
+                    kernel = current.kernel.copy(
+                        resources = snapshot.toLocalHarnessResourceState(current.usageMode),
+                        contextBudgetChars = localHistoryBudgetFor(memoryClassMb, snapshot.pressure).maxHistoryChars,
+                    ),
                 )
             }
         },
@@ -794,8 +796,10 @@ class LocalHarnessEngine @Inject constructor(
         val initialResources = resourceScheduler.snapshot()
         _state.update {
             it.copy(
-                resources = initialResources.toLocalHarnessResourceState(it.usageMode),
-                contextBudgetChars = localHistoryBudgetFor(memoryClassMb, initialResources.pressure).maxHistoryChars,
+                kernel = it.kernel.copy(
+                    resources = initialResources.toLocalHarnessResourceState(it.usageMode),
+                    contextBudgetChars = localHistoryBudgetFor(memoryClassMb, initialResources.pressure).maxHistoryChars,
+                ),
             )
         }
         scope.launch {
@@ -991,7 +995,7 @@ class LocalHarnessEngine @Inject constructor(
     internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) {
         val snapshot = _state.value
         if (
-            snapshot.running ||
+            snapshot.kernel.running ||
             snapshot.loading ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
             snapshot.chat.groupChat.enabled ||
@@ -1023,7 +1027,7 @@ class LocalHarnessEngine @Inject constructor(
 
     internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) {
         val snapshot = _state.value
-        if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return
+        if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) return
         _state.update { state ->
             if (state.sessionId != snapshot.sessionId) state else state.copy(
                 chat = state.chat.copy(
@@ -1065,7 +1069,7 @@ class LocalHarnessEngine @Inject constructor(
     internal suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile {
         val snapshot = _state.value
         check(
-            !snapshot.running &&
+            !snapshot.kernel.running &&
                 !snapshot.loading &&
                 snapshot.usageMode == LocalUsageMode.CHAT &&
                 !snapshot.chat.groupChat.enabled
@@ -1099,7 +1103,7 @@ class LocalHarnessEngine @Inject constructor(
             .take(MAX_GROUP_CHAT_MEMBERS)
         if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
         val snapshot = _state.value
-        if (snapshot.loading || snapshot.running) return false
+        if (snapshot.loading || snapshot.kernel.running) return false
         return createSession(
             mode = LocalConversationMode.INDEPENDENT,
             usageMode = LocalUsageMode.CHAT,
@@ -1118,7 +1122,7 @@ class LocalHarnessEngine @Inject constructor(
         val snapshot = _state.value
         if (
             snapshot.loading ||
-            snapshot.running ||
+            snapshot.kernel.running ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
             !snapshot.chat.groupChat.enabled
         ) return false
@@ -1178,7 +1182,7 @@ class LocalHarnessEngine @Inject constructor(
         val snapshot = _state.value
         if (
             snapshot.loading ||
-            snapshot.running ||
+            snapshot.kernel.running ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
             !snapshot.chat.groupChat.enabled ||
             snapshot.chat.groupChat.members.none { it.galleryId == galleryId }
@@ -1228,7 +1232,7 @@ class LocalHarnessEngine @Inject constructor(
         if (!state.modelState.configured) return@synchronized LocalChatUserEditResult.UNAVAILABLE
         if (
             state.loading ||
-            state.running ||
+            state.kernel.running ||
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
             activeWorkRuns[state.sessionId]?.job?.isCompleted == false ||
@@ -1580,7 +1584,7 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private suspend fun regenerateWorkReply(messageId: String) {
-        _state.update { it.copy(running = true, error = null) }
+        _state.update { it.copy(kernel = it.kernel.copy(running = true), error = null) }
         try {
             val snapshot = _state.value
             val key = modelRequestMarker()
@@ -1625,7 +1629,7 @@ class LocalHarnessEngine @Inject constructor(
         } catch (error: Exception) {
             _state.update { it.copy(error = error.message ?: "重新生成失败") }
         } finally {
-            _state.update { it.copy(running = false) }
+            _state.update { it.copy(kernel = it.kernel.copy(running = false)) }
             val completedJob = currentCoroutineContext()[Job]
             synchronized(runStateLock) { if (activeJob === completedJob) activeJob = null }
         }
@@ -1666,7 +1670,7 @@ class LocalHarnessEngine @Inject constructor(
                 enqueue = { targetPending.offer(queuedInput) },
                 onQueued = {
                     recordUserTranscript(content, modelMessage, true, queuedInput, binding)
-                    targetState.update { it.copy(queuedInputCount = targetPending.size(), error = null) }
+                    targetState.update { it.copy(work = it.work.copy(queuedInputCount = targetPending.size()), error = null) }
                     if (binding != null) persist(binding) else persist()
                 },
                 onStart = { reservedWorkLease ->
@@ -1700,7 +1704,7 @@ class LocalHarnessEngine @Inject constructor(
             ?: recordUserTranscript(content, durableMessage, queued = false)
         appendUserToModelHistory(durableMessage)
         resumedInput?.let { resumed ->
-            _state.update { it.copy(queuedInputCount = pendingInputs.size()) }
+            _state.update { it.copy(work = it.work.copy(queuedInputCount = pendingInputs.size())) }
             eventLog.append(
                 LOCAL_AGENT_INBOX_EVENT_TYPE,
                 encodeLocalAgentInboxEvent(
@@ -1715,7 +1719,9 @@ class LocalHarnessEngine @Inject constructor(
 
         val binding = LocalWorkRunBinding(
             sessionId = sessionId,
-            initialState = _state.value.copy(running = true, error = null),
+            initialState = _state.value.let { current ->
+                    current.copy(kernel = current.kernel.copy(running = true), error = null)
+                },
             initialHistory = modelHistory.snapshot(),
             eventLog = eventLogFor(sessionId),
             initialTranscriptProjectionCursor = transcriptProjectionCursor,
@@ -1942,7 +1948,7 @@ class LocalHarnessEngine @Inject constructor(
             while (!ownsVisibleTurn) {
                 ownsVisibleTurn = synchronized(runStateLock) {
                     val busy = sessionTransitioning ||
-                        _state.value.running ||
+                        _state.value.kernel.running ||
                         activeJob?.isCompleted == false
                     if (!busy) {
                         activeJob = automationJob
@@ -1956,7 +1962,7 @@ class LocalHarnessEngine @Inject constructor(
         }
         _state.update { current ->
             if (current.sessionId == targetSessionId) {
-                current.copy(running = true, error = null)
+                current.copy(kernel = current.kernel.copy(running = true), error = null)
             } else {
                 current
             }
@@ -2041,9 +2047,11 @@ class LocalHarnessEngine @Inject constructor(
         _state.update { current ->
             if (current.sessionId == targetSessionId) {
                 current.copy(
-                    running = false,
-                    pendingApproval = null,
-                    pendingQuestion = null,
+                    work = current.work.copy(
+                        pendingApproval = null,
+                        pendingQuestion = null,
+                    ),
+                    kernel = current.kernel.copy(running = false),
                     deviceApprovalLease = false,
                 )
             } else {
@@ -2133,7 +2141,7 @@ class LocalHarnessEngine @Inject constructor(
 
     internal fun enableAutoApprovalForPending(callId: String) {
         val binding = activeWorkRuns[currentSessionId]
-        val pending = binding?.state?.value?.pendingApproval?.takeIf { it.callId == callId }
+        val pending = binding?.state?.value?.work?.pendingApproval?.takeIf { it.callId == callId }
         if (binding != null && pending != null) {
             approvalCoordinator.enableAutoApproval()
             activeWorkRuns.values.forEach { run ->
@@ -2151,7 +2159,7 @@ class LocalHarnessEngine @Inject constructor(
 
     internal fun enableDeviceApprovalLease(callId: String) {
         val binding = activeWorkRuns[currentSessionId]
-        val pending = binding?.state?.value?.pendingApproval?.takeIf { it.callId == callId }
+        val pending = binding?.state?.value?.work?.pendingApproval?.takeIf { it.callId == callId }
         if (binding != null && pending != null) {
             if (pending.canApproveDeviceTurn) {
                 binding.state.update { it.copy(deviceApprovalLease = true) }
@@ -2216,9 +2224,11 @@ class LocalHarnessEngine @Inject constructor(
             }
             binding.state.update {
                 it.copy(
-                    queuedInputCount = 0,
-                    pendingApproval = null,
-                    pendingQuestion = null,
+                    work = it.work.copy(
+                        queuedInputCount = 0,
+                        pendingApproval = null,
+                        pendingQuestion = null,
+                    ),
                 )
             }
             binding.job?.cancel()
@@ -2238,11 +2248,11 @@ class LocalHarnessEngine @Inject constructor(
                     ),
                 )
             }
-            _state.update { it.copy(queuedInputCount = 0) }
+            _state.update { it.copy(work = it.work.copy(queuedInputCount = 0)) }
             activeJob
         }
         running?.cancel()
-        _state.update { it.copy(pendingApproval = null, pendingQuestion = null) }
+        _state.update { it.copy(work = it.work.copy(pendingApproval = null, pendingQuestion = null)) }
     }
 
     /** Start a clean, project-scoped, or continuation session without copying full old history. */
@@ -2410,7 +2420,7 @@ class LocalHarnessEngine @Inject constructor(
             durableMessages += durableMessage
             captureAutoMemoryDirective(input.memoryInput, input.id, binding)
         }
-        targetState.update { it.copy(queuedInputCount = targetPending.size()) }
+        targetState.update { it.copy(work = it.work.copy(queuedInputCount = targetPending.size())) }
         targetLog.append(
             LOCAL_AGENT_INBOX_EVENT_TYPE,
             encodeLocalAgentInboxEvent(
@@ -2454,7 +2464,7 @@ class LocalHarnessEngine @Inject constructor(
             put("role", "user")
             put("content", next.content)
         }
-        binding.state.update { it.copy(queuedInputCount = binding.pendingInputs.size()) }
+        binding.state.update { it.copy(work = it.work.copy(queuedInputCount = binding.pendingInputs.size())) }
         appendUserToModelHistory(durableMessage, binding)
         binding.eventLog.append(
             LOCAL_AGENT_INBOX_EVENT_TYPE,
@@ -2724,11 +2734,13 @@ class LocalHarnessEngine @Inject constructor(
         cancelChatPostTurn()
         _state.update {
             it.copy(
-                running = true,
+                work = it.work.copy(
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                ),
+                kernel = it.kernel.copy(running = true),
                 error = null,
                 deviceApprovalLease = false,
-                pendingApproval = null,
-                pendingQuestion = null,
             )
         }
         try {
@@ -2878,9 +2890,11 @@ class LocalHarnessEngine @Inject constructor(
 
             _state.update {
                 it.copy(
-                    running = false,
-                    pendingApproval = null,
-                    pendingQuestion = null,
+                    work = it.work.copy(
+                        pendingApproval = null,
+                        pendingQuestion = null,
+                    ),
+                    kernel = it.kernel.copy(running = false),
                     deviceApprovalLease = false,
                 )
             }
@@ -2941,9 +2955,11 @@ class LocalHarnessEngine @Inject constructor(
         } finally {
             _state.update {
                 it.copy(
-                    running = false,
-                    pendingApproval = null,
-                    pendingQuestion = null,
+                    work = it.work.copy(
+                        pendingApproval = null,
+                        pendingQuestion = null,
+                    ),
+                    kernel = it.kernel.copy(running = false),
                     deviceApprovalLease = false,
                 )
             }
@@ -2988,7 +3004,14 @@ class LocalHarnessEngine @Inject constructor(
         val foregroundSessionId = runSessionId
         var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
         LocalExecutionService.holdTurn(context, foregroundSessionId)
-        runState.update { it.copy(running = true, error = null, deviceApprovalLease = false, workflowProgress = null) }
+        runState.update {
+            it.copy(
+                work = it.work.copy(workflowProgress = null),
+                kernel = it.kernel.copy(running = true),
+                error = null,
+                deviceApprovalLease = false,
+            )
+        }
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
         var finalChatAssistant: LocalHarnessMessage? = null
         var finalChatAssistantSequence: Long? = null
@@ -3007,8 +3030,8 @@ class LocalHarnessEngine @Inject constructor(
             adaptiveAgentStepLimit(
                 configuredBase = mainMaxSteps,
                 task = input,
-                contextChars = runSnapshot.contextChars,
-                contextBudgetChars = runSnapshot.contextBudgetChars,
+                contextChars = runSnapshot.kernel.contextChars,
+                contextBudgetChars = runSnapshot.kernel.contextBudgetChars,
                 pressure = resourceScheduler.snapshot().pressure,
                 kind = LocalAgentRunKind.FOREGROUND,
             )
@@ -3036,7 +3059,7 @@ class LocalHarnessEngine @Inject constructor(
                 maxLanguageServers = resourceScheduler.budget.maxLanguageServers,
             ),
             toolNames = runToolNames(runPolicy, binding),
-            contextChars = runSnapshot.contextChars,
+            contextChars = runSnapshot.kernel.contextChars,
             parentRunId = continuationParentRunId,
         )
         var lastModelError: LocalModelException? = null
@@ -4365,7 +4388,7 @@ class LocalHarnessEngine @Inject constructor(
         val targetState = binding?.state ?: _state
         val runner = binding?.let(::workSubagents) ?: subagents
         val workerSelection = LocalWorkerModelRouter.resolve(modelOverride, targetState.value)
-        targetState.update { it.copy(workflowProgress = null) }
+        targetState.update { it.copy(work = it.work.copy(workflowProgress = null)) }
         return LocalWorkflowCoordinator(
             execute = { prompt -> runner.runResult(
                 task = prompt,
@@ -4376,17 +4399,21 @@ class LocalHarnessEngine @Inject constructor(
             ).requireCompletedOutput() },
             pruneOutput = ::pruneToolResult,
             onProgress = { progress -> targetState.update { state ->
-                val previousBlock = state.workflowProgress?.takeIf { it.needsUserAction }
+                val previousBlock = state.work.workflowProgress?.takeIf { it.needsUserAction }
                 val blocked = progress.stage == "受阻"
-                state.copy(workflowProgress = LocalWorkflowProgress(
-                    sessionId = binding?.sessionId ?: currentSessionId,
-                    stage = progress.stage,
-                    task = progress.task,
-                    completed = progress.completed,
-                    total = progress.total,
-                    blockedReason = if (blocked) progress.detail else previousBlock?.blockedReason,
-                    needsUserAction = blocked || previousBlock != null,
-                ))
+                state.copy(
+                    work = state.work.copy(
+                        workflowProgress = LocalWorkflowProgress(
+                            sessionId = binding?.sessionId ?: currentSessionId,
+                            stage = progress.stage,
+                            task = progress.task,
+                            completed = progress.completed,
+                            total = progress.total,
+                            blockedReason = if (blocked) progress.detail else previousBlock?.blockedReason,
+                            needsUserAction = blocked || previousBlock != null,
+                        ),
+                    ),
+                )
             } },
         ).run(tasks, mode, requiredEvidence)
     }
@@ -4571,8 +4598,10 @@ class LocalHarnessEngine @Inject constructor(
         val targetState = binding?.state ?: _state
         targetState.update {
             it.copy(
-                contextChars = history.encodedChars,
-                contextBudgetChars = budget.maxHistoryChars,
+                kernel = it.kernel.copy(
+                    contextChars = history.encodedChars,
+                    contextBudgetChars = budget.maxHistoryChars,
+                ),
             )
         }
     }
@@ -4862,15 +4891,17 @@ class LocalHarnessEngine @Inject constructor(
                 todos = projectedControls.todos,
                 goal = projectedControls.goal,
                 planMode = projectedControls.planMode,
+                jobs = projectExecutionJobs(stored.usageMode, stored.id, jobs.snapshotInfos()),
+                queuedInputCount = pendingInputs.size(),
             ),
             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
                 loaded?.legacySafeAutoApproval == true,
             ),
-            jobs = projectExecutionJobs(stored.usageMode, stored.id, jobs.snapshotInfos()),
-            queuedInputCount = pendingInputs.size(),
-            resources = resourceScheduler.snapshot().toLocalHarnessResourceState(stored.usageMode),
-            contextChars = modelHistory.encodedChars,
-            contextBudgetChars = currentHistoryBudget().maxHistoryChars,
+            kernel = com.labteto.dshmobile.local.runtime.LocalKernelState(
+                resources = resourceScheduler.snapshot().toLocalHarnessResourceState(stored.usageMode),
+                contextChars = modelHistory.encodedChars,
+                contextBudgetChars = currentHistoryBudget().maxHistoryChars,
+            ),
             error = runRecoveryError,
         )
         LocalSessionRuntimeRegistry.submitWhenIdle(sessionId) {
