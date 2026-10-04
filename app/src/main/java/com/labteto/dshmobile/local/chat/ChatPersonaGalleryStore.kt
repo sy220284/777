@@ -10,6 +10,11 @@ import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
+internal data class PersonaGalleryImportOutcome(
+    val entry: PersonaGalleryEntry,
+    val diaryEntries: List<ChatDiaryEntry> = emptyList(),
+)
+
 @Singleton
 class ChatPersonaGalleryStore internal constructor(
     private val file: File,
@@ -55,10 +60,16 @@ class ChatPersonaGalleryStore internal constructor(
     internal fun exportPersonaDocument(
         id: String,
         format: PersonaTransferFormat,
+        diaryEntries: List<ChatDiaryEntry> = emptyList(),
     ): PersonaTransferDocument {
         val entry = readNormalized().entries.firstOrNull { it.id == id }
             ?: error("人物档案不存在")
-        return PersonaTransferDocuments.encode(json, history.hydrate(entry), format)
+        return PersonaTransferDocuments.encode(
+            json = json,
+            entry = history.hydrate(entry),
+            format = format,
+            diaryEntries = diaryEntries,
+        )
     }
 
     @Synchronized
@@ -66,15 +77,28 @@ class ChatPersonaGalleryStore internal constructor(
         bytes: ByteArray,
         fileName: String? = null,
         mimeType: String? = null,
-    ): PersonaGalleryEntry {
+    ): PersonaGalleryEntry =
+        importPersonaDocumentWithDiary(bytes, fileName, mimeType).entry
+
+    @Synchronized
+    internal fun importPersonaDocumentWithDiary(
+        bytes: ByteArray,
+        fileName: String? = null,
+        mimeType: String? = null,
+    ): PersonaGalleryImportOutcome {
         val canonicalJson = PersonaTransferDocuments.decodeToCanonicalJson(
             bytes = bytes,
             fileName = fileName,
             mimeType = mimeType,
         )
         return when (val decoded = PersonaSchemaMigration.decodeDocumentImport(json, canonicalJson)) {
-            is PersonaDocumentImport.Archive -> importArchivedEntry(decoded.entry)
-            PersonaDocumentImport.Share -> importPersona(canonicalJson)
+            is PersonaDocumentImport.Archive -> PersonaGalleryImportOutcome(
+                entry = importArchivedEntry(decoded.entry),
+                diaryEntries = decoded.diaryEntries,
+            )
+            PersonaDocumentImport.Share -> PersonaGalleryImportOutcome(
+                entry = importPersona(canonicalJson),
+            )
         }
     }
 
