@@ -11,7 +11,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** Owns one subagent model-step request, retry and context-overflow recovery policy. */
+/** Owns subagent-specific recovery policy while the shared runtime owns request-step lifecycle. */
 internal class LocalSubagentModelStepExecutor(
     private val modelGateway: LocalModelGateway,
     private val modelAttempts: () -> Int,
@@ -23,6 +23,7 @@ internal class LocalSubagentModelStepExecutor(
     private val requestBoundary = LocalSubagentModelRequestBoundary(
         LocalAgentModelRequestRuntime(modelGateway, resourceScheduler), eventLog, executionControl,
     )
+    private val modelStepRuntime = LocalAgentModelStepRuntime()
 
     suspend fun complete(
         surface: LocalRunModelSurface,
@@ -33,7 +34,11 @@ internal class LocalSubagentModelStepExecutor(
         durableHistory: LocalModelHistoryBuffer? = null,
         allowContextOverflowRecovery: Boolean = true,
     ): LocalModelReply {
-        val executor = AgentRequestExecutor(
+        var overflowRound = 0
+        var structureRecoveryAttempted = false
+        var continuationRound = 0
+        return modelStepRuntime.execute(
+            initialMessages = history,
             maxAttempts = modelAttempts().coerceIn(1, 5),
             retryable = { error ->
                 (error as? LocalModelException)?.retryable == true || error is java.io.IOException
@@ -82,71 +87,94 @@ internal class LocalSubagentModelStepExecutor(
                     is AgentRequestEvent.AttemptSucceeded -> Unit
                 }
             },
-        )
-        var activeHistory = history
-        var overflowRound = 0
-        var structureRecoveryAttempted = false
-        var continuationRound = 0
-        while (true) {
-            try {
-                return executor.execute {
-                    requestBoundary.complete(
-                        surface = surface,
-                        messages = activeHistory,
-                        tools = tools,
-                        subagentId = subagentId,
-                        step = step,
-                    )
-                }
-            } catch (error: Throwable) {
+            recoveryPolicy = LocalAgentModelStepRecoveryPolicy { error, activeHistory, _ ->
                 val modelError = error as? LocalModelException
                 val continuation = modelError?.let {
                     subagentContinuationMessage(it, continuationRound)
                 }
                 if (continuation != null) {
                     continuationRound += 1
-                    activeHistory = activeHistory + continuation
                     recordSubagentContinuation(
-                        continuation, modelError, continuationRound, durableHistory, eventLog(), subagentId, step,
+                        continuation,
+                        modelError,
+                        continuationRound,
+                        durableHistory,
+                        eventLog(),
+                        subagentId,
+                        step,
                     )
-                    continue
-                }
-                if (!structureRecoveryAttempted) {
-                    LocalSubagentStructureRecovery.recover(
-                        error, activeHistory, subagentId, step, eventLog(),
-                    )?.let { recovered ->
+                    LocalAgentModelStepRecovery(
+                        messages = activeHistory + continuation,
+                        reason = "continuation",
+                    )
+                } else {
+                    val structureRecovery = if (!structureRecoveryAttempted) {
+                        LocalSubagentStructureRecovery.recover(
+                            error,
+                            activeHistory,
+                            subagentId,
+                            step,
+                            eventLog(),
+                        )
+                    } else {
+                        null
+                    }
+                    if (structureRecovery != null) {
                         structureRecoveryAttempted = true
-                        activeHistory = recovered
-                        continue
+                        LocalAgentModelStepRecovery(
+                            messages = structureRecovery,
+                            reason = "structure",
+                        )
+                    } else if (allowContextOverflowRecovery && contextWindowExceeded(error)) {
+                        val compacted = historyCompactor.compactForOverflow(
+                            activeHistory,
+                            LocalHistorySummaryMode.WORK,
+                        )
+                        val madeProgress = compacted != null &&
+                            compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
+                            compacted.messages != activeHistory
+                        if (!madeProgress || compacted == null) {
+                            null
+                        } else {
+                            overflowRound += 1
+                            durableHistory?.compactOverflow(
+                                compactor = historyCompactor,
+                                summaryMode = LocalHistorySummaryMode.WORK,
+                            )?.let { durableCompaction ->
+                                recordSubagentCompaction(
+                                    durableCompaction,
+                                    eventLog(),
+                                    subagentId,
+                                    overflowRound,
+                                )
+                            }
+                            eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
+                                put("agent_id", subagentId)
+                                put("step", step)
+                                put("round", overflowRound)
+                                put("model", surface.model)
+                                put("estimated_tokens_before", compacted.estimatedTokensBefore)
+                                put("estimated_tokens_after", compacted.estimatedTokensAfter)
+                                put("omitted_messages", compacted.omittedMessages)
+                            })
+                            LocalAgentModelStepRecovery(
+                                messages = compacted.messages,
+                                reason = "context_overflow",
+                            )
+                        }
+                    } else {
+                        null
                     }
                 }
-                if (!allowContextOverflowRecovery || !contextWindowExceeded(error)) throw error
-                val compacted = historyCompactor.compactForOverflow(
-                    activeHistory,
-                    LocalHistorySummaryMode.WORK,
-                ) ?: throw error
-                val madeProgress = compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
-                    compacted.messages != activeHistory
-                if (!madeProgress) throw error
-
-                overflowRound += 1
-                durableHistory?.compactOverflow(
-                    compactor = historyCompactor,
-                    summaryMode = LocalHistorySummaryMode.WORK,
-                )?.let { durableCompaction ->
-                    recordSubagentCompaction(durableCompaction, eventLog(), subagentId, overflowRound)
-                }
-                eventLog().append("subagent/context-overflow-recovery", buildJsonObject {
-                    put("agent_id", subagentId)
-                    put("step", step)
-                    put("round", overflowRound)
-                    put("model", surface.model)
-                    put("estimated_tokens_before", compacted.estimatedTokensBefore)
-                    put("estimated_tokens_after", compacted.estimatedTokensAfter)
-                    put("omitted_messages", compacted.omittedMessages)
-                })
-                activeHistory = compacted.messages
-            }
+            },
+        ) { activeHistory ->
+            requestBoundary.complete(
+                surface = surface,
+                messages = activeHistory,
+                tools = tools,
+                subagentId = subagentId,
+                step = step,
+            )
         }
     }
 }
