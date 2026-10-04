@@ -277,7 +277,6 @@ class LocalHarnessEngine @Inject constructor(
             },
         )
     }
-    private val streamingPreviewStore = LocalStreamingPreviewStore()
     private val modelRequestCoordinator by lazy {
         LocalModelRequestCoordinator(
             modelGateway = modelGateway,
@@ -285,7 +284,7 @@ class LocalHarnessEngine @Inject constructor(
             historyCompactor = historyCompactor,
             toolSchemas = ::modelToolSchemas,
             defaultEventLog = { eventLog },
-            streamingPreviewStore = streamingPreviewStore,
+            streamingPreviewStore = runtimeStateStore.streamingPreviewStore,
             persistOverflowCompaction = ::persistForegroundOverflowCompaction,
             pressureStore = requestPressureStore,
             maxStreamPreviewChars = MAX_STREAM_PREVIEW_CHARS,
@@ -346,7 +345,6 @@ class LocalHarnessEngine @Inject constructor(
         ),
     )
     internal val state: StateFlow<LocalHarnessState> = runtimeStateStore.state
-    internal val streamingState: StateFlow<LocalHarnessStreamingState> = streamingPreviewStore.state
 
     private val currentSessionId: String
         get() = runtimeStateStore.currentSessionId
