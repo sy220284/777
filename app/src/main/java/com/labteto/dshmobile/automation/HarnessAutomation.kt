@@ -285,8 +285,8 @@ class AutomationStore internal constructor(
     ) : this(File(context.filesDir, "local-harness/automations.json"), json)
 
     private val documents = AutomationDocumentStore(file, json)
-    private val taskState = kotlinx.coroutines.flow.MutableStateFlow(list())
-    val tasks: kotlinx.coroutines.flow.StateFlow<List<AutomationTask>> = taskState
+    private val taskState by lazy { kotlinx.coroutines.flow.MutableStateFlow(list()) }
+    val tasks: kotlinx.coroutines.flow.StateFlow<List<AutomationTask>> get() = taskState
 
     @Synchronized
     fun list(): List<AutomationTask> = read().tasks.sortedBy { it.nextRunAt }
