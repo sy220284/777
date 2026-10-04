@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.ui.screens.tasks
+import androidx.compose.foundation.layout.weight\npackage com.labteto.dshmobile.ui.screens.tasks
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
