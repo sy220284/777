@@ -204,7 +204,7 @@ internal class LocalModelRequestCoordinator(
             put("profile_id", frozenProfile.id)
             put("provider", frozenProfile.provider)
             put("auth_kind", frozenProfile.authKind.name)
-            put("protocol", resolvedProtocol.name)
+            put("protocol", runSurface.protocol.name)
             put("route_fingerprint", routeFingerprint)
             put("prompt_cache_mode", cachePolicy.mode.name.lowercase())
             put("prompt_cache_key_enabled", promptCacheKey != null)
@@ -316,7 +316,7 @@ internal class LocalModelRequestCoordinator(
                                 }
                                 append("origin=${if (localPreflight) "local_preflight" else "provider_or_transport"} ")
                                 append("retryable=${event.retryable} profile_id=${frozenProfile.id} ")
-                                append("auth_kind=${frozenProfile.authKind.name} protocol=${resolvedProtocol.name} ")
+                                append("auth_kind=${frozenProfile.authKind.name} protocol=${runSurface.protocol.name} ")
                                 credentialDiagnostic.credentialRefTail?.let { append("credential_ref_tail=$it ") }
                                 credentialDiagnostic.clientIdTail?.let { append("client_id_tail=$it ") }
                                 credentialDiagnostic.selectedAccountTail?.let { append("selected_account_tail=$it ") }
@@ -336,7 +336,7 @@ internal class LocalModelRequestCoordinator(
                                     put("profile_id", frozenProfile.id)
                                     put("provider", frozenProfile.provider)
                                     put("auth_kind", frozenProfile.authKind.name)
-                                    put("protocol", resolvedProtocol.name)
+                                    put("protocol", runSurface.protocol.name)
                                     put("route_fingerprint", routeFingerprint)
                                     put("message_count", logMessages.size)
                                     put("context_chars", contextChars)
