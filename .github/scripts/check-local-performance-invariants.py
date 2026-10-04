@@ -28,6 +28,7 @@ MODEL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalM
 MODEL_HISTORY_BUFFER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryBuffer.kt"
 ENGINE_DEFAULTS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt"
 TRANSCRIPT_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt"
+SESSION_PERSISTENCE_PROJECTION = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionPersistenceProjection.kt"
 AUTOMATION_CHAT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt"
 PROMPT_CONTEXT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt"
 TOOL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
@@ -118,6 +119,7 @@ run_coordinator = RUN_COORDINATOR.read_text(encoding="utf-8")
 model_coordinator = MODEL_COORDINATOR.read_text(encoding="utf-8")
 model_history_buffer = MODEL_HISTORY_BUFFER.read_text(encoding="utf-8")
 engine_defaults = ENGINE_DEFAULTS.read_text(encoding="utf-8")
+session_persistence_projection = SESSION_PERSISTENCE_PROJECTION.read_text(encoding="utf-8")
 transcript_runtime = TRANSCRIPT_RUNTIME.read_text(encoding="utf-8")
 automation_chat = AUTOMATION_CHAT.read_text(encoding="utf-8")
 prompt_context = PROMPT_CONTEXT.read_text(encoding="utf-8")
@@ -267,34 +269,22 @@ if "fun pageBefore(" not in event_log or "forEachEventReverseUnsafe" not in even
 if "summaryCache" not in repository or "snapshot.toSummary()" not in repository:
     violations.append("LocalSessionRepository must keep lightweight session-summary caching")
 
-snapshot_match = re.search(
-    r"private fun persistenceSnapshot\(binding: LocalWorkRunBinding\? = null\): LocalHarnessSession \{(.*?)\n    \}",
-    engine,
-    re.S,
-)
-persist_match = re.search(
-    r"private fun persist\(binding: LocalWorkRunBinding\? = null\) \{(.*?)\n    \}",
-    engine,
-    re.S,
-)
-if snapshot_match is not None:
-    persist_body = snapshot_match.group(1)
-elif persist_match is not None:
-    persist_body = persist_match.group(1)
-else:
-    persist_body = ""
-    violations.append("LocalHarnessEngine must keep the session snapshot persistence boundary")
+if "localSessionPersistenceSnapshot(" not in engine:
+    violations.append("LocalHarnessEngine must delegate session snapshot persistence to the Session capability")
 
-if persist_body:
-    control_pos = persist_body.find("val controlProjectedThroughSequence = log.latestSequence()")
-    transcript_pos = persist_body.find("val transcriptProjectedThroughSequence")
-    state_pos = persist_body.find("val state = binding?.state?.value ?: _state.value")
-    if min(control_pos, transcript_pos, state_pos) < 0 or not (
-        control_pos < state_pos and transcript_pos < state_pos
-    ):
-        violations.append(
-            "Session snapshot persistence must capture durable projection cursors before reading mutable state"
-        )
+control_pos = session_persistence_projection.find(
+    "val controlProjectedThroughSequence = log.latestSequence()"
+)
+transcript_pos = session_persistence_projection.find("val transcriptProjectedThroughSequence")
+state_pos = session_persistence_projection.find(
+    "val state = binding?.state?.value ?: currentState"
+)
+if min(control_pos, transcript_pos, state_pos) < 0 or not (
+    control_pos < state_pos and transcript_pos < state_pos
+):
+    violations.append(
+        "Session snapshot persistence must capture durable projection cursors before reading mutable state"
+    )
 
 if "parse(synthetic.toString())" in deepseek:
     violations.append("DeepSeek streaming replies must not rebuild and reparse a synthetic full response")
@@ -348,7 +338,11 @@ if "transcriptForBranchMaterialization(" not in engine or "restoreMaterializedCh
     violations.append("Chat branching must materialize full history only on demand and preserve durable branch graphs")
 if "(current.messages + messages).takeLast(runtimeWindowMessages)" not in transcript_runtime:
     violations.append("Runtime transcript must stay bounded inside LocalTranscriptRuntime")
-if "LocalSessionCoordinator(" not in engine or "sessionCoordinator.snapshot(" not in engine:
+if (
+    "LocalSessionCoordinator(" not in engine
+    or "sessionCoordinator.snapshot(" not in session_persistence_projection
+    or "localSessionPersistenceSnapshot(" not in engine
+):
     violations.append("Session snapshot writes must stay routed through LocalSessionCoordinator")
 if (
     "messages = emptyList()" not in coordinator or
