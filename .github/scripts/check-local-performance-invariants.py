@@ -272,12 +272,15 @@ if "summaryCache" not in repository or "snapshot.toSummary()" not in repository:
 if "localSessionPersistenceSnapshot(" not in engine:
     violations.append("LocalHarnessEngine must delegate session snapshot persistence to the Session capability")
 
+if "currentState: () -> LocalHarnessState" not in session_persistence_projection or "currentState = { _state.value }" not in engine:
+    violations.append("Session snapshot must defer foreground state reads until after cursor capture")
+
 control_pos = session_persistence_projection.find(
     "val controlProjectedThroughSequence = log.latestSequence()"
 )
 transcript_pos = session_persistence_projection.find("val transcriptProjectedThroughSequence")
 state_pos = session_persistence_projection.find(
-    "val state = binding?.state?.value ?: currentState"
+    "val state = binding?.state?.value ?: currentState()"
 )
 if min(control_pos, transcript_pos, state_pos) < 0 or not (
     control_pos < state_pos and transcript_pos < state_pos

@@ -492,7 +492,7 @@ if "profile: LocalModelProfile" not in chat_refresh or "requestPlanner(before, p
     die("Chat post-turn refresh and retries must retain the originating model profile")
 if "profile = profile" not in engine[engine.find("requestPlanner ="):engine.find("private val chatReplyCoordinator")]:
     die("Chat post-turn planner must pass its frozen profile into model requests")
-if "profileId = runSnapshot.modelSelection.activeProfileId" not in engine:
+if "profileId = runSnapshot.modelState.modelSelection.activeProfileId" not in engine:
     die("Foreground runs must freeze the exact selected model profile id")
 if "messages = chatPostTurnModelMessages(prompt)" not in engine:
     die("Chat post-turn requests must include a real model input, not system-only instructions")

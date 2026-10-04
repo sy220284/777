@@ -11,7 +11,7 @@ import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 internal fun localSessionPersistenceSnapshot(
     sessionCoordinator: LocalSessionCoordinator,
     currentSessionId: String,
-    currentState: LocalHarnessState,
+    currentState: () -> LocalHarnessState,
     eventLog: LocalSessionEventLog,
     transcriptProjectionCursor: Long?,
     binding: LocalWorkRunBinding? = null,
@@ -23,7 +23,7 @@ internal fun localSessionPersistenceSnapshot(
     val controlProjectedThroughSequence = log.latestSequence()
     val transcriptProjectedThroughSequence =
         binding?.transcriptProjectionCursor ?: transcriptProjectionCursor
-    val state = binding?.state?.value ?: currentState
+    val state = binding?.state?.value ?: currentState()
     return sessionCoordinator.snapshot(
         sessionId = binding?.sessionId ?: currentSessionId,
         state = state,

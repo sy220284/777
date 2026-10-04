@@ -115,6 +115,36 @@ class LocalSessionCoordinatorTest {
         assertEquals(7L, snapshot.transcriptProjectedThroughSequence)
     }
 
+    @Test
+    fun persistenceProjectionCapturesCursorBeforeReadingForegroundState() = runTest {
+        val json = Json { ignoreUnknownKeys = true }
+        val sessions = temporary.newFolder("cursor-order")
+        val log = LocalSessionEventLog(File(sessions, "s1.events.jsonl"), json)
+        val repository = LocalSessionRepository(sessions, json, backgroundScope, {}, {})
+        val coordinator = LocalSessionCoordinator(repository, { log }, 2)
+        val capturedSequence = log.latestSequence()
+        var stateReads = 0
+
+        val snapshot = localSessionPersistenceSnapshot(
+            sessionCoordinator = coordinator,
+            currentSessionId = "s1",
+            currentState = {
+                stateReads++
+                // Simulate a control update landing at the state-read boundary. Its event must
+                // remain replayable, rather than being skipped by a cursor newer than the state.
+                log.append("plan/state", kotlinx.serialization.json.buildJsonObject {})
+                LocalHarnessState(work = LocalWorkState(plan = listOf("新计划")))
+            },
+            eventLog = log,
+            transcriptProjectionCursor = 0L,
+        )
+
+        assertEquals(1, stateReads)
+        assertEquals(capturedSequence, snapshot.controlProjectedThroughSequence)
+        assertTrue(log.latestSequence() > snapshot.controlProjectedThroughSequence!!)
+        assertEquals(listOf("新计划"), snapshot.plan)
+    }
+
     private fun message(id: String, role: String, content: String) = LocalHarnessMessage(
         id = id,
         role = role,

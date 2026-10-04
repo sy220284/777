@@ -4929,7 +4929,7 @@ class LocalHarnessEngine @Inject constructor(
         localSessionPersistenceSnapshot(
             sessionCoordinator = sessionCoordinator,
             currentSessionId = currentSessionId,
-            currentState = _state.value,
+            currentState = { _state.value },
             eventLog = eventLog,
             transcriptProjectionCursor = transcriptProjectionCursor,
             binding = binding,
