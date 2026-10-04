@@ -353,26 +353,6 @@ class LocalHarnessEngine @Inject internal constructor(
         ),
     )
 
-    init {
-        runtimeStateStore.observeResourceSnapshots { snapshot ->
-            projectResourceSnapshotToSessionStates(
-                snapshot = snapshot,
-                contextBudgetFor = { current ->
-                    localHistoryBudgetFor(
-                        memoryClassMb = memoryClassMb,
-                        pressure = snapshot.pressure,
-                        model = current.modelState.model,
-                        baseUrl = current.modelState.baseUrl,
-                        contextWindowTokensOverride =
-                            current.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
-                    ).maxHistoryChars
-                },
-                visibleState = _state,
-                activeRuns = workRunRegistry,
-            )
-        }
-    }
-
     private val currentSessionId: String
         get() = runtimeStateStore.currentSessionId
 

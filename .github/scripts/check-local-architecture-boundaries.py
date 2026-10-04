@@ -198,6 +198,9 @@ if dependency_count > ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES:
 runtime_state_store = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt")
 )
+work_run_registry = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt")
+)
 if "MutableStateFlow(LocalHarnessState())" not in runtime_state_store:
     die("LocalRuntimeStateStore must own the aggregate runtime MutableStateFlow")
 if "foregroundInteractions = LocalInteractionCoordinator(mutable)" not in runtime_state_store:
@@ -773,6 +776,17 @@ if "LocalWorkRunRegistry" in runtime_state_store or "com.labteto.dshmobile.local
     die("Shared Runtime capability must not depend on WorkFeature internals")
 if "observeResourceSnapshots" not in runtime_state_store:
     die("Shared Runtime resource ownership must expose snapshots without importing Feature state")
+if "runtimeStateStore.observeResourceSnapshots(::projectResourceSnapshot)" not in work_run_registry:
+    die("WorkFeature must observe shared resource snapshots without Engine mediation")
+if "runtimeStateStore.resourceSnapshot()" not in work_run_registry:
+    die("New Work bindings must project the current shared resource snapshot on attach")
+if "runtimeStateStore.observeResourceSnapshots" in engine or "projectResourceSnapshotToSessionStates" in engine:
+    die("LocalHarnessEngine must not bridge Runtime resource snapshots into WorkFeature")
+work_binding_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt")
+)
+if "projectResourceSnapshotToSessionStates" in work_binding_source:
+    die("Legacy cross-layer resource projection helper must stay removed")
 if "AutomationExecutionRegistry.tryAcquire(id)" not in automation_worker:
     die("Automation scheduled/manual execution must share one task runtime lease")
 if "AutomationExecutionRegistry.tryAcquire(id) ?: return Result.retry()" not in automation_worker:

@@ -1,8 +1,6 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
-import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
-import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import kotlinx.coroutines.Job
@@ -119,25 +117,6 @@ internal fun projectJobSnapshotToSessionStates(
     }
 }
 
-
-/** Shared scheduler facts must reach detached runs as well as the visible session. */
-internal fun projectResourceSnapshotToSessionStates(
-    snapshot: HarnessResourceSnapshot,
-    contextBudgetFor: (LocalHarnessState) -> Int,
-    visibleState: MutableStateFlow<LocalHarnessState>,
-    activeRuns: LocalWorkRunRegistry,
-) {
-    fun project(state: MutableStateFlow<LocalHarnessState>) {
-        state.update { current ->
-            current.copy(kernel = current.kernel.copy(
-                resources = snapshot.toLocalHarnessResourceState(current.usageMode),
-                contextBudgetChars = contextBudgetFor(current),
-            ))
-        }
-    }
-    project(visibleState)
-    activeRuns.forEachBinding { project(it.state) }
-}
 
 internal fun mirrorLocalWorkRunState(
     currentSessionId: String,
