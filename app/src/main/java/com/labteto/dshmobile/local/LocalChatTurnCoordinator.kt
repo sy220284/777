@@ -10,13 +10,16 @@ import com.labteto.dshmobile.local.chat.ChatTurnContext
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.isUnboundChatPersona
+import javax.inject.Inject
+import javax.inject.Singleton
 
 internal data class LocalPreparedChatTurn(
     val context: ChatTurnContext,
     val dynamicContext: String,
 )
 
-internal class LocalChatTurnCoordinator(
+@Singleton
+internal class LocalChatTurnCoordinator @Inject constructor(
     private val runner: ChatTurnRunner,
     private val interactionPlanner: ChatInteractionPlanner,
 ) {
