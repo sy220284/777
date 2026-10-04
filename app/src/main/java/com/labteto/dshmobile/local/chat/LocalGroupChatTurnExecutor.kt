@@ -146,7 +146,7 @@ internal class LocalGroupChatTurnExecutor(
     ): GroupGeneratedReply {
         val persona = chatPersonaStore.get(member.personaId)
         val startedAtNanos = System.nanoTime()
-        val interactiveAttempts = snapshot.modelAttempts.coerceIn(1, 2)
+        val interactiveAttempts = snapshot.modelState.modelState.modelAttempts.coerceIn(1, 2)
 
         return try {
             val turnContext = chatReplyCoordinator.buildGroupTurnContext(
@@ -167,10 +167,10 @@ internal class LocalGroupChatTurnExecutor(
                 dynamicContext = turnContext.dynamicPrompt,
             )
             val groupImageMode = resolveLocalImageInputMode(
-                snapshot.imageInputMode,
+                snapshot.modelState.modelState.imageInputMode,
                 imageCapabilities,
-                snapshot.baseUrl,
-                snapshot.model,
+                snapshot.modelState.baseUrl,
+                snapshot.modelState.model,
             )
             if (hasLocalImageRefs(groupRequestHistory) && groupImageMode == LocalImageInputMode.TOOL) {
                 throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
@@ -180,7 +180,7 @@ internal class LocalGroupChatTurnExecutor(
                 workspaceRoot = File(workspacePath),
                 mode = groupImageMode,
                 budget = imageRequestBudget,
-                maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.model, snapshot.baseUrl),
+                maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.modelState.model, snapshot.modelState.baseUrl),
             )
             val rawReply = completeWithRetry(
                 key = key,
@@ -248,7 +248,7 @@ internal class LocalGroupChatTurnExecutor(
                 put("elapsed_ms", (System.nanoTime() - startedAtNanos) / 1_000_000L)
             })
             val failure = if (hasLocalImageRefs(baseHistory) && imageInputUnsupported(error)) {
-                imageCapabilities.markUnsupported(snapshot.baseUrl, snapshot.model)
+                imageCapabilities.markUnsupported(snapshot.modelState.baseUrl, snapshot.modelState.model)
                 IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。", error)
             } else {
                 error
@@ -612,7 +612,7 @@ internal class LocalGroupChatTurnExecutor(
             compactHistoryIfNeeded(extraTokens = groupPromptTokens)
 
             eventLog.append("turn/start", buildJsonObject {
-                put("model", snapshot.model)
+                put("model", snapshot.modelState.model)
                 put("mode", "group-chat")
                 put("member_count", members.size)
                 put("responder_count", responders.size)
@@ -858,9 +858,9 @@ internal class LocalGroupChatTurnExecutor(
     private suspend fun modelRequestMarkerOrNull(snapshot: LocalHarnessState): String? =
         try {
             modelGateway.profileForRoute(
-                profileId = snapshot.modelSelection.activeProfileId,
-                model = snapshot.model,
-                baseUrl = snapshot.baseUrl,
+                profileId = snapshot.modelState.modelState.modelSelection.activeProfileId,
+                model = snapshot.modelState.model,
+                baseUrl = snapshot.modelState.baseUrl,
             ).id
         } catch (cancelled: CancellationException) {
             throw cancelled
