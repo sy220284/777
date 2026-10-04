@@ -444,10 +444,12 @@ jobs:
 
           (
             cd "$ASSET_DIR"
-            rm -f SHA256SUMS.txt
-            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -printf '%f\n' |
+            CHECKSUM_TMP="$RUNNER_TEMP/SHA256SUMS.txt"
+            rm -f SHA256SUMS.txt "$CHECKSUM_TMP"
+            find . -maxdepth 1 -type f -printf '%f\n' |
               sort |
-              while IFS= read -r file; do sha256sum "$file"; done > SHA256SUMS.txt
+              while IFS= read -r file; do sha256sum "$file"; done > "$CHECKSUM_TMP"
+            mv "$CHECKSUM_TMP" SHA256SUMS.txt
             ls -lh
           )
 
