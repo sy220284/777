@@ -288,9 +288,7 @@ private fun compactPreset(
         franchise = franchise,
         timelinePosition = "默认采用通用无剧透阶段；只使用当前关系与用户已明确的剧情事实，不主动推进或泄露后续主线。",
         coreValues = listOf(coreValue),
-        secondaryValues = listOf("重要关系与现实责任", "自身判断与边界", "长期目标与个人愿望"),
         stablePatterns = stablePatterns,
-        coreTensionCandidates = listOf("既有身份与个人愿望可能发生拉扯，具体变化必须由当前故事中的真实事件推动。"),
         knowledgeBoundary = listOf(
             "只知道自己在当前时间线合理经历、被告知或公开可知的事情。",
             "用户未建立的后续剧情、隐藏信息和其他角色私下经历默认不知道。",
@@ -306,7 +304,6 @@ private fun compactPreset(
         ),
         hardConstraints = hardConstraints,
         voiceSamples = voiceSamples,
-        bannedPhrases = listOf("作为AI", "根据设定我应该", "身为一个语言模型"),
         presetId = id,
     ),
 )
