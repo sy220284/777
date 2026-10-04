@@ -75,10 +75,12 @@ internal class LocalWorkRunBinding(
         }
         state.update {
             it.copy(
-                running = false,
-                pendingApproval = null,
-                pendingQuestion = null,
-                queuedInputCount = 0,
+                kernel = it.kernel.copy(
+                    running = false,
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                    queuedInputCount = 0,
+                ),
             )
         }
         val activeJob = job.also { job = null }
@@ -94,11 +96,19 @@ internal fun projectJobSnapshotToSessionStates(
     activeRuns: java.util.concurrent.ConcurrentHashMap<String, LocalWorkRunBinding>,
 ) {
     visibleState.update { current ->
-        current.copy(jobs = projectExecutionJobs(current.usageMode, current.sessionId, jobs))
+        current.copy(
+            kernel = current.kernel.copy(
+                jobs = projectExecutionJobs(current.usageMode, current.sessionId, jobs),
+            ),
+        )
     }
     activeRuns.forEach { (sessionId, binding) ->
         binding.state.update { current ->
-            current.copy(jobs = projectExecutionJobs(current.usageMode, sessionId, jobs))
+            current.copy(
+                kernel = current.kernel.copy(
+                    jobs = projectExecutionJobs(current.usageMode, sessionId, jobs),
+                ),
+            )
         }
     }
 }
@@ -119,13 +129,15 @@ internal fun mirrorLocalWorkRunState(
                 messages = run.messages,
                 transcriptIndex = run.transcriptIndex,
                 work = run.work,
-                running = run.running,
-                pendingApproval = run.pendingApproval,
-                pendingQuestion = run.pendingQuestion,
-                queuedInputCount = run.queuedInputCount,
-                workflowProgress = run.workflowProgress,
-                contextChars = run.contextChars,
-                contextBudgetChars = run.contextBudgetChars,
+                kernel = visible.kernel.copy(
+                    running = run.kernel.running,
+                    pendingApproval = run.kernel.pendingApproval,
+                    pendingQuestion = run.kernel.pendingQuestion,
+                    queuedInputCount = run.kernel.queuedInputCount,
+                    workflowProgress = run.kernel.workflowProgress,
+                    contextChars = run.kernel.contextChars,
+                    contextBudgetChars = run.kernel.contextBudgetChars,
+                ),
                 error = run.error,
             )
         }
