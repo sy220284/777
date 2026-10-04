@@ -138,15 +138,25 @@ internal class PersonaGalleryHistoryStore(
     @Synchronized
     fun deleteStory(entryId: String, storyId: String) {
         val file = archiveFile(entryId, storyId)
-        file.delete()
-        file.parentFile?.takeIf { it.isDirectory && it.listFiles().isNullOrEmpty() }?.delete()
+        if (file.exists()) {
+            check(file.delete()) { "人物故事冷归档无法删除：${file.path}" }
+        }
+        file.parentFile
+            ?.takeIf { it.isDirectory && it.listFiles().isNullOrEmpty() }
+            ?.let { directory ->
+                check(directory.delete()) { "人物故事冷归档目录无法删除：${directory.path}" }
+            }
     }
 
     @Synchronized
     fun deleteEntry(entryId: String) {
         val directory = entryDirectory(entryId)
         if (!directory.isDirectory) return
-        directory.walkBottomUp().forEach(File::delete)
+        directory.walkBottomUp().forEach { target ->
+            if (target.exists()) {
+                check(target.delete()) { "人物冷归档无法删除：${target.path}" }
+            }
+        }
     }
 
     private fun tailInternal(
