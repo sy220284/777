@@ -33,7 +33,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Owns persona-gallery UI state, persistence, portraits, transfer and model-assisted maintenance. */
+/** Owns persona-gallery UI state, persistence, portraits and model-assisted maintenance. */
 internal class LocalPersonaGalleryUiController(
     private val runtime: LocalUiRuntime,
     private val personaAutoFillService: PersonaAutoFillService,
@@ -44,6 +44,7 @@ internal class LocalPersonaGalleryUiController(
 ) {
     private val state = runtime.session.state
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
+    private val transfer = LocalPersonaTransferCoordinator(runtime, galleryStore)
     val gallery: StateFlow<List<PersonaGalleryEntry>> = _gallery.asStateFlow()
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
     suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = runSuspendResult {
@@ -327,28 +328,15 @@ suspend fun renameGalleryStory(id: String, storyId: String, title: String): Resu
 internal suspend fun exportGalleryPersona(
     id: String,
     format: PersonaTransferFormat,
-): Result<PersonaTransferDocument> = runCatching {
-    withContext(Dispatchers.IO) {
-        val diaryEntries = runtime.chat.diaryEntriesForTransfer("gallery:$id")
-        galleryStore.exportPersonaDocument(id, format, diaryEntries)
-    }
-}
+): Result<PersonaTransferDocument> = runCatching { transfer.export(id, format) }
 
 internal suspend fun importGalleryPersona(
     bytes: ByteArray,
     fileName: String?,
     mimeType: String?,
 ): Result<PersonaGalleryEntry> = runCatching {
-    withContext(Dispatchers.IO) {
-        val outcome = galleryStore.importPersonaDocumentWithDiary(bytes, fileName, mimeType)
-        if (outcome.diaryEntries.isNotEmpty()) {
-            runtime.chat.importDiaryEntriesForTransfer(
-                subjectKey = "gallery:${outcome.entry.id}",
-                personaName = outcome.entry.persona.name,
-                entries = outcome.diaryEntries,
-            )
-        }
-        outcome.entry.also { _gallery.value = galleryStore.list() }
+    transfer.import(bytes, fileName, mimeType).also {
+        _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
     }
 }
 
