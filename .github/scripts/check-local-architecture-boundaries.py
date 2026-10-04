@@ -403,6 +403,31 @@ if "val runProfile = modelGateway.profileForRun()" not in automation_chat:
 if "profile = runProfile" not in automation_chat:
     die("Automation Chat model retries/repairs must reuse the frozen profile")
 
+automation_planning = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/automation/AutomationPlanningService.kt")
+)
+automation_runtime = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt")
+)
+automation_worker = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationWorker.kt")
+)
+session_event_log = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt")
+)
+if "runtime.withModelRequestResource" not in automation_planning:
+    die("Automation planning provider calls must use the Engine-owned model request resource lease")
+if "engine.withAutomationModelRequestResource(block)" not in automation_runtime:
+    die("Automation runtime must delegate model request resource ownership to LocalHarnessEngine")
+if 'resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST, "automation-planning", block)' not in engine:
+    die("Automation planning must reuse the Engine-owned HarnessResourceScheduler")
+if "AutomationExecutionRegistry.tryAcquire(id)" not in automation_worker:
+    die("Automation scheduled/manual execution must share one task runtime lease")
+if "predicate = { it.scheduleGeneration == requestedGeneration }" not in automation_worker:
+    die("Automation Worker terminal writes must be guarded by schedule generation")
+if "LocalSessionRuntimeRegistry::hasLiveOwner" not in session_event_log:
+    die("Session crash-tail repair must respect live in-process session owners")
+
 for helper_path in (
     "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaAutoFillService.kt",
     "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaInspectionService.kt",
