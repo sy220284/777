@@ -1692,7 +1692,7 @@ class LocalHarnessEngine @Inject constructor(
             maxPendingInputs = MAX_PENDING_INPUTS,
             pruneToolResult = ::pruneToolResult,
         )
-        workRunRegistry[sessionId] = binding
+        workRunRegistry.attach(binding)
         binding.mirrorJob = scope.launch {
             binding.state.collect {
                 mirrorLocalWorkRunState(currentSessionId, _state, binding)
