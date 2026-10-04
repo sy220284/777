@@ -65,6 +65,11 @@ class LocalAgentRuntimeFoundationV3Test {
     fun automationRevisionRejectsStaleCandidateInsideSameSession() {
         val current = AutomationPlanningRevision(
             sessionId = "session-a",
+            usageMode = LocalUsageMode.CHAT,
+            groupChatEnabled = false,
+            personaId = "persona-a",
+            galleryId = "gallery-a",
+            galleryStoryId = "story-a",
             latestDialogueMessageId = "a2",
             chatContextGeneration = 8L,
         )
