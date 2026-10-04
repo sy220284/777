@@ -202,7 +202,7 @@ internal object PersonaSchemaMigration {
             attentionBiases = latest.attentionBiases,
             attentionKeywords = latest.attentionKeywords,
             perceptionBlindSpots = latest.perceptionBlindSpots,
-            quirks = latest.quirks,
+            quirks = mergeLines(profile.quirks, latest.quirks, 12),
             limitations = latest.limitations,
             mutableTraits = latest.mutableTraits,
             hardConstraints = profile.hardConstraints.filterNot { it in legacyPresetConstraints },
