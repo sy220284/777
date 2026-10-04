@@ -19,11 +19,11 @@ internal data class LocalPreparedChatTurn(
 )
 
 @Singleton
-internal class LocalChatTurnCoordinator @Inject constructor(
+class LocalChatTurnCoordinator @Inject constructor(
     private val runner: ChatTurnRunner,
     private val interactionPlanner: ChatInteractionPlanner,
 ) {
-    fun prepare(
+    internal fun prepare(
         snapshot: LocalHarnessState,
         input: String,
         relationshipMemory: String = "",
@@ -66,7 +66,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         )
     }
 
-    fun prepareProfile(
+    internal fun prepareProfile(
         persona: PersonaProfile,
         state: ChatCharacterState,
         context: ChatContextState = ChatContextState(),
@@ -80,7 +80,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         storyContext = storyContext,
     )
 
-    suspend fun finalize(
+    internal suspend fun finalize(
         snapshot: LocalHarnessState,
         persona: PersonaProfile,
         reply: LocalModelReply,
@@ -100,10 +100,10 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         onGuardEvent = onGuardEvent,
     )
 
-    fun persona(snapshot: LocalHarnessState): PersonaProfile =
+    internal fun persona(snapshot: LocalHarnessState): PersonaProfile =
         runner.prepare(snapshot.chat.personaId, snapshot.chat.chatState).persona
 
-    fun postTurnPrompt(
+    internal fun postTurnPrompt(
         persona: PersonaProfile,
         state: ChatCharacterState,
         userMessage: String,
@@ -115,7 +115,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         assistantMessage = assistantMessage,
     )
 
-    fun parsePostTurn(
+    internal fun parsePostTurn(
         text: String,
         previous: ChatCharacterState,
         userMessage: String,
@@ -129,7 +129,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         persona = persona,
     )
 
-    fun applyDeterministicInteractionState(
+    internal fun applyDeterministicInteractionState(
         previous: ChatCharacterState,
         userMessage: String,
         assistantMessage: String,
@@ -139,7 +139,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         assistantMessage = assistantMessage,
     )
 
-    fun replySuggestionsPrompt(
+    internal fun replySuggestionsPrompt(
         persona: PersonaProfile,
         state: ChatCharacterState,
         messages: List<LocalHarnessMessage>,
@@ -160,7 +160,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         )
     }
 
-    fun parseReplySuggestions(text: String): List<ChatReplySuggestion>? =
+    internal fun parseReplySuggestions(text: String): List<ChatReplySuggestion>? =
         interactionPlanner.parseSuggestions(text)
 }
 
