@@ -10,10 +10,11 @@ import javax.inject.Singleton
 class LocalModelRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
     gateway: LocalModelGateway,
+    private val settings: LocalModelSettingsCoordinator,
 ) {
     internal val activeProfile = gateway.activeProfileState
     internal fun configure(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)
     internal fun selectModel(model: String) = engine.selectModel(model)
-    internal fun configureImageInputMode(mode: LocalImageInputMode) = engine.configureImageInputMode(mode)
+    internal fun configureImageInputMode(mode: LocalImageInputMode) = settings.configureImageInputMode(mode)
     internal fun clearCredential() = engine.clearCredential()
 }
