@@ -241,6 +241,12 @@ internal object PersonaSchemaMigration {
         val legacyGenericTension =
             "既有身份与个人愿望可能发生拉扯，具体变化必须由当前故事中的真实事件推动。"
         val userValues = profile.coreValues.filterNot { it in legacyGenericValues }
+        val userTension = profile.coreTension
+            .split('；')
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .filterNot { it == legacyGenericTension }
+            .joinToString("；")
         val userConstraints = profile.hardConstraints.filterNot { it in legacyPresetConstraints }
         val userBans = profile.bannedPhrases.filterNot { it in legacyPresetMetaBans }
         return profile.copy(
@@ -250,9 +256,7 @@ internal object PersonaSchemaMigration {
             quirks = mergeLines(profile.quirks, latest.quirks, 12),
             limitations = latest.limitations,
             coreValues = mergeLines(userValues, latest.coreValues, 6),
-            coreTension = profile.coreTension
-                .takeUnless { it.isBlank() || it == legacyGenericTension }
-                ?: latest.coreTension,
+            coreTension = userTension.ifBlank { latest.coreTension },
             stableTraits = latest.stableTraits,
             mutableTraits = latest.mutableTraits,
             hardConstraints = mergeLines(userConstraints, latest.hardConstraints, 20),
