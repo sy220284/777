@@ -6,6 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -37,6 +39,7 @@ import com.labteto.dshmobile.local.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
+import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -47,11 +50,15 @@ import com.labteto.dshmobile.ui.components.DsTimelineItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
+import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
+import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
+import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 internal const val LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT = 8
@@ -133,6 +140,15 @@ internal fun visibleWorkProcessNodes(
     return nodes.takeLast(collapsedLimit.coerceAtLeast(1))
 }
 
+internal fun workProcessStatus(
+    nodes: List<LocalWorkProcessNode>,
+    running: Boolean,
+): DsStatus = when {
+    running -> DsStatus.Running
+    nodes.any(LocalWorkProcessNode::failed) -> DsStatus.Failed
+    else -> DsStatus.Done
+}
+
 @Composable
 internal fun WorkProcessRow(
     messages: List<LocalHarnessMessage>,
@@ -141,8 +157,31 @@ internal fun WorkProcessRow(
     if (messages.isEmpty()) return
 
     val colors = DsTheme.colors
+    val backgroundState = LocalAppBackgroundState.current
     val nodes = remember(messages) { buildWorkProcessNodes(messages) }
     if (nodes.isEmpty()) return
+    val processStatus = workProcessStatus(nodes, running)
+    val processStatusLabel = stringResource(
+        agentOperationStatusRes(
+            running = processStatus == DsStatus.Running,
+            failed = processStatus == DsStatus.Failed,
+        ),
+    )
+    val processStateDot = when (processStatus) {
+        DsStatus.Running -> StateDotState.Running
+        DsStatus.Failed -> StateDotState.Error
+        DsStatus.Warning -> StateDotState.Warning
+        DsStatus.Done -> StateDotState.Done
+        DsStatus.Neutral -> StateDotState.Idle
+    }
+    val processSurface = if (backgroundState.hasImage) {
+        colors.wallpaperSurface(
+            level = WallpaperSurfaceLevel.CARD,
+            region = BackgroundRegion.MIDDLE,
+        )
+    } else {
+        Color.Transparent
+    }
 
     var expanded by remember(messages.first().id) { mutableStateOf(false) }
     var showAllNodes by remember(messages.first().id) { mutableStateOf(false) }
@@ -163,7 +202,10 @@ internal fun WorkProcessRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = DsSpacing.small),
+            .padding(horizontal = DsSpacing.small)
+            .clip(DsShapes.block)
+            .background(processSurface)
+            .padding(horizontal = DsSpacing.xsmall),
         verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
     ) {
         Row(
@@ -178,7 +220,7 @@ internal fun WorkProcessRow(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             StateDot(
-                state = if (running) StateDotState.Running else StateDotState.Done,
+                state = processStateDot,
                 size = 9.dp,
             )
             Column(
@@ -186,9 +228,11 @@ internal fun WorkProcessRow(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    stringResource(R.string.local_work_process),
+                    stringResource(R.string.local_work_process) + " · " + processStatusLabel,
                     style = DsType.std14Strong.withReadingWeight(),
                     color = colors.labelPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     preview,
@@ -224,6 +268,17 @@ internal fun WorkProcessRow(
                     val operationLabel = stringResource(agentOperationLabelRes(node.kind))
                     val stepNumber = visibleStartIndex + visibleIndex + 1
                     val rowRunning = running && stepNumber - 1 == nodes.lastIndex && !node.failed
+                    val rowStatus = when {
+                        node.failed -> DsStatus.Failed
+                        rowRunning -> DsStatus.Running
+                        else -> DsStatus.Done
+                    }
+                    val statusLabel = stringResource(
+                        agentOperationStatusRes(
+                            running = rowStatus == DsStatus.Running,
+                            failed = rowStatus == DsStatus.Failed,
+                        ),
+                    )
                     val detail = when {
                         node.summary != null && node.count > 0 -> stringResource(
                             R.string.local_work_process_step_operation_detail,
@@ -243,12 +298,8 @@ internal fun WorkProcessRow(
                     }
                     DsTimelineItem(
                         text = node.summary ?: operationLabel,
-                        detail = detail,
-                        state = when {
-                            node.failed -> DsStatus.Failed
-                            rowRunning -> DsStatus.Running
-                            else -> DsStatus.Done
-                        },
+                        detail = "$detail · $statusLabel",
+                        state = rowStatus,
                     )
                 }
                 DsTimeline(
