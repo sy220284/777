@@ -40,7 +40,7 @@ internal class LocalReplySuggestionCoordinator(
         val snapshot = state.value
         if (
             snapshot.loading ||
-            !snapshot.configured ||
+            !snapshot.modelState.configured ||
             snapshot.running ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
             snapshot.groupChat.enabled
