@@ -268,3 +268,7 @@ private fun showSchedulePicker(
         calendar.get(Calendar.DAY_OF_MONTH),
     ).show()
 }
+
+
+internal fun formatMinuteOfDay(minuteOfDay: Int): String =
+    "%02d:%02d".format(minuteOfDay / 60, minuteOfDay % 60)
