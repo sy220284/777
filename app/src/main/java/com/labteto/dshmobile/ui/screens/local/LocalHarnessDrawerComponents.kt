@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -102,7 +104,9 @@ internal fun DrawerContextCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING),
+        border = BorderStroke(1.dp, colors.borderL1),
+        shadowElevation = 1.dp,
     ) {
         Row(
             modifier = Modifier
@@ -170,84 +174,74 @@ internal fun DrawerQuickActions(
     onOpenRunCenter: () -> Unit,
     onTools: () -> Unit,
 ) {
-    Column(
+    val colors = DsTheme.colors
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
     ) {
-        if (usageMode == LocalUsageMode.CHAT) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-            ) {
+        Column {
+            if (usageMode == LocalUsageMode.CHAT) {
                 DrawerQuickAction(
                     icon = FeatherIcons.Users,
                     title = stringResource(R.string.local_group_chat_title),
                     badge = groupMemberCount.takeIf { it > 0 }?.toString(),
                     onClick = onOpenGroupChat,
-                    modifier = Modifier.weight(1f),
                 )
+                DrawerQuickDivider()
                 DrawerQuickAction(
                     icon = FeatherIcons.Image,
                     title = stringResource(R.string.persona_gallery_title),
                     badge = galleryCount.takeIf { it > 0 }?.toString(),
                     onClick = onOpenPersonaGallery,
-                    modifier = Modifier.weight(1f),
                 )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-            ) {
+                DrawerQuickDivider()
                 DrawerQuickAction(
                     icon = FeatherIcons.BookOpen,
                     title = stringResource(R.string.chat_diary_title),
                     onClick = onOpenDiary,
-                    modifier = Modifier.weight(1f),
                 )
+                DrawerQuickDivider()
                 DrawerQuickAction(
                     icon = FeatherIcons.Clock,
                     title = stringResource(R.string.tasks_chat_title),
                     onClick = onTasks,
-                    modifier = Modifier.weight(1f),
                 )
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-            ) {
+            } else {
                 DrawerQuickAction(
                     icon = FeatherIcons.Folder,
                     title = stringResource(R.string.chatlist_workspace_files),
                     onClick = onWorkspaceFiles,
-                    modifier = Modifier.weight(1f),
                 )
+                DrawerQuickDivider()
                 DrawerQuickAction(
                     icon = FeatherIcons.Activity,
                     title = stringResource(R.string.local_run_center),
                     onClick = onOpenRunCenter,
-                    modifier = Modifier.weight(1f),
                 )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-            ) {
+                DrawerQuickDivider()
                 DrawerQuickAction(
                     icon = FeatherIcons.Clock,
                     title = stringResource(R.string.tasks_title),
                     onClick = onTasks,
-                    modifier = Modifier.weight(1f),
                 )
+                DrawerQuickDivider()
                 DrawerQuickAction(
                     icon = FeatherIcons.Tool,
                     title = stringResource(R.string.tools_title),
                     onClick = onTools,
-                    modifier = Modifier.weight(1f),
                 )
             }
         }
     }
+}
+
+@Composable
+private fun DrawerQuickDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 48.dp),
+        color = DsTheme.colors.borderL1,
+    )
 }
 
 @Composable
@@ -273,7 +267,8 @@ internal fun DrawerQuickAction(
     )
     Row(
         modifier = modifier
-            .heightIn(min = 56.dp)
+            .fillMaxWidth()
+            .heightIn(min = DsSpacing.touchTarget)
             .clip(DsShapes.row)
             .background(feedbackColor)
             .hoverable(interaction)
@@ -289,8 +284,8 @@ internal fun DrawerQuickAction(
         Icon(
             icon,
             contentDescription = null,
-            tint = colors.labelSecondary,
-            modifier = Modifier.size(20.dp),
+            tint = colors.accent,
+            modifier = Modifier.size(18.dp),
         )
         Text(
             title,
@@ -301,6 +296,12 @@ internal fun DrawerQuickAction(
             modifier = Modifier.weight(1f),
         )
         badge?.let { DsPill(text = it) }
+        Icon(
+            FeatherIcons.ChevronRight,
+            contentDescription = null,
+            tint = colors.labelCaption,
+            modifier = Modifier.size(16.dp),
+        )
     }
 }
 
@@ -432,10 +433,11 @@ internal fun LocalSessionDrawerRow(
                 .clip(DsShapes.row)
                 .background(
                     animateColorAsState(
-                        targetValue = colors.wallpaperSurface(
-                            level = WallpaperSurfaceLevel.CARD,
-                            base = if (current || selected) colors.sidebarNavActive else colors.sidebar,
-                        ),
+                        targetValue = when {
+                            selected -> colors.accentTertiary
+                            current -> colors.sidebarNavActive
+                            else -> Color.Transparent
+                        },
                         animationSpec = DsAnimations.interactionColor,
                         label = "sessionRowBackground",
                     ).value,
@@ -444,6 +446,15 @@ internal fun LocalSessionDrawerRow(
                 .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (current && !selectionOpen) {
+                Box(
+                    Modifier
+                        .size(width = 3.dp, height = 24.dp)
+                        .clip(DsShapes.pillFull)
+                        .background(colors.accent),
+                )
+                Spacer(Modifier.width(DsSpacing.xsmall))
+            }
             if (selectionOpen) {
                 Checkbox(checked = selected, onCheckedChange = { onClick() })
             }
