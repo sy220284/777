@@ -117,7 +117,7 @@ class LocalChatContextRefreshRaceTest {
                 fixture.log,
             )
         }
-        fixture.state.delegate.value = before.copy(chatContext = context)
+        fixture.state.delegate.value = before.copy(chat = before.chat.copy(chatContext = context))
 
         fixture.coordinator.refresh(
             PersonaProfile(), "s", before.chat.chatState, context.generation, fixture.log, fixture.profile,
