@@ -74,6 +74,18 @@ class PersonaImmersionPolicyTest {
     }
 
     @Test
+    fun inCharacterRefusalIsNotMistakenForModelLimitation() {
+        val persona = PersonaProfile(
+            name = "阿青",
+            portrait = "普通人类，性格有自己的边界和脾气。",
+        )
+
+        assertTrue(!PersonaImmersionPolicy.breaksReplyImmersion(persona, "我不能抱你。"))
+        assertTrue(!PersonaImmersionPolicy.breaksReplyImmersion(persona, "别靠这么近，我现在不想让你碰。"))
+        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我不能真正拥抱你，因为我没有实体身体。"))
+    }
+
+    @Test
     fun runtimeKeepsInWorldLimitsForExplicitNonEmbodiedCharacters() {
         val persona = PersonaProfile(
             name = "镜中客",
