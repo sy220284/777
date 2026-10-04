@@ -10,7 +10,7 @@ import kotlinx.serialization.json.Json
 
 /** Owns portable diary export/import projection and destination identity rebinding. */
 @Singleton
-internal class ChatDiaryTransferCoordinator internal constructor(
+class ChatDiaryTransferCoordinator internal constructor(
     root: File,
     json: Json,
 ) {
@@ -19,7 +19,7 @@ internal class ChatDiaryTransferCoordinator internal constructor(
     private val documents = ChatDiaryDocumentStore(root, json)
 
     @Synchronized
-    fun list(subjectKey: String): List<ChatDiaryEntry> =
+    internal fun list(subjectKey: String): List<ChatDiaryEntry> =
         documents.read().entries.asSequence()
             .filter { it.subjectKey == subjectKey }
             .sortedWith(compareBy<ChatDiaryEntry>(ChatDiaryEntry::createdAt).thenBy(ChatDiaryEntry::id))
@@ -27,7 +27,7 @@ internal class ChatDiaryTransferCoordinator internal constructor(
             .toList()
 
     @Synchronized
-    fun import(
+    internal fun import(
         subjectKey: String,
         personaName: String,
         transferred: List<ChatDiaryEntry>,
