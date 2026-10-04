@@ -2917,9 +2917,11 @@ class LocalHarnessEngine @Inject constructor(
         var finalChatAssistantSequence: Long? = null
         var modelStep = 0
         var requestPrepared = false
-        var ephemeralContext = ""
+        var workStableContext = ""
+        var workDynamicContext = ""
         var chatStableContext = ""
         var chatDynamicContext = ""
+        var stableToolSchemas: JsonArray? = null
         val mainMaxSteps = runState.value.mainMaxSteps
         val runSnapshot = runState.value
         val mainStepLimit = if (runPolicy.allowToolExecution) {
@@ -3024,7 +3026,7 @@ class LocalHarnessEngine @Inject constructor(
                         chatStableContext = preparedChat.context.stablePrompt
                         chatDynamicContext = preparedChat.dynamicContext
                     } else {
-                        ephemeralContext = contextComposer.compose(
+                        val composed = contextComposer.composeParts(
                             ContextRequest(
                                 query = input,
                                 mode = snapshot.conversationMode,
@@ -3032,7 +3034,15 @@ class LocalHarnessEngine @Inject constructor(
                                 lineageId = snapshot.lineageId,
                                 handoffSummary = snapshot.handoffSummary,
                             ),
-                        ).let { withWorkRuntimeContext(it, workspace.path, runSnapshot.model, runSnapshot.baseUrl, runSnapshot.modelSelection.activeProfile) }
+                        )
+                        workStableContext = withWorkRuntimeContext(
+                            composed.stable,
+                            workspace.path,
+                            runSnapshot.model,
+                            runSnapshot.baseUrl,
+                            runSnapshot.modelSelection.activeProfile,
+                        )
+                        workDynamicContext = composed.dynamic
                         captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                     }
                     requestPrepared = true
@@ -3040,18 +3050,22 @@ class LocalHarnessEngine @Inject constructor(
                 drainPendingInputsIntoHistory(binding)
                 val key = modelRequestMarker()
                 val snapshot = runState.value
-                val tools = modelToolSchemas(runPolicy, binding)
-                // Re-check before every model step. Tool results and queued user messages can grow
-                // substantially inside one turn, so checking only at turn start is insufficient.
+                val tools = stableRunToolSchemas(
+                    previous = stableToolSchemas,
+                    current = modelToolSchemas(runPolicy, binding),
+                    state = snapshot,
+                ).also { stableToolSchemas = it }
                 val productContextTokens = if (snapshot.usageMode == LocalUsageMode.CHAT) {
                     estimateModelTokens(chatStableContext) + estimateModelTokens(chatDynamicContext)
                 } else {
-                    estimateModelTokens(ephemeralContext)
+                    estimateModelTokens(workStableContext) + estimateModelTokens(workDynamicContext)
                 }
-                compactHistoryIfNeeded(
-                    extraTokens = productContextTokens + estimateModelTokens(tools.toString()),
-                    binding = binding,
-                )
+                if (snapshot.usageMode != LocalUsageMode.WORK || modelStep == 0) {
+                    compactHistoryIfNeeded(
+                        extraTokens = productContextTokens + estimateModelTokens(tools.toString()),
+                        binding = binding,
+                    )
+                }
                 val durableRequestMessages = if (snapshot.usageMode == LocalUsageMode.CHAT) {
                     withChatTurnContext(
                         history = boundedChatRequestHistory(
@@ -3064,7 +3078,11 @@ class LocalHarnessEngine @Inject constructor(
                         dynamicContext = chatDynamicContext,
                     )
                 } else {
-                    withEphemeralContext(runHistory.snapshot(), ephemeralContext)
+                    withWorkTurnContext(
+                        history = runHistory.snapshot(),
+                        stableContext = workStableContext,
+                        dynamicContext = workDynamicContext,
+                    )
                 }
                 val selectedMode = resolveLocalImageInputMode(
                     snapshot.imageInputMode,
@@ -4886,6 +4904,9 @@ class LocalHarnessEngine @Inject constructor(
         reason: String,
         binding: LocalWorkRunBinding? = null,
     ) {
+        if ((binding?.state?.value ?: _state.value).usageMode == LocalUsageMode.WORK) {
+            compactHistoryIfNeeded(binding = binding)
+        }
         if (binding != null) {
             binding.turnsSinceModelHistoryCheckpoint += 1
             if (binding.turnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
