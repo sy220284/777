@@ -1,5 +1,4 @@
 package com.labteto.dshmobile.ui.screens.tasks
-
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.automation.AutomationMode
@@ -20,11 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
 enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED }
-
 internal enum class AutomationCadence { ONCE, DAILY, WEEKLY, CUSTOM }
-
 data class TasksUiState(
     val tasks: List<AutomationTask> = emptyList(),
     val notice: TasksNotice? = null,
@@ -35,7 +31,6 @@ data class TasksUiState(
     val plannerError: String? = null,
     val saveRevision: Long = 0L,
 )
-
 @HiltViewModel
 class TasksViewModel @Inject constructor(
     private val scheduler: HarnessAutomationScheduler,
@@ -49,15 +44,12 @@ class TasksViewModel @Inject constructor(
     )
     private val _state = MutableStateFlow(TasksUiState(tasks = scheduler.list()))
     val state: StateFlow<TasksUiState> = _state.asStateFlow()
-
     fun acknowledgeNotice(notice: TasksNotice) {
         if (_state.value.notice == notice) _state.update { it.copy(notice = null) }
     }
-
     fun refresh() {
         _state.update { it.copy(tasks = scheduler.list(), notice = null) }
     }
-
     fun cancel(id: String) {
         val removed = scheduler.cancelTask(id)
         _state.update {
@@ -67,17 +59,14 @@ class TasksViewModel @Inject constructor(
             )
         }
     }
-
     fun pause(id: String) {
         scheduler.pauseTask(id)
         refresh()
     }
-
     fun resume(id: String) {
         scheduler.resumeTask(id)
         refresh()
     }
-
     fun runNow(id: String): Boolean {
         val started = scheduler.runTaskNow(id)
         _state.update {
@@ -88,7 +77,6 @@ class TasksViewModel @Inject constructor(
         }
         return started
     }
-
     fun loadChatSuggestions(force: Boolean = false) {
         val snapshot = localRuntime.snapshot()
         if (!canPlanChat(snapshot)) {
@@ -105,7 +93,6 @@ class TasksViewModel @Inject constructor(
         if (!force && current.suggestionSessionId == snapshot.sessionId &&
             (current.suggestionsLoading || current.plannerSuggestions.isNotEmpty())
         ) return
-
         val expectedSessionId = snapshot.sessionId
         _state.update {
             it.copy(
@@ -139,13 +126,11 @@ class TasksViewModel @Inject constructor(
                 }
         }
     }
-
     fun submitChatPlan(input: String, editingTaskId: String? = null) {
         val snapshot = localRuntime.snapshot()
         if (!canPlanChat(snapshot) || input.isBlank() || _state.value.planning) return
         val expectedSessionId = snapshot.sessionId
         _state.update { it.copy(planning = true, plannerError = null) }
-
         viewModelScope.launch {
             runCatching { planningService.plan(input) }
                 .onSuccess { draft ->
@@ -189,7 +174,6 @@ class TasksViewModel @Inject constructor(
                 }
         }
     }
-
     private fun saveChatDraft(
         draft: AutomationPlanDraft,
         editingTaskId: String?,
@@ -231,7 +215,6 @@ class TasksViewModel @Inject constructor(
             proactiveMaxUnanswered = existing.proactiveMaxUnanswered,
         )
     }
-
     fun updateTask(
         id: String,
         prompt: String,
@@ -256,7 +239,6 @@ class TasksViewModel @Inject constructor(
             proactiveMinGapMinutes, proactiveMaxUnanswered,
         )
     }.getOrDefault(false).also { if (it) refresh() }
-
     fun createAt(
         prompt: String,
         firstRunAt: Long,
@@ -290,7 +272,6 @@ class TasksViewModel @Inject constructor(
                 windowEndMinuteOfDay !in 0 until 24 * 60 ||
                 windowStartMinuteOfDay == windowEndMinuteOfDay)
         ) return false
-
         val snapshot = localRuntime.snapshot()
         if (mode == AutomationMode.CHAT && !canPlanChat(snapshot)) return false
         return runCatching {
@@ -328,12 +309,10 @@ class TasksViewModel @Inject constructor(
             refresh()
         }.isSuccess
     }
-
     private fun canPlanChat(snapshot: LocalHarnessTaskState): Boolean =
         snapshot.usageMode == LocalUsageMode.CHAT &&
             !snapshot.groupChat.enabled &&
             snapshot.sessionId.isNotBlank()
 }
-
 private fun Throwable.userMessage(fallback: String): String =
     message?.takeIf(String::isNotBlank)?.take(180) ?: fallback
