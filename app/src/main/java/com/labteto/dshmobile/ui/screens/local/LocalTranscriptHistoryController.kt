@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.LocalHarnessMessage
+import com.labteto.dshmobile.local.LocalTranscriptPage
 import com.labteto.dshmobile.local.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.session.LocalSessionRuntime
 import kotlinx.coroutines.CancellationException
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
 /** Owns transcript-history paging state for the local conversation UI. */
 internal class LocalTranscriptHistoryController(
     private val session: LocalSessionRuntime,
@@ -36,29 +38,37 @@ internal class LocalTranscriptHistoryController(
         initializedSessionId = null
         _history.value = LocalTranscriptHistoryState(sessionId = sessionId, loading = true)
         try {
-            val liveMessagesAtBootstrap =
-                if (currentSessionId() == sessionId) liveMessages() else emptyList()
-            val firstPage = withContext(Dispatchers.IO) {
-                session.transcriptPageForUi(
-                    sessionId = sessionId,
-                    cursor = null,
-                    limit = transcriptHistoryBootstrapLimit(
-                        liveMessageCount = liveMessagesAtBootstrap.size,
-                        maxPageSize = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
-                    ),
+            var olderMessages = emptyList<LocalHarnessMessage>()
+            var pageCursor: LocalTranscriptPageCursor? = null
+            var nextCursor: LocalTranscriptPageCursor?
+
+            do {
+                val page = readPage(sessionId, pageCursor)
+                if (currentSessionId() != sessionId) return
+
+                val live = liveMessages()
+                olderMessages = prependUniqueOlderMessages(
+                    pageMessages = page.messages,
+                    olderMessages = olderMessages,
+                    liveMessages = live,
                 )
-            }
-            if (currentSessionId() != sessionId) return
-            val pageExtras = transcriptHistoryPageExtras(
-                pageMessages = firstPage.messages,
-                liveMessages = liveMessages(),
-            )
-            cursor = firstPage.nextCursor
+                nextCursor = page.nextCursor
+
+                val visibleTranscript = mergeLocalTranscriptHistory(olderMessages, live)
+                val needsMoreVisibleDialogue = needsMoreUserVisibleDialogue(
+                    messages = visibleTranscript,
+                    target = LOCAL_TRANSCRIPT_INITIAL_VISIBLE_DIALOGUE_MESSAGES,
+                )
+                val cursorAdvanced = nextCursor != pageCursor
+                pageCursor = nextCursor
+            } while (nextCursor != null && needsMoreVisibleDialogue && cursorAdvanced)
+
+            cursor = nextCursor
             initializedSessionId = sessionId
             _history.value = LocalTranscriptHistoryState(
                 sessionId = sessionId,
-                olderMessages = pageExtras,
-                hasMore = firstPage.nextCursor != null,
+                olderMessages = olderMessages,
+                hasMore = nextCursor != null,
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -78,42 +88,54 @@ internal class LocalTranscriptHistoryController(
         if (initializedSessionId != sessionId || _history.value.sessionId != sessionId) {
             prepare(sessionId)
         }
-        if (
-            cursor == null &&
-            _history.value.olderMessages.isEmpty() &&
-            currentSessionId() == sessionId &&
-            liveMessages().size > LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES
-        ) {
-            prepare(sessionId, force = true)
-        }
 
-        val nextCursor = cursor ?: return Result.success(0)
+        var nextCursor = cursor ?: return Result.success(0)
         val current = _history.value
         if (current.loading) return Result.success(0)
         _history.value = current.copy(loading = true, error = null)
 
         return try {
-            val page = withContext(Dispatchers.IO) {
-                session.transcriptPageForUi(
-                    sessionId = sessionId,
-                    cursor = nextCursor,
-                    limit = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
+            var olderMessages = current.olderMessages
+            var loadedRawMessages = 0
+            val initialVisibleCount = userVisibleDialogueMessageCount(
+                mergeLocalTranscriptHistory(olderMessages, liveMessages()),
+            )
+
+            do {
+                val requestedCursor = nextCursor
+                val page = readPage(sessionId, requestedCursor)
+                if (currentSessionId() != sessionId) return Result.success(0)
+
+                val beforeSize = olderMessages.size
+                olderMessages = prependUniqueOlderMessages(
+                    pageMessages = page.messages,
+                    olderMessages = olderMessages,
+                    liveMessages = liveMessages(),
                 )
-            }
-            if (currentSessionId() != sessionId) return Result.success(0)
+                loadedRawMessages += olderMessages.size - beforeSize
+                nextCursor = page.nextCursor
+
+                val visibleCount = userVisibleDialogueMessageCount(
+                    mergeLocalTranscriptHistory(olderMessages, liveMessages()),
+                )
+                val addedVisibleDialogue = (visibleCount - initialVisibleCount).coerceAtLeast(0)
+                val cursorAdvanced = nextCursor != requestedCursor
+            } while (
+                nextCursor != null &&
+                addedVisibleDialogue < LOCAL_TRANSCRIPT_HISTORY_VISIBLE_DIALOGUE_BATCH_MESSAGES &&
+                cursorAdvanced
+            )
+
+            cursor = nextCursor
             val latest = _history.value
             if (latest.sessionId != sessionId) return Result.success(0)
-            val existingIds = latest.olderMessages.mapTo(hashSetOf(), LocalHarnessMessage::id)
-            liveMessages().mapTo(existingIds, LocalHarnessMessage::id)
-            val newlyLoaded = page.messages.filterNot { message -> message.id in existingIds }
-            cursor = page.nextCursor
             _history.value = latest.copy(
-                olderMessages = newlyLoaded + latest.olderMessages,
-                hasMore = page.nextCursor != null,
+                olderMessages = olderMessages,
+                hasMore = nextCursor != null,
                 loading = false,
                 error = null,
             )
-            Result.success(newlyLoaded.size)
+            Result.success(loadedRawMessages)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -133,6 +155,30 @@ internal class LocalTranscriptHistoryController(
         initializedSessionId = null
         _history.value = LocalTranscriptHistoryState(sessionId = sessionId)
         scope.launch { prepare(sessionId, force = true) }
+    }
+
+    private suspend fun readPage(
+        sessionId: String,
+        pageCursor: LocalTranscriptPageCursor?,
+    ): LocalTranscriptPage = withContext(Dispatchers.IO) {
+        session.transcriptPageForUi(
+            sessionId = sessionId,
+            cursor = pageCursor,
+            limit = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,
+        )
+    }
+
+    private fun prependUniqueOlderMessages(
+        pageMessages: List<LocalHarnessMessage>,
+        olderMessages: List<LocalHarnessMessage>,
+        liveMessages: List<LocalHarnessMessage>,
+    ): List<LocalHarnessMessage> {
+        if (pageMessages.isEmpty()) return olderMessages
+        val existingIds = HashSet<String>(olderMessages.size + liveMessages.size)
+        olderMessages.mapTo(existingIds, LocalHarnessMessage::id)
+        liveMessages.mapTo(existingIds, LocalHarnessMessage::id)
+        val newlyLoaded = pageMessages.filter { message -> existingIds.add(message.id) }
+        return if (newlyLoaded.isEmpty()) olderMessages else newlyLoaded + olderMessages
     }
 
     private fun reset() {
