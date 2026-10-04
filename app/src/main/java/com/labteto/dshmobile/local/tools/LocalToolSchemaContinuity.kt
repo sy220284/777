@@ -39,6 +39,7 @@ internal fun appendOnlyToolSchemas(previous: JsonArray, current: JsonArray): Jso
     val currentByName = current.mapNotNull { element ->
         toolSchemaName(element)?.let { it to element }
     }.toMap()
+    if (previousByName.size != previous.size || currentByName.size != current.size) return current
     if (previousByName.keys.any { it !in currentByName }) return current
     if (previousByName.any { (name, schema) -> currentByName[name] != schema }) return current
 
