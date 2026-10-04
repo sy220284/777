@@ -26,7 +26,7 @@ internal suspend fun saveGroupChatAnnouncement(
     val before = state.value
     if (
         before.loading ||
-        before.running ||
+        before.kernel.running ||
         before.sessionId != sessionId ||
         before.usageMode != LocalUsageMode.CHAT ||
         !before.chat.groupChat.enabled
