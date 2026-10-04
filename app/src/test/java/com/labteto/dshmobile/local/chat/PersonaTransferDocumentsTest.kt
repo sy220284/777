@@ -22,11 +22,12 @@ class PersonaTransferDocumentsTest {
     }
 
     @Test
-    fun markdownRoundTripKeepsProfileMemoryAndDialogue() {
+    fun markdownRoundTripKeepsProfileMemoryDiaryAndDialogue() {
         val document = PersonaTransferDocuments.encode(
             json = json,
             entry = sampleEntry(),
             format = PersonaTransferFormat.MARKDOWN,
+            diaryEntries = sampleDiaryEntries(),
         )
 
         val markdown = String(document.bytes, StandardCharsets.UTF_8)
@@ -34,6 +35,9 @@ class PersonaTransferDocumentsTest {
         assertTrue(markdown.contains("## 人物生命资料"))
         assertTrue(markdown.contains("## 记忆摘要"))
         assertTrue(markdown.contains("剧情提要：第一次一起去海边"))
+        assertTrue(markdown.contains("## 人物日记"))
+        assertTrue(markdown.contains("我已经开始期待下次一起出门了"))
+        assertTrue(markdown.contains("披露范围：仅单聊"))
         assertTrue(markdown.contains("## 对话记录"))
         assertTrue(markdown.contains("用户：明天还去海边吗？"))
         assertTrue(markdown.contains("小岚：去，还是老地方。"))
@@ -50,6 +54,11 @@ class PersonaTransferDocumentsTest {
         assertEquals(2, archive.entry.stories.single().history.size)
         assertEquals("挚友", archive.entry.stories.single().chatState.relationshipState)
         assertEquals(listOf("一起看过日出"), archive.memorySummaries.single().sharedMoments)
+        assertEquals(1, archive.diaryEntries.size)
+        assertEquals("", archive.diaryEntries.single().subjectKey)
+        assertEquals(ChatDiaryDisclosure.SHAREABLE, archive.diaryEntries.single().disclosure)
+        assertTrue(archive.diaryEntries.single().sources.isEmpty())
+        assertTrue(archive.diaryEntries.single().revisions.single().sources.isEmpty())
         assertTrue(archive.memorySummaries.single().continuitySummary.contains("剧情提要：第一次一起去海边"))
         assertTrue(archive.memorySummaries.single().continuitySummary.contains("保存时的关系：挚友"))
         assertTrue(archive.entry.stories.single().sourceSessionIds.isEmpty())
@@ -62,6 +71,7 @@ class PersonaTransferDocumentsTest {
             json = json,
             entry = sampleEntry(),
             format = PersonaTransferFormat.WORD,
+            diaryEntries = sampleDiaryEntries(),
         )
 
         assertTrue(document.bytes.size > 4)
@@ -80,6 +90,8 @@ class PersonaTransferDocumentsTest {
         val wordXml = entries.getValue("word/document.xml")
         assertTrue(wordXml.contains("人物档案：小岚"))
         assertTrue(wordXml.contains("记忆摘要"))
+        assertTrue(wordXml.contains("人物日记"))
+        assertTrue(wordXml.contains("我已经开始期待下次一起出门了"))
         assertTrue(wordXml.contains("明天还去海边吗？"))
         assertTrue(entries.containsKey("customXml/persona-transfer.xml"))
 
@@ -206,7 +218,7 @@ class PersonaTransferDocumentsTest {
             format = PersonaTransferFormat.JSON,
         )
         val future = String(document.bytes, StandardCharsets.UTF_8)
-            .replace("\"schema\":3", "\"schema\":4")
+            .replace("\"schema\":4", "\"schema\":5")
 
         val result = runCatching {
             target.importPersonaDocument(
@@ -232,6 +244,49 @@ class PersonaTransferDocumentsTest {
         assertTrue(result.isFailure)
         assertFalse(result.exceptionOrNull()?.message.isNullOrBlank())
     }
+
+    private fun sampleDiaryEntries(): List<ChatDiaryEntry> = listOf(
+        ChatDiaryEntry(
+            id = "diary-1",
+            subjectKey = "gallery:gallery-lan",
+            personaName = "小岚",
+            event = "第一次一起去海边以后，我们又约了下一次短途旅行",
+            feeling = "想到这件事会忍不住开心",
+            innerThought = "我已经开始期待下次一起出门了",
+            relationshipMeaning = "我们开始有了会继续兑现的共同计划",
+            unresolvedEcho = "还没定下具体出发时间",
+            importance = 5,
+            disclosure = ChatDiaryDisclosure.SHAREABLE,
+            sources = listOf(
+                ChatDiarySourceRef(
+                    sessionId = "local-session-1",
+                    userMessageId = "m1",
+                    assistantMessageId = "m2",
+                ),
+            ),
+            revisions = listOf(
+                ChatDiaryRevision(
+                    event = "第一次一起去海边以后，我们又约了下一次短途旅行",
+                    feeling = "想到这件事会忍不住开心",
+                    innerThought = "我已经开始期待下次一起出门了",
+                    relationshipMeaning = "我们开始有了会继续兑现的共同计划",
+                    unresolvedEcho = "还没定下具体出发时间",
+                    importance = 5,
+                    disclosure = ChatDiaryDisclosure.SHAREABLE,
+                    sources = listOf(
+                        ChatDiarySourceRef(
+                            sessionId = "local-session-1",
+                            userMessageId = "m1",
+                            assistantMessageId = "m2",
+                        ),
+                    ),
+                    updatedAt = 2L,
+                ),
+            ),
+            createdAt = 1L,
+            updatedAt = 2L,
+        ),
+    )
 
     private fun sampleEntry(): PersonaGalleryEntry = PersonaGalleryEntry(
         id = "gallery-lan",
