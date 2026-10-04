@@ -198,7 +198,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - Work 大上下文在请求前派生“可信检查点 + 近期原文”的有界投影；SessionEventLog 和持久模型历史仍保留完整事实。Chat 不继承 Work 专属稳态投影阈值。
 - Chat / Work 必须通过共享请求上下文治理入口进入模型请求；模式策略可以不同，但请求压力、缓存连续性、overflow 与 checkpoint envelope 不得再各建平行事实源。
 - 主 Agent / 子代理必须使用冻结的 `LocalRunModelSurface` 解析 route capabilities，并经共享模型请求资源边界发起 provider 调用；统一 `LocalAgentModelStepRuntime` 必须负责 bounded retry、取消传播和恢复外循环，领域代码只提供具体 recovery policy；运行期间修改当前模型选择不得改变已启动 Run 的工具面更新语义。
-- Chat 定时事件规划不得直接形成无治理的模型调用旁路：必须冻结实际 route、经过输入 admission，并复用共享 Model Step 的有限重试/取消语义；候选落盘前必须核对 session、最新对话消息和 ChatContext generation，旧候选不得覆盖新对话状态。
+- Chat 定时事件规划不得直接形成无治理的模型调用旁路：必须冻结实际 route、经过共享 `LocalAgentModelRequestRuntime` 输入 admission，并复用 Model Step 的有限重试/取消语义；辅助调用不得自建第二套资源调度器；候选落盘前必须核对 session、usage mode、单聊/群聊、人物身份、最新对话消息和 ChatContext generation，旧候选不得覆盖新对话状态。
 - continuation 只允许用于明确 `continuationEligible` 的 post-admission 失败并受统一次数上限约束；不得把 continuation 退化为原请求重放。
 - durable 大工具结果必须复用统一 recoverable projection：完整结果可恢复、模型侧预览有界、EPHEMERAL 结果不得伪装成可恢复落盘结果。
 - 新生成的压缩检查点必须携带明确的 chat/work 类型；旧 Work v1 provenance 只允许作为恢复兼容读取，新 Chat 压缩不得写 Work 专属 provenance。
