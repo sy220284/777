@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalCanonicalContent
 import com.labteto.dshmobile.local.quality.LocalOutputQualityContext
 import com.labteto.dshmobile.local.quality.LocalOutputQualityGuard
+import com.labteto.dshmobile.local.quality.LocalOutputQualityPipeline
 import com.labteto.dshmobile.local.quality.LocalOutputQualityResult
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -49,6 +50,8 @@ internal object LocalWorkCompletionClaimGuard : LocalOutputQualityGuard {
     )
 }
 
+private val WORK_OUTPUT_QUALITY_PIPELINE = LocalOutputQualityPipeline(listOf(LocalWorkCompletionClaimGuard))
+
 internal fun guardWorkCompletionDelivery(
     reply: LocalModelReply,
     state: LocalHarnessState,
@@ -56,7 +59,7 @@ internal fun guardWorkCompletionDelivery(
 ): LocalModelReply {
     if (state.usageMode != LocalUsageMode.WORK || reply.toolCalls.isNotEmpty()) return reply
     val original = reply.content?.takeIf(String::isNotBlank) ?: return reply
-    val result = LocalWorkCompletionClaimGuard.inspect(
+    val result = WORK_OUTPUT_QUALITY_PIPELINE.inspect(
         original,
         LocalOutputQualityContext(usageMode = state.usageMode, state = state),
     )
@@ -99,7 +102,7 @@ internal fun recordWorkCompletionQuality(
     eventLog: LocalSessionEventLog,
 ) {
     if (state.usageMode != LocalUsageMode.WORK) return
-    val result = LocalWorkCompletionClaimGuard.inspect(
+    val result = WORK_OUTPUT_QUALITY_PIPELINE.inspect(
         text,
         LocalOutputQualityContext(usageMode = state.usageMode, state = state),
     )

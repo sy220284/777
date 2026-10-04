@@ -6,7 +6,6 @@ import com.labteto.dshmobile.local.LocalModelReply
 import com.labteto.dshmobile.local.LocalRunModelSurface
 import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.LocalWorkExecutionControl
-import com.labteto.dshmobile.local.executeWithModelAdmission
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -22,20 +21,13 @@ internal class LocalSubagentModelRequestBoundary(
         tools: JsonArray,
         subagentId: String,
         step: Int,
-    ): LocalModelReply = executeWithModelAdmission(
-        control = executionControl,
-        routeFingerprint = surface.routeFingerprint,
-        model = surface.model,
-        baseUrl = surface.baseUrl,
-        contextWindowTokensOverride = surface.contextWindowTokensOverride,
-        messages = messages,
-        tools = tools,
-    ) {
-        try {
+    ): LocalModelReply {
+        return try {
             requestRuntime.complete(
                 surface = surface,
                 messages = messages,
                 tools = tools,
+                executionControl = executionControl,
             )
         } catch (error: LocalModelException) {
             logSubagentProviderError(eventLog(), subagentId, step, error)

@@ -168,7 +168,9 @@ Chat 与 Work 继续保留各自领域策略，但高阶运行能力通过共享
 
 历史压缩使用带 `work/chat` 类型的统一可信 checkpoint envelope；旧 `_dsh_work_checkpoint_source=history_compactor_v1` 继续只读兼容，新 Chat 压缩不再伪装成 Work checkpoint。模型提出的状态变化通过 `RuntimeStateTransitionPolicy` 交给运行时裁决：Chat 的长期人物状态仍由运行时拥有，Work 目标在存在未完成 Todo 时不能直接落为 completed。输出质量守卫也采用共享协议：Chat 可做高置信最小修复，Work 对“完成声明与运行时状态冲突”只记录结构化诊断，不擅自改写模型正文。
 
-Agent 运行时继续向下收敛：一次 Run 的模型身份与能力由 `LocalRunModelSurface` 冻结，主 Agent 与子代理的真实 provider 调用统一经过 `LocalAgentModelRequestRuntime` 获取模型请求资源租约；各自的 retry / context / recovery 策略仍留在原责任边界。Work 与子代理对 post-admission 中断统一使用有界 `LocalAgentContinuationPolicy`，只创建新的 continuation 请求，不重放状态未知的原请求。大工具结果统一通过 `projectRecoverableToolResult` 完成 durable spill、有界模型预览和 `call_id` 恢复提示，避免前台与子代理继续维护两套截断语义。
+Agent 运行时继续向下收敛：一次 Run 的模型身份与能力由 `LocalRunModelSurface` 冻结，主 Agent 与子代理的真实 provider 调用统一经过 `LocalAgentModelRequestRuntime` 获取模型请求资源租约并执行统一 admission；二者的 bounded retry、取消传播与恢复外循环由 `LocalAgentModelStepRuntime` 统一治理，具体 overflow、结构修复和 continuation 含义仍由领域策略决定。Chat 定时事件规划也复用同一 `LocalAgentModelRequestRuntime` 与 Step 生命周期、冻结路由和输入 admission；辅助调用不创建第二套 Engine 资源调度器，设备资源配额仍只有 Engine 一个事实源。Work 与子代理对 post-admission 中断统一使用有界 `LocalAgentContinuationPolicy`，只创建新的 continuation 请求，不重放状态未知的原请求。大工具结果统一通过 `projectRecoverableToolResult` 完成 durable spill、有界模型预览和 `call_id` 恢复提示，避免前台与子代理继续维护两套截断语义。
+
+输出质量由 `LocalOutputQualityPipeline` 统一调度，领域 Guard 仍各自拥有规则：Chat 的人物异常只做高置信最小修复，Work 在 Todo 未完成或 Goal blocked 时会在最终交付前阻止整体完成声明。Automation 规划候选携带 `sessionId + latestDialogueMessageId + ChatContext generation` 版本快照，并通过 `RuntimeStateTransitionPolicy` 裁决；规划期间即使仍在同一会话，只要对话或连续性 generation 已变化，旧候选也不得落盘。
 
 持久事件遍历统一使用 `LocalSessionEventLog.withEvents` 的作用域快照；读取期间固定字节边界，遍历提前返回、消费者异常和正常完成均关闭全部文件与解压器，流不能逃逸作用域。
 
