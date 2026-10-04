@@ -180,7 +180,10 @@ if "engine.createGroupChatSession" in chat_runtime_source or "engine.createSingl
 model_configuration = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt")
 )
-if "@Inject constructor(" not in model_configuration or "@Singleton" not in model_configuration:
+if (
+    "@Inject constructor(" not in model_configuration
+    and "@Inject internal constructor(" not in model_configuration
+) or "@Singleton" not in model_configuration:
     die("LocalModelConfigurationCoordinator must remain an injected Model capability")
 if "LocalDeepSeekSearchCredentialResolver(::readProfiles, apiKeys).resolve()" not in model_configuration:
     die("DeepSeek search credential resolution must stay inside Model configuration capability")
@@ -377,6 +380,8 @@ if "activeWorkRuns" in engine or "ConcurrentHashMap<String, LocalWorkRunBinding>
     die("LocalHarnessEngine must not own a second active Work-run map")
 if "ConcurrentHashMap<String, LocalWorkRunBinding>" not in work_run_registry:
     die("LocalWorkRunRegistry must remain the single in-memory owner of active Work bindings")
+if re.search(r"workRunRegistry\[[^\]]+\]\s*=", engine):
+    die("Work bindings must be registered through LocalWorkRunRegistry.attach")
 if "LocalWorkRunRegistry" not in work_run_binding:
     die("Work job projection must consume LocalWorkRunRegistry instead of a raw active-run map")
 if "LocalWorkRunRegistry" not in token_usage_bridge:
