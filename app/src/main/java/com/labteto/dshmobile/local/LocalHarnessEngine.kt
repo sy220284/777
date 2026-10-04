@@ -67,6 +67,7 @@ import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.compact
 import com.labteto.dshmobile.local.model.compactOverflow
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
+import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.withoutLastCompletedAssistantReply
 import com.labteto.dshmobile.local.model.withModelToolCallEventData
@@ -313,7 +314,7 @@ class LocalHarnessEngine @Inject constructor(
             resourceScheduler = resourceScheduler,
             routeProvider = {
                 val current = _state.value
-                current.modelSelection.activeProfile?.takeIf { current.configured }
+                current.modelState.modelState.modelSelection.activeProfile?.takeIf { current.modelState.modelState.configured }
                     ?.let { LocalVisionRoute(it.baseUrl, it.model, profile = it) }
             },
             imageSupportProvider = { route ->
@@ -858,12 +859,14 @@ class LocalHarnessEngine @Inject constructor(
         check(!isModelIdentityLocked()) { "请等待初始化完成或结束当前任务后再切换模型" }
         val result = modelConfiguration.save(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
         imageCapabilities.clearRoute(result.baseUrl, result.model)
-        _state.update {
-            it.copy(
-                configured = result.configured,
-                model = result.model,
-                baseUrl = result.baseUrl,
-                modelSelection = it.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+        _state.update { current ->
+            current.copy(
+                modelState = current.modelState.copy(
+                    configured = result.configured,
+                    model = result.model,
+                    baseUrl = result.baseUrl,
+                    modelSelection = current.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+                ),
                 error = null,
             )
         }
@@ -885,12 +888,12 @@ class LocalHarnessEngine @Inject constructor(
     internal fun selectModel(id: String) {
         scope.launch {
             val current = _state.value
-            val selected = current.modelProfiles.firstOrNull { it.id == id } ?: return@launch
+            val selected = current.modelState.modelProfiles.firstOrNull { it.id == id } ?: return@launch
             if (
                 isModelIdentityLocked() ||
                 selected.id == modelGateway.activeProfile()?.id
             ) return@launch
-            runCatching { modelConfiguration.select(id, current.modelProfiles) }
+            runCatching { modelConfiguration.select(id, current.modelState.modelProfiles) }
                 .onSuccess { result ->
                     if (result != null) {
                         _state.update { state ->
@@ -898,7 +901,7 @@ class LocalHarnessEngine @Inject constructor(
                                 configured = result.configured,
                                 model = result.model,
                                 baseUrl = result.baseUrl,
-                                modelSelection = state.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+                                modelSelection = state.modelState.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
                                 error = null,
                             )
                         }
@@ -913,15 +916,17 @@ class LocalHarnessEngine @Inject constructor(
         scope.launch {
             val current = _state.value
             runCatching {
-                modelConfiguration.remove(id, current.model, current.baseUrl)
+                modelConfiguration.remove(id, current.modelState.model, current.modelState.baseUrl)
             }.onSuccess { result ->
                 if (result != null) {
                     _state.update {
                         it.copy(
-                            configured = result.configured,
-                            model = result.model,
-                            baseUrl = result.baseUrl,
-                            modelSelection = it.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+                            modelState = it.modelState.copy(
+                                configured = result.configured,
+                                model = result.model,
+                                baseUrl = result.baseUrl,
+                                modelSelection = it.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+                            ),
                         )
                     }
                 }
@@ -1205,7 +1210,7 @@ class LocalHarnessEngine @Inject constructor(
     internal fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = synchronized(runStateLock) {
         val requestedText = replacement.trim()
         val state = _state.value
-        if (!state.configured) return@synchronized LocalChatUserEditResult.UNAVAILABLE
+        if (!state.modelState.modelState.configured) return@synchronized LocalChatUserEditResult.UNAVAILABLE
         if (
             state.loading ||
             state.running ||
@@ -1473,7 +1478,7 @@ class LocalHarnessEngine @Inject constructor(
     /** Re-run the latest answer against the same turn; never re-execute work tools. */
     internal fun regenerateReply(messageId: String): Boolean = synchronized(runStateLock) {
         val state = _state.value
-        if (!state.configured || state.loading ||
+        if (!state.modelState.modelState.configured || state.loading ||
             state.groupChat.enabled ||
             sessionTransitioning || activeJob?.isCompleted == false || pendingInputs.size() != 0
         ) return@synchronized false
@@ -1621,7 +1626,7 @@ class LocalHarnessEngine @Inject constructor(
                 state.usageMode, state.sessionId,
                 workBindingActive = binding != null,
                 visibleJobActive = activeJob?.isCompleted == false,
-                configured = state.configured, loading = state.loading,
+                configured = state.modelState.modelState.configured, loading = state.loading,
                 sessionTransitioning = sessionTransitioning,
                 pendingCount = targetPending.size(), pendingLimit = MAX_PENDING_INPUTS,
                 onRejected = { rejected ->
@@ -2259,13 +2264,15 @@ class LocalHarnessEngine @Inject constructor(
                 try {
                     cancelActiveRunAndJoin()
                     val current = _state.value
-                    val result = modelConfiguration.clearActive(current.model, current.baseUrl)
+                    val result = modelConfiguration.clearActive(current.modelState.model, current.modelState.baseUrl)
                     _state.update {
                         it.copy(
-                            configured = result.configured,
-                            model = result.model,
-                            baseUrl = result.baseUrl,
-                            modelSelection = it.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+                            modelState = it.modelState.copy(
+                                configured = result.configured,
+                                model = result.model,
+                                baseUrl = result.baseUrl,
+                                modelSelection = it.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+                            ),
                         )
                     }
                 } finally {
@@ -2720,11 +2727,11 @@ class LocalHarnessEngine @Inject constructor(
                 workspaceRoot = File(workspace.path),
                 mode = LocalImageInputMode.NATIVE,
                 budget = imageRequestBudget,
-                maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.model, snapshot.baseUrl),
+                maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.modelState.model, snapshot.modelState.baseUrl),
             )
 
             eventLog.append("turn/start", buildJsonObject {
-                put("model", snapshot.model)
+                put("model", snapshot.modelState.model)
                 put("mode", "chat")
                 put("persona_id", chatContext.persona.id)
             })
@@ -2850,7 +2857,7 @@ class LocalHarnessEngine @Inject constructor(
                     expectedSessionId = snapshot.sessionId,
                     expectedAssistantMessageId = assistantTranscript.id,
                     expectedBaseState = _state.value.chatState,
-                    profile = snapshot.modelSelection.activeProfile,
+                    profile = snapshot.modelState.modelState.modelSelection.activeProfile,
                     sourceUserMessageId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
                     assistantEventSequence = assistantEvent.sequence,
                 )
@@ -2953,7 +2960,7 @@ class LocalHarnessEngine @Inject constructor(
         var chatDynamicContext = ""
         val runSnapshot = runState.value
         val runToolSurface = LocalRunToolSurface(
-            runSnapshot.modelSelection.activeProfile?.toRunModelSurface(),
+            runSnapshot.modelState.modelState.modelSelection.activeProfile?.toRunModelSurface(),
         )
         val mainMaxSteps = runSnapshot.mainMaxSteps
         val mainStepLimit = if (runPolicy.allowToolExecution) {
@@ -2971,9 +2978,9 @@ class LocalHarnessEngine @Inject constructor(
         val runContext = agentRunCoordinator.start(
             sessionId = foregroundSessionId,
             usageMode = runSnapshot.usageMode,
-            model = runSnapshot.model,
-            baseUrl = runSnapshot.baseUrl,
-            routeProfile = runSnapshot.modelSelection.activeProfile,
+            model = runSnapshot.modelState.model,
+            baseUrl = runSnapshot.modelState.baseUrl,
+            routeProfile = runSnapshot.modelState.modelState.modelSelection.activeProfile,
             planMode = runSnapshot.work.planMode,
             policy = runPolicy,
             safeAutoApprovalEnabled = runSnapshot.safeAutoApprovalEnabled,
@@ -3102,13 +3109,13 @@ class LocalHarnessEngine @Inject constructor(
                     withWorkTurnContext(runHistory.snapshot(), workPromptContext.stable, workPromptContext.dynamic)
                 }
                 val selectedMode = resolveLocalImageInputMode(
-                    snapshot.imageInputMode,
+                    snapshot.modelState.modelState.imageInputMode,
                     imageCapabilities,
-                    snapshot.baseUrl,
-                    snapshot.model,
+                    snapshot.modelState.baseUrl,
+                    snapshot.modelState.model,
                 )
                 if (hasLocalImageRefs(durableRequestMessages) &&
-                    imageCapabilities.state(snapshot.baseUrl, snapshot.model) == LocalImageCapability.UNSUPPORTED) {
+                    imageCapabilities.state(snapshot.modelState.baseUrl, snapshot.modelState.model) == LocalImageCapability.UNSUPPORTED) {
                     throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
                 }
                 val requestMessages = prepareLocalMultimodalMessages(
@@ -3116,7 +3123,7 @@ class LocalHarnessEngine @Inject constructor(
                     workspaceRoot = File(workspace.path),
                     mode = selectedMode,
                     budget = imageRequestBudget,
-                    maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.model, snapshot.baseUrl),
+                    maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.modelState.model, snapshot.modelState.baseUrl),
                 )
                 val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
                 agentRunCoordinator.ensureCurrentOwner(runContext)
@@ -3136,7 +3143,7 @@ class LocalHarnessEngine @Inject constructor(
                         binding = binding,
                     ).also {
                         if (nativeImagesSent) {
-                            imageCapabilities.markSupported(snapshot.baseUrl, snapshot.model)
+                            imageCapabilities.markSupported(snapshot.modelState.baseUrl, snapshot.modelState.model)
                         }
                     }
                 } catch (error: Throwable) {
@@ -3145,7 +3152,7 @@ class LocalHarnessEngine @Inject constructor(
                         nativeImagesSent &&
                             imageInputUnsupported(error)
                     if (nativeImageRejected) {
-                        imageCapabilities.markUnsupported(snapshot.baseUrl, snapshot.model)
+                        imageCapabilities.markUnsupported(snapshot.modelState.baseUrl, snapshot.modelState.model)
                     }
                     if (nativeImageRejected) {
                         throw IllegalStateException(
@@ -3492,9 +3499,9 @@ class LocalHarnessEngine @Inject constructor(
         try {
             withTimeout(FOREGROUND_TURN_TIMEOUT_MILLIS) {
                 modelGateway.withFrozenRoute(
-                    profileId = runSnapshot.modelSelection.activeProfileId,
-                    model = runSnapshot.model,
-                    baseUrl = runSnapshot.baseUrl,
+                    profileId = runSnapshot.modelState.modelState.modelSelection.activeProfileId,
+                    model = runSnapshot.modelState.model,
+                    baseUrl = runSnapshot.modelState.baseUrl,
                 ) { loop.run(input) }
             }
             if (runState.value.usageMode == LocalUsageMode.CHAT) {
@@ -3507,7 +3514,7 @@ class LocalHarnessEngine @Inject constructor(
                         expectedSessionId = postTurnSnapshot.sessionId,
                         expectedAssistantMessageId = assistantMessage.id,
                         expectedBaseState = postTurnSnapshot.chatState,
-                        profile = runSnapshot.modelSelection.activeProfile,
+                        profile = runSnapshot.modelState.modelState.modelSelection.activeProfile,
                         sourceUserMessageId = sourceMessageId ?: runSnapshot.transcriptIndex.latestUserMessageId,
                         assistantEventSequence = finalChatAssistantSequence,
                     )
@@ -4510,9 +4517,9 @@ class LocalHarnessEngine @Inject constructor(
         return localHistoryBudgetFor(
             memoryClassMb = memoryClassMb,
             pressure = resourceScheduler.snapshot().pressure,
-            model = snapshot.model,
-            baseUrl = snapshot.baseUrl,
-            contextWindowTokensOverride = snapshot.modelSelection.activeProfile?.contextWindowTokensOverride,
+            model = snapshot.modelState.model,
+            baseUrl = snapshot.modelState.baseUrl,
+            contextWindowTokensOverride = snapshot.modelState.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
         )
     }
 
@@ -4746,12 +4753,23 @@ class LocalHarnessEngine @Inject constructor(
         val restoredBaseUrl = activeModelProfile?.baseUrl ?: baseUrl
         _state.value = LocalHarnessState(
             loading = deferReady,
-            configured = modelConfigured,
-            model = restoredModel,
-            baseUrl = restoredBaseUrl,
-            modelSelection = LocalModelSelectionState.restored(
-                modelProfiles, activeModelProfile?.id,
-                preferences.getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null),
+            modelState = LocalModelState(
+                configured = modelConfigured,
+                model = restoredModel,
+                baseUrl = restoredBaseUrl,
+                modelSelection = LocalModelSelectionState.restored(
+                    modelProfiles, activeModelProfile?.id,
+                    preferences.getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null),
+                ),
+                modelAttempts = LocalAgentRuntimeLimits.normalizeModelAttempts(
+                    preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS),
+                ),
+                imageInputMode = runCatching {
+                    LocalImageInputMode.valueOf(
+                        preferences.getString(LocalHarnessSettingsCoordinator.KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)
+                            ?: LocalImageInputMode.AUTO.name,
+                    )
+                }.getOrDefault(LocalImageInputMode.AUTO),
             ),
             mainMaxSteps = LocalAgentRuntimeLimits.normalizeMainSteps(
                 preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS),
@@ -4759,15 +4777,6 @@ class LocalHarnessEngine @Inject constructor(
             subagentMaxSteps = LocalAgentRuntimeLimits.normalizeSubagentSteps(
                 preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS),
             ),
-            modelAttempts = LocalAgentRuntimeLimits.normalizeModelAttempts(
-                preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS),
-            ),
-            imageInputMode = runCatching {
-                LocalImageInputMode.valueOf(
-                    preferences.getString(LocalHarnessSettingsCoordinator.KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)
-                        ?: LocalImageInputMode.AUTO.name,
-                )
-            }.getOrDefault(LocalImageInputMode.AUTO),
             workspacePath = workspace.path,
             sessionId = sessionId,
             usageMode = stored.usageMode,
