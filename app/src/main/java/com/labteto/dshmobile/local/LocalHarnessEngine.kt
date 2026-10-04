@@ -103,7 +103,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
@@ -345,7 +344,6 @@ class LocalHarnessEngine @Inject constructor(
                 LocalHarnessSettingsCoordinator.loadChatStyleGuardCustomPhrases(preferences),
         ),
     )
-    internal val state: StateFlow<LocalHarnessState> = runtimeStateStore.state
 
     private val currentSessionId: String
         get() = runtimeStateStore.currentSessionId
