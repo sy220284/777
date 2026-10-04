@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -24,7 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
@@ -201,85 +199,6 @@ internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
                     onClick = { onSelect(key) },
                 )
             }
-        }
-    }
-}
-
-/** Miniature Clear Realm preview: canvas, grouped surface, content hierarchy and composer. */
-@Composable
-private fun ThemePreviewBlock(
-    themeKey: String,
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = DsTheme.colors
-    val previewColors = when (themeKey) {
-        "light" -> Color(0xFFF7F7F5) to Color(0xFFFFFFFF)
-        "dark" -> Color(0xFF10100F) to Color(0xFF191918)
-        "matte_black" -> Color(0xFF10100F) to Color(0xFF222220)
-        else -> Color(0xFFF7F7F5) to Color(0xFFFFFFFF)
-    }
-    Column(
-        modifier = modifier
-            .clip(DsShapes.cube)
-            .border(if (selected) 1.5.dp else 1.dp, if (selected) colors.accent else colors.borderL2, DsShapes.cube)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
-    ) {
-        Box(Modifier.fillMaxWidth().height(72.dp)) {
-            if (themeKey == "system") {
-                Row(Modifier.fillMaxSize()) {
-                    ThemeMiniCanvas(
-                        background = Color(0xFFF7F7F5),
-                        surface = Color(0xFFFFFFFF),
-                        modifier = Modifier.weight(1f),
-                    )
-                    ThemeMiniCanvas(
-                        background = Color(0xFF10100F),
-                        surface = Color(0xFF191918),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            } else {
-                ThemeMiniCanvas(
-                    background = previewColors.first,
-                    surface = previewColors.second,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            if (selected) Icon(
-                Icons.Filled.Check,
-                contentDescription = null,
-                tint = colors.accent,
-                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(16.dp),
-            )
-        }
-        Text(
-            label,
-            style = DsType.small13.withReadingWeight(),
-            color = if (selected) colors.accent else colors.labelSecondary,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-        )
-    }
-}
-
-@Composable
-private fun ThemeMiniCanvas(
-    background: Color,
-    surface: Color,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier.background(background)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 9.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            Box(Modifier.fillMaxWidth(0.42f).height(6.dp).background(surface, RoundedCornerShape(3.dp)))
-            Box(Modifier.fillMaxWidth().height(30.dp).background(surface, RoundedCornerShape(8.dp)))
-            Box(Modifier.fillMaxWidth(0.72f).height(10.dp).background(surface, RoundedCornerShape(6.dp)))
         }
     }
 }
