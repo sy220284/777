@@ -553,7 +553,7 @@ class LocalHarnessEngine @Inject constructor(
             memoryStore = memoryStore,
             memoryManager = memoryManager,
             eventLogFor = ::eventLogFor,
-            defaultState = state,
+            defaultState = runtimeStateStore.state,
             defaultSessionId = { currentSessionId },
         )
     }
@@ -576,7 +576,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private val automationWorkCoordinator by lazy {
         LocalAutomationWorkCoordinator(
-            state = state,
+            state = runtimeStateStore.state,
             sessionCoordinator = sessionCoordinator,
             eventLogFor = ::eventLogFor,
             agentRunCoordinator = agentRunCoordinator,
@@ -595,7 +595,7 @@ class LocalHarnessEngine @Inject constructor(
 
     private val automationChatCoordinator by lazy {
         LocalAutomationChatCoordinator(
-            state = state,
+            state = runtimeStateStore.state,
             sessionCoordinator = sessionCoordinator,
             eventLogFor = ::eventLogFor,
             chatPersonaStore = chatPersonaStore,
