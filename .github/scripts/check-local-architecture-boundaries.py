@@ -103,6 +103,7 @@ LINE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt": 418,
     "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTargetResolver.kt": 261,
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentHistoryPolicy.kt": 66,
+    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentContextPolicy.kt": 40,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt": 316,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkRecovery.kt": 64,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt": 523,
