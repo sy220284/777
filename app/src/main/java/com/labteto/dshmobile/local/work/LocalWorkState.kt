@@ -15,7 +15,6 @@ data class LocalWorkState(
     val planMode: Boolean = false,
     val jobs: List<LocalJobInfo> = emptyList(),
     val workflowProgress: LocalWorkflowProgress? = null,
-    val queuedInputCount: Int = 0,
     val pendingApproval: LocalApproval? = null,
     val pendingQuestion: LocalQuestion? = null,
 )
