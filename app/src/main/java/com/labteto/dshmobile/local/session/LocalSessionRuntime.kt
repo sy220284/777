@@ -13,8 +13,8 @@ import com.labteto.dshmobile.local.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.LocalWorkspaceFile
 import com.labteto.dshmobile.local.LocalWorkspaceFilePreview
-import com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_MEMBERS
-import com.labteto.dshmobile.local.chat.MIN_GROUP_CHAT_MEMBERS
+import com.labteto.dshmobile.local.MAX_GROUP_CHAT_MEMBERS
+import com.labteto.dshmobile.local.MIN_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import javax.inject.Inject
