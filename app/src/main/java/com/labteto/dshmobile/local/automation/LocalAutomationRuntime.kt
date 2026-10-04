@@ -5,20 +5,37 @@ import com.labteto.dshmobile.local.LocalHarnessEngine
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Automation-only execution boundary shared by WorkManager and the loopback webhook service. */
+/** Automation execution plus the bounded chat snapshot used by the event planner. */
 @Singleton
 class LocalAutomationRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
 ) {
-    internal suspend fun runPrompt(
-        text: String,
-        timeoutMillis: Long = 5 * 60_000L,
-    ): String = engine.runAutomationPrompt(text, timeoutMillis)
+    internal fun planningContext(): AutomationPlanningContext {
+        val snapshot = engine.state.value
+        return AutomationPlanningContext(
+            sessionId = snapshot.sessionId,
+            configured = snapshot.configured,
+            usageMode = snapshot.usageMode,
+            groupChatEnabled = snapshot.groupChat.enabled,
+            model = snapshot.model,
+            baseUrl = snapshot.baseUrl,
+            profileId = snapshot.modelSelection.activeProfileId,
+            personaName = snapshot.chatPersona.name,
+            recentMessages = snapshot.messages
+                .asSequence()
+                .filter { it.role == "user" || it.role == "assistant" }
+                .filter { it.content.isNotBlank() }
+                .toList()
+                .takeLast(12)
+                .map { AutomationPlanningMessage(it.role, it.content) },
+        )
+    }
 
-    internal suspend fun prepareWorkSession(
-        text: String,
-        preferredSessionId: String? = null,
-    ): String = engine.prepareAutomationWorkSession(text, preferredSessionId)
+    internal suspend fun runPrompt(text: String, timeoutMillis: Long = 5 * 60_000L): String =
+        engine.runAutomationPrompt(text, timeoutMillis)
+
+    internal suspend fun prepareWorkSession(text: String, preferredSessionId: String? = null): String =
+        engine.prepareAutomationWorkSession(text, preferredSessionId)
 
     internal suspend fun runWork(
         text: String,
@@ -49,20 +66,9 @@ class LocalAutomationRuntime @Inject constructor(
         silenceReferenceAt: Long? = null,
         bypassProactivePolicy: Boolean = false,
     ): LocalAutomationRunResult = engine.runAutomationChat(
-        instruction = instruction,
-        targetSessionId = targetSessionId,
-        timeoutMillis = timeoutMillis,
-        recoverInterrupted = recoverInterrupted,
-        recoveryStartedAt = recoveryStartedAt,
-        quietHoursEnabled = quietHoursEnabled,
-        quietStartHour = quietStartHour,
-        quietStartMinute = quietStartMinute,
-        quietEndHour = quietEndHour,
-        quietEndMinute = quietEndMinute,
-        proactiveMinGapMinutes = proactiveMinGapMinutes,
-        proactiveMaxUnanswered = proactiveMaxUnanswered,
-        minimumSilenceMinutes = minimumSilenceMinutes,
-        silenceReferenceAt = silenceReferenceAt,
-        bypassProactivePolicy = bypassProactivePolicy,
+        instruction, targetSessionId, timeoutMillis, recoverInterrupted, recoveryStartedAt,
+        quietHoursEnabled, quietStartHour, quietStartMinute, quietEndHour, quietEndMinute,
+        proactiveMinGapMinutes, proactiveMaxUnanswered, minimumSilenceMinutes,
+        silenceReferenceAt, bypassProactivePolicy,
     )
 }

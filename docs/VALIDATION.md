@@ -217,6 +217,8 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - 仅因并发 pending reservation 临时重叠造成的 exposure 超限应等待结算；当前请求在所有 pending 释放后仍无法容纳时才拒绝。
 - 本地 preflight 拒绝必须带稳定 code / failure_kind / admission_state / origin，禁止伪装成供应商模型故障。
 - Work 传输层路由健康必须按物理路由指纹跨 run 共享：连续 3 次可归因传输失败进入冷却；冷却结束只允许一个 half-open 探测；成功清零、探测失败指数延长且上限 15 分钟。用户取消、本地预算/上下文拒绝不得累计路由失败；进程级状态必须有容量和空闲淘汰边界。
+- 远程会话异步请求必须绑定发起时的 host/session scope：快速切换会话或主机后，旧请求的成功结果、失败结果、loading 结算和错误横幅都不得写入当前界面；host-scoped plugin/preset/catalog 同样必须拒绝旧 host 结果。
+- “上次打开会话”持久化必须 latest-wins：并发 A→B 快速切换时，即使 A 的持久化更慢，最终落盘也必须是 B；不得依赖协程调度顺序。
 
 当前高风险领域：
 

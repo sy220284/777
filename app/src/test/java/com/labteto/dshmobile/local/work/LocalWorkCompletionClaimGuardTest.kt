@@ -2,10 +2,22 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.LocalGoal
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalModelReply
+import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.LocalTodoItem
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.model.LocalCanonicalContent
+import com.labteto.dshmobile.local.model.LocalCanonicalMessage
+import com.labteto.dshmobile.local.model.LocalCanonicalRole
 import com.labteto.dshmobile.local.quality.LocalOutputQualityContext
+import java.io.File
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -24,9 +36,72 @@ class LocalWorkCompletionClaimGuardTest {
             "全部完成，可以交付。",
             LocalOutputQualityContext(usageMode = LocalUsageMode.WORK, state = state),
         )
-        assertEquals("全部完成，可以交付。", result.text)
+        assertTrue(result.changed)
+        assertTrue(result.text.startsWith("当前尚未完成："))
+        assertTrue(result.text.contains("仍有 1 项任务未完成"))
+        assertTrue(result.text.contains("目标仍处于阻塞状态"))
+        assertFalse(result.text.contains("全部完成"))
         assertTrue(result.findings.contains("完成声明与未完成任务清单冲突"))
         assertTrue(result.findings.contains("完成声明与阻塞目标状态冲突"))
+    }
+
+    @Test
+    fun localProgressClaimIsNotMistakenForWholeTaskCompletion() {
+        val state = LocalHarnessState(
+            usageMode = LocalUsageMode.WORK,
+            todos = listOf(LocalTodoItem("继续测试", "pending")),
+        )
+        val result = LocalWorkCompletionClaimGuard.inspect(
+            "代码修改已完成，测试仍在运行。",
+            LocalOutputQualityContext(usageMode = LocalUsageMode.WORK, state = state),
+        )
+
+        assertFalse(result.changed)
+        assertTrue(result.findings.isEmpty())
+        assertEquals("代码修改已完成，测试仍在运行。", result.text)
+    }
+
+    @Test
+    fun deliveryGuardReplacesFalseCompletionAcrossVisibleAndCanonicalReply() {
+        val root = createTempDir(prefix = "work-completion-guard-")
+        try {
+            val log = LocalSessionEventLog(File(root, "events.jsonl"), Json)
+            val state = LocalHarnessState(
+                usageMode = LocalUsageMode.WORK,
+                goal = LocalGoal("完成发布", status = "active"),
+                todos = listOf(LocalTodoItem("跑完整 CI", "in_progress")),
+            )
+            val reply = LocalModelReply(
+                message = buildJsonObject {
+                    put("role", "assistant")
+                    put("content", "任务完成，可以交付。")
+                },
+                content = "任务完成，可以交付。",
+                reasoning = null,
+                toolCalls = emptyList(),
+                canonicalMessage = LocalCanonicalMessage(
+                    role = LocalCanonicalRole.ASSISTANT,
+                    content = listOf(LocalCanonicalContent.Text("任务完成，可以交付。")),
+                ),
+            )
+
+            val guarded = guardWorkCompletionDelivery(reply, state, log)
+
+            assertTrue(guarded.content.orEmpty().startsWith("当前尚未完成："))
+            assertTrue(guarded.content.orEmpty().contains("仍有 1 项任务未完成"))
+            assertFalse(guarded.content.orEmpty().contains("可以交付"))
+            assertEquals(guarded.content, guarded.message["content"]?.jsonPrimitive?.contentOrNull)
+            val canonicalText = guarded.canonicalMessage?.content
+                ?.filterIsInstance<LocalCanonicalContent.Text>()
+                ?.singleOrNull()
+                ?.text
+            assertEquals(guarded.content, canonicalText)
+            val event = log.snapshot().last()
+            assertEquals("work/output-quality", event.type)
+            assertEquals(true, event.data["delivery_blocked"]?.jsonPrimitive?.content?.toBoolean())
+        } finally {
+            root.deleteRecursively()
+        }
     }
 
     @Test

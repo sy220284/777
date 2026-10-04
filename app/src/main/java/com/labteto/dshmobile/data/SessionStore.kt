@@ -143,8 +143,14 @@ class SessionStore @Inject constructor(
     private val _currentSessionId = MutableStateFlow<String?>(null)
     val currentSessionId: StateFlow<String?> = _currentSessionId.asStateFlow()
 
+    private val landingRuntime = SessionLandingRuntime(
+        activeHostKey = { activeHostKey },
+        currentSessionId = { _currentSessionId.value },
+        persist = hostsStore::setLastSessionId,
+        logger = ::log,
+    )
+
     private val catalogs = SessionCatalogRuntime(
-        apiProvider = ::apiOrNull,
         apiForHost = ::apiForHost,
         activeHostKey = { activeHostKey },
         currentSessionId = { _currentSessionId.value },
@@ -329,7 +335,7 @@ class SessionStore @Inject constructor(
     )
 
     private val subagentRuntime = SessionSubagentRuntime(
-        apiProvider = ::apiOrNull,
+        apiForHost = ::apiForHost,
         currentSessionId = { _currentSessionId.value },
         activeHostKey = { activeHostKey },
         remoteStreams = remoteStreams,
@@ -880,14 +886,14 @@ class SessionStore @Inject constructor(
         // tap, which is what made switching sessions feel like loading them. The follow stream is
         // already open by this point, so the transcript arrives while these are still in flight.
         //
-        // `refreshSubagents` and `refreshCommands` read the open session from `currentId`, which
-        // was set synchronously above, so they still target this session rather than a stale one.
+        // Each background result is scoped to the host/session captured when it started. Old
+        // responses are ignored after a rapid switch instead of repainting the newly opened session.
         coroutineScope {
             launch { loadSkills(sessionId) }
             launch { loadModels(sessionId) }
             launch { refreshSubagents() }
             launch { refreshCommands() }
-            launch { rememberLastSession(sessionId) }
+            launch { landingRuntime.remember(sessionId) }
         }
     }
 
@@ -953,13 +959,6 @@ class SessionStore @Inject constructor(
      */
     private fun expandRecords(records: List<SessionHistoryRecord>): List<SessionEventEnvelope> =
         ChunkRows.expandAll(records).map { wireEventToEnvelope(it) }
-
-    /** Persist the landing session for this harness; a write failure is not worth surfacing. */
-    private suspend fun rememberLastSession(sessionId: String) {
-        val key = hostKey() ?: return
-        runCatching { hostsStore.setLastSessionId(key, sessionId) }
-            .onFailure { log("could not remember last session", it) }
-    }
 
     /**
      * Page one screen further back.
