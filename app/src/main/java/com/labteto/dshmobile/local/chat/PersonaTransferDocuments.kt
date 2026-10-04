@@ -211,6 +211,7 @@ internal object PersonaTransferDocuments {
             addField("人物整体", persona.portrait)
             addField("独立生活", persona.lifeContext)
             addList("天然注意", persona.attentionBiases)
+            addList("关注关键词", persona.attentionKeywords)
             addList("容易漏掉或误读", persona.perceptionBlindSpots)
             addList("小习惯和小坚持", persona.quirks)
             addList("不擅长", persona.limitations)
