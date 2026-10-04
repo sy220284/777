@@ -48,7 +48,7 @@ internal fun queueAutomaticWorkContinuation(
     binding.continuationParentRunId = sourceRunId
     binding.state.update {
         it.copy(
-            work = it.work.copy(queuedInputCount = binding.pendingInputs.size()),
+            kernel = it.kernel.copy(queuedInputCount = binding.pendingInputs.size()),
             error = null,
         )
     }
