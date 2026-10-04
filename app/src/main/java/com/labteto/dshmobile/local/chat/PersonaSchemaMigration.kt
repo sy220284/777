@@ -178,41 +178,44 @@ internal object PersonaSchemaMigration {
         )
 
     /**
-     * Current V3 values win. Legacy content only restores information that would otherwise be lost.
+     * Current V3 values are authoritative. Legacy data only fills a field that is still empty.
+     *
+     * This deliberately avoids list union: a user may have removed an old value in V3, and migration
+     * must not silently resurrect it just because the legacy source is still retained for recovery.
      */
-    fun mergeCurrentFirst(current: PersonaProfile, migrated: PersonaProfile): PersonaProfile {
-        val mergedLore = mergePersonaProfiles(current, migrated).loreEntries
-        return current.copy(
+    fun mergeCurrentFirst(current: PersonaProfile, migrated: PersonaProfile): PersonaProfile =
+        current.copy(
             id = current.id.ifBlank { migrated.id },
             name = current.name
                 .takeUnless { it.isBlank() || it == "默认角色" }
                 ?: migrated.name,
             portrait = current.portrait.ifBlank { migrated.portrait },
             lifeContext = current.lifeContext.ifBlank { migrated.lifeContext },
-            attentionBiases = mergeLines(current.attentionBiases, migrated.attentionBiases, 8),
-            attentionKeywords = mergeLines(current.attentionKeywords, migrated.attentionKeywords, 12),
-            perceptionBlindSpots = mergeLines(
+            attentionBiases = fillMissingLines(current.attentionBiases, migrated.attentionBiases, 8),
+            attentionKeywords = fillMissingLines(current.attentionKeywords, migrated.attentionKeywords, 12),
+            perceptionBlindSpots = fillMissingLines(
                 current.perceptionBlindSpots,
                 migrated.perceptionBlindSpots,
                 8,
             ),
-            quirks = mergeLines(current.quirks, migrated.quirks, 12),
-            limitations = mergeLines(current.limitations, migrated.limitations, 8),
-            coreValues = mergeLines(current.coreValues, migrated.coreValues, 6),
+            quirks = fillMissingLines(current.quirks, migrated.quirks, 12),
+            limitations = fillMissingLines(current.limitations, migrated.limitations, 8),
+            coreValues = fillMissingLines(current.coreValues, migrated.coreValues, 6),
             coreTension = current.coreTension.ifBlank { migrated.coreTension },
-            stableTraits = mergeLines(current.stableTraits, migrated.stableTraits, 8),
-            mutableTraits = mergeLines(current.mutableTraits, migrated.mutableTraits, 8),
+            stableTraits = fillMissingLines(current.stableTraits, migrated.stableTraits, 8),
+            mutableTraits = fillMissingLines(current.mutableTraits, migrated.mutableTraits, 8),
             initialUserImpression = current.initialUserImpression.ifBlank { migrated.initialUserImpression },
-            voiceSamples = mergeLines(current.voiceSamples, migrated.voiceSamples, 20),
+            voiceSamples = fillMissingLines(current.voiceSamples, migrated.voiceSamples, 20),
             worldSetting = current.worldSetting.ifBlank { migrated.worldSetting },
             franchise = current.franchise.ifBlank { migrated.franchise },
             timelinePosition = current.timelinePosition.ifBlank { migrated.timelinePosition },
-            knowledgeBoundary = mergeLines(current.knowledgeBoundary, migrated.knowledgeBoundary, 20),
-            loreEntries = mergedLore,
+            knowledgeBoundary = fillMissingLines(current.knowledgeBoundary, migrated.knowledgeBoundary, 20),
+            loreEntries = current.loreEntries.takeIf(List<PersonaLoreEntry>::isNotEmpty)
+                ?: migrated.loreEntries,
             presetId = current.presetId.ifBlank { migrated.presetId },
-            hardConstraints = mergeLines(current.hardConstraints, migrated.hardConstraints, 20),
-            bannedPhrases = mergeLines(current.bannedPhrases, migrated.bannedPhrases, 30),
-            corrections = mergeLines(current.corrections, migrated.corrections, 20),
+            hardConstraints = fillMissingLines(current.hardConstraints, migrated.hardConstraints, 20),
+            bannedPhrases = fillMissingLines(current.bannedPhrases, migrated.bannedPhrases, 30),
+            corrections = fillMissingLines(current.corrections, migrated.corrections, 20),
             behaviorTuning = if (current.behaviorTuning == CharacterBehaviorTuning()) {
                 migrated.behaviorTuning
             } else {
@@ -220,7 +223,6 @@ internal object PersonaSchemaMigration {
             },
             updatedAt = maxOf(current.updatedAt, migrated.updatedAt),
         )
-    }
 
     private fun enrichInstalledPreset(profile: PersonaProfile): PersonaProfile {
         val latest = PersonaPresetCatalog.presets
@@ -235,15 +237,26 @@ internal object PersonaSchemaMigration {
             "不自称 AI，不讨论自己正在扮演角色。",
         )
         val legacyPresetMetaBans = setOf("作为AI", "根据设定我应该", "身为一个语言模型")
+        val legacyGenericValues = setOf("重要关系与现实责任", "自身判断与边界", "长期目标与个人愿望")
+        val legacyGenericTension =
+            "既有身份与个人愿望可能发生拉扯，具体变化必须由当前故事中的真实事件推动。"
+        val userValues = profile.coreValues.filterNot { it in legacyGenericValues }
+        val userConstraints = profile.hardConstraints.filterNot { it in legacyPresetConstraints }
+        val userBans = profile.bannedPhrases.filterNot { it in legacyPresetMetaBans }
         return profile.copy(
             attentionBiases = latest.attentionBiases,
             attentionKeywords = latest.attentionKeywords,
             perceptionBlindSpots = latest.perceptionBlindSpots,
             quirks = mergeLines(profile.quirks, latest.quirks, 12),
             limitations = latest.limitations,
+            coreValues = mergeLines(userValues, latest.coreValues, 6),
+            coreTension = profile.coreTension
+                .takeUnless { it.isBlank() || it == legacyGenericTension }
+                ?: latest.coreTension,
+            stableTraits = latest.stableTraits,
             mutableTraits = latest.mutableTraits,
-            hardConstraints = profile.hardConstraints.filterNot { it in legacyPresetConstraints },
-            bannedPhrases = profile.bannedPhrases.filterNot { it in legacyPresetMetaBans },
+            hardConstraints = mergeLines(userConstraints, latest.hardConstraints, 20),
+            bannedPhrases = mergeLines(userBans, latest.bannedPhrases, 30),
         )
     }
 
@@ -264,6 +277,20 @@ internal object PersonaSchemaMigration {
             .distinct()
             .joinToString("；")
             .take(4_000)
+
+    private fun fillMissingLines(
+        current: List<String>,
+        migrated: List<String>,
+        limit: Int,
+    ): List<String> {
+        val source = current.takeIf { values -> values.any(String::isNotBlank) } ?: migrated
+        return source.asSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .take(limit)
+            .toList()
+    }
 
     private fun mergeLines(first: List<String>, second: List<String>, limit: Int): List<String> =
         (first + second)
