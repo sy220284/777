@@ -4220,7 +4220,7 @@ class LocalHarnessEngine @Inject internal constructor(
         question: String,
         options: List<String>,
         binding: LocalWorkRunBinding? = null,
-    ): String = (binding?.interactions ?: interactions).awaitQuestion(
+    ): String = (binding?.interactions ?: runtimeStateStore.foregroundInteractions).awaitQuestion(
         LocalQuestion(call.id, question.take(2_000), options.take(6)),
     )
 
