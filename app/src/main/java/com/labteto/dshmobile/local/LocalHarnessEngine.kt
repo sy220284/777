@@ -1097,27 +1097,6 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean {
-        val selected = entries
-            .distinctBy(PersonaGalleryEntry::id)
-            .take(MAX_GROUP_CHAT_MEMBERS)
-        if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
-        val snapshot = _state.value
-        if (snapshot.loading || snapshot.kernel.running) return false
-        return createSession(
-            mode = LocalConversationMode.INDEPENDENT,
-            usageMode = LocalUsageMode.CHAT,
-            chatMode = LocalChatMode.GROUP,
-            groupEntries = selected,
-        )
-    }
-
-    internal fun createSingleChatSession(): Boolean = createSession(
-        mode = LocalConversationMode.INDEPENDENT,
-        usageMode = LocalUsageMode.CHAT,
-        chatMode = LocalChatMode.SINGLE,
-    )
-
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean {
         val snapshot = _state.value
         if (
