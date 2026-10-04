@@ -25,7 +25,7 @@ RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 15,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 4,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 6,
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 4,
 }
 PROJECTION_FIELD_BUDGETS = {
     "LocalHarnessSettingsState": 17,
@@ -176,6 +176,14 @@ if "internal val state: StateFlow<LocalHarnessState> = runtimeStateStore.state" 
     die("LocalSessionRuntime must consume aggregate state from LocalRuntimeStateStore")
 if "engine.state" in session_runtime_source:
     die("LocalSessionRuntime must not reach through LocalHarnessEngine for aggregate state")
+
+automation_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt")
+)
+if "runtimeStateStore.state" not in automation_runtime_source:
+    die("LocalAutomationRuntime planning state must consume LocalRuntimeStateStore")
+if "engine.state" in automation_runtime_source:
+    die("LocalAutomationRuntime must not reach through LocalHarnessEngine for aggregate state")
 
 chat_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt")
