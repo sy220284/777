@@ -54,9 +54,9 @@ internal class LocalReplySuggestionCoordinator(
         val boundEventLog = eventLogFor(expectedSessionId)
         val profile = try {
             modelGateway.profileForRoute(
-                profileId = snapshot.modelSelection.activeProfileId,
-                model = snapshot.model,
-                baseUrl = snapshot.baseUrl,
+                profileId = snapshot.modelState.modelState.modelSelection.activeProfileId,
+                model = snapshot.modelState.model,
+                baseUrl = snapshot.modelState.baseUrl,
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
