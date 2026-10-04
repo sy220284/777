@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.chat.ChatContinuityGuardMode
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatReplyContinuityGuard
+import com.labteto.dshmobile.local.chat.ChatReplyImmersionGuard
 import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import kotlinx.serialization.json.JsonArray
@@ -66,15 +67,37 @@ internal class LocalChatReplyCoordinator(
                 },
             )
 
+        suspend fun finalizeImmersedCandidate(
+            candidate: LocalModelReply,
+            candidateUsageContext: TokenUsageContext,
+        ): LocalModelReply = ChatReplyImmersionGuard.enforce(
+            persona = persona,
+            initial = finalizeCandidate(candidate, candidateUsageContext),
+            contentOf = { checked -> checked.content.orEmpty() },
+            retry = { immersionHint ->
+                finalizeCandidate(
+                    retryRaw(immersionHint),
+                    candidateUsageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
+                )
+            },
+            onEvent = { action, violations ->
+                appendEvent("chat/immersion-guard", buildJsonObject {
+                    put("step", step)
+                    put("action", action)
+                    put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                })
+            },
+        )
+
         val scene = snapshot.chatContext.scene
         return ChatReplyContinuityGuard.enforce(
             previous = scene,
             userMessage = userMessage,
-            initial = finalizeCandidate(reply, usageContext),
+            initial = finalizeImmersedCandidate(reply, usageContext),
             mode = ChatContinuityGuardMode.DIRECT,
             contentOf = { candidate -> candidate.content.orEmpty() },
             retry = { repairHint ->
-                finalizeCandidate(
+                finalizeImmersedCandidate(
                     retryRaw(repairHint),
                     usageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
                 )
@@ -174,15 +197,38 @@ internal class LocalChatReplyCoordinator(
             )
         }
 
+        suspend fun finalizeImmersedCandidate(
+            candidate: LocalModelReply,
+            candidateUsageContext: TokenUsageContext,
+        ): String = ChatReplyImmersionGuard.enforce(
+            persona = persona,
+            initial = finalizeCandidate(candidate, candidateUsageContext),
+            contentOf = { content -> content },
+            retry = { immersionHint ->
+                finalizeCandidate(
+                    retryRaw(immersionHint),
+                    candidateUsageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
+                )
+            },
+            onEvent = { action, violations ->
+                appendEvent("chat/immersion-guard", buildJsonObject {
+                    put("step", 100 + index)
+                    put("action", action)
+                    put("group_gallery_id", member.galleryId)
+                    put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                })
+            },
+        )
+
         val scene = sharedContext.scene
         return ChatReplyContinuityGuard.enforce(
             previous = scene,
             userMessage = input,
-            initial = finalizeCandidate(rawReply, usageContext),
+            initial = finalizeImmersedCandidate(rawReply, usageContext),
             mode = ChatContinuityGuardMode.GROUP,
             contentOf = { content -> content },
             retry = { repairHint ->
-                finalizeCandidate(
+                finalizeImmersedCandidate(
                     retryRaw(repairHint),
                     usageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
                 )
@@ -211,39 +257,80 @@ internal class LocalChatReplyCoordinator(
         ),
         retryRaw: suspend (repairHint: String) -> LocalModelReply,
         appendEvent: (type: String, data: JsonObject) -> Unit,
-    ): LocalModelReply = ChatReplyContinuityGuard.enforce(
-        previous = scene,
-        userMessage = "",
-        initial = initial,
-        mode = ChatContinuityGuardMode.PROACTIVE,
-        contentOf = { candidate -> candidate.content.orEmpty().trim() },
-        retry = { repairHint ->
-            finalizeStyled(
-                snapshot = snapshot,
-                persona = persona,
-                reply = retryRaw(repairHint),
-                usageContext = usageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
-                onStyleGuard = { action, violations ->
-                    appendEvent("chat/style-guard", buildJsonObject {
-                        put("action", action)
-                        put("automation", true)
-                        put("proactive", true)
-                        put("continuity_retry", true)
-                        put("violations", JsonArray(violations.map(::JsonPrimitive)))
-                    })
-                },
-            )
-        },
-        onEvent = { action, check ->
-            appendEvent("chat/continuity-guard", buildJsonObject {
-                put("action", action)
-                put("automation", true)
-                put("proactive", true)
-                put("location", scene.location)
-                put("violation_count", check.violations.size)
-            })
-        },
-    )
+    ): LocalModelReply {
+        suspend fun finalizeRawCandidate(
+            candidate: LocalModelReply,
+            candidateUsageContext: TokenUsageContext,
+        ): LocalModelReply = finalizeStyled(
+            snapshot = snapshot,
+            persona = persona,
+            reply = candidate,
+            usageContext = candidateUsageContext,
+            onStyleGuard = { action, violations ->
+                appendEvent("chat/style-guard", buildJsonObject {
+                    put("action", action)
+                    put("automation", true)
+                    put("proactive", true)
+                    put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                })
+            },
+        )
+
+        suspend fun enforceImmersionOnFinalized(
+            candidate: LocalModelReply,
+            candidateUsageContext: TokenUsageContext,
+        ): LocalModelReply = ChatReplyImmersionGuard.enforce(
+            persona = persona,
+            initial = candidate,
+            contentOf = { checked -> checked.content.orEmpty().trim() },
+            retry = { immersionHint ->
+                finalizeRawCandidate(
+                    retryRaw(immersionHint),
+                    candidateUsageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
+                )
+            },
+            onEvent = { action, violations ->
+                appendEvent("chat/immersion-guard", buildJsonObject {
+                    put("action", action)
+                    put("automation", true)
+                    put("proactive", true)
+                    put("violations", JsonArray(violations.map(::JsonPrimitive)))
+                })
+            },
+        )
+
+        val immersedInitial = enforceImmersionOnFinalized(
+            candidate = initial,
+            candidateUsageContext = usageContext,
+        )
+        return ChatReplyContinuityGuard.enforce(
+            previous = scene,
+            userMessage = "",
+            initial = immersedInitial,
+            mode = ChatContinuityGuardMode.PROACTIVE,
+            contentOf = { candidate -> candidate.content.orEmpty().trim() },
+            retry = { repairHint ->
+                val repairUsageContext = usageContext.copy(action = TokenUsageAction.CHAT_REPAIR)
+                val finalized = finalizeRawCandidate(
+                    retryRaw(repairHint),
+                    repairUsageContext,
+                )
+                enforceImmersionOnFinalized(
+                    candidate = finalized,
+                    candidateUsageContext = repairUsageContext,
+                )
+            },
+            onEvent = { action, check ->
+                appendEvent("chat/continuity-guard", buildJsonObject {
+                    put("action", action)
+                    put("automation", true)
+                    put("proactive", true)
+                    put("location", scene.location)
+                    put("violation_count", check.violations.size)
+                })
+            },
+        )
+    }
 
     private suspend fun finalizeStyled(
         snapshot: LocalHarnessState,
