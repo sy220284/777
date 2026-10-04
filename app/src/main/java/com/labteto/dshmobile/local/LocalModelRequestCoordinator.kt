@@ -3,14 +3,12 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
 import com.labteto.dshmobile.harness.agent.AgentRequestExecutor
-import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
-import com.labteto.dshmobile.local.model.resolveLocalModelProtocol
 import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -41,6 +39,8 @@ internal class LocalModelRequestCoordinator(
     private val maxStreamPreviewChars: Int = 4_096,
     private val streamPreviewIntervalMs: Long = 50L,
 ) {
+    private val requestRuntime = LocalAgentModelRequestRuntime(modelGateway, resourceScheduler)
+
     suspend fun complete(
         snapshot: LocalHarnessState,
         messages: List<JsonObject>,
@@ -65,21 +65,11 @@ internal class LocalModelRequestCoordinator(
             snapshot.model,
             snapshot.baseUrl,
         )
+        val runSurface = frozenProfile.toRunModelSurface()
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
-        val resolvedProtocol = resolveLocalModelProtocol(
-            authKind = frozenProfile.authKind,
-            profile = frozenProfile,
-            model = frozenProfile.model,
-            baseUrl = frozenProfile.baseUrl,
-        )
-        val runtimeCapabilities = LocalModelPresets.runtimeCapabilitiesFor(
-            model = frozenProfile.model,
-            baseUrl = frozenProfile.baseUrl,
-            protocol = resolvedProtocol,
-            authKind = frozenProfile.authKind,
-        )
-        val routeFingerprint = frozenProfile.routeFingerprint()
-        val cachePolicy = runtimeCapabilities.promptCachePolicy
+        val runtimeCapabilities = runSurface.capabilities
+        val routeFingerprint = runSurface.routeFingerprint
+        val cachePolicy = runSurface.promptCachePolicy
         val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
             promptCacheBaselines.get(snapshot.sessionId, routeFingerprint)
         } else {
@@ -458,23 +448,21 @@ internal class LocalModelRequestCoordinator(
                             messages = activeMessages,
                             tools = tools,
                         ) {
-                            resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST) {
-                                try {
-                                    modelGateway.completeStreaming(
-                                        baseUrl = snapshot.baseUrl,
-                                        model = snapshot.model,
-                                        messages = activeMessages,
-                                        tools = tools,
-                                        temperature = temperature,
-                                        profile = frozenProfile,
-                                        promptCacheComparisonResponseId = cacheComparisonResponseId,
-                                        promptCacheKey = promptCacheKey,
-                                        promptCacheTtl = promptCacheTtl,
-                                        onDelta = { delta ->
-                                            val visible = streamFilter?.append(delta.content)?.text ?: delta.content
-                                            streamPreview.append(visible)
-                                        },
-                                    )
+                            try {
+                                requestRuntime.complete(
+                                    surface = runSurface,
+                                    messages = activeMessages,
+                                    tools = tools,
+                                    streaming = true,
+                                    temperature = temperature,
+                                    promptCacheComparisonResponseId = cacheComparisonResponseId,
+                                    promptCacheKey = promptCacheKey,
+                                    promptCacheTtl = promptCacheTtl,
+                                    onDelta = { delta ->
+                                        val visible = streamFilter?.append(delta.content)?.text ?: delta.content
+                                        streamPreview.append(visible)
+                                    },
+                                )
                                 } catch (cancelled: CancellationException) {
                                     val admission =
                                         (cancelled as? LocalModelCancellationException)?.admissionState
@@ -511,8 +499,7 @@ internal class LocalModelRequestCoordinator(
                                         }
                                     })
                                     throw error
-                                }
-                            }.also { reply ->
+                                }.also { reply ->
                                 streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
                                 streamPreview.flush()
                                 activePrefixAssessment?.let { cache ->
