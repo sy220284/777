@@ -12,7 +12,10 @@ import kotlinx.serialization.json.jsonPrimitive
  * schema. Legacy fields never participate in the current runtime after this conversion.
  */
 internal sealed interface PersonaDocumentImport {
-    data class Archive(val entry: PersonaGalleryEntry) : PersonaDocumentImport
+    data class Archive(
+        val entry: PersonaGalleryEntry,
+        val diaryEntries: List<ChatDiaryEntry> = emptyList(),
+    ) : PersonaDocumentImport
     data object Share : PersonaDocumentImport
 }
 
@@ -67,9 +70,10 @@ internal object PersonaSchemaMigration {
             .getOrElse { error -> throw IllegalArgumentException("人物迁移数据格式不正确", error) }
         val schema = explicitSchema(root)
         return when {
-            schema == 3 && "entry" in root -> PersonaDocumentImport.Archive(
-                PersonaTransferDocuments.decodeArchive(json, payload).entry,
-            )
+            (schema == 4 || schema == 3) && "entry" in root -> {
+                val archive = PersonaTransferDocuments.decodeArchive(json, payload)
+                PersonaDocumentImport.Archive(archive.entry, archive.diaryEntries)
+            }
             schema == 2 && "entry" in root -> PersonaDocumentImport.Archive(
                 decodeMixedArchive(json, payload),
             )
@@ -78,9 +82,8 @@ internal object PersonaSchemaMigration {
                 if (persona.hasLegacyPersonaFields()) {
                     PersonaDocumentImport.Archive(decodeMixedArchive(json, payload))
                 } else {
-                    PersonaDocumentImport.Archive(
-                        PersonaTransferDocuments.decodeArchive(json, payload).entry,
-                    )
+                    val archive = PersonaTransferDocuments.decodeArchive(json, payload)
+                    PersonaDocumentImport.Archive(archive.entry, archive.diaryEntries)
                 }
             }
             (schema == 2 || schema == 1 || schema == null) && "persona" in root ->
