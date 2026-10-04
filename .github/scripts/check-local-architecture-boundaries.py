@@ -294,6 +294,7 @@ feature_navigation = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureNavigation.kt")
 )
 for required_feature_owner in (
+    "LocalFeatureModuleId.SHELL",
     "LocalFeatureModuleId.CHAT",
     "LocalFeatureModuleId.WORK",
     "LocalFeatureModuleId.AUTOMATION",
@@ -302,6 +303,14 @@ for required_feature_owner in (
 ):
     if required_feature_owner not in feature_catalog:
         die(f"Architecture 3.0 feature catalog is missing owner: {required_feature_owner}")
+for forbidden_catalog_mutation in (
+    "fun register(",
+    "fun unregister(",
+    "fun addModule(",
+    "fun removeModule(",
+):
+    if forbidden_catalog_mutation in feature_catalog:
+        die("Architecture 3.0 product Feature catalog must remain immutable after composition")
 if "check(put(route, module.id) == null)" not in feature_catalog:
     die("feature catalog must reject duplicate subfeature route ownership")
 if "ownerByRoute.keys == LocalFeatureRoute.entries.toSet()" not in feature_catalog:
