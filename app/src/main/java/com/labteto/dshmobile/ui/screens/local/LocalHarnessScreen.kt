@@ -310,7 +310,6 @@ fun LocalHarnessScreen(
                 groupChatEnabled = shell.groupChat.enabled,
                 running = shell.running,
                 onUsageModeChange = {
-                    resetFeatureNavigation()
                     switchUsageMode(it)
                 },
                 onNewSession = {
