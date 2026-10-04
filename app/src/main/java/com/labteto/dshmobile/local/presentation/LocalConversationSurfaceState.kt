@@ -95,7 +95,7 @@ internal fun LocalHarnessState.toWorkSurfaceUiState(): LocalConversationSurfaceS
         model = model,
         baseUrl = baseUrl,
         modelProfiles = modelProfiles,
-        planMode = planMode,
+        planMode = work.planMode,
         safeAutoApprovalEnabled = safeAutoApprovalEnabled,
         deviceApprovalLease = deviceApprovalLease,
         queuedInputCount = queuedInputCount,
