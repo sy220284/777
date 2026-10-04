@@ -3,8 +3,8 @@ package com.labteto.dshmobile.local.automation
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.local.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalAgentModelRequestRuntime
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
-import com.labteto.dshmobile.local.executeWithModelAdmission
 import com.labteto.dshmobile.local.toRunModelSurface
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
@@ -71,6 +71,7 @@ class AutomationPlanningService @Inject constructor(
     private val json: Json,
 ) {
     private val modelStepRuntime = LocalAgentModelStepRuntime()
+    private val requestRuntime = LocalAgentModelRequestRuntime(modelGateway)
     internal suspend fun plan(input: String): AutomationPlanDraft {
         val context = runtime.planningContext()
         validateContext(context)
@@ -168,24 +169,12 @@ class AutomationPlanningService @Inject constructor(
                     ?: (750L shl (failedAttempt - 1).coerceIn(0, 10))
             },
         ) { activeMessages ->
-            executeWithModelAdmission(
-                control = null,
-                routeFingerprint = surface.routeFingerprint,
-                model = surface.model,
-                baseUrl = surface.baseUrl,
-                contextWindowTokensOverride = surface.contextWindowTokensOverride,
+            requestRuntime.complete(
+                surface = surface,
                 messages = activeMessages,
                 tools = JsonArray(emptyList()),
-            ) {
-                modelGateway.complete(
-                    model = surface.model,
-                    baseUrl = surface.baseUrl,
-                    messages = activeMessages,
-                    tools = JsonArray(emptyList()),
-                    temperature = 0.35,
-                    profile = surface.profile,
-                )
-            }
+                temperature = 0.35,
+            )
         }
         withContext(Dispatchers.IO) {
             usageTracker.record(
