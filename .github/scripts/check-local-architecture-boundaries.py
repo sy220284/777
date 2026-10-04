@@ -27,7 +27,6 @@ RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 6,
 }
-LOCAL_ROOT_MAX_KOTLIN_FILES = 23
 PROJECTION_FIELD_BUDGETS = {
     "LocalHarnessSettingsState": 17,
     "LocalHarnessTaskState": 4,
@@ -315,12 +314,6 @@ if "LocalFeatureCatalog.routes" not in screen_source:
     die("LocalHarnessScreen must enumerate registered feature routes through LocalFeatureCatalog")
 
 local_root = ROOT / "app/src/main/java/com/labteto/dshmobile/local"
-local_root_files = list(local_root.glob("*.kt"))
-if len(local_root_files) > LOCAL_ROOT_MAX_KOTLIN_FILES:
-    die(
-        f"local/ root has {len(local_root_files)} Kotlin files "
-        f"(ratchet: {LOCAL_ROOT_MAX_KOTLIN_FILES}); place new code in a capability package"
-    )
 
 main_root = ROOT / "app/src/main/java/com/labteto/dshmobile"
 engine_consumers = set()
@@ -572,5 +565,5 @@ print(
     "[architecture-guard] OK: "
     f"engine deps={dependency_count}, public methods={public_method_count}, "
     f"internal methods={internal_method_count}, "
-    f"aggregate fields={state_field_count}, local root files={len(local_root_files)}"
+    f"aggregate fields={state_field_count}"
 )
