@@ -72,13 +72,13 @@ data class LocalHarnessShellState(
 internal fun LocalHarnessState.toSettingsUiState(): LocalHarnessSettingsState =
     LocalHarnessSettingsState(
         loading = loading,
-        model = model,
-        baseUrl = baseUrl,
-        modelSelection = modelSelection,
+        model = modelState.model,
+        baseUrl = modelState.baseUrl,
+        modelSelection = modelState.modelSelection,
         mainMaxSteps = mainMaxSteps,
         subagentMaxSteps = subagentMaxSteps,
-        modelAttempts = modelAttempts,
-        imageInputMode = imageInputMode,
+        modelAttempts = modelState.modelAttempts,
+        imageInputMode = modelState.imageInputMode,
         userRules = userRules,
         autoRecall = autoRecall,
         autoMemory = autoMemory,
