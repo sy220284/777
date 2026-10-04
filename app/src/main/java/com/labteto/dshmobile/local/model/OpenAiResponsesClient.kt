@@ -534,14 +534,19 @@ class OpenAiResponsesClient @Inject constructor(
         if (usage == null) return DeepSeekTokenUsage(reported = false)
         val input = usage["input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L
         val output = usage["output_tokens"]?.jsonPrimitive?.longOrNull ?: 0L
-        val cached = (usage["input_tokens_details"] as? JsonObject)
+        val inputDetails = usage["input_tokens_details"] as? JsonObject
+        val cached = inputDetails
             ?.get("cached_tokens")?.jsonPrimitive?.longOrNull ?: 0L
+        val cacheWrite = inputDetails
+            ?.get("cache_write_tokens")?.jsonPrimitive?.longOrNull ?: 0L
         val reasoning = (usage["output_tokens_details"] as? JsonObject)
             ?.get("reasoning_tokens")?.jsonPrimitive?.longOrNull ?: 0L
         return DeepSeekTokenUsage(
             promptTokens = input.coerceAtLeast(0L),
             cacheHitTokens = cached.coerceAtLeast(0L),
             cacheMissTokens = (input - cached).coerceAtLeast(0L),
+            cacheWriteTokens = cacheWrite.coerceAtLeast(0L)
+                .coerceAtMost((input - cached).coerceAtLeast(0L)),
             completionTokens = output.coerceAtLeast(0L),
             reasoningTokens = reasoning.coerceAtLeast(0L),
             reported = true,

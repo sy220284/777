@@ -68,6 +68,13 @@ internal class ChatDiaryStore(
             candidate.also(entries::add)
         }
 
+        entries.indices.forEach { index ->
+            val existing = entries[index]
+            if (existing.id != saved.id && ChatDiarySupersessionPolicy.supersedes(existing, saved)) {
+                entries[index] = existing.copy(supersededBy = saved.id)
+            }
+        }
+
         documents.write(
             ChatDiaryDocument(
                 entries = ChatDiaryEntryPolicy.compact(
@@ -86,47 +93,14 @@ internal class ChatDiaryStore(
         subjectKey: String,
         groupAudience: Boolean,
         maxItems: Int,
-    ): List<ChatDiaryEntry> {
-        val cleanSubject = subjectKey.trim()
-        if (cleanSubject.isBlank()) return emptyList()
-        val queryCore = ChatDiaryEntryPolicy.normalizeQuery(query)
-        val queryTerms = ChatDiaryEntryPolicy.queryTerms(query)
-        val broad = isExplicitDiaryRecall(query)
-        val now = System.currentTimeMillis()
-
-        val eligible = documents.read().entries.asSequence()
-            .filter { entry ->
-                entry.active &&
-                    entry.subjectKey == cleanSubject &&
-                    (!groupAudience || entry.disclosure != ChatDiaryDisclosure.PRIVATE)
-            }
-            .toList()
-        val candidates = if (broad || eligible.size <= MAX_NORMAL_RECALL_CANDIDATES) {
-            eligible
-        } else {
-            val recent = eligible.sortedByDescending(ChatDiaryEntry::updatedAt)
-                .take(MAX_NORMAL_RECALL_CANDIDATES)
-            val important = eligible.asSequence()
-                .filter { it.importance >= IMPORTANT_RECALL_THRESHOLD }
-                .sortedByDescending(ChatDiaryEntry::updatedAt)
-                .take(MAX_IMPORTANT_RECALL_CANDIDATES)
-                .toList()
-            (recent + important).distinctBy(ChatDiaryEntry::id)
-        }
-
-        return candidates.asSequence()
-            .map { entry ->
-                entry to ChatDiaryEntryPolicy.matchScore(entry, queryCore, queryTerms, now)
-            }
-            .filter { (_, score) -> ChatDiaryRecallMatchPolicy.isRecallMatch(score, broad, query) }
-            .sortedWith(
-                compareByDescending<Pair<ChatDiaryEntry, ChatDiaryMatchScore>> { it.second.total }
-                    .thenByDescending { it.first.updatedAt },
-            )
-            .map(Pair<ChatDiaryEntry, ChatDiaryMatchScore>::first)
-            .take(maxItems.coerceIn(1, 6))
-            .toList()
-    }
+    ): List<ChatDiaryEntry> =
+        ChatDiaryRecallEngine.search(
+            entries = documents.read().entries,
+            query = query,
+            subjectKey = subjectKey,
+            groupAudience = groupAudience,
+            maxItems = maxItems,
+        )
 
     @Synchronized
     fun rollbackSourceSessionFrom(
@@ -166,7 +140,9 @@ internal class ChatDiaryStore(
                 changed++
             }
         }
-        if (changed > 0) documents.write(ChatDiaryDocument(entries = entries))
+        if (changed > 0) {
+            documents.write(ChatDiaryDocument(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
+        }
         return changed
     }
 
@@ -197,7 +173,9 @@ internal class ChatDiaryStore(
                 changed++
             }
         }
-        if (changed > 0) documents.write(ChatDiaryDocument(entries = entries))
+        if (changed > 0) {
+            documents.write(ChatDiaryDocument(entries = ChatDiarySupersessionPolicy.repairLinks(entries)))
+        }
         return changed
     }
 
@@ -209,9 +187,4 @@ internal class ChatDiaryStore(
             .take(limit.coerceIn(1, MAX_CHAT_DIARY_ENTRIES))
             .toList()
 
-    private companion object {
-        const val MAX_NORMAL_RECALL_CANDIDATES = 256
-        const val MAX_IMPORTANT_RECALL_CANDIDATES = 64
-        const val IMPORTANT_RECALL_THRESHOLD = 4
-    }
 }

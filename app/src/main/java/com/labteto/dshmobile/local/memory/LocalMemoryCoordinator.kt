@@ -5,7 +5,8 @@ import com.labteto.dshmobile.local.chat.ChatMemorySelector
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.chatLongTermMemoryBudget
 import com.labteto.dshmobile.local.chat.diaryRecallUsageInstruction
-import com.labteto.dshmobile.local.chat.shouldRecallDiary
+import com.labteto.dshmobile.local.chat.diaryRecallItemLimit
+import com.labteto.dshmobile.local.chat.shouldSearchDiary
 import com.labteto.dshmobile.local.chat.takeWithinModelTokenBudget
 import com.labteto.dshmobile.local.chat.isUnboundChatPersona
 import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
@@ -112,9 +113,9 @@ internal class LocalMemoryCoordinator(
         if (subjectKey.isNullOrBlank()) return ""
         if (viewerSubjectKey == null && snapshot.chatPersona.isUnboundChatPersona()) return ""
 
-        val recallFacts = !groupAudience && ChatMemorySelector.shouldRecall(query)
-        val recallDiary = shouldRecallDiary(query)
-        if (!recallFacts && !recallDiary) return ""
+        val recallFacts = ChatMemorySelector.shouldRecall(query)
+        val searchDiary = shouldSearchDiary(query)
+        if (!recallFacts && !searchDiary) return ""
 
         val subjectLabel = viewerName?.trim()?.takeIf(String::isNotBlank)
             ?: snapshot.chatPersona.name
@@ -152,7 +153,13 @@ internal class LocalMemoryCoordinator(
             if (recalled.isNotEmpty()) {
                 blocks += takeWithinModelTokenBudget(
                     buildString {
-                        appendLine("【本轮相关长期事实】仅用于补足当前输入缺失的信息。")
+                        appendLine(
+                            if (groupAudience) {
+                                "【本轮相关精确事实｜允许带入群聊】这些是已有事实记忆，可自然用于当前角色在群聊中的判断和表达。"
+                            } else {
+                                "【本轮相关长期事实】仅用于补足当前输入缺失的信息。"
+                            },
+                        )
                         recalled.forEach { appendLine("- ${it.content}") }
                     }.trim(),
                     budget.factTokens,
@@ -160,16 +167,12 @@ internal class LocalMemoryCoordinator(
             }
         }
 
-        if (recallDiary) {
+        if (searchDiary) {
             val diary = diaryStore.search(
                 query = query,
                 subjectKey = subjectKey,
                 groupAudience = groupAudience,
-                maxItems = when {
-                    budget.diaryTokens <= 500 -> 1
-                    budget.diaryTokens <= 900 -> 2
-                    else -> 3
-                },
+                maxItems = diaryRecallItemLimit(query),
             )
             if (diary.isNotEmpty()) {
                 blocks += takeWithinModelTokenBudget(

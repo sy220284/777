@@ -171,6 +171,36 @@ for relative, maximum in LINE_BUDGETS.items():
         die(f"{relative} grew to {lines} lines (ratchet: {maximum}); move the new responsibility out")
     print(f"[architecture-guard] {relative}: {lines}/{maximum} lines")
 
+# Diary privacy is a security/knowledge-boundary invariant, not a tuning preference.
+# Group prompts may receive PUBLIC diary entries only. Do not relax this to "anything except PRIVATE"
+# and do not bypass the central policy with a second group-memory path.
+diary_recall_policy = read(
+    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryRecallPolicy.kt"
+)
+diary_recall_engine = read(
+    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryRecallEngine.kt"
+)
+if (
+    "disclosure == ChatDiaryDisclosure.PUBLIC" not in diary_recall_policy
+    or "canExposeDiaryToGroup(entry.disclosure)" not in diary_recall_engine
+):
+    die("group diary recall must stay centralized and PUBLIC-only")
+if "!= ChatDiaryDisclosure.PRIVATE" in diary_recall_engine:
+    die("group diary recall must not regress to the old non-private shortcut")
+if (
+    "crossScopeAdmissible" in diary_recall_engine
+    or "crossScopeAdmissible" in diary_recall_policy
+):
+    die("legacy cross-scope diary bypass must not return")
+
+memory_coordinator = read(
+    "app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt"
+)
+if "val recallFacts = ChatMemorySelector.shouldRecall(query)" not in memory_coordinator:
+    die("precise chat facts must remain recallable in both direct and group chat")
+if "!groupAudience && ChatMemorySelector.shouldRecall(query)" in memory_coordinator:
+    die("group chat must not disable precise fact recall")
+
 engine_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
 engine = read(engine_path)
 constructor = re.search(

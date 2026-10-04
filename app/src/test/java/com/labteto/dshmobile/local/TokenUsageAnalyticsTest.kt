@@ -22,6 +22,7 @@ class TokenUsageAnalyticsTest {
                 output = 20,
                 hit = 60,
                 miss = 40,
+                write = 15,
                 reasoning = 10,
                 context = TokenUsageContext(
                     mode = LocalUsageMode.CHAT,
@@ -124,6 +125,7 @@ class TokenUsageAnalyticsTest {
 
         // Cache and reasoning are diagnostic subdivisions and must never inflate totalTokens.
         assertEquals(60L, snapshot.tracked.cacheHitTokens)
+        assertEquals(15L, snapshot.tracked.cacheWriteTokens)
         assertEquals(10L, snapshot.tracked.reasoningTokens)
         assertEquals(1, snapshot.days.size)
     }
@@ -190,6 +192,7 @@ class TokenUsageAnalyticsTest {
         output: Long,
         hit: Long = 0,
         miss: Long = input - hit,
+        write: Long = 0,
         reasoning: Long = 0,
         context: TokenUsageContext,
     ) = TokenUsageRecord(
@@ -200,6 +203,7 @@ class TokenUsageAnalyticsTest {
         inputTokens = input,
         cacheHitTokens = hit,
         cacheMissTokens = miss,
+        cacheWriteTokens = write,
         outputTokens = output,
         reasoningTokens = reasoning,
         reported = true,
@@ -286,6 +290,7 @@ class TokenUsageAnalyticsTest {
                     inputTokens = -5L,
                     cacheHitTokens = -2L,
                     cacheMissTokens = -3L,
+                    cacheWriteTokens = -4L,
                     outputTokens = -7L,
                     reasoningTokens = -1L,
                     estimatedCostCny = Double.NaN,
@@ -297,6 +302,7 @@ class TokenUsageAnalyticsTest {
 
         assertEquals(0L, snapshot.tracked.totalTokens)
         assertEquals(0L, snapshot.tracked.cacheMeasuredTokens)
+        assertEquals(0L, snapshot.tracked.cacheWriteTokens)
         assertEquals(0.0, snapshot.tracked.estimatedCostCny, 0.0)
     }
 
@@ -323,6 +329,7 @@ class TokenUsageAnalyticsTest {
             """{"requestId":"legacy","timestamp":1,"model":"model"}""",
         )
         assertEquals(null, legacy.route)
+        assertEquals(0L, legacy.cacheWriteTokens)
 
         val route = LocalModelRouteIdentity(
             profileId = "profile-a",

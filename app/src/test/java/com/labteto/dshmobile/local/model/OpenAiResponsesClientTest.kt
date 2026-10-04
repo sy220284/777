@@ -102,7 +102,7 @@ class OpenAiResponsesClientTest {
     @Test
     fun completedEventSettlesBeforeTrailingTransportResetAndKeepsReportedUsage() = runBlocking {
         val terminalFrame =
-            """data: {"type":"response.completed","response":{"id":"resp-terminal","output":[{"type":"message","content":[{"type":"output_text","text":"完成"}]}],"usage":{"input_tokens":7,"output_tokens":3}}}""" + "\n"
+            """data: {"type":"response.completed","response":{"id":"resp-terminal","output":[{"type":"message","content":[{"type":"output_text","text":"完成"}]}],"usage":{"input_tokens":7,"input_tokens_details":{"cached_tokens":4,"cache_write_tokens":2},"output_tokens":3}}}""" + "\n"
         val bytes = Buffer().writeUtf8(terminalFrame)
         var sourceReads = 0
         var sourceCloses = 0
@@ -156,6 +156,9 @@ class OpenAiResponsesClientTest {
         assertEquals("完成", reply.content)
         assertTrue(reply.usage.reported)
         assertEquals(7L, reply.usage.promptTokens)
+        assertEquals(4L, reply.usage.cacheHitTokens)
+        assertEquals(3L, reply.usage.cacheMissTokens)
+        assertEquals(2L, reply.usage.cacheWriteTokens)
         assertEquals(3L, reply.usage.completionTokens)
         assertEquals(1, sourceReads)
         assertEquals(1, sourceCloses)

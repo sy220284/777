@@ -171,7 +171,7 @@ internal fun ChatPersonaPickerDialog(
                     style = DsType.base16Strong.withReadingWeight(),
                     color = colors.labelPrimary,
                 )
-                currentPersona.identity.takeIf(String::isNotBlank)?.let {
+                currentPersona.portrait.takeIf(String::isNotBlank)?.let {
                     Text(it, style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }
             }
@@ -224,7 +224,7 @@ internal fun ChatPersonaPickerDialog(
                                 style = DsType.std14.withReadingWeight(),
                                 color = colors.labelPrimary,
                             )
-                            val subtitle = entry.persona.identity
+                            val subtitle = entry.persona.portrait
                                 .ifBlank { entry.persona.worldSetting }
                                 .ifBlank { stringResource(R.string.local_persona_picker_saved_hint) }
                             Text(
@@ -400,24 +400,22 @@ internal fun ChatPersonaDialog(
 ) {
     var runtimeProfile by remember(profile.id, profile.updatedAt) { mutableStateOf(profile) }
     var name by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.name) }
-    var identity by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.identity) }
-    var background by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.background) }
-    var personality by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.personality) }
-    var speechStyle by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.speechStyle) }
-    var relationship by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.relationship) }
+    var portrait by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.portrait) }
+    var lifeContext by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.lifeContext) }
+    var attention by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.attentionBiases.joinToString("\n")) }
+    var blindSpots by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.perceptionBlindSpots.joinToString("\n")) }
+    var quirks by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.quirks.joinToString("\n")) }
+    var limitations by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.limitations.joinToString("\n")) }
+    var coreValues by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreValues.joinToString("\n")) }
+    var coreTension by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.coreTension) }
+    var stableTraits by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.stableTraits.joinToString("\n")) }
+    var mutableTraits by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.mutableTraits.joinToString("\n")) }
+    var initialUserImpression by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.initialUserImpression) }
+    var voiceSamples by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.voiceSamples.joinToString("\n")) }
     var worldSetting by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.worldSetting) }
-    var constraints by rememberSaveable(profile.id, profile.updatedAt) {
-        mutableStateOf(profile.hardConstraints.joinToString("\n"))
-    }
-    var examples by rememberSaveable(profile.id, profile.updatedAt) {
-        mutableStateOf(profile.exampleDialogues.joinToString("\n"))
-    }
-    var banned by rememberSaveable(profile.id, profile.updatedAt) {
-        mutableStateOf(profile.bannedPhrases.joinToString("\n"))
-    }
-    var signature by rememberSaveable(profile.id, profile.updatedAt) {
-        mutableStateOf(profile.signaturePhrases.joinToString("\n"))
-    }
+    var constraints by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.hardConstraints.joinToString("\n")) }
+    var banned by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.bannedPhrases.joinToString("\n")) }
+    var corrections by rememberSaveable(profile.id, profile.updatedAt) { mutableStateOf(profile.corrections.joinToString("\n")) }
     var aiDescription by rememberSaveable(profile.id) { mutableStateOf("") }
     var aiGenerating by remember(profile.id) { mutableStateOf(false) }
     var saving by remember(profile.id) { mutableStateOf(false) }
@@ -425,9 +423,6 @@ internal fun ChatPersonaDialog(
     var aiSucceeded by remember(profile.id) { mutableStateOf(false) }
     var aiError by remember(profile.id) { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
-    var corrections by rememberSaveable(profile.id, profile.updatedAt) {
-        mutableStateOf(profile.corrections.joinToString("\n"))
-    }
 
     fun lines(value: String): List<String> = value.lineSequence()
         .map(String::trim)
@@ -437,21 +432,27 @@ internal fun ChatPersonaDialog(
     fun applyGenerated(generated: PersonaProfile) {
         runtimeProfile = generated
         name = generated.name
-        identity = generated.identity
-        background = generated.background
-        personality = generated.personality
-        speechStyle = generated.speechStyle
-        relationship = generated.relationship
+        portrait = generated.portrait
+        lifeContext = generated.lifeContext
+        attention = generated.attentionBiases.joinToString("\n")
+        blindSpots = generated.perceptionBlindSpots.joinToString("\n")
+        quirks = generated.quirks.joinToString("\n")
+        limitations = generated.limitations.joinToString("\n")
+        coreValues = generated.coreValues.joinToString("\n")
+        coreTension = generated.coreTension
+        stableTraits = generated.stableTraits.joinToString("\n")
+        mutableTraits = generated.mutableTraits.joinToString("\n")
+        initialUserImpression = generated.initialUserImpression
+        voiceSamples = generated.voiceSamples.joinToString("\n")
         worldSetting = generated.worldSetting
         constraints = generated.hardConstraints.joinToString("\n")
-        examples = generated.exampleDialogues.joinToString("\n")
         banned = generated.bannedPhrases.joinToString("\n")
-        signature = generated.signaturePhrases.joinToString("\n")
+        corrections = generated.corrections.joinToString("\n")
     }
 
     DsDialog(title = stringResource(R.string.local_persona_title), onDismiss = onDismiss) {
         Text(
-            stringResource(R.string.local_persona_intro),
+            stringResource(R.string.local_persona_intro_v3),
             style = DsType.small13.withReadingWeight(),
             color = DsTheme.colors.labelSecondary,
         )
@@ -480,7 +481,7 @@ internal fun ChatPersonaDialog(
                     onValueChange = { aiDescription = it },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.local_persona_ai_description)) },
-                    placeholder = { Text(stringResource(R.string.local_persona_ai_example)) },
+                    placeholder = { Text(stringResource(R.string.local_persona_ai_example_v3)) },
                     minLines = 2,
                     maxLines = 5,
                     enabled = !aiGenerating,
@@ -531,51 +532,58 @@ internal fun ChatPersonaDialog(
                         "persona_autofill_failed" -> stringResource(R.string.local_persona_ai_failed)
                         else -> error
                     }
-                    Text(
-                        message,
-                        style = DsType.caption11.withReadingWeight(),
-                        color = DsTheme.colors.error,
-                    )
+                    Text(message, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error)
                 }
             }
         }
 
         PersonaTextField(stringResource(R.string.local_persona_name), name, { name = it }, singleLine = true)
-        PersonaTextField(stringResource(R.string.local_persona_identity), identity, { identity = it })
-        PersonaTextField(stringResource(R.string.local_persona_background), background, { background = it })
-        PersonaTextField(stringResource(R.string.local_persona_personality), personality, { personality = it })
-        PersonaTextField(stringResource(R.string.local_persona_speech_style), speechStyle, { speechStyle = it })
-        PersonaTextField(stringResource(R.string.local_persona_relationship), relationship, { relationship = it })
+        PersonaTextField(stringResource(R.string.local_persona_portrait), portrait, { portrait = it })
+        PersonaTextField(stringResource(R.string.local_persona_life_context), lifeContext, { lifeContext = it })
+        PersonaTextField(stringResource(R.string.local_persona_attention), attention, { attention = it })
+        PersonaTextField(stringResource(R.string.local_persona_blind_spots), blindSpots, { blindSpots = it })
+        PersonaTextField(stringResource(R.string.local_persona_quirks), quirks, { quirks = it })
+        PersonaTextField(stringResource(R.string.local_persona_limitations), limitations, { limitations = it })
+        PersonaTextField(stringResource(R.string.local_persona_core_values), coreValues, { coreValues = it })
+        PersonaTextField(stringResource(R.string.local_persona_core_tension), coreTension, { coreTension = it })
+        PersonaTextField(stringResource(R.string.local_persona_stable_traits), stableTraits, { stableTraits = it })
+        PersonaTextField(stringResource(R.string.local_persona_mutable_traits), mutableTraits, { mutableTraits = it })
+        PersonaTextField(stringResource(R.string.local_persona_user_impression), initialUserImpression, { initialUserImpression = it })
+        PersonaTextField(stringResource(R.string.local_persona_voice_samples), voiceSamples, { voiceSamples = it })
         PersonaTextField(stringResource(R.string.local_persona_world_setting), worldSetting, { worldSetting = it })
         PersonaTextField(stringResource(R.string.local_persona_constraints), constraints, { constraints = it })
-        PersonaTextField(stringResource(R.string.local_persona_examples), examples, { examples = it })
         PersonaTextField(stringResource(R.string.local_persona_banned), banned, { banned = it })
-        PersonaTextField(stringResource(R.string.local_persona_signature), signature, { signature = it })
-        PersonaTextField(
-            stringResource(R.string.local_persona_corrections),
-            corrections,
-            { corrections = it },
-        )
+        PersonaTextField(stringResource(R.string.local_persona_corrections), corrections, { corrections = it })
+
         DsButton(
             text = stringResource(R.string.local_persona_save),
             onClick = {
                 saving = true
                 saveError = null
                 coroutineScope.launch {
-                    val result = runCatching { onSave(runtimeProfile.copy(
-                        name = name,
-                        identity = identity,
-                        background = background,
-                        personality = personality,
-                        speechStyle = speechStyle,
-                        relationship = relationship,
-                        worldSetting = worldSetting,
-                        hardConstraints = lines(constraints),
-                        exampleDialogues = lines(examples),
-                        bannedPhrases = lines(banned),
-                        signaturePhrases = lines(signature),
-                        corrections = lines(corrections),
-                    )) }.getOrElse { Result.failure(it) }
+                    val result = runCatching {
+                        onSave(
+                            runtimeProfile.copy(
+                                name = name,
+                                portrait = portrait,
+                                lifeContext = lifeContext,
+                                attentionBiases = lines(attention),
+                                perceptionBlindSpots = lines(blindSpots),
+                                quirks = lines(quirks),
+                                limitations = lines(limitations),
+                                coreValues = lines(coreValues),
+                                coreTension = coreTension,
+                                stableTraits = lines(stableTraits),
+                                mutableTraits = lines(mutableTraits),
+                                initialUserImpression = initialUserImpression,
+                                voiceSamples = lines(voiceSamples),
+                                worldSetting = worldSetting,
+                                hardConstraints = lines(constraints),
+                                bannedPhrases = lines(banned),
+                                corrections = lines(corrections),
+                            ),
+                        )
+                    }.getOrElse { Result.failure(it) }
                     result.onSuccess { onDismiss() }
                         .onFailure { saveError = it.message ?: "保存失败" }
                     saving = false
@@ -587,7 +595,6 @@ internal fun ChatPersonaDialog(
         saveError?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
     }
 }
-
 
 @Composable
 private fun PersonaTextField(

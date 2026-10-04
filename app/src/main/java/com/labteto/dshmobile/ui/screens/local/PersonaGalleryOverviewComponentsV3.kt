@@ -117,7 +117,7 @@ internal fun PersonaGalleryDetailHeaderV3(
             imageHeight = portrait?.height ?: 0,
         )
     }
-    val subtitle = entry.persona.identity.ifBlank { relationSummary }
+    val subtitle = entry.persona.portrait.ifBlank { relationSummary }
 
     if (portraitActionsOpen && entry.portraitPath.isNotBlank()) {
         DsBottomSheet(
@@ -237,7 +237,7 @@ internal fun PersonaGalleryDetailHeaderV3(
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
                 )
-                if (entry.persona.identity.isNotBlank()) {
+                if (entry.persona.portrait.isNotBlank()) {
                     Text(
                         relationSummary,
                         style = DsType.caption11.withReadingWeight(),
@@ -490,7 +490,7 @@ internal fun CompactPersonaRow(
                     }
                 }
                 Text(
-                    entry.persona.identity.ifBlank {
+                    entry.persona.portrait.ifBlank {
                         stringResource(
                             R.string.persona_gallery_compact_meta,
                             entry.stories.size,

@@ -10,6 +10,8 @@ data class MemoryCandidate(
     val kind: MemoryKind,
     val importance: Int,
     val subjectKey: String? = null,
+    val disclosure: MemoryDisclosure = MemoryDisclosure.SHAREABLE,
+    val disclosureExplicit: Boolean = false,
 )
 
 @Singleton
@@ -23,7 +25,6 @@ class MemoryPolicy @Inject constructor() {
         if (clean.length !in MIN_CHARS..MAX_SOURCE_CHARS) return null
         if (clean.endsWith("?") || clean.endsWith("？")) return null
         if (containsSensitiveData(clean)) return null
-
         PROJECT_RULE.matchEntire(clean)?.let { match ->
             if (projectId == null || mode == LocalConversationMode.INDEPENDENT) return null
             val body = match.groupValues[2].trim().take(MAX_MEMORY_CHARS)
@@ -78,12 +79,14 @@ class MemoryPolicy @Inject constructor() {
     fun extractChatRelationshipFact(
         text: String,
         subjectLabel: String? = null,
+        groupAudience: Boolean = false,
     ): MemoryCandidate? {
         val raw = text.trim()
         val clean = REMEMBER.matchEntire(raw)?.groupValues?.getOrNull(1)?.trim() ?: raw
         if (clean.length !in MIN_CHARS..MAX_SOURCE_CHARS) return null
         if (clean.endsWith("?") || clean.endsWith("？")) return null
         if (containsSensitiveData(clean)) return null
+        val disclosure = chatDisclosure(clean, groupAudience)
 
         NAMED_RELATIONSHIP_STATE.matchEntire(clean)?.let { match ->
             val person = match.groupValues[1].trim()
@@ -94,6 +97,8 @@ class MemoryPolicy @Inject constructor() {
                     scope = MemoryScope.GLOBAL,
                     kind = MemoryKind.RELATIONSHIP_STATE,
                     importance = 86,
+                        disclosure = disclosure.first,
+                        disclosureExplicit = disclosure.second,
                 )
             }
         }
@@ -108,6 +113,8 @@ class MemoryPolicy @Inject constructor() {
                         scope = MemoryScope.GLOBAL,
                         kind = MemoryKind.RELATIONSHIP_STATE,
                         importance = 86,
+                        disclosure = disclosure.first,
+                        disclosureExplicit = disclosure.second,
                     )
                 } else {
                     MemoryCandidate(
@@ -115,6 +122,8 @@ class MemoryPolicy @Inject constructor() {
                         scope = MemoryScope.LINEAGE,
                         kind = MemoryKind.RELATIONSHIP_STATE,
                         importance = 82,
+                        disclosure = disclosure.first,
+                        disclosureExplicit = disclosure.second,
                     )
                 }
             }
@@ -129,6 +138,8 @@ class MemoryPolicy @Inject constructor() {
                     scope = MemoryScope.GLOBAL,
                     kind = MemoryKind.RELATIONSHIP_FACT,
                     importance = 88,
+                        disclosure = disclosure.first,
+                        disclosureExplicit = disclosure.second,
                 )
             }
         }
@@ -139,6 +150,8 @@ class MemoryPolicy @Inject constructor() {
                 scope = MemoryScope.GLOBAL,
                 kind = MemoryKind.RELATIONSHIP_PREFERENCE,
                 importance = 84,
+                        disclosure = disclosure.first,
+                        disclosureExplicit = disclosure.second,
             )
         }
 
@@ -148,10 +161,26 @@ class MemoryPolicy @Inject constructor() {
                 scope = MemoryScope.LINEAGE,
                 kind = MemoryKind.RELATIONSHIP_FACT,
                 importance = 78,
+                        disclosure = disclosure.first,
+                        disclosureExplicit = disclosure.second,
             )
         }
 
         return null
+    }
+
+    private fun chatDisclosure(
+        text: String,
+        groupAudience: Boolean,
+    ): Pair<MemoryDisclosure, Boolean> {
+        if (groupAudience) return MemoryDisclosure.PUBLIC to true
+        val privacy = PRIVACY_SIGNAL.findAll(text).lastOrNull()?.range?.first ?: -1
+        val public = PUBLIC_TO_GROUP_SIGNAL.findAll(text).lastOrNull()?.range?.first ?: -1
+        return when {
+            privacy < 0 && public < 0 -> MemoryDisclosure.SHAREABLE to false
+            public > privacy -> MemoryDisclosure.PUBLIC to true
+            else -> MemoryDisclosure.PRIVATE to true
+        }
     }
 
     private fun normalizeRelationshipState(raw: String): String =
@@ -210,6 +239,12 @@ class MemoryPolicy @Inject constructor() {
             setOf(RegexOption.DOT_MATCHES_ALL),
         )
         val GLOBAL_HINT = Regex("""全局|所有项目|任何项目|所有对话|任何对话|每个项目""")
+        val PRIVACY_SIGNAL = Regex(
+            """(?:别告诉|不要告诉|别跟.{0,40}说|不要跟.{0,40}说|(?<!不用)(?<!不必)保密|只告诉你|只跟你说|别让.{0,40}知道|不要公开|别公开|只能你知道)""",
+        )
+        val PUBLIC_TO_GROUP_SIGNAL = Regex(
+            """(?:可以告诉大家|可以跟大家说|可以和大家说|群里可以说|群里可以提|可以公开|公开说|不用保密|不必保密|可以让别人知道|可以带到群里)""",
+        )
         val RULE_HINT = Regex("""以后|后续|禁止|必须|只能|只用|一律|统一|默认|不要|不得|需要|要求""")
         val DECISION_HINT = Regex("""采用|确定|改为|切换为|发布|构建|架构|方案""")
         val SECRET_AFTER_LABEL = Regex(

@@ -29,6 +29,8 @@ class MemoryStore internal constructor(
         sourceSessionId: String? = null,
         sourceMessageId: String? = null,
         subjectKey: String? = null,
+        disclosure: MemoryDisclosure = MemoryDisclosure.SHAREABLE,
+        disclosureExplicit: Boolean = false,
         importance: Int = 50,
         pinned: Boolean = false,
         replaceIds: Set<String> = emptySet(),
@@ -49,12 +51,13 @@ class MemoryStore internal constructor(
                 it.content.equals(clean, ignoreCase = true)
         }
         if (duplicateIndex >= 0) {
-            val incomingSource = sourceRef(sourceSessionId, sourceMessageId)
-            val mergedSources = mergeSourceMessages(
+            val incomingSource = memorySourceRef(sourceSessionId, sourceMessageId)
+            val mergedSources = mergeMemorySourceMessages(
                 records[duplicateIndex].sourceMessages,
                 incomingSource,
             )
-            val refreshed = records[duplicateIndex].copy(
+            val existing = records[duplicateIndex]
+            val refreshed = existing.copy(
                 kind = kind,
                 importance = importance.coerceIn(0, 100),
                 pinned = pinned || records[duplicateIndex].pinned,
@@ -63,7 +66,9 @@ class MemoryStore internal constructor(
                 hasUnboundSource = records[duplicateIndex].hasUnboundSource ||
                     incomingSource == null ||
                     mergedSources.truncated,
-                subjectKey = subjectKey ?: records[duplicateIndex].subjectKey,
+                subjectKey = subjectKey ?: existing.subjectKey,
+                disclosure = if (disclosureExplicit) disclosure else existing.disclosure,
+                disclosureExplicit = if (disclosureExplicit) true else existing.disclosureExplicit,
                 updatedAt = now,
             )
             records[duplicateIndex] = refreshed
@@ -91,9 +96,11 @@ class MemoryStore internal constructor(
             projectId = projectId,
             lineageId = lineageId,
             sourceSessionId = sourceSessionId,
-            sourceMessages = sourceRef(sourceSessionId, sourceMessageId)?.let(::listOf).orEmpty(),
+            sourceMessages = memorySourceRef(sourceSessionId, sourceMessageId)?.let(::listOf).orEmpty(),
             hasUnboundSource = sourceMessageId.isNullOrBlank(),
             subjectKey = subjectKey,
+            disclosure = disclosure,
+            disclosureExplicit = disclosureExplicit,
             importance = importance.coerceIn(0, 100),
             pinned = pinned,
             createdAt = now,
@@ -444,25 +451,6 @@ class MemoryStore internal constructor(
         return words
     }
 
-    private fun sourceRef(sessionId: String?, messageId: String?): MemorySourceRef? =
-        if (sessionId.isNullOrBlank() || messageId.isNullOrBlank()) null
-        else MemorySourceRef(sessionId = sessionId, messageId = messageId)
-
-    private data class SourceMergeResult(
-        val sources: List<MemorySourceRef>,
-        val truncated: Boolean,
-    )
-
-    private fun mergeSourceMessages(
-        current: List<MemorySourceRef>,
-        incoming: MemorySourceRef?,
-    ): SourceMergeResult {
-        val all = (current + listOfNotNull(incoming)).distinct()
-        return SourceMergeResult(
-            sources = all.takeLast(MAX_SOURCE_MESSAGES),
-            truncated = all.size > MAX_SOURCE_MESSAGES,
-        )
-    }
 
     private companion object {
         const val MAX_MEMORY_CONTENT_CHARS = 2_000

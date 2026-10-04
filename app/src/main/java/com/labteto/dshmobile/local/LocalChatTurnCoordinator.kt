@@ -117,11 +117,13 @@ internal class LocalChatTurnCoordinator(
         previous: ChatCharacterState,
         userMessage: String,
         assistantMessage: String,
+        persona: PersonaProfile = PersonaProfile(),
     ): ChatPostTurnPlan? = interactionPlanner.parse(
         text = text,
         previous = previous,
         userMessage = userMessage,
         assistantMessage = assistantMessage,
+        persona = persona,
     )
 
     fun applyDeterministicInteractionState(

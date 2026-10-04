@@ -65,6 +65,8 @@ data class DeepSeekTokenUsage(
     val promptTokens: Long = 0L,
     val cacheHitTokens: Long = 0L,
     val cacheMissTokens: Long = 0L,
+    /** Subset of cacheMissTokens that the provider reports as a new cache write. */
+    val cacheWriteTokens: Long = 0L,
     val completionTokens: Long = 0L,
     val reasoningTokens: Long = 0L,
     val reported: Boolean = false,
@@ -76,6 +78,7 @@ data class DeepSeekUsageSnapshot(
     val inputTokens: Long = 0L,
     val cacheHitTokens: Long = 0L,
     val cacheMissTokens: Long = 0L,
+    val cacheWriteTokens: Long = 0L,
     val outputTokens: Long = 0L,
     val reasoningTokens: Long = 0L,
     val requestCount: Long = 0L,
@@ -144,6 +147,11 @@ internal fun parseDeepSeekOpenAiUsage(root: JsonObject): DeepSeekTokenUsage {
         .coerceAtLeast(0L)
         .takeIf { it > 0L }
         ?: nonNegativeUsageDifference(promptTokens, normalizedCacheHitTokens)
+    val cacheWriteTokens = usage["prompt_tokens_details"]?.jsonObject
+        ?.get("cache_write_tokens")?.jsonPrimitive?.longOrNull
+        ?.coerceAtLeast(0L)
+        ?.coerceAtMost(cacheMissTokens)
+        ?: 0L
     val completionTokens = (usage["completion_tokens"]?.jsonPrimitive?.longOrNull ?: 0L).coerceAtLeast(0L)
     val reasoningTokens = usage["completion_tokens_details"]?.jsonObject
         ?.get("reasoning_tokens")?.jsonPrimitive?.longOrNull
@@ -152,6 +160,7 @@ internal fun parseDeepSeekOpenAiUsage(root: JsonObject): DeepSeekTokenUsage {
         promptTokens = promptTokens,
         cacheHitTokens = normalizedCacheHitTokens,
         cacheMissTokens = cacheMissTokens,
+        cacheWriteTokens = cacheWriteTokens,
         completionTokens = completionTokens,
         reasoningTokens = reasoningTokens.coerceAtLeast(0L),
         reported = true,
@@ -203,6 +212,7 @@ internal fun accumulateDeepSeekUsage(
         inputTokens = saturatingUsageAdd(current.inputTokens, normalized.promptTokens),
         cacheHitTokens = saturatingUsageAdd(current.cacheHitTokens, normalized.cacheHitTokens),
         cacheMissTokens = saturatingUsageAdd(current.cacheMissTokens, miss),
+        cacheWriteTokens = saturatingUsageAdd(current.cacheWriteTokens, normalized.cacheWriteTokens),
         outputTokens = saturatingUsageAdd(current.outputTokens, normalized.completionTokens),
         reasoningTokens = saturatingUsageAdd(current.reasoningTokens, normalized.reasoningTokens),
         requestCount = saturatingUsageAdd(current.requestCount, 1L),
@@ -365,6 +375,7 @@ class DeepSeekUsageTracker @Inject constructor(
                     inputTokens = if (usage.reported) normalized.promptTokens else 0L,
                     cacheHitTokens = if (usage.reported) normalized.cacheHitTokens else 0L,
                     cacheMissTokens = if (usage.reported) miss else 0L,
+                    cacheWriteTokens = if (usage.reported) normalized.cacheWriteTokens else 0L,
                     outputTokens = if (usage.reported) normalized.completionTokens else 0L,
                     reasoningTokens = if (usage.reported) normalized.reasoningTokens else 0L,
                     estimatedCostCny = cost ?: 0.0,
@@ -400,6 +411,7 @@ class DeepSeekUsageTracker @Inject constructor(
         inputTokens = preferences.getLong(KEY_INPUT, 0L),
         cacheHitTokens = preferences.getLong(KEY_CACHE_HIT, 0L),
         cacheMissTokens = preferences.getLong(KEY_CACHE_MISS, 0L),
+        cacheWriteTokens = preferences.getLong(KEY_CACHE_WRITE, 0L),
         outputTokens = preferences.getLong(KEY_OUTPUT, 0L),
         reasoningTokens = preferences.getLong(KEY_REASONING, 0L),
         requestCount = preferences.getLong(KEY_REQUESTS, 0L),
@@ -414,6 +426,7 @@ class DeepSeekUsageTracker @Inject constructor(
             .putLong(KEY_INPUT, value.inputTokens)
             .putLong(KEY_CACHE_HIT, value.cacheHitTokens)
             .putLong(KEY_CACHE_MISS, value.cacheMissTokens)
+            .putLong(KEY_CACHE_WRITE, value.cacheWriteTokens)
             .putLong(KEY_OUTPUT, value.outputTokens)
             .putLong(KEY_REASONING, value.reasoningTokens)
             .putLong(KEY_REQUESTS, value.requestCount)
@@ -429,6 +442,7 @@ class DeepSeekUsageTracker @Inject constructor(
         private const val KEY_INPUT = "input_tokens"
         private const val KEY_CACHE_HIT = "cache_hit_tokens"
         private const val KEY_CACHE_MISS = "cache_miss_tokens"
+        private const val KEY_CACHE_WRITE = "cache_write_tokens"
         private const val KEY_OUTPUT = "output_tokens"
         private const val KEY_REASONING = "reasoning_tokens"
         private const val KEY_REQUESTS = "request_count"

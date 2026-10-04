@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
 import com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger
 import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
 import com.labteto.dshmobile.local.chat.proactiveConversationFocus
+import com.labteto.dshmobile.local.chat.characterProactiveDirective
 import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import kotlinx.coroutines.Job
@@ -281,15 +282,11 @@ internal class LocalAutomationChatCoordinator(
                 )
                 val relationshipMemory = chatRelationshipMemoryContext(conversationFocus, boundState)
                 val proactiveAvoidance = recentProactiveAvoidanceContext(recentTranscript)
-                val proactiveDirective = """
-                    【定时主动互动】
-                    这是用户提前为当前角色设置的主动互动意图，时间到了。它只是幕后触发条件，不是用户刚发来的消息。
-                    触发意图：$trigger
-                    现在由【${persona.name}】主动给用户发一条新消息，延续当前人物、关系和故事。
-                    结合最近聊天、未完话题、角色当下状态和世界设定，自然决定怎么开口；允许简短、突然、带情绪、带动作感或开启一个小剧情。
-                    不要提“定时任务”“自动化”“触发”“系统提醒”等机制，也不要编造用户刚刚说过触发意图里的文字。
-                    只输出角色此刻真正会发给用户的消息，不加说明、标题、分析或幕后旁白。
-                """.trimIndent()
+                val proactiveDirective = characterProactiveDirective(
+                    trigger = trigger,
+                    persona = persona,
+                    state = sessionCharacterState,
+                )
                 val localHistory = buildList {
                     add(buildJsonObject {
                         put("role", "system")

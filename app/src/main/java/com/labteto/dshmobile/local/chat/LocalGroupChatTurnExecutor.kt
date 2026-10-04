@@ -144,15 +144,12 @@ internal class LocalGroupChatTurnExecutor(
         index: Int,
         turnId: String?,
     ): GroupGeneratedReply {
-        val persona = member.persona.takeUnless {
-            it.id == PersonaProfile.DEFAULT_PERSONA_ID &&
-                member.personaId != PersonaProfile.DEFAULT_PERSONA_ID
-        } ?: chatPersonaStore.get(member.personaId)
+        val persona = chatPersonaStore.get(member.personaId)
         val startedAtNanos = System.nanoTime()
         val interactiveAttempts = snapshot.modelAttempts.coerceIn(1, 2)
 
         return try {
-            val prompt = chatReplyCoordinator.buildGroupPrompt(
+            val turnContext = chatReplyCoordinator.buildGroupTurnContext(
                 persona = persona,
                 member = member,
                 input = input,
@@ -164,7 +161,11 @@ internal class LocalGroupChatTurnExecutor(
                 mayStaySilent = false,
                 silentToken = GROUP_CHAT_SILENT_TOKEN,
             )
-            val groupRequestHistory = withTailEphemeralContext(baseHistory, prompt)
+            val groupRequestHistory = withChatTurnContext(
+                history = baseHistory,
+                stableContext = turnContext.stablePrompt,
+                dynamicContext = turnContext.dynamicPrompt,
+            )
             val groupImageMode = resolveLocalImageInputMode(
                 snapshot.imageInputMode,
                 imageCapabilities,
@@ -376,6 +377,7 @@ internal class LocalGroupChatTurnExecutor(
                 previous = plannerState,
                 userMessage = userMessage,
                 assistantMessage = assistantMessage,
+                persona = persona,
             ) ?: return null
             recordGroupDiary(member, persona, plan, sharedPending, snapshot)
             plan.state
@@ -403,10 +405,7 @@ internal class LocalGroupChatTurnExecutor(
             .filter { it.galleryId !in responderIds }
             .map { member ->
                 member to (
-                    member.persona.takeUnless {
-                        it.id == PersonaProfile.DEFAULT_PERSONA_ID &&
-                            member.personaId != PersonaProfile.DEFAULT_PERSONA_ID
-                    } ?: chatPersonaStore.get(member.personaId)
+                    chatPersonaStore.get(member.personaId)
                 )
             }
         if (replies.size == 1 && observers.isEmpty()) {
@@ -458,8 +457,9 @@ internal class LocalGroupChatTurnExecutor(
             observers.forEach { (member, persona) ->
                 appendLine()
                 appendLine("===== 在场旁观人物 ${member.galleryId} / ${persona.name} =====")
-                appendLine("性格：${persona.personality.take(240)}")
-                persona.relationship.takeIf(String::isNotBlank)?.let { appendLine("关系设定：${it.take(160)}") }
+                appendLine("人物底色：${persona.portrait.take(320)}")
+                if (persona.coreValues.isNotEmpty()) appendLine("真正重要：${persona.coreValues.take(3).joinToString("；")}")
+                persona.initialUserImpression.takeIf(String::isNotBlank)?.let { appendLine("对用户初始印象：${it.take(180)}") }
                 appendLine(
                     "当前心理：情绪=${member.chatState.mood}｜关系=${member.chatState.relationshipState}｜" +
                         "关注=${member.chatState.currentFocus.take(120).ifBlank { "无" }}｜" +
@@ -503,6 +503,7 @@ internal class LocalGroupChatTurnExecutor(
                     ),
                     userMessage = userMessage,
                     assistantMessage = source.content,
+                    persona = source.persona,
                 ) ?: return@forEach
                 recordGroupDiary(source.member, source.persona, parsed, sharedPending, snapshot)
                 result[galleryId] = parsed.state
@@ -583,10 +584,7 @@ internal class LocalGroupChatTurnExecutor(
             val responders = groupChatResponders(input, rotated)
             require(responders.isNotEmpty()) { "群聊里还没有可发言的角色" }
             val groupMemoryContexts = responders.associate { member ->
-                val persona = member.persona.takeUnless {
-                    it.id == PersonaProfile.DEFAULT_PERSONA_ID &&
-                        member.personaId != PersonaProfile.DEFAULT_PERSONA_ID
-                } ?: chatPersonaStore.get(member.personaId)
+                val persona = chatPersonaStore.get(member.personaId)
                 val subjectKey = com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey(
                     member.galleryId,
                     member.personaId,
@@ -596,24 +594,20 @@ internal class LocalGroupChatTurnExecutor(
                 }.orEmpty()
             }
             val groupPromptTokens = responders.maxOfOrNull { member ->
-                val persona = member.persona.takeUnless {
-                    it.id == PersonaProfile.DEFAULT_PERSONA_ID &&
-                        member.personaId != PersonaProfile.DEFAULT_PERSONA_ID
-                } ?: chatPersonaStore.get(member.personaId)
-                estimateModelTokens(
-                    chatReplyCoordinator.buildGroupPrompt(
-                        persona = persona,
-                        member = member,
-                        input = input,
-                        allMembers = members,
-                        handoffSummary = snapshot.handoffSummary,
-                        sharedContext = snapshot.groupChat.context,
-                        memoryContext = groupMemoryContexts[member.galleryId].orEmpty(),
-                        announcement = snapshot.groupChat.announcement,
-                        mayStaySilent = false,
-                        silentToken = GROUP_CHAT_SILENT_TOKEN,
-                    ),
+                val persona = chatPersonaStore.get(member.personaId)
+                val turnContext = chatReplyCoordinator.buildGroupTurnContext(
+                    persona = persona,
+                    member = member,
+                    input = input,
+                    allMembers = members,
+                    handoffSummary = snapshot.handoffSummary,
+                    sharedContext = snapshot.groupChat.context,
+                    memoryContext = groupMemoryContexts[member.galleryId].orEmpty(),
+                    announcement = snapshot.groupChat.announcement,
+                    mayStaySilent = false,
+                    silentToken = GROUP_CHAT_SILENT_TOKEN,
                 )
+                estimateModelTokens(turnContext.prompt)
             } ?: 0
             compactHistoryIfNeeded(extraTokens = groupPromptTokens)
 

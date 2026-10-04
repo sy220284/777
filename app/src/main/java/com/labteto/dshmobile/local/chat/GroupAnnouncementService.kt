@@ -17,6 +17,7 @@ import kotlinx.serialization.json.put
 class GroupAnnouncementService @Inject constructor(
     private val modelGateway: LocalModelGateway,
     private val usageTracker: DeepSeekUsageTracker,
+    private val personaStore: ChatPersonaStore,
 ) {
     suspend fun generate(
         model: String,
@@ -27,8 +28,13 @@ class GroupAnnouncementService @Inject constructor(
         current: String,
     ): String {
         val cast = members.joinToString("\n") { member ->
-            val persona = member.persona
-            "${member.displayName}：${persona.identity.take(100)}；${persona.personality.take(120)}；${persona.relationship.take(120)}"
+            val persona = personaStore.get(member.personaId)
+            val values = listOf(
+                persona.portrait.take(180),
+                persona.initialUserImpression.take(120),
+                persona.coreValues.take(2).joinToString("；"),
+            ).filter(String::isNotBlank)
+            "${member.displayName}：${values.joinToString("；")}"
         }
         val messages = listOf(
             buildJsonObject {

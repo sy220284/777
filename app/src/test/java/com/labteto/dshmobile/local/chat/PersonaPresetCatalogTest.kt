@@ -54,12 +54,19 @@ class PersonaPresetCatalogTest {
     }
 
     @Test
-    fun starterPresetsContainBehaviorInsteadOfOnlyBiography() {
+    fun starterPresetsContainLivingCharacterSignals() {
         PersonaPresetCatalog.presets.forEach { preset ->
-            assertTrue(preset.persona.coreMotivations.isNotEmpty())
-            assertTrue(preset.persona.behaviorPatterns.isNotEmpty())
+            assertTrue(preset.persona.coreValues.isNotEmpty())
+            assertTrue(preset.persona.attentionBiases.isNotEmpty())
+            assertTrue(preset.persona.perceptionBlindSpots.isNotEmpty())
+            assertTrue(preset.persona.quirks.isNotEmpty())
+            assertTrue(preset.persona.limitations.isNotEmpty())
+            assertTrue(preset.persona.mutableTraits.isNotEmpty())
+            assertTrue(preset.persona.voiceSamples.size >= 3)
+            assertTrue(preset.persona.voiceSamples.all { it.isNotBlank() })
+            assertTrue(preset.persona.voiceSamples.distinct().size >= 3)
             assertTrue(preset.persona.hardConstraints.isNotEmpty())
-            assertTrue(preset.persona.speechStyle.isNotBlank())
+            assertTrue(preset.persona.portrait.isNotBlank())
         }
     }
 

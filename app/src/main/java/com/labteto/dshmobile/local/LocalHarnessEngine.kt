@@ -2595,10 +2595,7 @@ class LocalHarnessEngine @Inject constructor(
                     groupChat = state.groupChat.copy(
                         members = state.groupChat.members.map { existing ->
                             if (existing.galleryId == member.galleryId) {
-                                existing.copy(
-                                    displayName = updated.name,
-                                    persona = updated,
-                                )
+                                existing.copy(displayName = updated.name)
                             } else {
                                 existing
                             }

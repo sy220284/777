@@ -29,13 +29,38 @@ class ChatPersonaStorageSafetyTest {
     private fun galleryStore() = ChatPersonaGalleryStore(galleryFile, json)
 
     @Test
+    fun oldPersonaSchemaIsRejectedInsteadOfSilentlyDecodingIntoV3() {
+        personaFile.writeText(
+            """{"version":1,"personas":[{"id":"legacy","name":"旧人物","identity":"剑客","personality":"直接"}]}""",
+        )
+
+        val result = runCatching { personaStore().list() }
+
+        assertTrue(result.isFailure)
+        assertTrue(
+            temporary.root.listFiles().orEmpty()
+                .any { it.name.startsWith("personas.json.corrupt-") },
+        )
+    }
+
+    @Test
+    fun oldGallerySchemaIsRejectedInsteadOfMigrated() {
+        galleryFile.writeText("""{"version":4,"entries":[]}""")
+
+        val result = runCatching { galleryStore().list() }
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("版本不受支持"))
+    }
+
+    @Test
     fun corruptedPersonaPrimaryRecoversBackupBeforeNextWrite() {
         val store = personaStore()
         store.upsert(
             PersonaProfile(
                 id = "persona-a",
                 name = "阿青",
-                personality = "嘴硬心软",
+                portrait = "嘴硬心软",
             ),
         )
         assertTrue(File(temporary.root, "personas.json.bak").isFile)
@@ -57,7 +82,7 @@ class ChatPersonaStorageSafetyTest {
     fun corruptedGalleryPrimaryRecoversArchivedCharacterBeforeNextWrite() {
         val store = galleryStore()
         val saved = store.save(
-            persona = PersonaProfile(name = "阿青", identity = "剑客"),
+            persona = PersonaProfile(name = "阿青", portrait = "剑客"),
             sourceSessionId = "session-a",
             history = listOf(
                 LocalHarnessMessage("m1", "user", "你来了", createdAt = 1L),
@@ -78,7 +103,7 @@ class ChatPersonaStorageSafetyTest {
         )
 
         store.save(
-            persona = PersonaProfile(name = "小岚", identity = "花店店主"),
+            persona = PersonaProfile(name = "小岚", portrait = "花店店主"),
             sourceSessionId = "session-b",
             history = emptyList(),
             chatState = ChatCharacterState(),
