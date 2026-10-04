@@ -107,6 +107,7 @@ internal fun ChatAutomationScreen(
     var draft by rememberSaveable { mutableStateOf("") }
     var editingTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var observedSaveRevision by remember { mutableLongStateOf(state.saveRevision) }
+    val planMention = stringResource(R.string.tasks_chat_plan_mention)
 
     BackHandler(onBack = onClose)
     LaunchedEffect(harnessState.sessionId, canPlan) {
@@ -165,12 +166,19 @@ internal fun ChatAutomationScreen(
                     }
                 } else {
                     items(tasks, key = AutomationTask::id) { task ->
+                        val scheduleDescription = chatScheduleDescription(task)
+                        val editSeed = stringResource(
+                            R.string.tasks_chat_edit_seed,
+                            task.prompt,
+                            scheduleDescription,
+                        )
                         ChatAutomationEventRow(
                             task = task,
+                            scheduleDescription = scheduleDescription,
                             currentSessionId = harnessState.sessionId,
                             onEdit = {
                                 editingTaskId = task.id
-                                draft = "@角色事件规划 " + chatAutomationEditSeed(task)
+                                draft = "$planMention $editSeed"
                             },
                             onOpenSession = onOpenSession,
                             onPause = { viewModel.pause(task.id) },
@@ -214,7 +222,7 @@ internal fun ChatAutomationScreen(
                                 subtitle = stringResource(R.string.tasks_chat_suggestion_hint),
                                 onClick = {
                                     editingTaskId = null
-                                    draft = "@角色事件规划 $suggestion"
+                                    draft = "$planMention $suggestion"
                                 },
                             )
                         }
@@ -224,7 +232,7 @@ internal fun ChatAutomationScreen(
 
             state.plannerError?.let {
                 Text(
-                    it,
+                    stringResource(it.messageRes()),
                     modifier = Modifier.padding(horizontal = DsSpacing.large),
                     style = DsType.small13.withReadingWeight(),
                     color = colors.error,
@@ -301,6 +309,7 @@ private fun SectionTitle(title: String, subtitle: String) {
 @Composable
 private fun ChatAutomationEventRow(
     task: AutomationTask,
+    scheduleDescription: String,
     currentSessionId: String,
     onEdit: () -> Unit,
     onOpenSession: (String) -> Unit,
@@ -335,7 +344,7 @@ private fun ChatAutomationEventRow(
             maxLines = 3,
         )
         Text(
-            chatScheduleDescription(task),
+            scheduleDescription,
             style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
@@ -435,23 +444,50 @@ private fun ChatAutomationVisualStatus.dsStatus(): DsStatus = when (this) {
     else -> DsStatus.Neutral
 }
 
-private fun chatAutomationEditSeed(task: AutomationTask): String =
-    "把这个事件调整为：${task.prompt}。当前安排：${chatScheduleDescription(task)}"
-
+@Composable
 private fun chatScheduleDescription(task: AutomationTask): String = when (task.scheduleType) {
-    AutomationScheduleType.SILENCE ->
-        "沉默 ${((task.silenceMinutes ?: 60L) / 60L).coerceAtLeast(1L)} 小时后"
-    AutomationScheduleType.WINDOW ->
-        "每天 ${formatMinute(task.windowStartMinuteOfDay ?: 20 * 60)}–${formatMinute(task.windowEndMinuteOfDay ?: 22 * 60)} 内"
-    AutomationScheduleType.DAILY -> "每天 · 下次 ${shortTime(task.nextRunAt)}"
-    AutomationScheduleType.WEEKLY -> "每周 · 下次 ${shortTime(task.nextRunAt)}"
+    AutomationScheduleType.SILENCE -> stringResource(
+        R.string.tasks_chat_schedule_silence,
+        ((task.silenceMinutes ?: 60L) / 60L).coerceAtLeast(1L),
+    )
+    AutomationScheduleType.WINDOW -> stringResource(
+        R.string.tasks_chat_schedule_window,
+        formatMinute(task.windowStartMinuteOfDay ?: 20 * 60),
+        formatMinute(task.windowEndMinuteOfDay ?: 22 * 60),
+    )
+    AutomationScheduleType.DAILY -> stringResource(
+        R.string.tasks_chat_schedule_daily,
+        shortTime(task.nextRunAt),
+    )
+    AutomationScheduleType.WEEKLY -> stringResource(
+        R.string.tasks_chat_schedule_weekly,
+        shortTime(task.nextRunAt),
+    )
     AutomationScheduleType.INTERVAL, AutomationScheduleType.LEGACY -> {
         val minutes = task.recurringMinutes
-        if (minutes == null) "一次 · ${shortTime(task.nextRunAt)}"
-        else if (minutes % 60L == 0L) "每 ${minutes / 60L} 小时 · 下次 ${shortTime(task.nextRunAt)}"
-        else "每 $minutes 分钟 · 下次 ${shortTime(task.nextRunAt)}"
+        when {
+            minutes == null -> stringResource(R.string.tasks_chat_schedule_once, shortTime(task.nextRunAt))
+            minutes % 60L == 0L -> stringResource(
+                R.string.tasks_chat_schedule_interval_hours,
+                minutes / 60L,
+                shortTime(task.nextRunAt),
+            )
+            else -> stringResource(
+                R.string.tasks_chat_schedule_interval_minutes,
+                minutes,
+                shortTime(task.nextRunAt),
+            )
+        }
     }
-    AutomationScheduleType.ONCE -> "一次 · ${shortTime(task.nextRunAt)}"
+    AutomationScheduleType.ONCE ->
+        stringResource(R.string.tasks_chat_schedule_once, shortTime(task.nextRunAt))
+}
+
+private fun PlannerUiError.messageRes(): Int = when (this) {
+    PlannerUiError.SUGGESTIONS_FAILED -> R.string.tasks_chat_suggestions_failed
+    PlannerUiError.SESSION_CHANGED -> R.string.tasks_chat_session_changed
+    PlannerUiError.SAVE_FAILED -> R.string.tasks_chat_save_failed
+    PlannerUiError.PLAN_FAILED -> R.string.tasks_chat_plan_failed
 }
 
 private fun formatMinute(minuteOfDay: Int): String =
