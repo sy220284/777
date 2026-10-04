@@ -53,6 +53,16 @@ class PersonaImmersionPolicyTest {
     }
 
     @Test
+    fun aiRelatedOccupationDoesNotBecomeNonEmbodiedIdentity() {
+        val persona = PersonaProfile(
+            name = "林然",
+            portrait = "一家科技公司的AI研究员，平时喜欢跑步和做饭。",
+        )
+
+        assertTrue(PersonaImmersionPolicy.breaksReplyImmersion(persona, "我没有实体身体，所以没法走过去抱你。"))
+    }
+
+    @Test
     fun runtimeKeepsInWorldLimitsForExplicitNonEmbodiedCharacters() {
         val persona = PersonaProfile(
             name = "镜中客",
