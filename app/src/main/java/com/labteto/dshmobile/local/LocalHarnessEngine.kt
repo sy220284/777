@@ -2478,11 +2478,7 @@ class LocalHarnessEngine @Inject constructor(
         eventLog.append("plan/mode", buildJsonObject { put("active", enabled) })
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             val prompt = systemPrompt()
-            val updateMode = applyRuntimeSystemPromptUpdate(modelHistory, prompt, _state.value)
-            eventLog.append("system/prompt", buildJsonObject {
-                put("content", prompt)
-                put("update_mode", updateMode.name.lowercase())
-            })
+            recordRuntimeSystemPromptUpdate(modelHistory, prompt, _state.value, eventLog)
             updateContextMetrics()
         }
         persist()
@@ -2918,11 +2914,10 @@ class LocalHarnessEngine @Inject constructor(
         var finalChatAssistantSequence: Long? = null
         var modelStep = 0
         var requestPrepared = false
-        var workStableContext = ""
-        var workDynamicContext = ""
+        var workPromptContext = LocalWorkTurnPromptContext()
         var chatStableContext = ""
         var chatDynamicContext = ""
-        var stableToolSchemas: JsonArray? = null
+        val runToolSurface = LocalRunToolSurface()
         val mainMaxSteps = runState.value.mainMaxSteps
         val runSnapshot = runState.value
         val mainStepLimit = if (runPolicy.allowToolExecution) {
@@ -3027,23 +3022,7 @@ class LocalHarnessEngine @Inject constructor(
                         chatStableContext = preparedChat.context.stablePrompt
                         chatDynamicContext = preparedChat.dynamicContext
                     } else {
-                        val composed = contextComposer.composeParts(
-                            ContextRequest(
-                                query = input,
-                                mode = snapshot.conversationMode,
-                                projectId = snapshot.projectId,
-                                lineageId = snapshot.lineageId,
-                                handoffSummary = snapshot.handoffSummary,
-                            ),
-                        )
-                        workStableContext = withWorkRuntimeContext(
-                            composed.stable,
-                            workspace.path,
-                            runSnapshot.model,
-                            runSnapshot.baseUrl,
-                            runSnapshot.modelSelection.activeProfile,
-                        )
-                        workDynamicContext = composed.dynamic
+                        workPromptContext = contextComposer.composeWorkTurnContext(input, snapshot, workspace.path)
                         captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                     }
                     requestPrepared = true
@@ -3051,15 +3030,11 @@ class LocalHarnessEngine @Inject constructor(
                 drainPendingInputsIntoHistory(binding)
                 val key = modelRequestMarker()
                 val snapshot = runState.value
-                val tools = stableRunToolSchemas(
-                    previous = stableToolSchemas,
-                    current = modelToolSchemas(runPolicy, binding),
-                    state = snapshot,
-                ).also { stableToolSchemas = it }
+                val tools = runToolSurface.next(modelToolSchemas(runPolicy, binding), snapshot)
                 val productContextTokens = if (snapshot.usageMode == LocalUsageMode.CHAT) {
                     estimateModelTokens(chatStableContext) + estimateModelTokens(chatDynamicContext)
                 } else {
-                    estimateModelTokens(workStableContext) + estimateModelTokens(workDynamicContext)
+                    estimateModelTokens(workPromptContext.stable) + estimateModelTokens(workPromptContext.dynamic)
                 }
                 if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
                     compactHistoryIfNeeded(
@@ -3079,11 +3054,7 @@ class LocalHarnessEngine @Inject constructor(
                         dynamicContext = chatDynamicContext,
                     )
                 } else {
-                    withWorkTurnContext(
-                        history = runHistory.snapshot(),
-                        stableContext = workStableContext,
-                        dynamicContext = workDynamicContext,
-                    )
+                    withWorkTurnContext(runHistory.snapshot(), workPromptContext.stable, workPromptContext.dynamic)
                 }
                 val selectedMode = resolveLocalImageInputMode(
                     snapshot.imageInputMode,
@@ -4246,11 +4217,7 @@ class LocalHarnessEngine @Inject constructor(
             log.append("plan/mode", buildJsonObject { put("active", false) })
             if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
                 val prompt = systemPrompt(binding)
-                val updateMode = applyRuntimeSystemPromptUpdate(history, prompt, targetState.value)
-                log.append("system/prompt", buildJsonObject {
-                    put("content", prompt)
-                    put("update_mode", updateMode.name.lowercase())
-                })
+                recordRuntimeSystemPromptUpdate(history, prompt, targetState.value, log)
                 updateContextMetrics(binding)
             }
             persist(binding)
