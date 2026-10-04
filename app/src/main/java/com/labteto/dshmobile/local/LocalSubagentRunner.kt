@@ -265,7 +265,7 @@ internal class LocalSubagentRunner(
                     historyPolicy.compactBeforeModelStep(history, subagentId, modelStep, runHistoryBudget, runCachePolicy)
                     modelStep += 1
                     val durableHistory = history.snapshot()
-                    val selectedMode = resolveImageMode(snapshot.modelState.modelState.imageInputMode, snapshot.modelState.baseUrl, routeModel)
+                    val selectedMode = resolveImageMode(snapshot.modelState.imageInputMode, snapshot.modelState.baseUrl, routeModel)
                     if (hasLocalImageRefs(durableHistory) &&
                         resolveImageMode(LocalImageInputMode.AUTO, snapshot.modelState.baseUrl, routeModel) == LocalImageInputMode.TOOL) {
                         throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
