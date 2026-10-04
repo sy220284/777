@@ -7,6 +7,8 @@ import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -113,6 +115,7 @@ internal class LocalAgentRunCoordinator(
     private val now: () -> Long = System::currentTimeMillis,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
 ) {
+    private val foregroundOwners = ConcurrentHashMap<String, String>()
     fun start(
         sessionId: String,
         usageMode: LocalUsageMode,
@@ -161,6 +164,9 @@ internal class LocalAgentRunCoordinator(
             parentRunId = parentRunId,
             agentId = agentId,
         )
+        if (context.kind == LocalAgentRunKind.FOREGROUND) {
+            foregroundOwners[context.sessionId] = context.runId
+        }
         append(
             context = context,
             status = LocalAgentRunCheckpointStatus.RUNNING,
@@ -169,7 +175,18 @@ internal class LocalAgentRunCoordinator(
         return context
     }
 
+    fun isCurrentOwner(context: LocalAgentRunContext): Boolean =
+        context.kind != LocalAgentRunKind.FOREGROUND ||
+            foregroundOwners[context.sessionId] == context.runId
+
+    fun ensureCurrentOwner(context: LocalAgentRunContext) {
+        if (!isCurrentOwner(context)) {
+            throw CancellationException("前台任务运行时所有权已转移，丢弃旧任务迟到结果")
+        }
+    }
+
     fun recordEvent(context: LocalAgentRunContext, event: AgentEvent) {
+        if (!isCurrentOwner(context)) return
         when (event) {
             is AgentEvent.TurnStarted -> append(
                 context,
@@ -236,6 +253,14 @@ internal class LocalAgentRunCoordinator(
                 LocalAgentRunPhase.TURN_FINISHED,
                 reason = "cancelled",
             )
+        }
+        val terminal =
+            event is AgentEvent.TurnCompleted ||
+                event is AgentEvent.TurnStepLimit ||
+                event is AgentEvent.TurnFailed ||
+                event is AgentEvent.TurnCancelled
+        if (context.kind == LocalAgentRunKind.FOREGROUND && terminal) {
+            foregroundOwners.remove(context.sessionId, context.runId)
         }
     }
 
@@ -396,12 +421,15 @@ internal class LocalAgentRunCoordinator(
         runId: String,
         kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
     ) {
+        if (kind == LocalAgentRunKind.FOREGROUND) {
+            foregroundOwners.remove(sessionId, runId)
+        }
         appendRecoveryState(
             sessionId = sessionId,
             runId = runId,
             kind = kind,
             status = LocalAgentRunCheckpointStatus.RECOVERY_QUEUED,
-            reason = "process_restart",
+            reason = "persisted_runtime_recovery",
         )
     }
 
@@ -411,6 +439,9 @@ internal class LocalAgentRunCoordinator(
         reason: String,
         kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
     ) {
+        if (kind == LocalAgentRunKind.FOREGROUND) {
+            foregroundOwners.remove(sessionId, runId)
+        }
         appendRecoveryState(
             sessionId = sessionId,
             runId = runId,
@@ -528,7 +559,14 @@ internal class LocalAgentRunCoordinator(
         status: LocalAgentRunCheckpointStatus,
         reason: String,
     ) {
-        eventLogFor(sessionId).append(
+        val log = eventLogFor(sessionId)
+        val latestRunId = log.latest(eventType(kind))
+            ?.data
+            ?.get("run_id")
+            ?.jsonPrimitive
+            ?.contentOrNull
+        if (latestRunId != runId) return
+        log.append(
             eventType(kind),
             buildJsonObject {
                 put("version", LOCAL_AGENT_RUN_CHECKPOINT_VERSION)

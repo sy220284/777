@@ -32,6 +32,7 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
@@ -219,8 +220,9 @@ class LocalHarnessEngine @Inject constructor(
             eventLogFor = ::eventLogFor,
         )
     }
-    private val agentRunCoordinator by lazy {
-        LocalAgentRunCoordinator(eventLogFor = ::eventLogFor)
+    private val agentRunCoordinator by lazy { LocalAgentRunCoordinator(eventLogFor = ::eventLogFor) }
+    private val foregroundRecoveryCoordinator by lazy {
+        LocalForegroundRecoveryCoordinator(agentRunCoordinator, modelGateway::hasCredential)
     }
     private val toolRegistry
         get() = pluginComposition.tools
@@ -512,6 +514,9 @@ class LocalHarnessEngine @Inject constructor(
     )
     /** Work runs are session-owned and may outlive whichever conversation is currently visible. */
     private val activeWorkRuns = ConcurrentHashMap<String, LocalWorkRunBinding>()
+
+    private fun liveWorkRun(sessionId: String): LocalWorkRunBinding? =
+        activeWorkRuns[sessionId]?.takeIf { it.job?.isCompleted == false }
     private val jobs = LocalJobManager(scope, persistentJobStore) { snapshot ->
         projectJobSnapshotToSessionStates(snapshot, _state, activeWorkRuns)
         syncForegroundJobs(context, snapshot) { message ->
@@ -1729,11 +1734,25 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
-    private fun syncVisibleWorkRun(sessionId: String) {
-        val binding = activeWorkRuns[sessionId] ?: return
+    private fun syncVisibleWorkRun(
+        sessionId: String,
+        ownedBinding: LocalWorkRunBinding? = null,
+    ) {
+        val binding = ownedBinding ?: liveWorkRun(sessionId) ?: return
+        val liveState = binding.state.value
+        liveState.modelSelection.activeProfile
+            ?.takeIf { liveState.configured }
+            ?.let(modelGateway::activate)
+        val resources = resourceScheduler.snapshot()
+        _state.value = liveState.copy(
+            loading = _state.value.loading,
+            usage = usageTracker.state.value,
+            sessions = sessionSummaries(),
+            resources = resources.toLocalHarnessResourceState(liveState.usageMode),
+            contextBudgetChars = localHistoryBudgetFor(memoryClassMb, resources.pressure).maxHistoryChars,
+        )
         modelHistory.reset(binding.modelHistory.snapshot())
         transcriptProjectionCursor = binding.transcriptProjectionCursor
-        mirrorWorkRunState(binding)
     }
 
     private fun queueTurn(
@@ -2446,7 +2465,14 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun startNextQueuedTurnIfIdle(): Job? = synchronized(runStateLock) {
-        if (sessionTransitioning || activeJob?.isCompleted == false) return@synchronized null
+        val liveWorkOwner = liveWorkRun(currentSessionId) != null
+        if (
+            !LocalRuntimeOwnershipPolicy.allowVisibleQueuedTurn(
+                sessionTransitioning = sessionTransitioning,
+                visibleRunActive = activeJob?.isCompleted == false,
+                liveWorkOwner = liveWorkOwner,
+            )
+        ) return@synchronized null
         val next = pendingInputs.poll() ?: return@synchronized null
         val durableMessage = next.modelMessage ?: buildJsonObject {
             put("role", "user")
@@ -3010,6 +3036,7 @@ class LocalHarnessEngine @Inject constructor(
 
         val loop = AgentLoop(
             model = AgentModel {
+                agentRunCoordinator.ensureCurrentOwner(runContext)
                 // Persistent history stays compact; user rules, recalled memory and handoff are
                 // assembled per request and are deliberately never written back into runHistory.
                 if (!requestPrepared) {
@@ -3078,6 +3105,7 @@ class LocalHarnessEngine @Inject constructor(
                     maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.model, snapshot.baseUrl),
                 )
                 val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
+                agentRunCoordinator.ensureCurrentOwner(runContext)
                 val rawReply = try {
                     completeWithRetry(
                         key = key,
@@ -3159,6 +3187,7 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             tools = AgentToolExecutor { call ->
+                agentRunCoordinator.ensureCurrentOwner(runContext)
                 if (!runPolicy.allowToolExecution) {
                     AgentToolResult(
                         content = "聊天模式不提供工具执行能力。",
@@ -3166,10 +3195,11 @@ class LocalHarnessEngine @Inject constructor(
                         errorCode = "TOOLS_DISABLED",
                     )
                 } else {
-                    executeSafely(call.toLocalToolCall(), allowMutation = true)
+                    executeSafely(call.toLocalToolCall(), allowMutation = true, binding = binding)
                 }
             },
             toolBatch = AgentToolBatchExecutor { calls ->
+                agentRunCoordinator.ensureCurrentOwner(runContext)
                 if (!runPolicy.allowToolExecution) {
                     calls.map {
                         AgentToolResult(
@@ -3182,6 +3212,7 @@ class LocalHarnessEngine @Inject constructor(
                     executeToolBatch(
                         calls = calls.map { it.toLocalToolCall() },
                         allowMutation = true,
+                        binding = binding,
                     ).map { (_, result) -> result }
                 }
             },
@@ -3189,6 +3220,7 @@ class LocalHarnessEngine @Inject constructor(
                 runPolicy.allowToolExecution && call.name in PARALLEL_SUBAGENT_TOOLS
             },
             eventSink = AgentEventSink { event ->
+                agentRunCoordinator.ensureCurrentOwner(runContext)
                 when (event) {
                     is AgentEvent.TurnStarted -> {
                         runEventLog.append("turn/start", buildJsonObject {
@@ -4609,6 +4641,15 @@ class LocalHarnessEngine @Inject constructor(
         baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
         deferReady: Boolean = false,
     ) {
+        val capturedLiveWorkBinding = liveWorkRun(sessionId)
+        if (capturedLiveWorkBinding != null) {
+            // 同进程内仍存活的 Work runtime 是唯一运行时事实源。重新进入只重新绑定，
+            // 不触碰持久恢复，不重启任务，也不让磁盘快照覆盖正在执行的状态。
+            pendingInputs.clear()
+            syncVisibleWorkRun(sessionId, capturedLiveWorkBinding)
+            return
+        }
+
         val loaded = try {
             sessionCoordinator.readWithLegacyApproval(sessionId)
         } catch (future: FutureSessionVersionException) {
@@ -4621,9 +4662,17 @@ class LocalHarnessEngine @Inject constructor(
             }
             return
         }
-        // Only mutate the durable event tail after the persisted session format is accepted.
-        // A future-version session must remain completely untouched.
-        val recovery = eventLog.repairInterruptedTail()
+        // A live Work binding still owns this session in the current process. Re-entering the
+        // conversation is only a UI/runtime rebind; persisted crash recovery must not touch its
+        // open turn or manufacture a second foreground run.
+        val liveWorkBinding = liveWorkRun(sessionId)
+        val recovery = if (
+            LocalRuntimeOwnershipPolicy.allowPersistedRecovery(liveWorkBinding != null)
+        ) {
+            eventLog.repairInterruptedTail()
+        } else {
+            SessionRepairResult()
+        }
         recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
@@ -4659,50 +4708,20 @@ class LocalHarnessEngine @Inject constructor(
         val restoredInbox = eventLog.latest(LOCAL_AGENT_INBOX_EVENT_TYPE)
             ?.let { event -> decodeLocalAgentInboxPending(event.data) }
             .orEmpty()
-        pendingInputs.restore(restoredInbox)
+        // A live Work run owns its own pending queue. Never mirror its durable inbox into the
+        // visible/global queue or start those inputs as a second foreground run.
+        pendingInputs.restore(if (liveWorkBinding == null) restoredInbox else emptyList())
         val modelProfiles = modelConfiguration.readProfiles()
-        var recoveredRunProfile: LocalModelProfile? = null
-        var runRecoveryError: String? = null
-        agentRunCoordinator.recoveryDecision(sessionId, recovery)?.let { decision ->
-            val route = decision.route
-            val exactRecoveryProfile = route?.let { identity ->
-                resolveRecoveryModelProfile(modelProfiles, identity)
-            }
-            val routeMismatch = route != null &&
-                (exactRecoveryProfile == null || !modelGateway.hasCredential(exactRecoveryProfile))
-            val blocked = when {
-                decision.blockedReason != null -> decision.blockedReason
-                routeMismatch -> "上次任务绑定的模型账户或凭据身份已变化，已停止自动续跑。请恢复原模型配置后再继续。"
-                else -> null
-            }
-            if (blocked != null) {
-                runRecoveryError = blocked
-                agentRunCoordinator.markRecoveryBlocked(sessionId, decision.runId, blocked)
-            } else {
-                recoveredRunProfile = exactRecoveryProfile
-                val queued = decision.queuedInput
-                if (queued != null && pendingInputs.snapshot().none { it.id == queued.id }) {
-                    if (pendingInputs.offer(queued)) {
-                        eventLog.append(
-                            LOCAL_AGENT_INBOX_EVENT_TYPE,
-                            encodeLocalAgentInboxEvent(
-                                action = "recovered-run",
-                                pending = pendingInputs.snapshot(),
-                                affected = listOf(queued),
-                            ),
-                        )
-                        agentRunCoordinator.markRecoveryQueued(sessionId, decision.runId)
-                    } else {
-                        runRecoveryError = "上次任务可以安全续跑，但待处理输入队列已满，请先处理现有任务。"
-                        agentRunCoordinator.markRecoveryBlocked(
-                            sessionId,
-                            decision.runId,
-                            runRecoveryError.orEmpty(),
-                        )
-                    }
-                }
-            }
+        val recoveryDecision = if (liveWorkBinding == null) {
+            agentRunCoordinator.recoveryDecision(sessionId, recovery)
+        } else {
+            null
         }
+        val recoveryState = foregroundRecoveryCoordinator.restore(
+            sessionId, recoveryDecision, modelProfiles, pendingInputs, eventLog,
+        )
+        val recoveredRunProfile = recoveryState.profile
+        val runRecoveryError = recoveryState.error
         val profile = userProfileStore.read()
         val restoredBehavior = withContext(Dispatchers.IO) {
             reconcileCharacterBehaviorTuning(
@@ -4798,12 +4817,17 @@ class LocalHarnessEngine @Inject constructor(
                 loaded?.legacySafeAutoApproval == true,
             ),
             jobs = projectExecutionJobs(stored.usageMode, stored.id, jobs.snapshotInfos()),
-            queuedInputCount = pendingInputs.size(),
+            queuedInputCount = liveWorkBinding?.pendingInputs?.size() ?: pendingInputs.size(),
             resources = resourceScheduler.snapshot().toLocalHarnessResourceState(stored.usageMode),
             contextChars = modelHistory.encodedChars,
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
             error = runRecoveryError,
         )
+        // While a live Work binding owns the session, its in-memory history/state is authoritative.
+        // The lifecycle caller immediately rebinds that runtime into the visible projection. Avoid
+        // writing stale disk-restored checkpoints or snapshots during this hand-off.
+        if (liveWorkBinding != null) return
+
         var wroteHistoryCheckpoint = false
         if (_state.value.groupChat.enabled) {
             projectGroupGalleryState(_state.value.groupChat, chatPersonaGalleryStore).failures.forEach { failure ->

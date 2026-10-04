@@ -306,6 +306,37 @@ if 'eventLog.append("user/queue"' in engine:
     violations.append("Queued user input must use the durable agent/inbox/spliced fact, not legacy user/queue writers")
 if "decodeLocalAgentInboxPending" not in engine or "pendingInputs.restore(" not in engine:
     violations.append("LocalHarnessEngine must restore the durable Agent inbox on Session load")
+
+live_capture_pos = engine.find("val capturedLiveWorkBinding = liveWorkRun(sessionId)")
+live_rebind_pos = engine.find("syncVisibleWorkRun(sessionId, capturedLiveWorkBinding)")
+durable_read_pos = engine.find("sessionCoordinator.readWithLegacyApproval(sessionId)")
+durable_repair_pos = engine.find("eventLog.repairInterruptedTail()")
+if min(live_capture_pos, live_rebind_pos, durable_read_pos, durable_repair_pos) < 0 or not (
+    live_capture_pos < live_rebind_pos < durable_read_pos < durable_repair_pos
+):
+    violations.append(
+        "Live session-bound Work runtime must rebind before any durable recovery path"
+    )
+if "executeSafely(call.toLocalToolCall(), allowMutation = true, binding = binding)" not in engine:
+    violations.append(
+        "Bound Work single-tool execution must keep the originating session binding"
+    )
+if "binding = binding," not in engine or "executeToolBatch(" not in engine:
+    violations.append(
+        "Bound Work tool batches must keep the originating session binding"
+    )
+if "LocalRuntimeOwnershipPolicy.allowVisibleQueuedTurn(" not in engine:
+    violations.append(
+        "Shared visible queue must stay idle while the current session has a live Work owner"
+    )
+if "agentRunCoordinator.ensureCurrentOwner(runContext)" not in engine:
+    violations.append(
+        "Foreground Work execution must reject late work after runtime ownership transfers"
+    )
+if "val latestRunId = log.latest(eventType(kind))" not in run_coordinator:
+    violations.append(
+        "Recovery checkpoints must not overwrite a newer run for the same session"
+    )
 wake_path_count = (
     engine.count("startNextQueuedTurnIfIdle()?.start()") +
     lifecycle_coordinator.count("startNextQueuedTurnIfIdle()?.start()")
