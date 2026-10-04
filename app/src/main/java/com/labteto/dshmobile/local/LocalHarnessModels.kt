@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.model.LocalCanonicalMessage
 import com.labteto.dshmobile.local.work.LocalWorkState
+import com.labteto.dshmobile.local.runtime.LocalKernelState
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -268,17 +269,9 @@ data class LocalHarnessState(
     val messages: List<LocalHarnessMessage> = emptyList(),
     val transcriptIndex: LocalTranscriptRuntimeIndex = LocalTranscriptRuntimeIndex(),
     val work: LocalWorkState = LocalWorkState(),
+    val kernel: LocalKernelState = LocalKernelState(),
     val safeAutoApprovalEnabled: Boolean = false,
     val deviceApprovalLease: Boolean = false,
-    val jobs: List<LocalJobInfo> = emptyList(),
-    val workflowProgress: LocalWorkflowProgress? = null,
-    val queuedInputCount: Int = 0,
-    val resources: LocalHarnessResourceState = LocalHarnessResourceState(),
-    val contextChars: Int = 0,
-    val contextBudgetChars: Int = 0,
-    val running: Boolean = false,
-    val pendingApproval: LocalApproval? = null,
-    val pendingQuestion: LocalQuestion? = null,
     val usage: DeepSeekUsageSnapshot = DeepSeekUsageSnapshot(),
     val error: String? = null,
 ) {
