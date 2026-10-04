@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.work.LocalWorkState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.applySceneTurn
@@ -265,7 +266,7 @@ internal class LocalAutomationChatCoordinator(
                     handoffSummary = session.handoffSummary,
                     messages = recentTranscript,
                     transcriptIndex = sessionTranscriptIndex,
-                    planMode = false,
+                    work = LocalWorkState(),
                     jobs = emptyList(),
                     queuedInputCount = 0,
                     pendingApproval = null,
