@@ -78,6 +78,11 @@ internal class LocalAutomationChatCoordinator(
         require(initialSession.usageMode == LocalUsageMode.CHAT) { "定时互动只能绑定聊天模式会话" }
         require(!initialSession.groupChat.enabled) { "群聊暂不支持定时角色互动" }
 
+        val sessionLease = LocalSessionRuntimeRegistry.acquire(
+            targetSessionId,
+            LocalSessionRuntimeKind.AUTOMATION_CHAT,
+        )
+        try {
         if (recoverInterrupted) {
             recoverAutomationChatOutput(
                 eventLog = eventLogFor(targetSessionId),
@@ -496,6 +501,9 @@ internal class LocalAutomationChatCoordinator(
             if (ownsVisibleTurn) {
                 releaseVisibleTurn(targetSessionId, automationJob)
             }
+        }
+        } finally {
+            sessionLease.close()
         }
     }
 
