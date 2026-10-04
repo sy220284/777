@@ -51,12 +51,8 @@ internal class SessionSubagentRuntime(
         val scope = SessionAsyncScope(activeHostKey(), parentSessionId)
         val api = apiForHost(scope.hostKey) ?: return
         when (val result = api.subagentList(parentSessionId)) {
-            is RpcResult.Ok -> if (scope.isCurrent(activeHostKey, currentSessionId)) {
-                _subagents.value = result.value.entries
-            }
-            is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) {
-                onConnectionError(result.error.message)
-            }
+            is RpcResult.Ok -> if (scope.isCurrent(activeHostKey, currentSessionId)) _subagents.value = result.value.entries
+            is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) onConnectionError(result.error.message)
         }
     }
 
@@ -71,9 +67,7 @@ internal class SessionSubagentRuntime(
             )
         ) {
             is RpcResult.Ok -> Unit
-            is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) {
-                onConnectionError(result.error.message)
-            }
+            is RpcResult.Err -> if (scope.isCurrent(activeHostKey, currentSessionId)) onConnectionError(result.error.message)
         }
     }
 
@@ -161,9 +155,7 @@ internal class SessionSubagentRuntime(
         }
     }
 
-    fun closeTranscript() {
-        remoteStreams.cancelSubagentFollow()
-    }
+    fun closeTranscript() = remoteStreams.cancelSubagentFollow()
 
     private fun expandRecords(records: List<com.labteto.dshmobile.core.wire.dto.SessionHistoryRecord>): List<SessionEventEnvelope> =
         ChunkRows.expandAll(records).map { wireEventToEnvelope(it) }
