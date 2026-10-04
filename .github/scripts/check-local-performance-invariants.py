@@ -321,7 +321,10 @@ if "fun isCurrentForegroundRun(" not in run_coordinator:
     violations.append(
         "Foreground run checkpoints must reject late events after recovery or ownership replacement"
     )
-if "binding = binding," not in engine:
+if (
+    "executeSafely(\n                        call.toLocalToolCall(),\n                        allowMutation = true,\n                        binding = binding," not in engine
+    or "executeToolBatch(\n                        calls = calls.map { it.toLocalToolCall() },\n                        allowMutation = true,\n                        binding = binding," not in engine
+):
     violations.append(
         "Bound Work tool execution must keep the originating session binding after UI navigation"
     )
