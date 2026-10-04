@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 import com.labteto.dshmobile.local.LocalChatUserEditResult
+import androidx.activity.BackEventCompat
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
@@ -129,6 +131,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
 internal fun localHarnessDrawerUsageMode(
     current: LocalUsageMode,
     pending: LocalUsageMode?,
@@ -269,11 +272,20 @@ fun LocalHarnessScreen(
         }
     }
 
-    BackHandler(enabled = drawerState.isOpen || featurePage != LocalFeaturePage.HOME) {
-        if (drawerState.isOpen) {
-            scope.launch { drawerState.close() }
-        } else {
-            popFeature()
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch { drawerState.close() }
+    }
+
+    PredictiveBackHandler(
+        enabled = !drawerState.isOpen && featurePage != LocalFeaturePage.HOME,
+    ) { progress ->
+        var swipeEdge: Int? = null
+        progress.collect { event ->
+            if (swipeEdge == null) swipeEdge = event.swipeEdge
+        }
+        when (localFeatureBackAction(swipeEdge)) {
+            LocalFeatureBackAction.OPEN_DRAWER -> drawerState.open()
+            LocalFeatureBackAction.POP_FEATURE -> popFeature()
         }
     }
 
