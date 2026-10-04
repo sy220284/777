@@ -72,7 +72,7 @@ internal class LocalChatModelAssistController(
                     current.modelState.modelSelection.activeProfileId == snapshot.modelState.modelSelection.activeProfileId &&
                     current.chat.chatPersona == snapshot.chat.chatPersona &&
                     !current.loading &&
-                    !current.running &&
+                    !current.kernel.running &&
                     current.usageMode == LocalUsageMode.CHAT &&
                     !current.chat.groupChat.enabled
             ) {
