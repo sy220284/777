@@ -11,6 +11,7 @@ import java.util.UUID
  */
 internal class ChatDiaryTransferStore(
     private val documents: ChatDiaryDocumentStore,
+    private val rollback: ChatDiaryRollbackRecovery,
 ) {
     fun list(subjectKey: String): List<ChatDiaryEntry> =
         documents.read().entries.asSequence()
@@ -36,7 +37,7 @@ internal class ChatDiaryTransferStore(
         } catch (error: Throwable) {
             if (merged.changed > 0) {
                 try {
-                    documents.restore(before)
+                    rollback.restore(before, documents)
                 } catch (rollbackError: Throwable) {
                     error.addSuppressed(rollbackError)
                 }
