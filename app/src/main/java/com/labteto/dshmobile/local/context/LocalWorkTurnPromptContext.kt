@@ -28,7 +28,7 @@ internal fun ContextComposer.composeWorkTurnContext(
             workspacePath,
             snapshot.modelState.model,
             snapshot.modelState.baseUrl,
-            snapshot.modelState.modelState.modelSelection.activeProfile,
+            snapshot.modelState.modelSelection.activeProfile,
         ),
         dynamic = composed.dynamic,
     )
