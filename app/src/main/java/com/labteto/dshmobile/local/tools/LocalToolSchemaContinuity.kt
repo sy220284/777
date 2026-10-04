@@ -12,6 +12,13 @@ import kotlinx.serialization.json.jsonPrimitive
  * Additions are appended after the previously exposed schemas. Any removal or schema mutation is
  * treated as an authoritative capability/security change and replaces the surface immediately.
  */
+internal class LocalRunToolSurface {
+    private var visible: JsonArray? = null
+
+    fun next(current: JsonArray, state: LocalHarnessState): JsonArray =
+        stableRunToolSchemas(visible, current, state).also { visible = it }
+}
+
 internal fun stableRunToolSchemas(
     previous: JsonArray?,
     current: JsonArray,
