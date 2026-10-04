@@ -1849,7 +1849,10 @@ class LocalHarnessEngine @Inject constructor(
     internal suspend fun runAutomationPrompt(
         text: String,
         timeoutMillis: Long = 5 * 60_000L,
-    ): String = automationWorkCoordinator.runPrompt(text, timeoutMillis)
+    ): String = automationWorkCoordinator.runWork(
+        text = text,
+        timeoutMillis = timeoutMillis,
+    ).output
 
     internal suspend fun prepareAutomationWorkSession(
         text: String,
