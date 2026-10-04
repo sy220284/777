@@ -66,7 +66,7 @@ suspend fun saveCurrentToGallery(
     val snapshot = state.value
     check(
         !snapshot.loading &&
-            !snapshot.running &&
+            !snapshot.kernel.running &&
             snapshot.usageMode == LocalUsageMode.CHAT &&
             !snapshot.chat.groupChat.enabled
     ) {
@@ -106,7 +106,7 @@ fun hasUnsavedCurrentPersona(): Boolean {
     val snapshot = state.value
     if (
         snapshot.loading ||
-        snapshot.running ||
+        snapshot.kernel.running ||
         snapshot.usageMode != LocalUsageMode.CHAT ||
         snapshot.chat.groupChat.enabled
     ) return false
@@ -152,7 +152,7 @@ fun selectGalleryPersonaForCurrentChat(id: String): Boolean {
     val snapshot = state.value
     if (
         snapshot.loading ||
-        snapshot.running ||
+        snapshot.kernel.running ||
         snapshot.usageMode != LocalUsageMode.CHAT ||
         snapshot.transcriptIndex.hasDialogue
     ) return false
@@ -180,7 +180,7 @@ suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGallery
 }
 suspend fun autoFillNewPersona(description: String): Result<PersonaProfile> = runSuspendResult {
     val snapshot = state.value
-    check(!snapshot.loading && !snapshot.running && snapshot.modelState.configured) { "请先配置模型并等待当前回复结束" }
+    check(!snapshot.loading && !snapshot.kernel.running && snapshot.modelState.configured) { "请先配置模型并等待当前回复结束" }
     personaAutoFillService.generate(
         model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
         profileId = snapshot.modelState.modelSelection.activeProfileId,
@@ -195,7 +195,7 @@ suspend fun inspectGalleryPersona(
     storyId: String?,
 ): Result<PersonaInspectionResult> {
     val snapshot = state.value
-    if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) {
+    if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) {
         return Result.failure(IllegalStateException("请在聊天空闲时检查人物"))
     }
     if (!snapshot.modelState.configured) {
@@ -386,7 +386,7 @@ fun startFromGallery(
     freshStory: Boolean,
 ): Boolean {
     val snapshot = state.value
-    if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
+    if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
     val entry = gallery.value.firstOrNull { it.id == id } ?: return false
     return runtime.session.createSession(
         mode = LocalConversationMode.INDEPENDENT,
