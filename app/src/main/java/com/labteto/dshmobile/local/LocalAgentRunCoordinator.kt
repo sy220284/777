@@ -7,7 +7,6 @@ import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import java.util.UUID
-import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -183,12 +182,6 @@ internal class LocalAgentRunCoordinator(
         return data["run_id"]?.jsonPrimitive?.contentOrNull == context.runId &&
             data["status"]?.jsonPrimitive?.contentOrNull ==
                 LocalAgentRunCheckpointStatus.RUNNING.name.lowercase()
-    }
-
-    fun ensureCurrentForegroundRun(context: LocalAgentRunContext) {
-        if (!isCurrentForegroundRun(context)) {
-            throw CancellationException("当前运行已由新的执行或恢复流程接管")
-        }
     }
 
     fun recordEvent(context: LocalAgentRunContext, event: AgentEvent) {
