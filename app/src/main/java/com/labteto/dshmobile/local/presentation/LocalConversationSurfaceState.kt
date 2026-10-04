@@ -83,7 +83,7 @@ internal fun LocalHarnessState.toChatSurfaceUiState(): LocalConversationSurfaceS
 internal fun LocalHarnessState.toWorkSurfaceUiState(): LocalConversationSurfaceState =
     LocalConversationSurfaceState(
         loading = loading,
-        configured = configured,
+        configured = modelState.configured,
         sessionId = sessionId,
         usageMode = LocalUsageMode.WORK,
         running = running,

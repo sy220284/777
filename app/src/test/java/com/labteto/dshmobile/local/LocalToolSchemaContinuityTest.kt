@@ -40,7 +40,7 @@ class LocalToolSchemaContinuityTest {
         val unknown = stableRunToolSchemas(
             previous,
             reordered,
-            LocalHarnessState(model = "custom", baseUrl = "https://proxy.example/v1"),
+            LocalHarnessState(modelState = com.labteto.dshmobile.local.model.LocalModelState(model = "custom", baseUrl = "https://proxy.example/v1")),
         )
 
         assertEquals(listOf("a", "b", "c"), names(deepSeek))

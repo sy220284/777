@@ -48,23 +48,23 @@ class LocalWorkerModelRouterTest {
 
     @Test
     fun apiKeyParentWithoutWorkerInheritsParentRoute() {
-        val state = LocalHarnessState(
+        val state = LocalHarnessState(modelState = com.labteto.dshmobile.local.model.LocalModelState(
             modelSelection = LocalModelSelectionState(
                 profiles = listOf(worker),
                 activeProfileId = worker.id,
             ),
-        )
+        ))
         assertNull(LocalWorkerModelRouter.resolve(null, state))
     }
 
     private fun state(
         profiles: List<LocalModelProfile>,
         workerProfileId: String?,
-    ): LocalHarnessState = LocalHarnessState(
+    ): LocalHarnessState = LocalHarnessState(modelState = com.labteto.dshmobile.local.model.LocalModelState(
         modelSelection = LocalModelSelectionState(
             profiles = profiles,
             activeProfileId = primaryPlan.id,
             workerProfileId = workerProfileId,
         ),
-    )
+    ))
 }

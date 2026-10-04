@@ -67,7 +67,7 @@ class LocalSystemPromptContinuityTest {
     @Test
     fun unknownRouteKeepsReplacementSemantics() {
         val history = LocalModelHistoryBuffer().apply { append(system("原始规则")) }
-        val state = LocalHarnessState(model = "custom", baseUrl = "https://proxy.example/v1")
+        val state = LocalHarnessState(modelState = com.labteto.dshmobile.local.model.LocalModelState(model = "custom", baseUrl = "https://proxy.example/v1"))
 
         val mode = applyRuntimeSystemPromptUpdate(history, "新规则", state)
 

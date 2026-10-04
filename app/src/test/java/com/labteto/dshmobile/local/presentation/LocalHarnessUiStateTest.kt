@@ -155,9 +155,9 @@ class LocalHarnessUiStateTest {
     fun sameRouteAccountSwitchUpdatesSettingsWithoutWakingUnrelatedShellState() {
         val first = com.labteto.dshmobile.local.LocalModelProfile("account-a", "same-model", "https://example.com")
         val second = first.copy(id = "account-b")
-        val before = LocalHarnessState(model = first.model, baseUrl = first.baseUrl,
-            modelSelection = com.labteto.dshmobile.local.model.LocalModelSelectionState(listOf(first, second), first.id))
-        val after = before.copy(modelSelection = before.modelSelection.copy(activeProfileId = second.id))
+        val before = LocalHarnessState(modelState = com.labteto.dshmobile.local.model.LocalModelState(model = first.model, baseUrl = first.baseUrl,
+            modelSelection = com.labteto.dshmobile.local.model.LocalModelSelectionState(listOf(first, second), first.id)))
+        val after = before.copy(modelState = before.modelState.copy(modelSelection = before.modelState.modelSelection.copy(activeProfileId = second.id)))
         assertNotEquals(before.toSettingsUiState(), after.toSettingsUiState())
         assertEquals(before.toShellUiState(), after.toShellUiState())
         assertEquals(second.id, after.toSettingsUiState().modelSelection.activeProfileId)
