@@ -81,26 +81,6 @@ internal class ChatDiaryDocumentStore(private val root: File, private val json: 
         cachedStamp = stamp()
     }
 
-    /**
-     * Restores a failed higher-level transaction without leaving the rolled-back document in the
-     * recovery backup. A normal [write] intentionally backs up the previous primary; rollback must
-     * instead make both recovery copies agree with the restored state.
-     */
-    @Synchronized
-    fun restore(document: ChatDiaryDocument) {
-        write(document)
-        val backupRestored = runCatching {
-            file.copyTo(backup, overwrite = true)
-            decode(backup) == document
-        }.getOrDefault(false)
-        if (!backupRestored) {
-            val staleBackupRemoved = !backup.exists() || backup.delete()
-            check(staleBackupRemoved) { "人物日记回滚备份无法恢复或清除" }
-        }
-        cached = document
-        cachedStamp = stamp()
-    }
-
     private fun decode(target: File): ChatDiaryDocument? {
         if (!target.isFile) return null
         return runCatching {
