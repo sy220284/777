@@ -32,7 +32,6 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
-import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
@@ -4641,12 +4640,9 @@ class LocalHarnessEngine @Inject constructor(
         baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
         deferReady: Boolean = false,
     ) {
-        val capturedLiveWorkBinding = liveWorkRun(sessionId)
-        if (capturedLiveWorkBinding != null) {
-            // 同进程内仍存活的 Work runtime 是唯一运行时事实源。重新进入只重新绑定，
-            // 不触碰持久恢复，不重启任务，也不让磁盘快照覆盖正在执行的状态。
+        liveWorkRun(sessionId)?.let { liveBinding ->
             pendingInputs.clear()
-            syncVisibleWorkRun(sessionId, capturedLiveWorkBinding)
+            syncVisibleWorkRun(sessionId, liveBinding)
             return
         }
 
@@ -4662,17 +4658,7 @@ class LocalHarnessEngine @Inject constructor(
             }
             return
         }
-        // A live Work binding still owns this session in the current process. Re-entering the
-        // conversation is only a UI/runtime rebind; persisted crash recovery must not touch its
-        // open turn or manufacture a second foreground run.
-        val liveWorkBinding = liveWorkRun(sessionId)
-        val recovery = if (
-            LocalRuntimeOwnershipPolicy.allowPersistedRecovery(liveWorkBinding != null)
-        ) {
-            eventLog.repairInterruptedTail()
-        } else {
-            SessionRepairResult()
-        }
+        val recovery = eventLog.repairInterruptedTail()
         recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
@@ -4708,15 +4694,9 @@ class LocalHarnessEngine @Inject constructor(
         val restoredInbox = eventLog.latest(LOCAL_AGENT_INBOX_EVENT_TYPE)
             ?.let { event -> decodeLocalAgentInboxPending(event.data) }
             .orEmpty()
-        // A live Work run owns its own pending queue. Never mirror its durable inbox into the
-        // visible/global queue or start those inputs as a second foreground run.
-        pendingInputs.restore(if (liveWorkBinding == null) restoredInbox else emptyList())
+        pendingInputs.restore(restoredInbox)
         val modelProfiles = modelConfiguration.readProfiles()
-        val recoveryDecision = if (liveWorkBinding == null) {
-            agentRunCoordinator.recoveryDecision(sessionId, recovery)
-        } else {
-            null
-        }
+        val recoveryDecision = agentRunCoordinator.recoveryDecision(sessionId, recovery)
         val recoveryState = foregroundRecoveryCoordinator.restore(
             sessionId, recoveryDecision, modelProfiles, pendingInputs, eventLog,
         )
@@ -4817,17 +4797,12 @@ class LocalHarnessEngine @Inject constructor(
                 loaded?.legacySafeAutoApproval == true,
             ),
             jobs = projectExecutionJobs(stored.usageMode, stored.id, jobs.snapshotInfos()),
-            queuedInputCount = liveWorkBinding?.pendingInputs?.size() ?: pendingInputs.size(),
+            queuedInputCount = pendingInputs.size(),
             resources = resourceScheduler.snapshot().toLocalHarnessResourceState(stored.usageMode),
             contextChars = modelHistory.encodedChars,
             contextBudgetChars = currentHistoryBudget().maxHistoryChars,
             error = runRecoveryError,
         )
-        // While a live Work binding owns the session, its in-memory history/state is authoritative.
-        // The lifecycle caller immediately rebinds that runtime into the visible projection. Avoid
-        // writing stale disk-restored checkpoints or snapshots during this hand-off.
-        if (liveWorkBinding != null) return
-
         var wroteHistoryCheckpoint = false
         if (_state.value.groupChat.enabled) {
             projectGroupGalleryState(_state.value.groupChat, chatPersonaGalleryStore).failures.forEach { failure ->
