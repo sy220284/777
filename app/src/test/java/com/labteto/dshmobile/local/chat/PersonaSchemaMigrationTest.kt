@@ -54,6 +54,8 @@ class PersonaSchemaMigrationTest {
                 name = "神里绫华",
                 identity = "用户自己补写过的神里家大小姐",
                 personality = "用户自己调整过的沉静性格",
+                behaviorPatterns = listOf("用户自己补过：紧张时会先整理袖口"),
+                hardConstraints = listOf("用户自己补过：绝不会失约"),
                 presetId = "genshin-kamisato-ayaka",
             ),
         )
@@ -63,9 +65,11 @@ class PersonaSchemaMigrationTest {
         assertTrue(migrated.attentionBiases.isNotEmpty())
         assertTrue(migrated.attentionKeywords.isNotEmpty())
         assertTrue(migrated.perceptionBlindSpots.isNotEmpty())
-        assertTrue(migrated.quirks.isNotEmpty())
+        assertTrue("常见习惯：用户自己补过：紧张时会先整理袖口" in migrated.quirks)
+        assertTrue(migrated.quirks.size > 1)
         assertTrue(migrated.limitations.isNotEmpty())
         assertTrue(migrated.mutableTraits.isNotEmpty())
+        assertTrue("用户自己补过：绝不会失约" in migrated.hardConstraints)
     }
 
     @Test
