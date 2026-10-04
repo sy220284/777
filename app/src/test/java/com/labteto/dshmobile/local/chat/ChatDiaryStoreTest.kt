@@ -787,6 +787,10 @@ class ChatDiaryStoreTest {
 
         assertTrue(result.isFailure)
         assertTrue(target.listForTransfer("gallery:target").isEmpty())
+
+        File(targetRoot, "diary.json").writeText("{broken")
+        val recovered = ChatDiaryStore(targetRoot, json)
+        assertTrue(recovered.listForTransfer("gallery:target").isEmpty())
     }
 
     private fun request(
