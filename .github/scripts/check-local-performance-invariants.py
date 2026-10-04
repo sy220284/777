@@ -313,7 +313,7 @@ if live_rebind_pos < 0 or durable_repair_pos < 0 or live_rebind_pos > durable_re
     violations.append(
         "Live session-bound Work runtime must be rebound before durable interrupted-tail recovery"
     )
-if "liveWorkRuntimeActive = liveWorkRun(currentSessionId) != null" not in engine:
+if "canStartUnboundQueuedTurn(sessionTransitioning, activeJob?.isCompleted == false, activeWorkRuns[currentSessionId]?.job?.isCompleted == false)" not in engine:
     violations.append(
         "Shared visible queue must stay idle while the current session has a live bound Work runtime"
     )
@@ -322,8 +322,8 @@ if "fun isCurrentForegroundRun(" not in run_coordinator:
         "Foreground run checkpoints must reject late events after recovery or ownership replacement"
     )
 if (
-    "executeSafely(\n                        call.toLocalToolCall(),\n                        allowMutation = true,\n                        binding = binding," not in engine
-    or "executeToolBatch(\n                        calls = calls.map { it.toLocalToolCall() },\n                        allowMutation = true,\n                        binding = binding," not in engine
+    "executeSafely(call.toLocalToolCall(), allowMutation = true, binding = binding)" not in engine
+    or "executeToolBatch(calls.map { it.toLocalToolCall() }, allowMutation = true, binding = binding)" not in engine
 ):
     violations.append(
         "Bound Work tool execution must keep the originating session binding after UI navigation"
