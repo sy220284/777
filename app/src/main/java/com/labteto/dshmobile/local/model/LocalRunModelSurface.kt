@@ -39,3 +39,16 @@ internal fun LocalModelProfile.toRunModelSurface(): LocalRunModelSurface {
         routeFingerprint = routeFingerprint(),
     )
 }
+
+internal fun LocalHarnessState.currentModelRuntimeCapabilities(): LocalModelRuntimeCapabilities {
+    val profile = modelSelection.activeProfile
+    val protocol = profile?.let {
+        resolveLocalModelProtocol(it.authKind, it, model, baseUrl)
+    } ?: LocalModelPresets.protocolFor(model, baseUrl)
+    return LocalModelPresets.runtimeCapabilitiesFor(
+        model = model,
+        baseUrl = baseUrl,
+        protocol = protocol,
+        authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
+    )
+}
