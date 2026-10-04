@@ -60,7 +60,7 @@ class LocalToolSchemaContinuityTest {
     fun frozenRunSurfaceKeepsToolUpdateModeStableAcrossLaterStateChanges() {
         val surface = LocalModelProfile(
             id = "deepseek-run",
-            model = "deepseek-chat",
+            model = "deepseek-flash",
             baseUrl = "https://api.deepseek.com",
             provider = "DeepSeek",
         ).toRunModelSurface()

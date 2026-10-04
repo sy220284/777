@@ -14,7 +14,7 @@ class LocalAgentRuntimeFoundationV2Test {
     fun frozenRunSurfaceOwnsRouteCapabilitiesAndFingerprint() {
         val profile = LocalModelProfile(
             id = "deepseek-main",
-            model = "deepseek-chat",
+            model = "deepseek-flash",
             baseUrl = "https://api.deepseek.com",
             provider = "DeepSeek",
         )
