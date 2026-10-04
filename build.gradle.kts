@@ -1,4 +1,5 @@
 // Top-level build file for DSH Mobile (DeepSeek Harness Remote).
+// CI full-topology validation marker; no product or build behavior change.
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
