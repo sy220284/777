@@ -21,13 +21,11 @@ internal class LocalSubagentModelStepExecutor(
     private val executionControl: LocalWorkExecutionControl? = null,
 ) {
     private val requestBoundary = LocalSubagentModelRequestBoundary(
-        modelGateway, resourceScheduler, eventLog, executionControl,
+        LocalAgentModelRequestRuntime(modelGateway, resourceScheduler), eventLog, executionControl,
     )
 
     suspend fun complete(
-        profile: LocalModelProfile,
-        baseUrl: String,
-        model: String,
+        surface: LocalRunModelSurface,
         history: List<JsonObject>,
         tools: JsonArray,
         subagentId: String,
@@ -93,7 +91,11 @@ internal class LocalSubagentModelStepExecutor(
             try {
                 return executor.execute {
                     requestBoundary.complete(
-                        profile, model, baseUrl, activeHistory, tools, subagentId, step,
+                        surface = surface,
+                        messages = activeHistory,
+                        tools = tools,
+                        subagentId = subagentId,
+                        step = step,
                     )
                 }
             } catch (error: Throwable) {
@@ -138,7 +140,7 @@ internal class LocalSubagentModelStepExecutor(
                     put("agent_id", subagentId)
                     put("step", step)
                     put("round", overflowRound)
-                    put("model", model)
+                    put("model", surface.model)
                     put("estimated_tokens_before", compacted.estimatedTokensBefore)
                     put("estimated_tokens_after", compacted.estimatedTokensAfter)
                     put("omitted_messages", compacted.omittedMessages)

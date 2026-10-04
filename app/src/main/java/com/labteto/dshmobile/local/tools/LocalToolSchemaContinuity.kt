@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.model.resolveLocalModelProtocol
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -9,32 +8,57 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Keeps an APPEND_ONLY provider tool surface byte-stable inside one run.
  *
- * Additions are appended after the previously exposed schemas. Any removal or schema mutation is
- * treated as an authoritative capability/security change and replaces the surface immediately.
+ * A frozen [LocalRunModelSurface] is preferred so changing UI model selection cannot mutate an
+ * already running Agent's provider capability semantics.
  */
-internal class LocalRunToolSurface {
+internal class LocalRunToolSurface(
+    private val surface: LocalRunModelSurface? = null,
+) {
     private var visible: JsonArray? = null
 
     fun next(current: JsonArray, state: LocalHarnessState): JsonArray =
-        stableRunToolSchemas(visible, current, state).also { visible = it }
+        stableRunToolSchemas(
+            previous = visible,
+            current = current,
+            capabilities = surface?.capabilities ?: state.currentModelRuntimeCapabilities(),
+        ).also { visible = it }
+
+    fun next(current: JsonArray): JsonArray {
+        val frozen = requireNotNull(surface) { "Frozen model surface is required" }
+        return stableRunToolSchemas(
+            previous = visible,
+            current = current,
+            capabilities = frozen.capabilities,
+        ).also { visible = it }
+    }
 }
 
 internal fun stableRunToolSchemas(
     previous: JsonArray?,
     current: JsonArray,
     state: LocalHarnessState,
+): JsonArray = stableRunToolSchemas(
+    previous = previous,
+    current = current,
+    capabilities = state.currentModelRuntimeCapabilities(),
+)
+
+internal fun stableRunToolSchemas(
+    previous: JsonArray?,
+    current: JsonArray,
+    surface: LocalRunModelSurface,
+): JsonArray = stableRunToolSchemas(
+    previous = previous,
+    current = current,
+    capabilities = surface.capabilities,
+)
+
+private fun stableRunToolSchemas(
+    previous: JsonArray?,
+    current: JsonArray,
+    capabilities: LocalModelRuntimeCapabilities,
 ): JsonArray {
     previous ?: return current
-    val profile = state.modelSelection.activeProfile
-    val protocol = profile?.let {
-        resolveLocalModelProtocol(it.authKind, it, state.model, state.baseUrl)
-    } ?: LocalModelPresets.protocolFor(state.model, state.baseUrl)
-    val capabilities = LocalModelPresets.runtimeCapabilitiesFor(
-        model = state.model,
-        baseUrl = state.baseUrl,
-        protocol = protocol,
-        authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
-    )
     if (capabilities.toolUpdateMode != LocalModelPromptUpdateMode.APPEND_ONLY) return current
     return appendOnlyToolSchemas(previous, current)
 }

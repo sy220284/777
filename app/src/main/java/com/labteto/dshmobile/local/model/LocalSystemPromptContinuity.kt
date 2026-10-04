@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
-import com.labteto.dshmobile.local.model.resolveLocalModelProtocol
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -46,16 +45,7 @@ internal fun applyRuntimeSystemPromptUpdate(
     prompt: String,
     state: LocalHarnessState,
 ): LocalModelPromptUpdateMode {
-    val profile = state.modelSelection.activeProfile
-    val protocol = profile?.let {
-        resolveLocalModelProtocol(it.authKind, it, state.model, state.baseUrl)
-    } ?: LocalModelPresets.protocolFor(state.model, state.baseUrl)
-    val mode = LocalModelPresets.runtimeCapabilitiesFor(
-        model = state.model,
-        baseUrl = state.baseUrl,
-        protocol = protocol,
-        authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
-    ).systemPromptUpdateMode
+    val mode = state.currentModelRuntimeCapabilities().systemPromptUpdateMode
     val hasSystem = history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
     val message = buildJsonObject {
         put("role", "system")

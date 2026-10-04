@@ -2918,9 +2918,11 @@ class LocalHarnessEngine @Inject constructor(
         var workPromptContext = LocalWorkTurnPromptContext()
         var chatStableContext = ""
         var chatDynamicContext = ""
-        val runToolSurface = LocalRunToolSurface()
-        val mainMaxSteps = runState.value.mainMaxSteps
         val runSnapshot = runState.value
+        val runToolSurface = LocalRunToolSurface(
+            runSnapshot.modelSelection.activeProfile?.toRunModelSurface(),
+        )
+        val mainMaxSteps = runSnapshot.mainMaxSteps
         val mainStepLimit = if (runPolicy.allowToolExecution) {
             adaptiveAgentStepLimit(
                 configuredBase = mainMaxSteps,
@@ -4489,7 +4491,9 @@ class LocalHarnessEngine @Inject constructor(
         sessionId: String,
         callId: String?,
         result: String,
-        binding: LocalWorkRunBinding? = null, retention: com.labteto.dshmobile.harness.tools.ToolResultRetention = com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE,
+        binding: LocalWorkRunBinding? = null,
+        retention: com.labteto.dshmobile.harness.tools.ToolResultRetention =
+            com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE,
     ): String {
         val history = binding?.modelHistory ?: modelHistory
         val budget = adaptiveToolResultBudget(
@@ -4497,21 +4501,14 @@ class LocalHarnessEngine @Inject constructor(
             currentHistoryChars = history.encodedChars,
             currentHistoryTokens = history.estimatedTokens,
         )
-        val stored = retention == com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE &&
-            callId?.let { toolOutputStore.store(sessionId, it, result) } != null
-        val retained = retainToolResultForModel(
-            result,
-            (binding?.state?.value ?: _state.value).usageMode,
-            budget,
-        )
-        if (!retained.truncated) return retained.text
-        val recovery = when {
-            callId == null -> "请缩小查询范围后继续读取。"
-            stored -> "可调用 tool_output_read，并传入 call_id=$callId 分段读取完整结果。"
-            else -> "完整结果超过本机私有保留上限；请缩小原查询后重试。"
-        }
-        return retained.text +
-            "\n[已从模型上下文省略 ${retained.omittedBytes} 个 UTF-8 字节；$recovery]"
+        return projectRecoverableToolResult(
+            value = result,
+            retention = retention,
+            usageMode = (binding?.state?.value ?: _state.value).usageMode,
+            budget = budget,
+            callId = callId,
+            spill = { id, value -> toolOutputStore.store(sessionId, id, value) != null },
+        ).text
     }
 
     private fun compactHistoryIfNeeded(

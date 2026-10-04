@@ -228,11 +228,10 @@ internal fun shouldAutoContinueWorkFailure(
     automaticContinuationCount: Int,
     pendingInputs: Int,
 ): Boolean =
-    error?.continuationEligible == true &&
-        automaticContinuationCount < MAX_AUTOMATIC_CONTINUATIONS &&
-        pendingInputs == 0
-
-private const val MAX_AUTOMATIC_CONTINUATIONS = 2
+    com.labteto.dshmobile.local.agent.DEFAULT_AGENT_CONTINUATION_POLICY.allows(
+        error = error,
+        completedContinuations = automaticContinuationCount,
+    ) && pendingInputs == 0
 
 internal class LocalWorkExecutionControl(
     val budget: LocalWorkExecutionBudget = LocalWorkExecutionBudget(),
