@@ -95,6 +95,7 @@ internal fun ChatAutomationScreen(
     viewModel: TasksViewModel,
     onClose: () -> Unit,
     onOpenSession: (String) -> Unit,
+    handleRootSystemBack: Boolean,
 ) {
     val colors = DsTheme.colors
     val canPlan = harnessState.usageMode == LocalUsageMode.CHAT &&
@@ -108,7 +109,7 @@ internal fun ChatAutomationScreen(
     var observedSaveRevision by remember { mutableLongStateOf(state.saveRevision) }
     val planMention = stringResource(R.string.tasks_chat_plan_mention)
 
-    BackHandler(onBack = onClose)
+    BackHandler(enabled = handleRootSystemBack, onBack = onClose)
     LaunchedEffect(harnessState.sessionId, canPlan) {
         if (canPlan) viewModel.loadChatSuggestions()
     }
