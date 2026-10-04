@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.local.LocalHarnessSettingsCoordinator
 import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalSessionStorageStatus
 import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
@@ -29,6 +30,7 @@ class LocalSettingsRuntime @Inject constructor(
     chatGptAuth: ChatGptAuthCoordinator,
     chatGptPlanTester: ChatGptPlanConnectionTester,
     private val modelSettings: LocalModelSettingsCoordinator,
+    private val settingsCoordinator: LocalHarnessSettingsCoordinator,
     runtimeStateStore: LocalRuntimeStateStore,
 ) {
     private val chatGpt = ChatGptSettingsController(
@@ -62,13 +64,16 @@ class LocalSettingsRuntime @Inject constructor(
     fun removeModel(id: String) = engine.removeModelProfile(id)
     suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null) = engine.testModelConfiguration(apiKey, model, baseUrl, protocol, profileId)
     fun configureImageInputMode(mode: LocalImageInputMode) = modelSettings.configureImageInputMode(mode)
-    fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int, workerProfileId: String?) = engine.configureRuntimeLimits(main, subagent, attempts).also { engine.configureWorkerProfile(workerProfileId) }
+    fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int, workerProfileId: String?) =
+        settingsCoordinator.configureRuntimeLimits(main, subagent, attempts).also {
+            settingsCoordinator.configureWorkerProfile(workerProfileId)
+        }
     fun configurePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean) =
-        engine.configurePersonalization(rules, autoRecall, autoMemory)
-    fun configureChatStyleGuard(enabled: Boolean) = engine.configureChatStyleGuard(enabled)
-    fun addChatStyleGuardPhrase(value: String) = engine.addChatStyleGuardPhrase(value)
-    fun removeChatStyleGuardPhrase(value: String) = engine.removeChatStyleGuardPhrase(value)
-    fun clearChatStyleGuardHits() = engine.clearChatStyleGuardHits()
+        settingsCoordinator.configurePersonalization(rules, autoRecall, autoMemory)
+    fun configureChatStyleGuard(enabled: Boolean) = settingsCoordinator.configureChatStyleGuard(enabled)
+    fun addChatStyleGuardPhrase(value: String) = settingsCoordinator.addChatStyleGuardPhrase(value)
+    fun removeChatStyleGuardPhrase(value: String) = settingsCoordinator.removeChatStyleGuardPhrase(value)
+    fun clearChatStyleGuardHits() = settingsCoordinator.clearChatStyleGuardHits()
     suspend fun diagnoseNetwork(target: String) = engine.diagnoseNetwork(target)
     suspend fun sessionStorageStatus(): LocalSessionStorageStatus = engine.sessionStorageStatusForUi()
     suspend fun compactSessionStorage(): LocalSessionStorageStatus = engine.compactSessionStorageForUi()
