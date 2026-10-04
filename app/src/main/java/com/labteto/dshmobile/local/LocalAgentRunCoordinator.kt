@@ -169,7 +169,23 @@ internal class LocalAgentRunCoordinator(
         return context
     }
 
+    /**
+     * Foreground runs have a single durable owner per session. Once recovery or a newer foreground
+     * run takes over, late results from the old coroutine must not revive its checkpoint stream.
+     */
+    fun isCurrentForegroundRun(context: LocalAgentRunContext): Boolean {
+        if (context.kind != LocalAgentRunKind.FOREGROUND) return true
+        val data = eventLogFor(context.sessionId)
+            .latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT)
+            ?.data
+            ?: return false
+        return data["run_id"]?.jsonPrimitive?.contentOrNull == context.runId &&
+            data["status"]?.jsonPrimitive?.contentOrNull ==
+                LocalAgentRunCheckpointStatus.RUNNING.name.lowercase()
+    }
+
     fun recordEvent(context: LocalAgentRunContext, event: AgentEvent) {
+        if (!isCurrentForegroundRun(context)) return
         when (event) {
             is AgentEvent.TurnStarted -> append(
                 context,
@@ -395,13 +411,14 @@ internal class LocalAgentRunCoordinator(
         sessionId: String,
         runId: String,
         kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
+        reason: String = "durable_session_recovery",
     ) {
         appendRecoveryState(
             sessionId = sessionId,
             runId = runId,
             kind = kind,
             status = LocalAgentRunCheckpointStatus.RECOVERY_QUEUED,
-            reason = "process_restart",
+            reason = reason,
         )
     }
 
@@ -528,7 +545,14 @@ internal class LocalAgentRunCoordinator(
         status: LocalAgentRunCheckpointStatus,
         reason: String,
     ) {
-        eventLogFor(sessionId).append(
+        val log = eventLogFor(sessionId)
+        val latestRunId = log.latest(eventType(kind))
+            ?.data
+            ?.get("run_id")
+            ?.jsonPrimitive
+            ?.contentOrNull
+        if (latestRunId != runId) return
+        log.append(
             eventType(kind),
             buildJsonObject {
                 put("version", LOCAL_AGENT_RUN_CHECKPOINT_VERSION)
