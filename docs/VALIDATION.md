@@ -197,6 +197,9 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - Token 诊断复用 `TokenUsageAnalyticsStore` 请求级账本，至少保留 action、run/parent/agent/step、真实 route、input/cache/output/reasoning 与 Prompt 构成；禁止再建第二套 Token 事实源。
 - Work 大上下文在请求前派生“可信检查点 + 近期原文”的有界投影；SessionEventLog 和持久模型历史仍保留完整事实。Chat 不继承 Work 专属稳态投影阈值。
 - Chat / Work 必须通过共享请求上下文治理入口进入模型请求；模式策略可以不同，但请求压力、缓存连续性、overflow 与 checkpoint envelope 不得再各建平行事实源。
+- 主 Agent / 子代理必须使用冻结的 `LocalRunModelSurface` 解析 route capabilities，并经共享模型请求资源边界发起 provider 调用；运行期间修改当前模型选择不得改变已启动 Run 的工具面更新语义。
+- continuation 只允许用于明确 `continuationEligible` 的 post-admission 失败并受统一次数上限约束；不得把 continuation 退化为原请求重放。
+- durable 大工具结果必须复用统一 recoverable projection：完整结果可恢复、模型侧预览有界、EPHEMERAL 结果不得伪装成可恢复落盘结果。
 - 新生成的压缩检查点必须携带明确的 chat/work 类型；旧 Work v1 provenance 只允许作为恢复兼容读取，新 Chat 压缩不得写 Work 专属 provenance。
 - 模型候选状态不得直接覆盖运行时事实：Chat 长期人物状态和 Work 目标状态都必须经过运行时 transition policy；Work 仍有 pending/in_progress Todo 时禁止把目标标记为 completed。
 - 输出质量守卫采用共享 inspect/result 契约；Chat 仅做高置信最小修复，Work 完成声明与 Todo/Goal 状态冲突时只记录脱敏诊断，禁止在缺少执行证据时静默改写最终答复。
