@@ -57,6 +57,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -126,6 +127,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 @Composable
 internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
@@ -200,34 +202,15 @@ internal fun LocalConversationSurface(
     val attachments = remember(state.sessionId) { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
-    var transcriptWindowSize by rememberSaveable(state.sessionId) {
-        mutableStateOf(LOCAL_TRANSCRIPT_INITIAL_WINDOW_MESSAGES)
-    }
+    var transcriptInitialPositionReady by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var planReviewBusy by remember(state.pendingQuestion?.callId) { mutableStateOf(false) }
-    var previousTranscriptMessageCount by rememberSaveable(state.sessionId) {
-        mutableStateOf(state.messages.size)
-    }
-    LaunchedEffect(state.messages.size) {
-        val added = (state.messages.size - previousTranscriptMessageCount).coerceAtLeast(0)
-        if (
-            added > 0 &&
-            transcriptHistory.sessionId == state.sessionId &&
-            transcriptHistory.olderMessages.isNotEmpty()
-        ) {
-            transcriptWindowSize += added
-        }
-        previousTranscriptMessageCount = state.messages.size
-    }
-    val transcriptWindow = remember(state.messages, transcriptWindowSize) {
-        localTranscriptWindow(state.messages, transcriptWindowSize)
-    }
     val pagedOlderMessages = if (transcriptHistory.sessionId == state.sessionId) {
         transcriptHistory.olderMessages
     } else {
         emptyList()
     }
-    val transcriptMessages = remember(pagedOlderMessages, transcriptWindow.messages) {
-        mergeLocalTranscriptHistory(pagedOlderMessages, transcriptWindow.messages)
+    val transcriptMessages = remember(pagedOlderMessages, state.messages) {
+        mergeLocalTranscriptHistory(pagedOlderMessages, state.messages)
     }
     val transcriptItems = remember(transcriptMessages, state.usageMode) {
         buildLocalTranscript(
@@ -235,12 +218,15 @@ internal fun LocalConversationSurface(
             includeWorkProcess = state.usageMode == LocalUsageMode.WORK,
         )
     }
-    val hiddenTranscriptCount = (state.messages.size - transcriptMessages.size).coerceAtLeast(0)
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.loading
-    val transcriptPrefixItemCount = if (hiddenTranscriptCount > 0 || hasOlderTranscript) 1 else 0
+    val transcriptHistoryError = transcriptHistory.error
+        ?.takeIf { transcriptHistory.sessionId == state.sessionId }
+    val showTranscriptPagingRow = transcriptHistoryError != null ||
+        (hasOlderTranscript && loadingOlderTranscript)
+    val transcriptPrefixItemCount = if (showTranscriptPagingRow) 1 else 0
     val transcriptLastListIndex = transcriptPrefixItemCount + transcriptItems.lastIndex
     val messageEditingEnabled = true
     val messageBranchingEnabled = state.usageMode == LocalUsageMode.CHAT
@@ -323,6 +309,7 @@ internal fun LocalConversationSurface(
     }
 
     LaunchedEffect(state.sessionId) {
+        transcriptInitialPositionReady = false
         scrollHint.hide()
         attachments.clear()
         attachmentError = null
@@ -330,6 +317,31 @@ internal fun LocalConversationSurface(
         if (transcriptItems.isNotEmpty()) {
             listState.scrollToItem(transcriptLastListIndex)
         }
+        transcriptInitialPositionReady = true
+    }
+
+    LaunchedEffect(
+        state.sessionId,
+        hasOlderTranscript,
+        loadingOlderTranscript,
+        transcriptHistoryError,
+        transcriptInitialPositionReady,
+    ) {
+        if (
+            !transcriptInitialPositionReady ||
+            !hasOlderTranscript ||
+            loadingOlderTranscript ||
+            transcriptHistoryError != null
+        ) {
+            return@LaunchedEffect
+        }
+        snapshotFlow {
+            listState.firstVisibleItemIndex <= LOCAL_TRANSCRIPT_AUTOLOAD_THRESHOLD_ITEMS
+        }
+            .distinctUntilChanged()
+            .collect { nearStart ->
+                if (nearStart) onLoadOlderTranscript(state.sessionId)
+            }
     }
 
     LaunchedEffect(state.messages.size, transcriptItems.size) {
@@ -521,28 +533,35 @@ internal fun LocalConversationSurface(
                 ),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.comfortable),
             ) {
-                if (hiddenTranscriptCount > 0 || hasOlderTranscript) {
-                    item(key = "local-transcript-load-older") {
-                        DsButton(
-                            text = when {
-                                loadingOlderTranscript -> stringResource(R.string.tools_processing)
-                                hiddenTranscriptCount > 0 -> stringResource(
-                                    R.string.local_transcript_load_older,
-                                    hiddenTranscriptCount,
-                                )
-                                else -> stringResource(R.string.local_transcript_load_older_unknown)
-                            },
-                            onClick = {
-                                if (!loadingOlderTranscript) {
+                if (showTranscriptPagingRow) {
+                    item(key = "local-transcript-history-status") {
+                        if (transcriptHistoryError != null) {
+                            DsButton(
+                                text = stringResource(R.string.local_transcript_retry_older),
+                                onClick = {
                                     scope.launch {
                                         onLoadOlderTranscript(state.sessionId)
                                     }
-                                }
-                            },
-                            enabled = !loadingOlderTranscript,
-                            modifier = Modifier.fillMaxWidth(),
-                            variant = DsButtonVariant.Ghost,
-                        )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                variant = DsButtonVariant.Ghost,
+                            )
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .padding(vertical = DsSpacing.small),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(DsSpacing.small))
+                                Text(
+                                    stringResource(R.string.local_transcript_loading_older),
+                                    style = DsType.small13.withReadingWeight(),
+                                    color = colors.labelSecondary,
+                                )
+                            }
+                        }
                     }
                 }
                 if (transcriptItems.isEmpty() && state.usageMode == LocalUsageMode.WORK) {
