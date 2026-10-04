@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
+import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class LocalRuntimeStateStore @Inject constructor() {
     private val mutable = MutableStateFlow(LocalHarnessState())
     private val sendFeedbackMutable = MutableStateFlow(LocalSendFeedbackState())
+    internal val streamingPreviewStore = LocalStreamingPreviewStore()
     @Volatile private var initialized = false
     @Volatile private var foregroundSessionId: String? = null
 
