@@ -48,10 +48,10 @@ internal class LocalToolSchemaProjection(
         val tools = registry.names()
             .mapNotNull(registry::get)
             .filter { tool ->
-                !state.planMode || LocalToolPolicy.allowedInPlan(tool.name, tool.access)
+                !state.work.planMode || LocalToolPolicy.allowedInPlan(tool.name, tool.access)
             }
         return LocalToolRouter.visibleSchemas(
-            tools = if (state.planMode) tools.map(HarnessTool::forReadOnlyModelScope) else tools,
+            tools = if (state.work.planMode) tools.map(HarnessTool::forReadOnlyModelScope) else tools,
             enabledOptional = enabled,
             maxOptionalDefinitionTokens = promptBudget,
         )
