@@ -6,7 +6,6 @@ import com.labteto.dshmobile.local.work.guardWorkCompletionDelivery
 import com.labteto.dshmobile.local.work.recordWorkCompletionQuality
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
-import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.send.prepareLocalSend
 import android.app.ActivityManager
@@ -346,10 +345,8 @@ class LocalHarnessEngine @Inject constructor(
                 LocalHarnessSettingsCoordinator.loadChatStyleGuardCustomPhrases(preferences),
         ),
     )
-    private val _sendFeedbackState = MutableStateFlow(LocalSendFeedbackState())
     internal val state: StateFlow<LocalHarnessState> = runtimeStateStore.state
     internal val streamingState: StateFlow<LocalHarnessStreamingState> = streamingPreviewStore.state
-    internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = _sendFeedbackState.asStateFlow()
 
     private val currentSessionId: String
         get() = runtimeStateStore.currentSessionId
@@ -1630,14 +1627,16 @@ class LocalHarnessEngine @Inject constructor(
                 sessionTransitioning = sessionTransitioning,
                 pendingCount = targetPending.size(), pendingLimit = MAX_PENDING_INPUTS,
                 onRejected = { rejected ->
-                    _sendFeedbackState.value = LocalSendFeedbackState(
-                        sessionId = state.sessionId,
-                        rejectReason = rejected.rejectReason,
-                        rejectLimit = rejected.rejectLimit,
+                    runtimeStateStore.publishSendFeedback(
+                        com.labteto.dshmobile.local.send.LocalSendFeedbackState(
+                            sessionId = state.sessionId,
+                            rejectReason = rejected.rejectReason,
+                            rejectLimit = rejected.rejectLimit,
+                        ),
                     )
                 },
                 onAccepted = {
-                    _sendFeedbackState.value = LocalSendFeedbackState()
+                    runtimeStateStore.clearSendFeedback()
                     cancelChatPostTurn()
                 },
                 enqueue = { targetPending.offer(queuedInput) },
