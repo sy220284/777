@@ -14,6 +14,7 @@ class LocalAutomationRuntime @Inject constructor(
         val snapshot = engine.state.value
         return AutomationPlanningContext(
             sessionId = snapshot.sessionId,
+            revision = planningRevision(snapshot),
             configured = snapshot.configured,
             usageMode = snapshot.usageMode,
             groupChatEnabled = snapshot.groupChat.enabled,
@@ -30,6 +31,16 @@ class LocalAutomationRuntime @Inject constructor(
                 .map { AutomationPlanningMessage(it.role, it.content) },
         )
     }
+
+    internal fun planningRevision(): AutomationPlanningRevision =
+        planningRevision(engine.state.value)
+
+    private fun planningRevision(snapshot: com.labteto.dshmobile.local.LocalHarnessState) =
+        AutomationPlanningRevision(
+            sessionId = snapshot.sessionId,
+            latestDialogueMessageId = snapshot.transcriptIndex.latestDialogueMessageId,
+            chatContextGeneration = snapshot.chatContext.generation,
+        )
 
     internal suspend fun runPrompt(text: String, timeoutMillis: Long = 5 * 60_000L): String =
         engine.runAutomationPrompt(text, timeoutMillis)
