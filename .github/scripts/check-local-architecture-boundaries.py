@@ -209,6 +209,35 @@ for owned_field in ("plan", "todos", "goal", "planMode"):
     if not re.search(rf"\bval\s+{owned_field}\s*:", work_state):
         die(f"LocalWorkState must own Work field: {owned_field}")
 
+if "val modelState: LocalModelState = LocalModelState()" not in aggregate_state_source:
+    die("LocalHarnessState must compose Model runtime state through LocalModelState")
+for legacy_model_field in (
+    "configured",
+    "model",
+    "baseUrl",
+    "modelSelection",
+    "modelAttempts",
+    "imageInputMode",
+):
+    if re.search(rf"^\s*val\s+{legacy_model_field}\s*:", aggregate_state_source, re.MULTILINE):
+        die(
+            f"LocalHarnessState must not reintroduce flattened Model field: {legacy_model_field}"
+        )
+
+model_state = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/model/LocalModelState.kt")
+)
+for owned_field in (
+    "configured",
+    "model",
+    "baseUrl",
+    "modelSelection",
+    "modelAttempts",
+    "imageInputMode",
+):
+    if not re.search(rf"\bval\s+{owned_field}\s*:", model_state):
+        die(f"LocalModelState must own Model field: {owned_field}")
+
 work_progress = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt")
 )
