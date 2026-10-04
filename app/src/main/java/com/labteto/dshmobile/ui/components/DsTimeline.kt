@@ -1,13 +1,15 @@
 package com.labteto.dshmobile.ui.components
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -31,6 +33,7 @@ data class DsTimelineItem(
  * Clear Realm vertical timeline.
  *
  * The connector provides order, the semantic dot provides state, and text stays container-less.
+ * The rail follows the measured row height so long summaries and large text never break the line.
  * Only a live running node animates through [StateDot]; settled history is completely still.
  */
 @Composable
@@ -42,34 +45,42 @@ fun DsTimeline(
     Column(modifier) {
         items.forEachIndexed { index, item ->
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
                 verticalAlignment = Alignment.Top,
             ) {
                 Box(
                     modifier = Modifier
                         .width(18.dp)
-                        .height(if (item.detail.isNullOrBlank()) 38.dp else 54.dp),
-                    contentAlignment = Alignment.TopCenter,
+                        .fillMaxHeight(),
                 ) {
-                    if (index > 0) {
-                        Box(
-                            Modifier
-                                .offset(y = (-8).dp)
-                                .width(1.5.dp)
-                                .height(20.dp)
-                                .background(colors.borderL2),
-                        )
+                    Canvas(Modifier.matchParentSize()) {
+                        val centerX = size.width / 2f
+                        val dotCenterY = 12.5.dp.toPx()
+                        val stroke = 1.5.dp.toPx()
+                        if (index > 0) {
+                            drawLine(
+                                color = colors.borderL2,
+                                start = androidx.compose.ui.geometry.Offset(centerX, 0f),
+                                end = androidx.compose.ui.geometry.Offset(centerX, dotCenterY),
+                                strokeWidth = stroke,
+                            )
+                        }
+                        if (index < items.lastIndex) {
+                            drawLine(
+                                color = colors.borderL2,
+                                start = androidx.compose.ui.geometry.Offset(centerX, dotCenterY),
+                                end = androidx.compose.ui.geometry.Offset(centerX, size.height),
+                                strokeWidth = stroke,
+                            )
+                        }
                     }
-                    if (index < items.lastIndex) {
-                        Box(
-                            Modifier
-                                .offset(y = 13.dp)
-                                .width(1.5.dp)
-                                .height(if (item.detail.isNullOrBlank()) 34.dp else 50.dp)
-                                .background(colors.borderL2),
-                        )
-                    }
-                    Box(Modifier.padding(top = 8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 8.dp),
+                    ) {
                         StateDot(
                             state = when (item.state) {
                                 DsStatus.Running -> StateDotState.Running
@@ -85,7 +96,7 @@ fun DsTimeline(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(start = DsSpacing.small, bottom = DsSpacing.xsmall),
+                        .padding(start = DsSpacing.small, bottom = DsSpacing.small),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
