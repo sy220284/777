@@ -249,7 +249,7 @@ fun AppRoot(
 }
 
 @Composable
-private fun RemoteRelayStatus(
+internal fun RemoteRelayStatus(
     failed: Boolean,
     onRetryPairing: () -> Unit,
     onBack: () -> Unit,
