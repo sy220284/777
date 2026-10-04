@@ -137,7 +137,11 @@ internal fun LocalWorkspaceFilesDialog(
         }
     }
 
-    BackHandler(onBack = ::navigateBack)
+    val hasInternalBackLayer =
+        preview != null ||
+            previewPath != null ||
+            (mode == LocalFilesMode.WORKSPACE && directory.isNotEmpty())
+    BackHandler(enabled = hasInternalBackLayer, onBack = ::navigateBack)
 
     Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
