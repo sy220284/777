@@ -20,7 +20,6 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.chat.galleryEntryHasUnsavedChanges
-import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
 import com.labteto.dshmobile.local.chat.isMeaningfulGalleryPersona
 import com.labteto.dshmobile.local.chat.samePersonaIdentity
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
@@ -330,12 +329,7 @@ internal suspend fun exportGalleryPersona(
     format: PersonaTransferFormat,
 ): Result<PersonaTransferDocument> = runCatching {
     withContext(Dispatchers.IO) {
-        val entry = galleryStore.list().firstOrNull { it.id == id }
-            ?: error("人物档案不存在")
-        val subjectKey = chatRelationshipSubjectKey(entry.id, entry.persona.id)
-        val diaryEntries = subjectKey
-            ?.let(runtime.chat::diaryEntriesForTransfer)
-            .orEmpty()
+        val diaryEntries = runtime.chat.diaryEntriesForTransfer("gallery:$id")
         galleryStore.exportPersonaDocument(id, format, diaryEntries)
     }
 }
@@ -348,10 +342,8 @@ internal suspend fun importGalleryPersona(
     withContext(Dispatchers.IO) {
         val outcome = galleryStore.importPersonaDocumentWithDiary(bytes, fileName, mimeType)
         if (outcome.diaryEntries.isNotEmpty()) {
-            val subjectKey = chatRelationshipSubjectKey(outcome.entry.id, outcome.entry.persona.id)
-                ?: error("人物日记无法绑定到导入人物")
             runtime.chat.importDiaryEntriesForTransfer(
-                subjectKey = subjectKey,
+                subjectKey = "gallery:${outcome.entry.id}",
                 personaName = outcome.entry.persona.name,
                 entries = outcome.diaryEntries,
             )
