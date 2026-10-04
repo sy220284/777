@@ -2478,10 +2478,11 @@ class LocalHarnessEngine @Inject constructor(
         eventLog.append("plan/mode", buildJsonObject { put("active", enabled) })
         if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             val prompt = systemPrompt()
-            modelHistory.replaceSystem(
-                buildJsonObject { put("role", "system"); put("content", prompt) },
-            )
-            eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
+            val updateMode = applyRuntimeSystemPromptUpdate(modelHistory, prompt, _state.value)
+            eventLog.append("system/prompt", buildJsonObject {
+                put("content", prompt)
+                put("update_mode", updateMode.name.lowercase())
+            })
             updateContextMetrics()
         }
         persist()
@@ -4245,10 +4246,11 @@ class LocalHarnessEngine @Inject constructor(
             log.append("plan/mode", buildJsonObject { put("active", false) })
             if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
                 val prompt = systemPrompt(binding)
-                history.replaceSystem(
-                    buildJsonObject { put("role", "system"); put("content", prompt) },
-                )
-                log.append("system/prompt", buildJsonObject { put("content", prompt) })
+                val updateMode = applyRuntimeSystemPromptUpdate(history, prompt, targetState.value)
+                log.append("system/prompt", buildJsonObject {
+                    put("content", prompt)
+                    put("update_mode", updateMode.name.lowercase())
+                })
                 updateContextMetrics(binding)
             }
             persist(binding)
