@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -118,6 +119,20 @@ internal fun LocalModeDrawer(
     LaunchedEffect(usageMode) {
         selectionOpen = false
         selectedIds.clear()
+    }
+
+    BackHandler(enabled = selectionOpen || searchOpen) {
+        when {
+            selectionOpen -> {
+                selectionOpen = false
+                selectedIds.clear()
+            }
+            searchOpen -> {
+                searchOpen = false
+                historyQuery = ""
+                keyboardController?.hide()
+            }
+        }
     }
 
     val galleryById = remember(gallery) { gallery.associateBy { it.id } }
