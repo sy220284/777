@@ -77,7 +77,10 @@ data class LocalHarnessSession(
      */
     @SerialName("modelHistory")
     val legacyModelHistory: List<JsonObject> = emptyList(),
-    val work: LocalWorkState = LocalWorkState(),
+    val plan: List<String> = emptyList(),
+    val todos: List<LocalTodoItem> = emptyList(),
+    val goal: LocalGoal? = null,
+    val planMode: Boolean = false,
     /** Highest SessionEvent sequence already reflected in the materialized control-state snapshot. */
     val controlProjectedThroughSequence: Long? = null,
     /** Highest SessionEvent sequence already reflected in the materialized user-facing transcript. */
@@ -279,10 +282,7 @@ data class LocalHarnessState(
     val sessions: List<LocalSessionSummary> = emptyList(),
     val messages: List<LocalHarnessMessage> = emptyList(),
     val transcriptIndex: LocalTranscriptRuntimeIndex = LocalTranscriptRuntimeIndex(),
-    val plan: List<String> = emptyList(),
-    val todos: List<LocalTodoItem> = emptyList(),
-    val goal: LocalGoal? = null,
-    val planMode: Boolean = false,
+    val work: LocalWorkState = LocalWorkState(),
     val safeAutoApprovalEnabled: Boolean = false,
     val deviceApprovalLease: Boolean = false,
     val jobs: List<LocalJobInfo> = emptyList(),
