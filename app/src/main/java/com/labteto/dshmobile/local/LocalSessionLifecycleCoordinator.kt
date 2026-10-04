@@ -135,11 +135,11 @@ internal class LocalSessionLifecycleCoordinator(
         state.update {
             it.copy(
                 loading = true,
-                kernel = it.kernel.copy(
-                    running = false,
+                work = it.work.copy(
                     pendingApproval = null,
                     pendingQuestion = null,
                 ),
+                kernel = it.kernel.copy(running = false),
             )
         }
         scope.launch {
@@ -314,11 +314,12 @@ internal class LocalSessionLifecycleCoordinator(
                             handoffSummary = handoff,
                             messages = emptyList(),
                             transcriptIndex = LocalTranscriptRuntimeIndex(),
-                            work = LocalWorkState(),
+                            work = LocalWorkState(
+                                jobs = projectExecutionJobs(usageMode, nextSessionId, jobs.snapshotInfos()),
+                            ),
                             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
                             deviceApprovalLease = false,
                             kernel = LocalKernelState(
-                                jobs = projectExecutionJobs(usageMode, nextSessionId, jobs.snapshotInfos()),
                                 resources = resourceScheduler.snapshot().toLocalHarnessResourceState(usageMode),
                             ),
                             error = null,
