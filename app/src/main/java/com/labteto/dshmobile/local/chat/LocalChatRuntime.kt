@@ -34,11 +34,8 @@ class LocalChatRuntime @Inject constructor(
     internal suspend fun generateReplySuggestions(): Boolean = engine.generateReplySuggestions()
     internal fun diaryEntries(subjectKey: String, limit: Int = MAX_CHAT_DIARY_ENTRIES) = engine.chatDiaryEntries(subjectKey, limit)
     internal fun diaryEntriesForTransfer(subjectKey: String) = engine.chatDiaryEntriesForTransfer(subjectKey)
-    internal fun importDiaryEntriesForTransfer(
-        subjectKey: String,
-        personaName: String,
-        entries: List<ChatDiaryEntry>,
-    ): Int = engine.importChatDiaryEntriesForTransfer(subjectKey, personaName, entries)
+    internal fun importDiaryEntriesForTransfer(subjectKey: String, personaName: String, entries: List<ChatDiaryEntry>): Int =
+        engine.importChatDiaryEntriesForTransfer(subjectKey, personaName, entries)
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): com.labteto.dshmobile.local.send.LocalSendResult = engine.send(text, attachments)
     internal fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult =
         engine.editAndResendUserMessage(messageId, replacement)
