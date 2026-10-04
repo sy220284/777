@@ -15,7 +15,7 @@ internal class ChatDiaryStore(
     json: Json,
 ) {
     private val documents = ChatDiaryDocumentStore(root, json)
-    private val transfer = ChatDiaryTransferStore(documents)
+    private val transfer = ChatDiaryTransferStore(documents, ChatDiaryRollbackRecovery(root, json))
 
     @Synchronized
     fun record(request: ChatDiaryWriteRequest): ChatDiaryEntry? {
