@@ -10,30 +10,16 @@ import javax.inject.Singleton
 class LocalAutomationRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
 ) {
-    internal fun planningContext(): AutomationPlanningContext {
-        val snapshot = engine.state.value
-        return AutomationPlanningContext(
-            sessionId = snapshot.sessionId,
-            revision = snapshot.toAutomationPlanningRevision(),
-            configured = snapshot.configured,
-            usageMode = snapshot.usageMode,
-            groupChatEnabled = snapshot.groupChat.enabled,
-            model = snapshot.model,
-            baseUrl = snapshot.baseUrl,
-            profileId = snapshot.modelSelection.activeProfileId,
-            personaName = snapshot.chatPersona.name,
-            recentMessages = snapshot.messages
-                .asSequence()
-                .filter { it.role == "user" || it.role == "assistant" }
-                .filter { it.content.isNotBlank() }
-                .toList()
-                .takeLast(12)
-                .map { AutomationPlanningMessage(it.role, it.content) },
-        )
-    }
+    private val runtimeState = engine.state
+
+    internal fun planningContext(): AutomationPlanningContext =
+        runtimeState.value.toAutomationPlanningContext()
 
     internal fun planningRevision(): AutomationPlanningRevision =
-        engine.state.value.toAutomationPlanningRevision()
+        runtimeState.value.toAutomationPlanningRevision()
+
+    internal suspend fun runPrompt(text: String, timeoutMillis: Long = 5 * 60_000L): String =
+        engine.runAutomationPrompt(text, timeoutMillis)
 
     internal suspend fun <T> withModelRequestResource(block: suspend () -> T): T =
         engine.withAutomationModelRequestResource(block)
