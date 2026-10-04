@@ -64,6 +64,27 @@ class LocalModelHistoryProjectionTest {
     }
 
     @Test
+    fun appendOnlySystemPromptEventReplaysAsTailOverride() {
+        val events = listOf(
+            event(0L, "system/prompt", buildJsonObject { put("content", "基础规则") }),
+            event(1L, "user/message", buildJsonObject { put("content", "任务") }),
+            event(2L, "system/prompt", buildJsonObject {
+                put("content", "更新规则")
+                put("model_content", "【系统规则更新；后续以本条为准】\n更新规则")
+                put("update_mode", "append_only")
+            }),
+        )
+
+        val restored = restoreLocalModelHistory(events, emptyList(), codec)
+
+        assertEquals(listOf("system", "user", "system"), restored.messages.map {
+            it["role"].toString().trim('"')
+        })
+        assertEquals("基础规则", restored.messages.first()["content"].toString().trim('"'))
+        assertTrue(restored.messages.last()["content"].toString().contains("更新规则"))
+    }
+
+    @Test
     fun structuredUserMessageKeepsDurableImageReference() {
         val structured = buildLocalUserModelMessage(
             visibleText = "看这张图",
