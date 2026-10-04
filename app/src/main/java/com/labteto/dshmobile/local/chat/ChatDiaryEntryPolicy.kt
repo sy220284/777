@@ -7,7 +7,7 @@ internal object ChatDiaryEntryPolicy {
         val significance = request.turnSignificance.trim().uppercase()
         if (significance == "NONE") return null
 
-        val event = raw.event.trim().take(MAX_EVENT_CHARS)
+        val event = raw.event.trim().take(ChatDiaryBounds.MAX_EVENT_CHARS)
         val importance = raw.importance.coerceIn(0, 5)
         if (event.length < MIN_EVENT_CHARS || importance < MIN_IMPORTANCE) return null
         if (significance != "MAJOR" && importance < MINOR_IMPORTANCE) return null
@@ -15,10 +15,10 @@ internal object ChatDiaryEntryPolicy {
 
         return ChatDiaryDelta(
             event = event,
-            feeling = raw.feeling.trim().take(MAX_FEELING_CHARS),
-            innerThought = raw.innerThought.trim().take(MAX_THOUGHT_CHARS),
-            relationshipMeaning = raw.relationshipMeaning.trim().take(MAX_RELATIONSHIP_CHARS),
-            unresolvedEcho = raw.unresolvedEcho.trim().take(MAX_ECHO_CHARS),
+            feeling = raw.feeling.trim().take(ChatDiaryBounds.MAX_FEELING_CHARS),
+            innerThought = raw.innerThought.trim().take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
+            relationshipMeaning = raw.relationshipMeaning.trim().take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
+            unresolvedEcho = raw.unresolvedEcho.trim().take(ChatDiaryBounds.MAX_ECHO_CHARS),
             importance = importance,
             disclosure = raw.disclosure.trim().uppercase(),
         ).takeIf { delta ->
@@ -105,11 +105,11 @@ internal object ChatDiaryEntryPolicy {
         val current = revisions.last()
         val sources = revisions.flatMap(ChatDiaryRevision::sources).distinct()
         return entry.copy(
-            event = current.event.take(MAX_EVENT_CHARS),
-            feeling = current.feeling.take(MAX_FEELING_CHARS),
-            innerThought = current.innerThought.take(MAX_THOUGHT_CHARS),
-            relationshipMeaning = current.relationshipMeaning.take(MAX_RELATIONSHIP_CHARS),
-            unresolvedEcho = current.unresolvedEcho.take(MAX_ECHO_CHARS),
+            event = current.event.take(ChatDiaryBounds.MAX_EVENT_CHARS),
+            feeling = current.feeling.take(ChatDiaryBounds.MAX_FEELING_CHARS),
+            innerThought = current.innerThought.take(ChatDiaryBounds.MAX_THOUGHT_CHARS),
+            relationshipMeaning = current.relationshipMeaning.take(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS),
+            unresolvedEcho = current.unresolvedEcho.take(ChatDiaryBounds.MAX_ECHO_CHARS),
             importance = revisions.maxOf(ChatDiaryRevision::importance),
             disclosure = current.disclosure,
             sources = sources,
@@ -127,7 +127,7 @@ internal object ChatDiaryEntryPolicy {
             existing.subjectKey == candidate.subjectKey &&
             existing.sourceMode == candidate.sourceMode &&
             existing.disclosure == candidate.disclosure &&
-            revisionsOf(existing).size < MAX_REFINEMENT_REVISIONS &&
+            revisionsOf(existing).size < ChatDiaryBounds.MAX_REFINEMENT_REVISIONS &&
             now - existing.updatedAt <= DUPLICATE_WINDOW_MILLIS &&
             similarity(existing.event, candidate.event) >= DUPLICATE_SIMILARITY
 
@@ -244,12 +244,6 @@ internal object ChatDiaryEntryPolicy {
         else (0 until text.length - 1).mapTo(linkedSetOf()) { text.substring(it, it + 2) }
 
     private const val MAX_SOURCE_IDS = 16
-    private const val MAX_REFINEMENT_REVISIONS = 8
-    private const val MAX_EVENT_CHARS = 320
-    private const val MAX_FEELING_CHARS = 220
-    private const val MAX_THOUGHT_CHARS = 260
-    private const val MAX_RELATIONSHIP_CHARS = 220
-    private const val MAX_ECHO_CHARS = 180
     private const val MIN_EVENT_CHARS = 6
     private const val MIN_IMPORTANCE = 2
     private const val MINOR_IMPORTANCE = 3

@@ -55,10 +55,11 @@ class ChatPersonaGalleryStore internal constructor(
     internal fun exportPersonaDocument(
         id: String,
         format: PersonaTransferFormat,
+        diaryEntries: List<ChatDiaryEntry> = emptyList(),
     ): PersonaTransferDocument {
         val entry = readNormalized().entries.firstOrNull { it.id == id }
             ?: error("人物档案不存在")
-        return PersonaTransferDocuments.encode(json, history.hydrate(entry), format)
+        return PersonaTransferDocuments.encode(json, history.hydrate(entry), format, diaryEntries)
     }
 
     @Synchronized
@@ -66,64 +67,54 @@ class ChatPersonaGalleryStore internal constructor(
         bytes: ByteArray,
         fileName: String? = null,
         mimeType: String? = null,
-    ): PersonaGalleryEntry {
-        val canonicalJson = PersonaTransferDocuments.decodeToCanonicalJson(
-            bytes = bytes,
-            fileName = fileName,
-            mimeType = mimeType,
-        )
+    ): PersonaGalleryEntry =
+        commitPersonaDocumentImport(preparePersonaDocumentImport(bytes, fileName, mimeType))
+
+    @Synchronized
+    internal fun preparePersonaDocumentImport(
+        bytes: ByteArray,
+        fileName: String? = null,
+        mimeType: String? = null,
+    ): PersonaGalleryPreparedImport {
+        val canonicalJson = PersonaTransferDocuments.decodeToCanonicalJson(bytes, fileName, mimeType)
         return when (val decoded = PersonaSchemaMigration.decodeDocumentImport(json, canonicalJson)) {
-            is PersonaDocumentImport.Archive -> importArchivedEntry(decoded.entry)
-            PersonaDocumentImport.Share -> importPersona(canonicalJson)
+            is PersonaDocumentImport.Archive -> {
+                val current = readNormalized()
+                val planned = PersonaGalleryImportPlanner.archive(current, decoded.entry, decoded.diaryEntries)
+                planned.copy(
+                    rollbackEntry = current.entries
+                        .firstOrNull { it.id == planned.entry.id }
+                        ?.let(history::hydrate),
+                )
+            }
+            PersonaDocumentImport.Share -> PersonaGalleryPreparedImport.Share(canonicalJson)
         }
     }
 
-    private fun importArchivedEntry(source: PersonaGalleryEntry): PersonaGalleryEntry {
-        val now = System.currentTimeMillis()
-        val importedPersona = fullSharePersona(source.persona).copy(updatedAt = now)
-        require(isMeaningfulGalleryPersona(importedPersona)) { "人物设定内容不足，无法导入" }
-
-        val seenStoryIds = hashSetOf<String>()
-        val importedStories = source.stories.map { raw ->
-            val sourceId = raw.id.trim().take(120)
-            val storyId = sourceId
-                .takeIf { it.isNotBlank() && seenStoryIds.add(it) }
-                ?: "story-${UUID.randomUUID()}".also { seenStoryIds.add(it) }
-            raw.copy(
-                id = storyId,
-                title = raw.title.trim().take(160),
-                notes = raw.notes.trim().take(4_000),
-                history = mergeHistory(emptyList(), raw.history),
-                sourceSessionIds = emptyList(),
-                excludedMessageKeys = emptyList(),
-            )
+    @Synchronized
+    internal fun commitPersonaDocumentImport(prepared: PersonaGalleryPreparedImport): PersonaGalleryEntry =
+        when (prepared) {
+            is PersonaGalleryPreparedImport.Share -> importPersona(prepared.payload)
+            is PersonaGalleryPreparedImport.Archive -> commitPreparedArchive(prepared)
         }
 
-        val doc = readNormalized()
-        val matched = doc.entries.filter {
-            samePersonaIdentity(it.persona, importedPersona)
-        }.singleOrNull()
-        val entryId = matched?.id ?: "gallery-${UUID.randomUUID()}"
-        val mergedEntry = if (matched != null) {
-            matched.copy(
-                persona = mergePersonaProfiles(matched.persona, importedPersona)
-                    .copy(id = entryId, updatedAt = now),
-                groupChatState = mergeChatState(matched.groupChatState, source.groupChatState),
-                stories = mergeGalleryStoryLists(matched.stories, importedStories),
-                updatedAt = now,
-            )
-        } else {
-            PersonaGalleryEntry(
-                id = entryId,
-                persona = importedPersona.copy(id = entryId),
-                groupChatState = source.groupChatState,
-                stories = importedStories,
-                updatedAt = now,
-            )
+    private fun commitPreparedArchive(prepared: PersonaGalleryPreparedImport.Archive): PersonaGalleryEntry {
+        check(readNormalized() == prepared.baseDocument) { "人物图集在导入期间发生变化，请重试" }
+        return try {
+            val entry = history.archiveEntry(prepared.entry)
+            val base = prepared.baseDocument
+            documentStore.write(base.copy(version = 5, entries = base.entries.filterNot { it.id == entry.id } + entry))
+            entry
+        } catch (error: Throwable) {
+            runCatching {
+                history.deleteEntry(prepared.entry.id)
+                prepared.rollbackEntry?.let(history::archiveEntry)
+            }.exceptionOrNull()?.let(error::addSuppressed)
+            runCatching {
+                documentStore.write(prepared.baseDocument)
+            }.exceptionOrNull()?.let(error::addSuppressed)
+            throw error
         }
-        val entry = history.archiveEntry(migrateLegacyPersonaGalleryEntry(mergedEntry))
-        documentStore.write(doc.copy(version = 5, entries = doc.entries.filterNot { it.id == entryId } + entry))
-        return entry
     }
 
     @Synchronized

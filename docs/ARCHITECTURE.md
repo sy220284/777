@@ -209,6 +209,8 @@ Relationship memory uses a stable subject key; Gallery identity wins over copied
 
 日记保存来源会话、用户/角色消息 ID 和 generation。聊天分支编辑、历史重写或回滚时，与被丢弃消息关联的日记同步失效，避免“幽灵记忆”残留。相近经历在短时间内优先精炼已有条目，保留更完整的感受、心理和关系意义，而不是每轮追加重复记录。
 
+人物迁移档案 v4 将该人物的日记与人物设定、记忆摘要和已归档对话一起迁移。导出保留日记正文、披露级别、来源模式、修订、generation、有效/失效状态及替代关系，但移除设备内会话/消息来源引用，并清空旧 `subjectKey`；导入完成人物身份合并后，再按目标 Gallery 身份重新绑定稳定 `subjectKey`，避免跨设备残留旧人物 ID 或被不存在的旧会话回滚。v3 人物档案继续只读兼容，缺少日记时按空日记处理。人物迁移与正常聊天复用同一个进程级 `ChatDiaryStore` 写入所有者；导入先规划目标 Gallery 身份，再在日记写锁内提交日记和 Gallery，Gallery 提交失败时恢复导入前日记文档和人物冷对话归档，跨人物日记 ID 冲突使用确定性重映射保证重复导入幂等。
+
 ### Token usage and observability
 
 `TokenUsageAnalyticsStore` migrates the legacy JSONL ledger transactionally into SQLite. Request insertion, deduplication and lifetime totals commit together; a failed write can be retried with the same request id. Request details retain at most 90 days and 10,000 records (shrinking to 9,000 after overflow), with a 4 KiB per-record bound. Lifetime totals are retained independently. The bounded projection updates incrementally; reopening, retention cleanup and time-zone changes rebuild it from the retained window. Averages, action splits and groups describe that window, while headline aggregates remain lifetime totals. Deduplication covers retained request identities; callers must use a new id for a new request and avoid replaying expired requests. API-reported input/output usage is the total; prompt sections are diagnostic attribution only and are not added again.

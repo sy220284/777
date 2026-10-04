@@ -54,9 +54,7 @@ import com.labteto.dshmobile.local.chat.boundDurablePending
 import com.labteto.dshmobile.local.chat.restoreBranchContext
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.chat.saveGroupChatAnnouncement
-import com.labteto.dshmobile.local.chat.ChatPersonaStore
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
-import com.labteto.dshmobile.local.chat.ChatDiaryStore
+import com.labteto.dshmobile.local.chat.LocalChatPersistence
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.LocalReplySuggestionCoordinator
@@ -146,13 +144,14 @@ class LocalHarnessEngine @Inject constructor(
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
     private val contextComposer: ContextComposer,
-    private val chatPersonaStore: ChatPersonaStore,
-    private val chatPersonaGalleryStore: ChatPersonaGalleryStore,
+    private val chatPersistence: LocalChatPersistence,
     private val chatTurnRunner: ChatTurnRunner,
     private val chatInteractionPlanner: ChatInteractionPlanner,
 ) {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
-    private val chatDiaryStore = ChatDiaryStore(File(root, "chat-diary"), json)
+    private val chatPersonaStore get() = chatPersistence.personaStore
+    private val chatPersonaGalleryStore get() = chatPersistence.galleryStore
+    private val chatDiaryStore get() = chatPersistence.diaryStore
     private val memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
     private val persistentJobStore = LocalPersistentJobStore(
         file = File(root, "jobs.json"),
@@ -1181,7 +1180,6 @@ class LocalHarnessEngine @Inject constructor(
     /** Generate reply suggestions only on explicit user request. */
     internal suspend fun generateReplySuggestions(): Boolean =
         replySuggestionCoordinator.generate()
-    internal fun chatDiaryEntries(subjectKey: String, limit: Int) = chatDiaryStore.listActive(subjectKey, limit)
 
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult {

@@ -684,6 +684,161 @@ class ChatDiaryStoreTest {
         assertTrue(memory.listActive("gallery:a").none { it.id == saved.id })
     }
 
+    @Test
+    fun transferRebindsSubjectAndKeepsDiarySemanticsWithoutDeviceSourceLinks() {
+        val sourceRoot = File(temporary.root, "source-diary")
+        val targetRoot = File(temporary.root, "target-diary")
+        val source = ChatDiaryStore(sourceRoot, json)
+        val target = ChatDiaryStore(targetRoot, json)
+        val first = source.record(request(
+            delta = ChatDiaryDelta(
+                event = "两人约定周六上午十点在南门钟楼见面",
+                feeling = "我把时间认真记下来了",
+                innerThought = "这次见面我不想迟到",
+                importance = 4,
+            ),
+            userId = "u-old",
+            assistantId = "a-old",
+            evidence = "两人约定周六上午十点在南门钟楼见面",
+        ))!!
+        source.record(request(
+            delta = ChatDiaryDelta(
+                event = "两人再次确认周六上午十点在南门钟楼见面",
+                feeling = "再次确认以后我更踏实了",
+                innerThought = "我已经开始按这个时间准备",
+                importance = 5,
+            ),
+            userId = "u-confirm",
+            assistantId = "a-confirm",
+            evidence = "两人再次确认周六上午十点在南门钟楼见面",
+        ))
+        val latest = source.record(request(
+            delta = ChatDiaryDelta(
+                event = "见面安排改为周日下午三点在白桦咖啡馆",
+                feeling = "新安排确定以后我安心了",
+                innerThought = "现在只需要按新时间准备",
+                importance = 5,
+            ),
+            userId = "u-new",
+            assistantId = "a-new",
+            evidence = "见面安排改为周日下午三点在白桦咖啡馆",
+        ))!!
+
+        val transferred = source.listForTransfer("gallery:a")
+        assertTrue(transferred.first { it.id == first.id }.revisions.size >= 2)
+        assertEquals(latest.id, transferred.first { it.id == first.id }.supersededBy)
+
+        target.importForTransfer("gallery:target", "阿青", transferred) { Unit }
+        val imported = target.listForTransfer("gallery:target")
+        assertEquals(transferred.map { it.id }.toSet(), imported.map { it.id }.toSet())
+        assertTrue(imported.all { it.subjectKey == "gallery:target" })
+        assertTrue(imported.all { it.personaName == "阿青" })
+        assertTrue(imported.all { it.sources.isEmpty() })
+        assertTrue(imported.flatMap { it.revisions }.all { it.sources.isEmpty() })
+        assertEquals(latest.id, imported.first { it.id == first.id }.supersededBy)
+        assertEquals(
+            transferred.first { it.id == first.id }.revisions.size,
+            imported.first { it.id == first.id }.revisions.size,
+        )
+        target.importForTransfer("gallery:target", "阿青", transferred) { Unit }
+        assertEquals(imported.map { it.id }, target.listForTransfer("gallery:target").map { it.id })
+    }
+
+    @Test
+    fun transferCollisionUsesStableRemapAndDoesNotDuplicateOnRetry() {
+        val source = ChatDiaryStore(File(temporary.root, "collision-source"), json)
+        val target = ChatDiaryStore(File(temporary.root, "collision-target"), json)
+        val transferred = listOf(source.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户确认下周一起去看展",
+                feeling = "我很期待这次约定",
+                importance = 4,
+            ),
+        ))!!)
+
+        target.importForTransfer("gallery:other", "别人", transferred) { Unit }
+        target.importForTransfer("gallery:target", "阿青", transferred) { Unit }
+        val first = target.listForTransfer("gallery:target")
+        target.importForTransfer("gallery:target", "阿青", transferred) { Unit }
+        val second = target.listForTransfer("gallery:target")
+
+        assertEquals(1, first.size)
+        assertEquals(first.map { it.id }, second.map { it.id })
+        assertTrue(first.single().id != transferred.single().id)
+    }
+
+    @Test
+    fun transferBoundsUntrustedDiaryTextAndRevisionPayloads() {
+        val target = ChatDiaryStore(File(temporary.root, "bounded-transfer"), json)
+        val longText = "超".repeat(2_000)
+        val transferred = listOf(
+            ChatDiaryEntry(
+                id = "external-diary-".repeat(40),
+                subjectKey = "foreign",
+                personaName = longText,
+                event = longText,
+                feeling = longText,
+                innerThought = longText,
+                relationshipMeaning = longText,
+                unresolvedEcho = longText,
+                importance = 99,
+                revisions = List(20) { index ->
+                    ChatDiaryRevision(
+                        event = "$index$longText",
+                        feeling = longText,
+                        innerThought = longText,
+                        relationshipMeaning = longText,
+                        unresolvedEcho = longText,
+                        importance = 99,
+                        updatedAt = index.toLong(),
+                    )
+                },
+                createdAt = 1L,
+                updatedAt = 2L,
+            ),
+        )
+
+        target.importForTransfer("gallery:target", "阿青", transferred) { Unit }
+        val imported = target.listForTransfer("gallery:target").single()
+
+        assertEquals(ChatDiaryBounds.MAX_EVENT_CHARS, imported.event.length)
+        assertEquals(ChatDiaryBounds.MAX_FEELING_CHARS, imported.feeling.length)
+        assertEquals(ChatDiaryBounds.MAX_THOUGHT_CHARS, imported.innerThought.length)
+        assertEquals(ChatDiaryBounds.MAX_RELATIONSHIP_CHARS, imported.relationshipMeaning.length)
+        assertEquals(ChatDiaryBounds.MAX_ECHO_CHARS, imported.unresolvedEcho.length)
+        assertEquals(5, imported.importance)
+        assertEquals(ChatDiaryBounds.MAX_REFINEMENT_REVISIONS, imported.revisions.size)
+        assertTrue(imported.revisions.all { it.sources.isEmpty() })
+        assertTrue(imported.id.length <= 160)
+    }
+
+    @Test
+    fun failedGalleryCommitRollsBackDiaryImportBeforeReleasingWriterLock() {
+        val source = ChatDiaryStore(File(temporary.root, "rollback-source"), json)
+        val targetRoot = File(temporary.root, "rollback-target")
+        val target = ChatDiaryStore(targetRoot, json)
+        val transferred = listOf(source.record(request(
+            delta = ChatDiaryDelta(
+                event = "用户答应周末一起吃饭",
+                feeling = "我把这件事认真记下来了",
+                importance = 4,
+            ),
+        ))!!)
+
+        val result = runCatching {
+            target.importForTransfer("gallery:target", "阿青", transferred) {
+                error("模拟人物图集提交失败")
+            }
+        }
+
+        assertTrue(result.isFailure)
+        assertTrue(target.listForTransfer("gallery:target").isEmpty())
+
+        File(targetRoot, "diary.json").writeText("{broken")
+        val recovered = ChatDiaryStore(targetRoot, json)
+        assertTrue(recovered.listForTransfer("gallery:target").isEmpty())
+    }
+
     private fun request(
         delta: ChatDiaryDelta,
         sourceMode: ChatDiarySourceMode = ChatDiarySourceMode.DIRECT,

@@ -9,7 +9,7 @@ import javax.inject.Singleton
 /** Chat/persona capability boundary for the local UI. */
 @Singleton
 class LocalChatRuntime @Inject constructor(
-    private val engine: LocalHarnessEngine,
+    private val engine: LocalHarnessEngine, private val persistence: LocalChatPersistence,
 ) {
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = engine.configureChatPersona(profile)
     internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) =
@@ -32,7 +32,9 @@ class LocalChatRuntime @Inject constructor(
     internal fun removeGroupChatMemberByGalleryId(galleryId: String) =
         engine.removeGroupChatMemberByGalleryId(galleryId)
     internal suspend fun generateReplySuggestions(): Boolean = engine.generateReplySuggestions()
-    internal fun diaryEntries(subjectKey: String, limit: Int = MAX_CHAT_DIARY_ENTRIES) = engine.chatDiaryEntries(subjectKey, limit)
+    internal fun diaryEntries(subjectKey: String, limit: Int = MAX_CHAT_DIARY_ENTRIES) = persistence.diaryStore.listActive(subjectKey, limit)
+    internal fun diaryEntriesForTransfer(subjectKey: String) = persistence.diaryStore.listForTransfer(subjectKey)
+    internal fun <T> importDiaryEntriesForTransfer(subjectKey: String, personaName: String, entries: List<ChatDiaryEntry>, commit: () -> T): T = persistence.diaryStore.importForTransfer(subjectKey, personaName, entries, commit)
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): com.labteto.dshmobile.local.send.LocalSendResult = engine.send(text, attachments)
     internal fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult =
         engine.editAndResendUserMessage(messageId, replacement)

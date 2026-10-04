@@ -179,11 +179,12 @@ internal fun mergeGalleryStoryLists(
     val result = base.toMutableList()
     incoming.forEach { candidate ->
         val matchIndex = result.indexOfFirst { existing ->
+            val sameId = candidate.id.isNotBlank() && existing.id == candidate.id
             val sharedSession = existing.sourceSessionIds.any { it in candidate.sourceSessionIds }
             val existingKeys = existing.history.mapTo(linkedSetOf(), ::galleryMessageArchiveKey)
             val candidateKeys = candidate.history.mapTo(linkedSetOf(), ::galleryMessageArchiveKey)
             val sameArchive = existingKeys.isNotEmpty() && existingKeys == candidateKeys
-            sharedSession || sameArchive
+            sameId || sharedSession || sameArchive
         }
         if (matchIndex >= 0) {
             result[matchIndex] = mergeGalleryStories(result[matchIndex], candidate)
