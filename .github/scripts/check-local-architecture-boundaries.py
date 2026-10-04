@@ -412,6 +412,9 @@ automation_runtime = strip_comments(
 automation_worker = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationWorker.kt")
 )
+automation_settlement = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/automation/AutomationWorkerSettlementCoordinator.kt")
+)
 session_event_log = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionEventLog.kt")
 )
@@ -423,7 +426,7 @@ if 'resourceScheduler.withResource(HarnessResourceKind.MODEL_REQUEST, "automatio
     die("Automation planning must reuse the Engine-owned HarnessResourceScheduler")
 if "AutomationExecutionRegistry.tryAcquire(id)" not in automation_worker:
     die("Automation scheduled/manual execution must share one task runtime lease")
-if "predicate = { it.scheduleGeneration == requestedGeneration }" not in automation_worker:
+if "predicate = { it.scheduleGeneration == requestedGeneration }" not in automation_settlement:
     die("Automation Worker terminal writes must be guarded by schedule generation")
 if "LocalSessionRuntimeRegistry::hasLiveOwner" not in session_event_log:
     die("Session crash-tail repair must respect live in-process session owners")
