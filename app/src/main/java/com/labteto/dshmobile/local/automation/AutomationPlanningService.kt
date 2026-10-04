@@ -169,12 +169,14 @@ class AutomationPlanningService @Inject constructor(
                     ?: (750L shl (failedAttempt - 1).coerceIn(0, 10))
             },
         ) { activeMessages ->
-            requestRuntime.complete(
-                surface = surface,
-                messages = activeMessages,
-                tools = JsonArray(emptyList()),
-                temperature = 0.35,
-            )
+            runtime.withModelRequestResource {
+                requestRuntime.complete(
+                    surface = surface,
+                    messages = activeMessages,
+                    tools = JsonArray(emptyList()),
+                    temperature = 0.35,
+                )
+            }
         }
         withContext(Dispatchers.IO) {
             usageTracker.record(
