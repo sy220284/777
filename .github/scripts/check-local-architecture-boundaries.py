@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ENGINE_MAX_PUBLIC_METHODS = 0
 ENGINE_MAX_INTERNAL_METHODS = 80
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 19
-AGGREGATE_STATE_MAX_FIELDS = 36
+AGGREGATE_STATE_MAX_FIELDS = 28
 
 HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": ("LocalGroupChatTurnExecutor", 26),
@@ -278,6 +278,41 @@ for owned_field in (
 ):
     if not re.search(rf"\bval\s+{owned_field}\s*:", chat_state):
         die(f"LocalChatState must own Chat field: {owned_field}")
+
+if "val kernel: LocalKernelState = LocalKernelState()" not in aggregate_state_source:
+    die("LocalHarnessState must compose Kernel runtime state through LocalKernelState")
+for legacy_kernel_field in (
+    "running",
+    "jobs",
+    "workflowProgress",
+    "queuedInputCount",
+    "resources",
+    "contextChars",
+    "contextBudgetChars",
+    "pendingApproval",
+    "pendingQuestion",
+):
+    if re.search(rf"^\\s*val\\s+{legacy_kernel_field}\\s*:", aggregate_state_source, re.MULTILINE):
+        die(
+            f"LocalHarnessState must not reintroduce flattened Kernel field: {legacy_kernel_field}"
+        )
+
+kernel_state = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalKernelState.kt")
+)
+for owned_field in (
+    "running",
+    "jobs",
+    "workflowProgress",
+    "queuedInputCount",
+    "resources",
+    "contextChars",
+    "contextBudgetChars",
+    "pendingApproval",
+    "pendingQuestion",
+):
+    if not re.search(rf"\\bval\\s+{owned_field}\\s*:", kernel_state):
+        die(f"LocalKernelState must own Kernel field: {owned_field}")
 
 work_progress = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt")
