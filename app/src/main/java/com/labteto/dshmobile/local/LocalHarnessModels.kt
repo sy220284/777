@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.model.LocalCanonicalMessage
+import com.labteto.dshmobile.local.work.LocalWorkState
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -76,10 +77,7 @@ data class LocalHarnessSession(
      */
     @SerialName("modelHistory")
     val legacyModelHistory: List<JsonObject> = emptyList(),
-    val plan: List<String> = emptyList(),
-    val todos: List<LocalTodoItem> = emptyList(),
-    val goal: LocalGoal? = null,
-    val planMode: Boolean = false,
+    val work: LocalWorkState = LocalWorkState(),
     /** Highest SessionEvent sequence already reflected in the materialized control-state snapshot. */
     val controlProjectedThroughSequence: Long? = null,
     /** Highest SessionEvent sequence already reflected in the materialized user-facing transcript. */
