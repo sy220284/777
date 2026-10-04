@@ -204,6 +204,14 @@ if "engine.configureImageInputMode" in model_runtime_source:
 if "KEY_IMAGE_INPUT_MODE" not in model_settings_source or "runtimeStateStore.mutableState.update" not in model_settings_source:
     die("LocalModelSettingsCoordinator must own image input persistence and ModelState projection")
 
+settings_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt")
+)
+if "runtimeStateStore.state" not in settings_runtime_source:
+    die("LocalSettingsRuntime must consume LocalRuntimeStateStore for visible settings state")
+if "engine.state" in settings_runtime_source:
+    die("LocalSettingsRuntime must not reach through LocalHarnessEngine for aggregate state")
+
 automation_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt")
 )
