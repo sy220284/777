@@ -132,10 +132,10 @@ class AutomationPlanningService @Inject constructor(
     }
 
     internal fun isCurrent(draft: AutomationPlanDraft): Boolean =
-        resolveAutomationPlanningRevision(runtime.planningContext().revision, draft.sourceRevision).accepted
+        resolveAutomationPlanningRevision(runtime.planningRevision(), draft.sourceRevision).accepted
 
     internal fun isCurrent(suggestions: AutomationSuggestionSet): Boolean =
-        resolveAutomationPlanningRevision(runtime.planningContext().revision, suggestions.sourceRevision).accepted
+        resolveAutomationPlanningRevision(runtime.planningRevision(), suggestions.sourceRevision).accepted
 
     private suspend fun complete(
         context: AutomationPlanningContext,
