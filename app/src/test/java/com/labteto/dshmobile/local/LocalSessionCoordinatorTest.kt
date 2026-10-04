@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.work.LocalWorkState
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatSceneState
 import java.io.File
@@ -87,6 +88,12 @@ class LocalSessionCoordinatorTest {
                 latestCreatedAt = 123_456L,
                 totalMessageCount = 3L,
             ),
+            work = LocalWorkState(
+                plan = listOf("检查边界"),
+                todos = listOf(LocalTodoItem("补回归", "in_progress")),
+                goal = LocalGoal("完成架构迁移"),
+                planMode = true,
+            ),
         )
 
         val snapshot = coordinator.snapshot(
@@ -100,6 +107,10 @@ class LocalSessionCoordinatorTest {
         assertEquals(listOf("m2", "m3"), snapshot.transcriptWindow.map { it.id })
         assertEquals(3L, snapshot.transcriptIndex.totalMessageCount)
         assertEquals(123_456L, snapshot.updatedAt)
+        assertEquals(listOf("检查边界"), snapshot.plan)
+        assertEquals(listOf(LocalTodoItem("补回归", "in_progress")), snapshot.todos)
+        assertEquals(LocalGoal("完成架构迁移"), snapshot.goal)
+        assertTrue(snapshot.planMode)
         assertEquals(8L, snapshot.controlProjectedThroughSequence)
         assertEquals(7L, snapshot.transcriptProjectedThroughSequence)
     }
