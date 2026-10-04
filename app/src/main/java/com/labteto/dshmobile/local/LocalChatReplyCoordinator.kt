@@ -258,7 +258,7 @@ internal class LocalChatReplyCoordinator(
         retryRaw: suspend (repairHint: String) -> LocalModelReply,
         appendEvent: (type: String, data: JsonObject) -> Unit,
     ): LocalModelReply {
-        suspend fun finalizeProactiveCandidate(
+        suspend fun finalizeRawCandidate(
             candidate: LocalModelReply,
             candidateUsageContext: TokenUsageContext,
         ): LocalModelReply = finalizeStyled(
@@ -276,15 +276,15 @@ internal class LocalChatReplyCoordinator(
             },
         )
 
-        suspend fun finalizeImmersedCandidate(
+        suspend fun enforceImmersionOnFinalized(
             candidate: LocalModelReply,
             candidateUsageContext: TokenUsageContext,
         ): LocalModelReply = ChatReplyImmersionGuard.enforce(
             persona = persona,
-            initial = finalizeProactiveCandidate(candidate, candidateUsageContext),
+            initial = candidate,
             contentOf = { checked -> checked.content.orEmpty().trim() },
             retry = { immersionHint ->
-                finalizeProactiveCandidate(
+                finalizeRawCandidate(
                     retryRaw(immersionHint),
                     candidateUsageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
                 )
@@ -299,27 +299,36 @@ internal class LocalChatReplyCoordinator(
             },
         )
 
+        val immersedInitial = enforceImmersionOnFinalized(
+            candidate = initial,
+            candidateUsageContext = usageContext,
+        )
         return ChatReplyContinuityGuard.enforce(
-        previous = scene,
-        userMessage = "",
-        initial = finalizeImmersedCandidate(initial, usageContext),
-        mode = ChatContinuityGuardMode.PROACTIVE,
-        contentOf = { candidate -> candidate.content.orEmpty().trim() },
-        retry = { repairHint ->
-            finalizeImmersedCandidate(
-                retryRaw(repairHint),
-                usageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
-            )
-        },
-        onEvent = { action, check ->
-            appendEvent("chat/continuity-guard", buildJsonObject {
-                put("action", action)
-                put("automation", true)
-                put("proactive", true)
-                put("location", scene.location)
-                put("violation_count", check.violations.size)
-            })
-        },
+            previous = scene,
+            userMessage = "",
+            initial = immersedInitial,
+            mode = ChatContinuityGuardMode.PROACTIVE,
+            contentOf = { candidate -> candidate.content.orEmpty().trim() },
+            retry = { repairHint ->
+                val repairUsageContext = usageContext.copy(action = TokenUsageAction.CHAT_REPAIR)
+                val finalized = finalizeRawCandidate(
+                    retryRaw(repairHint),
+                    repairUsageContext,
+                )
+                enforceImmersionOnFinalized(
+                    candidate = finalized,
+                    candidateUsageContext = repairUsageContext,
+                )
+            },
+            onEvent = { action, check ->
+                appendEvent("chat/continuity-guard", buildJsonObject {
+                    put("action", action)
+                    put("automation", true)
+                    put("proactive", true)
+                    put("location", scene.location)
+                    put("violation_count", check.violations.size)
+                })
+            },
         )
     }
 
