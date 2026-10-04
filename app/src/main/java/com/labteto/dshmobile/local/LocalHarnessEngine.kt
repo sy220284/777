@@ -68,6 +68,7 @@ import com.labteto.dshmobile.local.model.compact
 import com.labteto.dshmobile.local.model.compactOverflow
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.model.LocalModelState
+import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.withoutLastCompletedAssistantReply
 import com.labteto.dshmobile.local.model.withModelToolCallEventData
@@ -934,10 +935,6 @@ class LocalHarnessEngine @Inject constructor(
 
     internal suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): String =
         modelConfiguration.test(apiKey, model, baseUrl, protocol, profileId)
-
-    /** Choose how user image attachments reach the local model. */
-    internal fun configureImageInputMode(mode: LocalImageInputMode) =
-        settingsCoordinator.configureImageInputMode(mode)
 
     /** Persist execution limits exposed from Settings. */
     internal fun configureRuntimeLimits(mainMaxSteps: Int, subagentMaxSteps: Int, modelAttempts: Int) =
@@ -4811,7 +4808,7 @@ class LocalHarnessEngine @Inject constructor(
                 ),
                 imageInputMode = runCatching {
                     LocalImageInputMode.valueOf(
-                        preferences.getString(LocalHarnessSettingsCoordinator.KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)
+                        preferences.getString(LocalModelSettingsCoordinator.KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)
                             ?: LocalImageInputMode.AUTO.name,
                     )
                 }.getOrDefault(LocalImageInputMode.AUTO),
