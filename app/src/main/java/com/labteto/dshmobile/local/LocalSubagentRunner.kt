@@ -150,7 +150,7 @@ internal class LocalSubagentRunner(
             configuredBase = maxSteps,
             task = task,
             contextChars = history.encodedChars + task.length,
-            contextBudgetChars = runHistoryBudget?.maxHistoryChars ?: snapshot.contextBudgetChars,
+            contextBudgetChars = runHistoryBudget?.maxHistoryChars ?: snapshot.kernel.contextBudgetChars,
             pressure = resourceScheduler.snapshot().pressure,
             kind = runKind,
         )
@@ -202,11 +202,11 @@ internal class LocalSubagentRunner(
             kind = runKind,
             allowMutation = allowMutation,
             resourceBudget = LocalAgentRunResourceBudget(
-                maxModelRequests = snapshot.resources.maxModelRequests,
-                maxAgents = snapshot.resources.maxAgents,
-                maxTerminals = snapshot.resources.maxTerminals,
-                maxVirtualDisplays = snapshot.resources.maxVirtualDisplays,
-                maxLanguageServers = snapshot.resources.maxLanguageServers,
+                maxModelRequests = snapshot.kernel.resources.maxModelRequests,
+                maxAgents = snapshot.kernel.resources.maxAgents,
+                maxTerminals = snapshot.kernel.resources.maxTerminals,
+                maxVirtualDisplays = snapshot.kernel.resources.maxVirtualDisplays,
+                maxLanguageServers = snapshot.kernel.resources.maxLanguageServers,
             ),
             toolNames = schemas(
                 allowMutation,
@@ -490,7 +490,7 @@ internal class LocalSubagentRunner(
                         configuredBase = maxSteps,
                         task = task,
                         contextChars = history.encodedChars,
-                        contextBudgetChars = liveBudget?.maxHistoryChars ?: state.value.contextBudgetChars,
+                        contextBudgetChars = liveBudget?.maxHistoryChars ?: state.value.kernel.contextBudgetChars,
                         pressure = resourceScheduler.snapshot().pressure,
                         kind = runKind,
                     )
