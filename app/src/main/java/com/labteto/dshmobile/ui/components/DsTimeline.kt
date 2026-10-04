@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -55,7 +55,7 @@ fun DsTimeline(
                         .width(18.dp)
                         .fillMaxHeight(),
                 ) {
-                    Canvas(Modifier.matchParentSize()) {
+                    Canvas(Modifier.fillMaxSize()) {
                         val centerX = size.width / 2f
                         val dotCenterY = 12.5.dp.toPx()
                         val stroke = 1.5.dp.toPx()
