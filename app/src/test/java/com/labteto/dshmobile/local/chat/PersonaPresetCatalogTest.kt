@@ -57,7 +57,9 @@ class PersonaPresetCatalogTest {
     fun starterPresetsContainLivingCharacterSignals() {
         PersonaPresetCatalog.presets.forEach { preset ->
             assertTrue(preset.persona.coreValues.isNotEmpty())
+            assertTrue(preset.persona.coreTension.isNotBlank())
             assertTrue(preset.persona.attentionBiases.isNotEmpty())
+            assertTrue(preset.persona.attentionKeywords.isNotEmpty())
             assertTrue(preset.persona.perceptionBlindSpots.isNotEmpty())
             assertTrue(preset.persona.quirks.isNotEmpty())
             assertTrue(preset.persona.limitations.isNotEmpty())
@@ -67,6 +69,20 @@ class PersonaPresetCatalogTest {
             assertTrue(preset.persona.voiceSamples.distinct().size >= 3)
             assertTrue(preset.persona.hardConstraints.isNotEmpty())
             assertTrue(preset.persona.portrait.isNotBlank())
+        }
+    }
+
+    @Test
+    fun starterPresetsUseCharacterSpecificLifeFieldsInsteadOfLegacyTemplateFiller() {
+        val genericTension = "既有身份与个人愿望可能发生拉扯，具体变化必须由当前故事中的真实事件推动。"
+        val genericValues = setOf("重要关系与现实责任", "自身判断与边界", "长期目标与个人愿望")
+        val modelMetaBans = setOf("作为AI", "根据设定我应该", "身为一个语言模型")
+
+        PersonaPresetCatalog.presets.forEach { preset ->
+            assertTrue(preset.persona.coreTension.isNotBlank())
+            assertTrue(preset.persona.coreTension != genericTension)
+            assertTrue(preset.persona.coreValues.none { it in genericValues })
+            assertTrue(preset.persona.bannedPhrases.none { it in modelMetaBans })
         }
     }
 
