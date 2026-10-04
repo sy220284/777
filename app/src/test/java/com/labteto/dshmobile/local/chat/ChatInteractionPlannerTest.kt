@@ -213,14 +213,11 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
-    fun legacyReplyDraftStillWorksAndLegacyDirectionIsRetired() {
-        val previous = ChatCharacterState(
-            narrativeDirection = ChatNarrativeDirection("说开误会", "角色给彼此澄清的机会"),
-        )
-        val payload = """{"state":{"mood":"自然"},"suggestions":[{"label":"自然接话","text":"那你继续说，我听着。"}]}"""
+    fun legacyReplyDraftStillWorksAfterDirectionFieldsAreRetired() {
+        val previous = ChatCharacterState()
+        val payload = """{"state":{"mood":"自然"},"suggestions":[{"label":"自然接话","text":"那你继续说，我听着。","direction":"旧剧情方向","impact":"旧影响"}]}"""
 
         val plan = planner.parse(payload, previous)!!
-        assertTrue(plan.state.narrativeDirection == null)
         assertEquals(1, plan.suggestions.size)
         assertEquals("那你继续说，我听着。", plan.suggestions.single().text)
     }
