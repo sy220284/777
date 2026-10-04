@@ -75,12 +75,12 @@ internal class LocalWorkRunBinding(
         }
         state.update {
             it.copy(
-                kernel = it.kernel.copy(
-                    running = false,
+                work = it.work.copy(
                     pendingApproval = null,
                     pendingQuestion = null,
                     queuedInputCount = 0,
                 ),
+                kernel = it.kernel.copy(running = false),
             )
         }
         val activeJob = job.also { job = null }
@@ -97,7 +97,7 @@ internal fun projectJobSnapshotToSessionStates(
 ) {
     visibleState.update { current ->
         current.copy(
-            kernel = current.kernel.copy(
+            work = current.work.copy(
                 jobs = projectExecutionJobs(current.usageMode, current.sessionId, jobs),
             ),
         )
@@ -105,7 +105,7 @@ internal fun projectJobSnapshotToSessionStates(
     activeRuns.forEach { (sessionId, binding) ->
         binding.state.update { current ->
             current.copy(
-                kernel = current.kernel.copy(
+                work = current.work.copy(
                     jobs = projectExecutionJobs(current.usageMode, sessionId, jobs),
                 ),
             )
@@ -131,10 +131,6 @@ internal fun mirrorLocalWorkRunState(
                 work = run.work,
                 kernel = visible.kernel.copy(
                     running = run.kernel.running,
-                    pendingApproval = run.kernel.pendingApproval,
-                    pendingQuestion = run.kernel.pendingQuestion,
-                    queuedInputCount = run.kernel.queuedInputCount,
-                    workflowProgress = run.kernel.workflowProgress,
                     contextChars = run.kernel.contextChars,
                     contextBudgetChars = run.kernel.contextBudgetChars,
                 ),
