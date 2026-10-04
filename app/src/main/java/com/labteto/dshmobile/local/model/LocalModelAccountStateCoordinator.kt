@@ -55,7 +55,7 @@ internal class LocalModelAccountStateCoordinator(
         val result = requested?.let { configuration.select(it.id, profiles) }
         val active = result?.activeProfileId
             ?.let { id -> profiles.firstOrNull { it.id == id } }
-            ?: configuration.activeProfile(before.model, before.baseUrl, profiles)
+            ?: configuration.activeProfile(before.modelState.model, before.modelState.baseUrl, profiles)
         val configured = active != null && gateway.hasCredential(active)
         if (configured) gateway.activate(active!!) else gateway.clearActive()
         val removedActiveChatGptModel = active == null &&
@@ -64,10 +64,12 @@ internal class LocalModelAccountStateCoordinator(
             profiles.none { it.id == beforeActiveProfile.id }
         state.update { current ->
             current.copy(
-                configured = configured,
-                model = result?.model ?: active?.model ?: current.model,
-                baseUrl = result?.baseUrl ?: active?.baseUrl ?: current.baseUrl,
-                modelSelection = current.modelSelection.replaceProfiles(profiles, active?.id),
+                modelState = current.modelState.copy(
+                    configured = configured,
+                    model = result?.model ?: active?.model ?: current.modelState.model,
+                    baseUrl = result?.baseUrl ?: active?.baseUrl ?: current.modelState.baseUrl,
+                    modelSelection = current.modelState.modelSelection.replaceProfiles(profiles, active?.id),
+                ),
                 error = when {
                     models.isEmpty() -> "当前 ChatGPT 账户没有可用于套餐共享的模型"
                     removedActiveChatGptModel -> "当前 ChatGPT 模型已不可用，请重新选择模型"
@@ -84,17 +86,19 @@ internal class LocalModelAccountStateCoordinator(
         val before = state.value
         val beforeActive = gateway.activeProfile()
         val profiles = configuration.saveChatGptModels(accountId, emptyList())
-        val active = configuration.activeProfile(before.model, before.baseUrl, profiles)
+        val active = configuration.activeProfile(before.modelState.model, before.modelState.baseUrl, profiles)
         val configured = active != null && gateway.hasCredential(active)
         if (configured) gateway.activate(active!!) else gateway.clearActive()
         val retiredActive = beforeActive?.authKind == LocalModelAuthKind.CHATGPT_PLAN &&
             beforeActive.credentialRef == accountId
         state.update { current ->
             current.copy(
-                configured = configured,
-                model = active?.model ?: current.model,
-                baseUrl = active?.baseUrl ?: current.baseUrl,
-                modelSelection = current.modelSelection.replaceProfiles(profiles, active?.id),
+                modelState = current.modelState.copy(
+                    configured = configured,
+                    model = active?.model ?: current.modelState.model,
+                    baseUrl = active?.baseUrl ?: current.modelState.baseUrl,
+                    modelSelection = current.modelState.modelSelection.replaceProfiles(profiles, active?.id),
+                ),
                 error = if (retiredActive) {
                     "当前 ChatGPT 套餐授权已失效，已停止使用该模型；请重新启用套餐或手动选择其他模型"
                 } else {
@@ -109,18 +113,20 @@ internal class LocalModelAccountStateCoordinator(
         val current = state.value
         val result = configuration.removeChatGptAccount(
             accountId = accountId,
-            currentModel = current.model,
-            currentBaseUrl = current.baseUrl,
+            currentModel = current.modelState.model,
+            currentBaseUrl = current.modelState.baseUrl,
         ) ?: return
         val active = configuration.activeProfile(result.model, result.baseUrl, result.profiles)
         val configured = active != null && gateway.hasCredential(active)
         active?.takeIf { configured }?.let(gateway::activate)
         state.update { current ->
             current.copy(
-                configured = configured,
-                model = result.model,
-                baseUrl = result.baseUrl,
-                modelSelection = current.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+                modelState = current.modelState.copy(
+                    configured = configured,
+                    model = result.model,
+                    baseUrl = result.baseUrl,
+                    modelSelection = current.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+                ),
                 error = null,
             )
         }
@@ -128,11 +134,11 @@ internal class LocalModelAccountStateCoordinator(
 
     suspend fun requestMarkerOrNull(): String? {
         val snapshot = state.value
-        val profileId = snapshot.modelSelection.activeProfileId ?: return null
+        val profileId = snapshot.modelState.modelState.modelSelection.activeProfileId ?: return null
         return gateway.profileForRoute(
             profileId = profileId,
-            model = snapshot.model,
-            baseUrl = snapshot.baseUrl,
+            model = snapshot.modelState.model,
+            baseUrl = snapshot.modelState.baseUrl,
         ).id
     }
 }
