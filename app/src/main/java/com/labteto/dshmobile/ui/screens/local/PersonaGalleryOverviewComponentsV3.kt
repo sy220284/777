@@ -61,6 +61,7 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -456,9 +457,16 @@ internal fun CompactPersonaRow(
     onMove: (Int) -> Unit,
 ) {
     var dragDistance by remember(entry.id) { mutableFloatStateOf(0f) }
+    val colors = DsTheme.colors
+    val backgroundState = LocalAppBackgroundState.current
+    val rowColor = when {
+        selected -> colors.accentTertiary
+        backgroundState.hasImage -> colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
+        else -> Color.Transparent
+    }
     Surface(
         shape = DsShapes.row,
-        color = if (selected) DsTheme.colors.accentTertiary else Color.Transparent,
+        color = rowColor,
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
