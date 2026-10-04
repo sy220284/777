@@ -26,6 +26,7 @@ RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 4,
+    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 12,
 }
 PROJECTION_FIELD_BUDGETS = {
     "LocalHarnessSettingsState": 17,
@@ -144,6 +145,39 @@ for relative in ENGINE_CONSUMER_ALLOWLIST:
     consumer_source = strip_comments(read(relative))
     if "engine.state" in consumer_source:
         die(f"{relative} must consume LocalRuntimeStateStore instead of LocalHarnessEngine.state")
+
+settings_coordinator = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt")
+)
+settings_runtime = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt")
+)
+if "@Singleton" not in settings_coordinator or "private val runtimeStateStore: LocalRuntimeStateStore" not in settings_coordinator:
+    die("LocalHarnessSettingsCoordinator must be the injected owner of Settings runtime state mutations")
+if "private val settingsCoordinator: LocalHarnessSettingsCoordinator" not in settings_runtime:
+    die("LocalSettingsRuntime must depend on the Settings capability directly")
+for forbidden_proxy in (
+    "engine.configureRuntimeLimits",
+    "engine.configureWorkerProfile",
+    "engine.configurePersonalization",
+    "engine.configureChatStyleGuard",
+    "engine.addChatStyleGuardPhrase",
+    "engine.removeChatStyleGuardPhrase",
+    "engine.clearChatStyleGuardHits",
+):
+    if forbidden_proxy in settings_runtime:
+        die("LocalSettingsRuntime must not route owned Settings behavior back through Engine: " + forbidden_proxy)
+for removed_engine_proxy in (
+    "internal fun configureRuntimeLimits",
+    "internal fun configureWorkerProfile",
+    "internal fun configurePersonalization",
+    "internal fun configureChatStyleGuard",
+    "internal fun addChatStyleGuardPhrase",
+    "internal fun removeChatStyleGuardPhrase",
+    "internal fun clearChatStyleGuardHits",
+):
+    if removed_engine_proxy in engine:
+        die("LocalHarnessEngine must not reintroduce Settings proxy API: " + removed_engine_proxy)
 
 constructor = re.search(
     r"class LocalHarnessEngine @Inject constructor\((.*?)\n\) \{",
