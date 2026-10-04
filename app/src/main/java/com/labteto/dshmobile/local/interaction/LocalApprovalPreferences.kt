@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.local
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
+
 import android.content.SharedPreferences
 
 /**
@@ -10,10 +15,16 @@ import android.content.SharedPreferences
  * approval-gated operation is approved automatically. A legacy session flag may seed it once
  * during upgrade, but an explicit persisted choice always wins.
  */
-internal class LocalApprovalPreferences(
+@Singleton
+class LocalApprovalPreferences internal constructor(
     private val preferences: SharedPreferences,
 ) {
-    fun isSafeAutoApprovalEnabled(legacySessionValue: Boolean = false): Boolean {
+    @Inject
+    internal constructor(@ApplicationContext context: Context) : this(
+        preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE),
+    )
+
+    internal fun isSafeAutoApprovalEnabled(legacySessionValue: Boolean = false): Boolean {
         if (preferences.contains(KEY_SAFE_AUTO_APPROVAL)) {
             return preferences.getBoolean(KEY_SAFE_AUTO_APPROVAL, true)
         }
@@ -24,7 +35,7 @@ internal class LocalApprovalPreferences(
         return true
     }
 
-    fun setSafeAutoApprovalEnabled(enabled: Boolean) {
+    internal fun setSafeAutoApprovalEnabled(enabled: Boolean) {
         preferences.edit().putBoolean(KEY_SAFE_AUTO_APPROVAL, enabled).apply()
     }
 

@@ -49,7 +49,6 @@ import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
-import com.labteto.dshmobile.local.tools.LocalGitHubCredentialStore
 import com.labteto.dshmobile.local.tools.LocalPluginCompositionFactory
 import com.labteto.dshmobile.local.usage.LocalTokenUsageContextBridge
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
@@ -143,9 +142,7 @@ class LocalHarnessEngine @Inject internal constructor(
     private val modelGateway: LocalModelGateway,
     private val modelConfiguration: LocalModelConfigurationCoordinator,
     private val usageTracker: DeepSeekUsageTracker,
-    private val githubCredentials: LocalGitHubCredentialStore,
     private val bundledRuntimeManager: LocalBundledRuntimeManager,
-    private val web: LocalWebProvider,
     private val json: Json,
     private val automationScheduler: HarnessAutomationScheduler,
     private val pluginCompositionFactory: LocalPluginCompositionFactory,
@@ -156,6 +153,8 @@ class LocalHarnessEngine @Inject internal constructor(
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
     private val workRunRegistry: LocalWorkRunRegistry,
     private val runtimeStateStore: LocalRuntimeStateStore,
+    private val approvalPreferences: LocalApprovalPreferences,
+    private val eventLogRegistry: LocalSessionEventLogRegistry,
 ) {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val chatPersonaStore get() = chatPersistence.personaStore
@@ -185,15 +184,11 @@ class LocalHarnessEngine @Inject internal constructor(
         File(context.noBackupFilesDir, "local-harness/tool-output"),
     )
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
-    private val webTools = LocalWebTools(
-        web = web,
+    private val webTools = pluginCompositionFactory.createWebTools(
         searchKeyProvider = modelConfiguration::resolveDeepSeekSearchCredential,
         workspace = workspace,
-        json = json,
     )
-    private val approvalPreferences = LocalApprovalPreferences(preferences)
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
-    private val eventLogRegistry by lazy { LocalSessionEventLogRegistry(sessionsRoot, json) }
     private val sessionStorageManager by lazy { LocalSessionStorageManager(sessionsRoot, json) }
     private val sessionRepository by lazy {
         LocalSessionRepository(sessionsRoot, json, scope,
@@ -700,15 +695,6 @@ class LocalHarnessEngine @Inject internal constructor(
             memoryManager = memoryManager,
             diaryStore = chatDiaryStore,
             currentSessionId = { currentSessionId },
-            eventLog = { eventLog },
-            persist = ::persist,
-        )
-    }
-    private val approvalCoordinator by lazy {
-        LocalApprovalCoordinator(
-            state = _state,
-            approvalPreferences = approvalPreferences,
-            interactions = runtimeStateStore.foregroundInteractions,
             eventLog = { eventLog },
             persist = ::persist,
         )
@@ -2000,7 +1986,7 @@ class LocalHarnessEngine @Inject internal constructor(
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
         withContext(Dispatchers.IO) { attachmentImporter.import(uri) }
 
-    internal suspend fun diagnoseNetwork(target: String): String = web.diagnose(target)
+    internal suspend fun diagnoseNetwork(target: String): String = webTools.diagnose(target)
 
     internal suspend fun sessionStorageStatusForUi(): LocalSessionStorageStatus =
         withContext(Dispatchers.IO) { sessionStorageManager.status() }
@@ -2027,10 +2013,10 @@ class LocalHarnessEngine @Inject internal constructor(
         )
     }
 
-    internal suspend fun githubConnectorConfiguredForUi(): Boolean = githubCredentials.configured()
+    internal suspend fun githubConnectorConfiguredForUi(): Boolean = pluginComposition.githubConfigured()
     internal suspend fun configureGitHubConnectorForUi(token: String): GitHubConnectorStatus =
-        pluginComposition.validateGitHubCredential(token).also { githubCredentials.put(token) }
-    internal suspend fun clearGitHubConnectorForUi() = githubCredentials.clear()
+        pluginComposition.configureGitHubCredential(token)
+    internal suspend fun clearGitHubConnectorForUi() = pluginComposition.clearGitHubCredential()
 
     internal suspend fun mcpServersForUi(): List<McpServerSnapshot> = pluginComposition.mcpServers()
 
@@ -2055,65 +2041,6 @@ class LocalHarnessEngine @Inject internal constructor(
     internal fun backgroundJobOutputForUi(jobId: String): String = jobs.output(jobId, currentSessionId)
 
     internal fun stopBackgroundJobForUi(jobId: String): String = jobs.kill(jobId, currentSessionId)
-
-    internal fun enableAutoApproval() {
-        approvalCoordinator.enableAutoApproval()
-        workRunRegistry.forEachBinding { run ->
-            run.state.update { it.copy(safeAutoApprovalEnabled = true) }
-        }
-    }
-
-    internal fun enableAutoApprovalForPending(callId: String) {
-        val binding = workRunRegistry[currentSessionId]
-        val pending = binding?.state?.value?.work?.pendingApproval?.takeIf { it.callId == callId }
-        if (binding != null && pending != null) {
-            approvalCoordinator.enableAutoApproval()
-            workRunRegistry.forEachBinding { run ->
-                run.state.update { it.copy(safeAutoApprovalEnabled = true) }
-            }
-            binding.eventLog.append("approval/mode", buildJsonObject {
-                put("mode", "global")
-                put("tool", pending.toolName)
-            })
-            binding.interactions.answerApproval(callId, true)
-            return
-        }
-        approvalCoordinator.enableAutoApprovalForPending(callId)
-    }
-
-    internal fun enableDeviceApprovalLease(callId: String) {
-        val binding = workRunRegistry[currentSessionId]
-        val pending = binding?.state?.value?.work?.pendingApproval?.takeIf { it.callId == callId }
-        if (binding != null && pending != null) {
-            if (pending.canApproveDeviceTurn) {
-                binding.state.update { it.copy(deviceApprovalLease = true) }
-                binding.eventLog.append("approval/device-lease", buildJsonObject { put("active", true) })
-                binding.interactions.answerApproval(callId, true)
-            } else {
-                binding.eventLog.append("approval/device-lease-rejected", buildJsonObject {
-                    put("reason", "pending-tool-requires-explicit-approval")
-                    put("tool", pending.toolName)
-                })
-            }
-            return
-        }
-        approvalCoordinator.enableDeviceApprovalLease(callId)
-    }
-
-    internal fun disableDeviceApprovalLease() {
-        workRunRegistry[currentSessionId]?.let { binding ->
-            binding.state.update { it.copy(deviceApprovalLease = false) }
-            binding.eventLog.append("approval/device-lease", buildJsonObject { put("active", false) })
-        }
-        approvalCoordinator.disableDeviceApprovalLease()
-    }
-
-    internal fun disableAutoApproval() {
-        approvalCoordinator.disableAutoApproval()
-        workRunRegistry.forEachBinding { run ->
-            run.state.update { it.copy(safeAutoApprovalEnabled = false) }
-        }
-    }
 
     /** Stop only the run owned by the currently visible conversation. */
     internal fun stop() {
@@ -2903,7 +2830,7 @@ class LocalHarnessEngine @Inject internal constructor(
         clearRunCapabilities(binding)
         if (runState.value.usageMode == LocalUsageMode.WORK) {
             toolExecutionCoordinator.prepareWorkTurnCapabilities(
-                input, runHistory.snapshot(), githubCredentials::configured, binding?.enabledOptionalTools,
+                input, runHistory.snapshot(), pluginComposition::githubConfigured, binding?.enabledOptionalTools,
             )
         }
         if (runState.value.usageMode == LocalUsageMode.CHAT) {
@@ -4009,7 +3936,7 @@ class LocalHarnessEngine @Inject internal constructor(
                 query = args.optionalString("query").orEmpty(),
                 allowArtifactWrite = allowMutation && !executionState.value.work.planMode,
             )
-            "network_diagnose" -> web.diagnose(args.string("url"))
+            "network_diagnose" -> webTools.diagnose(args.string("url"))
             "environment_info" -> environmentInfoCoordinator.build(binding)
             "capability_search" -> if (binding == null) {
                 searchCapabilities(args.string("query"))
@@ -4139,7 +4066,7 @@ class LocalHarnessEngine @Inject internal constructor(
             })
             return true
         }
-        if (_state.value.safeAutoApprovalEnabled) {
+        if (approvalPreferences.isSafeAutoApprovalEnabled()) {
             eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
@@ -4179,7 +4106,7 @@ class LocalHarnessEngine @Inject internal constructor(
             })
             return true
         }
-        if (snapshot.safeAutoApprovalEnabled || approvalPreferences.isSafeAutoApprovalEnabled()) {
+        if (approvalPreferences.isSafeAutoApprovalEnabled()) {
             binding.eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)

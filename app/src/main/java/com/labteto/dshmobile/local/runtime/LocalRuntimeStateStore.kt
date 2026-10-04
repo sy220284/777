@@ -27,15 +27,17 @@ import kotlinx.coroutines.flow.update
  * Feature internals. Engine bootstrap initializes the first visible snapshot exactly once.
  */
 @Singleton
-class LocalRuntimeStateStore @Inject constructor(
-    @ApplicationContext context: Context,
+class LocalRuntimeStateStore internal constructor(
+    internal val memoryClassMb: Int = 256,
 ) {
+    @Inject
+    internal constructor(@ApplicationContext context: Context) : this(
+        memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
+    )
     private val mutable = MutableStateFlow(LocalHarnessState())
     private val sendFeedbackMutable = MutableStateFlow(LocalSendFeedbackState())
     private val resourceObservers = CopyOnWriteArrayList<(HarnessResourceSnapshot) -> Unit>()
 
-    internal val memoryClassMb =
-        context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256
     internal val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
     internal val resourceScheduler = HarnessResourceScheduler(
         budget = resourceBudget,

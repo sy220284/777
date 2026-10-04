@@ -10,6 +10,8 @@ internal class LocalWebTools(
     private val workspace: LocalWorkspace,
     private val json: Json,
 ) {
+    suspend fun diagnose(target: String): String = web.diagnose(target)
+
     suspend fun search(
         queries: List<String>,
         usageContext: TokenUsageContext? = null,

@@ -4,8 +4,8 @@ import com.labteto.dshmobile.local.presentation.toWorkSurfaceUiState
 import com.labteto.dshmobile.local.runtime.LocalKernelState
 import com.labteto.dshmobile.local.work.LocalWorkState
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
-import com.labteto.dshmobile.harness.resource.HarnessResourceBudget
-import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -65,29 +65,22 @@ class LocalWorkRunBindingTest {
         assertNull(binding.state.value.work.pendingQuestion)
     }
 
-    @Test fun schedulerChangeUpdatesDetachedWorkWithoutCopyingItsExecutionIntoChat() {
-        val visible = MutableStateFlow(LocalHarnessState(sessionId = "chat", usageMode = LocalUsageMode.CHAT))
+    @Test fun schedulerChangeUpdatesDetachedWorkWithoutCopyingItsExecutionIntoChat() = runTest {
+        val runtime = LocalRuntimeStateStore()
+        val visible = runtime.initialize(LocalHarnessState(sessionId = "chat", usageMode = LocalUsageMode.CHAT))
         val binding = binding(LocalHarnessState(
             sessionId = "work",
             kernel = LocalKernelState(running = true, queuedInputCount = 2, contextChars = 32_000),
         ))
-        val registry = LocalWorkRunRegistry().apply { attach(binding) }
-        val resources = HarnessResourceSnapshot(
-            activeModelRequests = 1, activeAgents = 3, activeTerminals = 0,
-            activeVirtualDisplays = 0, activeLanguageServers = 0,
-            budget = HarnessResourceBudget(maxModelRequests = 2, maxAgents = 4),
-        )
-
-        projectResourceSnapshotToSessionStates(
-            resources,
-            contextBudgetFor = { if (it.sessionId == "work") 48_000 else 24_000 },
-            visibleState = visible, activeRuns = registry,
-        )
-
+        val registry = LocalWorkRunRegistry(runtime).apply { attach(binding) }
+        val initialBudget = binding.state.value.kernel.contextBudgetChars
+        val leases = List(3) { runtime.resourceScheduler.acquire(HarnessResourceKind.AGENT) } +
+            runtime.resourceScheduler.acquire(HarnessResourceKind.MODEL_REQUEST)
+        try {
         assertEquals(0, visible.value.kernel.resources.activeAgents)
         assertEquals(3, binding.state.value.kernel.resources.activeAgents)
-        assertEquals(48_000, binding.state.value.kernel.contextBudgetChars)
-        assertEquals(24_000, visible.value.kernel.contextBudgetChars)
+        assertTrue(binding.state.value.kernel.contextBudgetChars < initialBudget)
+        assertEquals(binding.state.value.kernel.contextBudgetChars, visible.value.kernel.contextBudgetChars)
         assertTrue(binding.state.value.kernel.running)
         assertFalse(visible.value.kernel.running)
         assertEquals(2, binding.state.value.kernel.queuedInputCount)
@@ -95,6 +88,11 @@ class LocalWorkRunBindingTest {
         mirrorLocalWorkRunState("chat", visible, binding)
         assertEquals("chat", visible.value.sessionId)
         assertFalse(visible.value.kernel.running)
+        } finally {
+            leases.forEach { it.close() }
+        }
+        assertEquals(0, binding.state.value.kernel.resources.activeAgents)
+        assertEquals(initialBudget, binding.state.value.kernel.contextBudgetChars)
     }
 
     private fun binding(initial: LocalHarnessState) = LocalWorkRunBinding(

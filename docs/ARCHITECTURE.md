@@ -408,13 +408,25 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 ### 阶段 3：建立 ChatFeature / WorkFeature
 
-状态：**待完成。**
+状态：**进行中。**
 
 - Runtime 的 `engine.xxx()` 行为逐项迁入所属 Feature；
 - 每迁走一项立即删除对应 Engine 入口；
 - Feature internal 只依赖 Shared Capability / Kernel 契约；
 - 禁止用“Port → Engine 原样转发”冒充完成；
 - 完成时 ChatRuntime / WorkRuntime 对 `LocalHarnessEngine` 直接引用必须为 0。
+
+当前 Work 审批子阶段已落实：
+
+- `LocalWorkApprovalCoordinator` 拥有全局自动审批切换、待审批授权、回合设备授权及撤销；WorkRuntime 直接消费该能力，Engine 对应业务入口删除。
+- `LocalApprovalPreferences` 与 `LocalSessionEventLogRegistry` 为共享注入对象；全局自动审批以设备级持久配置为权威，Session 快照不再为审批配置变化重复写盘。
+- 待审批操作在交互所有者内校验真实、未完成的等待者；过期或已回答点击不能改变全局模式或授予设备授权。开启全局自动批准会同步所有活跃 Work 状态并结算其审批等待。
+- 设备授权只修改目标会话的运行绑定；撤销不影响其他会话，前台恢复与后台取消继续使用各自交互所有者。
+- 插件组合根持有 GitHub 凭据操作和 Web 工具构造，Engine 不再直接依赖对应平台存储/Provider；构造依赖预算维持 17，Work 直接 Engine 引用预算收紧到 4。
+- 回归覆盖多会话等待、全局模式启停、过期/已完成点击、设备授权隔离/撤销、显式审批工具与前台切换；本子阶段须通过最终 Head 的完整 CI 验证。
+
+剩余：Chat 的人物、分支与发送业务，以及 Work 的运行停止、计划和任务业务仍有 Engine 代理；不将本审批子阶段标记为整个阶段 3 完成。
+
 
 ### 阶段 4：建立 AutomationFeature
 

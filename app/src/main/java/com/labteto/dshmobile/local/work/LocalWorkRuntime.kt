@@ -11,6 +11,7 @@ class LocalWorkRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
     private val workRunRegistry: LocalWorkRunRegistry,
     private val runtimeStateStore: LocalRuntimeStateStore,
+    private val approvals: LocalWorkApprovalCoordinator,
 ) {
     internal fun backgroundJobOutputForUi(jobId: String): String = engine.backgroundJobOutputForUi(jobId)
     internal fun stopBackgroundJobForUi(jobId: String): String = engine.stopBackgroundJobForUi(jobId)
@@ -19,11 +20,11 @@ class LocalWorkRuntime @Inject constructor(
         if (binding?.interactions?.answerApproval(callId, approved) == true) return
         runtimeStateStore.foregroundInteractions.answerApproval(callId, approved)
     }
-    internal fun enableAutoApproval() = engine.enableAutoApproval()
-    internal fun enableAutoApprovalForPending(callId: String) = engine.enableAutoApprovalForPending(callId)
-    internal fun enableDeviceApprovalLease(callId: String) = engine.enableDeviceApprovalLease(callId)
-    internal fun disableDeviceApprovalLease() = engine.disableDeviceApprovalLease()
-    internal fun disableAutoApproval() = engine.disableAutoApproval()
+    internal fun enableAutoApproval() = approvals.enableAutoApproval()
+    internal fun enableAutoApprovalForPending(callId: String) = approvals.enableAutoApprovalForPending(callId)
+    internal fun enableDeviceApprovalLease(callId: String) = approvals.enableDeviceApprovalLease(callId)
+    internal fun disableDeviceApprovalLease() = approvals.disableDeviceApprovalLease()
+    internal fun disableAutoApproval() = approvals.disableAutoApproval()
     internal fun answerQuestion(callId: String, answer: String) {
         val binding = workRunRegistry[runtimeStateStore.currentSessionId]
         if (binding?.interactions?.answerQuestion(callId, answer) == true) return

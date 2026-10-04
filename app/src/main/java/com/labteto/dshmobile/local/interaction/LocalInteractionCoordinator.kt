@@ -109,6 +109,18 @@ internal class LocalInteractionCoordinator(
             waiter.response.complete(approved)
         }
 
+    /** Commit an approval mode change only while this exact unresolved request still owns the wait. */
+    fun resolveApproval(callId: String, commit: (LocalApproval) -> Boolean): Boolean =
+        synchronized(waiterLock) {
+            val waiter = approvalWaiter
+            val pending = state.value.work.pendingApproval
+            if (waiter?.callId != callId || waiter.response.isCompleted || pending?.callId != callId) {
+                return@synchronized false
+            }
+            if (!commit(pending)) return@synchronized false
+            waiter.response.complete(true)
+        }
+
     fun answerQuestion(callId: String, answer: String): Boolean =
         synchronized(waiterLock) {
             val waiter = questionWaiter

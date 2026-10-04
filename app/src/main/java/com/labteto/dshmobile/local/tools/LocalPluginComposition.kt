@@ -29,6 +29,9 @@ import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
 import com.labteto.dshmobile.local.LocalApiKeyStore
 import com.labteto.dshmobile.local.LocalBuiltinPlugin
 import com.labteto.dshmobile.local.LocalToolCall
+import com.labteto.dshmobile.local.LocalWebProvider
+import com.labteto.dshmobile.local.LocalWebTools
+import com.labteto.dshmobile.local.LocalWorkspace
 import com.labteto.dshmobile.local.LocalVisionPlugin
 import com.labteto.dshmobile.local.LocalVisionRoute
 import com.labteto.dshmobile.local.TokenUsageContext
@@ -58,11 +61,17 @@ class LocalPluginCompositionFactory @Inject constructor(
     private val visionClient: VisionClient,
     private val githubCredentials: LocalGitHubCredentialStore,
     private val http: OkHttpClient,
+    private val web: LocalWebProvider,
     private val json: Json,
     private val automationScheduler: HarnessAutomationScheduler,
     private val automationStore: AutomationStore,
     private val webhookController: WebhookController,
 ) {
+    internal fun createWebTools(
+        searchKeyProvider: suspend () -> String?,
+        workspace: LocalWorkspace,
+    ): LocalWebTools = LocalWebTools(web, searchKeyProvider, workspace, json)
+
     internal fun create(
         workspaceRoot: File,
         runtimeProcess: AndroidProcessRuntime,
@@ -101,7 +110,7 @@ internal class LocalPluginComposition(
     apiKeys: LocalApiKeyStore,
     modelGateway: LocalModelGateway,
     visionClient: VisionClient,
-    githubCredentials: LocalGitHubCredentialStore,
+    private val githubCredentials: LocalGitHubCredentialStore,
     http: OkHttpClient,
     json: Json,
     automationScheduler: HarnessAutomationScheduler,
@@ -251,6 +260,13 @@ internal class LocalPluginComposition(
     fun pluginDescriptors(): List<PluginDescriptor> = pluginManager.descriptors()
 
     fun lifecycleSnapshots(): List<PluginLifecycleSnapshot> = pluginManager.lifecycleSnapshots()
+
+    suspend fun githubConfigured(): Boolean = githubCredentials.configured()
+
+    suspend fun configureGitHubCredential(token: String): GitHubConnectorStatus =
+        validateGitHubCredential(token).also { githubCredentials.put(token) }
+
+    suspend fun clearGitHubCredential() = githubCredentials.clear()
 
     suspend fun validateGitHubCredential(token: String): GitHubConnectorStatus =
         pluginManager.withActivePlugin("github-connector") { plugin, _ ->

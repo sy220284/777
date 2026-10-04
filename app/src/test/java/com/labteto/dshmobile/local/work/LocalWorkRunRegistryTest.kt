@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.LocalWorkRunBinding
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.serialization.json.Json
@@ -23,7 +24,7 @@ class LocalWorkRunRegistryTest {
 
     @Test
     fun registryOwnsAttachLiveAndDetachLifecycle() {
-        val registry = LocalWorkRunRegistry()
+        val registry = LocalWorkRunRegistry(LocalRuntimeStateStore())
         val first = binding("session-a")
         val second = binding("session-b")
         val firstJob = Job()
@@ -51,7 +52,7 @@ class LocalWorkRunRegistryTest {
 
     @Test
     fun attachingSameSessionReplacesPreviousBindingAtomically() {
-        val registry = LocalWorkRunRegistry()
+        val registry = LocalWorkRunRegistry(LocalRuntimeStateStore())
         val first = binding("shared")
         val replacement = binding("shared")
 

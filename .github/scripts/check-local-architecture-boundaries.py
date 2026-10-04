@@ -8,7 +8,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 
 ENGINE_MAX_PUBLIC_METHODS = 0
-ENGINE_MAX_INTERNAL_METHODS = 80
+ENGINE_MAX_INTERNAL_METHODS = 59
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
 
@@ -21,7 +21,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
 
 RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 14,
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 9,
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 4,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 12,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
@@ -305,6 +305,22 @@ for forbidden_model_proxy in (
 ):
     if forbidden_model_proxy in settings_runtime_source:
         die("LocalSettingsRuntime must route model operations through LocalModelRuntime: " + forbidden_model_proxy)
+
+work_approval_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkApprovalCoordinator.kt")
+)
+if "LocalHarnessEngine" in work_approval_source or "persist:" in work_approval_source:
+    die("Work approval policy must depend on shared capabilities, not Engine callbacks")
+for method in (
+    "enableAutoApproval", "enableAutoApprovalForPending", "enableDeviceApprovalLease",
+    "disableDeviceApprovalLease", "disableAutoApproval",
+):
+    if re.search(rf"\bfun\s+{method}\s*\(", engine):
+        die(f"Work approval ownership must not return to Engine: {method}")
+if "LocalSessionEventLogRegistry(sessionsRoot" in engine or "LocalApprovalPreferences(preferences)" in engine:
+    die("Engine must consume the shared Session EventLog/approval preference owners")
+if "binding.runtimeStateStore" in engine:
+    die("Work bindings must use their session-owned interactions")
 
 automation_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt")
