@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.ChatReplyRepairBudget
 import com.labteto.dshmobile.local.chat.ChatContinuityGuardMode
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatReplyContinuityGuard
@@ -49,6 +50,7 @@ internal class LocalChatReplyCoordinator(
             return reply
         }
         val persona = chatTurnCoordinator.persona(snapshot)
+        val repairBudget = ChatReplyRepairBudget()
         suspend fun finalizeCandidate(
             candidate: LocalModelReply,
             candidateUsageContext: TokenUsageContext,
@@ -76,7 +78,7 @@ internal class LocalChatReplyCoordinator(
             contentOf = { checked -> checked.content.orEmpty() },
             retry = { immersionHint ->
                 finalizeCandidate(
-                    retryRaw(immersionHint),
+                    repairBudget.repair(immersionHint, retryRaw),
                     candidateUsageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
                 )
             },
@@ -98,7 +100,7 @@ internal class LocalChatReplyCoordinator(
             contentOf = { candidate -> candidate.content.orEmpty() },
             retry = { repairHint ->
                 finalizeImmersedCandidate(
-                    retryRaw(repairHint),
+                    repairBudget.repair(repairHint, retryRaw),
                     usageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
                 )
             },
@@ -172,6 +174,7 @@ internal class LocalChatReplyCoordinator(
         retryRaw: suspend (repairHint: String) -> LocalModelReply,
         appendEvent: (type: String, data: JsonObject) -> Unit,
     ): String {
+        val repairBudget = ChatReplyRepairBudget()
         suspend fun finalizeCandidate(
             candidate: LocalModelReply,
             candidateUsageContext: TokenUsageContext,
@@ -206,7 +209,7 @@ internal class LocalChatReplyCoordinator(
             contentOf = { content -> content },
             retry = { immersionHint ->
                 finalizeCandidate(
-                    retryRaw(immersionHint),
+                    repairBudget.repair(immersionHint, retryRaw),
                     candidateUsageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
                 )
             },
@@ -229,7 +232,7 @@ internal class LocalChatReplyCoordinator(
             contentOf = { content -> content },
             retry = { repairHint ->
                 finalizeImmersedCandidate(
-                    retryRaw(repairHint),
+                    repairBudget.repair(repairHint, retryRaw),
                     usageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
                 )
             },
@@ -258,6 +261,7 @@ internal class LocalChatReplyCoordinator(
         retryRaw: suspend (repairHint: String) -> LocalModelReply,
         appendEvent: (type: String, data: JsonObject) -> Unit,
     ): LocalModelReply {
+        val repairBudget = ChatReplyRepairBudget()
         suspend fun finalizeRawCandidate(
             candidate: LocalModelReply,
             candidateUsageContext: TokenUsageContext,
@@ -285,7 +289,7 @@ internal class LocalChatReplyCoordinator(
             contentOf = { checked -> checked.content.orEmpty().trim() },
             retry = { immersionHint ->
                 finalizeRawCandidate(
-                    retryRaw(immersionHint),
+                    repairBudget.repair(immersionHint, retryRaw),
                     candidateUsageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
                 )
             },
@@ -312,7 +316,7 @@ internal class LocalChatReplyCoordinator(
             retry = { repairHint ->
                 val repairUsageContext = usageContext.copy(action = TokenUsageAction.CHAT_REPAIR)
                 val finalized = finalizeRawCandidate(
-                    retryRaw(repairHint),
+                    repairBudget.repair(repairHint, retryRaw),
                     repairUsageContext,
                 )
                 enforceImmersionOnFinalized(

@@ -186,5 +186,20 @@ class PersonaSchemaMigrationTest {
         assertEquals("常年在外行走", imported.persona.lifeContext)
         assertEquals("桥边旧事", imported.stories.single().title)
     }
+    @Test
+    fun missingAndLegacySchemasPreserveCurrentFieldsInMixedShares() {
+        for (schema in listOf("", "\"schema\":1,")) {
+            val payload = """{$schema"persona":{"name":"阿青","portrait":"新版人物整体","identity":"旧身份","background":"旧生活","coreValues":["新版价值"],"valuePriorities":["旧价值"]}}"""
+            val result = PersonaSchemaMigration.decodeShare(json, payload)
+            assertEquals("新版人物整体", result.portrait)
+            assertEquals("旧生活", result.lifeContext)
+            assertEquals(listOf("新版价值"), result.coreValues)
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun malformedExplicitSchemaDoesNotFallBackToLegacy() {
+        PersonaSchemaMigration.decodeShare(json, """{"schema":"1","persona":{"name":"阿青","identity":"旧身份"}}""")
+    }
 }
 

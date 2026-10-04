@@ -257,4 +257,23 @@ class CharacterLifeRuntimeV3Test {
         )
         assertEquals("1. 苹果\n2. 香蕉\n3. 梨\n4. 葡萄", legitimateList.text)
     }
+    @Test
+    fun unchangedLifeSourceDoesNotRenewExpiryAfterOtherStateUpdates() {
+        val first = advanceCharacterLife(PersonaProfile(), ChatCharacterState(
+            currentAgenda = "写完封面", updatedAt = 1000L), now = 1000L)
+        val event = first.activeEvents.single { it.source == "agenda" }
+        val later = advanceCharacterLife(PersonaProfile(), ChatCharacterState(
+            currentAgenda = "写完封面", updatedAt = 2000L, lifeState = first), now = 2000L)
+        assertEquals(event.expiresAt, later.activeEvents.single { it.source == "agenda" }.expiresAt)
+        val expired = advanceCharacterLife(PersonaProfile(), ChatCharacterState(
+            currentAgenda = "写完封面", updatedAt = event.expiresAt, lifeState = later), now = event.expiresAt)
+        assertTrue(expired.activeEvents.none { it.source == "agenda" })
+    }
+    @Test
+    fun explicitStoryEveningWinsOverPhoneTimeAndWeekendHabit() {
+        val life = advanceCharacterLife(PersonaProfile(lifeContext = "早上去出版社；晚上整理插画；周末看外婆"),
+            ChatCharacterState(), now = 1000L, storyTime = "周末晚上")
+        assertTrue(life.currentBeat.contains("晚上"))
+        assertTrue(renderCharacterLifePrompt(life).contains("不代表此刻已经发生"))
+    }
 }

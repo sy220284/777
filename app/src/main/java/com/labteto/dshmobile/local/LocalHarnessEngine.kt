@@ -3323,6 +3323,8 @@ class LocalHarnessEngine @Inject constructor(
                             content = durableToolResultContent(boundedContent, event.retention),
                             toolName = event.call.name,
                             contentAlreadyBounded = true,
+                            toolIsError = event.isError,
+                            toolErrorCode = event.errorCode,
                         )
                         val toolEvent = runEventLog.append("tool/result", buildJsonObject {
                             put("step", event.step)

@@ -131,6 +131,9 @@ class AutomationPlanningService @Inject constructor(
         )
     }
 
+    internal val revisions get() = runtime.planningRevisions
+    internal fun currentRevision() = runtime.planningRevision()
+
     internal fun isCurrent(draft: AutomationPlanDraft): Boolean =
         resolveAutomationPlanningRevision(runtime.planningRevision(), draft.sourceRevision).accepted
 

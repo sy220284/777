@@ -99,4 +99,17 @@ class AutomationStoreRecoveryTest {
         }
     }
 
+    @Test
+    fun durableWorkerStyleMutationsPublishLatestTaskState() {
+        val directory = Files.createTempDirectory("automation-flow").toFile()
+        try {
+            val store = AutomationStore(directory.resolve("automations.json"), json)
+            store.upsert(task("first", 1000L))
+            store.update("first") { it.copy(nextRunAt = 2000L) }
+            assertEquals(2000L, store.tasks.value.single().nextRunAt)
+            assertEquals(store.list(), store.tasks.value)
+            store.remove("first")
+            assertTrue(store.tasks.value.isEmpty())
+        } finally { directory.deleteRecursively() }
+    }
 }

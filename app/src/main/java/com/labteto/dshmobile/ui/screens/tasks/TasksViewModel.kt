@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -70,108 +71,14 @@ class TasksViewModel @Inject constructor(
         }
         return started
     }
-    fun loadChatSuggestions(force: Boolean = false) {
-        val snapshot = localRuntime.snapshot()
-        if (!canPlanChat(snapshot)) {
-            _state.update {
-                it.copy(
-                    plannerSuggestions = emptyList(),
-                    suggestionsLoading = false,
-                    suggestionSessionId = snapshot.sessionId.takeIf(String::isNotBlank),
-                )
-            }
-            return
-        }
-        val current = _state.value
-        if (!force && current.suggestionSessionId == snapshot.sessionId &&
-            (current.suggestionsLoading || current.plannerSuggestions.isNotEmpty())
-        ) return
-        val expectedSessionId = snapshot.sessionId
-        _state.update {
-            it.copy(
-                suggestionsLoading = true,
-                plannerError = null,
-                suggestionSessionId = expectedSessionId,
-            )
-        }
-        viewModelScope.launch {
-            runCatching { planningService.suggestions() }
-                .onSuccess { result ->
-                    if (localRuntime.snapshot().sessionId != expectedSessionId ||
-                        result.sourceSessionId != expectedSessionId ||
-                        !planningService.isCurrent(result)
-                    ) {
-                        _state.update { it.copy(suggestionsLoading = false) }
-                        return@onSuccess
-                    }
-                    _state.update {
-                        it.copy(
-                            plannerSuggestions = result.suggestions,
-                            suggestionsLoading = false,
-                            suggestionSessionId = expectedSessionId,
-                        )
-                    }
-                }
-                .onFailure { error ->
-                    if (localRuntime.snapshot().sessionId != expectedSessionId) return@onFailure
-                    _state.update {
-                        it.copy(
-                            suggestionsLoading = false,
-                            plannerError = PlannerUiError.SUGGESTIONS_FAILED,
-                        )
-                    }
-                }
-        }
+    private val planner = AutomationPlannerUiController(
+        viewModelScope, localRuntime, planningService, _state, ::saveChatDraft, scheduler::list,
+    )
+    init {
+        viewModelScope.launch { scheduler.tasks.collect { tasks -> _state.update { it.copy(tasks = tasks) } } }
     }
-    fun submitChatPlan(input: String, editingTaskId: String? = null) {
-        val snapshot = localRuntime.snapshot()
-        if (!canPlanChat(snapshot) || input.isBlank() || _state.value.planning) return
-        val expectedSessionId = snapshot.sessionId
-        _state.update { it.copy(planning = true, plannerError = null) }
-        viewModelScope.launch {
-            runCatching { planningService.plan(input) }
-                .onSuccess { draft ->
-                    val latest = localRuntime.snapshot()
-                    if (latest.sessionId != expectedSessionId ||
-                        draft.sourceSessionId != expectedSessionId ||
-                        !planningService.isCurrent(draft)
-                    ) {
-                        _state.update {
-                            it.copy(
-                                planning = false,
-                                plannerError = PlannerUiError.SESSION_CHANGED,
-                            )
-                        }
-                        return@onSuccess
-                    }
-                    val saved = saveChatDraft(draft, editingTaskId, expectedSessionId)
-                    _state.update {
-                        if (saved) {
-                            it.copy(
-                                tasks = scheduler.list(),
-                                planning = false,
-                                plannerError = null,
-                                saveRevision = it.saveRevision + 1L,
-                            )
-                        } else {
-                            it.copy(
-                                planning = false,
-                                plannerError = PlannerUiError.SAVE_FAILED,
-                            )
-                        }
-                    }
-                }
-                .onFailure { error ->
-                    if (localRuntime.snapshot().sessionId != expectedSessionId) return@onFailure
-                    _state.update {
-                        it.copy(
-                            planning = false,
-                            plannerError = PlannerUiError.PLAN_FAILED,
-                        )
-                    }
-                }
-        }
-    }
+    fun loadChatSuggestions(force: Boolean = false) = planner.loadChatSuggestions(force)
+    fun submitChatPlan(input: String, editingTaskId: String? = null) = planner.submitChatPlan(input, editingTaskId)
     private fun saveChatDraft(
         draft: AutomationPlanDraft,
         editingTaskId: String?,

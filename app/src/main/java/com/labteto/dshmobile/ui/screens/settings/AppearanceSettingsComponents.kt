@@ -215,12 +215,13 @@ private fun ThemePreviewBlock(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    val (bg, card) = when (themeKey) {
-        "light" -> Color(0xFFF7F7F5) to Color(0xFFFFFFFF)
-        "dark" -> Color(0xFF10100F) to Color(0xFF191918)
-        "matte_black" -> Color(0xFF10100F) to Color(0xFF222220)
-        else -> Color(0xFFF7F7F5) to Color(0xFF10100F)
+    val palette = when (themeKey) {
+        "light" -> com.labteto.dshmobile.ui.theme.DsThemeTokens.light
+        "dark" -> com.labteto.dshmobile.ui.theme.DsThemeTokens.dark
+        "matte_black" -> com.labteto.dshmobile.ui.theme.DsThemeTokens.matteBlack
+        else -> com.labteto.dshmobile.ui.theme.DsThemeTokens.light
     }
+    val bg = palette.bgBase
     Column(
         modifier = modifier
             .clip(DsShapes.cube)
@@ -228,19 +229,22 @@ private fun ThemePreviewBlock(
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
     ) {
         Box(Modifier.fillMaxWidth().height(72.dp).background(bg)) {
-            if (themeKey == "system") {
-                Row(Modifier.fillMaxSize()) {
-                    Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFF7F7F5)))
-                    Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFF10100F)))
+            val previews = if (themeKey == "system") listOf(
+                com.labteto.dshmobile.ui.theme.DsThemeTokens.light,
+                com.labteto.dshmobile.ui.theme.DsThemeTokens.dark,
+            ) else listOf(palette)
+            Row(Modifier.fillMaxSize()) {
+                previews.forEach { preview ->
+                    Column(
+                        Modifier.weight(1f).fillMaxHeight().background(preview.bgBase)
+                            .padding(horizontal = 9.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Box(Modifier.fillMaxWidth(0.5f).height(6.dp).background(preview.labelTertiary, RoundedCornerShape(3.dp)))
+                        Box(Modifier.fillMaxWidth().height(30.dp).background(preview.bgLayer1, RoundedCornerShape(8.dp)))
+                        Box(Modifier.fillMaxWidth(0.72f).height(10.dp).background(preview.bgLayer1, RoundedCornerShape(6.dp)))
+                    }
                 }
-            }
-            Column(
-                Modifier.padding(horizontal = 9.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Box(Modifier.size(width = 46.dp, height = 6.dp).background(card, RoundedCornerShape(3.dp)))
-                Box(Modifier.fillMaxWidth().height(30.dp).background(card, RoundedCornerShape(8.dp)))
-                Box(Modifier.fillMaxWidth(0.72f).height(10.dp).background(card, RoundedCornerShape(6.dp)))
             }
             if (selected) Icon(
                 Icons.Filled.Check,

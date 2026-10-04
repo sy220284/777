@@ -285,6 +285,8 @@ class AutomationStore internal constructor(
     ) : this(File(context.filesDir, "local-harness/automations.json"), json)
 
     private val documents = AutomationDocumentStore(file, json)
+    private val taskState = kotlinx.coroutines.flow.MutableStateFlow(list())
+    val tasks: kotlinx.coroutines.flow.StateFlow<List<AutomationTask>> = taskState
 
     @Synchronized
     fun list(): List<AutomationTask> = read().tasks.sortedBy { it.nextRunAt }
@@ -322,7 +324,10 @@ class AutomationStore internal constructor(
             document.copy(tasks = document.tasks.map(::normalizeAutomationTask))
         }
 
-    private fun write(document: AutomationDocument) = documents.write(document)
+    private fun write(document: AutomationDocument) {
+        documents.write(document)
+        taskState.value = document.tasks.map(::normalizeAutomationTask).sortedBy { it.nextRunAt }
+    }
 
 }
 

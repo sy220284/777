@@ -123,7 +123,7 @@ internal fun buildWorkProcessNodes(messages: List<LocalHarnessMessage>): List<Lo
             "progress", "assistant" -> appendSummary(message.content)
             "tool" -> appendOperation(
                 kind = agentOperationKind(message.toolName),
-                failed = toolResultFailed(message.content),
+                failed = message.toolIsError ?: toolResultFailed(message.content),
             )
         }
     }
@@ -145,7 +145,7 @@ internal fun workProcessStatus(
     running: Boolean,
 ): DsStatus = when {
     running -> DsStatus.Running
-    nodes.any(LocalWorkProcessNode::failed) -> DsStatus.Failed
+    nodes.any(LocalWorkProcessNode::failed) -> DsStatus.Warning
     else -> DsStatus.Done
 }
 
@@ -161,12 +161,11 @@ internal fun WorkProcessRow(
     val nodes = remember(messages) { buildWorkProcessNodes(messages) }
     if (nodes.isEmpty()) return
     val processStatus = workProcessStatus(nodes, running)
-    val processStatusLabel = stringResource(
-        agentOperationStatusRes(
-            running = processStatus == DsStatus.Running,
-            failed = processStatus == DsStatus.Failed,
-        ),
-    )
+    val processStatusLabel = stringResource(when (processStatus) {
+        DsStatus.Running -> R.string.agent_operation_status_running
+        DsStatus.Warning, DsStatus.Failed -> R.string.audit_attempt_failed
+        else -> R.string.agent_operation_status_done
+    })
     val processStateDot = when (processStatus) {
         DsStatus.Running -> StateDotState.Running
         DsStatus.Failed -> StateDotState.Error
@@ -186,6 +185,7 @@ internal fun WorkProcessRow(
     var expanded by remember(messages.first().id) { mutableStateOf(false) }
     var showAllNodes by remember(messages.first().id) { mutableStateOf(false) }
     val latestNode = nodes.last()
+    val processFailed = nodes.any { it.failed }
     val preview = latestNode.summary ?: stringResource(agentOperationLabelRes(latestNode.kind))
     val collapsedHiddenCount = (nodes.size - LOCAL_WORK_PROCESS_COLLAPSED_NODE_LIMIT).coerceAtLeast(0)
     val visibleNodes = visibleWorkProcessNodes(nodes, showAllNodes)

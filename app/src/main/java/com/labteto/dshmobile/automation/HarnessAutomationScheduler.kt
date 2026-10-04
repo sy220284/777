@@ -304,6 +304,8 @@ class HarnessAutomationScheduler @Inject constructor(
         enqueueOneTime(id, firstRun)
     }
 
+    val tasks: kotlinx.coroutines.flow.StateFlow<List<AutomationTask>> get() = store.tasks
+
     fun list(): List<AutomationTask> = store.list()
 
     fun pauseTask(id: String): Boolean {

@@ -166,7 +166,7 @@ Work 请求由 `LocalWorkRequestContextProjection` 生成：完整历史持久�
 
 Chat 与 Work 继续保留各自领域策略，但高阶运行能力通过共享契约回流：`projectLocalRequestContext` 是统一请求上下文治理入口，当前只由 Work 启用语义稳态投影，Chat 明确保留自身阈值与连续性策略；请求压力按 usage mode 保存 request/source 两套坐标，避免模式专属诊断继续渗入共享请求协调器。
 
-历史压缩使用带 `work/chat` 类型的统一可信 checkpoint envelope；旧 `_dsh_work_checkpoint_source=history_compactor_v1` 继续只读兼容，新 Chat 压缩不再伪装成 Work checkpoint。模型提出的状态变化通过 `RuntimeStateTransitionPolicy` 交给运行时裁决：Chat 的长期人物状态仍由运行时拥有，Work 目标在存在未完成 Todo 时不能直接落为 completed。输出质量守卫也采用共享协议：Chat 可做高置信最小修复，Work 对“完成声明与运行时状态冲突”只记录结构化诊断，不擅自改写模型正文。
+历史压缩使用带 `work/chat` 类型的统一可信 checkpoint envelope；旧 `_dsh_work_checkpoint_source=history_compactor_v1` 继续只读兼容，新 Chat 压缩不再伪装成 Work checkpoint。模型提出的状态变化通过 `RuntimeStateTransitionPolicy` 交给运行时裁决：Chat 的长期人物状态仍由运行时拥有，Work 目标在存在未完成 Todo 时不能直接落为 completed。输出质量守卫也采用共享协议：Chat 可做高置信最小修复，Work 对“完成声明与运行时状态冲突”记录结构化诊断，并在交付时局部修正整体完成结论，保留成果链接、局部进度和剩余阻塞。
 
 Agent 运行时继续向下收敛：一次 Run 的模型身份与能力由 `LocalRunModelSurface` 冻结，主 Agent 与子代理的真实 provider 调用统一经过 `LocalAgentModelRequestRuntime` 获取模型请求资源租约并执行统一 admission；二者的 bounded retry、取消传播与恢复外循环由 `LocalAgentModelStepRuntime` 统一治理，具体 overflow、结构修复和 continuation 含义仍由领域策略决定。Chat 定时事件规划也复用同一 `LocalAgentModelRequestRuntime` 与 Step 生命周期、冻结路由和输入 admission；辅助调用不创建第二套 Engine 资源调度器，设备资源配额仍只有 Engine 一个事实源。Work 与子代理对 post-admission 中断统一使用有界 `LocalAgentContinuationPolicy`，只创建新的 continuation 请求，不重放状态未知的原请求。大工具结果统一通过 `projectRecoverableToolResult` 完成 durable spill、有界模型预览和 `call_id` 恢复提示，避免前台与子代理继续维护两套截断语义。
 
@@ -300,3 +300,9 @@ Token 预算在投影层硬限制：稳定人物前缀最多 520 Token，本轮�
 
 角色回复最终仍经过已有字面风格过滤与重复守卫，并增加 `CharacterReplyAnomalyGuard`。异常守卫只对绑定人物启用，只做高置信度、最小结构修复（解释式标题、过度罗列、连续重复等）；正常文本不重写，检测到但无法安全自动修复的结构只记录诊断。
 
+
+### 审计修复边界
+
+远端异步目录与子代理请求携带会话代次及独立请求序号，关闭、切换与更新后旧回调不能覆盖新状态。Automation 的领域版本变化取消旧规划请求，各加载标记由所属请求的 finally 清理；任务 UI 订阅同一持久 Store 写入后的 StateFlow。工具消息持久携带结构化错误结果，新消息不得从正文猜测失败；旧数据才使用兼容推断。过程聚合中的失败表示“含失败尝试”，不等同于最终任务失败。
+
+压缩事件段由全局有界 LRU 缓存共享解压结果，以文件身份失效，单次解压也必须执行大小上限；分页仍只构造请求范围的行。角色回复链共享两次修复预算，重复诊断不删除用户需要的确认内容。人物生活事件的相同来源不因投影或其他状态更新而续期；故事时间优先于设备时钟，生活习惯只能作为可能性。群聊未交付成员持久记录并展示重试入口，不能把部分成功隐去。

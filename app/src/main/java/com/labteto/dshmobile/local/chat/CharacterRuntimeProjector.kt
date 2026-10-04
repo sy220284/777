@@ -20,7 +20,7 @@ internal class CharacterRuntimeProjector(
         storyContext: String?,
     ): CharacterRuntimeProjection {
         val privateState = state.copy(scene = ChatSceneState(), continuity = ChatContinuityState())
-        val lifeState = advanceCharacterLife(persona, privateState)
+        val lifeState = advanceCharacterLife(persona, privateState, storyTime = context.scene.sceneTime)
         val runtimeState = privateState.copy(lifeState = lifeState)
         val attention = resolveCharacterAttention(persona, runtimeState, userInput)
         val mode = resolveCharacterMode(persona, runtimeState, userInput, attention)

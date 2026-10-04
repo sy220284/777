@@ -55,6 +55,7 @@ internal fun ExecutionStatusCard(
     var expandedJobId by remember(state.sessionId) { mutableStateOf<String?>(null) }
     var expandedJobOutput by remember(state.sessionId) { mutableStateOf("") }
     var technicalDetailsExpanded by remember(state.sessionId) { mutableStateOf(false) }
+    var showAll by remember(state.sessionId) { mutableStateOf(false) }
     val completed = state.todos.count { it.status == "completed" }
     val total = state.todos.size
     val resourceSummary = stringResource(
@@ -114,7 +115,7 @@ internal fun ExecutionStatusCard(
                         color = colors.labelTertiary,
                     )
                     Text(goal.description, style = DsType.std14Strong.withReadingWeight(), color = colors.labelPrimary)
-                    Text(goal.status, style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
+                    Text(localGoalStatusLabel(goal.status), style = DsType.caption11.withReadingWeight(), color = colors.labelSecondary)
                 }
             }
 
@@ -137,7 +138,7 @@ internal fun ExecutionStatusCard(
                         style = DsType.caption11Strong.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
-                    state.plan.take(5).forEachIndexed { index, step ->
+                    (if (showAll) state.plan else state.plan.take(5)).forEachIndexed { index, step ->
                         Text(
                             (index + 1).toString().padStart(2, '0') + "  " + step,
                             style = DsType.small13.withReadingWeight(),
@@ -156,7 +157,7 @@ internal fun ExecutionStatusCard(
                         style = DsType.caption11Strong.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
-                    state.todos.take(5).forEach { todo ->
+                    (if (showAll) state.todos else state.todos.sortedBy { it.status == "completed" }.take(5)).forEach { todo ->
                         val marker = when (todo.status) {
                             "completed" -> "✓"
                             "in_progress", "running" -> "●"
@@ -184,7 +185,7 @@ internal fun ExecutionStatusCard(
                         style = DsType.caption11Strong.withReadingWeight(),
                         color = colors.labelTertiary,
                     )
-                    state.jobs.take(4).forEach { job ->
+                    (if (showAll) state.jobs else state.jobs.sortedBy { it.status !in setOf("running", "interrupted") }.take(4)).forEach { job ->
                         val expanded = expandedJobId == job.id
                         Surface(
                             shape = DsShapes.row,
@@ -277,6 +278,15 @@ internal fun ExecutionStatusCard(
                     }
                 }
 
+            if (state.plan.size > 5 || state.todos.size > 5 || state.jobs.size > 4) {
+                DsButton(
+                    text = stringResource(if (showAll) R.string.audit_show_summary else R.string.audit_show_all),
+                    onClick = { showAll = !showAll },
+                    variant = DsButtonVariant.Ghost,
+                    size = DsButtonSize.Small,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             DsButton(
                 text = stringResource(R.string.local_run_open_results),
                 onClick = onOpenResults,
