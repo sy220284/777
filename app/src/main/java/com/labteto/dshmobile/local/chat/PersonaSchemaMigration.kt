@@ -229,7 +229,8 @@ internal object PersonaSchemaMigration {
             ?.persona
             ?: return profile
 
-        // Only fill V3-only dimensions. Existing semantic content remains the user's source of truth.
+        // Rebuild installed presets with the current preset-specific life structure while preserving
+        // user-authored legacy content. Known old template filler is removed instead of being carried forward.
         val legacyPresetConstraints = setOf(
             "不读取玩家上帝视角，不凭空知道未发生或未获知的剧情。",
             "关系变化必须有共同经历支撑，不因几句对话直接跳级。",
