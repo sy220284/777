@@ -196,7 +196,17 @@ if "streamingAssistant" in models or "streamingReasoning" in models:
 aggregate_state_source = models[state_start:state_end]
 if "val work: LocalWorkState = LocalWorkState()" not in aggregate_state_source:
     die("LocalHarnessState must compose Work runtime state through LocalWorkState")
-for legacy_work_field in ("plan", "todos", "goal", "planMode"):
+for legacy_work_field in (
+    "plan",
+    "todos",
+    "goal",
+    "planMode",
+    "jobs",
+    "workflowProgress",
+    "queuedInputCount",
+    "pendingApproval",
+    "pendingQuestion",
+):
     if re.search(rf"^\s*val\s+{legacy_work_field}\s*:", aggregate_state_source, re.MULTILINE):
         die(
             f"LocalHarnessState must not reintroduce flattened Work field: {legacy_work_field}"
@@ -205,7 +215,17 @@ for legacy_work_field in ("plan", "todos", "goal", "planMode"):
 work_state = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkState.kt")
 )
-for owned_field in ("plan", "todos", "goal", "planMode"):
+for owned_field in (
+    "plan",
+    "todos",
+    "goal",
+    "planMode",
+    "jobs",
+    "workflowProgress",
+    "queuedInputCount",
+    "pendingApproval",
+    "pendingQuestion",
+):
     if not re.search(rf"\bval\s+{owned_field}\s*:", work_state):
         die(f"LocalWorkState must own Work field: {owned_field}")
 
@@ -283,16 +303,11 @@ if "val kernel: LocalKernelState = LocalKernelState()" not in aggregate_state_so
     die("LocalHarnessState must compose Kernel runtime state through LocalKernelState")
 for legacy_kernel_field in (
     "running",
-    "jobs",
-    "workflowProgress",
-    "queuedInputCount",
     "resources",
     "contextChars",
     "contextBudgetChars",
-    "pendingApproval",
-    "pendingQuestion",
 ):
-    if re.search(rf"^\\s*val\\s+{legacy_kernel_field}\\s*:", aggregate_state_source, re.MULTILINE):
+    if re.search(rf"^\s*val\s+{legacy_kernel_field}\s*:", aggregate_state_source, re.MULTILINE):
         die(
             f"LocalHarnessState must not reintroduce flattened Kernel field: {legacy_kernel_field}"
         )
@@ -302,16 +317,11 @@ kernel_state = strip_comments(
 )
 for owned_field in (
     "running",
-    "jobs",
-    "workflowProgress",
-    "queuedInputCount",
     "resources",
     "contextChars",
     "contextBudgetChars",
-    "pendingApproval",
-    "pendingQuestion",
 ):
-    if not re.search(rf"\\bval\\s+{owned_field}\\s*:", kernel_state):
+    if not re.search(rf"\bval\s+{owned_field}\s*:", kernel_state):
         die(f"LocalKernelState must own Kernel field: {owned_field}")
 
 work_progress = strip_comments(
