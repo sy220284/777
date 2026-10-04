@@ -63,12 +63,10 @@ internal fun editAndResendWorkUserMessage(
         activeTranscript = rewritten,
         modelHistory = rewrittenHistory,
         state = LocalTimelineRewriteState(
-            work = current.work.copy(
-                plan = restoredControls.plan,
-                todos = restoredControls.todos,
-                goal = restoredControls.goal,
-                planMode = restoredControls.planMode,
-            ),
+            plan = restoredControls.plan,
+            todos = restoredControls.todos,
+            goal = restoredControls.goal,
+            planMode = restoredControls.planMode,
             chatState = state.chatState,
             chatContext = state.chatContext,
             chatBranches = LocalChatBranchState(),
@@ -90,10 +88,12 @@ internal fun editAndResendWorkUserMessage(
         current.copy(
             messages = rewritten.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
             transcriptIndex = buildLocalTranscriptRuntimeIndex(rewritten),
-            plan = restoredControls.plan,
-            todos = restoredControls.todos,
-            goal = restoredControls.goal,
-            planMode = restoredControls.planMode,
+            work = current.work.copy(
+                plan = restoredControls.plan,
+                todos = restoredControls.todos,
+                goal = restoredControls.goal,
+                planMode = restoredControls.planMode,
+            ),
             error = null,
         )
     }
