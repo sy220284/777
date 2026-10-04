@@ -4784,44 +4784,44 @@ class LocalHarnessEngine @Inject constructor(
             error = runRecoveryError,
         )
         LocalSessionRuntimeRegistry.submitWhenIdle(sessionId) {
-        var wroteHistoryCheckpoint = false
-        if (_state.value.groupChat.enabled) {
-            projectGroupGalleryState(_state.value.groupChat, chatPersonaGalleryStore).failures.forEach { failure ->
-                AppLog.warn(
-                    "LocalHarnessEngine",
-                    "群聊人物库投影恢复失败 galleryId=${failure.galleryId} detail=${failure.detail}",
+            var wroteHistoryCheckpoint = false
+            if (_state.value.groupChat.enabled) {
+                projectGroupGalleryState(_state.value.groupChat, chatPersonaGalleryStore).failures.forEach { failure ->
+                    AppLog.warn(
+                        "LocalHarnessEngine",
+                        "群聊人物库投影恢复失败 galleryId=${failure.galleryId} detail=${failure.detail}",
+                    )
+                }
+                // Group model history is already restored from its durable checkpoint/event tail.
+                // Rebuilding it from the bounded UI transcript would silently discard older context.
+                refreshGroupModelSystemPrompt()
+                checkpointModelHistory("load/group-system-refresh")
+                wroteHistoryCheckpoint = true
+            } else if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
+                modelHistory.replaceSystem(
+                    buildJsonObject { put("role", "system"); put("content", systemPrompt()) },
                 )
+                updateContextMetrics()
+                checkpointModelHistory("load/system-refresh")
+                wroteHistoryCheckpoint = true
+            } else if (recovery.repaired || restoredHistory.checkpointRecommended) {
+                checkpointModelHistory(
+                    if (restoredHistory.usedLegacyFallback) "load/legacy-history-migration"
+                    else "load/event-replay",
+                )
+                wroteHistoryCheckpoint = true
             }
-            // Group model history is already restored from its durable checkpoint/event tail.
-            // Rebuilding it from the bounded UI transcript would silently discard older context.
-            refreshGroupModelSystemPrompt()
-            checkpointModelHistory("load/group-system-refresh")
-            wroteHistoryCheckpoint = true
-        } else if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
-            modelHistory.replaceSystem(
-                buildJsonObject { put("role", "system"); put("content", systemPrompt()) },
-            )
-            updateContextMetrics()
-            checkpointModelHistory("load/system-refresh")
-            wroteHistoryCheckpoint = true
-        } else if (recovery.repaired || restoredHistory.checkpointRecommended) {
-            checkpointModelHistory(
-                if (restoredHistory.usedLegacyFallback) "load/legacy-history-migration"
-                else "load/event-replay",
-            )
-            wroteHistoryCheckpoint = true
-        }
-        if (restoredHistory.usedLegacyFallback && !wroteHistoryCheckpoint) {
-            checkpointModelHistory("load/legacy-history-migration")
-        }
-        if (
-            restoredHistory.usedLegacyFallback ||
-            restoredTranscript.needsPersist ||
-            restoredBehavior.changed
-        ) {
-            // Materialize migrated/replayed projections so later restarts only fold the new tail.
-            persist()
-        }
+            if (restoredHistory.usedLegacyFallback && !wroteHistoryCheckpoint) {
+                checkpointModelHistory("load/legacy-history-migration")
+            }
+            if (
+                restoredHistory.usedLegacyFallback ||
+                restoredTranscript.needsPersist ||
+                restoredBehavior.changed
+            ) {
+                // Materialize migrated/replayed projections so later restarts only fold the new tail.
+                persist()
+            }
         }
     }
 

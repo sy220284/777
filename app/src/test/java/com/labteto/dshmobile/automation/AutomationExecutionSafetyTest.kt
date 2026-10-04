@@ -79,8 +79,27 @@ class AutomationExecutionSafetyTest {
         val userMessageAt = 10_000L
 
         assertEquals(
-            userMessageAt + 60L * 60L * 1000L,
+            3_610_000L,
             nextAutomationRunAfterUserActivity(task, userMessageAt),
         )
+    }
+    @Test
+    fun intervalAfterReplyStartsFromActualActivity() {
+        val task = AutomationTask(
+            id = "anchored-chat", prompt = "继续互动", createdAt = 1L, nextRunAt = 2L,
+            recurringMinutes = 60L, scheduleType = AutomationScheduleType.INTERVAL,
+            mode = AutomationMode.CHAT, targetSessionId = "session-a", status = "waiting_user",
+        )
+        assertEquals(10_800_100L, nextAutomationRunAfterUserActivity(task, 7_200_100L))
+    }
+
+    @Test
+    fun silenceScheduleRestartsItsDelayFromActualUserActivity() {
+        val task = AutomationTask(
+            id = "silence-chat", prompt = "继续互动", createdAt = 1L, nextRunAt = 2L,
+            silenceMinutes = 60L, scheduleType = AutomationScheduleType.SILENCE,
+            mode = AutomationMode.CHAT, targetSessionId = "session-a", status = "waiting_user",
+        )
+        assertEquals(3_610_000L, nextAutomationRunAfterUserActivity(task, 10_000L))
     }
 }
