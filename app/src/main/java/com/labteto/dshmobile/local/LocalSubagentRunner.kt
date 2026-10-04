@@ -188,7 +188,7 @@ internal class LocalSubagentRunner(
             sessionId = runSessionId(),
             usageMode = LocalUsageMode.WORK,
             model = routeModel,
-            baseUrl = snapshot.baseUrl,
+            baseUrl = snapshot.modelState.baseUrl,
             routeProfile = runProfile,
             planMode = snapshot.work.planMode,
             policy = localAgentRunPolicy(LocalUsageMode.WORK),
@@ -265,15 +265,15 @@ internal class LocalSubagentRunner(
                     historyPolicy.compactBeforeModelStep(history, subagentId, modelStep, runHistoryBudget, runCachePolicy)
                     modelStep += 1
                     val durableHistory = history.snapshot()
-                    val selectedMode = resolveImageMode(snapshot.imageInputMode, snapshot.baseUrl, routeModel)
+                    val selectedMode = resolveImageMode(snapshot.modelState.modelState.imageInputMode, snapshot.modelState.baseUrl, routeModel)
                     if (hasLocalImageRefs(durableHistory) &&
-                        resolveImageMode(LocalImageInputMode.AUTO, snapshot.baseUrl, routeModel) == LocalImageInputMode.TOOL) {
+                        resolveImageMode(LocalImageInputMode.AUTO, snapshot.modelState.baseUrl, routeModel) == LocalImageInputMode.TOOL) {
                         throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
                     }
                     val preparedHistory = prepareMessages(
                         durableHistory,
                         selectedMode,
-                        snapshot.baseUrl,
+                        snapshot.modelState.baseUrl,
                         routeModel,
                     )
                     val nativeImagesSent = hasMaterializedImageUrls(preparedHistory)
@@ -287,7 +287,7 @@ internal class LocalSubagentRunner(
                             durableHistory = history,
                         ).also {
                             if (nativeImagesSent) {
-                                onNativeImageAccepted(snapshot.baseUrl, routeModel)
+                                onNativeImageAccepted(snapshot.modelState.baseUrl, routeModel)
                             }
                         }
                     } catch (error: Throwable) {
@@ -295,7 +295,7 @@ internal class LocalSubagentRunner(
                             nativeImagesSent &&
                                 imageInputUnsupported(error)
                         if (nativeImageRejected) {
-                            onNativeImageRejected(snapshot.baseUrl, routeModel)
+                            onNativeImageRejected(snapshot.modelState.baseUrl, routeModel)
                         }
                         if (nativeImageRejected) {
                             throw IllegalStateException(
