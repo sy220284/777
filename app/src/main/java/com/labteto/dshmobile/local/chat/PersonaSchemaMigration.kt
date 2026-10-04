@@ -210,8 +210,7 @@ internal object PersonaSchemaMigration {
             franchise = current.franchise.ifBlank { migrated.franchise },
             timelinePosition = current.timelinePosition.ifBlank { migrated.timelinePosition },
             knowledgeBoundary = fillMissingLines(current.knowledgeBoundary, migrated.knowledgeBoundary, 20),
-            loreEntries = current.loreEntries.takeIf(List<PersonaLoreEntry>::isNotEmpty)
-                ?: migrated.loreEntries,
+            loreEntries = current.loreEntries.ifEmpty { migrated.loreEntries },
             presetId = current.presetId.ifBlank { migrated.presetId },
             hardConstraints = fillMissingLines(current.hardConstraints, migrated.hardConstraints, 20),
             bannedPhrases = fillMissingLines(current.bannedPhrases, migrated.bannedPhrases, 30),
