@@ -272,6 +272,72 @@ class PersonaTransferDocumentsTest {
     }
 
     @Test
+    fun unsafeOrDuplicateStoryIdsStaySeparatedAndIdempotent() {
+        val source = sampleEntry().copy(
+            stories = listOf(
+                sampleEntry().stories.single().copy(
+                    id = "story/a",
+                    history = listOf(
+                        LocalHarnessMessage(
+                            id = "unsafe-a",
+                            role = "user",
+                            content = "第一段独立历史",
+                            createdAt = 1L,
+                        ),
+                    ),
+                    historyTotalCount = 1,
+                ),
+                sampleEntry().stories.single().copy(
+                    id = "story?a",
+                    title = "另一段",
+                    history = listOf(
+                        LocalHarnessMessage(
+                            id = "unsafe-b",
+                            role = "assistant",
+                            content = "第二段独立历史",
+                            createdAt = 2L,
+                        ),
+                    ),
+                    historyTotalCount = 1,
+                ),
+            ),
+        )
+        val document = PersonaTransferDocuments.encode(
+            json = json,
+            entry = source,
+            format = PersonaTransferFormat.JSON,
+        )
+        val target = ChatPersonaGalleryStore(File(temporary.root, "unsafe-story-ids.json"), json)
+
+        val first = target.importPersonaDocument(
+            bytes = document.bytes,
+            fileName = "小岚.persona.json",
+            mimeType = "application/json",
+        )
+        val second = target.importPersonaDocument(
+            bytes = document.bytes,
+            fileName = "小岚.persona.json",
+            mimeType = "application/json",
+        )
+
+        assertEquals(first.id, second.id)
+        assertEquals(2, target.list().single().stories.size)
+        assertEquals(2, target.list().single().stories.map { it.id }.distinct().size)
+        assertTrue(target.list().single().stories.all { Regex("[A-Za-z0-9._-]{1,120}").matches(it.id) })
+
+        val exported = target.exportPersonaDocument(second.id, PersonaTransferFormat.JSON)
+        val canonical = PersonaTransferDocuments.decodeToCanonicalJson(
+            bytes = exported.bytes,
+            fileName = "小岚.persona.json",
+            mimeType = "application/json",
+        )
+        val archive = PersonaTransferDocuments.decodeArchive(json, canonical)
+        val histories = archive.entry.stories.map { story -> story.history.map(LocalHarnessMessage::content).toSet() }
+        assertTrue(histories.contains(setOf("第一段独立历史")))
+        assertTrue(histories.contains(setOf("第二段独立历史")))
+    }
+
+    @Test
     fun currentPersonaShareJsonImportsWithoutStories() {
         val source = ChatPersonaGalleryStore(
             File(temporary.root, "legacy-source.json"),
