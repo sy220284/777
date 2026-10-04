@@ -54,7 +54,7 @@ internal class LocalReplySuggestionCoordinator(
         val boundEventLog = eventLogFor(expectedSessionId)
         val profile = try {
             modelGateway.profileForRoute(
-                profileId = snapshot.modelState.modelState.modelSelection.activeProfileId,
+                profileId = snapshot.modelState.modelSelection.activeProfileId,
                 model = snapshot.modelState.model,
                 baseUrl = snapshot.modelState.baseUrl,
             )
