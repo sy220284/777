@@ -4,6 +4,9 @@ import androidx.activity.BackEventCompat
 import com.labteto.dshmobile.local.LocalChatMode
 import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
+import com.labteto.dshmobile.local.feature.LocalFeatureModuleId
+import com.labteto.dshmobile.local.feature.LocalFeatureRoute
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -162,7 +165,7 @@ class LocalFeatureNavigationTest {
 
     @Test
     fun everySidebarFeatureKeepsDrawerAndBackFlowConsistent() {
-        val pages = LocalFeaturePage.entries.filter { it != LocalFeaturePage.HOME }
+        val pages = LocalFeatureCatalog.routes.filter { it != LocalFeaturePage.HOME }
 
         pages.forEach { page ->
             val opened = localFeatureOpenFromDrawer(
@@ -187,6 +190,25 @@ class LocalFeatureNavigationTest {
         }
     }
 
+    @Test
+    fun featureCatalogAssignsEveryRouteToExactlyOneModule() {
+        val registered = LocalFeatureCatalog.modules.flatMap { it.routes }
+
+        assertEquals(LocalFeatureRoute.entries.toSet(), registered.toSet())
+        assertEquals(registered.size, registered.toSet().size)
+        assertEquals(
+            LocalFeatureModuleId.CHAT,
+            LocalFeatureCatalog.ownerOf(LocalFeaturePage.PERSONA_GALLERY),
+        )
+        assertEquals(
+            listOf(LocalFeaturePage.WORKSPACE, LocalFeaturePage.RUN_CENTER),
+            LocalFeatureCatalog.routesFor(LocalFeatureModuleId.WORK),
+        )
+        assertEquals(
+            LocalFeatureModuleId.AUTOMATION,
+            LocalFeatureCatalog.ownerOf(LocalFeaturePage.TASKS),
+        )
+    }
     @Test
     fun onlyGroupWithConfiguredMembersCountsAsEstablished() {
         val emptyGroup = LocalSessionSummary(
