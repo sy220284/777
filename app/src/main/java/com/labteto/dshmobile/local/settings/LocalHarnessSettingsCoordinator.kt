@@ -15,11 +15,6 @@ internal class LocalHarnessSettingsCoordinator(
     private val state: () -> LocalHarnessState,
     private val updateState: ((LocalHarnessState) -> LocalHarnessState) -> Unit,
 ) {
-    fun configureImageInputMode(mode: LocalImageInputMode) {
-        preferences.edit().putString(KEY_IMAGE_INPUT_MODE, mode.name).apply()
-        updateState { it.copy(modelState = it.modelState.copy(imageInputMode = mode)) }
-    }
-
     fun configureRuntimeLimits(
         mainMaxSteps: Int,
         subagentMaxSteps: Int,
@@ -138,7 +133,6 @@ internal class LocalHarnessSettingsCoordinator(
         const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
         const val KEY_MODEL_ATTEMPTS = "model_attempts"
         const val KEY_WORKER_PROFILE_ID = LOCAL_WORKER_PROFILE_ID_PREFERENCE
-        const val KEY_IMAGE_INPUT_MODE = "image_input_mode"
         const val KEY_CHAT_STYLE_GUARD = "chat_style_guard_enabled"
         const val KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES = "chat_style_guard_custom_phrases"
         const val MAX_STYLE_GUARD_HITS = 20
