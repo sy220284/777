@@ -1729,8 +1729,11 @@ class LocalHarnessEngine @Inject constructor(
         }
     }
 
+    private fun liveWorkRun(sessionId: String): LocalWorkRunBinding? =
+        activeWorkRuns[sessionId]?.takeIf { it.job?.isCompleted == false }
+
     private fun syncVisibleWorkRun(sessionId: String) {
-        val binding = activeWorkRuns[sessionId] ?: return
+        val binding = liveWorkRun(sessionId) ?: return
         modelHistory.reset(binding.modelHistory.snapshot())
         transcriptProjectionCursor = binding.transcriptProjectionCursor
         mirrorWorkRunState(binding)
@@ -2446,7 +2449,13 @@ class LocalHarnessEngine @Inject constructor(
     }
 
     private fun startNextQueuedTurnIfIdle(): Job? = synchronized(runStateLock) {
-        if (sessionTransitioning || activeJob?.isCompleted == false) return@synchronized null
+        if (
+            !canStartUnboundQueuedTurn(
+                sessionTransitioning = sessionTransitioning,
+                visibleRunActive = activeJob?.isCompleted == false,
+                liveWorkRuntimeActive = liveWorkRun(currentSessionId) != null,
+            )
+        ) return@synchronized null
         val next = pendingInputs.poll() ?: return@synchronized null
         val durableMessage = next.modelMessage ?: buildJsonObject {
             put("role", "user")
@@ -2960,6 +2969,13 @@ class LocalHarnessEngine @Inject constructor(
             contextChars = runSnapshot.contextChars,
             parentRunId = continuationParentRunId,
         )
+
+        fun ensureRunOwnership() {
+            if (!agentRunCoordinator.isCurrentForegroundRun(runContext)) {
+                throw CancellationException("当前 Work 运行已由新的执行或恢复流程接管")
+            }
+        }
+
         var lastModelError: LocalModelException? = null
         val progressTracker = LocalAgentProgressTracker()
         var activeStep: Int? = null
@@ -3010,6 +3026,7 @@ class LocalHarnessEngine @Inject constructor(
 
         val loop = AgentLoop(
             model = AgentModel {
+                ensureRunOwnership()
                 // Persistent history stays compact; user rules, recalled memory and handoff are
                 // assembled per request and are deliberately never written back into runHistory.
                 if (!requestPrepared) {
@@ -3114,6 +3131,7 @@ class LocalHarnessEngine @Inject constructor(
                         throw error
                     }
                 }
+                ensureRunOwnership()
                 val reply = enforceChatStyle(
                     key = key,
                     snapshot = snapshot,
@@ -3159,6 +3177,7 @@ class LocalHarnessEngine @Inject constructor(
                 )
             },
             tools = AgentToolExecutor { call ->
+                ensureRunOwnership()
                 if (!runPolicy.allowToolExecution) {
                     AgentToolResult(
                         content = "聊天模式不提供工具执行能力。",
@@ -3166,10 +3185,15 @@ class LocalHarnessEngine @Inject constructor(
                         errorCode = "TOOLS_DISABLED",
                     )
                 } else {
-                    executeSafely(call.toLocalToolCall(), allowMutation = true)
+                    executeSafely(
+                        call.toLocalToolCall(),
+                        allowMutation = true,
+                        binding = binding,
+                    )
                 }
             },
             toolBatch = AgentToolBatchExecutor { calls ->
+                ensureRunOwnership()
                 if (!runPolicy.allowToolExecution) {
                     calls.map {
                         AgentToolResult(
@@ -3182,6 +3206,7 @@ class LocalHarnessEngine @Inject constructor(
                     executeToolBatch(
                         calls = calls.map { it.toLocalToolCall() },
                         allowMutation = true,
+                        binding = binding,
                     ).map { (_, result) -> result }
                 }
             },
@@ -4609,6 +4634,39 @@ class LocalHarnessEngine @Inject constructor(
         baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
         deferReady: Boolean = false,
     ) {
+        val liveBinding = liveWorkRun(sessionId)
+        if (!shouldUseDurableSessionRecovery(liveBinding != null)) {
+            val binding = requireNotNull(liveBinding)
+            // This process still owns the Work runtime. Re-entering the conversation only rebinds
+            // the visible projection; touching repairInterruptedTail() here would fabricate a crash,
+            // close the live turn and could launch a duplicate recovery run beside the real job.
+            pendingInputs.clear()
+            modelHistory.reset(binding.modelHistory.snapshot())
+            transcriptProjectionCursor = binding.transcriptProjectionCursor
+            val liveState = binding.state.value
+            val resources = resourceScheduler.snapshot()
+            liveState.modelSelection.activeProfile
+                ?.takeIf { liveState.configured }
+                ?.let(modelGateway::activate)
+            _state.value = liveState.copy(
+                loading = deferReady || _state.value.loading,
+                usage = usageTracker.state.value,
+                sessions = sessionSummaries(),
+                jobs = projectExecutionJobs(
+                    liveState.usageMode,
+                    liveState.sessionId,
+                    jobs.snapshotInfos(),
+                ),
+                resources = resources.toLocalHarnessResourceState(liveState.usageMode),
+                contextBudgetChars = localHistoryBudgetFor(
+                    memoryClassMb,
+                    resources.pressure,
+                ).maxHistoryChars,
+            )
+            mirrorWorkRunState(binding)
+            return
+        }
+
         val loaded = try {
             sessionCoordinator.readWithLegacyApproval(sessionId)
         } catch (future: FutureSessionVersionException) {
@@ -4691,7 +4749,11 @@ class LocalHarnessEngine @Inject constructor(
                                 affected = listOf(queued),
                             ),
                         )
-                        agentRunCoordinator.markRecoveryQueued(sessionId, decision.runId)
+                        agentRunCoordinator.markRecoveryQueued(
+                            sessionId = sessionId,
+                            runId = decision.runId,
+                            reason = "durable_session_recovery",
+                        )
                     } else {
                         runRecoveryError = "上次任务可以安全续跑，但待处理输入队列已满，请先处理现有任务。"
                         agentRunCoordinator.markRecoveryBlocked(
