@@ -1,4 +1,4 @@
-import androidx.compose.foundation.layout.weight\npackage com.labteto.dshmobile.ui.screens.tasks
+package com.labteto.dshmobile.ui.screens.tasks
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
