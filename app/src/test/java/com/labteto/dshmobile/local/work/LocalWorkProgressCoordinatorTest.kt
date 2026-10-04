@@ -67,13 +67,13 @@ class LocalWorkProgressCoordinatorTest {
             }))
         })
         assertEquals(20, state.value.plan.size)
-        assertEquals(50, state.value.todos.size)
-        assertTrue(state.value.todos.all { it.content.length == 500 && it.status == "pending" })
+        assertEquals(50, state.value.work.todos.size)
+        assertTrue(state.value.work.todos.all { it.content.length == 500 && it.status == "pending" })
 
         coordinator.updatePlan(buildJsonObject { put("plan", "一\n\n二") })
         assertEquals(listOf("一", "二"), state.value.plan)
         coordinator.updateTodos(buildJsonObject {})
-        assertTrue(state.value.todos.isEmpty())
+        assertTrue(state.value.work.todos.isEmpty())
         assertEquals(listOf("plan/state", "todo/state", "plan/state", "todo/state"), log.snapshot().map { it.type })
     }
 
@@ -85,26 +85,28 @@ class LocalWorkProgressCoordinatorTest {
         val coordinator = LocalWorkProgressCoordinator(state, log) { writes++ }
         assertTrue(runCatching { coordinator.updateGoal("active", null) }.isFailure)
         assertTrue(runCatching { coordinator.updateGoal("invalid", null) }.isFailure)
-        assertNull(state.value.goal)
+        assertNull(state.value.work.goal)
         assertTrue(log.snapshot().isEmpty())
         assertEquals(0, writes)
 
         coordinator.createGoal("g".repeat(3000))
         coordinator.updateGoal("completed", "n".repeat(3000))
-        assertEquals(2000, state.value.goal?.description?.length)
-        assertEquals(2000, state.value.goal?.note?.length)
+        assertEquals(2000, state.value.work.goal?.description?.length)
+        assertEquals(2000, state.value.work.goal?.note?.length)
         coordinator.updateGoal("paused", null)
-        assertNull(state.value.goal?.note)
+        assertNull(state.value.work.goal?.note)
     }
 
     @Test
     fun goalCompletionRequiresRuntimeTodosToBeClosed() {
         val state = MutableStateFlow(
             LocalHarnessState(
-                goal = LocalGoal("收口共享底座"),
-                todos = listOf(
-                    LocalTodoItem("补回归", "pending"),
-                    LocalTodoItem("已完成项", "completed"),
+                work = LocalWorkState(
+                    goal = LocalGoal("收口共享底座"),
+                    todos = listOf(
+                        LocalTodoItem("补回归", "pending"),
+                        LocalTodoItem("已完成项", "completed"),
+                    ),
                 ),
             ),
         )
@@ -115,16 +117,18 @@ class LocalWorkProgressCoordinatorTest {
         val rejected = runCatching { coordinator.updateGoal("completed", null) }
 
         assertTrue(rejected.isFailure)
-        assertEquals("active", state.value.goal?.status)
+        assertEquals("active", state.value.work.goal?.status)
         assertEquals(0, writes)
         assertEquals("goal/transition-rejected", log.snapshot().last().type)
 
         state.value = state.value.copy(
-            todos = state.value.todos.map { it.copy(status = "completed") },
+            work = state.value.work.copy(
+                todos = state.value.work.todos.map { it.copy(status = "completed") },
+            ),
         )
         coordinator.updateGoal("completed", "验证通过")
 
-        assertEquals("completed", state.value.goal?.status)
+        assertEquals("completed", state.value.work.goal?.status)
         assertEquals(1, writes)
         assertEquals("goal/state", log.snapshot().last().type)
     }
