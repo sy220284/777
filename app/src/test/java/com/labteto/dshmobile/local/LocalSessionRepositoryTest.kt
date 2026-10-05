@@ -167,6 +167,7 @@ class LocalSessionRepositoryTest {
         val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
         val summary = reopened.summaries().single { it.id == "legacy-group" }
 
+        assertEquals(LocalChatMode.GROUP.name, summary.chatMode)
         assertEquals(2, summary.groupMemberCount)
         assertTrue(summary.blank)
         assertTrue(summaryFile.readText().contains("\"version\":2"))

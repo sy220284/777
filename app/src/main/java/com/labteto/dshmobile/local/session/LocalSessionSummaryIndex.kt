@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.record
 import java.io.File
 import java.nio.file.Files
@@ -16,7 +15,7 @@ private data class LocalSessionSummaryRecord(
     val title: String,
     val updatedAt: Long,
     val usageMode: String,
-    val chatMode: String,
+    val chatMode: String? = null,
     val groupMemberCount: Int = 0,
     val personaId: String? = null,
     val galleryId: String? = null,
@@ -48,7 +47,7 @@ internal class LocalSessionSummaryIndex(
             title = summary.title,
             updatedAt = summary.updatedAt,
             usageMode = summary.usageMode.name,
-            chatMode = summary.chatMode.name,
+            chatMode = summary.chatMode,
             groupMemberCount = summary.groupMemberCount,
             personaId = summary.personaId,
             galleryId = summary.galleryId,
@@ -93,13 +92,12 @@ internal class LocalSessionSummaryIndex(
     private fun LocalSessionSummaryRecord.toSummary(): LocalSessionSummary? {
         if (version != CURRENT_VERSION || id.isBlank()) return null
         val usage = runCatching { LocalUsageMode.valueOf(usageMode) }.getOrNull() ?: return null
-        val mode = runCatching { LocalChatMode.valueOf(chatMode) }.getOrNull() ?: return null
         return LocalSessionSummary(
             id = id,
             title = title,
             updatedAt = updatedAt,
             usageMode = usage,
-            chatMode = mode,
+            chatMode = chatMode?.takeIf(String::isNotBlank),
             groupMemberCount = groupMemberCount,
             personaId = personaId,
             galleryId = galleryId,

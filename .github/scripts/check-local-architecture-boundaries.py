@@ -590,6 +590,14 @@ if "engine.streamingState" in session_runtime_source:
     die("LocalSessionRuntime must not reach through LocalHarnessEngine for streaming preview state")
 if "createSession(mode, state.value.usageMode)" not in session_runtime_source:
     die("LocalSessionRuntime convenience session creation must stay inside the Session capability")
+if "com.labteto.dshmobile.local.chat." in session_runtime_source:
+    die("Shared SessionRuntime must not import ChatFeature internals")
+for required_session_domain_command in (
+    "domainSpec: LocalSessionDomainCreateSpec?",
+    "switchDomainMode(command: LocalSessionDomainModeCommand)",
+):
+    if required_session_domain_command not in session_runtime_source:
+        die("SessionRuntime must carry Feature session intent through opaque Session contracts")
 if (
     "createGroupChatSession" in session_runtime_source
     or "createSingleChatSession" in session_runtime_source
@@ -604,8 +612,17 @@ if (
     "MIN_GROUP_CHAT_MEMBERS" not in chat_runtime_for_session_source
     or "MAX_GROUP_CHAT_MEMBERS" not in chat_runtime_for_session_source
     or "sessionRuntime.createSession(" not in chat_runtime_for_session_source
+    or "LocalChatSessionCreateSpec" not in chat_runtime_for_session_source
+    or "LocalChatSessionModeCommand" not in chat_runtime_for_session_source
 ):
-    die("ChatRuntime must own group-session admission and use generic Session creation")
+    die("ChatRuntime must own Chat session intent and use opaque Session contracts")
+persona_gallery_ui_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt")
+)
+if "runtime.session.createSession(" in persona_gallery_ui_source:
+    die("Persona gallery UI must route Chat session creation through ChatFeature")
+if "runtime.chat.startSessionFromGallery(" not in persona_gallery_ui_source:
+    die("Persona gallery UI must use the ChatFeature gallery-session entry point")
 if "private val streamingPreviewStore = LocalStreamingPreviewStore()" in engine:
     die("LocalHarnessEngine must not own the process-wide streaming preview store")
 if "MutableStateFlow(LocalSendFeedbackState())" in engine:
@@ -1195,12 +1212,35 @@ session_storage_runtime_source = strip_comments(
 session_domain_codec_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionDomainCodec.kt")
 )
+session_domain_command_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionDomainCommand.kt")
+)
+chat_session_domain_command_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatSessionDomainCommand.kt")
+)
+if "com.labteto.dshmobile.local.chat." in session_domain_command_source:
+    die("Session domain command contracts must stay Feature-agnostic")
+for required_domain_command in (
+    "interface LocalSessionDomainCreateSpec",
+    "interface LocalSessionDomainModeCommand",
+):
+    if required_domain_command not in session_domain_command_source:
+        die("Shared Session domain command contract is incomplete: " + required_domain_command)
+for required_chat_command in (
+    "LocalChatSessionCreateSpec",
+    "LocalChatSessionModeCommand",
+):
+    if required_chat_command not in chat_session_domain_command_source:
+        die("ChatFeature session command contribution is incomplete: " + required_chat_command)
 chat_session_codec_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatSessionDomainCodec.kt")
 )
 if "import com.labteto.dshmobile.local.chat." in session_coordinator_source:
     die("Session coordinator must not execute ChatFeature internal migration rules")
-if "List<LocalSessionDomainCodec>" not in session_coordinator_source or "domainCodecs.fold(session)" not in session_coordinator_source:
+if (
+    "List<LocalSessionDomainCodec>" not in session_coordinator_source
+    or "normalizeLocalSessionDomains(session, domainCodecs)" not in session_coordinator_source
+):
     die("Session coordinator must normalize Feature data through injected domain codecs")
 if "Set<@JvmSuppressWildcards LocalSessionDomainCodec>" not in session_storage_runtime_source:
     die("Shared Session storage must receive Feature codecs through the Session contract")
@@ -1222,6 +1262,24 @@ for required_chat_migration in (
         die(f"ChatFeature Session codec lost migration rule: {required_chat_migration}")
 if "@IntoSet" not in chat_session_codec_source or "LocalChatSessionDomainCodec" not in chat_session_codec_source:
     die("ChatFeature must contribute its Session codec through DI multibinding")
+if "override fun projectSummary(" not in chat_session_codec_source:
+    die("ChatFeature Session codec must own Chat summary projection")
+session_models_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt")
+)
+if "import com.labteto.dshmobile.local.chat.LocalChatMode" in session_models_source:
+    die("Shared Session summary must not type its mode as a ChatFeature enum")
+for shared_summary_path in (
+    "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionSummaryIndex.kt",
+):
+    shared_summary_source = strip_comments(read(shared_summary_path))
+    if "com.labteto.dshmobile.local.chat." in shared_summary_source:
+        die(f"{shared_summary_path} must not import ChatFeature internals")
+if "payload[\"groupChat\"]" in strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt")
+):
+    die("Session repository must not interpret ChatFeature summary payloads")
 transcript_history_loader = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryLoader.kt")
 )

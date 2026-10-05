@@ -5,7 +5,6 @@ import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
-import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
@@ -89,7 +88,7 @@ data class LocalSessionSummary(
     val title: String,
     val updatedAt: Long,
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
-    val chatMode: LocalChatMode = LocalChatMode.SINGLE,
+    val chatMode: String? = null,
     val groupMemberCount: Int = 0,
     val personaId: String? = null,
     val galleryId: String? = null,

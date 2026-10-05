@@ -5,8 +5,6 @@ import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
-import com.labteto.dshmobile.local.chat.LocalChatMode
-import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
@@ -30,22 +28,15 @@ class LocalSessionRuntime @Inject constructor(
     internal fun createSession(
         mode: LocalConversationMode,
         usageMode: LocalUsageMode,
-        galleryEntry: PersonaGalleryEntry? = null,
-        galleryStoryId: String? = null,
-        freshGalleryStory: Boolean = false,
-        chatMode: LocalChatMode? = null,
-        groupEntries: List<PersonaGalleryEntry> = emptyList(),
+        domainSpec: LocalSessionDomainCreateSpec? = null,
     ) = engine.createSession(
         mode = mode,
         usageMode = usageMode,
-        galleryEntry = galleryEntry,
-        galleryStoryId = galleryStoryId,
-        freshGalleryStory = freshGalleryStory,
-        chatMode = chatMode,
-        groupEntries = groupEntries,
+        domainSpec = domainSpec,
     )
 
-    internal fun switchChatMode(mode: LocalChatMode) = engine.switchChatMode(mode)
+    internal fun switchDomainMode(command: LocalSessionDomainModeCommand) =
+        engine.switchSessionDomainMode(command)
     internal fun switchUsageMode(mode: LocalUsageMode) = engine.switchUsageMode(mode)
     internal fun switchSession(sessionId: String) = engine.switchSession(sessionId)
     internal suspend fun deleteSessions(ids: Set<String>): Int = engine.deleteSessions(ids)

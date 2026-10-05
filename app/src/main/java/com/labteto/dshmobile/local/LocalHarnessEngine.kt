@@ -218,6 +218,8 @@ import com.labteto.dshmobile.local.send.prepareLocalSend
 import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.session.LocalConversationFilesCoordinator
 import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.session.LocalSessionDomainCreateSpec
+import com.labteto.dshmobile.local.session.LocalSessionDomainModeCommand
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator
@@ -1867,26 +1869,18 @@ class LocalHarnessEngine @Inject internal constructor(
     internal fun createSession(
         mode: LocalConversationMode,
         usageMode: LocalUsageMode,
-        galleryEntry: PersonaGalleryEntry? = null,
-        galleryStoryId: String? = null,
-        freshGalleryStory: Boolean = false,
-        chatMode: LocalChatMode? = null,
-        groupEntries: List<PersonaGalleryEntry> = emptyList(),
+        domainSpec: LocalSessionDomainCreateSpec? = null,
     ) = sessionLifecycle.createSession(
         mode = mode,
         usageMode = usageMode,
-        galleryEntry = galleryEntry,
-        galleryStoryId = galleryStoryId,
-        freshGalleryStory = freshGalleryStory,
-        chatMode = chatMode,
-        groupEntries = groupEntries,
+        domainSpec = domainSpec,
     )
 
     /** Backward-compatible entry point: a plain new session is fully independent. */
     internal fun newSession() = sessionLifecycle.createSession(LocalConversationMode.INDEPENDENT)
 
-    internal fun switchChatMode(mode: LocalChatMode) =
-        sessionLifecycle.switchChatMode(mode)
+    internal fun switchSessionDomainMode(command: LocalSessionDomainModeCommand) =
+        sessionLifecycle.switchDomainMode(command)
 
     /** Move between product surfaces; the Chat pill always returns to normal one-to-one chat. */
     internal fun switchUsageMode(mode: LocalUsageMode) =

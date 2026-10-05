@@ -23,7 +23,6 @@ import com.labteto.dshmobile.local.chat.isMeaningfulGalleryPersona
 import com.labteto.dshmobile.local.chat.samePersonaIdentity
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
-import com.labteto.dshmobile.local.session.LocalConversationMode
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -388,12 +387,10 @@ fun startFromGallery(
     val snapshot = state.value
     if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
     val entry = gallery.value.firstOrNull { it.id == id } ?: return false
-    return runtime.session.createSession(
-        mode = LocalConversationMode.INDEPENDENT,
-        usageMode = LocalUsageMode.CHAT,
-        galleryEntry = entry,
-        galleryStoryId = storyId,
-        freshGalleryStory = freshStory,
+    return runtime.chat.startSessionFromGallery(
+        entry = entry,
+        storyId = storyId,
+        freshStory = freshStory,
     )
 }
 

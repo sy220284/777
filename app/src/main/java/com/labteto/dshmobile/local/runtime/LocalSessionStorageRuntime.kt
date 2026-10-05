@@ -50,6 +50,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     internal val coordinator: LocalSessionCoordinator
 
     init {
+        val orderedDomainCodecs = domainCodecs.sortedBy(LocalSessionDomainCodec::id)
         repository = LocalSessionRepository(
             root = sessionsRoot,
             json = json,
@@ -58,12 +59,13 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             onError = { error ->
                 runtimeStateStore.projection.publishError(error.message ?: "会话写入失败")
             },
+            domainCodecs = orderedDomainCodecs,
         )
         coordinator = LocalSessionCoordinator(
             repository = repository,
             eventLogFor = eventLogs::get,
             runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
-            domainCodecs = domainCodecs.sortedBy(LocalSessionDomainCodec::id),
+            domainCodecs = orderedDomainCodecs,
         )
     }
 

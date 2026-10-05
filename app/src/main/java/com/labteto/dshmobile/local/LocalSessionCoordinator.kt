@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.session.normalizeLocalSessionDomains
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.migrateLegacyTranscriptSnapshot
@@ -162,7 +163,7 @@ internal class LocalSessionCoordinator(
     )
 
     private fun normalizeLoaded(session: LocalHarnessSession): LocalHarnessSession =
-        domainCodecs.fold(session) { current, codec -> codec.normalizeLoaded(current) }
+        normalizeLocalSessionDomains(session, domainCodecs)
 
     private companion object {
         const val LEGACY_TRANSCRIPT_PROJECTION_BASELINE_EVENT =

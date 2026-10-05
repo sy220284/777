@@ -11,6 +11,8 @@ import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.chat.LocalChatSessionCreateSpec
+import com.labteto.dshmobile.local.chat.LocalChatSessionModeCommand
 import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.LocalChatState
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
@@ -40,6 +42,8 @@ import com.labteto.dshmobile.local.runtime.projectExecutionJobs
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.session.LocalConversationFilesCoordinator
 import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.session.LocalSessionDomainCreateSpec
+import com.labteto.dshmobile.local.session.LocalSessionDomainModeCommand
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.work.LocalWorkState
@@ -123,12 +127,19 @@ internal class LocalSessionLifecycleCoordinator(
     fun createSession(
         mode: LocalConversationMode,
         usageMode: LocalUsageMode,
-        galleryEntry: PersonaGalleryEntry? = null,
-        galleryStoryId: String? = null,
-        freshGalleryStory: Boolean = false,
-        chatMode: LocalChatMode? = null,
-        groupEntries: List<PersonaGalleryEntry> = emptyList(),
+        domainSpec: LocalSessionDomainCreateSpec? = null,
     ): Boolean {
+        val chatSpec = when (domainSpec) {
+            null -> null
+            is LocalChatSessionCreateSpec -> domainSpec
+            else -> return false
+        }
+        if (chatSpec != null && usageMode != LocalUsageMode.CHAT) return false
+        val galleryEntry = chatSpec?.galleryEntry
+        val galleryStoryId = chatSpec?.galleryStoryId
+        val freshGalleryStory = chatSpec?.freshGalleryStory == true
+        val chatMode = chatSpec?.chatMode
+        val groupEntries = chatSpec?.groupEntries.orEmpty()
         if (
             chatMode == LocalChatMode.GROUP &&
             groupEntries.distinctBy(PersonaGalleryEntry::id).size !in
@@ -355,7 +366,14 @@ internal class LocalSessionLifecycleCoordinator(
         return true
     }
 
-    fun switchChatMode(mode: LocalChatMode) {
+    fun switchDomainMode(command: LocalSessionDomainModeCommand) {
+        when (command) {
+            is LocalChatSessionModeCommand -> switchChatMode(command.mode)
+            else -> Unit
+        }
+    }
+
+    private fun switchChatMode(mode: LocalChatMode) {
         val snapshot = state.value
         if (snapshot.loading || snapshot.kernel.running) return
         if (
@@ -367,7 +385,7 @@ internal class LocalSessionLifecycleCoordinator(
             listOfNotNull(findEstablishedGroupChatSession(snapshot.sessions))
         } else {
             snapshot.sessions.filter {
-                it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode
+                it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode.name
             }
         }
         val target = eligible.firstOrNull { !it.blank } ?: eligible.firstOrNull()
@@ -377,7 +395,7 @@ internal class LocalSessionLifecycleCoordinator(
             createSession(
                 mode = LocalConversationMode.INDEPENDENT,
                 usageMode = LocalUsageMode.CHAT,
-                chatMode = mode,
+                domainSpec = LocalChatSessionCreateSpec(chatMode = mode),
             )
         }
     }
@@ -400,11 +418,11 @@ internal class LocalSessionLifecycleCoordinator(
         if (snapshot.usageMode == mode) return
         val target = snapshot.sessions.firstOrNull {
             it.usageMode == mode &&
-                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE) &&
+                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE.name) &&
                 !it.blank
         } ?: snapshot.sessions.firstOrNull {
             it.usageMode == mode &&
-                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE)
+                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE.name)
         }
         val accepted = if (target != null) {
             switchSession(target.id)
@@ -412,7 +430,11 @@ internal class LocalSessionLifecycleCoordinator(
             createSession(
                 mode = LocalConversationMode.INDEPENDENT,
                 usageMode = mode,
-                chatMode = if (mode == LocalUsageMode.CHAT) LocalChatMode.SINGLE else null,
+                domainSpec = if (mode == LocalUsageMode.CHAT) {
+                    LocalChatSessionCreateSpec(chatMode = LocalChatMode.SINGLE)
+                } else {
+                    null
+                },
             )
         }
         if (!accepted) {

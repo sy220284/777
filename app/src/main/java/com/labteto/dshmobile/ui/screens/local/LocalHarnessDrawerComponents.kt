@@ -524,7 +524,7 @@ internal fun LocalSessionDrawerRow(
                         color = colors.labelCaption,
                         maxLines = 1,
                     )
-                    if (session.chatMode == LocalChatMode.GROUP) {
+                    if (session.chatMode == LocalChatMode.GROUP.name) {
                         DsPill(text = stringResource(R.string.local_group_chat_title))
                     }
                     if (running) {

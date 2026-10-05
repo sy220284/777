@@ -47,18 +47,43 @@ class LocalChatRuntime @Inject internal constructor(
         return sessionRuntime.createSession(
             mode = com.labteto.dshmobile.local.session.LocalConversationMode.INDEPENDENT,
             usageMode = com.labteto.dshmobile.local.LocalUsageMode.CHAT,
-            chatMode = LocalChatMode.GROUP,
-            groupEntries = selected,
+            domainSpec = LocalChatSessionCreateSpec(
+                chatMode = LocalChatMode.GROUP,
+                groupEntries = selected,
+            ),
         )
     }
 
     internal fun createSingleChatSession(): Boolean = sessionRuntime.createSession(
         mode = com.labteto.dshmobile.local.session.LocalConversationMode.INDEPENDENT,
         usageMode = com.labteto.dshmobile.local.LocalUsageMode.CHAT,
-        chatMode = LocalChatMode.SINGLE,
+        domainSpec = LocalChatSessionCreateSpec(chatMode = LocalChatMode.SINGLE),
     )
 
-    internal fun switchChatMode(mode: LocalChatMode) = sessionRuntime.switchChatMode(mode)
+    internal fun startSessionFromGallery(
+        entry: PersonaGalleryEntry,
+        storyId: String?,
+        freshStory: Boolean,
+    ): Boolean {
+        val snapshot = chatState.value
+        if (
+            snapshot.loading ||
+            snapshot.kernel.running ||
+            snapshot.usageMode != com.labteto.dshmobile.local.LocalUsageMode.CHAT
+        ) return false
+        return sessionRuntime.createSession(
+            mode = com.labteto.dshmobile.local.session.LocalConversationMode.INDEPENDENT,
+            usageMode = com.labteto.dshmobile.local.LocalUsageMode.CHAT,
+            domainSpec = LocalChatSessionCreateSpec(
+                galleryEntry = entry,
+                galleryStoryId = storyId,
+                freshGalleryStory = freshStory,
+            ),
+        )
+    }
+
+    internal fun switchChatMode(mode: LocalChatMode) =
+        sessionRuntime.switchDomainMode(LocalChatSessionModeCommand(mode))
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean =
         groupMembership.configure(entries)
     internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> {

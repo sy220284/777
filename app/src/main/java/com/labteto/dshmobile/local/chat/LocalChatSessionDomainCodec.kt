@@ -21,6 +21,17 @@ internal object LocalChatSessionDomainCodec : LocalSessionDomainCodec {
             chatBranches = session.chatBranches.canonicalizeLegacyChatBranchState(),
             groupChat = session.groupChat.migrateLegacyConversationContext(),
         )
+
+    override fun projectSummary(
+        session: LocalHarnessSession,
+        summary: com.labteto.dshmobile.local.session.LocalSessionSummary,
+    ): com.labteto.dshmobile.local.session.LocalSessionSummary =
+        summary.copy(
+            chatMode = session.groupChat.mode.name,
+            groupMemberCount = session.groupChat.members.size,
+            personaId = session.personaId,
+            galleryId = session.galleryId,
+        )
 }
 
 /** Composition contribution only; Shared Runtime sees the Session contract, never Chat internals. */

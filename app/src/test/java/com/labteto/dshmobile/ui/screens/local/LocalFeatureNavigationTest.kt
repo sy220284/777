@@ -216,7 +216,7 @@ class LocalFeatureNavigationTest {
             title = "群聊",
             updatedAt = 1L,
             usageMode = LocalUsageMode.CHAT,
-            chatMode = LocalChatMode.GROUP,
+            chatMode = LocalChatMode.GROUP.name,
             groupMemberCount = 0,
             blank = true,
         )
@@ -229,7 +229,7 @@ class LocalFeatureNavigationTest {
             title = "单聊",
             updatedAt = 2L,
             usageMode = LocalUsageMode.CHAT,
-            chatMode = LocalChatMode.SINGLE,
+            chatMode = LocalChatMode.SINGLE.name,
             blank = false,
         )
 

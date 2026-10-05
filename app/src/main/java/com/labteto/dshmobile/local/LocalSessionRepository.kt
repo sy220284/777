@@ -2,11 +2,10 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
-import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.session.LocalSessionSummaryIndex
-import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -18,13 +17,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 
 internal data class LocalSessionRead(
     val session: LocalHarnessSession,
@@ -41,6 +37,7 @@ internal class LocalSessionRepository(
     scope: CoroutineScope,
     private val onWritten: () -> Unit,
     private val onError: (Throwable) -> Unit,
+    private val domainCodecs: List<LocalSessionDomainCodec> = emptyList(),
 ) {
     private val sessionsRoot = root
     private val catalogStore = VersionedSessionStore(root, json)
@@ -90,7 +87,7 @@ internal class LocalSessionRepository(
                             persistSummaryIndex(snapshot, sourceModifiedAt)
                             synchronized(lock) {
                                 if (snapshot.id !in deletedIds) {
-                                    cacheSummaryLocked(snapshot.toSummary())
+                                    cacheSummaryLocked(projectSummary(snapshot))
                                     if (latestSnapshots[snapshot.id] === snapshot) {
                                         latestSnapshots.remove(snapshot.id)
                                     }
@@ -157,7 +154,7 @@ internal class LocalSessionRepository(
             persistSummaryIndex(snapshot, sourceModifiedAt)
             synchronized(lock) {
                 if (snapshot.id !in deletedIds) {
-                    cacheSummaryLocked(snapshot.toSummary())
+                    cacheSummaryLocked(projectSummary(snapshot))
                     if (latestSnapshots[snapshot.id] === snapshot) {
                         latestSnapshots.remove(snapshot.id)
                         pending.remove(snapshot.id)
@@ -319,58 +316,17 @@ internal class LocalSessionRepository(
         fallbackId: String,
         fallbackUpdatedAt: Long,
     ): LocalSessionSummary {
-        val messages = payload["messages"] as? JsonArray
-        val transcriptIndex = (payload["transcriptIndex"] as? JsonObject)?.let { encoded ->
-            runCatching {
-                json.decodeFromJsonElement(LocalTranscriptRuntimeIndex.serializer(), encoded)
-            }.getOrNull()
-        }
-        return LocalSessionSummary(
-            id = payload["id"]?.jsonPrimitive?.contentOrNull
-                ?.takeIf(String::isNotBlank)
-                ?: fallbackId,
-            title = payload["title"]?.jsonPrimitive?.contentOrNull ?: "新会话",
-            updatedAt = payload["updatedAt"]?.jsonPrimitive?.longOrNull
-                ?.takeIf { it > 0L }
-                ?: fallbackUpdatedAt,
-            usageMode = runCatching {
-                LocalUsageMode.valueOf(
-                    payload["usageMode"]?.jsonPrimitive?.contentOrNull
-                        ?: LocalUsageMode.WORK.name,
-                )
-            }.getOrDefault(LocalUsageMode.WORK),
-            chatMode = runCatching {
-                val group = payload["groupChat"] as? JsonObject
-                LocalChatMode.valueOf(
-                    group?.get("mode")?.jsonPrimitive?.contentOrNull
-                        ?: LocalChatMode.SINGLE.name,
-                )
-            }.getOrDefault(LocalChatMode.SINGLE),
-            groupMemberCount = ((payload["groupChat"] as? JsonObject)?.get("members") as? JsonArray)
-                ?.size
-                ?: 0,
-            personaId = payload["personaId"]?.jsonPrimitive?.contentOrNull,
-            galleryId = payload["galleryId"]?.jsonPrimitive?.contentOrNull,
-            blank = when {
-                transcriptIndex != null -> transcriptIndex.totalMessageCount == 0L
-                else -> messages?.none { element ->
-                    val message = element as? JsonObject ?: return@none false
-                    message["content"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
-                } ?: true
-            },
-            summaryPreview = transcriptIndex?.latestUserContent
-                ?.replace(Regex("\\s+"), " ")
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-                ?.let { if (it.length > 72) it.take(72) + "…" else it },
-            projectId = payload["projectId"]?.jsonPrimitive?.contentOrNull,
-            lineageId = payload["lineageId"]?.jsonPrimitive?.contentOrNull
-                ?.takeIf(String::isNotBlank),
+        val decoded = json.decodeFromJsonElement(LocalHarnessSession.serializer(), payload)
+        return projectSummary(
+            decoded.copy(
+                id = decoded.id.takeIf(String::isNotBlank) ?: fallbackId,
+                updatedAt = decoded.updatedAt.takeIf { it > 0L } ?: fallbackUpdatedAt,
+            ),
         )
     }
 
     private fun persistSummaryIndex(snapshot: LocalHarnessSession, sourceModifiedAt: Long) {
-        runCatching { summaryIndex.write(snapshot.toSummary(), sourceModifiedAt) }
+        runCatching { summaryIndex.write(projectSummary(snapshot), sourceModifiedAt) }
             .onFailure { error ->
                 // The sidecar is derivative. A failed index write must not roll back a durable Session.
                 AppLog.warn(
@@ -396,26 +352,9 @@ internal class LocalSessionRepository(
     private fun storeFor(id: String): VersionedSessionStore =
         sessionStores.computeIfAbsent(id) { VersionedSessionStore(sessionsRoot, json) }
 
-    private fun LocalHarnessSession.toSummary(): LocalSessionSummary = LocalSessionSummary(
-        id = id,
-        title = title,
-        updatedAt = updatedAt,
-        usageMode = usageMode,
-        chatMode = groupChat.mode,
-        groupMemberCount = groupChat.members.size,
-        personaId = personaId,
-        galleryId = galleryId,
-        blank = transcriptIndex.totalMessageCount == 0L &&
-            transcriptWindow.none { it.content.isNotBlank() } &&
-            messages.none { it.content.isNotBlank() },
-        summaryPreview = transcriptIndex.latestUserContent
-            ?.replace(Regex("\\s+"), " ")
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?.let { if (it.length > 72) it.take(72) + "…" else it },
-        projectId = projectId,
-        lineageId = lineageId.ifBlank { id },
-    )
+    private fun projectSummary(snapshot: LocalHarnessSession): LocalSessionSummary =
+        com.labteto.dshmobile.local.session.projectLocalSessionSummary(snapshot, domainCodecs)
+
     private companion object {
         const val SESSION_LOCK_STRIPES = 64
     }
