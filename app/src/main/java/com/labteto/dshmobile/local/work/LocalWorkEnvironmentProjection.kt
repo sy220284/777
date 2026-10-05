@@ -15,9 +15,9 @@ internal fun LocalWorkRunBinding.toEnvironmentRunSnapshot(
     val optionalTools = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
     return LocalEnvironmentRunSnapshot(
         sessionId = sessionId,
-        contextChars = modelHistory.encodedChars,
+        contextChars = runHandle.modelHistory.encodedChars,
         contextBudgetChars = contextBudgetChars,
-        pendingInputs = pendingInputs.size(),
+        pendingInputs = runHandle.pendingInputs.size(),
         enabledOptionalTools = optionalTools,
         workBudget = executionControl.budget.snapshot().toEnvironmentWorkBudget(),
     )

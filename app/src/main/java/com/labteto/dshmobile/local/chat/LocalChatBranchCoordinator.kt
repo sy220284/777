@@ -41,8 +41,8 @@ internal class LocalChatBranchCoordinator @Inject constructor(
             reason = reason,
             activeTranscript = activeTranscript,
         )
-        runtimeStateStore.foregroundTranscriptProjectionCursor = maxOf(
-            runtimeStateStore.foregroundTranscriptProjectionCursor ?: -1L,
+        runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor = maxOf(
+            runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor ?: -1L,
             transcriptSequence,
         )
         return true
@@ -55,8 +55,8 @@ internal class LocalChatBranchCoordinator @Inject constructor(
             before.chat.groupChat.enabled ||
             before.loading ||
             before.kernel.running ||
-            runtimeStateStore.foregroundJob?.isCompleted == false ||
-            runtimeStateStore.foregroundPendingInputs.size() != 0 ||
+            runtimeStateStore.foregroundRunHandle.hasLiveJob() ||
+            runtimeStateStore.foregroundRunHandle.pendingInputs.size() != 0 ||
             !before.transcriptIndex.branchingEligible
         ) return false
 
@@ -72,8 +72,8 @@ internal class LocalChatBranchCoordinator @Inject constructor(
                 state.chat.groupChat.enabled ||
                 state.loading ||
                 state.kernel.running ||
-                runtimeStateStore.foregroundJob?.isCompleted == false ||
-                runtimeStateStore.foregroundPendingInputs.size() != 0 ||
+                runtimeStateStore.foregroundRunHandle.hasLiveJob() ||
+                runtimeStateStore.foregroundRunHandle.pendingInputs.size() != 0 ||
                 !state.transcriptIndex.branchingEligible
             ) return false
 
@@ -130,8 +130,8 @@ internal class LocalChatBranchCoordinator @Inject constructor(
                 reason = "variant-selected",
                 activeTranscript = activeMessages,
             )
-            runtimeStateStore.foregroundTranscriptProjectionCursor = maxOf(
-                runtimeStateStore.foregroundTranscriptProjectionCursor ?: -1L,
+            runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor = maxOf(
+                runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor ?: -1L,
                 transcriptSequence,
             )
             modelHistoryRuntime.checkpoint(state.sessionId, "chat/variant-selected")

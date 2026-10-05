@@ -1215,8 +1215,18 @@ if "LocalWorkPlanModeCoordinator" not in work_runtime_source or "engine.setPlanM
     die("Work plan-mode ownership must stay inside WorkFeature")
 if "workRunRegistry.requestCancel(sessionId)" not in work_runtime_source or "val sessionId = runtimeStateStore.currentSessionId" not in work_runtime_source:
     die("Work session-bound cancellation must stay inside WorkFeature")
-if "foregroundModelHistory = LocalModelHistoryBuffer()" not in runtime_state_store:
-    die("Shared Runtime must own the visible foreground model-history state")
+if "foregroundRunHandle = LocalAgentRunHandle(" not in runtime_state_store:
+    die("Shared Runtime must own one foreground LocalAgentRunHandle")
+for legacy_foreground_fact in (
+    "foregroundModelHistory",
+    "foregroundRunLock",
+    "foregroundPendingInputs",
+    "foregroundJob",
+    "foregroundTranscriptProjectionCursor",
+    "foregroundTurnsSinceModelHistoryCheckpoint",
+):
+    if legacy_foreground_fact in runtime_state_store:
+        die(f"Shared Runtime must not split foreground run facts again: {legacy_foreground_fact}")
 if "private val modelHistory = LocalModelHistoryBuffer()" in engine:
     die("LocalHarnessEngine must not recreate foreground model-history ownership")
 if "internal fun setPlanMode(enabled: Boolean)" in engine:
@@ -1230,6 +1240,34 @@ work_binding_source = strip_comments(
 )
 if "projectResourceSnapshotToSessionStates" in work_binding_source:
     die("Legacy cross-layer resource projection helper must stay removed")
+if "val runHandle: LocalAgentRunHandle" not in work_binding_source:
+    die("WorkFeature must reference the shared LocalAgentRunHandle for runtime facts")
+for forbidden_work_run_fact in (
+    "val modelHistory = LocalModelHistoryBuffer",
+    "val pendingInputs = AgentInputQueue",
+    "var job: Job?",
+    "var mirrorJob: Job?",
+    "var transcriptProjectionCursor:",
+    "var turnsSinceModelHistoryCheckpoint:",
+):
+    if forbidden_work_run_fact in work_binding_source:
+        die(f"LocalWorkRunBinding must not recreate shared run fact: {forbidden_work_run_fact}")
+
+run_handle_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunHandle.kt")
+)
+for required_run_fact in (
+    "val modelHistory = LocalModelHistoryBuffer()",
+    "val pendingInputs = AgentInputQueue(maxPendingInputs)",
+    "var job: Job? = null",
+    "var transcriptProjectionCursor: Long? = initialTranscriptProjectionCursor",
+    "var turnsSinceModelHistoryCheckpoint: Int = 0",
+    "internal fun rebindSession(nextSessionId: String)",
+):
+    if required_run_fact not in run_handle_source:
+        die(f"Shared LocalAgentRunHandle is missing runtime ownership fact: {required_run_fact}")
+if "com.labteto.dshmobile.local.work." in run_handle_source:
+    die("Shared LocalAgentRunHandle must not depend on WorkFeature internals")
 if "AutomationExecutionRegistry.tryAcquire(id)" not in automation_worker:
     die("Automation scheduled/manual execution must share one task runtime lease")
 if "AutomationExecutionRegistry.tryAcquire(id) ?: return Result.retry()" not in automation_worker:

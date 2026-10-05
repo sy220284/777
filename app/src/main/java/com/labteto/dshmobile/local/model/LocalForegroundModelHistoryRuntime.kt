@@ -23,7 +23,7 @@ internal class LocalForegroundModelHistoryRuntime @Inject constructor(
     private val sessionStorage: LocalSessionStorageRuntime,
 ) {
     internal val history: LocalModelHistoryBuffer
-        get() = runtimeStateStore.foregroundModelHistory
+        get() = runtimeStateStore.foregroundRunHandle.modelHistory
 
     internal fun reset(expectedSessionId: String, messages: List<JsonObject>): Boolean {
         if (runtimeStateStore.state.value.sessionId != expectedSessionId) return false
@@ -69,7 +69,7 @@ internal class LocalForegroundModelHistoryRuntime @Inject constructor(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
             codec.encode(durableModelHistorySnapshot(history.snapshot()), reason),
         )
-        runtimeStateStore.foregroundTurnsSinceModelHistoryCheckpoint = 0
+        runtimeStateStore.foregroundRunHandle.turnsSinceModelHistoryCheckpoint = 0
         return true
     }
 

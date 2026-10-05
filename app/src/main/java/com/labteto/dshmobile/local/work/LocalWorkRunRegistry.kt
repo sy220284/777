@@ -60,7 +60,7 @@ class LocalWorkRunRegistry internal constructor(
     internal fun state(sessionId: String): LocalHarnessState? = bindings[sessionId]?.aggregateSnapshot()
 
     internal fun live(sessionId: String): LocalWorkRunBinding? =
-        bindings[sessionId]?.takeIf { it.job?.isCompleted == false }
+        bindings[sessionId]?.takeIf { it.runHandle.hasLiveJob() }
 
     internal fun attach(binding: LocalWorkRunBinding): LocalWorkRunBinding? {
         val previous = synchronized(approvalProjectionLock) {
@@ -94,7 +94,7 @@ class LocalWorkRunRegistry internal constructor(
     internal fun detachAll(sessionIds: Set<String>): List<LocalWorkRunBinding> =
         sessionIds.mapNotNull(::detach)
 
-    internal fun anyLive(): Boolean = bindings.values.any { it.job?.isCompleted == false }
+    internal fun anyLive(): Boolean = bindings.values.any { it.runHandle.hasLiveJob() }
 
     internal fun mirrorVisible(binding: LocalWorkRunBinding) {
         if (

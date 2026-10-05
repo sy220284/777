@@ -172,6 +172,7 @@ import com.labteto.dshmobile.local.runtime.KEY_SESSION_ID
 import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
 import com.labteto.dshmobile.local.runtime.LocalAgentProgressTracker
+import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
 import com.labteto.dshmobile.local.runtime.LocalAgentRunContext
 import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
@@ -516,11 +517,12 @@ class LocalHarnessEngine @Inject internal constructor(
         )
     }
     private var transcriptProjectionCursor: Long?
-        get() = runtimeStateStore.foregroundTranscriptProjectionCursor
+        get() = runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor
         set(value) {
-            runtimeStateStore.foregroundTranscriptProjectionCursor = value
+            runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor = value
         }
-    private val modelHistory = runtimeStateStore.foregroundModelHistory
+    private val modelHistory: LocalModelHistoryBuffer
+        get() = runtimeStateStore.foregroundRunHandle.modelHistory
     private val _state = runtimeStateStore.initialize(
         LocalHarnessState(
             workspacePath = workspace.path,
@@ -867,15 +869,15 @@ class LocalHarnessEngine @Inject internal constructor(
     )
 
     private val runStateLock: Any
-        get() = runtimeStateStore.foregroundRunLock
+        get() = runtimeStateStore.foregroundRunHandle.lock
     private val pendingInputs: AgentInputQueue
-        get() = runtimeStateStore.foregroundPendingInputs
+        get() = runtimeStateStore.foregroundRunHandle.pendingInputs
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
     private var activeJob: Job?
-        get() = runtimeStateStore.foregroundJob
+        get() = runtimeStateStore.foregroundRunHandle.job
         set(value) {
-            runtimeStateStore.foregroundJob = value
+            runtimeStateStore.foregroundRunHandle.job = value
         }
     private val memoryCoordinator by lazy {
         LocalMemoryCoordinator(
@@ -1385,9 +1387,9 @@ class LocalHarnessEngine @Inject internal constructor(
         val result = synchronized(runStateLock) {
             val state = _state.value
             val binding = if (state.usageMode == LocalUsageMode.WORK) {
-                workRunRegistry[state.sessionId]?.takeIf { it.job?.isCompleted == false }
+                workRunRegistry[state.sessionId]?.takeIf { it.runHandle.hasLiveJob() }
             } else null
-            val targetPending = binding?.pendingInputs ?: pendingInputs
+            val targetPending = binding?.runHandle?.pendingInputs ?: pendingInputs
             val targetState = aggregateRunState(binding)
             val queuedInput = QueuedAgentInput(content, memoryInput, modelMessage, UUID.randomUUID().toString())
             coordinateOwnedLocalSend(
@@ -1469,14 +1471,17 @@ class LocalHarnessEngine @Inject internal constructor(
                 current.copy(kernel = current.kernel.copy(running = true), error = null)
             }.toLocalWorkRunState(),
             sessionBase = persistenceSnapshot(),
-            initialHistory = modelHistory.snapshot(),
+            runHandle = LocalAgentRunHandle(
+                initialSessionId = sessionId,
+                initialHistory = modelHistory.snapshot(),
+                initialTranscriptProjectionCursor = transcriptProjectionCursor,
+                maxPendingInputs = MAX_PENDING_INPUTS,
+            ),
             eventLog = eventLogFor(sessionId),
-            initialTranscriptProjectionCursor = transcriptProjectionCursor,
-            maxPendingInputs = MAX_PENDING_INPUTS,
             pruneToolResult = ::pruneToolResult,
         )
         workRunRegistry.attach(binding)
-        binding.mirrorJob = scope.launch {
+        binding.runHandle.projectionJob = scope.launch {
             binding.state.collect {
                 workRunRegistry.mirrorVisible(binding)
             }
@@ -1492,7 +1497,7 @@ class LocalHarnessEngine @Inject internal constructor(
         }
         // A lazy run cancelled before its body starts never reaches withOwner/finally.
         job.invokeOnCompletion { sessionLease.close() }
-        binding.job = job
+        binding.runHandle.job = job
         return job
     }
 
@@ -1516,8 +1521,8 @@ class LocalHarnessEngine @Inject internal constructor(
                 contextBudgetChars = localHistoryBudgetFor(memoryClassMb, resources.pressure).maxHistoryChars,
             ),
         )
-        modelHistory.reset(binding.modelHistory.snapshot())
-        transcriptProjectionCursor = binding.transcriptProjectionCursor
+        modelHistory.reset(binding.runHandle.modelHistory.snapshot())
+        transcriptProjectionCursor = binding.runHandle.transcriptProjectionCursor
     }
 
     private fun queueTurn(
@@ -1556,7 +1561,7 @@ class LocalHarnessEngine @Inject internal constructor(
         val targetState = aggregateRunState(binding)
         val targetLog = binding?.eventLog ?: eventLog
         val targetTranscript = binding?.transcriptRuntime ?: transcriptRuntime
-        val targetPending = binding?.pendingInputs ?: pendingInputs
+        val targetPending = binding?.runHandle?.pendingInputs ?: pendingInputs
         val before = targetState.value
         persistChatTimelineBaseline(targetLog, json, before)
         val durableInput = queuedInput.takeIf { queued }
@@ -1624,7 +1629,7 @@ class LocalHarnessEngine @Inject internal constructor(
         message: JsonObject,
         binding: LocalWorkRunBinding? = null,
     ) {
-        (binding?.modelHistory ?: modelHistory).append(message)
+        (binding?.runHandle?.modelHistory ?: modelHistory).append(message)
         updateContextMetrics(binding)
     }
 
@@ -1959,8 +1964,8 @@ class LocalHarnessEngine @Inject internal constructor(
         memoryCoordinator.hydrateNewChatStateFromRelationshipMemory()
 
     private suspend fun drainPendingInputsIntoHistory(binding: LocalWorkRunBinding? = null) {
-        val targetPending = binding?.pendingInputs ?: pendingInputs
-        val targetHistory = binding?.modelHistory ?: modelHistory
+        val targetPending = binding?.runHandle?.pendingInputs ?: pendingInputs
+        val targetHistory = binding?.runHandle?.modelHistory ?: modelHistory
         val targetState = aggregateRunState(binding)
         val targetLog = binding?.eventLog ?: eventLog
         val queued = targetPending.drain()
@@ -1993,7 +1998,7 @@ class LocalHarnessEngine @Inject internal constructor(
         binding: LocalWorkRunBinding,
         completedJob: Job?,
     ): Job? = synchronized(runStateLock) {
-        if (binding.job !== completedJob) return@synchronized null
+        if (binding.runHandle.job !== completedJob) return@synchronized null
 
         // Always checkpoint the final Work history before detaching it from memory. A later switch
         // back to this conversation can then rebuild the exact model-visible context from Session
@@ -2001,15 +2006,15 @@ class LocalHarnessEngine @Inject internal constructor(
         checkpointModelHistory("work/background-turn-end", binding)
         persist(binding)
 
-        val next = binding.pendingInputs.poll()
+        val next = binding.runHandle.pendingInputs.poll()
         if (next == null) {
-            binding.job = null
+            binding.runHandle.job = null
             workRunRegistry.detach(binding)
-            binding.mirrorJob?.cancel()
-            binding.mirrorJob = null
+            binding.runHandle.projectionJob?.cancel()
+            binding.runHandle.projectionJob = null
             if (currentSessionId == binding.sessionId && _state.value.sessionId == binding.sessionId) {
-                modelHistory.reset(binding.modelHistory.snapshot())
-                transcriptProjectionCursor = binding.transcriptProjectionCursor
+                modelHistory.reset(binding.runHandle.modelHistory.snapshot())
+                transcriptProjectionCursor = binding.runHandle.transcriptProjectionCursor
                 workRunRegistry.mirrorVisible(binding)
             }
             return@synchronized null
@@ -2019,13 +2024,13 @@ class LocalHarnessEngine @Inject internal constructor(
             put("role", "user")
             put("content", next.content)
         }
-        binding.state.update { it.copy(kernel = it.kernel.copy(queuedInputCount = binding.pendingInputs.size())) }
+        binding.state.update { it.copy(kernel = it.kernel.copy(queuedInputCount = binding.runHandle.pendingInputs.size())) }
         appendUserToModelHistory(durableMessage, binding)
         binding.eventLog.append(
             LOCAL_AGENT_INBOX_EVENT_TYPE,
             encodeLocalAgentInboxEvent(
                 action = "resumed",
-                pending = binding.pendingInputs.snapshot(),
+                pending = binding.runHandle.pendingInputs.snapshot(),
                 affected = listOf(next),
                 modelMessages = listOf(durableMessage),
             ),
@@ -2039,7 +2044,7 @@ class LocalHarnessEngine @Inject internal constructor(
                 binding = binding,
             )
         }.also { nextJob ->
-            binding.job = nextJob
+            binding.runHandle.job = nextJob
         }
     }
 
@@ -2488,7 +2493,7 @@ class LocalHarnessEngine @Inject internal constructor(
         if (binding == null && currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
         val runState = aggregateRunState(binding)
         val runEventLog = binding?.eventLog ?: eventLog
-        val runHistory = binding?.modelHistory ?: modelHistory
+        val runHistory = binding?.runHandle?.modelHistory ?: modelHistory
         val runTranscript = binding?.transcriptRuntime ?: transcriptRuntime
         val runSessionId = binding?.sessionId ?: currentSessionId
         val runPolicy = localAgentRunPolicy(runState.value.usageMode)
@@ -3009,7 +3014,7 @@ class LocalHarnessEngine @Inject internal constructor(
                                 shouldAutoContinueWorkFailure(
                                     error = lastModelError,
                                     automaticContinuationCount = binding.automaticContinuationCount,
-                                    pendingInputs = binding.pendingInputs.size(),
+                                    pendingInputs = binding.runHandle.pendingInputs.size(),
                                 )
                         if (continuationEligible) {
                             runEventLog.append("turn/end", buildJsonObject {
@@ -3431,7 +3436,7 @@ class LocalHarnessEngine @Inject internal constructor(
         return toolSchemaProjection.modelSchemas(
             policy = runPolicy,
             state = binding?.aggregateSnapshot() ?: _state.value,
-            history = binding?.modelHistory?.snapshot() ?: modelHistory.snapshot(),
+            history = binding?.runHandle?.modelHistory?.snapshot() ?: modelHistory.snapshot(),
             enabledOptional = enabledOptional,
         )
     }
@@ -3643,7 +3648,7 @@ class LocalHarnessEngine @Inject internal constructor(
                         virtualScreen = virtualScreen,
                         sessionId = boundSessionId,
                         boundState = executionState.value,
-                        historySnapshot = binding?.modelHistory?.let { history -> history::snapshot }
+                        historySnapshot = binding?.runHandle?.modelHistory?.let { history -> history::snapshot }
                             ?: modelHistory::snapshot,
                     )
                 } else (binding?.let(::workSubagents) ?: subagents).run(
@@ -3820,7 +3825,7 @@ class LocalHarnessEngine @Inject internal constructor(
     ): String {
         val targetState = aggregateRunState(binding)
         val log = binding?.eventLog ?: eventLog
-        val history = binding?.modelHistory ?: modelHistory
+        val history = binding?.runHandle?.modelHistory ?: modelHistory
         if (!targetState.value.work.planMode) return "当前未启用规划模式"
         val answer = askUser(
             call,
@@ -3875,7 +3880,7 @@ class LocalHarnessEngine @Inject internal constructor(
                     enabledOptionalTools = enabledOptional,
                 )
             },
-            historySnapshot = binding.modelHistory::snapshot,
+            historySnapshot = binding.runHandle.modelHistory::snapshot,
             modelAdmission = binding.executionControl.asModelAdmissionPort(),
         )
 
@@ -4070,7 +4075,7 @@ class LocalHarnessEngine @Inject internal constructor(
         binding: LocalWorkRunBinding?,
     ) {
         if (binding != null && snapshot.sessionId != binding.sessionId) return
-        val history = binding?.modelHistory ?: modelHistory
+        val history = binding?.runHandle?.modelHistory ?: modelHistory
         val log = binding?.eventLog ?: eventLog
         val compaction = history.compactOverflow(
             compactor = historyCompactor,
@@ -4102,7 +4107,7 @@ class LocalHarnessEngine @Inject internal constructor(
 
     private fun updateContextMetrics(binding: LocalWorkRunBinding? = null) {
         val budget = currentHistoryBudget(binding)
-        val history = binding?.modelHistory ?: modelHistory
+        val history = binding?.runHandle?.modelHistory ?: modelHistory
         val targetState = aggregateRunState(binding)
         targetState.update {
             it.copy(
@@ -4129,7 +4134,7 @@ class LocalHarnessEngine @Inject internal constructor(
         retention: com.labteto.dshmobile.harness.tools.ToolResultRetention =
             com.labteto.dshmobile.harness.tools.ToolResultRetention.DURABLE,
     ): String {
-        val history = binding?.modelHistory ?: modelHistory
+        val history = binding?.runHandle?.modelHistory ?: modelHistory
         val budget = adaptiveToolResultBudget(
             base = currentHistoryBudget(binding),
             currentHistoryChars = history.encodedChars,
@@ -4150,7 +4155,7 @@ class LocalHarnessEngine @Inject internal constructor(
         binding: LocalWorkRunBinding? = null,
     ) {
         val baseBudget = currentHistoryBudget(binding)
-        val history = binding?.modelHistory ?: modelHistory
+        val history = binding?.runHandle?.modelHistory ?: modelHistory
         val targetState = aggregateRunState(binding)
         val log = binding?.eventLog ?: eventLog
         val workMode = targetState.value.usageMode == LocalUsageMode.WORK
@@ -4202,7 +4207,7 @@ class LocalHarnessEngine @Inject internal constructor(
     }
 
     private fun ensureSystemMessage(binding: LocalWorkRunBinding? = null) {
-        val history = binding?.modelHistory ?: modelHistory
+        val history = binding?.runHandle?.modelHistory ?: modelHistory
         val log = binding?.eventLog ?: eventLog
         if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") return
         val prompt = systemPrompt(binding)
@@ -4476,15 +4481,15 @@ class LocalHarnessEngine @Inject internal constructor(
         binding: LocalWorkRunBinding? = null,
     ) {
         val log = binding?.eventLog ?: eventLog
-        val history = binding?.modelHistory ?: modelHistory
+        val history = binding?.runHandle?.modelHistory ?: modelHistory
         log.append(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
             modelHistoryCheckpointCodec.encode(durableModelHistorySnapshot(history.snapshot()), reason),
         )
         if (binding != null) {
-            binding.turnsSinceModelHistoryCheckpoint = 0
+            binding.runHandle.turnsSinceModelHistoryCheckpoint = 0
         } else {
-            runtimeStateStore.foregroundTurnsSinceModelHistoryCheckpoint = 0
+            runtimeStateStore.foregroundRunHandle.turnsSinceModelHistoryCheckpoint = 0
         }
     }
 
@@ -4496,13 +4501,13 @@ class LocalHarnessEngine @Inject internal constructor(
             compactHistoryIfNeeded(binding = binding)
         }
         if (binding != null) {
-            binding.turnsSinceModelHistoryCheckpoint += 1
-            if (binding.turnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
+            binding.runHandle.turnsSinceModelHistoryCheckpoint += 1
+            if (binding.runHandle.turnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
                 checkpointModelHistory(reason, binding)
             }
         } else {
-            runtimeStateStore.foregroundTurnsSinceModelHistoryCheckpoint += 1
-            if (runtimeStateStore.foregroundTurnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
+            runtimeStateStore.foregroundRunHandle.turnsSinceModelHistoryCheckpoint += 1
+            if (runtimeStateStore.foregroundRunHandle.turnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
                 checkpointModelHistory(reason)
             }
         }

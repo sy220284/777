@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local.runtime
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import android.app.ActivityManager
 import android.content.Context
-import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
@@ -15,7 +14,6 @@ import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.localHistoryBudgetFor
 import com.labteto.dshmobile.local.model.LocalImageCapabilityRegistry
-import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
@@ -82,12 +80,7 @@ class LocalRuntimeStateStore internal constructor(
 
     internal val foregroundInteractions = LocalInteractionCoordinator(mutable)
     internal val streamingPreviewStore = LocalStreamingPreviewStore()
-    internal val foregroundModelHistory = LocalModelHistoryBuffer()
-    internal val foregroundRunLock = Any()
-    internal val foregroundPendingInputs = AgentInputQueue(MAX_PENDING_INPUTS)
-    @Volatile internal var foregroundJob: Job? = null
-    @Volatile internal var foregroundTranscriptProjectionCursor: Long? = null
-    @Volatile internal var foregroundTurnsSinceModelHistoryCheckpoint: Int = 0
+    internal val foregroundRunHandle = LocalAgentRunHandle(maxPendingInputs = MAX_PENDING_INPUTS)
     internal val jobManager: LocalJobManager
         get() = jobOwner.manager
     @Volatile private var initialized = false
@@ -139,6 +132,7 @@ class LocalRuntimeStateStore internal constructor(
     internal fun initialize(initialState: LocalHarnessState): MutableStateFlow<LocalHarnessState> {
         check(!initialized) { "LocalRuntimeStateStore 已完成初始化" }
         require(initialState.sessionId.isNotBlank()) { "初始会话编号不能为空" }
+        foregroundRunHandle.rebindSession(initialState.sessionId)
         foregroundSessionId = initialState.sessionId
         mutable.value = projectResourceSnapshot(
             initialState.copy(safeAutoApprovalEnabled =
@@ -189,8 +183,8 @@ class LocalRuntimeStateStore internal constructor(
         } finally {
             withContext(NonCancellable) {
                 owner?.join()
-                synchronized(foregroundRunLock) {
-                    if (foregroundJob === owner) foregroundJob = null
+                synchronized(foregroundRunHandle.lock) {
+                    if (foregroundRunHandle.job === owner) foregroundRunHandle.job = null
                 }
             }
         }
@@ -203,17 +197,17 @@ class LocalRuntimeStateStore internal constructor(
         foregroundInteractions.cancelAll()
         var running: Job? = null
         try {
-            synchronized(foregroundRunLock) {
-                running = foregroundJob
+            synchronized(foregroundRunHandle.lock) {
+                running = foregroundRunHandle.job
                 captureOwner(running)
-                val discarded = foregroundPendingInputs.drain()
+                val discarded = foregroundRunHandle.pendingInputs.drain()
                 try {
                     if (discarded.isNotEmpty()) {
                         eventLog.append(
                             LOCAL_AGENT_INBOX_EVENT_TYPE,
                             encodeLocalAgentInboxEvent(
                                 action = "cancelled",
-                                pending = foregroundPendingInputs.snapshot(),
+                                pending = foregroundRunHandle.pendingInputs.snapshot(),
                                 affected = discarded,
                             ),
                         )
@@ -235,6 +229,9 @@ class LocalRuntimeStateStore internal constructor(
     internal fun activateSession(sessionId: String) {
         check(initialized) { "LocalRuntimeStateStore 尚未初始化" }
         require(sessionId.isNotBlank()) { "会话编号不能为空" }
+        if (foregroundRunHandle.sessionId != sessionId) {
+            foregroundRunHandle.rebindSession(sessionId)
+        }
         foregroundSessionId = sessionId
     }
 

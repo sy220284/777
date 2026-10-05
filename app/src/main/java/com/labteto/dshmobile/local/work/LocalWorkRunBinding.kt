@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
@@ -10,8 +9,8 @@ import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
 import com.labteto.dshmobile.local.interaction.LocalInteractionStatePort
 import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
-import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
+import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
 import com.labteto.dshmobile.local.runtime.projectExecutionJobs
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
@@ -28,7 +27,7 @@ import kotlinx.coroutines.withContext
 /**
  * One Work turn's session-bound mutable runtime.
  *
- * Work owns only its domain/run state. The persisted Session envelope is an immutable base used
+ * Work owns its domain state and Work-specific policy; shared run facts live in LocalAgentRunHandle. The persisted Session envelope is an immutable base used
  * when materializing a durable snapshot; Chat and other product domains never become mutable Work
  * state just because the run continues while its conversation is off screen.
  */
@@ -36,21 +35,18 @@ internal class LocalWorkRunBinding(
     val sessionId: String,
     initialState: LocalWorkRunState,
     private val sessionBase: LocalHarnessSession,
-    initialHistory: List<kotlinx.serialization.json.JsonObject>,
+    val runHandle: LocalAgentRunHandle,
     val eventLog: LocalSessionEventLog,
-    initialTranscriptProjectionCursor: Long?,
-    maxPendingInputs: Int,
     pruneToolResult: (String) -> String,
 ) {
     init {
         require(initialState.sessionId == sessionId) { "Work run 状态与会话编号不一致" }
         require(sessionBase.id == sessionId) { "Work run 持久化基线与会话编号不一致" }
+        require(runHandle.sessionId == sessionId) { "Work run 运行句柄与会话编号不一致" }
     }
 
     val state = MutableStateFlow(initialState)
     val workState: LocalWorkStatePort = localWorkRunStatePort(state)
-    val modelHistory = LocalModelHistoryBuffer().apply { reset(initialHistory) }
-    val pendingInputs = AgentInputQueue(maxPendingInputs)
     val enabledOptionalTools = linkedSetOf<String>()
     /** Main Agent and every child spawned by this Work run share one admission budget and breaker. */
     val executionControl = LocalWorkExecutionControl()
@@ -119,15 +115,6 @@ internal class LocalWorkRunBinding(
         }
     }
 
-    @Volatile
-    var transcriptProjectionCursor: Long? = initialTranscriptProjectionCursor
-
-    @Volatile
-    var job: Job? = null
-
-    @Volatile
-    var mirrorJob: Job? = null
-
     private var approvalProjection: Job? = null
 
     internal fun observeApprovalMode(preferences: LocalApprovalPreferences) {
@@ -142,9 +129,6 @@ internal class LocalWorkRunBinding(
         approvalProjection = null
     }
 
-    @Volatile
-    var turnsSinceModelHistoryCheckpoint: Int = 0
-
     /** Automatic continuation is bounded by the shared Work continuation policy. */
     @Volatile
     var automaticContinuationCount: Int = 0
@@ -157,7 +141,7 @@ internal class LocalWorkRunBinding(
         pruneToolResult = pruneToolResult,
         runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
         onProjected = { sequence ->
-            transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, sequence)
+            runHandle.transcriptProjectionCursor = maxOf(runHandle.transcriptProjectionCursor ?: -1L, sequence)
         },
     )
 
@@ -182,7 +166,7 @@ internal class LocalWorkRunBinding(
             goal = current.work.goal,
             planMode = current.work.planMode,
             controlProjectedThroughSequence = eventLog.latestSequence(),
-            transcriptProjectedThroughSequence = transcriptProjectionCursor,
+            transcriptProjectedThroughSequence = runHandle.transcriptProjectionCursor,
         )
     }
 
@@ -193,7 +177,7 @@ internal class LocalWorkRunBinding(
      * publishing idle before the Session owner releases would admit conflicting user actions.
      */
     internal fun requestCancel(): Boolean {
-        val activeJob = job?.takeIf { it.isCompleted == false } ?: return false
+        val activeJob = runHandle.job?.takeIf { it.isCompleted == false } ?: return false
         try {
             clearPendingForCancellation()
         } finally {
@@ -204,8 +188,8 @@ internal class LocalWorkRunBinding(
 
     /** Tear down only this session-owned runtime; other Work conversations keep running. */
     suspend fun cancelAndJoin() {
-        val activeJob = job
-        val activeMirror = mirrorJob
+        val activeJob = runHandle.job
+        val activeMirror = runHandle.projectionJob
         try {
             clearPendingForCancellation()
         } finally {
@@ -216,8 +200,8 @@ internal class LocalWorkRunBinding(
                 activeJob?.join()
                 activeMirror?.join()
                 stopApprovalProjection()
-                if (job === activeJob) job = null
-                if (mirrorJob === activeMirror) mirrorJob = null
+                if (runHandle.job === activeJob) runHandle.job = null
+                if (runHandle.projectionJob === activeMirror) runHandle.projectionJob = null
                 state.update { current ->
                     current.copy(kernel = current.kernel.copy(running = false))
                 }
@@ -227,14 +211,14 @@ internal class LocalWorkRunBinding(
 
     private fun clearPendingForCancellation() {
         interactions.cancelAll()
-        val discarded = pendingInputs.drain()
+        val discarded = runHandle.pendingInputs.drain()
         try {
             if (discarded.isNotEmpty()) {
                 eventLog.append(
                     LOCAL_AGENT_INBOX_EVENT_TYPE,
                     encodeLocalAgentInboxEvent(
                         action = "cancelled",
-                        pending = emptyList(),
+                        pending = runHandle.pendingInputs.snapshot(),
                         affected = discarded,
                     ),
                 )
