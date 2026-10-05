@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.update
 
 /** Work/interaction capability boundary for the local UI. */
 @Singleton
-class LocalWorkRuntime @Inject constructor(
+class LocalWorkRuntime @Inject internal constructor(
     private val workRunRegistry: LocalWorkRunRegistry,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val eventLogs: LocalSessionEventLogRegistry,
