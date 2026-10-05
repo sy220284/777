@@ -25,10 +25,10 @@ RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 12,
-    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
+    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 3,
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 7,
+    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 5,
 }
 PROJECTION_FIELD_BUDGETS = {
     "LocalHarnessSettingsState": 17,
@@ -42,7 +42,6 @@ ENGINE_CONSUMER_ALLOWLIST = {
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt",
 }
 
@@ -178,6 +177,12 @@ for source_path in work_root.rglob("*.kt"):
             f"{relative} writes the Runtime aggregate directly; "
             "use LocalRuntimeProjection or a narrower capability instead"
         )
+
+model_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt")
+)
+if "LocalHarnessEngine" in model_runtime_source:
+    die("LocalModelRuntime must use Model/Shared capabilities instead of LocalHarnessEngine")
 
 work_progress_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt")
