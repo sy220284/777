@@ -123,7 +123,8 @@ jobs:
           }
 
           new_stage() {
-            local component="$1" dir="$STAGE/$component"
+            local component="$1"
+            local dir="$STAGE/$component"
             rm -rf "$dir"
             mkdir -p "$dir"
             printf '%s\n' "$dir"
@@ -475,6 +476,7 @@ jobs:
             bash "$RUNNER_TEMP/bootstrap/tools/dev/install.sh" install build --artifacts-dir "$DEV777_ARTIFACTS_DIR"
           fi
 
+          # shellcheck source=/dev/null
           source "$DEV777_TOOLCHAIN_ENV_FILE"
 
           javac -version
