@@ -79,15 +79,14 @@ for source_path in LOCAL_SOURCE_ROOT.rglob("*.kt"):
     if re.search(r"^import\s+[^\n]+\.\*\s*$", source, re.MULTILINE):
         die(f"architecture-sensitive source must use explicit imports: {relative}")
 
-domain_models = read("app/src/main/java/com/labteto/dshmobile/local/LocalHarnessModels.kt")
-for domain_type in (
-    "LocalApproval", "LocalApprovalImpact", "LocalQuestion", "LocalJobInfo", "LocalTodoItem",
-    "LocalGoal", "LocalWorkflowProgress", "LocalChatBranchState", "LocalGroupChatState",
-    "ChatPersonaCorrectionNotice", "LocalImageInputMode", "LocalModelReply", "LocalToolCall",
-    "LocalHarnessSession", "LocalSessionSummary", "LocalHarnessMessage",
-):
-    if re.search(rf"\b(?:class|interface|object)\s+{domain_type}\b", domain_models):
-        die(f"domain model must not return to the root aggregate file: {domain_type}")
+domain_models = strip_comments(read("app/src/main/java/com/labteto/dshmobile/local/LocalHarnessModels.kt"))
+aggregate_contracts = {"LocalHarnessState", "LocalUsageMode"}
+declared_contracts = set(re.findall(
+    r"^\s*(?:(?:data|enum|sealed|annotation|value|internal|public)\s+)*(?:class|interface|object|typealias)\s+([A-Za-z0-9_]+)",
+    domain_models, re.MULTILINE,
+))
+if declared_contracts != aggregate_contracts:
+    die(f"root aggregate may only declare shared aggregate contracts: {sorted(declared_contracts - aggregate_contracts)}")
 
 
 def constructor_dependency_count(relative: str, class_name: str) -> int:

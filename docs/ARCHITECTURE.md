@@ -510,6 +510,16 @@ CI 必须逐步从“控制热点不继续变大”升级为“证明 3.0 边界
 - 导航必须通过 Catalog 解析；
 - Shell 页面状态枚举必须来自 Catalog。
 
+包名与领域契约收口已增加：
+
+- Local 生产源码的 Kotlin package 必须与物理目录一致；
+- Local 架构敏感源码禁止 wildcard import；
+- 根层 `LocalHarnessModels.kt` 仅声明 `LocalHarnessState` 与跨 Feature 的 `LocalUsageMode`；
+- Work 的计划、目标和任务清单归属 Work；审批/问答与后台任务类型分别归属共享 Interaction / Jobs 契约，避免 Runtime 反向依赖 Work internal；
+- 模型响应、会话/消息、附件、工具文件、Automation 结果与资源状态归位到对应契约目录，既有序列化字段与枚举值保持兼容。
+
+这轮包名和契约归位不代表运行状态边界已经完成。仍须移除 Feature 的完整可写聚合状态、收紧 Work run 所有权、建立审批配置的单一流式投影，并在实现完成后锁定跨 Feature internal 与聚合写入口门禁。
+
 后续随迁移继续增加：
 
 - Feature 禁止互相导入 internal package；
