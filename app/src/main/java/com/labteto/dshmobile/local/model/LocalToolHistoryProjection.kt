@@ -15,11 +15,11 @@ internal fun projectStaleToolResults(
     history: List<JsonObject>,
     budget: LocalHistoryBudget,
     keepRecentToolResults: Int = 4,
+    protectedRecentMaxBytes: Int? = null,
 ): LocalHistoryCompaction? {
     val toolIndexes = history.indices.filter { index ->
         history[index]["role"]?.jsonPrimitive?.contentOrNull == "tool"
     }
-    if (toolIndexes.size <= keepRecentToolResults) return null
 
     val protected = toolIndexes.takeLast(keepRecentToolResults).toSet()
     val maxChars = minOf(4_096, (budget.maxToolResultChars / 4).coerceAtLeast(1_024))
@@ -28,9 +28,17 @@ internal fun projectStaleToolResults(
     var changed = false
 
     toolIndexes.forEach { index ->
-        if (index in protected) return@forEach
         val message = history[index]
         val content = message["content"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+        if (
+            index in protected &&
+            (
+                protectedRecentMaxBytes == null ||
+                    content.toByteArray(Charsets.UTF_8).size <= protectedRecentMaxBytes
+            )
+        ) {
+            return@forEach
+        }
         if (content.length <= maxChars) return@forEach
         val retained = retainTextForModel(content, maxTokens = maxTokens, maxChars = maxChars)
         if (!retained.truncated) return@forEach

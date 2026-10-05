@@ -98,6 +98,7 @@ internal fun projectWorkRequestContext(
         history = messages,
         budget = budget,
         keepRecentToolResults = WORK_FRESH_TOOL_RESULTS,
+        protectedRecentMaxBytes = WORK_TOOL_INLINE_BYTES,
     )
     val toolProjectedMessages = staleToolProjection?.messages ?: messages
     val toolProjectedPressure = if (staleToolProjection != null) {
