@@ -1104,13 +1104,15 @@ class LocalHarnessEngine @Inject internal constructor(
     }
 
     internal val workTurnPort: LocalWorkTurnPort = object : LocalWorkTurnPort {
-        override fun sendPrepared(prepared: LocalPreparedSend): LocalSendResult =
-            queueHumanTurn(
-                prepared.content,
-                prepared.memoryInput,
-                prepared.modelMessage,
-                expectedMode = LocalUsageMode.WORK,
-            )
+        override fun startPrepared(
+            prepared: LocalPreparedSend,
+            sessionLease: LocalSessionRuntimeLease,
+        ): Job = workTurnStarter.startFresh(
+            content = prepared.content,
+            memoryInput = prepared.memoryInput,
+            modelMessage = prepared.modelMessage,
+            sessionLease = sessionLease,
+        )
 
         override fun regenerateReply(messageId: String): Boolean =
             regenerateReplyForMode(LocalUsageMode.WORK, messageId)
@@ -1486,19 +1488,25 @@ class LocalHarnessEngine @Inject internal constructor(
             if (expectedMode != null && state.usageMode != expectedMode) {
                 return@synchronized LocalSendResult.rejected(LocalSendRejectReason.SESSION_TRANSITION)
             }
-            val binding = if (state.usageMode == LocalUsageMode.WORK) {
-                workRunRegistry[state.sessionId]?.takeIf { it.runHandle.hasLiveJob() }
-            } else null
-            val targetPending = binding?.runHandle?.pendingInputs ?: pendingInputs
-            val targetState = aggregateRunState(binding)
-            val queuedInput = QueuedAgentInput(content, memoryInput, modelMessage, UUID.randomUUID().toString())
+            check(state.usageMode == LocalUsageMode.CHAT) {
+                "queueHumanTurn 已收窄为 Chat 发送入口"
+            }
+            val queuedInput = QueuedAgentInput(
+                content,
+                memoryInput,
+                modelMessage,
+                UUID.randomUUID().toString(),
+            )
             coordinateOwnedLocalSend(
-                state.usageMode, state.sessionId,
-                workBindingActive = binding != null,
+                usageMode = LocalUsageMode.CHAT,
+                sessionId = state.sessionId,
+                workBindingActive = false,
                 visibleJobActive = activeJob?.isCompleted == false,
-                configured = state.modelState.configured, loading = state.loading,
+                configured = state.modelState.configured,
+                loading = state.loading,
                 sessionTransitioning = sessionTransitioning,
-                pendingCount = targetPending.size(), pendingLimit = MAX_PENDING_INPUTS,
+                pendingCount = pendingInputs.size(),
+                pendingLimit = MAX_PENDING_INPUTS,
                 onRejected = { rejected ->
                     runtimeStateStore.publishSendFeedback(
                         com.labteto.dshmobile.local.send.LocalSendFeedbackState(
@@ -1513,33 +1521,28 @@ class LocalHarnessEngine @Inject internal constructor(
                     cancelChatPostTurn()
                 },
                 enqueue = {
-                    targetPending.offer(queuedInput) {
-                        recordUserTranscript(content, modelMessage, true, queuedInput, binding)
+                    pendingInputs.offer(queuedInput) {
+                        recordUserTranscript(content, modelMessage, true, queuedInput)
                     }
                 },
                 onQueued = {
-                    targetState.update { it.copy(kernel = it.kernel.copy(queuedInputCount = targetPending.size()), error = null) }
-                    if (binding != null) persist(binding) else persist()
-                },
-                onStart = { reservedWorkLease ->
-                    job = if (state.usageMode == LocalUsageMode.WORK) {
-                        workTurnStarter.startFresh(
-                            content = content,
-                            memoryInput = memoryInput,
-                            modelMessage = modelMessage,
-                            sessionLease = requireNotNull(reservedWorkLease) {
-                                "Work 启动前必须持有会话运行时租约"
-                            },
+                    _state.update {
+                        it.copy(
+                            kernel = it.kernel.copy(queuedInputCount = pendingInputs.size()),
+                            error = null,
                         )
-                    } else {
-                        queueTurnLocked(content, memoryInput, modelMessage)
                     }
+                    persist()
+                },
+                onStart = {
+                    job = queueTurnLocked(content, memoryInput, modelMessage)
                 },
             )
         }
         job?.start()
         return result
     }
+
     private fun syncVisibleWorkRun(
         sessionId: String,
         ownedBinding: LocalWorkRunBinding? = null,
