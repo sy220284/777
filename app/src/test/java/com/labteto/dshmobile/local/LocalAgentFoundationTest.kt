@@ -83,14 +83,8 @@ class LocalAgentFoundationTest {
             usageMode = LocalUsageMode.CHAT,
             workProjectionEnabled = true,
             messages = messages,
-            tools = tools,
-            compactor = LocalHistoryCompactor(maxHistoryChars = 10, tailChars = 5),
-            operationalLimitTokens = 100,
             measuredPressure = pressure,
-            previousSourcePressure = null,
-            structuredWorkState = null,
-            cachePolicy = LocalPromptCachePolicy(),
-            allowSemanticProjection = true,
+            workProjection = { error("Chat must not invoke Work semantic projection") },
         )
 
         assertFalse(projected.projected)
