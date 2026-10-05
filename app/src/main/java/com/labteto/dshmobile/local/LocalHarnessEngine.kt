@@ -224,8 +224,6 @@ import com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator
 import com.labteto.dshmobile.local.session.LocalSessionArchiveMaintenance
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
-import com.labteto.dshmobile.local.session.LocalSessionStorageManager
-import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.LocalTranscriptPage
@@ -287,7 +285,6 @@ import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import java.io.OutputStream
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -382,7 +379,6 @@ class LocalHarnessEngine @Inject internal constructor(
         workspace = workspace,
     )
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
-    private val sessionStorageManager by lazy { LocalSessionStorageManager(sessionsRoot, json) }
     private val eventLogRegistry: LocalSessionEventLogRegistry
         get() = sessionStorageRuntime.eventLogs
     private val sessionCoordinator: LocalSessionCoordinator
@@ -1822,15 +1818,6 @@ class LocalHarnessEngine @Inject internal constructor(
         withContext(Dispatchers.IO) { attachmentImporter.import(uri) }
 
     internal suspend fun diagnoseNetwork(target: String): String = webTools.diagnose(target)
-
-    internal suspend fun sessionStorageStatusForUi(): LocalSessionStorageStatus =
-        withContext(Dispatchers.IO) { sessionStorageManager.status() }
-
-    internal suspend fun compactSessionStorageForUi(): LocalSessionStorageStatus =
-        withContext(Dispatchers.IO) { sessionStorageManager.compactAll() }
-
-    internal suspend fun exportSessionStorageForUi(output: OutputStream): Long =
-        withContext(Dispatchers.IO) { sessionStorageManager.exportAll(output) }
 
     internal suspend fun environmentInfoForUi(): String = withContext(Dispatchers.IO) {
         environmentInfoCoordinator.build(null)
