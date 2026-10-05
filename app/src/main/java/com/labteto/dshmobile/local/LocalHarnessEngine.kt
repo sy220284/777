@@ -327,7 +327,11 @@ class LocalHarnessEngine @Inject internal constructor(
             currentEventLog = { eventLog },
         )
     }
-    private var transcriptProjectionCursor: Long? = null
+    private var transcriptProjectionCursor: Long?
+        get() = runtimeStateStore.foregroundTranscriptProjectionCursor
+        set(value) {
+            runtimeStateStore.foregroundTranscriptProjectionCursor = value
+        }
     private val modelHistory = runtimeStateStore.foregroundModelHistory
     private var turnsSinceModelHistoryCheckpoint = 0
     private val _state = runtimeStateStore.initialize(
