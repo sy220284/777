@@ -2,12 +2,17 @@ package com.labteto.dshmobile.local.runtime
 
 import android.app.ActivityManager
 import android.content.Context
+import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalJobInfo
 import com.labteto.dshmobile.local.LocalJobManager
+import com.labteto.dshmobile.local.LocalSessionEventLog
+import com.labteto.dshmobile.local.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.MAX_PENDING_INPUTS
+import com.labteto.dshmobile.local.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.LocalInteractionCoordinator
 import com.labteto.dshmobile.local.localHistoryBudgetFor
 import com.labteto.dshmobile.local.localResourceBudgetForMemoryClass
@@ -56,6 +61,9 @@ class LocalRuntimeStateStore internal constructor(
     internal val foregroundInteractions = LocalInteractionCoordinator(mutable)
     internal val streamingPreviewStore = LocalStreamingPreviewStore()
     internal val foregroundModelHistory = LocalModelHistoryBuffer()
+    internal val foregroundRunLock = Any()
+    internal val foregroundPendingInputs = AgentInputQueue(MAX_PENDING_INPUTS)
+    @Volatile internal var foregroundJob: Job? = null
     internal val jobManager: LocalJobManager
         get() = jobOwner.manager
     @Volatile private var initialized = false
@@ -115,6 +123,36 @@ class LocalRuntimeStateStore internal constructor(
 
     internal fun clearSendFeedback() {
         sendFeedbackMutable.value = LocalSendFeedbackState()
+    }
+
+    /**
+     * Cancel the one visible foreground run while preserving its single inbox and Job owner.
+     *
+     * The caller supplies the already-authorized Session EventLog; Runtime owns queue draining,
+     * cancellation ordering and visible queued-count projection, but no Feature-specific state.
+     */
+    internal fun cancelForegroundRun(eventLog: LocalSessionEventLog): Boolean {
+        foregroundInteractions.cancelAll()
+        val running = synchronized(foregroundRunLock) {
+            val discarded = foregroundPendingInputs.drain()
+            if (discarded.isNotEmpty()) {
+                eventLog.append(
+                    LOCAL_AGENT_INBOX_EVENT_TYPE,
+                    encodeLocalAgentInboxEvent(
+                        action = "cancelled",
+                        pending = foregroundPendingInputs.snapshot(),
+                        affected = discarded,
+                    ),
+                )
+            }
+            mutable.update { current ->
+                current.copy(kernel = current.kernel.copy(queuedInputCount = 0))
+            }
+            foregroundJob
+        }
+        val wasRunning = running?.isCompleted == false
+        running?.cancel()
+        return wasRunning
     }
 
     @Synchronized
