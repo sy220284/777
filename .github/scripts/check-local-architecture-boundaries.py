@@ -210,6 +210,7 @@ for required_runtime_owner in (
     "foregroundRunLock = Any()",
     "foregroundPendingInputs = AgentInputQueue(MAX_PENDING_INPUTS)",
     "foregroundJob: Job?",
+    "foregroundTranscriptProjectionCursor: Long?",
     "cancelForegroundRun(eventLog: LocalSessionEventLog)",
 ):
     if required_runtime_owner not in runtime_state_store:
@@ -218,6 +219,7 @@ for forbidden_engine_owner in (
     "private val runStateLock = Any()",
     "private val pendingInputs = AgentInputQueue",
     "private var activeJob: Job? = null",
+    "private var transcriptProjectionCursor: Long? = null",
 ):
     if forbidden_engine_owner in engine:
         die("LocalHarnessEngine must not recreate foreground-run backing state: " + forbidden_engine_owner)
