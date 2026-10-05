@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.chat.ChatDiaryWriteRequest
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.LocalChatPostTurnJobOwner
 import com.labteto.dshmobile.local.chat.activeChatBranchMessages
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
