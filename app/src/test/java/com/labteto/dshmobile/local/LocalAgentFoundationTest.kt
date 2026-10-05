@@ -11,7 +11,7 @@ import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
 import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
 import com.labteto.dshmobile.local.model.LocalRequestPressureStore
 import com.labteto.dshmobile.local.model.LocalWorkCheckpoint
-import com.labteto.dshmobile.local.runtime.structuredWorkState
+import com.labteto.dshmobile.local.work.structuredWorkState
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
