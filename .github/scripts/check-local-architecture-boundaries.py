@@ -13,15 +13,21 @@ ENGINE_MAX_PUBLIC_METHODS = 0
 ENGINE_MAX_INTERNAL_METHODS = 1
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
-ENGINE_COMPOSITION_BRIDGE_ALLOWLIST = {
-    "automationChatCoordinator",
-    "automationWorkCoordinator",
+ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST = {
     "chatTurnPort",
     "diagnosticsPort",
     "sessionLifecyclePort",
     "toolsManagementPort",
     "workTurnPort",
 }
+ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST = {
+    "automationChatCoordinator",
+    "automationWorkCoordinator",
+}
+ENGINE_COMPOSITION_BRIDGE_ALLOWLIST = (
+    ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST
+    | ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST
+)
 ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
     "sendChat",
     "queueHumanTurn",
@@ -2207,14 +2213,24 @@ if unexpected_engine_bridges:
         + ", ".join(unexpected_engine_bridges)
         + "; add a real capability owner instead of substituting another Engine proxy"
     )
-stale_engine_bridges = sorted(
-    ENGINE_COMPOSITION_BRIDGE_ALLOWLIST - engine_composition_bridges
+stale_stage3_engine_bridges = sorted(
+    ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST - engine_composition_bridges
 )
-if stale_engine_bridges:
+if stale_stage3_engine_bridges:
     die(
-        "stale Engine composition bridge allowlist entries: "
-        + ", ".join(stale_engine_bridges)
-        + "; tighten the ratchet in the same migration that removes the bridge"
+        "stale Stage-3 Engine composition bridge allowlist entries: "
+        + ", ".join(stale_stage3_engine_bridges)
+        + "; tighten Stage 3 in the same migration that removes the bridge"
+    )
+
+stale_stage4_automation_bridges = sorted(
+    ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST - engine_composition_bridges
+)
+if stale_stage4_automation_bridges:
+    die(
+        "stale Stage-4 Automation Engine bridge allowlist entries: "
+        + ", ".join(stale_stage4_automation_bridges)
+        + "; tighten Stage 4 when Automation stops using the Engine composition source"
     )
 
 for removed_private_business_method in ENGINE_REMOVED_PRIVATE_BUSINESS_METHODS:
