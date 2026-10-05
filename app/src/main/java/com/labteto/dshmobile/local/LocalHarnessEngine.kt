@@ -1505,37 +1505,6 @@ class LocalHarnessEngine @Inject internal constructor(
         snapshot: LocalHarnessState,
     ): String = memoryCoordinator.chatRelationshipMemoryContext(query, snapshot)
 
-    private suspend fun drainPendingInputsIntoHistory(binding: LocalWorkRunBinding? = null) {
-        val targetPending = binding?.runHandle?.pendingInputs ?: pendingInputs
-        val targetHistory = binding?.runHandle?.modelHistory ?: modelHistory
-        val targetState = aggregateRunState(binding)
-        val targetLog = binding?.eventLog ?: eventLog
-        val queued = targetPending.drain()
-        if (queued.isEmpty()) return
-        val durableMessages = mutableListOf<JsonObject>()
-        queued.forEach { input ->
-            val durableMessage = input.modelMessage ?: buildJsonObject {
-                put("role", "user")
-                put("content", input.content)
-            }
-            targetHistory.append(durableMessage)
-            durableMessages += durableMessage
-            captureAutoMemoryDirective(input.memoryInput, input.id, binding)
-        }
-        targetState.update { it.copy(kernel = it.kernel.copy(queuedInputCount = targetPending.size())) }
-        targetLog.append(
-            LOCAL_AGENT_INBOX_EVENT_TYPE,
-            encodeLocalAgentInboxEvent(
-                action = "claimed",
-                pending = targetPending.snapshot(),
-                affected = queued,
-                modelMessages = durableMessages,
-            ),
-        )
-        updateContextMetrics(binding)
-        persist(binding)
-    }
-
     private fun startNextQueuedTurnIfIdle(): Job? = synchronized(runStateLock) {
         val liveWorkOwner = liveWorkRun(currentSessionId) != null
         if (
@@ -1917,16 +1886,6 @@ class LocalHarnessEngine @Inject internal constructor(
             history = binding?.runHandle?.modelHistory?.snapshot() ?: modelHistory.snapshot(),
             enabledOptional = enabledOptional,
         )
-    }
-
-    private fun runToolNames(
-        runPolicy: LocalAgentRunPolicy,
-        binding: LocalWorkRunBinding?,
-    ): List<String> = toolSchemaProjection.names(modelToolSchemas(runPolicy, binding))
-
-    private fun clearRunCapabilities(binding: LocalWorkRunBinding?) {
-        binding?.enabledOptionalTools?.let(toolExecutionCoordinator::clearTurnCapabilities)
-            ?: toolExecutionCoordinator.clearTurnCapabilities()
     }
 
     private fun searchCapabilities(query: String): String =
@@ -2814,26 +2773,6 @@ class LocalHarnessEngine @Inject internal constructor(
             binding.runHandle.turnsSinceModelHistoryCheckpoint = 0
         } else {
             runtimeStateStore.foregroundRunHandle.turnsSinceModelHistoryCheckpoint = 0
-        }
-    }
-
-    private fun checkpointModelHistoryAtTurnBoundary(
-        reason: String,
-        binding: LocalWorkRunBinding? = null,
-    ) {
-        if (binding != null || _state.value.usageMode == LocalUsageMode.WORK) {
-            compactHistoryIfNeeded(binding = binding)
-        }
-        if (binding != null) {
-            binding.runHandle.turnsSinceModelHistoryCheckpoint += 1
-            if (binding.runHandle.turnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
-                checkpointModelHistory(reason, binding)
-            }
-        } else {
-            runtimeStateStore.foregroundRunHandle.turnsSinceModelHistoryCheckpoint += 1
-            if (runtimeStateStore.foregroundRunHandle.turnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
-                checkpointModelHistory(reason)
-            }
         }
     }
 
