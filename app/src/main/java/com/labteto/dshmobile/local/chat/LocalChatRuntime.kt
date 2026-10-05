@@ -22,6 +22,7 @@ class LocalChatRuntime @Inject internal constructor(
     private val sessionStorage: LocalSessionStorageRuntime,
     private val personaCoordinator: LocalChatPersonaCoordinator,
     private val groupMembership: LocalGroupChatMembershipCoordinator,
+    private val branchCoordinator: LocalChatBranchCoordinator,
 ) {
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = behaviorTuning.configure(profile)
     internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) =
@@ -62,7 +63,7 @@ class LocalChatRuntime @Inject internal constructor(
     internal fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult =
         engine.editAndResendUserMessage(messageId, replacement)
     internal fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean =
-        engine.selectChatMessageVariant(messageId, targetIndex)
+        branchCoordinator.selectVariant(messageId, targetIndex)
     internal fun regenerateReply(messageId: String): Boolean = engine.regenerateReply(messageId)
     internal fun stop() = runtimeStateStore.performVisibleOperation("停止聊天时保存失败") {
         val sessionId = runtimeStateStore.currentSessionId
