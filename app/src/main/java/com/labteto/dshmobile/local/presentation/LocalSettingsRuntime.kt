@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.presentation
 
-import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalWebProvider
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelRuntime
@@ -8,6 +7,7 @@ import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanConnectionTester
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
+import com.labteto.dshmobile.local.runtime.LocalDiagnosticsPort
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalConversationMode
@@ -29,7 +29,7 @@ data class LocalSettingsMemoryContext(
 
 @Singleton
 class LocalSettingsRuntime @Inject internal constructor(
-    private val engine: LocalHarnessEngine,
+    private val diagnostics: LocalDiagnosticsPort,
     chatGptAuth: ChatGptAuthCoordinator,
     chatGptPlanTester: ChatGptPlanConnectionTester,
     private val modelRuntime: LocalModelRuntime,
@@ -84,7 +84,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     suspend fun sessionStorageStatus(): LocalSessionStorageStatus = sessionStorage.storageStatus()
     suspend fun compactSessionStorage(): LocalSessionStorageStatus = sessionStorage.compactStorage()
     suspend fun exportSessionStorage(output: OutputStream) = sessionStorage.exportStorage(output)
-    suspend fun environmentInfo() = engine.environmentInfoForUi()
-    suspend fun diagnosticReport() = engine.diagnosticReportForUi()
+    suspend fun environmentInfo() = diagnostics.environmentInfo()
+    suspend fun diagnosticReport() = diagnostics.diagnosticReport()
     fun clearCredential() = modelRuntime.clearCredential()
 }
