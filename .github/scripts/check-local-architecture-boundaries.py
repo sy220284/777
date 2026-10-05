@@ -28,7 +28,7 @@ RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 3,
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 2,
+    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 0,
 }
 PROJECTION_FIELD_BUDGETS = {
     "LocalHarnessSettingsState": 17,
@@ -39,7 +39,6 @@ PROJECTION_FIELD_BUDGETS = {
 ENGINE_CONSUMER_ALLOWLIST = {
     "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt",
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt",
 }
 
@@ -1413,6 +1412,40 @@ for removed_engine_tools_proxy in (
         die("LocalHarnessEngine must not restore Tools management proxy API: " + removed_engine_tools_proxy)
 if "internal val toolsManagementPort: LocalToolsManagementPort" not in engine:
     die("Engine composition bridge must expose one Tools management port during Stage 3 migration")
+
+settings_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt")
+)
+if "LocalHarnessEngine" in settings_runtime_source:
+    die("LocalSettingsRuntime must not depend on LocalHarnessEngine")
+if not has_typed_property(settings_runtime_source, "LocalDiagnosticsPort"):
+    die("LocalSettingsRuntime must depend on the shared diagnostics port")
+for required_diagnostics_delegate in (
+    "diagnostics.environmentInfo()",
+    "diagnostics.diagnosticReport()",
+):
+    if required_diagnostics_delegate not in settings_runtime_source:
+        die("Settings diagnostics must route through LocalDiagnosticsPort: " + required_diagnostics_delegate)
+
+diagnostics_port_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalDiagnosticsPort.kt")
+)
+if "interface LocalDiagnosticsPort" not in diagnostics_port_source:
+    die("shared diagnostics port contract is missing")
+if "LocalHarnessEngine" in diagnostics_port_source or "LocalHarnessState" in diagnostics_port_source:
+    die("shared diagnostics port must not expose Engine or aggregate state")
+if "provideLocalDiagnosticsPort" not in feature_execution_port_module_source:
+    die("app composition root must provide the shared diagnostics port")
+if "engine.diagnosticsPort" not in feature_execution_port_module_source:
+    die("diagnostics composition must expose the migrated port, not Engine proxy methods")
+for removed_engine_diagnostics_proxy in (
+    "internal suspend fun environmentInfoForUi(",
+    "internal suspend fun diagnosticReportForUi(",
+):
+    if removed_engine_diagnostics_proxy in engine:
+        die("LocalHarnessEngine must not restore Settings diagnostics proxy API: " + removed_engine_diagnostics_proxy)
+if "internal val diagnosticsPort: LocalDiagnosticsPort" not in engine:
+    die("Engine composition bridge must expose one diagnostics port during Stage 3 migration")
 if "provideLocalActiveSessionScopeProvider" not in feature_execution_port_module_source:
     die("app composition root must adapt active Work session scope into the Shared Session access contract")
 if "provideLocalSessionLifecyclePort" not in feature_execution_port_module_source:
