@@ -362,8 +362,25 @@ settings_coordinator = strip_comments(
 settings_runtime = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt")
 )
-if "@Singleton" not in settings_coordinator or "private val runtimeStateStore: LocalRuntimeStateStore" not in settings_coordinator:
-    die("LocalHarnessSettingsCoordinator must be the injected owner of Settings runtime state mutations")
+if "@Singleton" not in settings_coordinator or "private val statePort: LocalSettingsStatePort" not in settings_coordinator:
+    die("LocalHarnessSettingsCoordinator must own Settings mutations through LocalSettingsStatePort")
+if "runtimeStateStore.projection" in settings_coordinator:
+    die("Settings coordinator must not write the aggregate Runtime projection directly")
+settings_state_port = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/settings/LocalSettingsStatePort.kt")
+)
+for required_settings_command in (
+    "updateSettingsRuntimeLimits",
+    "updateSettingsWorkerProfile",
+    "updatePersonalization",
+    "setChatStyleGuardEnabled",
+    "setChatStyleGuardPhrases",
+    "clearStyleGuardHits",
+    "recordStyleGuardHits",
+    "publishError",
+):
+    if required_settings_command not in settings_state_port:
+        die("Settings state port must expose explicit Runtime projection command: " + required_settings_command)
 if "private val settingsCoordinator: LocalHarnessSettingsCoordinator" not in settings_runtime:
     die("LocalSettingsRuntime must depend on the Settings capability directly")
 for forbidden_proxy in (
