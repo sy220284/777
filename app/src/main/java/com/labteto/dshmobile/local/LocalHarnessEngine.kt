@@ -1159,16 +1159,6 @@ class LocalHarnessEngine @Inject internal constructor(
         return true
     }
 
-    internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> =
-        saveGroupChatAnnouncement(
-            state = _state,
-            text = text,
-            sessionId = currentSessionId,
-            transcriptProjectedThroughSequence = transcriptProjectionCursor,
-            sessionCoordinator = sessionCoordinator,
-            eventLog = eventLog,
-        )
-
     internal fun removeGroupChatMemberByGalleryId(galleryId: String) {
         val snapshot = _state.value
         if (
