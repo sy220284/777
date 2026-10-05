@@ -45,7 +45,7 @@ ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
 ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST = set()
 
 HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": ("LocalGroupChatTurnExecutor", 26),
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": ("LocalGroupChatTurnExecutor", 16),
     "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt": ("LocalSubagentRunner", 23),
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt": ("LocalAutomationChatCoordinator", 14),
     "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt": ("LocalModelRequestCoordinator", 4),
@@ -852,6 +852,9 @@ chat_timeline_coordinator_source = strip_comments(
 chat_direct_turn_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt")
 )
+group_chat_turn_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt")
+)
 chat_turn_port_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnPort.kt")
 )
@@ -1006,6 +1009,32 @@ for required_direct_chat_turn_owner in (
         die("Direct Chat main turn ownership is incomplete: " + required_direct_chat_turn_owner)
 if "private suspend fun runChatTurn(" in engine:
     die("Direct Chat main turn must not return to LocalHarnessEngine")
+for required_group_owner in (
+    "private val runtimeStateStore: LocalRuntimeStateStore",
+    "private val chatState: LocalChatStatePort",
+    "private val modelRequests: LocalModelRequestCoordinator",
+    "private val modelHistoryRuntime: LocalForegroundModelHistoryRuntime",
+    "private val sessionStorage: LocalSessionStorageRuntime",
+    "private val chatMemory: LocalChatMemoryRuntime",
+    "private val branchCoordinator: LocalChatBranchCoordinator",
+    "private val transcriptRuntime: LocalChatTranscriptRuntime",
+):
+    if required_group_owner not in group_chat_turn_source:
+        die("Group Chat must use Chat/Shared owners instead of Engine callbacks: " + required_group_owner)
+for removed_group_callback in (
+    "MutableStateFlow<LocalHarnessState>",
+    "private val completeModel:",
+    "private val ensureSystemMessageAction:",
+    "private val captureAutoMemoryAction:",
+    "private val chatMemoryContextAction:",
+    "private val compactHistoryAction:",
+    "private val persistBranchStateAction:",
+    "private val checkpointHistoryAction:",
+    "private val persistAction:",
+    "private val persistNowAction:",
+):
+    if removed_group_callback in group_chat_turn_source:
+        die("Group Chat regained an Engine callback dependency: " + removed_group_callback)
 for stale_timeline_bridge in (
     "fun editAndResendUserMessage(",
     "fun regenerateReply(",
