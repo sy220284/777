@@ -500,9 +500,9 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 ## 15. 架构门禁
 
-CI 必须逐步从“控制热点不继续变大”升级为“证明 3.0 边界真的成立”。
+CI 已将架构 3.0 从通用静态检查中独立为 `architecture-3-gates`。范围分类器识别 Feature / Shared Capability / Runtime Kernel 及架构控制文件；完整产品改动必须通过该 lane，main push 也必须重新执行对应控制面验证。
 
-架构 3.0 不设置 Kotlin 文件数量门禁，也不设置单文件行数门禁。拆成几个文件、每个文件多少行都不能证明所有权正确；CI 只约束真实的架构边界、依赖方向、状态归属和运行不变量。
+架构 3.0 不设置 Kotlin 文件数量门禁，也不设置单文件行数门禁。拆成几个文件、每个文件多少行都不能证明所有权正确；CI 只约束真实的架构边界、依赖方向、状态归属和运行不变量。已经清零的依赖使用永久禁止规则，尚在迁移的桥和业务根使用具体 allowlist 单向收缩。
 
 阶段 1 已增加：
 
@@ -526,9 +526,10 @@ CI 必须逐步从“控制热点不继续变大”升级为“证明 3.0 边界
 
 - Feature 禁止互相导入 internal package；
 - UI 禁止引用领域 Store / Coordinator；
-- Runtime 对 Engine 的代理引用预算持续下降直至清零；
-- `LocalHarnessState` 字段预算持续下降；
-- Engine 构造依赖 / internal API / 直接消费者约束持续收紧。
+- Chat / Work / Session / Model / Tools / Automation / Settings Runtime 已清零的 Engine 依赖永久禁止回归，不再保留“0 预算”兼容口径；
+- 迁移期 Engine composition bridge、Feature 业务根和直接消费者采用具体 allowlist 单向收缩，删除后不得以同数量的新代理替代；
+- `LocalHarnessState` 字段与可写入口持续收缩；
+- Engine 构造依赖 / internal API 等热点上限仅用于防止重新中心化，不能单独作为阶段完成证明。
 
 ## 16. 验证与完成标准
 
