@@ -53,6 +53,7 @@ class LocalRuntimeStateStore internal constructor(
         jobOwner = LocalRuntimeJobOwner.persistent(context, json),
     ) { bindApprovalPreferences(approvals) }
     private val mutable = MutableStateFlow(LocalHarnessState())
+    internal val projection = LocalRuntimeProjection(mutable)
     private var approvalPreferences: LocalApprovalPreferences? = null
     private var approvalProjection: Job? = null
 
