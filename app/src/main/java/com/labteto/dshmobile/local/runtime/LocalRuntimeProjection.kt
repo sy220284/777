@@ -124,6 +124,47 @@ internal class LocalRuntimeProjection(
         }
     }
 
+    internal fun setForegroundRunning(
+        sessionId: String,
+        running: Boolean,
+        error: String? = null,
+    ) {
+        state.update { current ->
+            if (current.sessionId != sessionId) {
+                current
+            } else {
+                current.copy(
+                    kernel = current.kernel.copy(running = running),
+                    error = error,
+                )
+            }
+        }
+    }
+
+    internal fun removeForegroundTranscriptMessage(
+        sessionId: String,
+        messageId: String,
+    ) {
+        state.update { current ->
+            if (current.sessionId != sessionId) {
+                current
+            } else {
+                val retained = current.messages.filterNot { message -> message.id == messageId }
+                if (retained.size == current.messages.size) {
+                    current
+                } else {
+                    current.copy(
+                        messages = retained,
+                        transcriptIndex = current.transcriptIndex.copy(
+                            totalMessageCount = (current.transcriptIndex.totalMessageCount - 1L)
+                                .coerceAtLeast(0L),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
     internal fun updateContextMetrics(
         sessionId: String,
         contextChars: Int,
