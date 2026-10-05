@@ -11,7 +11,6 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,20 +36,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
     private val personaStore: ChatPersonaStore,
 ) {
     private val checkpointCodec = ModelHistoryCheckpointCodec()
-    private val scope = CoroutineScope(
-        SupervisorJob() + Dispatchers.IO +
-            CoroutineExceptionHandler { _, error ->
-                val before = runtimeStateStore.state.value
-                runtimeStateStore.mutableState.update { current ->
-                    if (current.sessionId == before.sessionId && current.usageMode == before.usageMode) {
-                        current.copy(
-                            error = error.message?.takeIf(String::isNotBlank)
-                                ?: "群聊成员更新失败：${error::class.java.simpleName}",
-                        )
-                    } else current
-                }
-            },
-    )
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     internal fun configure(entries: List<PersonaGalleryEntry>): Boolean {
         val snapshot = runtimeStateStore.state.value
@@ -67,7 +53,8 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
         if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
 
         scope.launch {
-            val members = resolveLocalGroupChatMembers(
+            try {
+                val members = resolveLocalGroupChatMembers(
                 entries = selected,
                 previousMembers = snapshot.chat.groupChat.members,
                 chatPersonaStore = personaStore,
@@ -108,6 +95,18 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
                 sessionStorage.enqueueCurrentSnapshot(snapshot.sessionId)
             } finally {
                 lease.close()
+            }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                runtimeStateStore.mutableState.update { current ->
+                    if (current.sessionId == snapshot.sessionId && current.usageMode == snapshot.usageMode) {
+                        current.copy(
+                            error = error.message?.takeIf(String::isNotBlank)
+                                ?: "群聊成员更新失败：${error::class.java.simpleName}",
+                        )
+                    } else current
+                }
             }
         }
         return true
