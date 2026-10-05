@@ -155,6 +155,7 @@ val prepareUpdatePatcher = tasks.register<Exec>("prepareUpdatePatcher") {
 android {
     namespace = "com.labteto.dshmobile"
     compileSdk = 37
+    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         // Keep this fork installable alongside the upstream DSH Mobile app.
