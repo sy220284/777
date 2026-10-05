@@ -5,7 +5,6 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
-import com.labteto.dshmobile.local.automation.LocalChatUserActivityPort
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.MAX_PENDING_INPUTS
