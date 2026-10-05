@@ -4,25 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - 'screen.png'
-      - 'LICENSE'
-      - '.editorconfig'
-      - '.gitignore'
-      - '.gitattributes'
-      - '.github/PULL_REQUEST_TEMPLATE.md'
-      - '.github/workflows/**'
-      - '.github/scripts/**'
-      - '**/src/test/**'
-      - '**/src/testFixtures/**'
-      - '**/src/androidTest/**'
-      - 'tools/reference-validation/**'
-      - 'tools/capture/**'
-      - 'reference-validation/**'
-      - 'mock-harness/**'
-      - 'upstream/**'
   pull_request:
 
 permissions:
@@ -39,6 +20,7 @@ jobs:
     outputs:
       scope: ${{ steps.classify.outputs.scope }}
       run_static: ${{ steps.classify.outputs.run_static }}
+      run_architecture: ${{ steps.classify.outputs.run_architecture }}
       run_unit: ${{ steps.classify.outputs.run_unit }}
       run_build: ${{ steps.classify.outputs.run_build }}
       run_device: ${{ steps.classify.outputs.run_device }}
@@ -120,13 +102,24 @@ jobs:
           python3 .github/scripts/check-ui-design-system-boundaries.py
           python3 .github/scripts/check-notification-presentation.py
           python3 .github/scripts/check-kotlin-risk-patterns.py
-          python3 .github/scripts/check-local-performance-invariants.py
-          python3 .github/scripts/check-local-architecture-boundaries.py
           python3 tools/runtime/compact-runtime-assets.py --self-test
       - name: Validate release version format
         run: |
           value="$(tr -d '\r\n' < .github/release-version)"
           [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$ ]]
+
+  architecture-3-gates:
+    needs: [scope, static-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_architecture == 'true' && needs.static-gates.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Validate Architecture 3.0 ownership and invariants
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/check-local-architecture-boundaries.py
+          python3 .github/scripts/check-local-performance-invariants.py
 
   fixture-provenance:
     needs: [scope, static-gates]
@@ -145,8 +138,8 @@ jobs:
           git diff --exit-code -- reference-validation/src/test/resources/official
 
   unit-tests:
-    needs: [scope, static-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_unit == 'true' && needs.static-gates.result == 'success' }}
+    needs: [scope, static-gates, architecture-3-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_unit == 'true' && needs.static-gates.result == 'success' && (needs.scope.outputs.run_architecture != 'true' || needs.architecture-3-gates.result == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -164,8 +157,8 @@ jobs:
           ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :mock-harness:test             :app:testDebugUnitTest             :reference-validation:test             --stacktrace
 
   build-arm64:
-    needs: [scope, static-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_build == 'true' && needs.static-gates.result == 'success' }}
+    needs: [scope, static-gates, architecture-3-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_build == 'true' && needs.static-gates.result == 'success' && (needs.scope.outputs.run_architecture != 'true' || needs.architecture-3-gates.result == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -201,8 +194,8 @@ jobs:
           retention-days: 3
 
   device-artifacts-x86:
-    needs: [scope, static-gates]
-    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' }}
+    needs: [scope, static-gates, architecture-3-gates]
+    if: ${{ always() && needs.scope.result == 'success' && needs.scope.outputs.run_device == 'true' && needs.static-gates.result == 'success' && (needs.scope.outputs.run_architecture != 'true' || needs.architecture-3-gates.result == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -339,6 +332,7 @@ jobs:
     needs:
       - scope
       - static-gates
+      - architecture-3-gates
       - fixture-provenance
       - unit-tests
       - build-arm64
@@ -353,6 +347,7 @@ jobs:
           SCOPE_RESULT: ${{ needs.scope.result }}
           SCOPE_NAME: ${{ needs.scope.outputs.scope }}
           REQUIRE_STATIC: ${{ needs.scope.outputs.run_static }}
+          REQUIRE_ARCHITECTURE: ${{ needs.scope.outputs.run_architecture }}
           REQUIRE_FIXTURE: ${{ needs.scope.outputs.run_fixture }}
           REQUIRE_UNIT: ${{ needs.scope.outputs.run_unit }}
           REQUIRE_BUILD: ${{ needs.scope.outputs.run_build }}
@@ -360,6 +355,7 @@ jobs:
           REQUIRE_ANDROID16: ${{ needs.scope.outputs.run_android16 }}
           REQUIRE_ANDROID17: ${{ needs.scope.outputs.run_android17 }}
           STATIC_RESULT: ${{ needs.static-gates.result }}
+          ARCHITECTURE_RESULT: ${{ needs.architecture-3-gates.result }}
           FIXTURE_RESULT: ${{ needs.fixture-provenance.result }}
           UNIT_RESULT: ${{ needs.unit-tests.result }}
           BUILD_RESULT: ${{ needs.build-arm64.result }}
@@ -389,6 +385,7 @@ jobs:
           }
 
           check_lane "$REQUIRE_STATIC" "$STATIC_RESULT" "static-gates"
+          check_lane "$REQUIRE_ARCHITECTURE" "$ARCHITECTURE_RESULT" "architecture-3-gates"
           check_lane "$REQUIRE_FIXTURE" "$FIXTURE_RESULT" "fixture-provenance"
           check_lane "$REQUIRE_UNIT" "$UNIT_RESULT" "unit-tests"
           check_lane "$REQUIRE_BUILD" "$BUILD_RESULT" "build-arm64"
