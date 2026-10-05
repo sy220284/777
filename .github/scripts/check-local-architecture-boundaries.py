@@ -24,7 +24,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
 RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 0,
-    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 12,
+    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 5,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 5,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 3,
@@ -557,10 +557,22 @@ if has_typed_property(constructor.group(1), "LocalSessionEventLogRegistry"):
     die("LocalHarnessEngine must not inject Session EventLog storage separately from LocalSessionStorageRuntime")
 if "LocalSessionRepository(" in engine or "LocalSessionCoordinator(" in engine:
     die("LocalHarnessEngine must not construct Session persistence owners")
+for removed_session_engine_method in (
+    "internal suspend fun importAttachment",
+    "internal suspend fun workspaceFilesForUi",
+    "internal suspend fun conversationFilesForUi",
+    "internal suspend fun previewWorkspaceFileForUi",
+    "internal fun transcriptPageForUi",
+    "internal fun transcriptTailForUi",
+    "internal fun completeTranscriptForUi",
+):
+    if removed_session_engine_method in engine:
+        die("LocalHarnessEngine must not reintroduce Session file/transcript proxy API: " + removed_session_engine_method)
 for required_session_storage in (
     "LocalSessionRepository(",
     "LocalSessionCoordinator(",
     "eventLogs: LocalSessionEventLogRegistry",
+    "files: LocalSessionFilesRuntime",
 ):
     if required_session_storage not in session_storage_runtime:
         die("Shared Session storage ownership is incomplete: " + required_session_storage)
@@ -590,6 +602,28 @@ if "engine.streamingState" in session_runtime_source:
     die("LocalSessionRuntime must not reach through LocalHarnessEngine for streaming preview state")
 if "createSession(mode, state.value.usageMode)" not in session_runtime_source:
     die("LocalSessionRuntime convenience session creation must stay inside the Session capability")
+for required_session_delegate in (
+    "sessionFiles.importAttachment(uri)",
+    "sessionFiles.workspaceFiles()",
+    "sessionFiles.conversationFiles(sessionId)",
+    "sessionFiles.previewWorkspaceFile(path)",
+    "sessionRead.transcriptPage(sessionId, cursor, limit)",
+    "sessionRead.transcriptTail(sessionId, limit)",
+    "sessionRead.completeTranscript(sessionId)",
+):
+    if required_session_delegate not in session_runtime_source:
+        die("Session UI file/transcript reads must use narrow Session capabilities: " + required_session_delegate)
+for removed_session_engine_proxy in (
+    "engine.importAttachment(",
+    "engine.workspaceFilesForUi(",
+    "engine.conversationFilesForUi(",
+    "engine.previewWorkspaceFileForUi(",
+    "engine.transcriptPageForUi(",
+    "engine.transcriptTailForUi(",
+    "engine.completeTranscriptForUi(",
+):
+    if removed_session_engine_proxy in session_runtime_source:
+        die("LocalSessionRuntime must not restore Engine file/transcript proxies: " + removed_session_engine_proxy)
 if "com.labteto.dshmobile.local.chat." in session_runtime_source:
     die("Shared SessionRuntime must not import ChatFeature internals")
 for required_session_domain_command in (
@@ -1304,6 +1338,32 @@ for runtime_source_path in (LOCAL_SOURCE_ROOT / "runtime").rglob("*.kt"):
     if "import com.labteto.dshmobile.local.work." in runtime_source:
         relative = runtime_source_path.relative_to(ROOT).as_posix()
         die(f"{relative} makes Shared Runtime depend on WorkFeature internals")
+
+session_read_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionReadRuntime.kt")
+)
+session_files_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionFilesRuntime.kt")
+)
+for relative, shared_session_source in (
+    ("LocalSessionReadRuntime", session_read_runtime_source),
+    ("LocalSessionFilesRuntime", session_files_runtime_source),
+):
+    if "import com.labteto.dshmobile.local.work." in shared_session_source:
+        die(f"{relative} must not depend on WorkFeature internals")
+if "LocalHarnessState" in strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionAccessCoordinator.kt")
+):
+    die("Session access authorization must use narrow access scopes instead of aggregate app state")
+if (ROOT / "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkspace.kt").exists():
+    die("LocalWorkspace is shared file infrastructure and must not return to WorkFeature")
+if not (ROOT / "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt").exists():
+    die("shared LocalWorkspace capability is missing")
+feature_execution_port_module_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt")
+)
+if "provideLocalActiveSessionScopeProvider" not in feature_execution_port_module_source:
+    die("app composition root must adapt active Work session scope into the Shared Session access contract")
 
 conversation_files_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/session/LocalConversationFilesCoordinator.kt")
