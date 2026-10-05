@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.local.chat.LocalChatMode
+import com.labteto.dshmobile.local.chat.LocalChatSessionDomainCodec
 import com.labteto.dshmobile.local.chat.LocalGroupChatMember
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
@@ -140,7 +141,10 @@ class LocalSessionRepositoryTest {
     }
 
     @Test fun legacySummarySidecarRebuildsGroupMemberCountFromAuthoritativeSession() = runTest {
-        val repository = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        val repository = LocalSessionRepository(
+            temporary.root, Json, backgroundScope, {}, {},
+            domainCodecs = listOf(LocalChatSessionDomainCodec),
+        )
         repository.writeNow(
             LocalHarnessSession(
                 id = "legacy-group",
@@ -164,7 +168,10 @@ class LocalSessionRepositoryTest {
             """{"id":"legacy-group","title":"旧群聊","updatedAt":10,"usageMode":"CHAT","chatMode":"GROUP","blank":true,"sourceModifiedAt":$sourceModifiedAt}""",
         )
 
-        val reopened = LocalSessionRepository(temporary.root, Json, backgroundScope, {}, {})
+        val reopened = LocalSessionRepository(
+            temporary.root, Json, backgroundScope, {}, {},
+            domainCodecs = listOf(LocalChatSessionDomainCodec),
+        )
         val summary = reopened.summaries().single { it.id == "legacy-group" }
 
         assertEquals(LocalChatMode.GROUP.name, summary.chatMode)
