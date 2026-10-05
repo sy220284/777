@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.model.LocalImageInputMode
+import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -101,6 +102,12 @@ internal class LocalRuntimeProjection(
                     ),
                 )
             }
+        }
+    }
+
+    internal fun projectModelState(modelState: LocalModelState, error: String?) {
+        state.update { current ->
+            current.copy(modelState = modelState, error = error)
         }
     }
 
