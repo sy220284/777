@@ -37,7 +37,6 @@ internal class LocalWorkRunBinding(
     private val sessionBase: LocalHarnessSession,
     val runHandle: LocalAgentRunHandle,
     val eventLog: LocalSessionEventLog,
-    pruneToolResult: (String) -> String,
 ) {
     init {
         require(initialState.sessionId == sessionId) { "Work run 状态与会话编号不一致" }
@@ -138,7 +137,8 @@ internal class LocalWorkRunBinding(
 
     val transcriptRuntime = LocalTranscriptRuntime(
         state = transcriptStatePort,
-        pruneToolResult = pruneToolResult,
+        // Work tool results are bounded by LocalWorkToolResultRuntime before transcript projection.
+        pruneToolResult = { it },
         runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
         onProjected = { sequence ->
             runHandle.transcriptProjectionCursor = maxOf(runHandle.transcriptProjectionCursor ?: -1L, sequence)
