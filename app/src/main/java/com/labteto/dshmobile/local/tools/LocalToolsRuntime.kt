@@ -9,11 +9,12 @@ import javax.inject.Singleton
 @Singleton
 class LocalToolsRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
+    private val githubCredentials: LocalGitHubCredentialManager,
 ) {
     internal suspend fun servers(): List<McpServerSnapshot> = engine.mcpServersForUi()
-    internal suspend fun githubConfigured(): Boolean = engine.githubConnectorConfiguredForUi()
-    internal suspend fun configureGitHub(token: String) = engine.configureGitHubConnectorForUi(token)
-    internal suspend fun clearGitHub() = engine.clearGitHubConnectorForUi()
+    internal suspend fun githubConfigured(): Boolean = githubCredentials.configured()
+    internal suspend fun configureGitHub(token: String) = githubCredentials.configure(token)
+    internal suspend fun clearGitHub() = githubCredentials.clear()
     internal fun installedPluginIds(): List<String> = engine.installedPluginIdsForUi()
     internal suspend fun connectHttp(serverId: String, endpoint: String): String = engine.connectMcpHttpForUi(serverId, endpoint)
     internal suspend fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?): String = engine.connectMcpStdioForUi(serverId, command, workingDirectory)
