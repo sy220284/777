@@ -1114,24 +1114,43 @@ class LocalHarnessEngine @Inject internal constructor(
             pendingInputs.size() != 0
         ) return@synchronized LocalChatUserEditResult.BUSY
         recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
-        if (state.usageMode == LocalUsageMode.WORK) return@synchronized editAndResendWorkUserMessage(
-            messageId,
-            requestedText,
-            eventLog,
-            memoryStore,
-            chatPersonaGalleryStore,
-            modelHistory,
-            modelHistoryCheckpointCodec,
-            _state,
-            { updateContextMetrics() },
-            { sequence -> transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, sequence) },
-            { reason -> checkpointModelHistory(reason) },
-            { persist() },
-            { content -> transcriptRuntime.newMessage("user", content) },
-        ) { content, memoryInput, sourceMessageId ->
-            scope.launch(start = CoroutineStart.LAZY) {
-                runTurn(content, memoryInput, sourceMessageId)
-            }.also { activeJob = it; it.start() }
+        if (state.usageMode == LocalUsageMode.WORK) {
+            val lease = LocalSessionRuntimeRegistry.tryAcquire(
+                state.sessionId,
+                LocalSessionRuntimeKind.FOREGROUND,
+            ) ?: return@synchronized LocalChatUserEditResult.BUSY
+            var leaseTransferred = false
+            try {
+                val result = editAndResendWorkUserMessage(
+                    messageId,
+                    requestedText,
+                    eventLog,
+                    memoryStore,
+                    chatPersonaGalleryStore,
+                    modelHistory,
+                    modelHistoryCheckpointCodec,
+                    _state,
+                    { updateContextMetrics() },
+                    { sequence -> transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, sequence) },
+                    { reason -> checkpointModelHistory(reason) },
+                    { persist() },
+                    { content -> transcriptRuntime.newMessage("user", content) },
+                ) { content, memoryInput, sourceMessageId ->
+                    val job = queueExistingWorkTurnLocked(
+                        content = content,
+                        memoryInput = memoryInput,
+                        sourceMessageId = sourceMessageId,
+                        sessionLease = lease,
+                    )
+                    leaseTransferred = true
+                    job.start()
+                }
+                if (!leaseTransferred) lease.close()
+                return@synchronized result
+            } catch (error: Throwable) {
+                if (!leaseTransferred) lease.close()
+                throw error
+            }
         }
         if (state.usageMode != LocalUsageMode.CHAT) {
             return@synchronized LocalChatUserEditResult.UNAVAILABLE
@@ -1578,6 +1597,48 @@ class LocalHarnessEngine @Inject internal constructor(
         return job
     }
 
+
+    private fun queueExistingWorkTurnLocked(
+        content: String,
+        memoryInput: String,
+        sourceMessageId: String,
+        sessionLease: LocalSessionRuntimeLease,
+    ): Job {
+        val sessionId = currentSessionId
+        val binding = LocalWorkRunBinding(
+            sessionId = sessionId,
+            initialState = _state.value.let { current ->
+                current.copy(kernel = current.kernel.copy(running = true), error = null)
+            }.toLocalWorkRunState(),
+            sessionBase = persistenceSnapshot(),
+            runHandle = LocalAgentRunHandle(
+                initialSessionId = sessionId,
+                initialHistory = modelHistory.snapshot(),
+                initialTranscriptProjectionCursor = transcriptProjectionCursor,
+                maxPendingInputs = MAX_PENDING_INPUTS,
+            ),
+            eventLog = eventLogFor(sessionId),
+            pruneToolResult = ::pruneToolResult,
+        )
+        workRunRegistry.attach(binding)
+        binding.runHandle.projectionJob = scope.launch {
+            binding.state.collect {
+                workRunRegistry.mirrorVisible(binding)
+            }
+        }
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            runWorkAgentTurn(
+                input = content,
+                memoryInput = memoryInput,
+                sourceMessageId = sourceMessageId,
+                binding = binding,
+                preownedLease = sessionLease,
+            )
+        }
+        job.invokeOnCompletion { sessionLease.close() }
+        binding.runHandle.job = job
+        return job
+    }
 
     private fun syncVisibleWorkRun(
         sessionId: String,
