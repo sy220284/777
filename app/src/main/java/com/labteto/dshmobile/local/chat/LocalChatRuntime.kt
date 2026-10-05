@@ -14,19 +14,20 @@ class LocalChatRuntime @Inject constructor(
     private val persistence: LocalChatPersistence,
     private val sessionRuntime: LocalSessionRuntime,
     private val personaCorrections: LocalChatPersonaCorrectionCoordinator,
+    private val personaCoordinator: LocalChatPersonaCoordinator,
 ) {
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = engine.configureChatPersona(profile)
     internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) =
-        engine.selectChatPersona(profile, galleryId)
+        personaCoordinator.select(profile, galleryId)
     internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) =
-        engine.bindChatGallery(galleryId, galleryStoryId)
+        personaCoordinator.bindGallery(galleryId, galleryStoryId)
     internal fun clearChatGalleryBinding(
         expectedGalleryId: String,
         expectedStoryId: String? = null,
         keepCharacter: Boolean = false,
-    ) = engine.clearChatGalleryBinding(expectedGalleryId, expectedStoryId, keepCharacter)
+    ) = personaCoordinator.clearGalleryBinding(expectedGalleryId, expectedStoryId, keepCharacter)
     internal suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile =
-        engine.syncDefaultChatPersona(profile)
+        personaCoordinator.syncDefault(profile)
     internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean = sessionRuntime.createGroupChatSession(entries)
     internal fun createSingleChatSession() = sessionRuntime.createSingleChatSession()
     internal fun switchChatMode(mode: LocalChatMode) = sessionRuntime.switchChatMode(mode)
