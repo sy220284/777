@@ -181,7 +181,6 @@ class LocalWorkRunBindingTest {
                     maxPendingInputs = 4,
                 ),
                 eventLog = log,
-                pruneToolResult = { it },
             )
             val job = kotlinx.coroutines.Job()
             val mirror = kotlinx.coroutines.Job()
@@ -257,7 +256,6 @@ class LocalWorkRunBindingTest {
                 maxPendingInputs = 4,
             ),
             eventLog = LocalSessionEventLog(File(temporary.newFolder(), "events.jsonl"), Json),
-            pruneToolResult = { it },
         )
     }
 }
