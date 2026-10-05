@@ -4,8 +4,6 @@ import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
-import com.labteto.dshmobile.local.work.LocalGoal
-import com.labteto.dshmobile.local.work.LocalTodoItem
 import java.util.UUID
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -25,10 +23,6 @@ private const val LOCAL_TIMELINE_REWRITE_PROJECTION_COMMITTED = "chat/timeline-r
 
 @Serializable
 internal data class LocalTimelineRewriteState(
-    val plan: List<String>,
-    val todos: List<LocalTodoItem>,
-    val goal: LocalGoal?,
-    val planMode: Boolean,
     val chatState: ChatCharacterState,
     val chatContext: ChatContextState,
     val chatBranches: LocalChatBranchState,
