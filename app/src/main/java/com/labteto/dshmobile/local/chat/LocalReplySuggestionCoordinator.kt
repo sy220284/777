@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.model.LocalAuxiliaryModelRequestRuntime
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.recordForeground
 import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
+import com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
@@ -16,7 +17,6 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -37,7 +37,7 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
     private val branchCoordinator: LocalChatBranchCoordinator,
 ) {
     suspend fun generate(): Boolean {
-        val state = runtimeStateStore.mutableState
+        val state: LocalAggregateProjectionPort = runtimeStateStore.projection
         val snapshot = state.value
         if (
             snapshot.loading ||
@@ -165,7 +165,7 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
     }
 
     private fun updateError(
-        state: MutableStateFlow<LocalHarnessState>,
+        state: LocalAggregateProjectionPort,
         snapshot: LocalHarnessState,
         expectedAssistantMessageId: String,
         message: String,
