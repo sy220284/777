@@ -93,7 +93,7 @@ approval_preferences_source = read("app/src/main/java/com/labteto/dshmobile/loca
 approval_coordinator_source = read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkApprovalCoordinator.kt")
 if "StateFlow<Boolean>" not in approval_preferences_source or "mode.value = enabled" not in approval_preferences_source:
     die("Approval preferences must publish the single global mode flow")
-if re.search(r"copy\\(\\s*safeAutoApprovalEnabled\\s*=", approval_coordinator_source):
+if re.search(r"copy\(\s*safeAutoApprovalEnabled\s*=", approval_coordinator_source):
     die("Approval coordinator must not fan out writable global mode copies")
 
 

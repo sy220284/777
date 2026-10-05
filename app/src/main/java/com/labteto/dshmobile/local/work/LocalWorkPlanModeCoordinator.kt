@@ -45,6 +45,11 @@ internal class LocalWorkPlanModeCoordinator @Inject constructor(
             ) return false
             if (before.work.planMode == enabled) return true
 
+            // Commit the authoritative fact before publishing its UI projection. A disk failure
+            // must leave plan mode and model history unchanged, and the lease still closes below.
+            val log = eventLogs.get(sessionId)
+            log.append("plan/mode", buildJsonObject { put("active", enabled) })
+
             runtimeStateStore.mutableState.update { current ->
                 if (
                     current.sessionId == sessionId &&
@@ -63,9 +68,6 @@ internal class LocalWorkPlanModeCoordinator @Inject constructor(
                 after.usageMode != LocalUsageMode.WORK ||
                 after.work.planMode != enabled
             ) return false
-
-            val log = eventLogs.get(sessionId)
-            log.append("plan/mode", buildJsonObject { put("active", enabled) })
 
             val history = runtimeStateStore.foregroundModelHistory
             if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {

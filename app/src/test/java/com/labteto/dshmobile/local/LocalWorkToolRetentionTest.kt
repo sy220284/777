@@ -24,8 +24,18 @@ class LocalWorkToolRetentionTest {
 
         assertTrue(retained.truncated)
         assertTrue(retained.omittedBytes > 0)
-        assertTrue(retained.text.length <= 1_100)
+        assertTrue(retained.text.length <= 4_200)
         assertFalse(retained.text.contains("\uFFFD"))
         assertTrue(retained.text.contains("工具结果过长"))
+    }
+
+    @Test
+    fun defaultRecoveryPageStaysVerbatimInWorkRetention() {
+        val source = "a".repeat(LocalToolOutputStore.DEFAULT_READ_BYTES)
+
+        val retained = retainWorkToolResultForModel(source)
+
+        assertFalse(retained.truncated)
+        assertTrue(retained.text == source)
     }
 }

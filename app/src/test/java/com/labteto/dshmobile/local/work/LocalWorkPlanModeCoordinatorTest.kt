@@ -99,6 +99,28 @@ class LocalWorkPlanModeCoordinatorTest {
         assertFalse(runtime.state.value.work.planMode)
     }
 
+    @Test
+    fun failedEventWriteDoesNotPublishModeOrMutateModelHistoryAndReleasesOwner() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(
+            loading = false, sessionId = "broken", usageMode = LocalUsageMode.WORK,
+        ))
+        runtime.foregroundModelHistory.prepend(buildJsonObject {
+            put("role", "system")
+            put("content", workSystemPrompt("/workspace", false))
+        })
+        val originalHistory = runtime.foregroundModelHistory.snapshot()
+        val root = File(temporary.root, "blocked-log-root").apply { writeText("file, not directory") }
+        val logs = LocalSessionEventLogRegistry(root, json)
+        val coordinator = LocalWorkPlanModeCoordinator(runtime, LocalWorkRunRegistry(runtime), logs)
+
+        val failure = runCatching { coordinator.setEnabled(true) }.exceptionOrNull()
+        assertTrue(failure != null)
+        assertFalse(runtime.state.value.work.planMode)
+        org.junit.Assert.assertEquals(originalHistory, runtime.foregroundModelHistory.snapshot())
+        assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("broken"))
+    }
+
     private fun fixture(): Fixture {
         val runtime = LocalRuntimeStateStore()
         runtime.initialize(
