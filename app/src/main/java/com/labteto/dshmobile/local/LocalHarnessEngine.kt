@@ -568,9 +568,6 @@ class LocalHarnessEngine @Inject internal constructor(
             }
         } ?: foregroundAggregateRunState
 
-    private val modelAccountStateCoordinator by lazy {
-        LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isModelIdentityLocked)
-    }
     private val transcriptRuntime by lazy {
         LocalTranscriptRuntime(
             state = _state,
@@ -672,7 +669,7 @@ class LocalHarnessEngine @Inject internal constructor(
     )
     private val resourceBudget get() = runtimeStateStore.resourceBudget
     private val resourceScheduler get() = runtimeStateStore.resourceScheduler
-    private val imageCapabilities = LocalImageCapabilityRegistry()
+    private val imageCapabilities get() = runtimeStateStore.imageCapabilities
     private val imageRequestBudget =
         localImageRequestBudgetForModelConcurrency(resourceBudget.maxModelRequests)
     private fun liveWorkRun(sessionId: String): LocalWorkRunBinding? =
@@ -932,7 +929,6 @@ class LocalHarnessEngine @Inject internal constructor(
     }
 
     init {
-        modelAccountStateCoordinator.observeInvalidations(scope)
         preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
         val initialResources = resourceScheduler.snapshot()
         _state.update {
@@ -992,100 +988,6 @@ class LocalHarnessEngine @Inject internal constructor(
         withContext(Dispatchers.IO) {
             conversationFilesCoordinator.preview(path)
         }
-
-    /** Save the local model route and its encrypted credential. */
-    internal fun configure(apiKey: String, model: String, baseUrl: String) {
-        scope.launch {
-            runCatching { saveModelConfiguration(apiKey, model, baseUrl) }
-                .onFailure { error -> _state.update { it.copy(error = error.message) } }
-        }
-    }
-
-    internal suspend fun saveModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) {
-        check(!isModelIdentityLocked()) { "请等待初始化完成或结束当前任务后再切换模型" }
-        val result = modelConfiguration.save(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
-        imageCapabilities.clearRoute(result.baseUrl, result.model)
-        _state.update { current ->
-            current.copy(
-                modelState = current.modelState.copy(
-                    configured = result.configured,
-                    model = result.model,
-                    baseUrl = result.baseUrl,
-                    modelSelection = current.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
-                ),
-                error = null,
-            )
-        }
-    }
-    internal fun requireChatGptAccountSelectionAllowed() = modelAccountStateCoordinator.requireAccountSelectionAllowed()
-
-    internal suspend fun syncChatGptModels(
-        accountId: String,
-        models: List<ChatGptModelOption>,
-        selectFirst: Boolean = true,
-    ) = modelAccountStateCoordinator.syncChatGptModels(accountId, models, selectFirst)
-
-    internal suspend fun retireChatGptAccountProfiles(accountId: String) = modelAccountStateCoordinator.retireChatGptAccountProfiles(accountId)
-
-    internal suspend fun removeChatGptAccountProfiles(accountId: String) =
-        modelAccountStateCoordinator.removeChatGptAccountProfiles(accountId)
-
-    /** Switch the active route and its corresponding encrypted key together. */
-    internal fun selectModel(id: String) {
-        scope.launch {
-            val current = _state.value
-            val selected = current.modelState.modelSelection.profiles.firstOrNull { it.id == id } ?: return@launch
-            if (
-                isModelIdentityLocked() ||
-                selected.id == modelGateway.activeProfile()?.id
-            ) return@launch
-            runCatching { modelConfiguration.select(id, current.modelState.modelSelection.profiles) }
-                .onSuccess { result ->
-                    if (result != null) {
-                        _state.update { state ->
-                            state.copy(
-                                modelState = state.modelState.copy(
-                                    configured = result.configured,
-                                    model = result.model,
-                                    baseUrl = result.baseUrl,
-                                    modelSelection = state.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
-                                ),
-                                error = null,
-                            )
-                        }
-                    }
-                }
-                .onFailure { error -> _state.update { it.copy(error = error.message) } }
-        }
-    }
-
-    internal fun removeModelProfile(id: String) {
-        if (isModelIdentityLocked()) return
-        scope.launch {
-            val current = _state.value
-            runCatching {
-                modelConfiguration.remove(id, current.modelState.model, current.modelState.baseUrl)
-            }.onSuccess { result ->
-                if (result != null) {
-                    _state.update {
-                        it.copy(
-                            modelState = it.modelState.copy(
-                                configured = result.configured,
-                                model = result.model,
-                                baseUrl = result.baseUrl,
-                                modelSelection = it.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
-                            ),
-                        )
-                    }
-                }
-            }.onFailure { error ->
-                _state.update { it.copy(error = error.message) }
-            }
-        }
-    }
-
-    internal suspend fun testModelConfiguration(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): String =
-        modelConfiguration.test(apiKey, model, baseUrl, protocol, profileId)
 
     private fun chatStreamFilterPhrases(
         snapshot: LocalHarnessState,
@@ -2003,43 +1905,6 @@ class LocalHarnessEngine @Inject internal constructor(
     /** Permanently remove selected local sessions and their durable event segments. */
     internal suspend fun deleteSessions(requestedIds: Set<String>): Int =
         sessionLifecycle.deleteSessions(requestedIds)
-
-    /** Remove the local API key after an in-flight turn has finished cancelling. */
-    internal fun clearCredential() {
-        if (!beginSessionTransition()) return
-        _state.update { it.copy(loading = true) }
-        scope.launch {
-            sessionTransitionMutex.withLock {
-                try {
-                    cancelActiveRunAndJoin()
-                    val current = _state.value
-                    val result = modelConfiguration.clearActive(current.modelState.model, current.modelState.baseUrl)
-                    _state.update {
-                        it.copy(
-                            modelState = it.modelState.copy(
-                                configured = result.configured,
-                                model = result.model,
-                                baseUrl = result.baseUrl,
-                                modelSelection = it.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
-                            ),
-                        )
-                    }
-                } finally {
-                    endSessionTransition()
-                    _state.update { it.copy(loading = false) }
-                }
-            }
-        }
-    }
-
-    private fun isModelIdentityLocked(): Boolean =
-        _state.value.let { it.loading || it.kernel.running } || isRunBusy()
-
-    private fun isRunBusy(): Boolean = synchronized(runStateLock) {
-        sessionTransitioning ||
-            activeJob?.isCompleted == false ||
-            workRunRegistry.anyLive()
-    }
 
     private fun beginSessionTransition(): Boolean {
         val started = synchronized(runStateLock) {
@@ -4148,8 +4013,15 @@ class LocalHarnessEngine @Inject internal constructor(
         },
     )
 
-    private suspend fun modelRequestMarkerOrNull(): String? =
-        modelAccountStateCoordinator.requestMarkerOrNull()
+    private suspend fun modelRequestMarkerOrNull(): String? {
+        val snapshot = _state.value
+        val profileId = snapshot.modelState.modelSelection.activeProfileId ?: return null
+        return modelGateway.profileForRoute(
+            profileId = profileId,
+            model = snapshot.modelState.model,
+            baseUrl = snapshot.modelState.baseUrl,
+        ).id
+    }
 
     private suspend fun modelRequestMarker(): String =
         modelRequestMarkerOrNull() ?: error("请先配置模型账户或 API Key")
