@@ -9,7 +9,7 @@ import javax.inject.Singleton
 @Singleton
 internal class LocalChatExecutionCoordinator @Inject constructor(
     private val sendCoordinator: LocalChatSendCoordinator,
-    private val turn: LocalChatTurnPort,
+    private val timeline: LocalChatTimelineCoordinator,
 ) : LocalChatExecutionPort {
     override fun send(
         text: String,
@@ -19,8 +19,8 @@ internal class LocalChatExecutionCoordinator @Inject constructor(
     override fun editAndResendUserMessage(
         messageId: String,
         replacement: String,
-    ): LocalChatUserEditResult = turn.editAndResendUserMessage(messageId, replacement)
+    ): LocalChatUserEditResult = timeline.editAndResendUserMessage(messageId, replacement)
 
     override fun regenerateReply(messageId: String): Boolean =
-        turn.regenerateReply(messageId)
+        timeline.regenerateReply(messageId)
 }
