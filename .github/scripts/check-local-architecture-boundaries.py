@@ -375,11 +375,17 @@ for required_foreground_compaction_owner in (
 ):
     if required_foreground_compaction_owner not in foreground_history_compaction_source:
         die("Shared foreground history compaction ownership is incomplete: " + required_foreground_compaction_owner)
-if "private val requestPressureStore = LocalRequestPressureStore()" in engine:
+engine_source_for_model_boundary = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt")
+)
+if "private val requestPressureStore = LocalRequestPressureStore()" in engine_source_for_model_boundary:
     die("LocalHarnessEngine must not own a second request-pressure window")
-if "private val modelRequestCoordinator by lazy" in engine or "LocalModelRequestCoordinator(" in engine:
+if (
+    "private val modelRequestCoordinator by lazy" in engine_source_for_model_boundary
+    or "LocalModelRequestCoordinator(" in engine_source_for_model_boundary
+):
     die("LocalHarnessEngine must consume the injected Shared model request coordinator")
-if "private fun persistForegroundOverflowCompaction(" in engine:
+if "private fun persistForegroundOverflowCompaction(" in engine_source_for_model_boundary:
     die("LocalHarnessEngine must not own visible foreground overflow persistence")
 if "LocalModelAdmissionPort" not in model_request_runtime_source:
     die("Model Capability must expose a Work-agnostic model admission port")
