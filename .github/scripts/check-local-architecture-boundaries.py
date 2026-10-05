@@ -14,10 +14,9 @@ ENGINE_MAX_INTERNAL_METHODS = 1
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
 ENGINE_MAX_COMPOSITION_BRIDGE_REFERENCES = 7
-ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 6
+ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 5
 ENGINE_STAGE3_FEATURE_METHOD_ROOTS = (
     "queueHumanTurn",
-    "queueWorkTurnLocked",
     "runAgentTurn",
     "runChatTurn",
     "runGroupChatTurn",
@@ -320,6 +319,23 @@ if "internal suspend fun exitWorkPlanMode(" not in work_plan_mode_source:
 
 engine_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
 engine = read(engine_path)
+work_turn_starter_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnStarter.kt")
+)
+for required_work_turn_owner in (
+    "internal fun startFresh(",
+    "internal fun startResumed(",
+    "internal fun startExisting(",
+    "LocalWorkRunBinding(",
+    "workRunRegistry.attach(binding)",
+):
+    if required_work_turn_owner not in work_turn_starter_source:
+        die("Work first-turn ownership is incomplete: " + required_work_turn_owner)
+if "private fun queueWorkTurnLocked(" in engine or "private fun queueExistingWorkTurnLocked(" in engine:
+    die("Work first-turn binding must not return to LocalHarnessEngine")
+if "workTurnStarter.startFresh(" not in engine or "workTurnStarter.startResumed(" not in engine:
+    die("Engine migration call sites must route Work start/resume to WorkFeature")
+
 work_subagent_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt")
 )
