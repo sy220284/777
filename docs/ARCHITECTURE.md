@@ -1,6 +1,6 @@
 # Architecture
 
-777 is an eight-module Android project built with Kotlin 2.2.10, Jetpack Compose, Hilt and Java 17.
+777 is an eight-module Android project built with Kotlin 2.2.10, Jetpack Compose, Hilt and JVM 21, using JDK 21+ as the build runtime.
 
 The repository uses two levels of boundary:
 
