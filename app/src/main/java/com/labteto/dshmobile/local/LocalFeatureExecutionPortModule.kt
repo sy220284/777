@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
+import com.labteto.dshmobile.local.runtime.LocalDiagnosticsPort
 import com.labteto.dshmobile.local.session.LocalActiveSessionScopeProvider
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.session.LocalSessionLifecyclePort
@@ -41,6 +42,11 @@ internal object LocalFeatureExecutionPortModule {
     @Singleton
     fun provideLocalToolsManagementPort(engine: LocalHarnessEngine): LocalToolsManagementPort =
         engine.toolsManagementPort
+
+    @Provides
+    @Singleton
+    fun provideLocalDiagnosticsPort(engine: LocalHarnessEngine): LocalDiagnosticsPort =
+        engine.diagnosticsPort
 
     @Provides
     @Singleton
