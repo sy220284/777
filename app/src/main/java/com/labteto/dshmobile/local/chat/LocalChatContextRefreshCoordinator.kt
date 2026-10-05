@@ -26,7 +26,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -195,36 +194,6 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
             Unit
         },
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-    )
-
-    /**
-     * Narrow test seam for CAS/retry races. It stays inside ChatFeature and does not expose Engine
-     * or mutable Runtime internals to production callers.
-     */
-    internal constructor(
-        state: MutableStateFlow<LocalHarnessState>,
-        scope: CoroutineScope,
-        chatTurnCoordinator: LocalChatTurnCoordinator,
-        diaryStore: ChatDiaryStore,
-        requestPlanner: suspend (
-            LocalHarnessState,
-            String,
-            LocalSessionEventLog,
-            LocalModelProfile,
-        ) -> LocalModelReply?,
-        recordUsage: (LocalHarnessState, LocalModelReply) -> Unit,
-        persistBranchState: () -> Unit,
-        persist: () -> Unit,
-    ) : this(
-        readState = { state.value },
-        chatState = LocalChatStatePort(state),
-        chatTurnCoordinator = chatTurnCoordinator,
-        diaryStore = diaryStore,
-        requestPlanner = requestPlanner,
-        recordUsage = recordUsage,
-        persistBranchState = { _, _ -> persistBranchState() },
-        persistSnapshot = { _ -> persist() },
-        scope = scope,
     )
 
     fun cancelScheduledRefresh() {

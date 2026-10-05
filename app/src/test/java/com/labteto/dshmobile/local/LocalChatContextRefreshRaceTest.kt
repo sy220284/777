@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.chat.ChatRelationshipEngine
 import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.LocalChatState
+import com.labteto.dshmobile.local.chat.LocalChatStatePort
 import com.labteto.dshmobile.local.chat.LocalChatContextRefreshCoordinator
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.enqueuePendingDurably
@@ -67,14 +68,23 @@ class LocalChatContextRefreshRaceTest {
         val profile = LocalModelProfile("profile-a", "model-a", "https://example.test/v1")
         val observedProfiles = mutableListOf<String>()
         val coordinator = LocalChatContextRefreshCoordinator(
-            state, scope, turns,
+            readState = { state.value },
+            chatState = LocalChatStatePort(state),
+            chatTurnCoordinator = turns,
             diaryStore = ChatDiaryStore(File(temporary.root, "diary"), json),
             requestPlanner = { _, _, _, selectedProfile ->
                 observedProfiles += selectedProfile.id
                 LocalModelReply(
-                buildJsonObject {}, """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""", null, emptyList(),
-            ) },
-            recordUsage = { _, _ -> }, persistBranchState = {}, persist = { persisted++ },
+                    buildJsonObject {},
+                    """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""",
+                    null,
+                    emptyList(),
+                )
+            },
+            recordUsage = { _, _ -> },
+            persistBranchState = { _, _ -> },
+            persistSnapshot = { persisted++ },
+            scope = scope,
         )
         return Fixture(log, state, coordinator, profile, observedProfiles) { persisted }
     }
