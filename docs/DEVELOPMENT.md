@@ -8,6 +8,8 @@
 
 这里的“只允许”约束的是依赖来源。本地不会通过 `apt`、Google Android 仓库、Gradle/Maven 在线解析、Node 官网等渠道补齐开发依赖。
 
+项目源码统一使用 Kotlin；构建环境接受 JDK 21+，CI 与兜底 Artifact 固定使用 JDK 21 LTS；项目编译目标固定为 JVM 21。Node 接受 22+，不锁 minor / patch。
+
 ## 按需下载模型
 
 工具链不再提供一个必须整体下载的超大 build/full 包。
@@ -24,7 +26,7 @@
 → Gradle --offline 真实构建
 ```
 
-已有且版本满足要求的工具直接复用。例如宿主已经有完整 JDK 17，就不会要求重新下载 JDK Artifact。
+已有且版本满足要求的工具直接复用。例如宿主已经有完整 JDK 21 或更高版本，就不会要求重新下载 JDK Artifact。
 
 AI / Agent 查询缺失项：
 
@@ -59,7 +61,7 @@ bash tools/dev/ai-toolchain.sh plan --profile full
 
 | Artifact | 内容 |
 |---|---|
-| `777-toolchain-jdk-latest` | JDK 17，包含 `java` / `javac` |
+| `777-toolchain-jdk-latest` | JDK 21 LTS 兜底包，包含 `java` / `javac`；本机 JDK 21+ 可直接复用 |
 | `777-toolchain-android-core-latest` | Android command-line tools、platform-tools、API 37 platform、build-tools 37.0.0、licenses |
 | `777-toolchain-gradle-runtime-latest` | Gradle 9.6.0 完整分发 |
 | `777-toolchain-gradle-deps-latest` | Gradle Wrapper 分发缓存、Kotlin 2.2.10、AGP 9.4.0 与项目依赖离线缓存 |
@@ -69,7 +71,7 @@ bash tools/dev/ai-toolchain.sh plan --profile full
 
 | Artifact | 内容 |
 |---|---|
-| `777-toolchain-node-latest` | Node.js 22.23.3 |
+| `777-toolchain-node-latest` | Node.js 22+ |
 | `777-toolchain-actionlint-latest` | actionlint 1.7.12 |
 | `777-toolchain-emulator-latest` | Android Emulator |
 | `777-toolchain-android-image-16-latest` | Android 16 x86_64 system image |
@@ -192,7 +194,7 @@ Gradle 离线缓存  ~/.local/share/777-dev/gradle-user-home
 
 `build` 要求：
 
-- JDK 17，且必须有 `javac`。
+- JDK 21 或更高版本，且必须有 `javac`。
 - Android command-line tools。
 - platform-tools。
 - API 37 platform。
@@ -204,7 +206,7 @@ Gradle 离线缓存  ~/.local/share/777-dev/gradle-user-home
 
 `full` 额外要求：
 
-- Node.js 22.23.3。
+- Node.js 22+。
 - actionlint 1.7.12。
 - Android Emulator。
 - Android 16 x86_64 system image。
@@ -260,7 +262,7 @@ bash tools/dev/ai-toolchain.sh gradle :app:assembleOptimized
 ```text
 bootstrap
 → 先 plan
-→ 证明已有 JDK 17 时不会要求下载 JDK
+→ 证明已有 JDK 21+ 时不会要求下载 JDK
 → 只下载 build 当前缺的 Android / Gradle / Runtime 组件
 → 安装
 → plan 必须变成 missing_artifacts=[]
