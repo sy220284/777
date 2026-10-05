@@ -219,6 +219,43 @@ model_runtime_source = strip_comments(
 if "LocalHarnessEngine" in model_runtime_source:
     die("LocalModelRuntime must use Model/Shared capabilities instead of LocalHarnessEngine")
 
+model_request_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/model/LocalAgentModelRequestRuntime.kt")
+)
+if "LocalModelAdmissionPort" not in model_request_runtime_source:
+    die("Model Capability must expose a Work-agnostic model admission port")
+if "import com.labteto.dshmobile.local.work." in model_request_runtime_source:
+    die("LocalAgentModelRequestRuntime must not depend on WorkFeature internals")
+if "admissionHandledExternally" in model_request_runtime_source:
+    die("Model request runtime must not retain the legacy Work-specific admission bypass")
+
+for model_source_path in (LOCAL_SOURCE_ROOT / "model").rglob("*.kt"):
+    model_source = strip_comments(model_source_path.read_text(encoding="utf-8"))
+    if "import com.labteto.dshmobile.local.work." in model_source:
+        relative = model_source_path.relative_to(ROOT).as_posix()
+        die(f"{relative} makes Model/Shared capability depend on WorkFeature internals")
+
+for relative in (
+    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelRequestBoundary.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelStepExecutor.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRunnerFactory.kt",
+):
+    agent_model_source = strip_comments(read(relative))
+    if (
+        "LocalWorkExecutionControl" in agent_model_source
+        or "import com.labteto.dshmobile.local.work." in agent_model_source
+    ):
+        die(f"{relative} must consume LocalModelAdmissionPort instead of WorkFeature internals")
+
+work_model_admission_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkModelAdmission.kt")
+)
+if (
+    "LocalModelAdmissionPort" not in work_model_admission_source
+    or "executeWithModelAdmission(" not in work_model_admission_source
+):
+    die("WorkFeature must adapt its execution control through LocalModelAdmissionPort")
+
 work_progress_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt")
 )

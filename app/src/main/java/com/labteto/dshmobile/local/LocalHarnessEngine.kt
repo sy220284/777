@@ -258,6 +258,7 @@ import com.labteto.dshmobile.local.vision.LocalVisionRoute
 import com.labteto.dshmobile.local.work.LocalForegroundRecoveryCoordinator
 import com.labteto.dshmobile.local.work.LocalRuntimeOwnershipPolicy
 import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
+import com.labteto.dshmobile.local.work.asModelAdmissionPort
 import com.labteto.dshmobile.local.work.LocalWorkProgressCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
@@ -827,7 +828,7 @@ class LocalHarnessEngine @Inject internal constructor(
             )
         },
         historySnapshot = historySnapshot,
-        executionControl = workRunRegistry[sessionId]?.executionControl ?: LocalWorkExecutionControl(),
+        modelAdmission = (workRunRegistry[sessionId]?.executionControl ?: LocalWorkExecutionControl()).asModelAdmissionPort(),
     )
     /**
      * Detached work runner for scheduled/webhook work.
@@ -862,7 +863,7 @@ class LocalHarnessEngine @Inject internal constructor(
                 onApprovalBlocked = onApprovalBlocked,
             )
         },
-        executionControl = LocalWorkExecutionControl(),
+        modelAdmission = LocalWorkExecutionControl().asModelAdmissionPort(),
     )
 
     private val runStateLock: Any
@@ -3875,7 +3876,7 @@ class LocalHarnessEngine @Inject internal constructor(
                 )
             },
             historySnapshot = binding.modelHistory::snapshot,
-            executionControl = binding.executionControl,
+            modelAdmission = binding.executionControl.asModelAdmissionPort(),
         )
 
     private suspend fun runWorkflow(

@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalImageCapabilityRegistry
 import com.labteto.dshmobile.local.model.LocalImageRequestBudget
+import com.labteto.dshmobile.local.model.LocalModelAdmissionPort
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelPresets
@@ -26,7 +27,6 @@ import com.labteto.dshmobile.local.record
 import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,7 +67,7 @@ internal class LocalSubagentRunnerFactory(
             enabledOptionalTools: MutableSet<String>,
         ) -> AgentToolResult,
         historySnapshot: () -> List<kotlinx.serialization.json.JsonObject> = modelHistory::snapshot,
-        executionControl: LocalWorkExecutionControl? = null,
+        modelAdmission: LocalModelAdmissionPort? = null,
     ): LocalSubagentRunner {
         val boundEventLog = eventLogFor(sessionId)
         val boundMemoryTools = LocalMemoryTools(
@@ -100,7 +100,7 @@ internal class LocalSubagentRunnerFactory(
             runSessionId = { sessionId },
             runKind = runKind,
             historySnapshotProvider = historySnapshot,
-            executionControl = executionControl,
+            modelAdmission = modelAdmission,
         )
     }
 
@@ -114,7 +114,7 @@ internal class LocalSubagentRunnerFactory(
         runSessionId: () -> String = defaultSessionId,
         runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
         historySnapshotProvider: () -> List<kotlinx.serialization.json.JsonObject> = modelHistory::snapshot,
-        executionControl: LocalWorkExecutionControl? = null,
+        modelAdmission: LocalModelAdmissionPort? = null,
     ): LocalSubagentRunner = LocalSubagentRunner(
         modelGateway = modelGateway,
         state = runnerState,
@@ -147,6 +147,6 @@ internal class LocalSubagentRunnerFactory(
         runCoordinator = agentRunCoordinator,
         runSessionId = runSessionId,
         runKind = runKind,
-        executionControl = executionControl,
+        modelAdmission = modelAdmission,
     )
 }

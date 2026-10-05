@@ -24,6 +24,7 @@ import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalModelAdmissionPort
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelReply
@@ -47,7 +48,6 @@ import com.labteto.dshmobile.local.runtime.nextAdaptiveAgentStepLimit
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
 import com.labteto.dshmobile.local.tools.LocalRunToolSurface
-import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.work.compactAtTurnBoundary
 import com.labteto.dshmobile.local.work.compactBeforeModelStep
 import com.labteto.dshmobile.observability.AppLog
@@ -89,7 +89,7 @@ internal class LocalSubagentRunner(
     private val runCoordinator: LocalAgentRunCoordinator? = null,
     private val runSessionId: () -> String = { state.value.sessionId },
     private val runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
-    private val executionControl: LocalWorkExecutionControl? = null,
+    private val modelAdmission: LocalModelAdmissionPort? = null,
 ) {
     private val historyPolicy = com.labteto.dshmobile.local.agent.LocalSubagentHistoryPolicy(
         spillToolOutput = spillToolOutput,
@@ -103,7 +103,7 @@ internal class LocalSubagentRunner(
         resourceScheduler = resourceScheduler,
         eventLog = eventLog,
         historyCompactor = historyCompactor,
-        executionControl = executionControl,
+        admission = modelAdmission,
     )
 
     suspend fun run(

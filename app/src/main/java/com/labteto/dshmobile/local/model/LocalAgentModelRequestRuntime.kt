@@ -2,10 +2,24 @@ package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
-import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
-import com.labteto.dshmobile.local.work.executeWithModelAdmission
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+
+internal data class LocalModelAdmissionRequest(
+    val routeFingerprint: String,
+    val model: String,
+    val baseUrl: String,
+    val contextWindowTokensOverride: Int?,
+    val messages: List<JsonObject>,
+    val tools: JsonArray,
+)
+
+internal fun interface LocalModelAdmissionPort {
+    suspend fun execute(
+        request: LocalModelAdmissionRequest,
+        block: suspend () -> LocalModelReply,
+    ): LocalModelReply
+}
 
 /**
  * Shared admitted provider-call boundary for foreground agents, subagents and bounded auxiliary work.
@@ -27,8 +41,7 @@ internal class LocalAgentModelRequestRuntime(
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
-        executionControl: LocalWorkExecutionControl? = null,
-        admissionHandledExternally: Boolean = false,
+        admission: LocalModelAdmissionPort? = null,
         onDelta: (LocalModelDelta) -> Unit = {},
     ): LocalModelReply {
         val completeProvider: suspend () -> LocalModelReply = {
@@ -67,17 +80,14 @@ internal class LocalAgentModelRequestRuntime(
                 completeProvider()
             }
         }
-        if (admissionHandledExternally) return invokeProvider()
-        return executeWithModelAdmission(
-            control = executionControl,
+        val admissionRequest = LocalModelAdmissionRequest(
             routeFingerprint = surface.routeFingerprint,
             model = surface.model,
             baseUrl = surface.baseUrl,
             contextWindowTokensOverride = surface.contextWindowTokensOverride,
             messages = messages,
             tools = tools,
-        ) {
-            invokeProvider()
-        }
+        )
+        return admission?.execute(admissionRequest, invokeProvider) ?: invokeProvider()
     }
 }

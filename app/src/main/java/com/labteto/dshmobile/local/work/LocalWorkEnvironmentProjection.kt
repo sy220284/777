@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.model.LocalWorkContextAssessmentSnapshot
 import com.labteto.dshmobile.local.runtime.LocalEnvironmentRunSnapshot
 import com.labteto.dshmobile.local.runtime.LocalEnvironmentWorkBudget
 import com.labteto.dshmobile.local.runtime.LocalEnvironmentWorkContextAssessment
@@ -22,9 +23,9 @@ internal fun LocalWorkRunBinding.toEnvironmentRunSnapshot(
     )
 }
 
-internal fun LocalWorkStepContextAssessment.toEnvironmentWorkContextAssessment() =
+internal fun LocalWorkContextAssessmentSnapshot.toEnvironmentWorkContextAssessment() =
     LocalEnvironmentWorkContextAssessment(
-        status = status.name.lowercase(),
+        status = status,
         historyRatioPermille = historyRatioPermille,
         toolRatioPermille = toolRatioPermille,
         inputGrowthTokens = inputGrowthTokens,

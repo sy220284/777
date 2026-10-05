@@ -4,12 +4,12 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.model.LocalAgentModelRequestRuntime
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
+import com.labteto.dshmobile.local.model.LocalModelAdmissionPort
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.model.LocalRunModelSurface
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -20,12 +20,12 @@ internal class LocalSubagentModelStepExecutor(
     resourceScheduler: HarnessResourceScheduler,
     eventLog: () -> LocalSessionEventLog,
     historyCompactor: LocalHistoryCompactor,
-    executionControl: LocalWorkExecutionControl? = null,
+    admission: LocalModelAdmissionPort? = null,
 ) {
     private val requestBoundary = LocalSubagentModelRequestBoundary(
         LocalAgentModelRequestRuntime(modelGateway, resourceScheduler),
         eventLog,
-        executionControl,
+        admission,
     )
     private val modelStepRuntime = LocalAgentModelStepRuntime()
     private val stepPolicy = LocalSubagentModelStepPolicy(eventLog, historyCompactor)

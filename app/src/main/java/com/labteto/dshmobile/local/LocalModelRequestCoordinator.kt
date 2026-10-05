@@ -34,6 +34,7 @@ import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.work.assessWorkStepContext
 import com.labteto.dshmobile.local.work.executeWithModelAdmission
+import com.labteto.dshmobile.local.work.toModelSnapshot
 import com.labteto.dshmobile.local.work.workRequestProjectionTargetTokens
 import com.labteto.dshmobile.local.work.workRequestProjectionTriggerTokens
 import com.labteto.dshmobile.observability.AppLog
@@ -181,7 +182,7 @@ internal class LocalModelRequestCoordinator(
         pressureStore.record(
             sessionId = snapshot.sessionId,
             pressure = pressure,
-            workAssessment = workContextAssessment,
+            workAssessment = workContextAssessment?.toModelSnapshot(),
             workSourcePressure = if (workContextAssessment != null) baselinePressure else null,
             usageMode = snapshot.usageMode,
             sourcePressure = baselinePressure,
@@ -526,7 +527,6 @@ internal class LocalModelRequestCoordinator(
                                 promptCacheComparisonResponseId = cacheComparisonResponseId,
                                 promptCacheKey = promptCacheKey,
                                 promptCacheTtl = promptCacheTtl,
-                                admissionHandledExternally = true,
                                 onDelta = { delta ->
                                     val visible = streamFilter?.append(delta.content)?.text ?: delta.content
                                     streamPreview.append(visible)
