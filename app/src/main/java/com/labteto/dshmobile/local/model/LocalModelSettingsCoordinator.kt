@@ -5,7 +5,6 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.update
 
 /** Model-owned user settings that affect request construction and capability exposure. */
 @Singleton
@@ -17,9 +16,7 @@ class LocalModelSettingsCoordinator @Inject constructor(
 
     fun configureImageInputMode(mode: LocalImageInputMode) {
         preferences.edit().putString(KEY_IMAGE_INPUT_MODE, mode.name).apply()
-        runtimeStateStore.mutableState.update {
-            it.copy(modelState = it.modelState.copy(imageInputMode = mode))
-        }
+        runtimeStateStore.projection.setImageInputMode(mode)
     }
 
     companion object {
