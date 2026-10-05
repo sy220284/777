@@ -6,17 +6,18 @@ import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
-import com.labteto.dshmobile.local.model.structuredWorkState
-import com.labteto.dshmobile.local.model.workSteadyStateHistoryBudget
 import com.labteto.dshmobile.local.runtime.MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
+import com.labteto.dshmobile.local.runtime.structuredWorkState
 import com.labteto.dshmobile.local.model.workSystemPrompt
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
