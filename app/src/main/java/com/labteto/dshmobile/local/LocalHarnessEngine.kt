@@ -408,7 +408,8 @@ class LocalHarnessEngine @Inject internal constructor(
             eventLogFor = ::eventLogFor,
         )
     }
-    private val agentRunCoordinator by lazy { LocalAgentRunCoordinator(eventLogFor = ::eventLogFor) }
+    private val agentRunCoordinator
+        get() = sessionStorageRuntime.agentRunCoordinator
     private val foregroundRecoveryCoordinator by lazy {
         LocalForegroundRecoveryCoordinator(agentRunCoordinator, modelGateway::hasCredential)
     }
