@@ -334,9 +334,9 @@ internal class LocalSessionLifecycleCoordinator(
                             transcriptIndex = LocalTranscriptRuntimeIndex(),
                             work = LocalWorkState(
                                 jobs = projectExecutionJobs(usageMode, nextSessionId, jobs.snapshotInfos()),
+                                deviceApprovalLease = false,
                             ),
                             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
-                            deviceApprovalLease = false,
                             kernel = LocalKernelState(
                                 resources = resourceScheduler.snapshot().toLocalHarnessResourceState(usageMode),
                             ),
