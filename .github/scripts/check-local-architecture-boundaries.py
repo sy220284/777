@@ -65,6 +65,14 @@ def strip_comments(source: str) -> str:
     return re.sub(r"//.*$", "", source, flags=re.MULTILINE)
 
 
+def has_typed_property(source: str, type_name: str) -> bool:
+    """Match a retained Kotlin property by type without coupling the guard to its variable name."""
+    return re.search(
+        rf"\b(?:(?:private|internal|public|protected)\s+)?(?:val|var)\s+[A-Za-z0-9_]+\s*:\s*{re.escape(type_name)}\b",
+        source,
+    ) is not None
+
+
 # Physical boundaries must also be Kotlin boundaries; root-package leakage defeats import guards.
 for source_path in LOCAL_SOURCE_ROOT.rglob("*.kt"):
     relative = source_path.relative_to(LOCAL_SOURCE_ROOT)
@@ -136,7 +144,7 @@ for source_path in LOCAL_SOURCE_ROOT.rglob("*.kt"):
 chat_state_port_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatStatePort.kt")
 )
-if "runtimeStateStore.projection.update(transform)" not in chat_state_port_source:
+if re.search(r"\bruntimeStateStore\.projection\.update\s*\(", chat_state_port_source) is None:
     die("ChatFeature aggregate projection bridge must stay centralized in LocalChatStatePort")
 for forbidden in ("work =", "mainMaxSteps =", "subagentMaxSteps =", "userRules =", "safeAutoApprovalEnabled ="):
     if forbidden in chat_state_port_source:
@@ -197,7 +205,7 @@ for source_path in work_root.rglob("*.kt"):
 settings_coordinator_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt")
 )
-if "private val statePort: LocalSettingsStatePort" not in settings_coordinator_source:
+if not has_typed_property(settings_coordinator_source, "LocalSettingsStatePort"):
     die("LocalHarnessSettingsCoordinator must depend on its narrow Settings state port")
 if (
     "runtimeStateStore.projection.update(" in settings_coordinator_source
@@ -354,6 +362,11 @@ for relative, maximum in RUNTIME_ENGINE_REFERENCE_BUDGETS.items():
             f"{relative} has {references} direct LocalHarnessEngine references "
             f"(ratchet: {maximum}); capability runtimes must own behavior instead of growing proxies"
         )
+    if maximum == 0 and has_typed_property(runtime_source, "LocalHarnessEngine"):
+        die(
+            f"{relative} retains a LocalHarnessEngine instance after its direct-reference budget reached zero; "
+            "depend on the owning Feature/Shared capability instead"
+        )
     print(
         f"[architecture-guard] {relative}: "
         f"{references}/{maximum} direct engine references"
@@ -405,7 +418,7 @@ settings_coordinator = strip_comments(
 settings_runtime = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt")
 )
-if "@Singleton" not in settings_coordinator or "private val statePort: LocalSettingsStatePort" not in settings_coordinator:
+if "@Singleton" not in settings_coordinator or not has_typed_property(settings_coordinator, "LocalSettingsStatePort"):
     die("LocalHarnessSettingsCoordinator must own Settings mutations through LocalSettingsStatePort")
 if "runtimeStateStore.projection" in settings_coordinator:
     die("Settings coordinator must not write the aggregate Runtime projection directly")
@@ -424,7 +437,7 @@ for required_settings_command in (
 ):
     if required_settings_command not in settings_state_port:
         die("Settings state port must expose explicit Runtime projection command: " + required_settings_command)
-if "private val settingsCoordinator: LocalHarnessSettingsCoordinator" not in settings_runtime:
+if not has_typed_property(settings_runtime, "LocalHarnessSettingsCoordinator"):
     die("LocalSettingsRuntime must depend on the Settings capability directly")
 for forbidden_proxy in (
     "engine.configureRuntimeLimits",
@@ -456,7 +469,7 @@ constructor = re.search(
 )
 if constructor is None:
     die("unable to locate LocalHarnessEngine constructor")
-if "private val settingsCoordinator: LocalHarnessSettingsCoordinator" in constructor.group(1):
+if has_typed_property(constructor.group(1), "LocalHarnessSettingsCoordinator"):
     die("LocalHarnessEngine must not depend on the Settings capability")
 dependency_count = len(re.findall(r"private val\s+[A-Za-z0-9_]+\s*:", constructor.group(1)))
 if dependency_count > ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES:
@@ -528,11 +541,11 @@ if "check(!initialized)" not in runtime_state_store:
     die("LocalRuntimeStateStore initialization must remain single-owner")
 if "runtimeStateStore.initialize(" not in engine:
     die("LocalHarnessEngine must initialize state through LocalRuntimeStateStore")
-if "private val runtimeStateStore: LocalRuntimeStateStore" not in constructor.group(1):
+if not has_typed_property(constructor.group(1), "LocalRuntimeStateStore"):
     die("LocalHarnessEngine must receive the shared LocalRuntimeStateStore by injection")
-if "private val sessionStorageRuntime: LocalSessionStorageRuntime" not in constructor.group(1):
+if not has_typed_property(constructor.group(1), "LocalSessionStorageRuntime"):
     die("LocalHarnessEngine must consume the shared Session storage capability")
-if "private val eventLogRegistry: LocalSessionEventLogRegistry" in constructor.group(1):
+if has_typed_property(constructor.group(1), "LocalSessionEventLogRegistry"):
     die("LocalHarnessEngine must not inject Session EventLog storage separately from LocalSessionStorageRuntime")
 if "LocalSessionRepository(" in engine or "LocalSessionCoordinator(" in engine:
     die("LocalHarnessEngine must not construct Session persistence owners")
