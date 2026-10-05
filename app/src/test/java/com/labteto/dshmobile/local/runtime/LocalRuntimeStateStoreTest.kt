@@ -1,12 +1,22 @@
 package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalSessionEventLog
+import java.io.File
+import kotlinx.coroutines.Job
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class LocalRuntimeStateStoreTest {
+    @get:Rule
+    val temporary = TemporaryFolder()
+
     @Test
     fun initializePublishesOneSharedStateAndRejectsSecondOwner() {
         val store = LocalRuntimeStateStore()
@@ -31,4 +41,33 @@ class LocalRuntimeStateStoreTest {
             assertEquals("session-c", store.currentSessionId)
         }
     }
+    @Test
+    fun foregroundCancellationUsesSharedJobOwnerAndClearsQueuedProjection() {
+        val store = LocalRuntimeStateStore()
+        store.initialize(
+            LocalHarnessState(
+                sessionId = "session-a",
+                kernel = LocalHarnessState().kernel.copy(
+                    running = true,
+                    queuedInputCount = 3,
+                ),
+            ),
+        )
+        val job = Job()
+        store.foregroundJob = job
+        val log = LocalSessionEventLog(
+            file = File(temporary.root, "session-a.events.jsonl"),
+            json = Json { ignoreUnknownKeys = true },
+            sessionId = "session-a",
+        )
+        try {
+            assertTrue(store.cancelForegroundRun(log))
+            assertTrue(job.isCancelled)
+            assertTrue(store.state.value.kernel.running)
+            assertEquals(0, store.state.value.kernel.queuedInputCount)
+        } finally {
+            log.close()
+        }
+    }
+
 }
