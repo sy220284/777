@@ -160,10 +160,13 @@ jobs:
           ln -s "$GRADLE_DIST_HOME" "$GRADLE_STAGE/gradle"
           make_component gradle-runtime "$GRADLE_STAGE"
 
+          # 先停掉 Gradle daemon，再制作不可变快照，避免打包过程中缓存仍被后台进程修改。
+          ./gradlew --stop || true
           rm -rf "$GRADLE_USER_HOME/daemon"
           find "$GRADLE_USER_HOME" -type f -name '*.lock' -delete || true
           GRADLE_DEPS_STAGE="$(new_stage gradle-deps)"
-          ln -s "$GRADLE_USER_HOME" "$GRADLE_DEPS_STAGE/gradle-user-home"
+          cp -a "$GRADLE_USER_HOME" "$GRADLE_DEPS_STAGE/gradle-user-home"
+          find "$GRADLE_DEPS_STAGE/gradle-user-home" -type f -name '*.lock' -delete || true
           make_component gradle-deps "$GRADLE_DEPS_STAGE"
 
           test -d .gradle/runtime-cache
