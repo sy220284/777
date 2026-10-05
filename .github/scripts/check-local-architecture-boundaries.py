@@ -21,7 +21,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
 
 RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 14,
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 2,
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 1,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 12,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
@@ -817,6 +817,16 @@ if "runtimeStateStore.observeJobSnapshots(::projectJobSnapshot)" not in work_run
     die("WorkFeature must observe shared background-job snapshots without Engine mediation")
 if "runtimeStateStore.jobManager.output" not in work_runtime_source or "runtimeStateStore.jobManager.kill" not in work_runtime_source:
     die("WorkRuntime must access background jobs through the shared Runtime capability")
+if "LocalWorkPlanModeCoordinator" not in work_runtime_source or "engine.setPlanMode" in work_runtime_source:
+    die("Work plan-mode ownership must stay inside WorkFeature")
+if "workRunRegistry.requestCancel(runtimeStateStore.currentSessionId)" not in work_runtime_source:
+    die("Work session-bound cancellation must stay inside WorkFeature")
+if "foregroundModelHistory = LocalModelHistoryBuffer()" not in runtime_state_store:
+    die("Shared Runtime must own the visible foreground model-history state")
+if "private val modelHistory = LocalModelHistoryBuffer()" in engine:
+    die("LocalHarnessEngine must not recreate foreground model-history ownership")
+if "internal fun setPlanMode(enabled: Boolean)" in engine:
+    die("LocalHarnessEngine must not own Work plan-mode transitions")
 if "LocalPersistentJobStore(" in engine or "LocalJobManager(scope" in engine:
     die("LocalHarnessEngine must not own the process-wide background job manager")
 if "runtimeStateStore.observeResourceSnapshots" in engine or "projectResourceSnapshotToSessionStates" in engine:
