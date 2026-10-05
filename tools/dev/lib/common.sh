@@ -1,6 +1,7 @@
 say() { printf '[777-toolchain] %s\n' "$*"; }
 ok() { printf '[777-toolchain] [OK] %s\n' "$*"; }
 warn() { printf '[777-toolchain] [WARN] %s\n' "$*" >&2; }
+manual() { printf '[777-toolchain] [MANUAL] %s\n' "$*" >&2; }
 fail() { printf '[777-toolchain] [MISSING] %s\n' "$*" >&2; }
 
 repo_root() {
