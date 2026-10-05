@@ -1564,7 +1564,7 @@ class LocalHarnessEngine @Inject internal constructor(
             }
         }
         val job = scope.launch(start = CoroutineStart.LAZY) {
-            runAgentTurn(
+            runWorkAgentTurn(
                 input = content,
                 memoryInput = memoryInput,
                 sourceMessageId = sourceMessageId,
@@ -1999,7 +1999,7 @@ class LocalHarnessEngine @Inject internal constructor(
             }
             return
         }
-        runAgentTurn(input, memoryInput, sourceMessageId)
+        runWorkAgentTurn(input, memoryInput, sourceMessageId)
     }
 
     private fun captureChatPersonaCorrection(text: String) {
@@ -2395,7 +2395,7 @@ class LocalHarnessEngine @Inject internal constructor(
         }
     }
 
-    private suspend fun runAgentTurn(
+    private suspend fun runWorkAgentTurn(
         input: String,
         memoryInput: String = input,
         sourceMessageId: String? = null,
@@ -2915,7 +2915,7 @@ class LocalHarnessEngine @Inject internal constructor(
                 LocalExecutionService.releaseTurn(context, foregroundSessionId, foregroundOutcome)
                 workRunRegistry.finishTurn(binding, completedJob) { next, ownedBinding ->
                     scope.launch(start = CoroutineStart.LAZY) {
-                        runAgentTurn(
+                        runWorkAgentTurn(
                             input = next.content,
                             memoryInput = next.memoryInput,
                             sourceMessageId = next.id,
