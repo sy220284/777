@@ -23,8 +23,13 @@ ENGINE_COMPOSITION_BRIDGE_ALLOWLIST = {
     "workTurnPort",
 }
 ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
+    "sendChat",
+    "queueHumanTurn",
     "queueWorkTurnLocked",
     "queueExistingWorkTurnLocked",
+    "queueTurn",
+    "queueTurnLocked",
+    "runTurn",
     "runAgentTurn",
     "runWorkAgentTurn",
     "runChatTurn",
@@ -39,14 +44,9 @@ ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
 )
 ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST = {
     "editAndResendUserMessage",
-    "queueHumanTurn",
-    "queueTurn",
-    "queueTurnLocked",
     "regenerateReplyForMode",
     "runChatTurn",
-    "runTurn",
     "runWorkAgentTurn",
-    "sendChat",
 }
 
 HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
