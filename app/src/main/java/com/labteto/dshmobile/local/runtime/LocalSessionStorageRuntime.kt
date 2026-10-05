@@ -4,14 +4,18 @@ import android.content.Context
 import com.labteto.dshmobile.local.LocalSessionCoordinator
 import com.labteto.dshmobile.local.LocalSessionRepository
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
+import com.labteto.dshmobile.local.session.LocalSessionStorageManager
+import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.io.OutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 /**
@@ -40,6 +44,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     )
 
     private val repository: LocalSessionRepository
+    private val storageManager = LocalSessionStorageManager(sessionsRoot, json)
     internal val coordinator: LocalSessionCoordinator
 
     init {
@@ -76,6 +81,15 @@ class LocalSessionStorageRuntime @Inject internal constructor(
         )
         return true
     }
+
+    internal suspend fun storageStatus(): LocalSessionStorageStatus =
+        withContext(Dispatchers.IO) { storageManager.status() }
+
+    internal suspend fun compactStorage(): LocalSessionStorageStatus =
+        withContext(Dispatchers.IO) { storageManager.compactAll() }
+
+    internal suspend fun exportStorage(output: OutputStream): Long =
+        withContext(Dispatchers.IO) { storageManager.exportAll(output) }
 
     internal suspend fun writeCurrentSnapshotNow(expectedSessionId: String): Boolean {
         val eventLog = eventLogs.get(expectedSessionId)
