@@ -82,7 +82,6 @@ import com.labteto.dshmobile.local.chat.reconcileCharacterBehaviorTuning
 import com.labteto.dshmobile.local.chat.reconcileGroupCharacterBehaviorTuning
 import com.labteto.dshmobile.local.chat.recoverPendingTimelineRewriteProjection
 import com.labteto.dshmobile.local.chat.replayHardChatContextFromTranscript
-import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
 import com.labteto.dshmobile.local.chat.restoreBranchContext
 import com.labteto.dshmobile.local.chat.restoreChatStateBefore
 import com.labteto.dshmobile.local.chat.restoreGroupStateBefore
@@ -520,7 +519,6 @@ class LocalHarnessEngine @Inject internal constructor(
             runtimeStateStore.foregroundTranscriptProjectionCursor = value
         }
     private val modelHistory = runtimeStateStore.foregroundModelHistory
-    private var turnsSinceModelHistoryCheckpoint = 0
     private val _state = runtimeStateStore.initialize(
         LocalHarnessState(
             workspacePath = workspace.path,
@@ -1109,96 +1107,6 @@ class LocalHarnessEngine @Inject internal constructor(
                     .takeLast(LocalHarnessSettingsCoordinator.MAX_STYLE_GUARD_HITS),
             )
         }
-    }
-
-    internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean {
-        val snapshot = _state.value
-        if (
-            snapshot.loading ||
-            snapshot.kernel.running ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            !snapshot.chat.groupChat.enabled
-        ) return false
-
-        val selected = entries
-            .distinctBy(PersonaGalleryEntry::id)
-            .take(MAX_GROUP_CHAT_MEMBERS)
-        if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
-        scope.launch {
-            val members = resolveLocalGroupChatMembers(
-                entries = selected,
-                previousMembers = snapshot.chat.groupChat.members,
-                chatPersonaStore = chatPersonaStore,
-            )
-            synchronized(runStateLock) {
-                val lease = LocalSessionRuntimeRegistry.tryAcquire(
-                    snapshot.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
-                ) ?: return@synchronized
-                try {
-                    var applied = false
-                    _state.update { current ->
-                        applied = current.sessionId == snapshot.sessionId &&
-                            current.usageMode == LocalUsageMode.CHAT &&
-                            !current.loading && !current.kernel.running &&
-                            activeJob?.isCompleted != false && !sessionTransitioning &&
-                            current.chat.groupChat == snapshot.chat.groupChat &&
-                            current.transcriptIndex.latestDialogueMessageId ==
-                                snapshot.transcriptIndex.latestDialogueMessageId
-                        if (!applied) current else current.copy(
-                            chat = current.chat.copy(
-                                groupChat = current.chat.groupChat.copy(members = members),
-                                replySuggestions = emptyList(),
-                                chatBranches = LocalChatBranchState(),
-                            ),
-                            error = null,
-                        )
-                    }
-                    if (applied) {
-                        refreshGroupModelSystemPrompt()
-                        checkpointModelHistory("group/members-updated")
-                        eventLog.append("group/members", buildJsonObject {
-                            put("count", members.size)
-                            put("gallery_ids", JsonArray(members.map { JsonPrimitive(it.galleryId) }))
-                        })
-                        persist()
-                    }
-                } finally {
-                    lease.close()
-                }
-            }
-        }
-        return true
-    }
-
-    internal fun removeGroupChatMemberByGalleryId(galleryId: String) {
-        val snapshot = _state.value
-        if (
-            snapshot.loading ||
-            snapshot.kernel.running ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            !snapshot.chat.groupChat.enabled ||
-            snapshot.chat.groupChat.members.none { it.galleryId == galleryId }
-        ) return
-
-        _state.update { current ->
-            if (current.sessionId != snapshot.sessionId) current else current.copy(
-                chat = current.chat.copy(
-                    groupChat = current.chat.groupChat.copy(
-                        members = current.chat.groupChat.members.filterNot { it.galleryId == galleryId },
-                        turnCursor = 0,
-                    ),
-                    groupActiveSpeakerName = null,
-                ),
-            )
-        }
-        refreshGroupModelSystemPrompt()
-        checkpointModelHistory("group/member-deleted")
-        eventLog.append("group/members", buildJsonObject {
-            put("action", "member-deleted")
-            put("gallery_id", galleryId)
-            put("count", _state.value.chat.groupChat.members.size)
-        })
-        persist()
     }
 
     /** Generate reply suggestions only on explicit user request. */
@@ -4784,7 +4692,7 @@ class LocalHarnessEngine @Inject internal constructor(
         if (binding != null) {
             binding.turnsSinceModelHistoryCheckpoint = 0
         } else {
-            turnsSinceModelHistoryCheckpoint = 0
+            runtimeStateStore.foregroundTurnsSinceModelHistoryCheckpoint = 0
         }
     }
 
@@ -4801,8 +4709,8 @@ class LocalHarnessEngine @Inject internal constructor(
                 checkpointModelHistory(reason, binding)
             }
         } else {
-            turnsSinceModelHistoryCheckpoint += 1
-            if (turnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
+            runtimeStateStore.foregroundTurnsSinceModelHistoryCheckpoint += 1
+            if (runtimeStateStore.foregroundTurnsSinceModelHistoryCheckpoint >= MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL) {
                 checkpointModelHistory(reason)
             }
         }
