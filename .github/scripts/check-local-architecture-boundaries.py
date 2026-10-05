@@ -357,14 +357,19 @@ if "workReplyRegenerator.regenerate(messageId)" not in engine:
 group_execution_owner_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatExecutionOwner.kt")
 )
+chat_turn_dispatcher_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnDispatcher.kt")
+)
 if "internal suspend fun runOwnedGroupChatTurn(" not in group_execution_owner_source:
     die("ChatFeature must own group-chat foreground admission")
 if "LocalSessionRuntimeRegistry.withOwner(" not in group_execution_owner_source:
     die("Group Chat must retain Shared Session ownership")
+if "runOwnedGroupChatTurn(" not in chat_turn_dispatcher_source:
+    die("Chat turn dispatcher must route group turns through Chat-owned execution")
 if "private suspend fun runGroupChatTurn(" in engine:
     die("Group-chat foreground execution proxy must not return to LocalHarnessEngine")
-if "runOwnedGroupChatTurn(" not in engine:
-    die("Group-chat Engine migration call sites must route to Chat-owned execution")
+if re.search(r"\brunOwnedGroupChatTurn\s*\(", strip_comments(engine)):
+    die("LocalHarnessEngine must not directly invoke Chat-owned group execution")
 
 work_turn_starter_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnStarter.kt")

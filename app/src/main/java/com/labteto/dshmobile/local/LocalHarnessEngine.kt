@@ -90,7 +90,6 @@ import com.labteto.dshmobile.local.chat.restoreChatStateBefore
 import com.labteto.dshmobile.local.chat.restoreGroupStateBefore
 import com.labteto.dshmobile.local.chat.restoreMaterializedChatBranchState
 import com.labteto.dshmobile.local.chat.rewriteChatTranscriptFromUserEdit
-import com.labteto.dshmobile.local.chat.runOwnedGroupChatTurn
 import com.labteto.dshmobile.local.chat.saveGroupChatAnnouncement
 import com.labteto.dshmobile.local.chat.selectChatBranchVariant
 import com.labteto.dshmobile.local.chat.sourceEventSequenceForMessage
