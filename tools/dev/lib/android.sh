@@ -38,28 +38,27 @@ accept_android_licenses() {
   return 1
 }
 
-resolve_android_platform_package() {
-  local sdkmanager="$1" candidate canonical available
-  canonical="platforms;android-$ANDROID_COMPILE_API"
-  available="$($sdkmanager --sdk_root="$SDK_ROOT" --list 2>/dev/null || true)"
-  for candidate in "$ANDROID_PLATFORM_PACKAGE" "$canonical"; do
-    if printf '%s\n' "$available" | awk -F'|' '{ gsub(/^[ \t]+|[ \t]+$/, "", $1); print $1 }' | grep -Fxq "$candidate"; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-  echo "[777-toolchain] Android SDK 中未发现 API $ANDROID_COMPILE_API platform（尝试：$ANDROID_PLATFORM_PACKAGE / $canonical）" >&2
-  return 1
-}
-
 install_android_packages() {
-  local sdkmanager="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" platform_package
-  platform_package="$(resolve_android_platform_package "$sdkmanager")"
+  local sdkmanager="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+  local canonical="platforms;android-$ANDROID_COMPILE_API"
   accept_android_licenses
-  local packages=(platform-tools "$platform_package" "build-tools;$ANDROID_BUILD_TOOLS")
-  if [ "$PROFILE" = full ]; then packages+=(emulator "$ANDROID_16_SYSTEM_IMAGE" "$ANDROID_17_SYSTEM_IMAGE"); fi
-  say "安装 / 校验 Android SDK packages：${packages[*]}"
-  "$sdkmanager" --sdk_root="$SDK_ROOT" "${packages[@]}"
+
+  say "安装 / 校验 Android SDK 基础 packages"
+  "$sdkmanager" --sdk_root="$SDK_ROOT" platform-tools "build-tools;$ANDROID_BUILD_TOOLS"
+
+  say "安装 Android platform：$ANDROID_PLATFORM_PACKAGE"
+  if ! "$sdkmanager" --sdk_root="$SDK_ROOT" "$ANDROID_PLATFORM_PACKAGE"; then
+    if [ "$canonical" = "$ANDROID_PLATFORM_PACKAGE" ]; then
+      return 1
+    fi
+    warn "CI 固定 platform 包名安装失败，尝试 sdkmanager 标准包名：$canonical"
+    "$sdkmanager" --sdk_root="$SDK_ROOT" "$canonical"
+  fi
+
+  if [ "$PROFILE" = full ]; then
+    say "安装 Android Emulator 与 Android 16 / 17 system images"
+    "$sdkmanager" --sdk_root="$SDK_ROOT" emulator "$ANDROID_16_SYSTEM_IMAGE" "$ANDROID_17_SYSTEM_IMAGE"
+  fi
 }
 
 create_avds() {
