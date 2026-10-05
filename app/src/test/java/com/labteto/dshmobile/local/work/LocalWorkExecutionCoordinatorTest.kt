@@ -42,7 +42,7 @@ class LocalWorkExecutionCoordinatorTest {
     }
 
     @Test
-    fun regenerateAdmissionIsOwnedByWorkFeatureBeforeStartingTheTurnBridge() {
+    fun regenerateAdmissionIsOwnedByWorkFeatureBeforeStartingRegenerationOwner() {
         val fake = RecordingTurnPort()
         val runtime = readyRuntimeForRegeneration()
         val coordinator = coordinator(fake, runtime)
@@ -64,7 +64,8 @@ class LocalWorkExecutionCoordinatorTest {
             runtimeStateStore = runtime,
             eventLogFor = { error("首轮启动不得绕回持久事件日志入口") },
             enqueueSnapshot = { error("首轮启动不得写排队快照") },
-            turn = turn,
+            startPreparedTurn = turn::startPrepared,
+            startRegeneration = turn::startRegeneration,
         )
 
     private fun defaultRuntime(): LocalRuntimeStateStore =
@@ -117,7 +118,7 @@ class LocalWorkExecutionCoordinatorTest {
             return Job().also { it.complete() }
         }
 
-        override fun startRegeneration(messageId: String): Job {
+        fun startRegeneration(messageId: String): Job {
             regenerateStartCalls += 1
             lastRegenerateId = messageId
             return Job().also { it.complete() }
