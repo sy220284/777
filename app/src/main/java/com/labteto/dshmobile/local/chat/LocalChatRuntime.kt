@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.update
 /** Chat/persona capability boundary for the local UI. */
 @Singleton
 class LocalChatRuntime @Inject internal constructor(
@@ -64,7 +65,17 @@ class LocalChatRuntime @Inject internal constructor(
         engine.selectChatMessageVariant(messageId, targetIndex)
     internal fun regenerateReply(messageId: String): Boolean = engine.regenerateReply(messageId)
     internal fun stop() = runtimeStateStore.performVisibleOperation("停止聊天时保存失败") {
-        engine.stopForegroundRun()
+        val sessionId = runtimeStateStore.currentSessionId
+        LocalChatPostTurnJobOwner.cancel()
+        runtimeStateStore.cancelForegroundRun(sessionStorage.eventLogs.get(sessionId))
+        runtimeStateStore.mutableState.update { current ->
+            if (current.sessionId != sessionId) current else current.copy(
+                work = current.work.copy(
+                    pendingApproval = null,
+                    pendingQuestion = null,
+                ),
+            )
+        }
     }
     internal suspend fun undoChatPersonaCorrection(
         noticeId: Long,
