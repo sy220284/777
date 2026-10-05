@@ -11,6 +11,9 @@ on:
         options:
           - build
           - full
+  schedule:
+    # Artifact 保留 30 天；每月 1 日和 20 日刷新一次，最长间隔 19 天。
+    - cron: '17 3 1,20 * *'
   pull_request:
     paths:
       - 'tools/dev/**'
@@ -37,47 +40,52 @@ jobs:
         run: |
           bash -n tools/dev/setup-toolchain.sh
           bash -n tools/dev/ai-toolchain.sh
+          bash -n tools/dev/install.sh
+          bash tools/dev/install.sh --help >/dev/null
           bash tools/dev/setup-toolchain.sh --self-test
-      - name: 生成可下载工具链包
+
+      - name: 生成一次解压即可使用的工具链包
         run: |
           set -euo pipefail
           ROOT="$RUNNER_TEMP/777-dev-toolchain"
-          mkdir -p "$ROOT/tools/dev" "$ROOT/docs"
-          cp -a tools/dev/. "$ROOT/tools/dev/"
+          rm -rf "$ROOT"
+          mkdir -p "$ROOT/tools" "$ROOT/docs"
+
+          cp -a tools/dev "$ROOT/tools/dev"
+          cp tools/dev/install.sh "$ROOT/install.sh"
           cp docs/DEVELOPMENT.md "$ROOT/docs/"
+
           cat > "$ROOT/安装说明.txt" <<'TXT'
           777 本地开发工具链
 
-          AI / Agent 推荐：
-             bash tools/dev/ai-toolchain.sh bootstrap
-             bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug
-
           人工使用：
+            ./install.sh
+            ./install.sh build
+            ./install.sh full
+            ./install.sh check build
 
-          1. 默认只检查：
-             bash tools/dev/setup-toolchain.sh --check --profile build
+          AI / Agent：
+            bash tools/dev/ai-toolchain.sh bootstrap
+            bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug
 
-          2. 自动配置 APK 构建环境：
-             bash tools/dev/setup-toolchain.sh --auto --profile build --accept-android-licenses --configure-shell
-
-          3. 自动配置完整验证环境：
-             bash tools/dev/setup-toolchain.sh --auto --profile full --accept-android-licenses --create-avds --configure-shell
-
+          下载 GitHub Artifact ZIP 后只需要解压一次。
+          install.sh 会自动校验包内 SHA256SUMS。
           详细说明见 docs/DEVELOPMENT.md。
           TXT
-          chmod +x "$ROOT/tools/dev/setup-toolchain.sh" "$ROOT/tools/dev/ai-toolchain.sh"
-          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/777-dev-toolchain-linux.tar.gz" 777-dev-toolchain
+
+          chmod +x "$ROOT/install.sh" "$ROOT/tools/dev/install.sh" "$ROOT/tools/dev/setup-toolchain.sh" "$ROOT/tools/dev/ai-toolchain.sh"
+
           (
-            cd "$RUNNER_TEMP"
-            sha256sum 777-dev-toolchain-linux.tar.gz > 777-dev-toolchain-linux.tar.gz.sha256
+            cd "$ROOT"
+            find install.sh tools docs 安装说明.txt -type f -print0               | sort -z               | xargs -0 sha256sum > SHA256SUMS
+            sha256sum -c SHA256SUMS
           )
-      - name: 上传工具链产物
+
+      - name: 上传可自动续期的工具链产物
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: 777-dev-toolchain-linux
-          path: |
-            ${{ runner.temp }}/777-dev-toolchain-linux.tar.gz
-            ${{ runner.temp }}/777-dev-toolchain-linux.tar.gz.sha256
+          name: 777-dev-toolchain-latest
+          path: ${{ runner.temp }}/777-dev-toolchain
           retention-days: 30
           if-no-files-found: error
 
@@ -90,9 +98,10 @@ jobs:
       - name: 下载刚生成的工具链产物
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: 777-dev-toolchain-linux
+          name: 777-dev-toolchain-latest
           path: ${{ runner.temp }}/artifact
-      - name: 从产物自动安装并复检
+
+      - name: 从一次解压产物自动安装并复检
         env:
           EVENT_NAME: ${{ github.event_name }}
           DISPATCH_PROFILE: ${{ inputs.profile }}
@@ -103,10 +112,12 @@ jobs:
             PROFILE="$DISPATCH_PROFILE"
           fi
 
-          cd "$RUNNER_TEMP/artifact"
-          sha256sum -c 777-dev-toolchain-linux.tar.gz.sha256
-          tar -xzf 777-dev-toolchain-linux.tar.gz -C "$RUNNER_TEMP"
-          KIT="$RUNNER_TEMP/777-dev-toolchain"
+          KIT="$RUNNER_TEMP/artifact"
+          cd "$KIT"
+          sha256sum -c SHA256SUMS
+          test -x "$KIT/install.sh"
+          bash "$KIT/install.sh" --help >/dev/null
+
           SDK="$RUNNER_TEMP/777-android-sdk"
           TOOLS="$RUNNER_TEMP/777-tools"
           ENV_FILE="$RUNNER_TEMP/777-dev-toolchain.env"
@@ -157,13 +168,53 @@ jobs:
               printf '%s\n' "$TOOLS/node-current/bin"
             fi
           } >> "$GITHUB_PATH"
+
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .gradle/runtime-cache
           key: dev-toolchain-${{ runner.os }}-${{ hashFiles('tools/runtime/prepare-termux-*.sh', 'tools/runtime/prepare-hdiffpatch.sh') }}
+
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+
       - name: 真实构建 smoke test
         run: |
           set -euo pipefail
           java -version
           bash "$AI_TOOLCHAIN" gradle -- :app:assembleDebug --stacktrace
+
+  verify-full-pr:
+    if: github.event_name == 'pull_request'
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: 下载同一工具链产物
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-dev-toolchain-latest
+          path: ${{ runner.temp }}/artifact
+
+      - name: 完整 full 档 Artifact 安装回归
+        run: |
+          set -euo pipefail
+          KIT="$RUNNER_TEMP/artifact"
+          SDK="$RUNNER_TEMP/777-full-android-sdk"
+          TOOLS="$RUNNER_TEMP/777-full-tools"
+          ENV_FILE="$RUNNER_TEMP/777-full-toolchain.env"
+
+          cd "$KIT"
+          sha256sum -c SHA256SUMS
+
+          bash "$KIT/tools/dev/setup-toolchain.sh"             --auto             --profile full             --tools-root "$TOOLS"             --sdk-root "$SDK"             --env-file "$ENV_FILE"             --accept-android-licenses             --create-avds             --non-interactive
+
+          bash "$KIT/tools/dev/setup-toolchain.sh"             --check             --profile full             --tools-root "$TOOLS"             --sdk-root "$SDK"             --env-file "$ENV_FILE"             --non-interactive
+
+          # shellcheck source=/dev/null
+          source "$ENV_FILE"
+          node --version
+          actionlint -version
+          emulator -version | head -n 1
+          "$SDK/cmdline-tools/latest/bin/avdmanager" list avd | grep -F 'Name: 777-android16'
+          "$SDK/cmdline-tools/latest/bin/avdmanager" list avd | grep -F 'Name: 777-android17'
