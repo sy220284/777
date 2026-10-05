@@ -5,6 +5,8 @@ import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.session.LocalSessionRuntime
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
 /** Chat/persona capability boundary for the local UI. */
@@ -15,6 +17,8 @@ class LocalChatRuntime @Inject constructor(
     private val sessionRuntime: LocalSessionRuntime,
     private val personaCorrections: LocalChatPersonaCorrectionCoordinator,
     private val behaviorTuning: LocalCharacterBehaviorTuningCoordinator,
+    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val sessionStorage: LocalSessionStorageRuntime,
     private val personaCoordinator: LocalChatPersonaCoordinator,
 ) {
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = behaviorTuning.configure(profile)
@@ -34,7 +38,18 @@ class LocalChatRuntime @Inject constructor(
     internal fun switchChatMode(mode: LocalChatMode) = sessionRuntime.switchChatMode(mode)
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean =
         engine.configureGroupChatMembers(entries)
-    internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> = engine.setGroupChatAnnouncement(text)
+    internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> {
+        val sessionId = runtimeStateStore.currentSessionId
+        return saveGroupChatAnnouncement(
+            state = runtimeStateStore.mutableState,
+            text = text,
+            sessionId = sessionId,
+            transcriptProjectedThroughSequence =
+                runtimeStateStore.foregroundTranscriptProjectionCursor,
+            sessionCoordinator = sessionStorage.coordinator,
+            eventLog = sessionStorage.eventLogs.get(sessionId),
+        )
+    }
     internal fun removeGroupChatMemberByGalleryId(galleryId: String) =
         engine.removeGroupChatMemberByGalleryId(galleryId)
     internal suspend fun generateReplySuggestions(): Boolean = engine.generateReplySuggestions()
