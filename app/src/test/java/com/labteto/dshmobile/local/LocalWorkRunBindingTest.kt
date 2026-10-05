@@ -38,13 +38,13 @@ class LocalWorkRunBindingTest {
             sessionId = "work",
             kernel = LocalKernelState(resources = LocalHarnessResourceState(activeAgents = 2)),
         ))
-        val binding = binding(visible.value.copy(deviceApprovalLease = true))
+        val binding = binding(visible.value.copy(work = visible.value.work.copy(deviceApprovalLease = true)))
 
         mirrorLocalWorkRunState("work", visible, binding)
 
         assertTrue(visible.value.toWorkSurfaceUiState().deviceApprovalLease)
         assertEquals(2, visible.value.kernel.resources.activeAgents)
-        binding.state.value = binding.state.value.copy(deviceApprovalLease = false)
+        binding.state.value = binding.state.value.copy(work = binding.state.value.work.copy(deviceApprovalLease = false))
         mirrorLocalWorkRunState("work", visible, binding)
         assertFalse(visible.value.toWorkSurfaceUiState().deviceApprovalLease)
     }
@@ -52,7 +52,7 @@ class LocalWorkRunBindingTest {
     @Test fun backgroundWorkCannotPublishDeviceLeaseIntoAnotherSession() {
         val other = LocalHarnessState(sessionId = "other", usageMode = LocalUsageMode.CHAT)
         val visible = MutableStateFlow(other)
-        val binding = binding(LocalHarnessState(sessionId = "work", deviceApprovalLease = true))
+        val binding = binding(LocalHarnessState(sessionId = "work", work = LocalWorkState(deviceApprovalLease = true)))
 
         mirrorLocalWorkRunState("other", visible, binding)
         assertEquals(other, visible.value)
@@ -64,14 +64,13 @@ class LocalWorkRunBindingTest {
     @Test fun teardownClearsRunInteractionAndDeviceLeaseTogether() = runTest {
         val binding = binding(LocalHarnessState(
             sessionId = "work",
-            deviceApprovalLease = true,
             kernel = LocalKernelState(running = true, queuedInputCount = 1),
-            work = LocalWorkState(pendingQuestion = LocalQuestion("question", "继续吗？")),
+            work = LocalWorkState(deviceApprovalLease = true, pendingQuestion = LocalQuestion("question", "继续吗？")),
         ))
 
         binding.cancelAndJoin()
 
-        assertFalse(binding.state.value.deviceApprovalLease)
+        assertFalse(binding.state.value.work.deviceApprovalLease)
         assertFalse(binding.state.value.kernel.running)
         assertEquals(0, binding.state.value.kernel.queuedInputCount)
         assertNull(binding.state.value.work.pendingQuestion)
@@ -107,6 +106,40 @@ class LocalWorkRunBindingTest {
         assertEquals(initialBudget, binding.state.value.kernel.contextBudgetChars)
     }
 
+    @Test fun reentrantResourceChangeCannotReplayOldBudgetIntoWorkBinding() = runTest {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(sessionId = "chat", usageMode = LocalUsageMode.CHAT))
+        var nestedLease: com.labteto.dshmobile.harness.resource.HarnessResourceLease? = null
+        var changed = false
+        runtime.observeResourceSnapshots { snapshot ->
+            if (snapshot.activeAgents == 1 && !changed) {
+                changed = true
+                nestedLease = kotlinx.coroutines.runBlocking {
+                    runtime.resourceScheduler.acquire(HarnessResourceKind.MODEL_REQUEST)
+                }
+            }
+        }
+        val binding = binding(LocalHarnessState(sessionId = "work"))
+        LocalWorkRunRegistry(runtime).attach(binding)
+        var observedModels = -1
+        runtime.observeResourceSnapshots { observedModels = it.activeModelRequests }
+        val agent = runtime.resourceScheduler.acquire(HarnessResourceKind.AGENT)
+        try {
+            assertEquals(1, runtime.resourceSnapshot().activeModelRequests)
+            assertEquals(1, observedModels)
+            assertEquals(1, binding.state.value.kernel.resources.activeModelRequests)
+            assertEquals(
+                runtime.contextBudgetCharsFor(binding.state.value, runtime.resourceSnapshot()),
+                binding.state.value.kernel.contextBudgetChars,
+            )
+        } finally {
+            nestedLease?.close()
+            agent.close()
+        }
+        assertEquals(0, binding.state.value.kernel.resources.activeModelRequests)
+        assertEquals(0, binding.state.value.kernel.resources.activeAgents)
+    }
+
     @Test fun failedCancellationLogCannotPreventRealWorkStopOrTeardown() = runTest {
         for (join in listOf(false, true)) {
             val blocked = File(temporary.newFolder(), "blocked").apply { writeText("not a directory") }
@@ -115,7 +148,7 @@ class LocalWorkRunBindingTest {
                 sessionId = "work",
                 initialState = LocalHarnessState(
                     kernel = LocalKernelState(running = true, queuedInputCount = 1),
-                    deviceApprovalLease = true,
+                    work = LocalWorkState(deviceApprovalLease = true),
                 ),
                 initialHistory = emptyList(), eventLog = log,
                 initialTranscriptProjectionCursor = null, maxPendingInputs = 4,
@@ -134,7 +167,7 @@ class LocalWorkRunBindingTest {
                 }.isFailure)
                 assertTrue(job.isCancelled)
                 assertEquals(0, binding.state.value.kernel.queuedInputCount)
-                assertFalse(binding.state.value.deviceApprovalLease)
+                assertFalse(binding.state.value.work.deviceApprovalLease)
                 if (join) {
                     assertTrue(mirror.isCancelled)
                     assertNull(binding.job)

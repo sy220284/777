@@ -35,6 +35,7 @@ class LocalWorkRunRegistry internal constructor(
 
     private val bindings = java.util.concurrent.ConcurrentHashMap<String, LocalWorkRunBinding>()
     private val jobProjectionLock = Any()
+    private val resourceProjectionLock = Any()
     private var approvalPreferences: LocalApprovalPreferences? = null
     private val approvalProjectionLock = Any()
 
@@ -66,7 +67,9 @@ class LocalWorkRunRegistry internal constructor(
                 approvalPreferences?.let(binding::observeApprovalMode)
             }
         }
-        projectResourceSnapshot(binding, runtimeStateStore.resourceSnapshot())
+        synchronized(resourceProjectionLock) {
+            projectResourceSnapshot(binding, runtimeStateStore.resourceSnapshot())
+        }
         refreshJobProjection(notify = false)
         return previous
     }
@@ -114,9 +117,12 @@ class LocalWorkRunRegistry internal constructor(
         }
     }
 
-    private fun projectResourceSnapshot(snapshot: HarnessResourceSnapshot) {
-        bindings.values.toList().forEach { binding ->
-            projectResourceSnapshot(binding, snapshot)
+    private fun projectResourceSnapshot(@Suppress("UNUSED_PARAMETER") snapshot: HarnessResourceSnapshot) {
+        synchronized(resourceProjectionLock) {
+            val latest = runtimeStateStore.resourceSnapshot()
+            bindings.values.toList().forEach { binding ->
+                projectResourceSnapshot(binding, latest)
+            }
         }
     }
 

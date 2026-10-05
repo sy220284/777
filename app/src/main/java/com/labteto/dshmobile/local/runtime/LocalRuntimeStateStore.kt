@@ -68,6 +68,7 @@ class LocalRuntimeStateStore internal constructor(
     }
 
     private val sendFeedbackMutable = MutableStateFlow(LocalSendFeedbackState())
+    private val resourceProjectionLock = Any()
     private val resourceObservers = CopyOnWriteArrayList<(HarnessResourceSnapshot) -> Unit>()
 
     internal val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
@@ -97,8 +98,10 @@ class LocalRuntimeStateStore internal constructor(
         get() = foregroundSessionId ?: error("LocalRuntimeStateStore 尚未初始化")
 
     internal fun observeResourceSnapshots(observer: (HarnessResourceSnapshot) -> Unit) {
-        resourceObservers += observer
-        runCatching { observer(resourceScheduler.snapshot()) }
+        synchronized(resourceProjectionLock) {
+            resourceObservers += observer
+            runCatching { observer(resourceScheduler.snapshot()) }
+        }
     }
 
     internal fun observeJobSnapshots(observer: (List<LocalJobInfo>) -> Unit) {
@@ -229,9 +232,16 @@ class LocalRuntimeStateStore internal constructor(
         foregroundSessionId = sessionId
     }
 
-    private fun publishResourceSnapshot(snapshot: HarnessResourceSnapshot) {
-        mutable.update { current -> projectResourceSnapshot(current, snapshot) }
-        resourceObservers.forEach { observer -> runCatching { observer(snapshot) } }
+    private fun publishResourceSnapshot(@Suppress("UNUSED_PARAMETER") snapshot: HarnessResourceSnapshot) {
+        synchronized(resourceProjectionLock) {
+            // Scheduler callbacks and initial replay may arrive out of order. Re-read the
+            // authority under the projection lock instead of publishing a captured snapshot.
+            val latest = resourceScheduler.snapshot()
+            mutable.update { current -> projectResourceSnapshot(current, latest) }
+            resourceObservers.forEach { observer ->
+                runCatching { observer(resourceScheduler.snapshot()) }
+            }
+        }
     }
 
     private fun projectResourceSnapshot(

@@ -136,7 +136,7 @@ class LocalWorkApprovalCoordinatorTest {
         f.approvals.enableAutoApprovalForPending("old")
         f.approvals.enableDeviceApprovalLease("old")
         assertFalse(f.preferences.isSafeAutoApprovalEnabled())
-        assertFalse(a.state.value.deviceApprovalLease)
+        assertFalse(a.state.value.work.deviceApprovalLease)
         assertFalse(wait.isCompleted)
 
         assertTrue(a.interactions.answerApproval("current", false))
@@ -144,7 +144,7 @@ class LocalWorkApprovalCoordinatorTest {
         f.approvals.enableAutoApprovalForPending("current")
         f.approvals.enableDeviceApprovalLease("current")
         assertFalse(f.preferences.isSafeAutoApprovalEnabled())
-        assertFalse(a.state.value.deviceApprovalLease)
+        assertFalse(a.state.value.work.deviceApprovalLease)
         assertFalse(wait.await())
     }
 
@@ -156,39 +156,39 @@ class LocalWorkApprovalCoordinatorTest {
         runCurrent()
         f.approvals.enableDeviceApprovalLease("device")
         assertTrue(wait.await())
-        assertTrue(a.state.value.deviceApprovalLease)
-        assertFalse(b.state.value.deviceApprovalLease)
+        assertTrue(a.state.value.work.deviceApprovalLease)
+        assertFalse(b.state.value.work.deviceApprovalLease)
         assertFalse(f.preferences.isSafeAutoApprovalEnabled())
 
         f.runtime.activateSession("b")
         f.runtime.mutableState.value = f.runtime.state.value.copy(sessionId = "b")
         f.approvals.disableDeviceApprovalLease(f.runtime.state.value.sessionId)
-        assertTrue(a.state.value.deviceApprovalLease)
+        assertTrue(a.state.value.work.deviceApprovalLease)
         f.runtime.activateSession("a")
-        f.runtime.mutableState.value = f.runtime.state.value.copy(sessionId = "a", deviceApprovalLease = true)
+        f.runtime.mutableState.value = f.runtime.state.value.copy(sessionId = "a", work = f.runtime.state.value.work.copy(deviceApprovalLease = true))
         f.approvals.disableDeviceApprovalLease(f.runtime.state.value.sessionId)
-        assertFalse(a.state.value.deviceApprovalLease)
-        assertFalse(f.runtime.state.value.deviceApprovalLease)
+        assertFalse(a.state.value.work.deviceApprovalLease)
+        assertFalse(f.runtime.state.value.work.deviceApprovalLease)
     }
 
     @Test fun staleVisibleRevokeCannotClearNewForegroundRunLeaseDuringTransition() = runTest {
         val f = Fixture()
         val a = f.binding("a")
         val b = f.binding("b")
-        a.state.value = a.state.value.copy(deviceApprovalLease = true)
-        b.state.value = b.state.value.copy(deviceApprovalLease = true)
+        a.state.value = a.state.value.copy(work = a.state.value.work.copy(deviceApprovalLease = true))
+        b.state.value = b.state.value.copy(work = b.state.value.work.copy(deviceApprovalLease = true))
         f.runtime.mutableState.value = f.runtime.state.value.copy(
             sessionId = "a",
-            deviceApprovalLease = true,
+            work = f.runtime.state.value.work.copy(deviceApprovalLease = true),
         )
 
         // Session identity advances before the visible projection switches away from A.
         f.runtime.activateSession("b")
         f.approvals.disableDeviceApprovalLease("a")
 
-        assertFalse(a.state.value.deviceApprovalLease)
-        assertFalse(f.runtime.state.value.deviceApprovalLease)
-        assertTrue(b.state.value.deviceApprovalLease)
+        assertFalse(a.state.value.work.deviceApprovalLease)
+        assertFalse(f.runtime.state.value.work.deviceApprovalLease)
+        assertTrue(b.state.value.work.deviceApprovalLease)
     }
 
     @Test fun ineligibleDeviceToolRemainsWaitingWithDurableRejection() = runTest {
@@ -197,7 +197,7 @@ class LocalWorkApprovalCoordinatorTest {
         val wait = async { a.interactions.awaitApproval(approval("explicit")) }
         runCurrent()
         f.approvals.enableDeviceApprovalLease("explicit")
-        assertFalse(a.state.value.deviceApprovalLease)
+        assertFalse(a.state.value.work.deviceApprovalLease)
         assertFalse(wait.isCompleted)
         assertNotNull(a.eventLog.latest("approval/device-lease-rejected"))
         a.interactions.cancelAll()
@@ -210,11 +210,11 @@ class LocalWorkApprovalCoordinatorTest {
         runCurrent()
         f.runtime.activateSession("next")
         f.approvals.enableDeviceApprovalLease("foreground")
-        assertFalse(f.runtime.state.value.deviceApprovalLease)
+        assertFalse(f.runtime.state.value.work.deviceApprovalLease)
         assertFalse(wait.isCompleted)
         f.runtime.activateSession("a")
         f.approvals.enableDeviceApprovalLease("foreground")
         assertTrue(wait.await())
-        assertTrue(f.runtime.state.value.deviceApprovalLease)
+        assertTrue(f.runtime.state.value.work.deviceApprovalLease)
     }
 }

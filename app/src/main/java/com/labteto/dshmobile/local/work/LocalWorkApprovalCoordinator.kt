@@ -106,5 +106,9 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
             ?: return
         target.log.append("approval/device-lease", buildJsonObject { put("active", false) })
         target.interactions.setDeviceApprovalLease(false)
+        // The visible mirror may lag or no longer collect a detached binding during transition.
+        if (runtime.state.value.sessionId == sessionId) {
+            runtime.foregroundInteractions.setDeviceApprovalLease(false)
+        }
     }
 }
