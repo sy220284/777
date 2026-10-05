@@ -21,7 +21,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
 
 RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 14,
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 1,
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 12,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
@@ -42,7 +42,6 @@ ENGINE_CONSUMER_ALLOWLIST = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
 }
 
 UI_AGGREGATE_STATE_ALLOWLIST = {
@@ -207,6 +206,21 @@ if "foregroundInteractions = LocalInteractionCoordinator(mutable)" not in runtim
     die("LocalRuntimeStateStore must own the foreground interaction coordinator")
 if "private val interactions = LocalInteractionCoordinator" in engine:
     die("LocalHarnessEngine must not own a second foreground interaction coordinator")
+for required_runtime_owner in (
+    "foregroundRunLock = Any()",
+    "foregroundPendingInputs = AgentInputQueue(MAX_PENDING_INPUTS)",
+    "foregroundJob: Job?",
+    "cancelForegroundRun(eventLog: LocalSessionEventLog)",
+):
+    if required_runtime_owner not in runtime_state_store:
+        die("Shared Runtime foreground-run ownership is incomplete: " + required_runtime_owner)
+for forbidden_engine_owner in (
+    "private val runStateLock = Any()",
+    "private val pendingInputs = AgentInputQueue",
+    "private var activeJob: Job? = null",
+):
+    if forbidden_engine_owner in engine:
+        die("LocalHarnessEngine must not recreate foreground-run backing state: " + forbidden_engine_owner)
 if "binding.runtimeStateStore.foregroundInteractions" in engine:
     die("Work-bound interactions must resolve through LocalWorkRunBinding.interactions")
 if "?: interactions" in engine or "else interactions." in engine:
@@ -232,6 +246,10 @@ for removed_engine_proxy in (
 ):
     if removed_engine_proxy in engine:
         die("LocalHarnessEngine must not reintroduce Work interaction proxy API: " + removed_engine_proxy)
+if "LocalHarnessEngine" in work_runtime_source or "engine." in work_runtime_source:
+    die("LocalWorkRuntime must not depend on LocalHarnessEngine")
+if "runtimeStateStore.cancelForegroundRun(eventLogs.get(sessionId))" not in work_runtime_source:
+    die("Work visible-run cancellation must use the shared Runtime owner")
 if "check(!initialized)" not in runtime_state_store:
     die("LocalRuntimeStateStore initialization must remain single-owner")
 if "runtimeStateStore.initialize(" not in engine:
@@ -341,10 +359,22 @@ if "engine.state" in automation_runtime_source:
 chat_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt")
 )
+local_view_model_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt")
+)
+if (
+    "LocalUsageMode.CHAT -> runtime.chat.stop()" not in local_view_model_source
+    or "LocalUsageMode.WORK -> runtime.work.stop()" not in local_view_model_source
+):
+    die("Local UI stop action must route to the owning Chat/Work Feature")
 if "sessionRuntime.switchChatMode(mode)" not in chat_runtime_source:
     die("Chat mode switching must route through Session capability")
 if "engine.createGroupChatSession" in chat_runtime_source or "engine.createSingleChatSession" in chat_runtime_source:
     die("Chat session creation must route through Session capability")
+if "engine.undoChatPersonaCorrection" in chat_runtime_source:
+    die("Persona-correction undo must stay inside ChatFeature")
+if "personaCorrections.undo" not in chat_runtime_source:
+    die("ChatRuntime must route persona-correction undo through its Chat coordinator")
 
 model_configuration = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt")
