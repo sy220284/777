@@ -26,7 +26,7 @@ RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 0,
-    "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 5,
+    "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 2,
 }
@@ -40,7 +40,6 @@ ENGINE_CONSUMER_ALLOWLIST = {
     "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt",
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt",
 }
 
@@ -1374,6 +1373,46 @@ if not (ROOT / "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspa
 feature_execution_port_module_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt")
 )
+if "provideLocalToolsManagementPort" not in feature_execution_port_module_source:
+    die("app composition root must provide the Tools management port")
+if "engine.toolsManagementPort" not in feature_execution_port_module_source:
+    die("Tools management composition must expose the plugin-owned port, not Engine proxy methods")
+
+tools_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt")
+)
+if "LocalHarnessEngine" in tools_runtime_source:
+    die("LocalToolsRuntime must not depend on LocalHarnessEngine")
+if not has_typed_property(tools_runtime_source, "LocalToolsManagementPort"):
+    die("LocalToolsRuntime must depend on LocalToolsManagementPort")
+for required_tools_delegate in (
+    "management.servers()",
+    "management.installedPluginIds()",
+    "management.connectHttp(serverId, endpoint)",
+    "management.connectStdio(serverId, command, workingDirectory)",
+    "management.disconnect(serverId)",
+):
+    if required_tools_delegate not in tools_runtime_source:
+        die("ToolsRuntime must route management through LocalToolsManagementPort: " + required_tools_delegate)
+
+tools_management_port_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsManagementPort.kt")
+)
+if "interface LocalToolsManagementPort" not in tools_management_port_source:
+    die("Tools management port contract is missing")
+if "LocalHarnessEngine" in tools_management_port_source:
+    die("Tools management port must not expose LocalHarnessEngine")
+for removed_engine_tools_proxy in (
+    "internal suspend fun mcpServersForUi(",
+    "internal suspend fun connectMcpHttpForUi(",
+    "internal suspend fun connectMcpStdioForUi(",
+    "internal suspend fun disconnectMcpForUi(",
+    "internal fun installedPluginIdsForUi(",
+):
+    if removed_engine_tools_proxy in engine:
+        die("LocalHarnessEngine must not restore Tools management proxy API: " + removed_engine_tools_proxy)
+if "internal val toolsManagementPort: LocalToolsManagementPort" not in engine:
+    die("Engine composition bridge must expose one Tools management port during Stage 3 migration")
 if "provideLocalActiveSessionScopeProvider" not in feature_execution_port_module_source:
     die("app composition root must adapt active Work session scope into the Shared Session access contract")
 if "provideLocalSessionLifecyclePort" not in feature_execution_port_module_source:
