@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.send.LocalPreparedSend
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.send.LocalSendResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -11,7 +12,7 @@ class LocalWorkExecutionCoordinatorTest {
     @Test
     fun emptyInputIsRejectedInsideWorkFeatureWithoutCallingTurnBridge() {
         val fake = RecordingTurnPort()
-        val coordinator = LocalWorkExecutionCoordinator(fake)
+        val coordinator = LocalWorkExecutionCoordinator(LocalWorkRunRegistry(LocalRuntimeStateStore()), fake)
 
         val result = coordinator.send("   ", emptyList())
 
@@ -22,7 +23,7 @@ class LocalWorkExecutionCoordinatorTest {
     @Test
     fun preparedWorkInputIsDelegatedToTheNarrowTurnBridge() {
         val fake = RecordingTurnPort()
-        val coordinator = LocalWorkExecutionCoordinator(fake)
+        val coordinator = LocalWorkExecutionCoordinator(LocalWorkRunRegistry(LocalRuntimeStateStore()), fake)
 
         val result = coordinator.send("  完成这项任务  ", emptyList())
 
@@ -35,7 +36,7 @@ class LocalWorkExecutionCoordinatorTest {
     @Test
     fun regenerateDelegatesWithoutRestoringAnEngineProductEntry() {
         val fake = RecordingTurnPort(regenerateResult = true)
-        val coordinator = LocalWorkExecutionCoordinator(fake)
+        val coordinator = LocalWorkExecutionCoordinator(LocalWorkRunRegistry(LocalRuntimeStateStore()), fake)
 
         assertTrue(coordinator.regenerateReply("assistant-1"))
         assertEquals("assistant-1", fake.lastRegenerateId)
