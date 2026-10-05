@@ -211,6 +211,7 @@ import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.runtime.projectExecutionJobs
 import com.labteto.dshmobile.local.runtime.structuredWorkState
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
+import com.labteto.dshmobile.local.send.LocalPreparedSend
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.send.prepareLocalSend
@@ -254,7 +255,7 @@ import com.labteto.dshmobile.local.tools.string
 import com.labteto.dshmobile.local.usage.LocalTokenUsageContextBridge
 import com.labteto.dshmobile.local.vision.LocalVisionRoute
 import com.labteto.dshmobile.local.work.LocalForegroundRecoveryCoordinator
-import com.labteto.dshmobile.local.work.LocalWorkExecutionPort
+import com.labteto.dshmobile.local.work.LocalWorkTurnPort
 import com.labteto.dshmobile.local.work.LocalRuntimeOwnershipPolicy
 import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.work.asModelAdmissionPort
@@ -1053,9 +1054,14 @@ class LocalHarnessEngine @Inject internal constructor(
             pluginComposition.disconnectMcp(serverId)
     }
 
-    internal val workExecutionPort: LocalWorkExecutionPort = object : LocalWorkExecutionPort {
-        override fun send(text: String, attachments: List<LocalImportedAttachment>): LocalSendResult =
-            sendForMode(LocalUsageMode.WORK, text, attachments)
+    internal val workTurnPort: LocalWorkTurnPort = object : LocalWorkTurnPort {
+        override fun sendPrepared(prepared: LocalPreparedSend): LocalSendResult =
+            queueHumanTurn(
+                prepared.content,
+                prepared.memoryInput,
+                prepared.modelMessage,
+                expectedMode = LocalUsageMode.WORK,
+            )
 
         override fun regenerateReply(messageId: String): Boolean =
             regenerateReplyForMode(LocalUsageMode.WORK, messageId)
@@ -1063,7 +1069,7 @@ class LocalHarnessEngine @Inject internal constructor(
 
     internal val chatExecutionPort: LocalChatExecutionPort = object : LocalChatExecutionPort {
         override fun send(text: String, attachments: List<LocalImportedAttachment>): LocalSendResult =
-            sendForMode(LocalUsageMode.CHAT, text, attachments)
+            sendChat(text, attachments)
 
         override fun editAndResendUserMessage(
             messageId: String,
@@ -1074,9 +1080,8 @@ class LocalHarnessEngine @Inject internal constructor(
             regenerateReplyForMode(LocalUsageMode.CHAT, messageId)
     }
 
-    /** Queue one human turn for the requested product mode. */
-    private fun sendForMode(
-        expectedMode: LocalUsageMode,
+    /** Queue one Chat turn while the Chat execution path is still migrating. */
+    private fun sendChat(
         text: String,
         attachments: List<LocalImportedAttachment> = emptyList(),
     ): LocalSendResult {
@@ -1085,7 +1090,7 @@ class LocalHarnessEngine @Inject internal constructor(
             prepared.content,
             prepared.memoryInput,
             prepared.modelMessage,
-            expectedMode = expectedMode,
+            expectedMode = LocalUsageMode.CHAT,
         )
     }
 
