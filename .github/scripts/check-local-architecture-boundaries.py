@@ -1093,6 +1093,12 @@ if "LocalWorkRunRegistry" not in work_run_binding:
     die("Work job projection must consume LocalWorkRunRegistry instead of a raw active-run map")
 if "LocalWorkRunRegistry" not in token_usage_bridge:
     die("Token usage attribution must resolve active Work state through LocalWorkRunRegistry")
+if "private fun finishBoundWorkTurn" in engine:
+    die("LocalHarnessEngine must not own Work binding completion lifecycle")
+if "internal fun finishTurn(" not in work_run_registry:
+    die("LocalWorkRunRegistry must own Work binding completion and queued continuation lifecycle")
+if "workRunRegistry.finishTurn(" not in engine:
+    die("legacy Agent execution must delegate Work binding completion to LocalWorkRunRegistry")
 
 work_progress = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt")
