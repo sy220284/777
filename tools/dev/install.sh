@@ -6,9 +6,11 @@ SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$SELF_DIR/tools/dev/setup-toolchain.sh" ]; then
   DEV_DIR="$SELF_DIR/tools/dev"
   PACKAGE_ROOT="$SELF_DIR"
+  USER_ENTRY="bash install.sh"
 elif [ -f "$SELF_DIR/setup-toolchain.sh" ]; then
   DEV_DIR="$SELF_DIR"
   PACKAGE_ROOT="$(cd "$SELF_DIR/../.." && pwd)"
+  USER_ENTRY="bash tools/dev/install.sh"
 else
   echo "[777-install] 找不到 tools/dev/setup-toolchain.sh；请确认工具链包完整。" >&2
   exit 2
@@ -22,10 +24,13 @@ usage() {
 777 开发环境安装器
 
 用法：
-  ./install.sh
-  ./install.sh build
-  ./install.sh full
-  ./install.sh check [build|full]
+  bash install.sh                  # GitHub Artifact 解压后
+  bash tools/dev/install.sh        # 仓库内
+
+快捷：
+  bash install.sh build
+  bash install.sh full
+  bash install.sh check [build|full]
 
 快捷命令：
   build       自动配置日常 APK 构建环境
@@ -71,7 +76,7 @@ show_success() {
   ./gradlew :app:assembleDebug
 
 以后检查环境：
-  ./install.sh check $profile
+  $USER_ENTRY check $profile
 
 AI / Agent：
   bash tools/dev/ai-toolchain.sh status
