@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.session
 
 import android.net.Uri
-import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
@@ -16,7 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 /** Session/file capability boundary for the local UI. */
 @Singleton
 class LocalSessionRuntime @Inject constructor(
-    private val engine: LocalHarnessEngine,
+    private val lifecycle: LocalSessionLifecyclePort,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionFiles: LocalSessionFilesRuntime,
     private val sessionRead: LocalSessionReadRuntime,
@@ -31,17 +30,17 @@ class LocalSessionRuntime @Inject constructor(
         mode: LocalConversationMode,
         usageMode: LocalUsageMode,
         domainSpec: LocalSessionDomainCreateSpec? = null,
-    ) = engine.createSession(
+    ) = lifecycle.createSession(
         mode = mode,
         usageMode = usageMode,
         domainSpec = domainSpec,
     )
 
     internal fun switchDomainMode(command: LocalSessionDomainModeCommand) =
-        engine.switchSessionDomainMode(command)
-    internal fun switchUsageMode(mode: LocalUsageMode) = engine.switchUsageMode(mode)
-    internal fun switchSession(sessionId: String) = engine.switchSession(sessionId)
-    internal suspend fun deleteSessions(ids: Set<String>): Int = engine.deleteSessions(ids)
+        lifecycle.switchDomainMode(command)
+    internal fun switchUsageMode(mode: LocalUsageMode) = lifecycle.switchUsageMode(mode)
+    internal fun switchSession(sessionId: String) = lifecycle.switchSession(sessionId)
+    internal suspend fun deleteSessions(ids: Set<String>): Int = lifecycle.deleteSessions(ids)
     internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment = sessionFiles.importAttachment(uri)
     internal suspend fun workspaceFilesForUi(): List<LocalWorkspaceFile> = sessionFiles.workspaceFiles()
     internal suspend fun conversationFilesForUi(sessionId: String): LocalConversationFiles =
