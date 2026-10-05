@@ -13,14 +13,46 @@ ENGINE_MAX_PUBLIC_METHODS = 0
 ENGINE_MAX_INTERNAL_METHODS = 1
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
-ENGINE_MAX_COMPOSITION_BRIDGE_REFERENCES = 7
-ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 4
-ENGINE_STAGE3_FEATURE_METHOD_ROOTS = (
+ENGINE_COMPOSITION_BRIDGE_ALLOWLIST = {
+    "automationChatCoordinator",
+    "automationWorkCoordinator",
+    "chatExecutionPort",
+    "diagnosticsPort",
+    "sessionLifecyclePort",
+    "toolsManagementPort",
+    "workTurnPort",
+}
+ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
+    "sendChat",
     "queueHumanTurn",
+    "queueWorkTurnLocked",
+    "queueExistingWorkTurnLocked",
+    "queueTurn",
+    "queueTurnLocked",
+    "runTurn",
+    "runAgentTurn",
     "runWorkAgentTurn",
     "runChatTurn",
+    "runGroupChatTurn",
+    "regenerateReplyForMode",
+    "regenerateWorkReply",
     "editAndResendUserMessage",
+    "workSubagents",
+    "runWorkflow",
+    "exitPlanMode",
+    "scheduleChatPostTurn",
 )
+ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST = {
+    "editAndResendUserMessage",
+    "queueHumanTurn",
+    "queueTurn",
+    "queueTurnLocked",
+    "regenerateReplyForMode",
+    "runChatTurn",
+    "runTurn",
+    "runWorkAgentTurn",
+    "sendChat",
+}
 
 HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": ("LocalGroupChatTurnExecutor", 26),
@@ -1812,23 +1844,49 @@ if "chatContextRefreshCoordinator.schedule(" not in engine:
 if "modelRequestMarkerOrNull()?.let" in engine[engine.find("requestPlanner ="):engine.find("private val chatReplyCoordinator")]:
     die("Chat post-turn planner must not re-read mutable active model identity")
 
-engine_bridge_reference_count = len(re.findall(r"\bengine\s*\.", feature_execution_port_module_source))
-if engine_bridge_reference_count > ENGINE_MAX_COMPOSITION_BRIDGE_REFERENCES:
+engine_composition_bridges = set(
+    re.findall(r"\bengine\s*\.\s*([A-Za-z0-9_]+)", feature_execution_port_module_source)
+)
+unexpected_engine_bridges = sorted(
+    engine_composition_bridges - ENGINE_COMPOSITION_BRIDGE_ALLOWLIST
+)
+if unexpected_engine_bridges:
     die(
-        "Stage-3 Engine-backed composition bridges grew to "
-        f"{engine_bridge_reference_count} (ratchet: {ENGINE_MAX_COMPOSITION_BRIDGE_REFERENCES}); "
-        "Runtime direct-reference zero is not permission to add new Port-to-Engine forwarding"
+        "new Stage-3 Engine-backed composition bridge(s): "
+        + ", ".join(unexpected_engine_bridges)
+        + "; add a real capability owner instead of substituting another Engine proxy"
+    )
+stale_engine_bridges = sorted(
+    ENGINE_COMPOSITION_BRIDGE_ALLOWLIST - engine_composition_bridges
+)
+if stale_engine_bridges:
+    die(
+        "stale Engine composition bridge allowlist entries: "
+        + ", ".join(stale_engine_bridges)
+        + "; tighten the ratchet in the same migration that removes the bridge"
     )
 
-stage3_feature_method_count = sum(
-    1
-    for method in ENGINE_STAGE3_FEATURE_METHOD_ROOTS
+stage3_feature_roots = {
+    method
+    for method in ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES
     if re.search(rf"\bprivate\s+(?:suspend\s+)?fun\s+{re.escape(method)}\s*\(", engine)
+}
+unexpected_stage3_roots = sorted(
+    stage3_feature_roots - ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST
 )
-if stage3_feature_method_count > ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS:
+if unexpected_stage3_roots:
     die(
-        "LocalHarnessEngine regained Stage-3 Feature business roots: "
-        f"{stage3_feature_method_count} (ratchet: {ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS})"
+        "LocalHarnessEngine regained removed Stage-3 Feature business root(s): "
+        + ", ".join(unexpected_stage3_roots)
+    )
+stale_stage3_roots = sorted(
+    ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST - stage3_feature_roots
+)
+if stale_stage3_roots:
+    die(
+        "stale Stage-3 Engine business-root allowlist entries: "
+        + ", ".join(stale_stage3_roots)
+        + "; tighten the ratchet when ownership moves into the Feature"
     )
 
 for transactional_chat_owner in (
