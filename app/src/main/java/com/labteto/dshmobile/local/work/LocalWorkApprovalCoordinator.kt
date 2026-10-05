@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -8,8 +7,6 @@ import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -27,18 +24,18 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
     }
 
     private val modeLock = Any()
+
     private data class Target(
-        val state: MutableStateFlow<LocalHarnessState>,
         val interactions: LocalInteractionCoordinator,
         val log: LocalSessionEventLog,
     )
 
     private fun currentTarget(): Target? {
         val sessionId = runtime.currentSessionId
-        runs[sessionId]?.let { return Target(it.state, it.interactions, it.eventLog) }
+        runs[sessionId]?.let { return Target(it.interactions, it.eventLog) }
         // Foreground identity can advance before its visible projection is loaded.
         if (runtime.state.value.sessionId != sessionId || runtime.state.value.loading) return null
-        return Target(runtime.mutableState, runtime.foregroundInteractions, events.get(sessionId))
+        return Target(runtime.foregroundInteractions, events.get(sessionId))
     }
 
     internal fun enableAutoApproval() = synchronized(modeLock) {
@@ -65,16 +62,20 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
         preferences.setSafeAutoApprovalEnabled(enabled)
         val active = mutableListOf<Target>()
         runs.forEachBinding { binding ->
-            active += Target(binding.state, binding.interactions, binding.eventLog)
+            active += Target(binding.interactions, binding.eventLog)
         }
         if (active.none { it.interactions === target.interactions }) active += target
         active.forEach { owner ->
-            val pending = owner.state.value.work.pendingApproval
+            val pending = owner.interactions.pendingApproval()
             owner.log.append("approval/mode", buildJsonObject {
                 put("mode", if (enabled) "global" else "ask")
                 pending?.toolName?.let { put("tool", it) }
             })
-            if (enabled && pending != null && !(skipTargetWaiter && owner.interactions === target.interactions)) {
+            if (
+                enabled &&
+                pending != null &&
+                !(skipTargetWaiter && owner.interactions === target.interactions)
+            ) {
                 owner.interactions.answerApproval(pending.callId, true)
             }
         }
@@ -91,29 +92,19 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
                 false
             } else {
                 target.log.append("approval/device-lease", buildJsonObject { put("active", true) })
-                target.state.update { current ->
-                    current.copy(work = current.work.copy(deviceApprovalLease = true))
-                }
+                target.interactions.setDeviceApprovalLease(true)
                 true
             }
         }
     }
 
     internal fun disableDeviceApprovalLease(sessionId: String) {
-        val target = runs[sessionId]?.let { Target(it.state, it.interactions, it.eventLog) }
+        val target = runs[sessionId]?.let { Target(it.interactions, it.eventLog) }
             ?: runtime.state.value
                 .takeIf { it.sessionId == sessionId }
-                ?.let { Target(runtime.mutableState, runtime.foregroundInteractions, events.get(sessionId)) }
+                ?.let { Target(runtime.foregroundInteractions, events.get(sessionId)) }
             ?: return
         target.log.append("approval/device-lease", buildJsonObject { put("active", false) })
-        target.state.update { current ->
-            current.copy(work = current.work.copy(deviceApprovalLease = false))
-        }
-        runtime.mutableState.update { visible ->
-            if (visible.sessionId == sessionId) visible.copy(
-                work = visible.work.copy(deviceApprovalLease = false),
-            )
-            else visible
-        }
+        target.interactions.setDeviceApprovalLease(false)
     }
 }
