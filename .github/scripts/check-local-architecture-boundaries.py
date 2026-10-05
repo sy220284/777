@@ -427,8 +427,13 @@ if "sessionStorage.enqueueSnapshot(binding.persistenceSnapshot())" not in work_r
     die("Work run persistence must use the narrow Shared Session storage command")
 if "private fun mirrorVisibleWorkRun" in engine:
     die("LocalHarnessEngine must not own Work visible run projection")
-if not has_call(engine, "workRunRegistry", "mirrorVisible"):
-    die("Engine migration call sites must delegate Work visible projection to LocalWorkRunRegistry")
+work_turn_starter_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnStarter.kt")
+)
+if not has_call(work_turn_starter_source, "workRunRegistry", "mirrorVisible"):
+    die("Work first-turn owner must delegate visible projection to LocalWorkRunRegistry")
+if has_call(engine, "workRunRegistry", "mirrorVisible"):
+    die("LocalHarnessEngine must not regain Work visible projection call sites")
 if "projectJobSnapshotToSessionStates" in work_registry_source:
     die("legacy Work job projection must not regain direct aggregate-state access")
 
