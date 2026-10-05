@@ -61,6 +61,9 @@ class LocalWorkRunRegistry internal constructor(
     internal fun detach(binding: LocalWorkRunBinding): Boolean =
         bindings.remove(binding.sessionId, binding)
 
+    internal fun requestCancel(sessionId: String): Boolean =
+        bindings[sessionId]?.requestCancel() == true
+
     internal fun detachAll(sessionIds: Set<String>): List<LocalWorkRunBinding> =
         sessionIds.mapNotNull(bindings::remove)
 
