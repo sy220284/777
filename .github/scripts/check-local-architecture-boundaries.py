@@ -316,6 +316,19 @@ if not has_call(work_registry_source, "runtimeStateStore.projection", "projectJo
     die("Work visible job projection must use LocalRuntimeProjection")
 if not has_call(work_registry_source, "runtimeStateStore.projection", "projectVisibleWorkRun"):
     die("Work visible run projection must be owned by LocalWorkRunRegistry through Shared Runtime")
+for required_work_send_owner in (
+    "internal fun enqueueIntoLiveRun(prepared: LocalPreparedSend)",
+    "coordinateOwnedLocalSend(",
+    "encodeLocalAgentInboxEvent(",
+    "binding.transcriptRuntime.applyMessages(",
+    "persistBinding(binding)",
+):
+    if required_work_send_owner not in work_registry_source:
+        die("Work live-run additional-input ownership is incomplete: " + required_work_send_owner)
+if "sessionTransitioning = runtimeStateStore.sessionTransitioning" not in work_registry_source:
+    die("Work send admission must consume the Shared Runtime Session transition fact")
+if "sessionStorage.enqueueSnapshot(binding.persistenceSnapshot())" not in work_registry_source:
+    die("Work run persistence must use the narrow Shared Session storage command")
 if "private fun mirrorVisibleWorkRun" in engine:
     die("LocalHarnessEngine must not own Work visible run projection")
 if not has_call(engine, "workRunRegistry", "mirrorVisible"):
@@ -560,8 +573,12 @@ if "LocalHarnessEngine" in work_execution_coordinator_source:
     die("WorkExecutionPort implementation must stay inside WorkFeature without Engine")
 if "prepareLocalSend(text, attachments)" not in work_execution_coordinator_source:
     die("WorkFeature must own Work input preparation")
+if "workRunRegistry.enqueueIntoLiveRun(prepared)" not in work_execution_coordinator_source:
+    die("WorkFeature must route additional input into the Work-owned live run before the bridge")
 if "turn.sendPrepared(prepared)" not in work_execution_coordinator_source:
-    die("WorkFeature must delegate only the prepared turn to the migration bridge")
+    die("WorkFeature may use the migration bridge only when no live Work binding exists")
+if work_execution_coordinator_source.find("workRunRegistry.enqueueIntoLiveRun(prepared)") > work_execution_coordinator_source.find("turn.sendPrepared(prepared)"):
+    die("Work-owned live-run queue must be checked before the first-turn migration bridge")
 if "interface LocalWorkTurnPort" not in work_turn_port_source:
     die("Work turn migration port contract is missing")
 if "LocalHarnessEngine" in work_turn_port_source or "LocalHarnessState" in work_turn_port_source:
@@ -611,6 +628,8 @@ for required_session_storage in (
 ):
     if required_session_storage not in session_storage_runtime:
         die("Shared Session storage ownership is incomplete: " + required_session_storage)
+if "internal fun enqueueSnapshot(snapshot: LocalHarnessSession)" not in session_storage_runtime:
+    die("Shared Session storage must expose a narrow snapshot enqueue command for Feature-owned runs")
 if "foregroundSessionId" not in runtime_state_store or "activateSession(sessionId: String)" not in runtime_state_store:
     die("LocalRuntimeStateStore must own foreground Session identity")
 if "private var currentSessionId" in engine:
