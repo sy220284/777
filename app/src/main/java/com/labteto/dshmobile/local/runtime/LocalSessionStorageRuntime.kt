@@ -68,7 +68,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
         val eventLog = eventLogs.get(expectedSessionId)
         val controlProjectedThroughSequence = eventLog.latestSequence()
         val transcriptProjectedThroughSequence =
-            runtimeStateStore.foregroundTranscriptProjectionCursor
+            runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor
         val state = runtimeStateStore.state.value
         if (state.sessionId != expectedSessionId) return false
         coordinator.enqueue(
@@ -95,7 +95,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
         val eventLog = eventLogs.get(expectedSessionId)
         val controlProjectedThroughSequence = eventLog.latestSequence()
         val transcriptProjectedThroughSequence =
-            runtimeStateStore.foregroundTranscriptProjectionCursor
+            runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor
         val state = runtimeStateStore.state.value
         if (state.sessionId != expectedSessionId) return false
         coordinator.writeNow(
