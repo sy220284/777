@@ -569,7 +569,9 @@ for forbidden_approval_aggregate in (
 def constructor_dependency_count(relative: str, class_name: str) -> int:
     source = strip_comments(read(relative))
     match = re.search(
-        rf"\bclass\s+{re.escape(class_name)}\s*\((.*?)\n\)\s*\{{",
+        rf"\bclass\s+{re.escape(class_name)}\b"
+        rf"(?:\s+@[A-Za-z0-9_.]+(?:\([^)]*\))?)*"
+        rf"\s*(?:constructor\s*)?\((.*?)\)\s*(?::[^{{]+)?\{{",
         source,
         re.DOTALL,
     )
