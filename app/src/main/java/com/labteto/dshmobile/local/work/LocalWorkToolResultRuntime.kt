@@ -3,7 +3,7 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.harness.tools.ToolResultRetention
 import com.labteto.dshmobile.local.LocalToolOutputStore
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.adaptiveToolResultBudget
+import com.labteto.dshmobile.local.runtime.adaptiveToolResultBudget
 import com.labteto.dshmobile.local.model.projectRecoverableToolResult
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 
