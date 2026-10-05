@@ -91,7 +91,9 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
                 false
             } else {
                 target.log.append("approval/device-lease", buildJsonObject { put("active", true) })
-                target.state.update { it.copy(deviceApprovalLease = true) }
+                target.state.update { current ->
+                    current.copy(work = current.work.copy(deviceApprovalLease = true))
+                }
                 true
             }
         }
@@ -104,9 +106,13 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
                 ?.let { Target(runtime.mutableState, runtime.foregroundInteractions, events.get(sessionId)) }
             ?: return
         target.log.append("approval/device-lease", buildJsonObject { put("active", false) })
-        target.state.update { it.copy(deviceApprovalLease = false) }
+        target.state.update { current ->
+            current.copy(work = current.work.copy(deviceApprovalLease = false))
+        }
         runtime.mutableState.update { visible ->
-            if (visible.sessionId == sessionId) visible.copy(deviceApprovalLease = false)
+            if (visible.sessionId == sessionId) visible.copy(
+                work = visible.work.copy(deviceApprovalLease = false),
+            )
             else visible
         }
     }
