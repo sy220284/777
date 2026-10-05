@@ -58,7 +58,10 @@ class LocalWorkRunRegistryTest {
             awaitCancellation()
         }.substringAfterLast('：')
         val notifications = mutableListOf<List<LocalJobInfo>>()
-        val registry = LocalWorkRunRegistry(runtime) { jobs, _ -> notifications += jobs }
+        val registry = LocalWorkRunRegistry(
+            runtimeStateStore = runtime,
+            notifyJobs = { jobs, _ -> notifications += jobs },
+        )
         val first = binding("session-a")
         val second = binding("session-b")
         try {
@@ -95,7 +98,10 @@ class LocalWorkRunRegistryTest {
         val runtime = LocalRuntimeStateStore(jobOwner = LocalRuntimeJobOwner(this, store))
         runtime.initialize(LocalHarnessState(sessionId = "chat", usageMode = LocalUsageMode.CHAT))
         val notifications = mutableListOf<List<LocalJobInfo>>()
-        val registry = LocalWorkRunRegistry(runtime) { jobs, _ -> notifications += jobs }
+        val registry = LocalWorkRunRegistry(
+            runtimeStateStore = runtime,
+            notifyJobs = { jobs, _ -> notifications += jobs },
+        )
         val restored = binding("session-a")
         try {
             registry.attach(restored)
