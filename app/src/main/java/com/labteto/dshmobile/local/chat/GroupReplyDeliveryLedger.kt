@@ -1,9 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -14,8 +11,8 @@ internal class GroupReplyDeliveryLedger(
     private val sessionId: String,
     previousFailedMemberIds: List<String>,
     responderIds: List<String>,
-    private val state: MutableStateFlow<LocalHarnessState>,
-    private val persist: suspend () -> Unit,
+    private val state: LocalChatStatePort,
+    private val persist: suspend (String) -> Unit,
 ) {
     private val failedIds = previousFailedMemberIds.filterNot { it in responderIds }.toMutableSet()
 
@@ -29,9 +26,13 @@ internal class GroupReplyDeliveryLedger(
         var accepted = false
         state.update { current ->
             accepted = current.sessionId == sessionId
-            if (accepted) current.copy(chat = current.chat.copy(groupChat = candidate)) else current
+            if (accepted) {
+                current.copy(chat = current.chat.copy(groupChat = candidate))
+            } else {
+                current
+            }
         }
-        if (accepted) persist()
+        if (accepted) persist(sessionId)
         return candidate
     }
 
