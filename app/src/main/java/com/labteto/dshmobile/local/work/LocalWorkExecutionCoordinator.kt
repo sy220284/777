@@ -19,6 +19,8 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Job
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /** Work-owned product execution entry. */
 @Singleton
@@ -133,8 +135,38 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         return result
     }
 
-    override fun regenerateReply(messageId: String): Boolean =
-        turn.regenerateReply(messageId)
+    override fun regenerateReply(messageId: String): Boolean {
+        var started: Job? = null
+        val handle = runtimeStateStore.foregroundRunHandle
+        val accepted = synchronized(handle.lock) {
+            val state = runtimeStateStore.state.value
+            if (
+                state.usageMode != LocalUsageMode.WORK ||
+                !state.modelState.configured ||
+                state.loading ||
+                state.chat.groupChat.enabled ||
+                state.kernel.running ||
+                runtimeStateStore.sessionTransitioning ||
+                handle.hasLiveJob() ||
+                handle.pendingInputs.size() != 0
+            ) return@synchronized false
+
+            val last = state.messages.lastOrNull() ?: return@synchronized false
+            if (last.id != messageId || last.role != "assistant") return@synchronized false
+            if (state.messages.dropLast(1).none { it.role == "user" }) return@synchronized false
+            if (
+                handle.modelHistory.lastOrNull()
+                    ?.get("role")
+                    ?.jsonPrimitive
+                    ?.contentOrNull != "assistant"
+            ) return@synchronized false
+
+            started = turn.startRegeneration(messageId).also { handle.job = it }
+            true
+        }
+        started?.start()
+        return accepted
+    }
 
     private fun reject(
         sessionId: String,
