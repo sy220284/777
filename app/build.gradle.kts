@@ -155,6 +155,7 @@ val prepareUpdatePatcher = tasks.register<Exec>("prepareUpdatePatcher") {
 android {
     namespace = "com.labteto.dshmobile"
     compileSdk = 37
+    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         // Keep this fork installable alongside the upstream DSH Mobile app.
@@ -209,8 +210,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
 
@@ -254,6 +255,12 @@ android {
         error += listOf("ImpliedQuantity")
         // `HardcodedText` is deliberately absent: it only inspects XML layouts, and this app has
         // none. Compose string literals have to be caught in review.
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     }
 }
 

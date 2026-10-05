@@ -394,7 +394,7 @@ harness-core / Android runtime / MCP / device
 - Kotlin 2.2.10
 - Jetpack Compose BOM 2026.09.00
 - Hilt 2.59.2
-- Java 17
+- Kotlin 单一源码语言 / JVM 21（构建 JDK 21+）
 
 当前正式版本以 GitHub Releases 的最新标签为准。
 

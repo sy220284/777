@@ -120,6 +120,7 @@ jobs:
           python3 .github/scripts/check-ui-design-system-boundaries.py
           python3 .github/scripts/check-notification-presentation.py
           python3 .github/scripts/check-kotlin-risk-patterns.py
+          python3 .github/scripts/check-build-baseline.py
           python3 .github/scripts/check-local-performance-invariants.py
           python3 .github/scripts/check-local-architecture-boundaries.py
           python3 tools/runtime/compact-runtime-assets.py --self-test
@@ -154,7 +155,7 @@ jobs:
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
@@ -162,6 +163,8 @@ jobs:
       - name: Unit tests and Harness conformance
         run: |
           ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :mock-harness:test             :app:testDebugUnitTest             :reference-validation:test             --stacktrace
+      - name: Verify JVM 21 bytecode output
+        run: python3 .github/scripts/check-jvm21-bytecode.py
 
   build-arm64:
     needs: [scope, static-gates]
@@ -173,7 +176,7 @@ jobs:
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
@@ -210,7 +213,7 @@ jobs:
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'

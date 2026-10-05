@@ -1,185 +1,405 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-if [ -f "$SELF_DIR/tools/dev/setup-toolchain.sh" ]; then
-  DEV_DIR="$SELF_DIR/tools/dev"
-  PACKAGE_ROOT="$SELF_DIR"
-  USER_ENTRY="bash install.sh"
-elif [ -f "$SELF_DIR/setup-toolchain.sh" ]; then
-  DEV_DIR="$SELF_DIR"
-  PACKAGE_ROOT="$(cd "$SELF_DIR/../.." && pwd)"
-  USER_ENTRY="bash tools/dev/install.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/toolchain-versions.env" ]; then
+  DEV_DIR="$SCRIPT_DIR"
+elif [ -f "$SCRIPT_DIR/tools/dev/toolchain-versions.env" ]; then
+  DEV_DIR="$SCRIPT_DIR/tools/dev"
 else
-  echo "[777-install] 找不到 tools/dev/setup-toolchain.sh；请确认工具链包完整。" >&2
+  echo "[777-install] 找不到 tools/dev/toolchain-versions.env。" >&2
   exit 2
 fi
 
-SETUP="$DEV_DIR/setup-toolchain.sh"
-ENV_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/777/dev-toolchain.env"
+VERSIONS_FILE="$DEV_DIR/toolchain-versions.env"
+COMPONENTS_FILE="$DEV_DIR/toolchain-components.env"
+# shellcheck disable=SC1090
+source "$VERSIONS_FILE"
+# shellcheck disable=SC1090
+source "$COMPONENTS_FILE"
+for library in common android optional components check; do
+  # shellcheck disable=SC1090
+  source "$DEV_DIR/lib/$library.sh"
+done
+
+COMMAND="${1:-help}"
+if [ "$#" -gt 0 ]; then shift; fi
+PROFILE=build
+ARTIFACTS_DIR="${DEV777_ARTIFACTS_DIR:-}"
+CONFIGURE_SHELL=false
+CREATE_AVDS=false
+
+TOOLS_ROOT="${DEV777_TOOLS_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/777-dev}"
+SDK_ROOT="${DEV777_ANDROID_SDK_ROOT:-${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$TOOLS_ROOT/android-sdk}}}"
+GRADLE_HOME="${DEV777_GRADLE_HOME:-${GRADLE_HOME:-$TOOLS_ROOT/gradle}}"
+GRADLE_USER_HOME="${DEV777_GRADLE_USER_HOME:-${GRADLE_USER_HOME:-$TOOLS_ROOT/gradle-user-home}}"
+ENV_FILE="${DEV777_TOOLCHAIN_ENV_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/777/dev-toolchain.env}"
+REPO_ROOT="${DEV777_REPO_ROOT:-}"
+if [ -z "$REPO_ROOT" ] && [ -x "$PWD/gradlew" ] && [ -f "$PWD/app/build.gradle.kts" ]; then
+  REPO_ROOT="$PWD"
+fi
+if [ -n "$REPO_ROOT" ]; then
+  export DEV777_REPO_ROOT="$REPO_ROOT"
+fi
 
 usage() {
   cat <<'USAGE'
-777 开发环境安装器
+777 开发工具链按需安装器
 
 用法：
-  bash install.sh                  # GitHub Artifact 解压后
-  bash tools/dev/install.sh        # 仓库内
+  bash tools/dev/install.sh plan [build|full]
+  bash tools/dev/install.sh install [build|full] --artifacts-dir PATH
+  bash tools/dev/install.sh check [build|full]
 
-快捷：
-  bash install.sh build
-  bash install.sh full
-  bash install.sh check [build|full]
+选项：
+  --artifacts-dir PATH   已下载并解压的 GitHub Actions 组件 Artifact 根目录
+  --configure-shell     将环境文件接入 shell rc
+  --create-avds         full 档使用已安装镜像创建 Android 16 / 17 AVD
 
-快捷命令：
-  build       自动配置日常 APK 构建环境
-  full        自动配置完整 CI 验证环境，并创建 Android 16/17 AVD
-  check       只检查，不修改机器
-
-无参数时进入交互向导。
-AI / Agent 请使用 tools/dev/ai-toolchain.sh。
+规则：
+  - plan 只检查本机，输出真正缺失的 Artifact 名称。
+  - install 只安装缺失组件；已经满足版本要求的组件直接复用。
+  - 组件来源只允许 GitHub Actions Artifact。
+  - 大组件会拆成多个 part Artifact；同一组件缺失时需下载 plan 列出的全部 part。
+  - 本地不会从 apt、Google SDK、Gradle/Maven、Node 等其他渠道补齐。
 USAGE
 }
 
-verify_package() {
-  if [ -f "$PACKAGE_ROOT/SHA256SUMS" ]; then
-    echo "[777-install] 校验工具链包完整性..."
-    (
-      cd "$PACKAGE_ROOT"
-      sha256sum -c SHA256SUMS
-    )
-  fi
-}
-
-ask_yes_no() {
-  local prompt="$1" default_yes="${2:-true}" answer
-  if [ "$default_yes" = true ]; then
-    read -r -p "$prompt [Y/n] " answer || true
-    case "${answer:-Y}" in y|Y|yes|YES|Yes) return 0 ;; *) return 1 ;; esac
-  else
-    read -r -p "$prompt [y/N] " answer || true
-    case "${answer:-N}" in y|Y|yes|YES|Yes) return 0 ;; *) return 1 ;; esac
-  fi
-}
-
-show_success() {
-  local profile="$1"
-  cat <<EOF
-
-✅ 777 开发环境配置完成（$profile）。
-
-当前终端立即启用：
-  source "$ENV_FILE"
-
-验证构建：
-  ./gradlew :app:assembleDebug
-
-以后检查环境：
-  $USER_ENTRY check $profile
-
-AI / Agent：
-  bash tools/dev/ai-toolchain.sh status
-EOF
-}
-
-run_install() {
-  local profile="$1" configure_shell="${2:-true}"
-  local args=(--auto --profile "$profile")
-  if [ "$profile" = full ]; then
-    args+=(--create-avds)
-  fi
-  if [ "$configure_shell" = true ]; then
-    args+=(--configure-shell)
-  fi
-
-  echo
-  echo "777 开发环境配置"
-  echo "----------------"
-  if [ "$profile" = build ]; then
-    echo "档位：日常开发 / APK 构建"
-  else
-    echo "档位：完整 CI 验证环境"
-  fi
-  echo
-  echo "Android SDK license 将由 sdkmanager 在终端中显示并由你确认。"
-  echo
-
-  bash "$SETUP" "${args[@]}"
-  show_success "$profile"
-}
-
-verify_package
-
-command="${1:-}"
-case "$command" in
+case "$COMMAND" in
+  plan|install|check)
+    if [ "$#" -gt 0 ] && { [ "$1" = build ] || [ "$1" = full ]; }; then
+      PROFILE="$1"
+      shift
+    fi
+    ;;
   -h|--help|help)
     usage
     exit 0
     ;;
-  build)
-    run_install build true
-    exit 0
-    ;;
-  full)
-    run_install full true
-    exit 0
-    ;;
-  check)
-    profile="${2:-build}"
-    if [ "$profile" != build ] && [ "$profile" != full ]; then
-      echo "[777-install] check 只支持 build 或 full。" >&2
-      exit 2
-    fi
-    exec bash "$SETUP" --check --profile "$profile"
-    ;;
-  "")
-    ;;
   *)
-    echo "[777-install] 未知命令：$command" >&2
+    echo "[777-install] 未知命令：$COMMAND" >&2
     usage >&2
     exit 2
     ;;
 esac
 
-if [ ! -t 0 ]; then
-  echo "[777-install] 无参数交互模式需要终端。非交互环境请显式使用 build/full，AI 请使用 ai-toolchain.sh。" >&2
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --artifacts-dir)
+      shift
+      ARTIFACTS_DIR="${1:-}"
+      ;;
+    --configure-shell)
+      CONFIGURE_SHELL=true
+      ;;
+    --create-avds)
+      CREATE_AVDS=true
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "[777-install] 未知参数：$1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
+detect_host_arch
+if [ "$ARCH_KIND" != x64 ]; then
+  echo "[777-install] 当前组件 Artifact 只发布 x64，检测到：$ARCH_KIND" >&2
   exit 2
 fi
 
-cat <<'MENU'
-777 开发环境配置
+if [ "$COMMAND" = plan ]; then
+  missing_artifacts "$PROFILE"
+  exit 0
+fi
 
-请选择：
-  1. 日常开发 / APK 构建（推荐）
-  2. 完整 CI 验证环境
-  3. 只检查当前环境
-MENU
+if [ "$COMMAND" = check ]; then
+  exec bash "$DEV_DIR/setup-toolchain.sh" --check --profile "$PROFILE" \
+    --tools-root "$TOOLS_ROOT" \
+    --sdk-root "$SDK_ROOT" \
+    --gradle-home "$GRADLE_HOME" \
+    --gradle-user-home "$GRADLE_USER_HOME" \
+    --env-file "$ENV_FILE"
+fi
 
-read -r -p "选择 [1]: " choice
-choice="${choice:-1}"
+if [ -z "$ARTIFACTS_DIR" ] || [ ! -d "$ARTIFACTS_DIR" ]; then
+  echo "[777-install] install 需要 --artifacts-dir，目录中放置按 plan 下载并解压的组件 Artifact。" >&2
+  exit 2
+fi
 
-case "$choice" in
-  1) profile=build ;;
-  2) profile=full ;;
-  3)
-    read -r -p "检查档位 build/full [build]: " profile
-    profile="${profile:-build}"
-    exec bash "$SETUP" --check --profile "$profile"
-    ;;
-  *)
-    echo "[777-install] 无效选择：$choice" >&2
+for command_name in sha256sum tar gzip cat cp rm mkdir mktemp uname sed head; do
+  command -v "$command_name" >/dev/null 2>&1 || {
+    echo "[777-install] 宿主缺少基础命令：$command_name；不会从其他渠道安装。" >&2
+    exit 1
+  }
+done
+
+safe_root() {
+  local path="$1" label="$2"
+  if [ -z "$path" ] || [ "$path" = / ] || [ "$path" = "$HOME" ]; then
+    echo "[777-install] 拒绝危险的 $label 路径：$path" >&2
     exit 2
-    ;;
-esac
+  fi
+}
+safe_root "$TOOLS_ROOT" TOOLS_ROOT
+safe_root "$SDK_ROOT" SDK_ROOT
+safe_root "$GRADLE_HOME" GRADLE_HOME
+safe_root "$GRADLE_USER_HOME" GRADLE_USER_HOME
+if [ -n "$REPO_ROOT" ]; then safe_root "$REPO_ROOT" REPO_ROOT; fi
 
-if ! ask_yes_no "是否自动安装缺失工具？" true; then
-  exec bash "$SETUP" --check --profile "$profile"
+find_artifact_dir() {
+  local artifact="$1"
+  if [ -f "$ARTIFACTS_DIR/$artifact/component.env" ]; then
+    printf '%s\n' "$ARTIFACTS_DIR/$artifact"
+    return 0
+  fi
+
+  # 兼容用户只解压了单个 Artifact，并直接把该目录传给 --artifacts-dir。
+  if [ -f "$ARTIFACTS_DIR/component.env" ]; then
+    printf '%s\n' "$ARTIFACTS_DIR"
+    return 0
+  fi
+  return 1
+}
+
+verify_artifact_dir() {
+  local component="$1" dir="$2" expected_part="$3" expected_parts="$4"
+  local artifact_component artifact_arch artifact_part artifact_parts payload_file
+
+  if [ ! -f "$dir/SHA256SUMS" ] || [ ! -f "$dir/component.env" ]; then
+    echo "[777-install] Artifact 不完整：$dir" >&2
+    return 3
+  fi
+
+  if [ "$expected_parts" -eq 1 ]; then
+    payload_file="payload.tar.gz"
+  else
+    payload_file="payload.part"
+  fi
+  if [ ! -f "$dir/$payload_file" ]; then
+    echo "[777-install] Artifact 缺少 $payload_file：$dir" >&2
+    return 3
+  fi
+
+  (
+    cd "$dir"
+    sha256sum -c SHA256SUMS
+  )
+
+  # 只有 SHA-256 通过后才加载 Actions 生成的元数据。
+  unset ARTIFACT_COMPONENT ARTIFACT_ARCH ARTIFACT_PART ARTIFACT_PARTS
+  # shellcheck disable=SC1090
+  source "$dir/component.env"
+  artifact_component="${ARTIFACT_COMPONENT:-}"
+  artifact_arch="${ARTIFACT_ARCH:-}"
+  artifact_part="${ARTIFACT_PART:-1}"
+  artifact_parts="${ARTIFACT_PARTS:-1}"
+
+  [ "$artifact_component" = "$component" ] || {
+    echo "[777-install] 组件身份不匹配：期望 $component，实际 $artifact_component" >&2
+    return 3
+  }
+  [ "$artifact_arch" = "$ARCH_KIND" ] || {
+    echo "[777-install] 组件架构不匹配：$artifact_arch / $ARCH_KIND" >&2
+    return 3
+  }
+  [ "$artifact_part" = "$expected_part" ] || {
+    echo "[777-install] 分片序号不匹配：$component 期望 $expected_part，实际 $artifact_part" >&2
+    return 3
+  }
+  [ "$artifact_parts" = "$expected_parts" ] || {
+    echo "[777-install] 分片总数不匹配：$component 期望 $expected_parts，实际 $artifact_parts" >&2
+    return 3
+  }
+}
+
+materialize_component_archive() {
+  local component="$1" target="$2"
+  local parts artifact dir part=1
+  parts="$(component_part_count "$component")"
+
+  rm -f "$target"
+  : > "$target"
+
+  while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
+    dir="$(find_artifact_dir "$artifact" || true)"
+    if [ -z "$dir" ]; then
+      echo "[777-install] 缺少组件 Artifact：$artifact" >&2
+      return 3
+    fi
+    verify_artifact_dir "$component" "$dir" "$part" "$parts" || return $?
+
+    if [ "$parts" -eq 1 ]; then
+      cat "$dir/payload.tar.gz" > "$target"
+    else
+      cat "$dir/payload.part" >> "$target"
+    fi
+    part=$((part + 1))
+  done < <(artifact_names_for_component "$component")
+
+  if [ "$part" -ne $((parts + 1)) ]; then
+    echo "[777-install] $component 分片数量不完整。" >&2
+    return 3
+  fi
+  gzip -t "$target"
+}
+
+install_component() {
+  local component="$1" tmp archive
+  tmp="$(mktemp -d)"
+  archive="$tmp/payload.tar.gz"
+
+  if ! materialize_component_archive "$component" "$archive"; then
+    rm -rf "$tmp"
+    return 3
+  fi
+
+  tar -xzf "$archive" -C "$tmp"
+
+  case "$component" in
+    jdk)
+      test -d "$tmp/jdk"
+      rm -rf "$TOOLS_ROOT/jdk"
+      mkdir -p "$TOOLS_ROOT"
+      cp -a "$tmp/jdk" "$TOOLS_ROOT/jdk"
+      ;;
+    android-core)
+      test -d "$tmp/android-sdk"
+      mkdir -p "$SDK_ROOT"
+      for part in cmdline-tools platform-tools build-tools platforms licenses; do
+        if [ -e "$tmp/android-sdk/$part" ]; then
+          rm -rf "$SDK_ROOT/$part"
+          cp -a "$tmp/android-sdk/$part" "$SDK_ROOT/$part"
+        fi
+      done
+      ;;
+    gradle-runtime)
+      test -d "$tmp/gradle"
+      rm -rf "$GRADLE_HOME"
+      mkdir -p "$(dirname "$GRADLE_HOME")"
+      cp -a "$tmp/gradle" "$GRADLE_HOME"
+      ;;
+    gradle-deps)
+      test -d "$tmp/gradle-user-home"
+      rm -rf "$GRADLE_USER_HOME"
+      mkdir -p "$(dirname "$GRADLE_USER_HOME")"
+      cp -a "$tmp/gradle-user-home" "$GRADLE_USER_HOME"
+      ;;
+    runtime-cache)
+      test -d "$tmp/runtime-cache"
+      if [ -z "$REPO_ROOT" ]; then
+        echo "[777-install] runtime-cache 需要在 777 仓库根目录执行，或设置 DEV777_REPO_ROOT。" >&2
+        rm -rf "$tmp"
+        return 3
+      fi
+      mkdir -p "$REPO_ROOT/.gradle"
+      rm -rf "$REPO_ROOT/.gradle/runtime-cache"
+      cp -a "$tmp/runtime-cache" "$REPO_ROOT/.gradle/runtime-cache"
+      ;;
+    node)
+      test -d "$tmp/node-current"
+      rm -rf "$TOOLS_ROOT/node-current"
+      mkdir -p "$TOOLS_ROOT"
+      cp -a "$tmp/node-current" "$TOOLS_ROOT/node-current"
+      ;;
+    actionlint)
+      test -x "$tmp/bin/actionlint"
+      mkdir -p "$TOOLS_ROOT/bin"
+      cp -a "$tmp/bin/actionlint" "$TOOLS_ROOT/bin/actionlint"
+      chmod +x "$TOOLS_ROOT/bin/actionlint"
+      ;;
+    emulator)
+      test -d "$tmp/android-sdk/emulator"
+      rm -rf "$SDK_ROOT/emulator"
+      mkdir -p "$SDK_ROOT"
+      cp -a "$tmp/android-sdk/emulator" "$SDK_ROOT/emulator"
+      ;;
+    android-image-16)
+      test -d "$tmp/android-sdk/system-images/android-36"
+      mkdir -p "$SDK_ROOT/system-images"
+      rm -rf "$SDK_ROOT/system-images/android-36"
+      cp -a "$tmp/android-sdk/system-images/android-36" "$SDK_ROOT/system-images/android-36"
+      ;;
+    android-image-17)
+      test -d "$tmp/android-sdk/system-images/android-37.0"
+      mkdir -p "$SDK_ROOT/system-images"
+      rm -rf "$SDK_ROOT/system-images/android-37.0"
+      cp -a "$tmp/android-sdk/system-images/android-37.0" "$SDK_ROOT/system-images/android-37.0"
+      ;;
+    *)
+      echo "[777-install] 未知组件：$component" >&2
+      rm -rf "$tmp"
+      return 3
+      ;;
+  esac
+
+  rm -rf "$tmp"
+  ok "已安装组件：$component"
+}
+
+missing_before="$(missing_components "$PROFILE")"
+if [ -z "$missing_before" ]; then
+  ok "当前 $PROFILE 环境已经满足，无需下载或安装组件"
+else
+  failed=0
+  while IFS= read -r component; do
+    [ -n "$component" ] || continue
+    if component_ready "$component"; then
+      ok "复用现有组件：$component"
+      continue
+    fi
+    install_component "$component" || failed=1
+  done <<< "$missing_before"
+
+  if [ "$failed" -ne 0 ]; then
+    echo "[777-install] 仍缺少以下 Artifact：" >&2
+    missing_artifacts "$PROFILE" >&2
+    exit 3
+  fi
 fi
 
-configure_shell=false
-if ask_yes_no "是否让新终端自动加载 777 开发环境？" true; then
-  configure_shell=true
+java_home="$(find_compatible_java_home || true)"
+if [ -z "$java_home" ]; then
+  echo "[777-install] 安装后仍未找到 JDK >= $BUILD_JDK_MIN_MAJOR。" >&2
+  exit 1
 fi
 
-run_install "$profile" "$configure_shell"
+export JAVA_HOME="$java_home"
+export ANDROID_SDK_ROOT="$SDK_ROOT" ANDROID_HOME="$SDK_ROOT"
+export GRADLE_HOME GRADLE_USER_HOME
+export DEV777_TOOLS_ROOT="$TOOLS_ROOT"
+export DEV777_ANDROID_SDK_ROOT="$SDK_ROOT"
+export DEV777_GRADLE_HOME="$GRADLE_HOME"
+export DEV777_GRADLE_USER_HOME="$GRADLE_USER_HOME"
+
+write_env_file "$JAVA_HOME"
+configure_shell
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+
+if [ "$PROFILE" = full ] && [ "$CREATE_AVDS" = true ]; then
+  create_avds
+fi
+
+bash "$DEV_DIR/setup-toolchain.sh" --check --profile "$PROFILE" \
+  --tools-root "$TOOLS_ROOT" \
+  --sdk-root "$SDK_ROOT" \
+  --gradle-home "$GRADLE_HOME" \
+  --gradle-user-home "$GRADLE_USER_HOME" \
+  --env-file "$ENV_FILE"
+
+cat <<EOF
+
+✅ 777 工具链按需安装完成（$PROFILE）。
+
+只安装了当前缺失组件；已有且版本正确的组件已复用。
+构建入口：
+  bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug
+EOF
