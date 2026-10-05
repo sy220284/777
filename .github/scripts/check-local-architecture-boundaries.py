@@ -51,7 +51,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": ("LocalGroupChatTurnExecutor", 26),
     "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt": ("LocalSubagentRunner", 23),
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt": ("LocalAutomationChatCoordinator", 14),
-    "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt": ("LocalModelRequestCoordinator", 12),
+    "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt": ("LocalModelRequestCoordinator", 4),
 }
 
 RUNTIME_ENGINE_FORBIDDEN_PATHS = (
@@ -335,6 +335,43 @@ if "LocalHarnessEngine" in model_runtime_source:
 model_request_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/model/LocalAgentModelRequestRuntime.kt")
 )
+model_request_coordinator_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt")
+)
+foreground_history_compaction_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/model/LocalForegroundHistoryCompactionRuntime.kt")
+)
+for required_shared_model_request in (
+    "@Inject constructor(",
+    "private val runtimeStateStore: LocalRuntimeStateStore",
+    "private val sessionStorage: LocalSessionStorageRuntime",
+    "private val foregroundCompaction: LocalForegroundHistoryCompactionRuntime",
+    "runtimeStateStore.requestPressureStore",
+    "sessionStorage.eventLogs.get(snapshot.sessionId)",
+):
+    if required_shared_model_request not in model_request_coordinator_source:
+        die("Shared model request coordinator must be injectable and self-contained: " + required_shared_model_request)
+for removed_engine_model_closure in (
+    "toolSchemas:",
+    "defaultEventLog:",
+    "persistOverflowCompaction:",
+):
+    if removed_engine_model_closure in model_request_coordinator_source:
+        die("Shared model request coordinator must not retain Engine composition closure: " + removed_engine_model_closure)
+for required_foreground_compaction_owner in (
+    "class LocalForegroundHistoryCompactionRuntime",
+    "runtimeStateStore.foregroundRunHandle.modelHistory",
+    "runtimeStateStore.requestPressureStore.advanceGeneration(",
+    "sessionStorage.enqueueCurrentSnapshot(snapshot.sessionId)",
+):
+    if required_foreground_compaction_owner not in foreground_history_compaction_source:
+        die("Shared foreground history compaction ownership is incomplete: " + required_foreground_compaction_owner)
+if "private val requestPressureStore = LocalRequestPressureStore()" in engine:
+    die("LocalHarnessEngine must not own a second request-pressure window")
+if "private val modelRequestCoordinator by lazy" in engine or "LocalModelRequestCoordinator(" in engine:
+    die("LocalHarnessEngine must consume the injected Shared model request coordinator")
+if "private fun persistForegroundOverflowCompaction(" in engine:
+    die("LocalHarnessEngine must not own visible foreground overflow persistence")
 if "LocalModelAdmissionPort" not in model_request_runtime_source:
     die("Model Capability must expose a Work-agnostic model admission port")
 if "import com.labteto.dshmobile.local.work." in model_request_runtime_source:
