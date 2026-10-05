@@ -216,6 +216,9 @@ Shared Capability 是多个 Feature 可以安全复用的纯能力边界。
 
 ### Session Capability
 
+`LocalSessionStorageRuntime` 统一持有 Session snapshot Repository/Coordinator，并复用唯一 `LocalSessionEventLogRegistry`；Feature 的持久化不得再借道 Engine 私有 Session 对象。
+
+
 负责：
 
 - Session 读取、写入与生命周期；
