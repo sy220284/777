@@ -122,6 +122,15 @@ runtime_state_store_source = strip_comments(
 if re.search(r"\binternal\s+val\s+mutableState\s*:", runtime_state_store_source):
     die("LocalRuntimeStateStore must not expose its writable aggregate state")
 
+for required_transition_owner in (
+    "private var sessionTransitionInProgress = false",
+    "internal val sessionTransitioning: Boolean",
+    "internal fun beginSessionTransition(): Boolean",
+    "internal fun endSessionTransition()",
+):
+    if required_transition_owner not in runtime_state_store_source:
+        die("Shared Runtime must own Session transition fact: " + required_transition_owner)
+
 # ChatFeature owns the only remaining generic aggregate-write bridge.
 # All Chat coordinators consume LocalChatStatePort; Settings/Model/Work already use explicit domain ports.
 aggregate_projection_migration_allowlist = {
@@ -603,6 +612,8 @@ if "LocalHarnessEngine" in session_runtime_source:
     die("LocalSessionRuntime must not depend on LocalHarnessEngine after Session lifecycle port migration")
 if not has_typed_property(session_runtime_source, "LocalSessionLifecyclePort"):
     die("LocalSessionRuntime must depend on the Session-owned lifecycle port")
+if "class LocalSessionRuntime @Inject internal constructor(" not in session_runtime_source:
+    die("LocalSessionRuntime constructor must stay internal while consuming internal Session contracts")
 for required_lifecycle_delegate in (
     "lifecycle.createSession(",
     "lifecycle.switchDomainMode(command)",
@@ -1480,6 +1491,12 @@ for removed_engine_lifecycle_proxy in (
         die("LocalHarnessEngine must not restore Session lifecycle proxy API: " + removed_engine_lifecycle_proxy)
 if "internal val sessionLifecyclePort: LocalSessionLifecyclePort" not in engine:
     die("Engine composition bridge must expose one Session lifecycle port during Stage 3 migration")
+if "private var sessionTransitioning" in engine:
+    die("LocalHarnessEngine must not own Session transition state")
+if "get() = runtimeStateStore.sessionTransitioning" not in engine:
+    die("Engine migration code must read the Shared Runtime Session transition fact")
+if "runtimeStateStore.beginSessionTransition()" not in engine or "runtimeStateStore.endSessionTransition()" not in engine:
+    die("Session transition mutation must stay owned by Shared Runtime")
 
 conversation_files_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/session/LocalConversationFilesCoordinator.kt")
