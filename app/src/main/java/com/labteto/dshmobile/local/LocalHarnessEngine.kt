@@ -1929,60 +1929,6 @@ class LocalHarnessEngine @Inject internal constructor(
         persist(binding)
     }
 
-    private fun finishBoundWorkTurn(
-        binding: LocalWorkRunBinding,
-        completedJob: Job?,
-    ): Job? = synchronized(runStateLock) {
-        if (binding.runHandle.job !== completedJob) return@synchronized null
-
-        // Always checkpoint the final Work history before detaching it from memory. A later switch
-        // back to this conversation can then rebuild the exact model-visible context from Session
-        // Event without depending on whichever session is currently shown.
-        checkpointModelHistory("work/background-turn-end", binding)
-        persist(binding)
-
-        val next = binding.runHandle.pendingInputs.poll()
-        if (next == null) {
-            binding.runHandle.job = null
-            workRunRegistry.detach(binding)
-            binding.runHandle.projectionJob?.cancel()
-            binding.runHandle.projectionJob = null
-            if (currentSessionId == binding.sessionId && _state.value.sessionId == binding.sessionId) {
-                modelHistory.reset(binding.runHandle.modelHistory.snapshot())
-                transcriptProjectionCursor = binding.runHandle.transcriptProjectionCursor
-                workRunRegistry.mirrorVisible(binding)
-            }
-            return@synchronized null
-        }
-
-        val durableMessage = next.modelMessage ?: buildJsonObject {
-            put("role", "user")
-            put("content", next.content)
-        }
-        binding.state.update { it.copy(kernel = it.kernel.copy(queuedInputCount = binding.runHandle.pendingInputs.size())) }
-        appendUserToModelHistory(durableMessage, binding)
-        binding.eventLog.append(
-            LOCAL_AGENT_INBOX_EVENT_TYPE,
-            encodeLocalAgentInboxEvent(
-                action = "resumed",
-                pending = binding.runHandle.pendingInputs.snapshot(),
-                affected = listOf(next),
-                modelMessages = listOf(durableMessage),
-            ),
-        )
-        persist(binding)
-        scope.launch(start = CoroutineStart.LAZY) {
-            runAgentTurn(
-                input = next.content,
-                memoryInput = next.memoryInput,
-                sourceMessageId = next.id,
-                binding = binding,
-            )
-        }.also { nextJob ->
-            binding.runHandle.job = nextJob
-        }
-    }
-
     private fun startNextQueuedTurnIfIdle(): Job? = synchronized(runStateLock) {
         val liveWorkOwner = liveWorkRun(currentSessionId) != null
         if (
@@ -3074,7 +3020,16 @@ class LocalHarnessEngine @Inject internal constructor(
                 startNextQueuedTurnIfIdle()?.start()
             } else {
                 LocalExecutionService.releaseTurn(context, foregroundSessionId, foregroundOutcome)
-                finishBoundWorkTurn(binding, completedJob)?.start()
+                workRunRegistry.finishTurn(binding, completedJob) { next, ownedBinding ->
+                    scope.launch(start = CoroutineStart.LAZY) {
+                        runAgentTurn(
+                            input = next.content,
+                            memoryInput = next.memoryInput,
+                            sourceMessageId = next.id,
+                            binding = ownedBinding,
+                        )
+                    }
+                }?.start()
             }
         }
     }
