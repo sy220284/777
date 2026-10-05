@@ -40,9 +40,9 @@ component_ready() {
 
   case "$component" in
     jdk)
-      java_home="$(find_java17_home || true)"
+      java_home="$(find_compatible_java_home || true)"
       [ -n "$java_home" ] &&
-        [ "$(java_major "$java_home")" = "$JDK_MAJOR" ] &&
+        [ "$(java_major "$java_home")" -ge "$BUILD_JDK_MIN_MAJOR" ] &&
         [ -x "$java_home/bin/javac" ]
       ;;
     android-core)
@@ -69,11 +69,20 @@ component_ready() {
       ;;
     node)
       node_bin="$TOOLS_ROOT/node-current/bin/node"
-      if [ -x "$node_bin" ] && [ "$("$node_bin" -p 'process.versions.node')" = "$NODE_VERSION" ]; then
-        return 0
+      if [ -x "$node_bin" ]; then
+        local installed_node_major
+        installed_node_major="$(node_major "$node_bin" || true)"
+        if [[ "$installed_node_major" =~ ^[0-9]+$ ]] && [ "$installed_node_major" -ge "$NODE_MIN_MAJOR" ]; then
+          return 0
+        fi
       fi
-      command -v node >/dev/null 2>&1 &&
-        [ "$(node -p 'process.versions.node' 2>/dev/null)" = "$NODE_VERSION" ]
+      if command -v node >/dev/null 2>&1; then
+        local system_node_major
+        system_node_major="$(node_major "$(command -v node)" || true)"
+        [[ "$system_node_major" =~ ^[0-9]+$ ]] && [ "$system_node_major" -ge "$NODE_MIN_MAJOR" ]
+      else
+        return 1
+      fi
       ;;
     actionlint)
       if [ -x "$TOOLS_ROOT/bin/actionlint" ]; then
