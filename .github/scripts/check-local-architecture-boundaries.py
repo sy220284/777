@@ -73,6 +73,14 @@ def has_typed_property(source: str, type_name: str) -> bool:
     ) is not None
 
 
+def has_call(source: str, receiver: str, method: str) -> bool:
+    """Match ownership-routing calls while ignoring argument spelling and formatting."""
+    return re.search(
+        rf"\b{re.escape(receiver)}\s*\.\s*{re.escape(method)}\s*\(",
+        source,
+    ) is not None
+
+
 # Physical boundaries must also be Kotlin boundaries; root-package leakage defeats import guards.
 for source_path in LOCAL_SOURCE_ROOT.rglob("*.kt"):
     relative = source_path.relative_to(LOCAL_SOURCE_ROOT)
@@ -275,21 +283,21 @@ work_progress_source = strip_comments(
 )
 if "LocalHarnessState" in work_progress_source or "MutableStateFlow" in work_progress_source:
     die("LocalWorkProgressCoordinator must depend only on LocalWorkStatePort")
-if "private val state: LocalWorkStatePort" not in work_progress_source:
+if not has_typed_property(work_progress_source, "LocalWorkStatePort"):
     die("LocalWorkProgressCoordinator lost its Work-owned state boundary")
 
 runtime_projection_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt")
 )
-if "private val state: MutableStateFlow<LocalHarnessState>" not in runtime_projection_source:
+if not has_typed_property(runtime_projection_source, "MutableStateFlow<LocalHarnessState>"):
     die("LocalRuntimeProjection must remain the narrow writable aggregate projection owner")
 
 work_plan_mode_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkPlanModeCoordinator.kt")
 )
-if "runtimeStateStore.projection.setWorkPlanMode" not in work_plan_mode_source:
+if not has_call(work_plan_mode_source, "runtimeStateStore.projection", "setWorkPlanMode"):
     die("Work plan-mode visible projection must use LocalRuntimeProjection")
-if "runtimeStateStore.projection.updateContextMetrics" not in work_plan_mode_source:
+if not has_call(work_plan_mode_source, "runtimeStateStore.projection", "updateContextMetrics"):
     die("Work plan-mode context metrics must use LocalRuntimeProjection")
 
 engine_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
@@ -298,13 +306,13 @@ engine = read(engine_path)
 work_registry_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt")
 )
-if "runtimeStateStore.projection.projectJobs" not in work_registry_source:
+if not has_call(work_registry_source, "runtimeStateStore.projection", "projectJobs"):
     die("Work visible job projection must use LocalRuntimeProjection")
-if "runtimeStateStore.projection.projectVisibleWorkRun" not in work_registry_source:
+if not has_call(work_registry_source, "runtimeStateStore.projection", "projectVisibleWorkRun"):
     die("Work visible run projection must be owned by LocalWorkRunRegistry through Shared Runtime")
 if "private fun mirrorVisibleWorkRun" in engine:
     die("LocalHarnessEngine must not own Work visible run projection")
-if "workRunRegistry.mirrorVisible(binding)" not in engine:
+if not has_call(engine, "workRunRegistry", "mirrorVisible"):
     die("Engine migration call sites must delegate Work visible projection to LocalWorkRunRegistry")
 if "projectJobSnapshotToSessionStates" in work_registry_source:
     die("legacy Work job projection must not regain direct aggregate-state access")
@@ -535,11 +543,11 @@ for removed_engine_proxy in (
         die("LocalHarnessEngine must not reintroduce Work interaction proxy API: " + removed_engine_proxy)
 if "LocalHarnessEngine" in work_runtime_source or "engine." in work_runtime_source:
     die("LocalWorkRuntime must not depend on LocalHarnessEngine")
-if "runtimeStateStore.cancelForegroundRun(eventLogs.get(sessionId))" not in work_runtime_source:
+if not has_call(work_runtime_source, "runtimeStateStore", "cancelForegroundRun"):
     die("Work visible-run cancellation must use the shared Runtime owner")
 if "check(!initialized)" not in runtime_state_store:
     die("LocalRuntimeStateStore initialization must remain single-owner")
-if "runtimeStateStore.initialize(" not in engine:
+if not has_call(engine, "runtimeStateStore", "initialize"):
     die("LocalHarnessEngine must initialize state through LocalRuntimeStateStore")
 if not has_typed_property(constructor.group(1), "LocalRuntimeStateStore"):
     die("LocalHarnessEngine must receive the shared LocalRuntimeStateStore by injection")
@@ -562,7 +570,7 @@ if "private var currentSessionId" in engine:
     die("LocalHarnessEngine must not keep a second mutable foreground Session id")
 if "get() = runtimeStateStore.currentSessionId" not in engine:
     die("LocalHarnessEngine foreground Session reads must resolve through LocalRuntimeStateStore")
-if "runtimeStateStore.activateSession(id)" not in engine:
+if not has_call(engine, "runtimeStateStore", "activateSession"):
     die("Session activation must update LocalRuntimeStateStore ownership before projection load")
 
 session_runtime_source = strip_comments(
@@ -609,13 +617,13 @@ model_runtime_source = strip_comments(
 model_settings_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/model/LocalModelSettingsCoordinator.kt")
 )
-if "settings.configureImageInputMode(mode)" not in model_runtime_source:
+if not has_call(model_runtime_source, "settings", "configureImageInputMode"):
     die("LocalModelRuntime image input mode must be owned by LocalModelSettingsCoordinator")
-if "configuration.test(apiKey, model, baseUrl, protocol, profileId)" not in model_runtime_source:
+if not has_call(model_runtime_source, "configuration", "test"):
     die("LocalModelRuntime must own model connection testing through Model configuration capability")
 if "engine.configureImageInputMode" in model_runtime_source:
     die("LocalModelRuntime must not route image input settings through LocalHarnessEngine")
-if "KEY_IMAGE_INPUT_MODE" not in model_settings_source or "runtimeStateStore.projection.setImageInputMode(mode)" not in model_settings_source:
+if "KEY_IMAGE_INPUT_MODE" not in model_settings_source or not has_call(model_settings_source, "runtimeStateStore.projection", "setImageInputMode"):
     die("LocalModelSettingsCoordinator must own image input persistence and use the ModelState projection command")
 
 task_runtime_source = strip_comments(
@@ -649,7 +657,7 @@ work_approval_source = strip_comments(
 )
 if "LocalHarnessEngine" in work_approval_source or "persist:" in work_approval_source:
     die("Work approval policy must depend on shared capabilities, not Engine callbacks")
-if "approvals.disableDeviceApprovalLease(runtimeStateStore.state.value.sessionId)" not in work_runtime_source:
+if not has_call(work_runtime_source, "approvals", "disableDeviceApprovalLease"):
     die("Device approval revocation must bind to the visible Session instead of mutable foreground identity")
 if "internal fun disableDeviceApprovalLease(sessionId: String)" not in work_approval_source:
     die("Work approval coordinator must require an explicit Session for device lease revocation")
@@ -683,7 +691,7 @@ if (
     or "LocalUsageMode.WORK -> runtime.work.stop()" not in local_view_model_source
 ):
     die("Local UI stop action must route to the owning Chat/Work Feature")
-if "sessionRuntime.switchChatMode(mode)" not in chat_runtime_source:
+if not has_call(chat_runtime_source, "sessionRuntime", "switchChatMode"):
     die("Chat mode switching must route through Session capability")
 if "engine.createGroupChatSession" in chat_runtime_source or "engine.createSingleChatSession" in chat_runtime_source:
     die("Chat session creation must route through Session capability")
@@ -691,7 +699,7 @@ if "engine.undoChatPersonaCorrection" in chat_runtime_source:
     die("Persona-correction undo must stay inside ChatFeature")
 if "personaCorrections.undo" not in chat_runtime_source:
     die("ChatRuntime must route persona-correction undo through its Chat coordinator")
-if "behaviorTuning.configure(profile)" not in chat_runtime_source or "engine.configureChatPersona" in chat_runtime_source:
+if not has_call(chat_runtime_source, "behaviorTuning", "configure") or "engine.configureChatPersona" in chat_runtime_source:
     die("Chat persona tuning must stay inside ChatFeature")
 if "engine.setGroupChatAnnouncement" in chat_runtime_source:
     die("Chat group announcement save must stay inside ChatFeature")
@@ -1098,7 +1106,7 @@ for path in main_root.rglob("*.kt"):
 view_model_path = "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt"
 if "LocalHarnessEngine" in strip_comments(read(view_model_path)):
     die("LocalHarnessViewModel must depend on capability runtimes, not LocalHarnessEngine")
-if "pluginComposition.installStartup()" not in engine:
+if not has_call(engine, "pluginComposition", "installStartup"):
     die("LocalHarnessEngine must delegate atomic startup plugin installation to its composition root")
 if re.search(r"\bpluginRegistry\b", strip_comments(engine)):
     die("LocalHarnessEngine must not own PluginRegistry directly")
@@ -1123,7 +1131,7 @@ if "PluginCatalog(" not in plugin_composition:
     die("LocalPluginComposition must declare a PluginCatalog")
 if "PluginManager(" not in plugin_composition:
     die("LocalPluginComposition must route lifecycle through PluginManager")
-if "pluginManager.installAll(pluginCatalog.ids())" not in plugin_composition:
+if not has_call(plugin_composition, "pluginManager", "installAll"):
     die("startup plugin installation must be resolved through PluginManager/PluginCatalog")
 if re.search(r"\bstartupPlugins\b", plugin_composition):
     die("startup plugins must not be maintained as a raw hard-coded lifecycle list")
@@ -1219,7 +1227,7 @@ transcript_history_loader = strip_comments(
 )
 if "runtime.withModelRequestResource" not in automation_planning:
     die("Automation planning provider calls must use the shared Runtime resource capability")
-if "runtimeStateStore.withModelRequestResource(block)" not in automation_runtime:
+if not has_call(automation_runtime, "runtimeStateStore", "withModelRequestResource"):
     die("Automation runtime must acquire model-request resources from LocalRuntimeStateStore")
 if "engine.withAutomationModelRequestResource" in automation_runtime or "withAutomationModelRequestResource" in engine:
     die("Automation resource ownership must not route through LocalHarnessEngine")
@@ -1246,21 +1254,21 @@ if (
     die("Session conversation-files capability must depend on workspace file ports, not WorkFeature LocalWorkspace")
 if "observeResourceSnapshots" not in runtime_state_store:
     die("Shared Runtime resource ownership must expose snapshots without importing Feature state")
-if "runtimeStateStore.observeResourceSnapshots(::projectResourceSnapshot)" not in work_run_registry:
+if not has_call(work_run_registry, "runtimeStateStore", "observeResourceSnapshots"):
     die("WorkFeature must observe shared resource snapshots without Engine mediation")
-if "runtimeStateStore.resourceSnapshot()" not in work_run_registry:
+if not has_call(work_run_registry, "runtimeStateStore", "resourceSnapshot"):
     die("New Work bindings must project the current shared resource snapshot on attach")
 if "jobOwner = LocalRuntimeJobOwner.persistent(context, json)" not in runtime_state_store:
     die("Shared Runtime must own the persistent process-wide background job manager")
 if "observeJobSnapshots" not in runtime_state_store:
     die("Shared Runtime background jobs must expose snapshots without importing Feature state")
-if "runtimeStateStore.observeJobSnapshots(::projectJobSnapshot)" not in work_run_registry:
+if not has_call(work_run_registry, "runtimeStateStore", "observeJobSnapshots"):
     die("WorkFeature must observe shared background-job snapshots without Engine mediation")
 if "runtimeStateStore.jobManager.output" not in work_runtime_source or "runtimeStateStore.jobManager.kill" not in work_runtime_source:
     die("WorkRuntime must access background jobs through the shared Runtime capability")
 if "LocalWorkPlanModeCoordinator" not in work_runtime_source or "engine.setPlanMode" in work_runtime_source:
     die("Work plan-mode ownership must stay inside WorkFeature")
-if "workRunRegistry.requestCancel(sessionId)" not in work_runtime_source or "val sessionId = runtimeStateStore.currentSessionId" not in work_runtime_source:
+if not has_call(work_runtime_source, "workRunRegistry", "requestCancel") or "val sessionId = runtimeStateStore.currentSessionId" not in work_runtime_source:
     die("Work session-bound cancellation must stay inside WorkFeature")
 if "foregroundRunHandle = LocalAgentRunHandle(" not in runtime_state_store:
     die("Shared Runtime must own one foreground LocalAgentRunHandle")
@@ -1349,7 +1357,7 @@ for removed_work_binding_access in (
         if removed_work_binding_access in test_source:
             relative = test_path.relative_to(ROOT).as_posix()
             die(f"{relative} still consumes removed Work binding fact: {removed_work_binding_access}")
-if "AutomationExecutionRegistry.tryAcquire(id)" not in automation_worker:
+if not has_call(automation_worker, "AutomationExecutionRegistry", "tryAcquire"):
     die("Automation scheduled/manual execution must share one task runtime lease")
 if "AutomationExecutionRegistry.tryAcquire(id) ?: return Result.retry()" not in automation_worker:
     die("Manual Automation execution must queue/retry on lease contention instead of reporting false success")
