@@ -638,8 +638,11 @@ if "behaviorTuning.configure(profile)" not in chat_runtime_source or "engine.con
     die("Chat persona tuning must stay inside ChatFeature")
 if "engine.setGroupChatAnnouncement" in chat_runtime_source:
     die("Chat group announcement save must stay inside ChatFeature")
-if "saveGroupChatAnnouncement(" not in chat_runtime_source or "sessionStorage.coordinator" not in chat_runtime_source:
-    die("ChatRuntime must commit group announcements through shared Session storage")
+if (
+    "saveGroupChatAnnouncement(" not in chat_runtime_source
+    or "persistNow = sessionStorage::writeCurrentSnapshotNow" not in chat_runtime_source
+):
+    die("ChatRuntime must commit group announcements through the shared Session persistence capability")
 if "internal suspend fun setGroupChatAnnouncement(" in engine:
     die("LocalHarnessEngine must not reintroduce group announcement API")
 if "internal suspend fun configureChatPersona(" in engine:
@@ -664,12 +667,14 @@ chat_persona_coordinator = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersonaCoordinator.kt")
 )
 for required_persona_dependency in (
-    "LocalRuntimeStateStore",
+    "LocalChatStatePort",
     "LocalSessionStorageRuntime",
     "ChatPersonaStore",
 ):
     if required_persona_dependency not in chat_persona_coordinator:
         die("Chat persona ownership is incomplete: " + required_persona_dependency)
+if "LocalRuntimeStateStore" in chat_persona_coordinator or "LocalAggregateProjectionPort" in chat_persona_coordinator:
+    die("Chat persona coordinator must not regain aggregate Runtime write access")
 
 model_configuration = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt")
