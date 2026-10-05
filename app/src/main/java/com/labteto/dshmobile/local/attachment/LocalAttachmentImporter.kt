@@ -7,7 +7,7 @@ import android.provider.OpenableColumns
 import com.labteto.dshmobile.local.model.LocalImageMetadata
 import com.labteto.dshmobile.local.model.SUPPORTED_LOCAL_IMAGE_TYPES
 import com.labteto.dshmobile.local.model.validateLocalImageMetadata
-import com.labteto.dshmobile.local.work.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
