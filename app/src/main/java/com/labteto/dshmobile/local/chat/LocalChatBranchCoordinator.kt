@@ -33,10 +33,6 @@ internal class LocalChatBranchCoordinator @Inject constructor(
             activeTranscript = activeTranscript,
             modelHistory = modelHistoryRuntime.history.snapshot(),
             state = LocalTimelineRewriteState(
-                plan = aggregate.work.plan,
-                todos = aggregate.work.todos,
-                goal = aggregate.work.goal,
-                planMode = aggregate.work.planMode,
                 chatState = state.chat.chatState,
                 chatContext = state.chat.chatContext,
                 chatBranches = state.chat.chatBranches,
@@ -106,10 +102,6 @@ internal class LocalChatBranchCoordinator @Inject constructor(
                 activeTranscript = activeMessages,
                 modelHistory = selectedHistory,
                 state = LocalTimelineRewriteState(
-                    plan = state.work.plan,
-                    todos = state.work.todos,
-                    goal = state.work.goal,
-                    planMode = state.work.planMode,
                     chatState = selectedChatState,
                     chatContext = selectedContext,
                     chatBranches = selected,
