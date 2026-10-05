@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.localHistoryBudgetFor
 import com.labteto.dshmobile.local.model.LocalImageCapabilityRegistry
 import com.labteto.dshmobile.local.model.LocalModelState
+import com.labteto.dshmobile.local.model.LocalRequestPressureStore
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
@@ -80,6 +81,7 @@ class LocalRuntimeStateStore internal constructor(
 
     internal val foregroundInteractions = LocalInteractionCoordinator(mutable)
     internal val streamingPreviewStore = LocalStreamingPreviewStore()
+    internal val requestPressureStore = LocalRequestPressureStore()
     internal val foregroundRunHandle = LocalAgentRunHandle(maxPendingInputs = MAX_PENDING_INPUTS)
     internal val jobManager: LocalJobManager
         get() = jobOwner.manager
