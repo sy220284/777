@@ -3,7 +3,11 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETUP="$SCRIPT_DIR/setup-toolchain.sh"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+DEFAULT_REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+if [ -x "$PWD/gradlew" ] && [ -f "$PWD/app/build.gradle.kts" ]; then
+  DEFAULT_REPO_ROOT="$PWD"
+fi
+REPO_ROOT="${DEV777_REPO_ROOT:-$DEFAULT_REPO_ROOT}"
 
 COMMAND="${1:-help}"
 if [ "$#" -gt 0 ]; then shift; fi
@@ -52,6 +56,7 @@ AI / Agent 推荐只记这个脚本：
   DEV777_ANDROID_SDK_ROOT
   DEV777_TOOLCHAIN_ENV_FILE
   DEV777_TOOLCHAIN_STATE_DIR
+  DEV777_REPO_ROOT
 
 约定：
 - 全程非交互，不修改 shell rc。
@@ -75,9 +80,14 @@ while [ "$#" -gt 0 ]; do
       break
       ;;
     -*)
-      echo "[777-ai] 未知参数：$1" >&2
-      usage >&2
-      exit 2
+      case "$COMMAND" in
+        gradle|run) break ;;
+        *)
+          echo "[777-ai] 未知参数：$1" >&2
+          usage >&2
+          exit 2
+          ;;
+      esac
       ;;
     *)
       break
@@ -233,7 +243,13 @@ case "$COMMAND" in
     printf '%s\n' "$ENV_FILE"
     ;;
   gradle)
-    ensure_build_ready
+    if ! ensure_build_ready; then
+      exit 1
+    fi
+    if [ ! -x "$REPO_ROOT/gradlew" ]; then
+      echo "[777-ai] 未找到仓库 Gradle Wrapper：$REPO_ROOT/gradlew" >&2
+      exit 2
+    fi
     cd "$REPO_ROOT"
     exec ./gradlew "$@"
     ;;
@@ -243,7 +259,9 @@ case "$COMMAND" in
       echo "[777-ai] run 需要命令。" >&2
       exit 2
     fi
-    ensure_build_ready
+    if ! ensure_build_ready; then
+      exit 1
+    fi
     exec "$@"
     ;;
   help|-h|--help)
