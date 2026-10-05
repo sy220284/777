@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.runtime.LocalForegroundRunOwner
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import javax.inject.Inject
 import javax.inject.Singleton
