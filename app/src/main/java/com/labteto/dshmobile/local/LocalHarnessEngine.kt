@@ -44,6 +44,7 @@ import com.labteto.dshmobile.local.chat.ChatStyleGuard
 import com.labteto.dshmobile.local.chat.LocalCharacterBehaviorTuningCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatBranchNode
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
 import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.LocalChatPersistence
 import com.labteto.dshmobile.local.chat.LocalChatState
@@ -259,6 +260,7 @@ import com.labteto.dshmobile.local.tools.string
 import com.labteto.dshmobile.local.usage.LocalTokenUsageContextBridge
 import com.labteto.dshmobile.local.vision.LocalVisionRoute
 import com.labteto.dshmobile.local.work.LocalForegroundRecoveryCoordinator
+import com.labteto.dshmobile.local.work.LocalWorkExecutionPort
 import com.labteto.dshmobile.local.work.LocalRuntimeOwnershipPolicy
 import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.work.asModelAdmissionPort
@@ -286,7 +288,11 @@ import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.observability.DiagnosticReport
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -1017,11 +1023,41 @@ class LocalHarnessEngine @Inject internal constructor(
         }
     }
 
-    /** Generate reply suggestions only on explicit user request. */
-    /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
-    internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult {
+    /** Feature execution ports are exposed to Hilt from the composition root below. */
+    internal val workExecutionPort: LocalWorkExecutionPort = object : LocalWorkExecutionPort {
+        override fun send(text: String, attachments: List<LocalImportedAttachment>): LocalSendResult =
+            sendForMode(LocalUsageMode.WORK, text, attachments)
+
+        override fun regenerateReply(messageId: String): Boolean =
+            regenerateReplyForMode(LocalUsageMode.WORK, messageId)
+    }
+
+    internal val chatExecutionPort: LocalChatExecutionPort = object : LocalChatExecutionPort {
+        override fun send(text: String, attachments: List<LocalImportedAttachment>): LocalSendResult =
+            sendForMode(LocalUsageMode.CHAT, text, attachments)
+
+        override fun editAndResendUserMessage(
+            messageId: String,
+            replacement: String,
+        ): LocalChatUserEditResult = editAndResendUserMessage(messageId, replacement)
+
+        override fun regenerateReply(messageId: String): Boolean =
+            regenerateReplyForMode(LocalUsageMode.CHAT, messageId)
+    }
+
+    /** Queue one human turn for the requested product mode. */
+    private fun sendForMode(
+        expectedMode: LocalUsageMode,
+        text: String,
+        attachments: List<LocalImportedAttachment> = emptyList(),
+    ): LocalSendResult {
         val prepared = prepareLocalSend(text, attachments) ?: return LocalSendResult.Empty
-        return queueHumanTurn(prepared.content, prepared.memoryInput, prepared.modelMessage)
+        return queueHumanTurn(
+            prepared.content,
+            prepared.memoryInput,
+            prepared.modelMessage,
+            expectedMode = expectedMode,
+        )
     }
 
     /**
@@ -1031,7 +1067,7 @@ class LocalHarnessEngine @Inject internal constructor(
      * message are removed from the active conversation. Hard scene state is replayed from the
      * retained prefix so deleted future locations cannot leak into the new continuation.
      */
-    internal fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = synchronized(runStateLock) {
+    private fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = synchronized(runStateLock) {
         val requestedText = replacement.trim()
         val state = _state.value
         if (!state.modelState.configured) return@synchronized LocalChatUserEditResult.UNAVAILABLE
@@ -1246,8 +1282,9 @@ class LocalHarnessEngine @Inject internal constructor(
     }
 
     /** Re-run the latest answer against the same turn; never re-execute work tools. */
-    internal fun regenerateReply(messageId: String): Boolean = synchronized(runStateLock) {
+    private fun regenerateReplyForMode(expectedMode: LocalUsageMode, messageId: String): Boolean = synchronized(runStateLock) {
         val state = _state.value
+        if (state.usageMode != expectedMode) return@synchronized false
         if (!state.modelState.configured || state.loading ||
             state.chat.groupChat.enabled ||
             sessionTransitioning || activeJob?.isCompleted == false || pendingInputs.size() != 0
@@ -1384,10 +1421,14 @@ class LocalHarnessEngine @Inject internal constructor(
         content: String,
         memoryInput: String = content,
         modelMessage: JsonObject? = null,
+        expectedMode: LocalUsageMode? = null,
     ): LocalSendResult {
         var job: Job? = null
         val result = synchronized(runStateLock) {
             val state = _state.value
+            if (expectedMode != null && state.usageMode != expectedMode) {
+                return@synchronized LocalSendResult.rejected(LocalSendRejectReason.SESSION_TRANSITION)
+            }
             val binding = if (state.usageMode == LocalUsageMode.WORK) {
                 workRunRegistry[state.sessionId]?.takeIf { it.runHandle.hasLiveJob() }
             } else null
@@ -4533,4 +4574,19 @@ class LocalHarnessEngine @Inject internal constructor(
         localSessionSummariesOrEmpty(sessionCoordinator) { future ->
             _state.update { it.copy(error = future.message) }
         }
+}
+
+
+@Module
+@InstallIn(SingletonComponent::class)
+internal object LocalFeatureExecutionPortModule {
+    @Provides
+    @Singleton
+    fun provideLocalWorkExecutionPort(engine: LocalHarnessEngine): LocalWorkExecutionPort =
+        engine.workExecutionPort
+
+    @Provides
+    @Singleton
+    fun provideLocalChatExecutionPort(engine: LocalHarnessEngine): LocalChatExecutionPort =
+        engine.chatExecutionPort
 }

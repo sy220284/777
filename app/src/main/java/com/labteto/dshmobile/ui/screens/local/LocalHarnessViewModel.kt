@@ -139,7 +139,13 @@ class LocalHarnessViewModel @Inject constructor(
 
     fun configure(apiKey: String, model: String, baseUrl: String) = runtime.model.configure(apiKey, model, baseUrl)
     fun selectModel(model: String) = runtime.model.selectModel(model)
-    internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult = runtime.chat.send(text, attachments)
+    internal fun send(
+        text: String,
+        attachments: List<LocalImportedAttachment> = emptyList(),
+    ): LocalSendResult = when (state.value.usageMode) {
+        LocalUsageMode.WORK -> runtime.work.send(text, attachments)
+        LocalUsageMode.CHAT -> runtime.chat.send(text, attachments)
+    }
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
         withContext(Dispatchers.IO) { runtime.chat.diaryEntries(subjectKey) }
@@ -183,7 +189,10 @@ class LocalHarnessViewModel @Inject constructor(
 
     private fun refreshTranscriptHistoryAfterTimelineRewrite() =
         transcriptHistoryController.refreshAfterTimelineRewrite()
-    fun regenerateReply(messageId: String): Boolean = runtime.chat.regenerateReply(messageId)
+    fun regenerateReply(messageId: String): Boolean = when (state.value.usageMode) {
+        LocalUsageMode.WORK -> runtime.work.regenerateReply(messageId)
+        LocalUsageMode.CHAT -> runtime.chat.regenerateReply(messageId)
+    }
     fun toggleSessionPinned(sessionId: String) = conversationUiState.toggleSessionPinned(sessionId)
     fun renameSession(sessionId: String, title: String): Boolean = conversationUiState.renameSession(sessionId, title)
     suspend fun deleteSessions(ids: Set<String>): Int = conversationUiState.deleteSessions(ids, runtime.session::deleteSessions)

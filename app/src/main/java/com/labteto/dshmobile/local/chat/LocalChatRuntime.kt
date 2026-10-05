@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
-import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.session.LocalSessionRuntime
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -12,7 +11,7 @@ import javax.inject.Singleton
 /** Chat/persona capability boundary for the local UI. */
 @Singleton
 class LocalChatRuntime @Inject internal constructor(
-    private val engine: LocalHarnessEngine,
+    private val execution: LocalChatExecutionPort,
     private val persistence: LocalChatPersistence,
     private val sessionRuntime: LocalSessionRuntime,
     private val personaCorrections: LocalChatPersonaCorrectionCoordinator,
@@ -101,12 +100,12 @@ class LocalChatRuntime @Inject internal constructor(
     internal fun diaryEntries(subjectKey: String, limit: Int = MAX_CHAT_DIARY_ENTRIES) = persistence.diaryStore.listActive(subjectKey, limit)
     internal fun diaryEntriesForTransfer(subjectKey: String) = persistence.diaryStore.listForTransfer(subjectKey)
     internal fun <T> importDiaryEntriesForTransfer(subjectKey: String, personaName: String, entries: List<ChatDiaryEntry>, commit: () -> T): T = persistence.diaryStore.importForTransfer(subjectKey, personaName, entries, commit)
-    internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): com.labteto.dshmobile.local.send.LocalSendResult = engine.send(text, attachments)
+    internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): com.labteto.dshmobile.local.send.LocalSendResult = execution.send(text, attachments)
     internal fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult =
-        engine.editAndResendUserMessage(messageId, replacement)
+        execution.editAndResendUserMessage(messageId, replacement)
     internal fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean =
         branchCoordinator.selectVariant(messageId, targetIndex)
-    internal fun regenerateReply(messageId: String): Boolean = engine.regenerateReply(messageId)
+    internal fun regenerateReply(messageId: String): Boolean = execution.regenerateReply(messageId)
     internal fun stop() = runtimeStateStore.performVisibleOperation("停止聊天时保存失败") {
         val sessionId = runtimeStateStore.currentSessionId
         LocalChatPostTurnJobOwner.cancel()

@@ -22,7 +22,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
 }
 
 RUNTIME_ENGINE_REFERENCE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 3,
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 12,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 0,

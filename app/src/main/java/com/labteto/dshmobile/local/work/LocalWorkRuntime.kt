@@ -14,7 +14,15 @@ class LocalWorkRuntime @Inject internal constructor(
     private val eventLogs: LocalSessionEventLogRegistry,
     private val approvals: LocalWorkApprovalCoordinator,
     private val planMode: LocalWorkPlanModeCoordinator,
+    private val execution: LocalWorkExecutionPort,
 ) {
+    internal fun send(
+        text: String,
+        attachments: List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = emptyList(),
+    ): com.labteto.dshmobile.local.send.LocalSendResult = execution.send(text, attachments)
+
+    internal fun regenerateReply(messageId: String): Boolean = execution.regenerateReply(messageId)
+
     internal fun backgroundJobOutputForUi(jobId: String): String =
         runtimeStateStore.jobManager.output(jobId, runtimeStateStore.currentSessionId)
     internal fun stopBackgroundJobForUi(jobId: String): String =
