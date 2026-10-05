@@ -2097,18 +2097,18 @@ chat_refresh = strip_comments(
 )
 if "profile: LocalModelProfile" not in chat_refresh or "requestPlanner(before, prompt, boundEventLog, profile)" not in chat_refresh:
     die("Chat post-turn refresh and retries must retain the originating model profile")
-if "profile = profile" not in engine[engine.find("requestPlanner ="):engine.find("private val chatReplyCoordinator")]:
-    die("Chat post-turn planner must pass its frozen profile into model requests")
+if "modelRequests.complete(" not in chat_refresh or "profile = profile" not in chat_refresh:
+    die("Chat post-turn planner must pass its frozen profile into Shared model requests")
+if "messages = chatPostTurnModelMessages(prompt)" not in chat_refresh:
+    die("Chat post-turn requests must include a real model input, not system-only instructions")
+if "modelRequestMarkerOrNull()?.let" in chat_refresh:
+    die("Chat post-turn planner must not re-read mutable active model identity")
 if "profileId = runSnapshot.modelState.modelSelection.activeProfileId" not in engine:
     die("Foreground runs must freeze the exact selected model profile id")
-if "messages = chatPostTurnModelMessages(prompt)" not in engine:
-    die("Chat post-turn requests must include a real model input, not system-only instructions")
 if "private fun scheduleChatPostTurn(" in engine:
     die("Chat PostTurn scheduling proxy must not return to LocalHarnessEngine")
 if "chatContextRefreshCoordinator.schedule(" not in engine:
     die("Chat turn completion must stay wired to the Chat PostTurn coordinator")
-if "modelRequestMarkerOrNull()?.let" in engine[engine.find("requestPlanner ="):engine.find("private val chatReplyCoordinator")]:
-    die("Chat post-turn planner must not re-read mutable active model identity")
 
 engine_composition_bridges = set(
     re.findall(r"\bengine\s*\.\s*([A-Za-z0-9_]+)", feature_execution_port_module_source)
