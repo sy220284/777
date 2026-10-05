@@ -62,7 +62,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
             ) ?: return@launch
             try {
                 var applied = false
-                runtimeStateStore.mutableState.update { current ->
+                runtimeStateStore.projection.update { current ->
                     applied =
                         current.sessionId == snapshot.sessionId &&
                             current.usageMode == LocalUsageMode.CHAT &&
@@ -96,7 +96,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
-                runtimeStateStore.mutableState.update { current ->
+                runtimeStateStore.projection.update { current ->
                     if (current.sessionId == snapshot.sessionId && current.usageMode == snapshot.usageMode) {
                         current.copy(
                             error = error.message?.takeIf(String::isNotBlank)
@@ -126,7 +126,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
         try {
             var applied = false
             var memberCount = 0
-            runtimeStateStore.mutableState.update { current ->
+            runtimeStateStore.projection.update { current ->
                 applied =
                     current.sessionId == snapshot.sessionId &&
                         current.usageMode == LocalUsageMode.CHAT &&
