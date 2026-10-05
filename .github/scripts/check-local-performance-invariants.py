@@ -282,7 +282,7 @@ control_pos = session_persistence_projection.find(
 )
 transcript_pos = session_persistence_projection.find("val transcriptProjectedThroughSequence")
 state_pos = session_persistence_projection.find(
-    "val state = binding?.state?.value ?: currentState()"
+    "val state = currentState()"
 )
 if min(control_pos, transcript_pos, state_pos) < 0 or not (
     control_pos < state_pos and transcript_pos < state_pos
