@@ -11,6 +11,7 @@ import com.labteto.dshmobile.local.LocalJobManager
 import com.labteto.dshmobile.local.LocalInteractionCoordinator
 import com.labteto.dshmobile.local.localHistoryBudgetFor
 import com.labteto.dshmobile.local.localResourceBudgetForMemoryClass
+import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -54,6 +55,7 @@ class LocalRuntimeStateStore internal constructor(
 
     internal val foregroundInteractions = LocalInteractionCoordinator(mutable)
     internal val streamingPreviewStore = LocalStreamingPreviewStore()
+    internal val foregroundModelHistory = LocalModelHistoryBuffer()
     internal val jobManager: LocalJobManager
         get() = jobOwner.manager
     @Volatile private var initialized = false
