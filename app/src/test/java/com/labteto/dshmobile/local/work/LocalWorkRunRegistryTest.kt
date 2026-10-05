@@ -400,6 +400,5 @@ class LocalWorkRunRegistryTest {
                 json = json,
                 sessionId = sessionId,
             ),
-            pruneToolResult = { it },
         )
 }
