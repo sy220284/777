@@ -110,6 +110,41 @@ def has_call(source: str, receiver: str, method: str) -> bool:
     ) is not None
 
 
+# ChatFeature must not depend on AutomationFeature internals.
+# Cross-feature user-activity notification is inverted through a Chat-owned contract and
+# bound to an Automation adapter only at the app composition root.
+for chat_source_path in (LOCAL_SOURCE_ROOT / "chat").rglob("*.kt"):
+    chat_source = strip_comments(chat_source_path.read_text(encoding="utf-8"))
+    if "import com.labteto.dshmobile.local.automation." in chat_source:
+        relative = chat_source_path.relative_to(ROOT).as_posix()
+        die(
+            f"{relative} makes ChatFeature depend on AutomationFeature internals; "
+            "publish through a Chat-owned contract and bind the observer at composition"
+        )
+
+chat_user_activity_contract_path = (
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatUserActivityPort.kt"
+)
+chat_user_activity_contract = strip_comments(read(chat_user_activity_contract_path))
+if "internal fun interface LocalChatUserActivityPort" not in chat_user_activity_contract:
+    die("ChatFeature must own the LocalChatUserActivityPort cross-feature contract")
+if "com.labteto.dshmobile.local.automation" in chat_user_activity_contract:
+    die("Chat-owned user-activity contract must stay Automation-agnostic")
+
+automation_user_activity_adapter_path = (
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatUserActivityAdapter.kt"
+)
+automation_user_activity_adapter = strip_comments(read(automation_user_activity_adapter_path))
+if (
+    "class LocalAutomationChatUserActivityAdapter" not in automation_user_activity_adapter
+    or ": LocalChatUserActivityPort" not in automation_user_activity_adapter
+):
+    die("AutomationFeature must adapt the Chat-owned user-activity contract")
+if (
+    ROOT / "app/src/main/java/com/labteto/dshmobile/local/automation/LocalChatUserActivityPort.kt"
+).exists():
+    die("legacy Automation-owned LocalChatUserActivityPort must not return")
+
 # Physical boundaries must also be Kotlin boundaries; root-package leakage defeats import guards.
 for source_path in LOCAL_SOURCE_ROOT.rglob("*.kt"):
     relative = source_path.relative_to(LOCAL_SOURCE_ROOT)
@@ -674,6 +709,12 @@ if "LocalHarnessEngine" in work_runtime_source or "engine." in work_runtime_sour
 feature_execution_port_module_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt")
 )
+if (
+    "provideLocalChatUserActivityPort(" not in feature_execution_port_module_source
+    or "adapter: LocalAutomationChatUserActivityAdapter" not in feature_execution_port_module_source
+    or "): LocalChatUserActivityPort = adapter" not in feature_execution_port_module_source
+):
+    die("app composition root must bind Automation's adapter to the Chat-owned user-activity contract")
 
 work_execution_coordinator_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionCoordinator.kt")
