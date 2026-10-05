@@ -107,7 +107,7 @@ if "private val state: MutableStateFlow<LocalHarnessState>" in interaction_coord
 # Work still has two explicit aggregate-state migration seams. Freeze that debt: no third writer.
 work_aggregate_state_allowlist = {
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkStatePort.kt",
 }
 work_root = LOCAL_SOURCE_ROOT / "work"
 for source_path in work_root.rglob("*.kt"):
@@ -123,6 +123,14 @@ for source_path in work_root.rglob("*.kt"):
             f"{relative} writes the Runtime aggregate directly; "
             "use LocalRuntimeProjection or a narrower capability instead"
         )
+
+work_progress_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt")
+)
+if "LocalHarnessState" in work_progress_source or "MutableStateFlow" in work_progress_source:
+    die("LocalWorkProgressCoordinator must depend only on LocalWorkStatePort")
+if "private val state: LocalWorkStatePort" not in work_progress_source:
+    die("LocalWorkProgressCoordinator lost its Work-owned state boundary")
 
 runtime_projection_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt")
