@@ -43,7 +43,10 @@ bash tools/dev/ai-toolchain.sh plan --profile build
   "missing_artifacts": [
     "777-toolchain-android-core-latest",
     "777-toolchain-gradle-runtime-latest",
-    "777-toolchain-gradle-deps-latest",
+    "777-toolchain-gradle-deps-part-01-latest",
+    "777-toolchain-gradle-deps-part-02-latest",
+    "777-toolchain-gradle-deps-part-03-latest",
+    "777-toolchain-gradle-deps-part-04-latest",
     "777-toolchain-runtime-cache-latest"
   ]
 }
@@ -64,7 +67,7 @@ bash tools/dev/ai-toolchain.sh plan --profile full
 | `777-toolchain-jdk-latest` | JDK 21 LTS 兜底包，包含 `java` / `javac`；本机 JDK 21+ 可直接复用 |
 | `777-toolchain-android-core-latest` | Android command-line tools、platform-tools、API 37 platform、build-tools 37.0.0、licenses |
 | `777-toolchain-gradle-runtime-latest` | Gradle 9.6.0 完整分发 |
-| `777-toolchain-gradle-deps-latest` | Gradle Wrapper 分发缓存、Kotlin 2.2.10、AGP 9.4.0 与项目依赖离线缓存 |
+| `777-toolchain-gradle-deps-part-01..04-latest` | Gradle Wrapper 分发缓存、Kotlin 2.2.10、AGP 9.4.0 与项目依赖离线缓存；4 个固定分片 |
 | `777-toolchain-runtime-cache-latest` | 777 APK Runtime 构建缓存 |
 
 完整验证的扩展组件：
@@ -74,8 +77,8 @@ bash tools/dev/ai-toolchain.sh plan --profile full
 | `777-toolchain-node-latest` | Node.js 22+ |
 | `777-toolchain-actionlint-latest` | actionlint 1.7.12 |
 | `777-toolchain-emulator-latest` | Android Emulator |
-| `777-toolchain-android-image-16-latest` | Android 16 x86_64 system image |
-| `777-toolchain-android-image-17-latest` | Android 17 / API 37 16 KiB x86_64 system image |
+| `777-toolchain-android-image-16-part-01..06-latest` | Android 16 x86_64 system image；6 个固定分片 |
+| `777-toolchain-android-image-17-part-01..06-latest` | Android 17 / API 37 16 KiB x86_64 system image；6 个固定分片 |
 
 另有小型入口包：
 
@@ -89,13 +92,20 @@ bash tools/dev/ai-toolchain.sh plan --profile full
 
 先运行 `plan`，然后只下载 `missing_artifacts` 中列出的 GitHub Actions Artifact。
 
+**Artifact 来源必须限定为默认分支 `main` 最新一次成功的“开发工具链”运行。** 不要按名称跨分支挑“最新 Artifact”，也不要使用 PR / 功能分支运行生成的同名产物；否则可能拿到与当前主线安装器不兼容的旧包。
+
+工具链相关文件合并到 `main` 后会自动刷新组件 Artifact；每月定时刷新仍作为保底。
+
 把下载后的 Artifact 分别解压到同一个目录，例如：
 
 ```text
 /tmp/777-artifacts/
 ├── 777-toolchain-android-core-latest/
 ├── 777-toolchain-gradle-runtime-latest/
-├── 777-toolchain-gradle-deps-latest/
+├── 777-toolchain-gradle-deps-part-01-latest/
+├── 777-toolchain-gradle-deps-part-02-latest/
+├── 777-toolchain-gradle-deps-part-03-latest/
+├── 777-toolchain-gradle-deps-part-04-latest/
 └── 777-toolchain-runtime-cache-latest/
 ```
 
@@ -291,6 +301,6 @@ bootstrap
 - 按需安装逻辑正确。
 - 最终能完成真实离线构建。
 
-组件 Artifact 保留 30 天。默认分支每月 **1 日和 20 日**重新生成全部组件，最长刷新间隔 19 天。
+组件 Artifact 保留 30 天。工具链相关文件每次合并到 `main` 都会自动重新生成全部组件；默认分支每月 **1 日和 20 日**额外定时刷新，防止长期无变更时 Artifact 过期。
 
 最终放行规则仍以 [VALIDATION.md](VALIDATION.md) 和当前 `.github/workflows/ci.yml` 为准。

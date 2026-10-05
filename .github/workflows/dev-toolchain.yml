@@ -2,6 +2,18 @@ name: 开发工具链
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'tools/dev/**'
+      - '.github/workflows/dev-toolchain.yml'
+      - '.github/workflows/ci.yml'
+      - 'gradle/wrapper/gradle-wrapper.properties'
+      - 'gradle/libs.versions.toml'
+      - 'docs/DEVELOPMENT.md'
+      - 'docs/README.md'
+      - 'CONTRIBUTING.md'
   schedule:
     # Artifact 保留 30 天；每月 1 日和 20 日刷新组件产物。
     - cron: '17 3 1,20 * *'
