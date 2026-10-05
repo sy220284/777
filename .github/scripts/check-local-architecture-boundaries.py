@@ -89,6 +89,14 @@ if declared_contracts != aggregate_contracts:
     die(f"root aggregate may only declare shared aggregate contracts: {sorted(declared_contracts - aggregate_contracts)}")
 
 
+approval_preferences_source = read("app/src/main/java/com/labteto/dshmobile/local/interaction/LocalApprovalPreferences.kt")
+approval_coordinator_source = read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkApprovalCoordinator.kt")
+if "StateFlow<Boolean>" not in approval_preferences_source or "mode.value = enabled" not in approval_preferences_source:
+    die("Approval preferences must publish the single global mode flow")
+if re.search(r"copy\\(\\s*safeAutoApprovalEnabled\\s*=", approval_coordinator_source):
+    die("Approval coordinator must not fan out writable global mode copies")
+
+
 def constructor_dependency_count(relative: str, class_name: str) -> int:
     source = strip_comments(read(relative))
     match = re.search(

@@ -21,6 +21,11 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
     private val runtime: LocalRuntimeStateStore,
     private val runs: LocalWorkRunRegistry,
 ) {
+    init {
+        runtime.bindApprovalPreferences(preferences)
+        runs.bindApprovalPreferences(preferences)
+    }
+
     private val modeLock = Any()
     private data class Target(
         val state: MutableStateFlow<LocalHarnessState>,
@@ -58,10 +63,8 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
     private fun setGlobalMode(enabled: Boolean, target: Target, skipTargetWaiter: Boolean = false) {
         // This is the durable authority; Session snapshots do not store this device-wide setting.
         preferences.setSafeAutoApprovalEnabled(enabled)
-        runtime.mutableState.update { it.copy(safeAutoApprovalEnabled = enabled) }
         val active = mutableListOf<Target>()
         runs.forEachBinding { binding ->
-            binding.state.update { it.copy(safeAutoApprovalEnabled = enabled) }
             active += Target(binding.state, binding.interactions, binding.eventLog)
         }
         if (active.none { it.interactions === target.interactions }) active += target

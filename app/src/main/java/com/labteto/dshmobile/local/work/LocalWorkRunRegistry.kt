@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import android.content.Context
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
 import com.labteto.dshmobile.local.LocalHarnessState
@@ -28,12 +29,24 @@ class LocalWorkRunRegistry internal constructor(
     internal constructor(
         runtimeStateStore: LocalRuntimeStateStore,
         @ApplicationContext context: Context,
+        preferences: LocalApprovalPreferences,
     ) : this(runtimeStateStore, { jobs, onFailure ->
         syncForegroundJobs(context.applicationContext, jobs, onFailure)
-    })
+    }) { bindApprovalPreferences(preferences) }
 
     private val bindings = java.util.concurrent.ConcurrentHashMap<String, LocalWorkRunBinding>()
     private val jobProjectionLock = Any()
+    private var approvalPreferences: LocalApprovalPreferences? = null
+    private val approvalProjectionLock = Any()
+
+    internal fun bindApprovalPreferences(preferences: LocalApprovalPreferences) =
+        synchronized(approvalProjectionLock) {
+            if (approvalPreferences === preferences) return@synchronized
+            check(approvalPreferences == null) { "Approval authority cannot be replaced" }
+            approvalPreferences = preferences
+            bindings.values.forEach { it.observeApprovalMode(preferences) }
+        }
+
 
     init {
         runtimeStateStore.observeResourceSnapshots(::projectResourceSnapshot)
@@ -48,22 +61,34 @@ class LocalWorkRunRegistry internal constructor(
         bindings[sessionId]?.takeIf { it.job?.isCompleted == false }
 
     internal fun attach(binding: LocalWorkRunBinding): LocalWorkRunBinding? {
-        val previous = bindings.put(binding.sessionId, binding)
+        val previous = synchronized(approvalProjectionLock) {
+            bindings.put(binding.sessionId, binding).also {
+                it?.stopApprovalProjection()
+                approvalPreferences?.let(binding::observeApprovalMode)
+            }
+        }
         projectResourceSnapshot(binding, runtimeStateStore.resourceSnapshot())
         refreshJobProjection(notify = false)
         return previous
     }
 
-    internal fun detach(sessionId: String): LocalWorkRunBinding? = bindings.remove(sessionId)
+    internal fun detach(sessionId: String): LocalWorkRunBinding? =
+        synchronized(approvalProjectionLock) {
+            bindings.remove(sessionId)?.also { it.stopApprovalProjection() }
+        }
 
     internal fun detach(binding: LocalWorkRunBinding): Boolean =
-        bindings.remove(binding.sessionId, binding)
+        synchronized(approvalProjectionLock) {
+            bindings.remove(binding.sessionId, binding).also { removed ->
+                if (removed) binding.stopApprovalProjection()
+            }
+        }
 
     internal fun requestCancel(sessionId: String): Boolean =
         bindings[sessionId]?.requestCancel() == true
 
     internal fun detachAll(sessionIds: Set<String>): List<LocalWorkRunBinding> =
-        sessionIds.mapNotNull(bindings::remove)
+        sessionIds.mapNotNull(::detach)
 
     internal fun anyLive(): Boolean = bindings.values.any { it.job?.isCompleted == false }
 

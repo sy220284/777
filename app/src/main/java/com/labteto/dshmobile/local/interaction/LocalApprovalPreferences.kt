@@ -1,5 +1,15 @@
 package com.labteto.dshmobile.local.interaction
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import android.content.Context
 import android.content.SharedPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -18,6 +28,16 @@ import javax.inject.Singleton
 class LocalApprovalPreferences internal constructor(
     private val preferences: SharedPreferences,
 ) {
+    private val mode = MutableStateFlow(preferences.getBoolean(KEY_SAFE_AUTO_APPROVAL, true))
+    internal val enabled: StateFlow<Boolean> = mode.asStateFlow()
+    private val projectionScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+
+    /** Every UI/run projection observes the same authority; mode changes never enumerate copies. */
+    internal fun observeMode(publish: (Boolean) -> Unit): Job =
+        projectionScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            enabled.collect { publish(it) }
+        }
+
     @Inject
     internal constructor(@ApplicationContext context: Context) : this(
         preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE),
@@ -34,8 +54,10 @@ class LocalApprovalPreferences internal constructor(
         return true
     }
 
+    @Synchronized
     internal fun setSafeAutoApprovalEnabled(enabled: Boolean) {
         preferences.edit().putBoolean(KEY_SAFE_AUTO_APPROVAL, enabled).apply()
+        mode.value = enabled
     }
 
     private companion object {

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
@@ -49,6 +50,20 @@ internal class LocalWorkRunBinding(
     @Volatile
     var mirrorJob: Job? = null
 
+    private var approvalProjection: Job? = null
+
+    internal fun observeApprovalMode(preferences: LocalApprovalPreferences) {
+        approvalProjection?.cancel()
+        approvalProjection = preferences.observeMode { enabled ->
+            state.update { it.copy(safeAutoApprovalEnabled = enabled) }
+        }
+    }
+
+    internal fun stopApprovalProjection() {
+        approvalProjection?.cancel()
+        approvalProjection = null
+    }
+
     @Volatile
     var turnsSinceModelHistoryCheckpoint: Int = 0
 
@@ -83,6 +98,7 @@ internal class LocalWorkRunBinding(
 
     /** Tear down only this session-owned runtime; other Work conversations keep running. */
     suspend fun cancelAndJoin() {
+        stopApprovalProjection()
         clearPendingForCancellation(markStopped = true)
         val activeJob = job.also { job = null }
         val activeMirror = mirrorJob.also { mirrorJob = null }

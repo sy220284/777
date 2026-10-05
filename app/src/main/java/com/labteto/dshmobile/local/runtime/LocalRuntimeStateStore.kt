@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.runtime
 
+import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import android.app.ActivityManager
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
@@ -43,11 +44,25 @@ class LocalRuntimeStateStore internal constructor(
     internal constructor(
         @ApplicationContext context: Context,
         json: Json,
+        approvals: LocalApprovalPreferences,
     ) : this(
         memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
         jobOwner = LocalRuntimeJobOwner.persistent(context, json),
-    )
+    ) { bindApprovalPreferences(approvals) }
     private val mutable = MutableStateFlow(LocalHarnessState())
+    private var approvalPreferences: LocalApprovalPreferences? = null
+    private var approvalProjection: Job? = null
+
+    @Synchronized
+    internal fun bindApprovalPreferences(preferences: LocalApprovalPreferences) {
+        if (approvalPreferences === preferences) return
+        check(approvalPreferences == null) { "Approval authority cannot be replaced" }
+        approvalPreferences = preferences
+        approvalProjection = preferences.observeMode { enabled ->
+            mutable.update { it.copy(safeAutoApprovalEnabled = enabled) }
+        }
+    }
+
     private val sendFeedbackMutable = MutableStateFlow(LocalSendFeedbackState())
     private val resourceObservers = CopyOnWriteArrayList<(HarnessResourceSnapshot) -> Unit>()
 
@@ -112,7 +127,11 @@ class LocalRuntimeStateStore internal constructor(
         check(!initialized) { "LocalRuntimeStateStore 已完成初始化" }
         require(initialState.sessionId.isNotBlank()) { "初始会话编号不能为空" }
         foregroundSessionId = initialState.sessionId
-        mutable.value = projectResourceSnapshot(initialState, resourceScheduler.snapshot())
+        mutable.value = projectResourceSnapshot(
+            initialState.copy(safeAutoApprovalEnabled =
+                approvalPreferences?.enabled?.value ?: initialState.safeAutoApprovalEnabled),
+            resourceScheduler.snapshot(),
+        )
         initialized = true
         return mutable
     }

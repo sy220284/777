@@ -59,6 +59,46 @@ class LocalWorkApprovalCoordinatorTest {
         ).also(runs::attach)
     }
 
+    @Test fun preferenceFlowUpdatesExistingAndLateRunProjectionsWithoutCoordinatorFanOut() {
+        val f = Fixture()
+        val a = f.binding("a")
+        f.preferences.setSafeAutoApprovalEnabled(true)
+
+        assertTrue(f.preferences.enabled.value)
+        assertTrue(f.runtime.state.value.safeAutoApprovalEnabled)
+        assertTrue(a.state.value.safeAutoApprovalEnabled)
+
+        val b = f.binding("b")
+        assertTrue(b.state.value.safeAutoApprovalEnabled)
+        f.preferences.setSafeAutoApprovalEnabled(false)
+        assertFalse(a.state.value.safeAutoApprovalEnabled)
+        assertFalse(b.state.value.safeAutoApprovalEnabled)
+    }
+
+    @Test fun detachedRunStopsObservingGlobalApprovalProjection() {
+        val f = Fixture()
+        val a = f.binding("a")
+        assertSame(a, f.runs.detach("a"))
+
+        f.preferences.setSafeAutoApprovalEnabled(true)
+        assertTrue(f.runtime.state.value.safeAutoApprovalEnabled)
+        assertFalse(a.state.value.safeAutoApprovalEnabled)
+
+        f.runs.attach(a)
+        assertTrue(a.state.value.safeAutoApprovalEnabled)
+    }
+
+    @Test fun runtimeInitializationProjectsCurrentApprovalAuthority() {
+        val preferences = Preferences().store
+        preferences.setSafeAutoApprovalEnabled(true)
+        val runtime = LocalRuntimeStateStore()
+        runtime.bindApprovalPreferences(preferences)
+        runtime.initialize(LocalHarnessState(
+            loading = false, sessionId = "fresh", safeAutoApprovalEnabled = false,
+        ))
+        assertTrue(runtime.state.value.safeAutoApprovalEnabled)
+    }
+
     private fun approval(id: String, device: Boolean = false) = LocalApproval(
         id, "tool", "执行工具", "{}", "device_write", canApproveDeviceTurn = device,
     )
