@@ -13,6 +13,7 @@ import com.labteto.dshmobile.local.model.LocalStructuredWorkState
 import com.labteto.dshmobile.local.model.compactHistoryWithStaleToolProjection
 import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.local.model.projectStaleToolResults
+import com.labteto.dshmobile.local.model.WORK_TOOL_INLINE_BYTES
 import com.labteto.dshmobile.local.runtime.structuredWorkState
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
