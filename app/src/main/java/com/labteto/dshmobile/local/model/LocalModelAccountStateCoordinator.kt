@@ -1,22 +1,18 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalModelConfigurationCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 internal fun canStartChatGptAccountSelection(isBusy: Boolean): Boolean = !isBusy
 
-/** Projects ChatGPT account model mutations into the aggregate runtime without owning OAuth. */
+/** Projects ChatGPT account mutations through the Model-owned state port without aggregate writes. */
 internal class LocalModelAccountStateCoordinator(
     private val configuration: LocalModelConfigurationCoordinator,
     private val gateway: LocalModelGateway,
-    private val state: MutableStateFlow<LocalHarnessState>,
+    private val state: LocalModelStatePort,
     private val isBusy: () -> Boolean,
 ) {
     fun observeInvalidations(scope: CoroutineScope) {
@@ -26,6 +22,7 @@ internal class LocalModelAccountStateCoordinator(
             }
         }
     }
+
     fun requireAccountSelectionAllowed() {
         check(canStartChatGptAccountSelection(isBusy())) { "请先结束当前任务再切换模型账户" }
     }
@@ -35,11 +32,7 @@ internal class LocalModelAccountStateCoordinator(
         models: List<ChatGptModelOption>,
         selectFirst: Boolean,
     ) {
-        // 启动恢复期间目录刷新等待统一就绪边界，避免与模型迁移并发写；运行中请求使用冻结路由。
-        if (!selectFirst && state.value.loading) {
-            state.first { !it.loading }
-        }
-        // 已开始的显式账户操作允许完整提交，避免授权状态已写入后再留下半完成状态。
+        if (!selectFirst && state.value.loading) state.awaitReady()
         val before = state.value
         val beforeActiveProfile = gateway.activeProfile()
         val profiles = configuration.saveChatGptModels(accountId, models)
@@ -47,9 +40,7 @@ internal class LocalModelAccountStateCoordinator(
             profiles.firstOrNull {
                 it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
             }
-        } else {
-            null
-        }
+        } else null
         val result = requested?.let { configuration.select(it.id, profiles) }
         val active = result?.activeProfileId
             ?.let { id -> profiles.firstOrNull { it.id == id } }
@@ -60,26 +51,23 @@ internal class LocalModelAccountStateCoordinator(
             beforeActiveProfile?.authKind == LocalModelAuthKind.CHATGPT_PLAN &&
             beforeActiveProfile.credentialRef == accountId &&
             profiles.none { it.id == beforeActiveProfile.id }
-        state.update { current ->
-            current.copy(
-                modelState = current.modelState.copy(
-                    configured = configured,
-                    model = result?.model ?: active?.model ?: current.modelState.model,
-                    baseUrl = result?.baseUrl ?: active?.baseUrl ?: current.modelState.baseUrl,
-                    modelSelection = current.modelState.modelSelection.replaceProfiles(profiles, active?.id),
-                ),
-                error = when {
-                    models.isEmpty() -> "当前 ChatGPT 账户没有可用于套餐共享的模型"
-                    removedActiveChatGptModel -> "当前 ChatGPT 模型已不可用，请重新选择模型"
-                    else -> null
-                },
-            )
-        }
+        state.commit(
+            before.modelState.copy(
+                configured = configured,
+                model = result?.model ?: active?.model ?: before.modelState.model,
+                baseUrl = result?.baseUrl ?: active?.baseUrl ?: before.modelState.baseUrl,
+                modelSelection = before.modelState.modelSelection.replaceProfiles(profiles, active?.id),
+            ),
+            when {
+                models.isEmpty() -> "当前 ChatGPT 账户没有可用于套餐共享的模型"
+                removedActiveChatGptModel -> "当前 ChatGPT 模型已不可用，请重新选择模型"
+                else -> null
+            },
+        )
     }
 
     suspend fun retireChatGptAccountProfiles(accountId: String) {
-        if (state.value.loading) state.first { !it.loading }
-        // 回放或等待就绪期间可能已经重新授权；旧失效事件不能退休新授权的档案。
+        if (state.value.loading) state.awaitReady()
         if (gateway.hasChatGptPlanAuthorization(accountId)) return
         val before = state.value
         val beforeActive = gateway.activeProfile()
@@ -89,54 +77,38 @@ internal class LocalModelAccountStateCoordinator(
         if (configured) gateway.activate(active!!) else gateway.clearActive()
         val retiredActive = beforeActive?.authKind == LocalModelAuthKind.CHATGPT_PLAN &&
             beforeActive.credentialRef == accountId
-        state.update { current ->
-            current.copy(
-                modelState = current.modelState.copy(
-                    configured = configured,
-                    model = active?.model ?: current.modelState.model,
-                    baseUrl = active?.baseUrl ?: current.modelState.baseUrl,
-                    modelSelection = current.modelState.modelSelection.replaceProfiles(profiles, active?.id),
-                ),
-                error = if (retiredActive) {
-                    "当前 ChatGPT 套餐授权已失效，已停止使用该模型；请重新启用套餐或手动选择其他模型"
-                } else {
-                    current.error
-                },
-            )
-        }
+        state.commit(
+            before.modelState.copy(
+                configured = configured,
+                model = active?.model ?: before.modelState.model,
+                baseUrl = active?.baseUrl ?: before.modelState.baseUrl,
+                modelSelection = before.modelState.modelSelection.replaceProfiles(profiles, active?.id),
+            ),
+            if (retiredActive) {
+                "当前 ChatGPT 套餐授权已失效，已停止使用该模型；请重新启用套餐或手动选择其他模型"
+            } else before.error,
+        )
     }
 
     suspend fun removeChatGptAccountProfiles(accountId: String) {
         check(!isBusy()) { "请先结束当前任务再断开模型账户" }
-        val current = state.value
+        val before = state.value
         val result = configuration.removeChatGptAccount(
             accountId = accountId,
-            currentModel = current.modelState.model,
-            currentBaseUrl = current.modelState.baseUrl,
+            currentModel = before.modelState.model,
+            currentBaseUrl = before.modelState.baseUrl,
         ) ?: return
         val active = configuration.activeProfile(result.model, result.baseUrl, result.profiles)
         val configured = active != null && gateway.hasCredential(active)
         active?.takeIf { configured }?.let(gateway::activate)
-        state.update { current ->
-            current.copy(
-                modelState = current.modelState.copy(
-                    configured = configured,
-                    model = result.model,
-                    baseUrl = result.baseUrl,
-                    modelSelection = current.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
-                ),
-                error = null,
-            )
-        }
-    }
-
-    suspend fun requestMarkerOrNull(): String? {
-        val snapshot = state.value
-        val profileId = snapshot.modelState.modelSelection.activeProfileId ?: return null
-        return gateway.profileForRoute(
-            profileId = profileId,
-            model = snapshot.modelState.model,
-            baseUrl = snapshot.modelState.baseUrl,
-        ).id
+        state.commit(
+            before.modelState.copy(
+                configured = configured,
+                model = result.model,
+                baseUrl = result.baseUrl,
+                modelSelection = before.modelState.modelSelection.replaceProfiles(result.profiles, result.activeProfileId),
+            ),
+            null,
+        )
     }
 }
