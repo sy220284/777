@@ -2370,7 +2370,7 @@ class LocalHarnessEngine @Inject internal constructor(
         binding?.sessionId ?: currentSessionId,
         LocalSessionRuntimeKind.FOREGROUND,
         preownedLease,
-    ) { ownedSessionId ->
+    ): Unit { ownedSessionId ->
         if (binding == null && currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
         val runState = aggregateRunState(binding)
         val runEventLog = binding?.eventLog ?: eventLog
