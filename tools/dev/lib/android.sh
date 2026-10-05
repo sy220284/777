@@ -38,7 +38,24 @@ accept_android_licenses() {
   return 1
 }
 
+android_packages_ready() {
+  [ -x "$SDK_ROOT/platform-tools/adb" ] || return 1
+  [ -d "$SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS" ] || return 1
+  if [ ! -d "$SDK_ROOT/platforms/android-$ANDROID_COMPILE_API" ] && [ ! -d "$SDK_ROOT/platforms/android-${ANDROID_COMPILE_API}.0" ]; then
+    return 1
+  fi
+  if [ "$PROFILE" = full ]; then
+    [ -x "$SDK_ROOT/emulator/emulator" ] || return 1
+    find "$SDK_ROOT/system-images" -type d -path '*android-36*google_apis*x86_64' -print -quit 2>/dev/null | grep -q . || return 1
+    find "$SDK_ROOT/system-images" -type d -path '*android-37.0*google_apis_ps16k*x86_64' -print -quit 2>/dev/null | grep -q . || return 1
+  fi
+}
+
 install_android_packages() {
+  if android_packages_ready; then
+    ok "Android SDK packages 已满足，跳过 sdkmanager 安装"
+    return 0
+  fi
   local sdkmanager="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
   local canonical="platforms;android-$ANDROID_COMPILE_API"
   accept_android_licenses

@@ -36,6 +36,7 @@ jobs:
       - name: 验证工具链清单与脚本
         run: |
           bash -n tools/dev/setup-toolchain.sh
+          bash -n tools/dev/ai-toolchain.sh
           bash tools/dev/setup-toolchain.sh --self-test
       - name: 生成可下载工具链包
         run: |
@@ -46,6 +47,12 @@ jobs:
           cp docs/DEVELOPMENT.md "$ROOT/docs/"
           cat > "$ROOT/安装说明.txt" <<'TXT'
           777 本地开发工具链
+
+          AI / Agent 推荐：
+             bash tools/dev/ai-toolchain.sh bootstrap
+             bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug
+
+          人工使用：
 
           1. 默认只检查：
              bash tools/dev/setup-toolchain.sh --check --profile build
@@ -58,7 +65,7 @@ jobs:
 
           详细说明见 docs/DEVELOPMENT.md。
           TXT
-          chmod +x "$ROOT/tools/dev/setup-toolchain.sh"
+          chmod +x "$ROOT/tools/dev/setup-toolchain.sh" "$ROOT/tools/dev/ai-toolchain.sh"
           tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/777-dev-toolchain-linux.tar.gz" 777-dev-toolchain
           (
             cd "$RUNNER_TEMP"
@@ -71,7 +78,7 @@ jobs:
           path: |
             ${{ runner.temp }}/777-dev-toolchain-linux.tar.gz
             ${{ runner.temp }}/777-dev-toolchain-linux.tar.gz.sha256
-          retention-days: 7
+          retention-days: 30
           if-no-files-found: error
 
   verify-install:
@@ -103,29 +110,41 @@ jobs:
           SDK="$RUNNER_TEMP/777-android-sdk"
           TOOLS="$RUNNER_TEMP/777-tools"
           ENV_FILE="$RUNNER_TEMP/777-dev-toolchain.env"
+          STATE_DIR="$RUNNER_TEMP/777-ai-state"
+          AI_TOOLCHAIN="$KIT/tools/dev/ai-toolchain.sh"
 
-          bash "$KIT/tools/dev/setup-toolchain.sh" \
-            --auto \
-            --profile "$PROFILE" \
-            --sdk-root "$SDK" \
-            --tools-root "$TOOLS" \
-            --env-file "$ENV_FILE" \
-            --accept-android-licenses
+          export DEV777_TOOLS_ROOT="$TOOLS"
+          export DEV777_ANDROID_SDK_ROOT="$SDK"
+          export DEV777_TOOLCHAIN_ENV_FILE="$ENV_FILE"
+          export DEV777_TOOLCHAIN_STATE_DIR="$STATE_DIR"
+          export DEV777_REPO_ROOT="$GITHUB_WORKSPACE"
+
+          BOOTSTRAP_JSON="$(bash "$AI_TOOLCHAIN" bootstrap --profile "$PROFILE")"
+          printf '%s\n' "$BOOTSTRAP_JSON"
+          printf '%s\n' "$BOOTSTRAP_JSON" | grep -F '"status": "ready"'
+
+          CHECK_JSON="$(bash "$AI_TOOLCHAIN" check --profile "$PROFILE")"
+          printf '%s\n' "$CHECK_JSON"
+          printf '%s\n' "$CHECK_JSON" | grep -F '"status": "ready"'
+
+          REPEAT_JSON="$(bash "$AI_TOOLCHAIN" bootstrap --profile "$PROFILE")"
+          printf '%s\n' "$REPEAT_JSON"
+          printf '%s\n' "$REPEAT_JSON" | grep -F '"status": "ready"'
 
           # shellcheck source=/dev/null
           source "$ENV_FILE"
-          bash "$KIT/tools/dev/setup-toolchain.sh" \
-            --check \
-            --profile "$PROFILE" \
-            --sdk-root "$SDK" \
-            --tools-root "$TOOLS" \
-            --env-file "$ENV_FILE"
 
           {
             echo "TOOLCHAIN_PROFILE=$PROFILE"
             echo "JAVA_HOME=$JAVA_HOME"
             echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
             echo "ANDROID_HOME=$ANDROID_HOME"
+            echo "DEV777_TOOLS_ROOT=$TOOLS"
+            echo "DEV777_ANDROID_SDK_ROOT=$SDK"
+            echo "DEV777_TOOLCHAIN_ENV_FILE=$ENV_FILE"
+            echo "DEV777_TOOLCHAIN_STATE_DIR=$STATE_DIR"
+            echo "DEV777_REPO_ROOT=$GITHUB_WORKSPACE"
+            echo "AI_TOOLCHAIN=$AI_TOOLCHAIN"
           } >> "$GITHUB_ENV"
 
           {
@@ -147,5 +166,4 @@ jobs:
         run: |
           set -euo pipefail
           java -version
-          ./gradlew --version
-          ./gradlew :app:assembleDebug --stacktrace
+          bash "$AI_TOOLCHAIN" gradle -- :app:assembleDebug --stacktrace

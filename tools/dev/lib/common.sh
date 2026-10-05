@@ -44,16 +44,38 @@ run_root() {
   if [ "${EUID:-$(id -u)}" -eq 0 ]; then
     "$@"
   elif command -v sudo >/dev/null 2>&1; then
-    sudo "$@"
+    if [ "${NON_INTERACTIVE:-false}" = true ]; then
+      if ! sudo -n "$@"; then
+        echo "[777-toolchain] 非交互模式无法取得 sudo 权限；请预装系统依赖，或为当前环境提供无需输入密码的 sudo。" >&2
+        return 1
+      fi
+    else
+      sudo "$@"
+    fi
   else
     echo "[777-toolchain] 自动安装系统包需要 root 或 sudo：$*" >&2
     return 1
   fi
 }
 
+system_packages_ready() {
+  local command_name java_home
+  for command_name in bash curl gpg python3 dpkg-deb readelf sha256sum unzip tar git find awk sed grep head tr; do
+    command -v "$command_name" >/dev/null 2>&1 || return 1
+  done
+  [ "${BASH_VERSINFO[0]}" -ge 4 ] || return 1
+  java_home="$(find_java17_home || true)"
+  [ -n "$java_home" ] || return 1
+  [ "$(java_major "$java_home")" = "$JDK_MAJOR" ]
+}
+
 install_system_packages() {
   if [ "$SKIP_SYSTEM_PACKAGES" = true ]; then
     say "已按参数跳过系统包安装"
+    return 0
+  fi
+  if system_packages_ready; then
+    ok "系统依赖已满足，跳过 apt-get"
     return 0
   fi
   if [ ! -r /etc/os-release ]; then
