@@ -1432,9 +1432,6 @@ if (ROOT / "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkspace.kt
     die("LocalWorkspace is shared file infrastructure and must not return to WorkFeature")
 if not (ROOT / "app/src/main/java/com/labteto/dshmobile/local/files/LocalWorkspace.kt").exists():
     die("shared LocalWorkspace capability is missing")
-feature_execution_port_module_source = strip_comments(
-    read("app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt")
-)
 if "provideLocalToolsManagementPort" not in feature_execution_port_module_source:
     die("app composition root must provide the Tools management port")
 if "engine.toolsManagementPort" not in feature_execution_port_module_source:
