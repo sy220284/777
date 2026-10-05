@@ -9,6 +9,7 @@ import javax.inject.Singleton
 /** Work-owned product execution entry. */
 @Singleton
 internal class LocalWorkExecutionCoordinator @Inject constructor(
+    private val workRunRegistry: LocalWorkRunRegistry,
     private val turn: LocalWorkTurnPort,
 ) : LocalWorkExecutionPort {
     override fun send(
@@ -16,7 +17,8 @@ internal class LocalWorkExecutionCoordinator @Inject constructor(
         attachments: List<LocalImportedAttachment>,
     ): LocalSendResult {
         val prepared = prepareLocalSend(text, attachments) ?: return LocalSendResult.Empty
-        return turn.sendPrepared(prepared)
+        return workRunRegistry.enqueueIntoLiveRun(prepared)
+            ?: turn.sendPrepared(prepared)
     }
 
     override fun regenerateReply(messageId: String): Boolean =
