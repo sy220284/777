@@ -6,11 +6,14 @@ import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecovery
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecoveryPolicy
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
 import com.labteto.dshmobile.local.chat.ChatStreamFilter
-import com.labteto.dshmobile.local.context.LocalRequestContextAssessment
+import com.labteto.dshmobile.local.context.LocalRequestContextAssessmentInput
+import com.labteto.dshmobile.local.context.LocalRequestContextPolicy
+import com.labteto.dshmobile.local.context.LocalRequestContextPolicyInput
 import com.labteto.dshmobile.local.context.LocalRequestContextProjection
 import com.labteto.dshmobile.local.context.historySummaryMode
 import com.labteto.dshmobile.local.context.projectLocalRequestContext
 import com.labteto.dshmobile.local.model.LocalAgentModelRequestRuntime
+import com.labteto.dshmobile.local.model.LocalModelAdmissionPort
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalForegroundHistoryCompactionRuntime
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
@@ -29,15 +32,7 @@ import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.toRunModelSurface
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
-import com.labteto.dshmobile.local.runtime.structuredWorkState
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
-import com.labteto.dshmobile.local.work.assessWorkStepContext
-import com.labteto.dshmobile.local.work.executeWithModelAdmission
-import com.labteto.dshmobile.local.work.projectWorkRequestContext
-import com.labteto.dshmobile.local.work.toModelSnapshot
-import com.labteto.dshmobile.local.work.workRequestProjectionTargetTokens
-import com.labteto.dshmobile.local.work.workRequestProjectionTriggerTokens
 import com.labteto.dshmobile.observability.AppLog
 import java.security.MessageDigest
 import java.util.UUID
@@ -93,7 +88,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         profile: LocalModelProfile? = null,
         previewGuard: () -> Boolean = { true },
         overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
-        executionControl: LocalWorkExecutionControl? = null,
+        contextPolicy: LocalRequestContextPolicy? = null,
+        admission: LocalModelAdmissionPort? = null,
     ): LocalModelReply {
         val tools = toolsOverride ?: JsonArray(emptyList())
         val log = requestLog ?: sessionStorage.eventLogs.get(snapshot.sessionId)
@@ -136,38 +132,25 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         )
         val contextProjection = projectLocalRequestContext(
             usageMode = snapshot.usageMode,
-            workProjectionEnabled = executionControl != null,
+            workProjectionEnabled = contextPolicy != null,
             messages = messages,
             measuredPressure = baselinePressure,
-            workProjection = {
-                val projected = projectWorkRequestContext(
-                    messages = messages,
-                    tools = tools,
-                    compactor = historyCompactor,
-                    operationalLimitTokens = operationalLimit,
-                    measuredPressure = baselinePressure,
-                    previousPressure = previousSourcePressure,
-                    structuredWorkState = structuredWorkState(snapshot, log),
-                    cachePolicy = cachePolicy,
-                    allowSemanticProjection = step <= 1,
-                )
-                LocalRequestContextProjection(
-                    messages = projected.messages,
-                    projected = projected.projected,
-                    estimatedTokensBefore = projected.estimatedTokensBefore,
-                    estimatedTokensAfter = projected.estimatedTokensAfter,
-                    omittedMessages = projected.omittedMessages,
-                    preProjectionAssessment = projected.preProjectionAssessment?.let { assessment ->
-                        LocalRequestContextAssessment(
-                            status = assessment.status.name.lowercase(),
-                            effectiveProjectionTriggerTokens =
-                                assessment.effectiveProjectionTriggerTokens,
-                            historyRatioPermille = assessment.historyRatioPermille,
-                            historyGrowthTokens = assessment.historyGrowthTokens,
-                            reasons = assessment.reasons,
-                        )
-                    },
-                )
+            workProjection = contextPolicy?.let { policy ->
+                {
+                    policy.project(
+                        LocalRequestContextPolicyInput(
+                            snapshot = snapshot,
+                            eventLog = log,
+                            messages = messages,
+                            tools = tools,
+                            operationalLimitTokens = operationalLimit,
+                            measuredPressure = baselinePressure,
+                            previousPressure = previousSourcePressure,
+                            cachePolicy = cachePolicy,
+                            allowSemanticProjection = step <= 1,
+                        ),
+                    )
+                }
             },
         )
         val requestMessages = contextProjection.messages
@@ -190,15 +173,16 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             )
         } else baselinePressure
         val workContextAssessment = if (
-            executionControl != null && snapshot.usageMode == LocalUsageMode.WORK
+            contextPolicy != null && snapshot.usageMode == LocalUsageMode.WORK
         ) {
-            assessWorkStepContext(
-                current = pressure,
-                previous = previousSourcePressure,
-                targetTokens = workRequestProjectionTargetTokens(operationalLimit, cachePolicy),
-                baseTriggerTokens = workRequestProjectionTriggerTokens(operationalLimit, cachePolicy),
-                growthCurrent = baselinePressure,
-                allowAdaptiveEarlyCompaction = cachePolicy.allowAdaptiveEarlyCompaction,
+            contextPolicy.assess(
+                LocalRequestContextAssessmentInput(
+                    current = pressure,
+                    previous = previousSourcePressure,
+                    operationalLimitTokens = operationalLimit,
+                    cachePolicy = cachePolicy,
+                    growthCurrent = baselinePressure,
+                ),
             )
         } else {
             null
@@ -206,7 +190,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         pressureStore.record(
             sessionId = snapshot.sessionId,
             pressure = pressure,
-            workAssessment = workContextAssessment?.toModelSnapshot(),
+            workAssessment = workContextAssessment,
             workSourcePressure = if (workContextAssessment != null) baselinePressure else null,
             usageMode = snapshot.usageMode,
             sourcePressure = baselinePressure,
@@ -292,7 +276,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             put("current_user_tokens_estimate", pressure.currentUserTokens)
             put("tool_definition_tokens_estimate", pressure.toolDefinitionTokens)
             workContextAssessment?.let { assessment ->
-                put("context_efficiency_status", assessment.status.name.lowercase())
+                put("context_efficiency_status", assessment.status)
                 put("history_ratio_permille", assessment.historyRatioPermille)
                 put("tool_ratio_permille", assessment.toolRatioPermille)
                 put("input_growth_tokens", assessment.inputGrowthTokens)
@@ -464,11 +448,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     val compacted = historyCompactor.compactForOverflow(
                         history = activeMessages,
                         summaryMode = summaryMode,
-                        structuredWorkState = if (summaryMode == LocalHistorySummaryMode.WORK) {
-                            structuredWorkState(snapshot, log)
-                        } else {
-                            null
-                        },
+                        structuredWorkState = contextPolicy?.structuredState(snapshot, log),
                     )
                     val madeProgress = compacted != null &&
                         compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
@@ -532,17 +512,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         activePressure,
                         usageMode = snapshot.usageMode,
                     )
-                    executeWithModelAdmission(
-                        control = executionControl,
-                        routeFingerprint = routeFingerprint,
-                        model = frozenProfile.model,
-                        baseUrl = frozenProfile.baseUrl,
-                        contextWindowTokensOverride = frozenProfile.contextWindowTokensOverride,
-                        messages = activeMessages,
-                        tools = tools,
-                    ) {
-                        try {
-                            requestRuntime.complete(
+                    try {
+                        requestRuntime.complete(
                                 surface = runSurface,
                                 messages = activeMessages,
                                 tools = tools,
@@ -550,18 +521,19 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 temperature = temperature,
                                 promptCacheComparisonResponseId = cacheComparisonResponseId,
                                 promptCacheKey = promptCacheKey,
-                                promptCacheTtl = promptCacheTtl,
-                                onDelta = { delta ->
+                            promptCacheTtl = promptCacheTtl,
+                            admission = admission,
+                            onDelta = { delta ->
                                     val visible = streamFilter?.append(delta.content)?.text ?: delta.content
                                     streamPreview.append(visible)
                                 },
                             )
                         } catch (cancelled: CancellationException) {
-                            val admission =
+                            val admissionState =
                                 (cancelled as? LocalModelCancellationException)?.admissionState
                             log.append("request/cancelled", buildJsonObject {
                                 put("step", step)
-                                admission?.let {
+                                admissionState?.let {
                                     put("admission_state", it.name.lowercase())
                                     put(
                                         "budget_settlement",
@@ -650,7 +622,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                     })
                                 }
                             }
-                        }
                     }
                 }
             } finally {

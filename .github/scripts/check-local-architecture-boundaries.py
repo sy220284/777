@@ -366,6 +366,30 @@ for removed_engine_model_closure in (
 ):
     if removed_engine_model_closure in model_request_coordinator_source:
         die("Shared model request coordinator must not retain Engine composition closure: " + removed_engine_model_closure)
+if "import com.labteto.dshmobile.local.work." in model_request_coordinator_source:
+    die(
+        "Shared model request coordinator must not depend on WorkFeature internals; "
+        "consume LocalRequestContextPolicy and LocalModelAdmissionPort"
+    )
+for required_neutral_model_policy in (
+    "contextPolicy: LocalRequestContextPolicy? = null",
+    "admission: LocalModelAdmissionPort? = null",
+    "admission = admission",
+):
+    if required_neutral_model_policy not in model_request_coordinator_source:
+        die("Shared model request coordinator lost its neutral Feature extension point: " + required_neutral_model_policy)
+
+work_context_policy_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRequestContextPolicy.kt")
+)
+for required_work_context_policy in (
+    "object LocalWorkRequestContextPolicy : LocalRequestContextPolicy",
+    "projectWorkRequestContext(",
+    "assessWorkStepContext(",
+    "structuredWorkState(",
+):
+    if required_work_context_policy not in work_context_policy_source:
+        die("WorkFeature request-context policy is incomplete: " + required_work_context_policy)
 for required_foreground_compaction_owner in (
     "class LocalForegroundHistoryCompactionRuntime",
     "runtimeStateStore.foregroundRunHandle.modelHistory",

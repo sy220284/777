@@ -267,6 +267,7 @@ import com.labteto.dshmobile.local.work.LocalWorkTurnPort
 import com.labteto.dshmobile.local.work.LocalWorkTurnStarter
 import com.labteto.dshmobile.local.work.LocalRuntimeOwnershipPolicy
 import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
+import com.labteto.dshmobile.local.work.LocalWorkRequestContextPolicy
 import com.labteto.dshmobile.local.work.asModelAdmissionPort
 import com.labteto.dshmobile.local.work.LocalWorkProgressCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkRunBinding
@@ -2856,7 +2857,8 @@ class LocalHarnessEngine @Inject internal constructor(
         overflowPersister = binding?.let { runBinding ->
             { snapshot, mode -> persistOverflowCompaction(snapshot, mode, runBinding) }
         },
-        executionControl = binding?.executionControl,
+        contextPolicy = binding?.let { LocalWorkRequestContextPolicy },
+        admission = binding?.executionControl?.asModelAdmissionPort(),
     )
 
     private fun persistOverflowCompaction(

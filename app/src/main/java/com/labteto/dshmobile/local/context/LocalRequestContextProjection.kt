@@ -1,7 +1,13 @@
 package com.labteto.dshmobile.local.context
 
+import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
 import com.labteto.dshmobile.local.model.LocalPromptPressure
+import com.labteto.dshmobile.local.model.LocalStructuredWorkState
+import com.labteto.dshmobile.local.model.LocalWorkContextAssessmentSnapshot
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
 /** Work-agnostic diagnostics emitted by an optional Feature-owned semantic projector. */
@@ -22,6 +28,41 @@ internal data class LocalRequestContextProjection(
     val omittedMessages: Int = 0,
     val preProjectionAssessment: LocalRequestContextAssessment? = null,
 )
+
+internal data class LocalRequestContextPolicyInput(
+    val snapshot: LocalHarnessState,
+    val eventLog: LocalSessionEventLog,
+    val messages: List<JsonObject>,
+    val tools: JsonArray,
+    val operationalLimitTokens: Int,
+    val measuredPressure: LocalPromptPressure,
+    val previousPressure: LocalPromptPressure?,
+    val cachePolicy: LocalPromptCachePolicy,
+    val allowSemanticProjection: Boolean,
+)
+
+internal data class LocalRequestContextAssessmentInput(
+    val current: LocalPromptPressure,
+    val previous: LocalPromptPressure?,
+    val operationalLimitTokens: Int,
+    val cachePolicy: LocalPromptCachePolicy,
+    val growthCurrent: LocalPromptPressure,
+)
+
+/**
+ * Shared context extension point. Product Features supply semantic projection/assessment without
+ * making Shared Model/Context import Feature internals.
+ */
+internal interface LocalRequestContextPolicy {
+    fun project(input: LocalRequestContextPolicyInput): LocalRequestContextProjection
+
+    fun assess(input: LocalRequestContextAssessmentInput): LocalWorkContextAssessmentSnapshot?
+
+    fun structuredState(
+        snapshot: LocalHarnessState,
+        eventLog: LocalSessionEventLog,
+    ): LocalStructuredWorkState?
+}
 
 /**
  * Shared mode gate for request-context governance.
