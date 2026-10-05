@@ -31,6 +31,7 @@ class LocalSessionAccessCoordinatorTest {
                 },
                 eventLogFor = { sessionId -> if (sessionId == "active") activeLog else currentLog },
             )
+
             assertSame(activeLog, coordinator.authorizedLog("active"))
         } finally {
             directory.deleteRecursively()
@@ -48,12 +49,15 @@ class LocalSessionAccessCoordinatorTest {
                 activeScope = { sessionId ->
                     if (sessionId == "other") {
                         LocalSessionAccessScope(projectId = null, lineageId = "lineage-b")
-                    } else null
+                    } else {
+                        null
+                    }
                 },
                 eventLogFor = { sessionId ->
                     LocalSessionEventLog(directory.resolve("$sessionId.events.jsonl"), json)
                 },
             )
+
             val failure = runCatching { coordinator.authorizedLog("other") }.exceptionOrNull()
             assertTrue(failure is IllegalArgumentException)
             assertTrue(failure?.message?.contains("会话不存在或不属于当前项目/会话链") == true)
