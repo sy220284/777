@@ -347,16 +347,10 @@ internal class LocalChatReplyCoordinator @Inject constructor(
     }
 
     private fun recordStyleGuardHits(violations: List<String>) {
-        if (violations.isEmpty()) return
-        runtimeStateStore.projection.update { current ->
-            current.copy(
-                styleGuardHits = (current.styleGuardHits + violations)
-                    .map(String::trim)
-                    .filter(String::isNotBlank)
-                    .distinct()
-                    .takeLast(LocalHarnessSettingsCoordinator.MAX_STYLE_GUARD_HITS),
-            )
-        }
+        runtimeStateStore.projection.recordStyleGuardHits(
+            violations,
+            LocalHarnessSettingsCoordinator.MAX_STYLE_GUARD_HITS,
+        )
     }
 
     private suspend fun finalizeStyled(
