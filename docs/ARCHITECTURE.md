@@ -424,11 +424,12 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 - 设备授权只修改目标会话的运行绑定；撤销不影响其他会话，前台恢复与后台取消继续使用各自交互所有者。
 - 插件组合根持有 GitHub 凭据操作和 Web 工具构造，Engine 不再直接依赖对应平台存储/Provider；构造依赖预算维持 17。
 - 进程唯一后台任务管理器由共享 Runtime 持有并继续使用原 `local-harness/jobs.json` 持久化；Work 单向订阅任务快照负责会话投影和前台通知，Engine 删除后台任务 UI 代理与任务管理器所有权。
-- WorkRuntime 的直接 Engine 引用预算从 4 收紧到 2；剩余仅为运行停止与计划模式切换。
+- WorkRuntime 的直接 Engine 引用预算从 4 → 2 → 1 持续收紧。计划模式切换已由 `LocalWorkPlanModeCoordinator` 接管：通过当前 Session 的共享 Runtime lease 保证与前台/Automation 运行互斥，直接写入 Work 状态和 `plan/mode` 权威事件，并使用 Shared Runtime 持有的前台模型历史更新系统 Prompt；Engine 对应 `setPlanMode` 入口已删除。剩余唯一引用只负责“当前 Session 没有 Work binding 时”停止迁移中的旧前台运行槽。
+- Session-bound Work 的取消请求已由 `LocalWorkRunBinding` / `LocalWorkRunRegistry` 所有；停止一个 Work 不再先进入 Engine，也不会影响其他 Session 的 Work。取消请求在真实 Job 退出前保持 `running`，避免 Session owner 尚未释放时 UI 提前显示空闲并接受冲突操作。旧前台槽停止仍保留为迁移期 fallback，待前台 run owner 完整迁入 Shared Runtime 后删除。
 - 后台任务快照的通知与持久化按统一提交顺序执行；Work 订阅重放和绑定接入在投影锁内读取当前任务事实，防止旧快照覆盖取消或完成终态。任务返回后再次验证取消状态与合法终态提交权，阻塞执行的迟到成功或异常均不得覆盖已取消终态。回归覆盖晚接入绑定、跨会话隔离、重启中断投影、并发取消与迟到成功/异常。
 - 回归覆盖多会话等待、全局模式启停、过期/已完成点击、设备授权隔离/撤销、显式审批工具与前台切换；本子阶段须通过最终 Head 的完整 CI 验证。
 
-剩余：Chat 的人物、分支与发送业务，以及 Work 的运行停止与计划模式切换仍有 Engine 代理；不将当前子阶段标记为整个阶段 3 完成。
+剩余：Chat 的人物、分支与发送业务仍有 Engine 代理；Work 仅剩旧前台运行槽停止 fallback 的 1 条 Engine 引用。该 fallback 依赖前台 activeJob / pending inbox 的迁移，必须随 Shared Runtime 前台 run owner 一起收口，不将当前子阶段标记为整个阶段 3 完成。
 
 
 ### 阶段 4：建立 AutomationFeature
