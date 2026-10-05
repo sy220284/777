@@ -12,7 +12,6 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 
 /**
@@ -33,12 +32,10 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO +
             CoroutineExceptionHandler { _, throwable ->
-                runtimeStateStore.mutableState.update { current ->
-                    current.copy(
-                        error = throwable.message?.takeIf(String::isNotBlank)
-                            ?: "会话存储后台任务失败：${throwable::class.java.simpleName}",
-                    )
-                }
+                runtimeStateStore.projection.publishError(
+                    throwable.message?.takeIf(String::isNotBlank)
+                        ?: "会话存储后台任务失败：${throwable::class.java.simpleName}",
+                )
             },
     )
 
@@ -52,9 +49,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             scope = scope,
             onWritten = ::publishSummaries,
             onError = { error ->
-                runtimeStateStore.mutableState.update {
-                    it.copy(error = error.message ?: "会话写入失败")
-                }
+                runtimeStateStore.projection.publishError(error.message ?: "会话写入失败")
             },
         )
         coordinator = LocalSessionCoordinator(
@@ -103,12 +98,10 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     private fun publishSummaries() {
         runCatching { coordinator.summaries() }
             .onSuccess { summaries ->
-                runtimeStateStore.mutableState.update { it.copy(sessions = summaries) }
+                runtimeStateStore.projection.publishSessions(summaries)
             }
             .onFailure { error ->
-                runtimeStateStore.mutableState.update {
-                    it.copy(error = error.message ?: "会话摘要读取失败")
-                }
+                runtimeStateStore.projection.publishError(error.message ?: "会话摘要读取失败")
             }
     }
 }
