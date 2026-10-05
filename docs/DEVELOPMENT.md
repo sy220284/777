@@ -6,74 +6,176 @@
 
 > **开发依赖只允许来自 GitHub Actions 生成的工具链 Artifact。**
 
-本地安装器不会调用 `apt-get`、`curl`、`wget`、`sdkmanager` 下载、Gradle/Maven 在线解析、Node 下载或其他外部补齐路径。Artifact 缺项时直接失败，回到工作流重新生成完整产物。
+这里的“只允许”约束的是依赖来源。本地不会通过 `apt`、Google Android 仓库、Gradle/Maven 在线解析、Node 官网等渠道补齐开发依赖。
 
-## Artifact 中包含什么
+## 按需下载模型
 
-### `build`
+工具链不再提供一个必须整体下载的超大 build/full 包。
 
-日常开发、单元测试和 APK 构建需要的编译环境直接打进产物：
-
-- JDK 17，包含 `java` 与 `javac`。
-- Android command-line tools。
-- Android platform-tools。
-- Android API 37 platform。
-- Android build-tools 37.0.0。
-- Gradle 9.6.0 完整分发。
-- Gradle Wrapper 分发缓存。
-- Kotlin 2.2.10、AGP 9.4.0 与项目 Gradle 依赖的离线缓存。
-- 777 Runtime 构建缓存，覆盖 APK 内 Node / Python / Git Runtime 的准备链。
-
-### `full`
-
-在 `build` 基础上增加：
-
-- Node.js 22。
-- actionlint 1.7.12。
-- Android Emulator。
-- Android 16 x86_64 system image。
-- Android 17 / API 37 16 KiB page-size x86_64 system image。
-- 可用产物内镜像创建 `777-android16`、`777-android17` 两个 AVD。
-
-KVM 属于宿主虚拟化能力，Artifact 只能检测，无法替宿主开启 BIOS / Hyper-V / WSL 虚拟化。
-
-## Artifact 名称
-
-开发工具链工作流同时生成：
+先检查本机已有环境，再只下载缺失组件：
 
 ```text
-777-dev-toolchain-build-latest
-777-dev-toolchain-full-latest
+本机检查
+→ 计算缺失组件
+→ 下载对应 GitHub Actions Artifact
+→ SHA-256 校验
+→ 只安装缺失组件
+→ 再检查
+→ Gradle --offline 真实构建
 ```
 
-两份产物保留 30 天，并在默认分支每月 **1 日和 20 日**重新生成，最长刷新间隔 19 天。
+已有且版本满足要求的工具直接复用。例如宿主已经有完整 JDK 17，就不会要求重新下载 JDK Artifact。
 
-## 人工安装
-
-先从 GitHub Actions 的 **开发工具链** 工作流下载需要的 Artifact ZIP。
-
-解压一次：
+AI / Agent 查询缺失项：
 
 ```sh
-unzip <下载的 Artifact ZIP> -d 777-dev-toolchain
-cd 777-dev-toolchain
+bash tools/dev/ai-toolchain.sh plan --profile build
 ```
 
-日常环境：
+输出示例：
+
+```json
+{
+  "schema": 1,
+  "profile": "build",
+  "missing_artifacts": [
+    "777-toolchain-android-core-latest",
+    "777-toolchain-gradle-runtime-latest",
+    "777-toolchain-gradle-deps-latest",
+    "777-toolchain-runtime-cache-latest"
+  ]
+}
+```
+
+`full`：
 
 ```sh
-bash install.sh build
+bash tools/dev/ai-toolchain.sh plan --profile full
 ```
 
-完整环境：
+## 组件 Artifact
+
+基础开发组件：
+
+| Artifact | 内容 |
+|---|---|
+| `777-toolchain-jdk-latest` | JDK 17，包含 `java` / `javac` |
+| `777-toolchain-android-core-latest` | Android command-line tools、platform-tools、API 37 platform、build-tools 37.0.0、licenses |
+| `777-toolchain-gradle-runtime-latest` | Gradle 9.6.0 完整分发 |
+| `777-toolchain-gradle-deps-latest` | Gradle Wrapper 分发缓存、Kotlin 2.2.10、AGP 9.4.0 与项目依赖离线缓存 |
+| `777-toolchain-runtime-cache-latest` | 777 APK Runtime 构建缓存 |
+
+完整验证的扩展组件：
+
+| Artifact | 内容 |
+|---|---|
+| `777-toolchain-node-latest` | Node.js 22.23.3 |
+| `777-toolchain-actionlint-latest` | actionlint 1.7.12 |
+| `777-toolchain-emulator-latest` | Android Emulator |
+| `777-toolchain-android-image-16-latest` | Android 16 x86_64 system image |
+| `777-toolchain-android-image-17-latest` | Android 17 / API 37 16 KiB x86_64 system image |
+
+另有小型入口包：
+
+```text
+777-toolchain-bootstrap-latest
+```
+
+它只包含当前安装/检查脚本、组件清单和文档，故体积很小。它明确叫 `bootstrap`，不会再与真正包含编译工具的组件产物混淆。
+
+## 下载与安装
+
+先运行 `plan`，然后只下载 `missing_artifacts` 中列出的 GitHub Actions Artifact。
+
+把下载后的 Artifact 分别解压到同一个目录，例如：
+
+```text
+/tmp/777-artifacts/
+├── 777-toolchain-android-core-latest/
+├── 777-toolchain-gradle-runtime-latest/
+├── 777-toolchain-gradle-deps-latest/
+└── 777-toolchain-runtime-cache-latest/
+```
+
+安装：
 
 ```sh
-bash install.sh full --create-avds
+bash tools/dev/ai-toolchain.sh bootstrap \
+  --profile build \
+  --artifacts-dir /tmp/777-artifacts
 ```
 
-安装器会先校验 `SHA256SUMS`，再解开产物内 `payload/toolchain.tar.gz` 并安装 JDK、Android SDK、Gradle、离线依赖缓存及 Runtime 构建缓存。
+安装器会再次检查当前机器。下载后如果某个组件已经由其他方式变成满足版本要求，该组件仍会跳过安装。
 
-仓库里的 `tools/dev/install.sh` 如果没有 Artifact payload，会直接拒绝安装。这是预期行为，用于防止退回外部下载路径。
+人工入口也可以使用：
+
+```sh
+bash tools/dev/install.sh plan build
+
+bash tools/dev/install.sh install build \
+  --artifacts-dir /tmp/777-artifacts
+```
+
+完整验证环境：
+
+```sh
+bash tools/dev/install.sh install full \
+  --artifacts-dir /tmp/777-artifacts \
+  --create-avds
+```
+
+## 工具来源约束
+
+组件包由 `.github/workflows/dev-toolchain.yml` 在 GitHub Actions 联网环境中生成。
+
+允许联网获取原始依赖的地方只有 Artifact 生成阶段：
+
+```text
+GitHub Actions
+→ 获取并固定 JDK / Android SDK / Gradle / Node / actionlint
+→ 预热 Kotlin / AGP / 项目依赖 / Runtime
+→ 拆成组件
+→ 每组件生成 SHA256SUMS
+→ 分别上传 Artifact
+```
+
+外部下载只发生在 GitHub Actions。安装机只消费已经生成的组件 Artifact。
+
+## AI / Agent 常用入口
+
+```sh
+# 查看当前缺什么
+bash tools/dev/ai-toolchain.sh plan
+
+# 安装已经下载好的缺失组件
+bash tools/dev/ai-toolchain.sh bootstrap \
+  --artifacts-dir /tmp/777-artifacts
+
+# 检查环境
+bash tools/dev/ai-toolchain.sh check
+
+# 查看最近状态
+bash tools/dev/ai-toolchain.sh status
+
+# 使用产物内 Gradle，固定离线构建
+bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug
+
+# 完整环境缺项
+bash tools/dev/ai-toolchain.sh plan --profile full
+```
+
+环境目录可以覆盖：
+
+```text
+DEV777_TOOLS_ROOT
+DEV777_ANDROID_SDK_ROOT
+DEV777_GRADLE_HOME
+DEV777_GRADLE_USER_HOME
+DEV777_TOOLCHAIN_ENV_FILE
+DEV777_TOOLCHAIN_STATE_DIR
+DEV777_REPO_ROOT
+DEV777_ARTIFACTS_DIR
+```
 
 默认目录：
 
@@ -86,94 +188,33 @@ Gradle 离线缓存  ~/.local/share/777-dev/gradle-user-home
 环境文件         ~/.config/777/dev-toolchain.env
 ```
 
-需要新终端自动加载时，可显式增加：
+## 检查规则
 
-```sh
-bash install.sh build --configure-shell
-```
+`build` 要求：
 
-## AI / Agent 推荐路径
+- JDK 17，且必须有 `javac`。
+- Android command-line tools。
+- platform-tools。
+- API 37 platform。
+- build-tools 37.0.0。
+- Gradle 9.6.0。
+- Gradle 离线依赖缓存。
+- Gradle Wrapper 分发缓存。
+- 777 Runtime 构建缓存。
 
-AI、Codex、自动化 Agent 先下载对应 Artifact，再从解压后的产物目录执行：
+`full` 额外要求：
 
-```sh
-bash tools/dev/ai-toolchain.sh bootstrap
-```
+- Node.js 22.23.3。
+- actionlint 1.7.12。
+- Android Emulator。
+- Android 16 x86_64 system image。
+- Android 17 16 KiB x86_64 system image。
 
-完整环境：
-
-```sh
-bash tools/dev/ai-toolchain.sh bootstrap --profile full
-```
-
-常用命令：
-
-```sh
-# 只检查当前环境
-bash tools/dev/ai-toolchain.sh check
-
-# 最近一次机器可读状态
-bash tools/dev/ai-toolchain.sh status
-
-# 固定使用产物内 Gradle，并强制 --offline
-bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug
-
-# 在已安装环境中执行命令
-bash tools/dev/ai-toolchain.sh run -- git status
-```
-
-当环境未就绪且当前脚本目录没有 Artifact payload 时，`bootstrap` 返回 `artifact_required`，不会尝试其他下载渠道。
-
-状态写入仓库本地：
-
-```text
-.777/toolchain/status.json
-```
-
-该目录已忽略，不进入 Git。
-
-可覆盖目录：
-
-```text
-DEV777_TOOLS_ROOT
-DEV777_ANDROID_SDK_ROOT
-DEV777_GRADLE_HOME
-DEV777_GRADLE_USER_HOME
-DEV777_TOOLCHAIN_ENV_FILE
-DEV777_TOOLCHAIN_STATE_DIR
-DEV777_REPO_ROOT
-```
-
-状态示例：
-
-```json
-{
-  "schema": 2,
-  "status": "ready",
-  "reason": "environment_ready",
-  "profile": "build",
-  "exit_code": 0,
-  "repo_root": "/workspace/777",
-  "env_file": "/home/user/.config/777/dev-toolchain.env",
-  "sdk_root": "/home/user/.local/share/777-dev/android-sdk",
-  "tools_root": "/home/user/.local/share/777-dev",
-  "gradle_home": "/home/user/.local/share/777-dev/gradle",
-  "gradle_user_home": "/home/user/.local/share/777-dev/gradle-user-home"
-}
-```
-
-主要状态：
-
-- `ready`：当前档位可直接使用。
-- `needs_bootstrap`：当前环境缺项。
-- `error / artifact_required`：必须下载 GitHub Actions 工具链 Artifact。
-- `error / artifact_install_failed`：Artifact 校验、架构、宿主命令或安装过程失败。
-- `error / post_check_failed`：产物安装完成后复检仍有缺项。
-- `unknown`：尚未执行检查。
+KVM 属于宿主虚拟化能力，只能检测，Artifact 无法替宿主开启 BIOS / Hyper-V / WSL 虚拟化。
 
 ## 宿主基础命令
 
-Artifact 负责项目开发工具与编译依赖。Linux 宿主仍需具备运行脚本与 Runtime 处理所需的基础命令：
+Artifact 负责项目开发工具和编译依赖。Linux 宿主仍需要脚本运行所需基础命令：
 
 ```text
 bash >= 4
@@ -195,97 +236,59 @@ rm
 mkdir
 ```
 
-这些基础命令缺失时，安装器会明确报错并停止，不会调用系统包管理器补装。
-
-## 检查
-
-安装完成后可直接检查：
-
-```sh
-bash tools/dev/setup-toolchain.sh --check --profile build
-```
-
-完整环境：
-
-```sh
-bash tools/dev/setup-toolchain.sh --check --profile full
-```
-
-`setup-toolchain.sh` 当前只负责检查与版本基线自检。旧的 `--auto`、`--accept-android-licenses`、`--skip-system-packages` 等联网安装参数已经禁用。
+缺失时直接报错，不会调用系统包管理器安装。
 
 ## 离线构建
 
-推荐始终通过 AI 工具链入口执行 Gradle：
+推荐统一：
 
 ```sh
 bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug
 bash tools/dev/ai-toolchain.sh gradle :app:assembleOptimized
 ```
 
-该入口调用 Artifact 内的 Gradle 9.6.0，并固定附加 `--offline`。
+该入口固定使用安装自 Artifact 的 Gradle，并附加 `--offline`。
 
-安装后也可手工：
+## CI 如何证明“真的有产物”
 
-```sh
-source "$HOME/.config/777/dev-toolchain.env"
-gradle --offline :app:assembleDebug
-```
+“开发工具链”工作流现在有两层验证。
 
-仓库 Gradle Wrapper 的分发缓存同样包含在 Artifact 中，兼容已有 Wrapper 流程；自动化路径仍优先使用上面的离线入口。
+第一层：每个组件必须真实上传，且设置 `if-no-files-found: error`。
 
-## 工作流如何生成产物
-
-`.github/workflows/dev-toolchain.yml` 在 GitHub Actions 联网环境中完成以下步骤：
+第二层：验证 Job 会重新从 GitHub Actions 下载刚刚生成的 Artifact：
 
 ```text
-锁定版本
-→ 准备 JDK / Android SDK
-→ 预热 Gradle、Kotlin/AGP、单元测试与 Runtime 依赖
-→ full 档补齐 Node / actionlint / Emulator / Android 16/17 image
-→ 组装 payload
-→ 生成 SHA256SUMS
-→ 上传 build / full Artifact
-```
+bootstrap
+→ 先 plan
+→ 证明已有 JDK 17 时不会要求下载 JDK
+→ 只下载 build 当前缺的 Android / Gradle / Runtime 组件
+→ 安装
+→ plan 必须变成 missing_artifacts=[]
+→ Gradle --offline assembleDebug
 
-外部下载只发生在 GitHub Actions 的 Artifact 生成阶段。本地安装阶段只消费已经生成并校验的产物。
-
-工具链相关 PR 会对 `build` 与 `full` 两套产物分别执行：
-
-```text
-下载当前工作流刚生成的 Artifact
+然后：
+→ 单独下载 JDK Artifact
 → SHA-256 校验
-→ 从 payload 安装
-→ JDK / Android SDK / Gradle / 离线缓存复检
-→ AI check
-→ 使用产物内 Gradle --offline 真实构建 :app:assembleDebug
-→ full 额外验证 Node / actionlint / Emulator / Android 16/17 AVD
+→ 解包并真实执行 javac
+
+再：
+→ plan full
+→ 下载 full 扩展组件
+→ 安装 / 创建 Android 16、17 AVD
+→ plan full 必须清零
+→ Gradle --offline assembleOptimized
 ```
 
-## 平台边界
+因此工作流全绿的前提包含：
 
-- Linux x86_64：当前 Artifact 的标准宿主。
-- WSL2 Ubuntu x86_64：当前 Artifact 的标准 Windows 开发路径。
-- Linux ARM64：当前 GitHub Actions Artifact 尚未提供 ARM64 payload，安装器会按架构拒绝误装。
-- Windows 原生：不作为标准构建宿主。
-- macOS 原生：当前 Runtime 脚本依赖 GNU/Linux 工具，不作为标准构建宿主。
+- Artifact 实际存在。
+- Artifact 能从 Actions 再下载。
+- 包内不是空壳。
+- SHA-256 正确。
+- 工具可执行。
+- 按需安装逻辑正确。
+- 最终能完成真实离线构建。
 
-## 项目验证
-
-工具链就绪后，常用验证统一通过离线 Gradle 入口：
-
-```sh
-bash tools/dev/ai-toolchain.sh gradle \
-  :core:test \
-  :harness-core:test \
-  :harness-runtime-android:test \
-  :harness-interop:test \
-  :harness-device-android:testDebugUnitTest \
-  :mock-harness:test \
-  :app:testDebugUnitTest
-
-bash tools/dev/ai-toolchain.sh gradle :reference-validation:test
-bash tools/dev/ai-toolchain.sh gradle :app:lintDebug
-bash tools/dev/ai-toolchain.sh gradle :app:assembleOptimized
-```
+组件 Artifact 保留 30 天。默认分支每月 **1 日和 20 日**重新生成全部组件，最长刷新间隔 19 天。
 
 最终放行规则仍以 [VALIDATION.md](VALIDATION.md) 和当前 `.github/workflows/ci.yml` 为准。
