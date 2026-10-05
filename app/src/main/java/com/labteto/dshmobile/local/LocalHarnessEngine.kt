@@ -268,6 +268,7 @@ import com.labteto.dshmobile.local.work.LocalWorkMemoryRuntime
 import com.labteto.dshmobile.local.work.LocalWorkModelHistoryRuntime
 import com.labteto.dshmobile.local.work.LocalWorkToolResultRuntime
 import com.labteto.dshmobile.local.work.LocalWorkTurnStarter
+import com.labteto.dshmobile.local.work.LocalWorkTurnToolRuntime
 import com.labteto.dshmobile.local.work.LocalRuntimeOwnershipPolicy
 import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.work.LocalWorkRequestContextPolicy
@@ -795,6 +796,16 @@ class LocalHarnessEngine @Inject internal constructor(
         LocalWorkToolResultRuntime(
             runtimeStateStore = runtimeStateStore,
             toolOutputStore = toolOutputStore,
+        )
+    }
+
+    private val workTurnToolRuntime by lazy {
+        LocalWorkTurnToolRuntime(
+            registry = toolRegistry,
+            execution = toolExecutionCoordinator,
+            schemas = toolSchemaProjection,
+            approvalPreferences = approvalPreferences,
+            githubConfigured = pluginComposition::githubConfigured,
         )
     }
 
@@ -1613,10 +1624,8 @@ class LocalHarnessEngine @Inject internal constructor(
             "Work Agent 回合只能处理 Work 模式"
         }
         val runPolicy = localAgentRunPolicy(LocalUsageMode.WORK)
-        clearRunCapabilities(binding)
-        toolExecutionCoordinator.prepareWorkTurnCapabilities(
-            input, runHistory.snapshot(), pluginComposition::githubConfigured, binding.enabledOptionalTools,
-        )
+        workTurnToolRuntime.clear(binding)
+        workTurnToolRuntime.prepare(binding, input)
         val foregroundSessionId = runSessionId
         var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
         LocalExecutionService.holdTurn(context, foregroundSessionId)
@@ -1672,7 +1681,7 @@ class LocalHarnessEngine @Inject internal constructor(
                 maxVirtualDisplays = resourceScheduler.budget.maxVirtualDisplays,
                 maxLanguageServers = resourceScheduler.budget.maxLanguageServers,
             ),
-            toolNames = runToolNames(runPolicy, binding),
+            toolNames = workTurnToolRuntime.names(runPolicy, binding),
             contextChars = runSnapshot.kernel.contextChars,
             parentRunId = continuationParentRunId,
         )
@@ -1740,7 +1749,7 @@ class LocalHarnessEngine @Inject internal constructor(
                 val key = modelRequestMarker()
                 val snapshot = runState.value
                 val tools = modelToolStepSurface.capture(
-                    runToolSurface.next(modelToolSchemas(runPolicy, binding), snapshot),
+                    runToolSurface.next(workTurnToolRuntime.schemas(runPolicy, binding), snapshot),
                 )
                 val productContextTokens =
                     estimateModelTokens(workPromptContext.stable) +
@@ -1842,20 +1851,24 @@ class LocalHarnessEngine @Inject internal constructor(
                 if (!modelToolStepSurface.allows(call.name)) {
                     modelToolStepSurface.hiddenCallResult(call.name)
                 } else {
-                    executeSafely(call.toLocalToolCall(), allowMutation = true, binding = binding)
+                    workTurnToolRuntime.execute(
+                        binding = binding,
+                        call = call.toLocalToolCall(),
+                        allowMutation = true,
+                    )
                 }
             },
             toolBatch = AgentToolBatchExecutor { calls ->
                 agentRunCoordinator.ensureCurrentOwner(runContext)
-                executeToolBatch(
+                workTurnToolRuntime.executeBatch(
+                    binding = binding,
                     calls = calls.map { it.toLocalToolCall() },
                     allowMutation = true,
-                    binding = binding,
                 ).map { (_, result) -> result }
             },
             isParallelTool = { call ->
                 modelToolStepSurface.allows(call.name) &&
-                    call.name in PARALLEL_SUBAGENT_TOOLS
+                    workTurnToolRuntime.isParallel(call.name)
             },
             eventSink = AgentEventSink { event ->
                 agentRunCoordinator.ensureCurrentOwner(runContext)
