@@ -191,6 +191,39 @@ if (
 ).exists():
     die("legacy Automation-owned LocalChatUserActivityPort must not return")
 
+# Removed package paths are permanent exits. Catch stale imports in source/tests before
+# Kotlin compilation so a completed ownership migration cannot silently depend on its old package.
+LEGACY_MOVED_IMPORTS = {
+    "com.labteto.dshmobile.local.runtime.structuredWorkState":
+        "com.labteto.dshmobile.local.work.structuredWorkState",
+    "com.labteto.dshmobile.local.runtime.LocalWorkCueKind":
+        "com.labteto.dshmobile.local.work.LocalWorkCueKind",
+    "com.labteto.dshmobile.local.runtime.extractLocalWorkCueSnippet":
+        "com.labteto.dshmobile.local.work.extractLocalWorkCueSnippet",
+    "com.labteto.dshmobile.local.LocalChatContextRefreshCoordinator":
+        "com.labteto.dshmobile.local.chat.LocalChatContextRefreshCoordinator",
+}
+for kotlin_root in (
+    ROOT / "app/src/main",
+    ROOT / "app/src/test",
+    ROOT / "app/src/androidTest",
+):
+    if not kotlin_root.exists():
+        continue
+    for kotlin_path in kotlin_root.rglob("*.kt"):
+        kotlin_source = strip_comments(kotlin_path.read_text(encoding="utf-8"))
+        for legacy_import, current_import in LEGACY_MOVED_IMPORTS.items():
+            if re.search(
+                rf"^import\s+{re.escape(legacy_import)}\s*$",
+                kotlin_source,
+                re.MULTILINE,
+            ):
+                relative = kotlin_path.relative_to(ROOT).as_posix()
+                die(
+                    f"{relative} still imports removed architecture path {legacy_import}; "
+                    f"use {current_import}"
+                )
+
 # Physical boundaries must also be Kotlin boundaries; root-package leakage defeats import guards.
 for source_path in LOCAL_SOURCE_ROOT.rglob("*.kt"):
     relative = source_path.relative_to(LOCAL_SOURCE_ROOT)
