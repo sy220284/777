@@ -4,11 +4,9 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.async
+import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -16,43 +14,40 @@ import org.junit.Test
 
 class LocalChatPersonaCoordinatorTest {
     private fun initialState() = MutableStateFlow(LocalHarnessState(
-        sessionId = "persona-edit", loading = false, usageMode = LocalUsageMode.CHAT,
+        sessionId = "persona-edit",
+        loading = false,
+        usageMode = LocalUsageMode.CHAT,
     ))
 
     @Test
-    fun selectionOwnsSessionUntilSnapshotIsDurableAndRejectsCompetingRun() = runBlocking {
+    fun selectionCommitsDurableFactBeforePublishingRuntimeProjection() = runBlocking {
         val state = initialState()
-        val reached = CompletableDeferred<Unit>()
-        val release = CompletableDeferred<Unit>()
+        var commits = 0
         val coordinator = LocalChatPersonaCoordinator(
-            state = LocalChatStatePort(state), savePersona = { it },
-            persistNow = {
-                reached.complete(Unit)
-                release.await()
-                true
+            state = LocalChatStatePort(state),
+            loadPersona = { null },
+            savePersona = { it },
+            restorePersona = { _, _ -> error("成功提交不得回滚") },
+            commitDomainState = { committed, _ ->
+                assertTrue(LocalSessionRuntimeRegistry.hasLiveOwner("persona-edit"))
+                assertEquals(PersonaProfile.DEFAULT_PERSONA_ID, state.value.chat.personaId)
+                assertEquals("new", committed.chat.personaId)
+                commits++
             },
-            enqueueSnapshot = { error("selection must await durable write") },
+            enqueueSnapshot = { true },
         )
-        val selecting = async { coordinator.selectNow(state.value.toLocalChatProjectionState(), PersonaProfile(id = "new")) }
-        try {
-            withTimeout(2_000) { reached.await() }
-            assertFalse(selecting.isCompleted)
-            assertTrue(LocalSessionRuntimeRegistry.hasLiveOwner("persona-edit"))
-            assertTrue(LocalSessionRuntimeRegistry.tryAcquire(
-                "persona-edit", LocalSessionRuntimeKind.FOREGROUND,
-            ) == null)
-            release.complete(Unit)
-            assertTrue(withTimeout(2_000) { selecting.await() })
-            assertEquals("new", state.value.chat.personaId)
-            assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("persona-edit"))
-        } finally {
-            release.complete(Unit)
-            selecting.cancel()
-        }
+
+        assertTrue(coordinator.selectNow(
+            state.value.toLocalChatProjectionState(),
+            PersonaProfile(id = "new"),
+        ))
+        assertEquals(1, commits)
+        assertEquals("new", state.value.chat.personaId)
+        assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("persona-edit"))
     }
 
     @Test
-    fun lateSelectionCannotOverwriteChangedPersonaGalleryOrMode() = runBlocking {
+    fun lateSelectionRollsBackPersonaWriteAndNeverCommitsDomainState() = runBlocking {
         for (mutation in listOf<(LocalHarnessState) -> LocalHarnessState>(
             { it.copy(chat = it.chat.copy(personaId = "newer")) },
             { it.copy(chat = it.chat.copy(galleryId = "new-gallery")) },
@@ -61,15 +56,22 @@ class LocalChatPersonaCoordinatorTest {
             { it.copy(sessionId = "other") },
         )) {
             val state = initialState()
-            var writes = 0
+            var restores = 0
+            var commits = 0
             val coordinator = LocalChatPersonaCoordinator(
                 state = LocalChatStatePort(state),
+                loadPersona = { PersonaProfile(id = "old", name = "旧值") },
                 savePersona = { profile -> state.value = mutation(state.value); profile },
-                persistNow = { writes++; true }, enqueueSnapshot = { true },
+                restorePersona = { _, _ -> restores++ },
+                commitDomainState = { _, _ -> commits++ },
+                enqueueSnapshot = { true },
             )
-            assertFalse(coordinator.selectNow(state.value.toLocalChatProjectionState(), PersonaProfile(id = "old")))
-            assertFalse(state.value.chat.personaId == "old")
-            assertEquals(0, writes)
+            assertFalse(coordinator.selectNow(
+                state.value.toLocalChatProjectionState(),
+                PersonaProfile(id = "old"),
+            ))
+            assertEquals(1, restores)
+            assertEquals(0, commits)
             assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("persona-edit"))
         }
     }
@@ -78,14 +80,22 @@ class LocalChatPersonaCoordinatorTest {
     fun existingOwnerRejectsBothEditsBeforePersonaWrite() = runBlocking {
         val state = initialState()
         val coordinator = LocalChatPersonaCoordinator(
-            state = LocalChatStatePort(state), savePersona = { error("must not write while owned") },
-            persistNow = { error("must not persist while owned") }, enqueueSnapshot = { true },
+            state = LocalChatStatePort(state),
+            loadPersona = { error("占用期间不得读取") },
+            savePersona = { error("占用期间不得写入") },
+            restorePersona = { _, _ -> error("占用期间不得回滚") },
+            commitDomainState = { _, _ -> error("占用期间不得提交") },
+            enqueueSnapshot = { true },
         )
         val owner = requireNotNull(LocalSessionRuntimeRegistry.tryAcquire(
-            "persona-edit", LocalSessionRuntimeKind.AUTOMATION_CHAT,
+            "persona-edit",
+            LocalSessionRuntimeKind.AUTOMATION_CHAT,
         ))
         try {
-            assertFalse(coordinator.selectNow(state.value.toLocalChatProjectionState(), PersonaProfile()))
+            assertFalse(coordinator.selectNow(
+                state.value.toLocalChatProjectionState(),
+                PersonaProfile(),
+            ))
             assertTrue(runCatching { coordinator.syncDefault(PersonaProfile()) }.isFailure)
         } finally {
             owner.close()
@@ -93,23 +103,49 @@ class LocalChatPersonaCoordinatorTest {
     }
 
     @Test
-    fun defaultSyncRejectsLateResultAndPersistenceFailureCannotReportSuccess() = runBlocking {
+    fun failedDomainCommitRestoresPersonaAndLeavesRuntimeProjectionUnchanged() = runBlocking {
         val state = initialState()
-        val stale = LocalChatPersonaCoordinator(
+        var restored: PersonaProfile? = null
+        val previous = PersonaProfile(id = "new", name = "旧人物")
+        val coordinator = LocalChatPersonaCoordinator(
             state = LocalChatStatePort(state),
-            savePersona = { profile -> state.value = state.value.copy(usageMode = LocalUsageMode.WORK); profile },
-            persistNow = { error("stale snapshot must not persist") }, enqueueSnapshot = { true },
+            loadPersona = { previous },
+            savePersona = { it },
+            restorePersona = { _, value -> restored = value },
+            commitDomainState = { _, _ -> throw IOException("disk full") },
+            enqueueSnapshot = { error("权威事件失败后不得写快照") },
         )
-        assertTrue(runCatching { stale.syncDefault(PersonaProfile(name = "old")) }.isFailure)
-        assertFalse(state.value.chat.chatPersona.name == "old")
-        assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("persona-edit"))
 
-        val fresh = initialState()
-        val failure = LocalChatPersonaCoordinator(
-            state = LocalChatStatePort(fresh), savePersona = { it },
-            persistNow = { throw java.io.IOException("disk full") }, enqueueSnapshot = { true },
+        val result = runCatching {
+            coordinator.selectNow(
+                state.value.toLocalChatProjectionState(),
+                PersonaProfile(id = "new", name = "新人物"),
+            )
+        }
+        assertTrue(result.isFailure)
+        assertEquals(previous, restored)
+        assertEquals(PersonaProfile.DEFAULT_PERSONA_ID, state.value.chat.personaId)
+        assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("persona-edit"))
+    }
+
+    @Test
+    fun defaultSyncRejectsLateResultAndRollsBackItsStoreWrite() = runBlocking {
+        val state = initialState()
+        var restores = 0
+        val coordinator = LocalChatPersonaCoordinator(
+            state = LocalChatStatePort(state),
+            loadPersona = { PersonaProfile() },
+            savePersona = { profile ->
+                state.value = state.value.copy(usageMode = LocalUsageMode.WORK)
+                profile
+            },
+            restorePersona = { _, _ -> restores++ },
+            commitDomainState = { _, _ -> error("过期状态不得提交") },
+            enqueueSnapshot = { true },
         )
-        assertTrue(runCatching { failure.selectNow(fresh.value.toLocalChatProjectionState(), PersonaProfile(id = "new")) }.isFailure)
+
+        assertTrue(runCatching { coordinator.syncDefault(PersonaProfile(name = "old")) }.isFailure)
+        assertEquals(1, restores)
         assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("persona-edit"))
     }
 }

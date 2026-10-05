@@ -1,8 +1,13 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatReplySuggestion
+import com.labteto.dshmobile.local.chat.LOCAL_CHAT_DOMAIN_STATE_EVENT_TYPE
 import com.labteto.dshmobile.local.chat.LocalChatBranchNode
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.chat.LocalChatDurableState
 import com.labteto.dshmobile.local.chat.encodeChatBranchStateEvent
+import com.labteto.dshmobile.local.chat.encodeChatDomainStateEvent
 import com.labteto.dshmobile.local.chat.upsertChatBranchNode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
@@ -90,6 +95,44 @@ class LocalSessionControlProjectionTest {
         )
 
         assertEquals(newState, projected.chatBranches)
+    }
+
+    @Test
+    fun chatDomainEventRecoversWhenMaterializedSnapshotLags() {
+        val snapshot = LocalHarnessSession(
+            id = "chat-domain",
+            personaId = "old-persona",
+            galleryId = "old-gallery",
+            replySuggestions = listOf(ChatReplySuggestion("旧", "旧建议")),
+            handoffSummary = "旧摘要",
+            controlProjectedThroughSequence = 8L,
+        )
+        val durable = LocalChatDurableState(
+            personaId = "new-persona",
+            galleryId = "new-gallery",
+            galleryStoryId = "story-2",
+            gallerySaveSuppressedThrough = 42L,
+            chatState = ChatCharacterState(mood = "稳定"),
+            replySuggestions = listOf(ChatReplySuggestion("新", "新建议")),
+            handoffSummary = null,
+        )
+        val projected = projectSessionControlTail(
+            snapshot = snapshot,
+            events = listOf(event(
+                9L,
+                LOCAL_CHAT_DOMAIN_STATE_EVENT_TYPE,
+                encodeChatDomainStateEvent(durable, "test"),
+            )),
+            sequenceExclusive = 8L,
+        )
+
+        assertEquals("new-persona", projected.personaId)
+        assertEquals("new-gallery", projected.galleryId)
+        assertEquals("story-2", projected.galleryStoryId)
+        assertEquals(42L, projected.gallerySaveSuppressedThrough)
+        assertEquals(durable.chatState, projected.chatState)
+        assertEquals(durable.replySuggestions, projected.replySuggestions)
+        assertEquals(null, projected.handoffSummary)
     }
 
     @Test
