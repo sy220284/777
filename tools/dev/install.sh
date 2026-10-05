@@ -170,10 +170,13 @@ find_artifact_dir() {
 
 verify_artifact_dir() {
   local component="$1" dir="$2" expected_part="$3" expected_parts="$4"
-  local artifact_component artifact_arch artifact_part artifact_parts payload_file
+  local artifact_schema artifact_component artifact_arch artifact_head_sha
+  local artifact_part artifact_parts payload_file
+  local artifact_build_jdk_min artifact_jvm_target artifact_android_api artifact_android_build_tools
+  local artifact_gradle artifact_kotlin artifact_agp artifact_node_min artifact_actionlint
 
   if [ ! -f "$dir/SHA256SUMS" ] || [ ! -f "$dir/component.env" ]; then
-    echo "[777-install] Artifact 不完整：$dir" >&2
+    echo "[777-install] Artifact 不完整或属于旧工具链：$dir" >&2
     return 3
   fi
 
@@ -192,15 +195,31 @@ verify_artifact_dir() {
     sha256sum -c SHA256SUMS
   )
 
-  # 只有 SHA-256 通过后才加载 Actions 生成的元数据。
-  unset ARTIFACT_COMPONENT ARTIFACT_ARCH ARTIFACT_PART ARTIFACT_PARTS
-  # shellcheck disable=SC1090
-  source "$dir/component.env"
-  artifact_component="${ARTIFACT_COMPONENT:-}"
-  artifact_arch="${ARTIFACT_ARCH:-}"
-  artifact_part="${ARTIFACT_PART:-1}"
-  artifact_parts="${ARTIFACT_PARTS:-1}"
+  # SHA-256 通过后只读取白名单元数据，避免旧 Artifact 覆盖当前工具链版本变量。
+  artifact_value() {
+    sed -n "s/^$1=//p" "$dir/component.env" | head -n 1
+  }
 
+  artifact_schema="$(artifact_value ARTIFACT_SCHEMA)"
+  artifact_component="$(artifact_value ARTIFACT_COMPONENT)"
+  artifact_arch="$(artifact_value ARTIFACT_ARCH)"
+  artifact_head_sha="$(artifact_value ARTIFACT_HEAD_SHA)"
+  artifact_part="$(artifact_value ARTIFACT_PART)"
+  artifact_parts="$(artifact_value ARTIFACT_PARTS)"
+  artifact_build_jdk_min="$(artifact_value BUILD_JDK_MIN_MAJOR)"
+  artifact_jvm_target="$(artifact_value JVM_TARGET)"
+  artifact_android_api="$(artifact_value ANDROID_COMPILE_API)"
+  artifact_android_build_tools="$(artifact_value ANDROID_BUILD_TOOLS)"
+  artifact_gradle="$(artifact_value GRADLE_VERSION)"
+  artifact_kotlin="$(artifact_value KOTLIN_VERSION)"
+  artifact_agp="$(artifact_value AGP_VERSION)"
+  artifact_node_min="$(artifact_value NODE_MIN_MAJOR)"
+  artifact_actionlint="$(artifact_value ACTIONLINT_VERSION)"
+
+  [ "$artifact_schema" = "4" ] || {
+    echo "[777-install] Artifact schema 不兼容：期望 4，实际 ${artifact_schema:-缺失}；请下载 main 最新“开发工具链”产物。" >&2
+    return 3
+  }
   [ "$artifact_component" = "$component" ] || {
     echo "[777-install] 组件身份不匹配：期望 $component，实际 $artifact_component" >&2
     return 3
@@ -217,6 +236,24 @@ verify_artifact_dir() {
     echo "[777-install] 分片总数不匹配：$component 期望 $expected_parts，实际 $artifact_parts" >&2
     return 3
   }
+
+  check_artifact_version() {
+    local label="$1" actual="$2" expected="$3"
+    [ "$actual" = "$expected" ] || {
+      echo "[777-install] Artifact 与当前工具链不匹配：$label 期望 $expected，实际 ${actual:-缺失}；来源 HEAD=${artifact_head_sha:-未知}。" >&2
+      return 3
+    }
+  }
+
+  check_artifact_version BUILD_JDK_MIN_MAJOR "$artifact_build_jdk_min" "$BUILD_JDK_MIN_MAJOR" || return $?
+  check_artifact_version JVM_TARGET "$artifact_jvm_target" "$JVM_TARGET" || return $?
+  check_artifact_version ANDROID_COMPILE_API "$artifact_android_api" "$ANDROID_COMPILE_API" || return $?
+  check_artifact_version ANDROID_BUILD_TOOLS "$artifact_android_build_tools" "$ANDROID_BUILD_TOOLS" || return $?
+  check_artifact_version GRADLE_VERSION "$artifact_gradle" "$GRADLE_VERSION" || return $?
+  check_artifact_version KOTLIN_VERSION "$artifact_kotlin" "$KOTLIN_VERSION" || return $?
+  check_artifact_version AGP_VERSION "$artifact_agp" "$AGP_VERSION" || return $?
+  check_artifact_version NODE_MIN_MAJOR "$artifact_node_min" "$NODE_MIN_MAJOR" || return $?
+  check_artifact_version ACTIONLINT_VERSION "$artifact_actionlint" "$ACTIONLINT_VERSION" || return $?
 }
 
 materialize_component_archive() {
