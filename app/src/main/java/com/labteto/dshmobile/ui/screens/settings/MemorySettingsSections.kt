@@ -314,16 +314,13 @@ private fun MemoryRecordSurface(
     val colors = DsTheme.colors
     val tone = when (kind) {
         MemoryKind.RULE,
-        MemoryKind.CONSTRAINT,
-        -> colors.accent
+        MemoryKind.CONSTRAINT -> colors.accent
 
         MemoryKind.PREFERENCE,
-        MemoryKind.RELATIONSHIP_PREFERENCE,
-        -> Ds.FamilyPurple
+        MemoryKind.RELATIONSHIP_PREFERENCE -> Ds.FamilyPurple
 
         MemoryKind.RELATIONSHIP_FACT,
-        MemoryKind.RELATIONSHIP_STATE,
-        -> Ds.FamilyCyan
+        MemoryKind.RELATIONSHIP_STATE -> Ds.FamilyCyan
 
         MemoryKind.DECISION -> colors.warn
         else -> colors.labelTertiary
@@ -543,52 +540,52 @@ internal fun MemoryManagementCard(
 
         visibleRecords.forEach { record ->
             MemoryRecordSurface(record.kind) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        DsPill(text = memoryKindLabel(record.kind), selected = true)
-                        DsPill(text = memoryScopeLabel(record.scope))
-                        if (record.pinned) {
-                            DsPill(text = stringResource(R.string.advanced_pinned), warn = true)
-                        }
-                    }
-                    Text(
-                        record.content,
-                        style = DsType.std14.withReadingWeight(),
-                        color = colors.labelPrimary,
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                    ) {
-                        Text(
-                            DateFormat.getDateInstance(DateFormat.SHORT).format(Date(record.updatedAt)),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.labelCaption,
-                            modifier = Modifier.weight(1f),
-                        )
-                        DsButton(
-                            text = stringResource(R.string.advanced_edit_memory),
-                            onClick = { editingId = record.id },
-                            size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Ghost,
-                        )
-                        DsButton(
-                            text = stringResource(R.string.advanced_deactivate),
-                            onClick = {
-                                viewModel.forgetMemory(record.id) { error ->
-                                    report(error ?: memoryDeactivatedMessage)
-                                }
-                            },
-                            size = DsButtonSize.Small,
-                            variant = DsButtonVariant.Ghost,
-                        )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    DsPill(text = memoryKindLabel(record.kind), selected = true)
+                    DsPill(text = memoryScopeLabel(record.scope))
+                    if (record.pinned) {
+                        DsPill(text = stringResource(R.string.advanced_pinned), warn = true)
                     }
                 }
+                Text(
+                    record.content,
+                    style = DsType.std14.withReadingWeight(),
+                    color = colors.labelPrimary,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    Text(
+                        DateFormat.getDateInstance(DateFormat.SHORT).format(Date(record.updatedAt)),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = colors.labelCaption,
+                        modifier = Modifier.weight(1f),
+                    )
+                    DsButton(
+                        text = stringResource(R.string.advanced_edit_memory),
+                        onClick = { editingId = record.id },
+                        size = DsButtonSize.Small,
+                        variant = DsButtonVariant.Ghost,
+                    )
+                    DsButton(
+                        text = stringResource(R.string.advanced_deactivate),
+                        onClick = {
+                            viewModel.forgetMemory(record.id) { error ->
+                                report(error ?: memoryDeactivatedMessage)
+                            }
+                        },
+                        size = DsButtonSize.Small,
+                        variant = DsButtonVariant.Ghost,
+                    )
+                }
+            }
         }
         if (visibleRecords.size < filteredRecords.size) {
             val remaining = filteredRecords.size - visibleRecords.size
