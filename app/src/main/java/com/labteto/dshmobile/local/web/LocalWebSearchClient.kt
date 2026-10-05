@@ -86,7 +86,7 @@ internal class LocalWebSearchClient(
         return try {
             withCancellableHttpResponse(http.newCall(request)) { response ->
                 val bounded = response.body?.byteStream()?.use { readBoundedWebBody(it, LOCAL_WEB_MAX_RESPONSE_BYTES) }
-                require(bounded?.truncated != true) { "网页搜索响应超过大小上限" }
+                if (bounded?.truncated == true) throw LocalWebException("RESPONSE_TOO_LARGE", "网页搜索响应超过 ${LOCAL_WEB_MAX_RESPONSE_BYTES} 字节上限")
                 val body = bounded?.bytes?.toString(Charsets.UTF_8).orEmpty()
                 if (!response.isSuccessful) {
                     val code = if (response.code in 400..499) "HTTP_4XX" else "HTTP_5XX"
