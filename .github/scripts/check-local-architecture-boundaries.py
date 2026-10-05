@@ -2104,11 +2104,11 @@ if "messages = chatPostTurnModelMessages(prompt)" not in chat_refresh:
 if "modelRequestMarkerOrNull()?.let" in chat_refresh:
     die("Chat post-turn planner must not re-read mutable active model identity")
 if "profileId = runSnapshot.modelState.modelSelection.activeProfileId" not in engine:
-    die("Foreground runs must freeze the exact selected model profile id")
+    die("Work foreground runs must freeze the exact selected model profile id")
 if "private fun scheduleChatPostTurn(" in engine:
     die("Chat PostTurn scheduling proxy must not return to LocalHarnessEngine")
-if "chatContextRefreshCoordinator.schedule(" not in engine:
-    die("Chat turn completion must stay wired to the Chat PostTurn coordinator")
+if "postTurn.schedule(" not in chat_direct_turn_source:
+    die("Direct Chat turn completion must stay wired to the Chat PostTurn coordinator")
 
 engine_composition_bridges = set(
     re.findall(r"\bengine\s*\.\s*([A-Za-z0-9_]+)", feature_execution_port_module_source)
