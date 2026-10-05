@@ -398,7 +398,7 @@ for forbidden_direct in (
         )
 
 chat_turn = re.search(
-    r"private suspend fun runChatTurn\(.*?\n    private fun captureChatPersonaCorrection",
+    r"private suspend fun runChatTurn\(.*?(?=\n    private (?:suspend )?fun )",
     engine,
     re.S,
 )
@@ -412,7 +412,7 @@ else:
         violations.append("Chat turns must preserve stable/dynamic context placement")
 
 work_turn = re.search(
-    r"private suspend fun runWorkAgentTurn\(.*?\n    private fun AgentToolCall",
+    r"private suspend fun runWorkAgentTurn\(.*?(?=\n    private (?:suspend )?fun )",
     engine,
     re.S,
 )
