@@ -242,6 +242,7 @@ import com.labteto.dshmobile.local.tools.LocalRunToolSurface
 import com.labteto.dshmobile.local.tools.LocalShellTool
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
+import com.labteto.dshmobile.local.tools.LocalToolsManagementPort
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.long
@@ -1012,6 +1013,24 @@ class LocalHarnessEngine @Inject internal constructor(
 
         override suspend fun deleteSessions(ids: Set<String>): Int =
             sessionLifecycle.deleteSessions(ids)
+    }
+
+    internal val toolsManagementPort: LocalToolsManagementPort = object : LocalToolsManagementPort {
+        override suspend fun servers(): List<McpServerSnapshot> = pluginComposition.mcpServers()
+
+        override fun installedPluginIds(): List<String> = pluginComposition.installedPluginIds()
+
+        override suspend fun connectHttp(serverId: String, endpoint: String): String =
+            pluginComposition.connectMcpHttp(serverId, endpoint)
+
+        override suspend fun connectStdio(
+            serverId: String,
+            command: List<String>,
+            workingDirectory: String?,
+        ): String = pluginComposition.connectMcpStdio(serverId, command, workingDirectory)
+
+        override suspend fun disconnect(serverId: String): String =
+            pluginComposition.disconnectMcp(serverId)
     }
 
     internal val workExecutionPort: LocalWorkExecutionPort = object : LocalWorkExecutionPort {
@@ -1868,26 +1887,6 @@ class LocalHarnessEngine @Inject internal constructor(
             appLogs = appLogs,
         )
     }
-
-    internal suspend fun mcpServersForUi(): List<McpServerSnapshot> = pluginComposition.mcpServers()
-
-    internal suspend fun connectMcpHttpForUi(serverId: String, endpoint: String): String =
-        pluginComposition.connectMcpHttp(serverId, endpoint)
-
-    internal suspend fun connectMcpStdioForUi(
-        serverId: String,
-        command: List<String>,
-        workingDirectory: String? = null,
-    ): String = pluginComposition.connectMcpStdio(
-        serverId,
-        command,
-        workingDirectory,
-    )
-
-    internal suspend fun disconnectMcpForUi(serverId: String): String =
-        pluginComposition.disconnectMcp(serverId)
-
-    internal fun installedPluginIdsForUi(): List<String> = pluginComposition.installedPluginIds()
 
     private fun beginSessionTransition(): Boolean {
         val started = synchronized(runStateLock) {
