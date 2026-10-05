@@ -35,6 +35,7 @@ internal class LocalWorkRunBinding(
     pruneToolResult: (String) -> String,
 ) {
     val state = MutableStateFlow(initialState.copy(sessionId = sessionId))
+    val workState: LocalWorkStatePort = localWorkStatePort(state)
     val modelHistory = LocalModelHistoryBuffer().apply { reset(initialHistory) }
     val pendingInputs = AgentInputQueue(maxPendingInputs)
     val interactions = LocalInteractionCoordinator(state)
