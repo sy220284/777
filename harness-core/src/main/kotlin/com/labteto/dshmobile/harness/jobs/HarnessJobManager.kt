@@ -6,6 +6,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -281,7 +283,9 @@ class HarnessJobManager(
                     notifyChanged()
                 }
                 val result = block(record.id, report).takeLast(MAX_OUTPUT)
+                currentCoroutineContext().ensureActive()
                 synchronized(lock) {
+                    if (record.status != "running") throw CancellationException("后台任务已停止")
                     record.output = result
                     record.status = "completed"
                     record.updatedAt = System.currentTimeMillis()
