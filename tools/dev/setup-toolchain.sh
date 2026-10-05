@@ -9,7 +9,14 @@ if [ ! -f "$VERSIONS_FILE" ]; then
 fi
 # shellcheck disable=SC1090
 source "$VERSIONS_FILE"
-for library in common android optional check; do
+COMPONENTS_FILE="$SCRIPT_DIR/toolchain-components.env"
+if [ ! -f "$COMPONENTS_FILE" ]; then
+  echo "[777-toolchain] 缺少组件清单：$COMPONENTS_FILE" >&2
+  exit 2
+fi
+# shellcheck disable=SC1090
+source "$COMPONENTS_FILE"
+for library in common android optional components check; do
   # shellcheck disable=SC1090
   source "$SCRIPT_DIR/lib/$library.sh"
 done
@@ -22,6 +29,7 @@ GRADLE_USER_HOME="${DEV777_GRADLE_USER_HOME:-${GRADLE_USER_HOME:-$TOOLS_ROOT/gra
 ENV_FILE="${DEV777_TOOLCHAIN_ENV_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/777/dev-toolchain.env}"
 SELF_TEST=false
 CREATE_AVDS=false
+PLAN_ONLY=false
 
 usage() {
   cat <<'USAGE'
@@ -34,6 +42,7 @@ usage() {
 
 选项：
   --check                       检查当前环境（默认）
+  --plan                        输出当前档位缺失组件对应的 Artifact 名称
   --profile build|full          build=APK 构建；full=再含 Node/actionlint/Android 16/17 模拟器
   --tools-root PATH             工具安装根目录
   --sdk-root PATH               Android SDK 目录
@@ -52,6 +61,7 @@ USAGE
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --check) ;;
+    --plan) PLAN_ONLY=true ;;
     --profile) shift; PROFILE="${1:-}" ;;
     --tools-root) shift; TOOLS_ROOT="${1:-}" ;;
     --sdk-root) shift; SDK_ROOT="${1:-}" ;;
@@ -93,6 +103,14 @@ fi
 if [ -f "$ENV_FILE" ]; then
   # shellcheck disable=SC1090
   source "$ENV_FILE"
+fi
+
+if [ "$PLAN_ONLY" = true ]; then
+  while IFS= read -r component; do
+    [ -n "$component" ] || continue
+    artifact_name_for_component "$component"
+  done < <(missing_components "$PROFILE")
+  exit 0
 fi
 
 check_environment
