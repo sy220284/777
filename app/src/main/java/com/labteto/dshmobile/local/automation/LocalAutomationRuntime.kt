@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.map
 
 /** Automation execution plus the bounded chat snapshot used by the event planner. */
 @Singleton
-class LocalAutomationRuntime @Inject constructor(
+class LocalAutomationRuntime @Inject internal constructor(
     private val chatCoordinator: LocalAutomationChatCoordinator,
     private val workCoordinator: LocalAutomationWorkCoordinator,
     private val runtimeStateStore: LocalRuntimeStateStore,
