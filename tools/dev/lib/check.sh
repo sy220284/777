@@ -41,9 +41,29 @@ check_environment() {
     check_android_package "Android emulator" "$SDK_ROOT/emulator/emulator" || failures=$((failures + 1))
     if find "$SDK_ROOT/system-images" -type d -path '*android-36*google_apis*x86_64' -print -quit 2>/dev/null | grep -q .; then ok "Android 16 x86_64 system image"; else fail "Android 16 x86_64 system image"; failures=$((failures + 1)); fi
     if find "$SDK_ROOT/system-images" -type d -path '*android-37.0*google_apis_ps16k*x86_64' -print -quit 2>/dev/null | grep -q .; then ok "Android 17 16 KiB x86_64 system image"; else fail "Android 17 16 KiB x86_64 system image"; failures=$((failures + 1)); fi
-    if [ -e /dev/kvm ]; then ok "KVM -> /dev/kvm"; else warn "未检测到 /dev/kvm；本机 Android 16/17 模拟器完整验证可能很慢或无法启动"; fi
+    if [ -e /dev/kvm ]; then
+      ok "KVM -> /dev/kvm"
+    else
+      manual "KVM：未检测到 /dev/kvm；需要在宿主 BIOS / Hyper-V / WSL 虚拟化层开启，脚本无法代替宿主完成。"
+    fi
   fi
 
-  if [ "$failures" -ne 0 ]; then fail "共 $failures 项必备能力未满足"; return 1; fi
+  if [ "$failures" -ne 0 ]; then
+    fail "共 $failures 项必备能力未满足"
+    if [ "${NON_INTERACTIVE:-false}" = true ]; then
+      say "这些缺失项可由 AI 工具链自动配置："
+      say "  bash tools/dev/ai-toolchain.sh bootstrap --profile $PROFILE"
+    else
+      say "这些缺失项可自动配置。推荐执行："
+      if [ -f "$SCRIPT_DIR/../../install.sh" ]; then
+        say "  bash install.sh $PROFILE"
+      else
+        say "  bash tools/dev/install.sh $PROFILE"
+      fi
+      say "或使用底层命令："
+      say "  bash tools/dev/setup-toolchain.sh --auto --profile $PROFILE --accept-android-licenses --configure-shell"
+    fi
+    return 1
+  fi
   ok "profile=$PROFILE 环境检查通过"
 }

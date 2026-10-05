@@ -17,6 +17,10 @@ install_node22() {
 
 install_actionlint() {
   [ "$PROFILE" = full ] || return 0
+  if [ -x "$TOOLS_ROOT/bin/actionlint" ] && "$TOOLS_ROOT/bin/actionlint" -version 2>/dev/null | grep -Fq "$ACTIONLINT_VERSION"; then
+    ok "actionlint $ACTIONLINT_VERSION 已存在，跳过安装"
+    return 0
+  fi
   local asset_arch sha archive cache tmp
   case "$ARCH_KIND" in
     x64) asset_arch=amd64; sha="$ACTIONLINT_LINUX_X64_SHA256" ;;

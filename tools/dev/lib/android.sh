@@ -1,3 +1,31 @@
+full_profile_preflight() {
+  [ "$PROFILE" = full ] || return 0
+
+  say "完整验证环境将额外安装："
+  say "  ✓ Node.js 22"
+  say "  ✓ actionlint"
+  say "  ✓ Android Emulator"
+  say "  ✓ Android 16 x86_64 system image"
+  say "  ✓ Android 17 16 KiB x86_64 system image"
+  say "预计需要数 GB 磁盘空间。"
+
+  local probe="$SDK_ROOT" available_kb available_gib
+  mkdir -p "$probe"
+  available_kb="$(df -Pk "$probe" | awk 'NR==2 {print $4}')"
+  available_gib=$((available_kb / 1024 / 1024))
+  say "当前可用磁盘空间：约 ${available_gib} GiB"
+
+  if [ "$available_gib" -lt 6 ]; then
+    fail "full 档至少建议保留 6 GiB 可用空间；当前约 ${available_gib} GiB"
+    return 1
+  fi
+  if [ "$available_gib" -lt 12 ]; then
+    warn "可用空间低于 12 GiB，完整镜像安装可能偏紧。"
+  else
+    ok "磁盘空间充足"
+  fi
+}
+
 install_android_commandline_tools() {
   local sdkmanager="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
   if [ -x "$sdkmanager" ]; then return 0; fi
@@ -58,6 +86,7 @@ install_android_packages() {
   fi
   local sdkmanager="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
   local canonical="platforms;android-$ANDROID_COMPILE_API"
+  full_profile_preflight
   accept_android_licenses
 
   say "安装 / 校验 Android SDK 基础 packages"
