@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local.chat
 
 import android.content.Context
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.runtime.LocalExecutionService
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 
 /**
@@ -45,12 +44,6 @@ internal class LocalChatTurnDispatcher(
 
         personaCorrections.captureDirect(memoryInput)
         relationshipHydrator.hydrate()
-        LocalExecutionService.withTurn(
-            context = context,
-            sessionId = snapshot.sessionId,
-            error = { runtimeStateStore.state.value.error },
-        ) {
-            directTurn(input, sourceMessageId)
-        }
+        directTurn(input, sourceMessageId)
     }
 }
