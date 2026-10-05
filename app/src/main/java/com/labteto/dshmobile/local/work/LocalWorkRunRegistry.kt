@@ -22,17 +22,18 @@ import kotlinx.coroutines.flow.update
  * never imports Work.
  */
 @Singleton
-class LocalWorkRunRegistry internal constructor(
+class LocalWorkRunRegistry private constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val appContext: Context?,
+    @Suppress("UNUSED_PARAMETER") constructorMarker: Unit,
 ) {
     @Inject
     internal constructor(
         runtimeStateStore: LocalRuntimeStateStore,
         @ApplicationContext context: Context,
-    ) : this(runtimeStateStore, context.applicationContext)
+    ) : this(runtimeStateStore, context.applicationContext, Unit)
 
-    internal constructor(runtimeStateStore: LocalRuntimeStateStore) : this(runtimeStateStore, null)
+    internal constructor(runtimeStateStore: LocalRuntimeStateStore) : this(runtimeStateStore, null, Unit)
 
     private val bindings = java.util.concurrent.ConcurrentHashMap<String, LocalWorkRunBinding>()
 
