@@ -65,6 +65,10 @@ system_packages_ready() {
     command -v "$command_name" >/dev/null 2>&1 || return 1
   done
   [ "${BASH_VERSINFO[0]}" -ge 4 ] || return 1
+  if [ "${PROFILE:-build}" = full ]; then
+    command -v ldconfig >/dev/null 2>&1 || return 1
+    ldconfig -p 2>/dev/null | grep -Fq 'libpulse.so.0' || return 1
+  fi
   java_home="$(find_java17_home || true)"
   [ -n "$java_home" ] || return 1
   [ "$(java_major "$java_home")" = "$JDK_MAJOR" ]
@@ -90,7 +94,8 @@ install_system_packages() {
   run_root env DEBIAN_FRONTEND=noninteractive apt-get update
   run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     bash ca-certificates curl gnupg python3 dpkg binutils coreutils findutils \
-    gawk grep sed unzip xz-utils tar git openjdk-17-jdk-headless
+    gawk grep sed unzip xz-utils tar git openjdk-17-jdk-headless \
+    libpulse0
 }
 
 java_major() {
