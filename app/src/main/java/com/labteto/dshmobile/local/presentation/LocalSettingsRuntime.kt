@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanConnectionTester
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.labteto.dshmobile.local.settings.LocalHarnessSettingsCoordinator
@@ -35,6 +36,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val modelSettings: LocalModelSettingsCoordinator,
     private val settingsCoordinator: LocalHarnessSettingsCoordinator,
     private val web: LocalWebProvider,
+    private val sessionStorage: LocalSessionStorageRuntime,
     runtimeStateStore: LocalRuntimeStateStore,
 ) {
     private val chatGpt = ChatGptSettingsController(
@@ -79,9 +81,9 @@ class LocalSettingsRuntime @Inject internal constructor(
     fun removeChatStyleGuardPhrase(value: String) = settingsCoordinator.removeChatStyleGuardPhrase(value)
     fun clearChatStyleGuardHits() = settingsCoordinator.clearChatStyleGuardHits()
     suspend fun diagnoseNetwork(target: String) = web.diagnose(target)
-    suspend fun sessionStorageStatus(): LocalSessionStorageStatus = engine.sessionStorageStatusForUi()
-    suspend fun compactSessionStorage(): LocalSessionStorageStatus = engine.compactSessionStorageForUi()
-    suspend fun exportSessionStorage(output: OutputStream) = engine.exportSessionStorageForUi(output)
+    suspend fun sessionStorageStatus(): LocalSessionStorageStatus = sessionStorage.storageStatus()
+    suspend fun compactSessionStorage(): LocalSessionStorageStatus = sessionStorage.compactStorage()
+    suspend fun exportSessionStorage(output: OutputStream) = sessionStorage.exportStorage(output)
     suspend fun environmentInfo() = engine.environmentInfoForUi()
     suspend fun diagnosticReport() = engine.diagnosticReportForUi()
     fun clearCredential() = modelRuntime.clearCredential()
