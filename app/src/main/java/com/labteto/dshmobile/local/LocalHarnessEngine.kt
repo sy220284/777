@@ -678,11 +678,17 @@ class LocalHarnessEngine @Inject internal constructor(
         executionControl = LocalWorkExecutionControl(),
     )
 
-    private val runStateLock = Any()
-    private val pendingInputs = AgentInputQueue(MAX_PENDING_INPUTS)
+    private val runStateLock: Any
+        get() = runtimeStateStore.foregroundRunLock
+    private val pendingInputs: AgentInputQueue
+        get() = runtimeStateStore.foregroundPendingInputs
     private val sessionTransitionMutex = Mutex()
     private var sessionTransitioning = false
-    private var activeJob: Job? = null
+    private var activeJob: Job?
+        get() = runtimeStateStore.foregroundJob
+        set(value) {
+            runtimeStateStore.foregroundJob = value
+        }
     private val memoryCoordinator by lazy {
         LocalMemoryCoordinator(
             state = _state,
@@ -2033,30 +2039,10 @@ class LocalHarnessEngine @Inject internal constructor(
 
     internal fun installedPluginIdsForUi(): List<String> = pluginComposition.installedPluginIds()
 
-    /**
-     * Stop the legacy visible foreground slot.
-     *
-     * Session-bound Work runs are owned and cancelled by WorkFeature before this fallback is used.
-     */
+    /** Stop the visible Chat foreground slot through the shared Runtime owner. */
     internal fun stopForegroundRun() {
         cancelChatPostTurn()
-        runtimeStateStore.foregroundInteractions.cancelAll()
-        val running = synchronized(runStateLock) {
-            val discarded = pendingInputs.drain()
-            if (discarded.isNotEmpty()) {
-                eventLog.append(
-                    LOCAL_AGENT_INBOX_EVENT_TYPE,
-                    encodeLocalAgentInboxEvent(
-                        action = "cancelled",
-                        pending = pendingInputs.snapshot(),
-                        affected = discarded,
-                    ),
-                )
-            }
-            _state.update { it.copy(kernel = it.kernel.copy(queuedInputCount = 0)) }
-            activeJob
-        }
-        running?.cancel()
+        runtimeStateStore.cancelForegroundRun(eventLog)
         _state.update { it.copy(work = it.work.copy(pendingApproval = null, pendingQuestion = null)) }
     }
 
@@ -2401,42 +2387,6 @@ class LocalHarnessEngine @Inject internal constructor(
                     current
                 }
             }
-        }
-    }
-
-    internal fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) {
-        val snapshot = _state.value
-        val notice = snapshot.chat.personaCorrectionNotice
-        if (
-            notice == null ||
-            notice.id != noticeId ||
-            notice.personaId != personaId ||
-            notice.correction != correction
-        ) return
-
-        scope.launch {
-            val updated = chatPersonaStore.removeCorrection(personaId, correction) ?: return@launch
-            _state.update { current ->
-                if (
-                    current.chat.personaId == personaId &&
-                    current.chat.personaCorrectionNotice?.id == noticeId
-                ) {
-                    current.copy(
-                        chat = current.chat.copy(
-                            chatPersona = updated,
-                            personaCorrectionNotice = null,
-                        ),
-                    )
-                } else {
-                    current
-                }
-            }
-            eventLog.append("chat/persona-correction", buildJsonObject {
-                put("persona_id", personaId)
-                put("action", "undo")
-                put("correction", correction)
-            })
-            persist()
         }
     }
 
