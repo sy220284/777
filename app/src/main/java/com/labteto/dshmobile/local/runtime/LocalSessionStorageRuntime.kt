@@ -76,21 +76,24 @@ class LocalSessionStorageRuntime @Inject internal constructor(
         coordinator.enqueue(snapshot)
     }
 
-    internal fun enqueueCurrentSnapshot(expectedSessionId: String): Boolean {
+    internal fun currentSnapshot(expectedSessionId: String): LocalHarnessSession? {
         val eventLog = eventLogs.get(expectedSessionId)
         val controlProjectedThroughSequence = eventLog.latestSequence()
         val transcriptProjectedThroughSequence =
             runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor
         val state = runtimeStateStore.state.value
-        if (state.sessionId != expectedSessionId) return false
-        coordinator.enqueue(
-            coordinator.snapshot(
-                sessionId = expectedSessionId,
-                state = state,
-                controlProjectedThroughSequence = controlProjectedThroughSequence,
-                transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
-            ),
+        if (state.sessionId != expectedSessionId) return null
+        return coordinator.snapshot(
+            sessionId = expectedSessionId,
+            state = state,
+            controlProjectedThroughSequence = controlProjectedThroughSequence,
+            transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
         )
+    }
+
+    internal fun enqueueCurrentSnapshot(expectedSessionId: String): Boolean {
+        val snapshot = currentSnapshot(expectedSessionId) ?: return false
+        coordinator.enqueue(snapshot)
         return true
     }
 
@@ -104,20 +107,8 @@ class LocalSessionStorageRuntime @Inject internal constructor(
         withContext(Dispatchers.IO) { storageManager.exportAll(output) }
 
     internal suspend fun writeCurrentSnapshotNow(expectedSessionId: String): Boolean {
-        val eventLog = eventLogs.get(expectedSessionId)
-        val controlProjectedThroughSequence = eventLog.latestSequence()
-        val transcriptProjectedThroughSequence =
-            runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor
-        val state = runtimeStateStore.state.value
-        if (state.sessionId != expectedSessionId) return false
-        coordinator.writeNow(
-            coordinator.snapshot(
-                sessionId = expectedSessionId,
-                state = state,
-                controlProjectedThroughSequence = controlProjectedThroughSequence,
-                transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
-            ),
-        )
+        val snapshot = currentSnapshot(expectedSessionId) ?: return false
+        coordinator.writeNow(snapshot)
         return true
     }
 
