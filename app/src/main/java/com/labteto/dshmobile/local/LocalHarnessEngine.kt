@@ -216,6 +216,7 @@ import com.labteto.dshmobile.local.send.prepareLocalSend
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalSessionDomainCreateSpec
 import com.labteto.dshmobile.local.session.LocalSessionDomainModeCommand
+import com.labteto.dshmobile.local.session.LocalSessionLifecyclePort
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator
@@ -990,7 +991,29 @@ class LocalHarnessEngine @Inject internal constructor(
         }
     }
 
-    /** Feature execution ports are exposed to Hilt from the composition root below. */
+    /** Feature execution and lifecycle ports are exposed to Hilt from the composition root below. */
+    internal val sessionLifecyclePort: LocalSessionLifecyclePort = object : LocalSessionLifecyclePort {
+        override fun createSession(
+            mode: LocalConversationMode,
+            usageMode: LocalUsageMode,
+            domainSpec: LocalSessionDomainCreateSpec?,
+        ): Boolean = sessionLifecycle.createSession(mode, usageMode, domainSpec)
+
+        override fun switchDomainMode(command: LocalSessionDomainModeCommand) {
+            sessionLifecycle.switchDomainMode(command)
+        }
+
+        override fun switchUsageMode(mode: LocalUsageMode) {
+            sessionLifecycle.switchUsageMode(mode)
+        }
+
+        override fun switchSession(sessionId: String): Boolean =
+            sessionLifecycle.switchSession(sessionId)
+
+        override suspend fun deleteSessions(ids: Set<String>): Int =
+            sessionLifecycle.deleteSessions(ids)
+    }
+
     internal val workExecutionPort: LocalWorkExecutionPort = object : LocalWorkExecutionPort {
         override fun send(text: String, attachments: List<LocalImportedAttachment>): LocalSendResult =
             sendForMode(LocalUsageMode.WORK, text, attachments)
@@ -1865,37 +1888,6 @@ class LocalHarnessEngine @Inject internal constructor(
         pluginComposition.disconnectMcp(serverId)
 
     internal fun installedPluginIdsForUi(): List<String> = pluginComposition.installedPluginIds()
-
-    /** Start a clean, project-scoped, or continuation session without copying full old history. */
-    internal fun createSession(mode: LocalConversationMode) =
-        sessionLifecycle.createSession(mode)
-
-    internal fun createSession(
-        mode: LocalConversationMode,
-        usageMode: LocalUsageMode,
-        domainSpec: LocalSessionDomainCreateSpec? = null,
-    ) = sessionLifecycle.createSession(
-        mode = mode,
-        usageMode = usageMode,
-        domainSpec = domainSpec,
-    )
-
-    /** Backward-compatible entry point: a plain new session is fully independent. */
-    internal fun newSession() = sessionLifecycle.createSession(LocalConversationMode.INDEPENDENT)
-
-    internal fun switchSessionDomainMode(command: LocalSessionDomainModeCommand) =
-        sessionLifecycle.switchDomainMode(command)
-
-    /** Move between product surfaces; the Chat pill always returns to normal one-to-one chat. */
-    internal fun switchUsageMode(mode: LocalUsageMode) =
-        sessionLifecycle.switchUsageMode(mode)
-
-    internal fun switchSession(sessionId: String) =
-        sessionLifecycle.switchSession(sessionId)
-
-    /** Permanently remove selected local sessions and their durable event segments. */
-    internal suspend fun deleteSessions(requestedIds: Set<String>): Int =
-        sessionLifecycle.deleteSessions(requestedIds)
 
     private fun beginSessionTransition(): Boolean {
         val started = synchronized(runStateLock) {
