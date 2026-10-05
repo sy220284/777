@@ -23,6 +23,7 @@ class LocalChatRuntime @Inject internal constructor(
     private val personaCoordinator: LocalChatPersonaCoordinator,
     private val groupMembership: LocalGroupChatMembershipCoordinator,
     private val branchCoordinator: LocalChatBranchCoordinator,
+    private val replySuggestions: LocalReplySuggestionCoordinator,
 ) {
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = behaviorTuning.configure(profile)
     internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) =
@@ -55,7 +56,7 @@ class LocalChatRuntime @Inject internal constructor(
     }
     internal fun removeGroupChatMemberByGalleryId(galleryId: String) =
         groupMembership.remove(galleryId)
-    internal suspend fun generateReplySuggestions(): Boolean = engine.generateReplySuggestions()
+    internal suspend fun generateReplySuggestions(): Boolean = replySuggestions.generate()
     internal fun diaryEntries(subjectKey: String, limit: Int = MAX_CHAT_DIARY_ENTRIES) = persistence.diaryStore.listActive(subjectKey, limit)
     internal fun diaryEntriesForTransfer(subjectKey: String) = persistence.diaryStore.listForTransfer(subjectKey)
     internal fun <T> importDiaryEntriesForTransfer(subjectKey: String, personaName: String, entries: List<ChatDiaryEntry>, commit: () -> T): T = persistence.diaryStore.importForTransfer(subjectKey, personaName, entries, commit)
