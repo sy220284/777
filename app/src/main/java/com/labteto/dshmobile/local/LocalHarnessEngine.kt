@@ -1340,66 +1340,6 @@ class LocalHarnessEngine @Inject internal constructor(
         LocalChatUserEditResult.SENT
     }
 
-    /** Switch among saved alternatives for one user or assistant turn. */
-    internal fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean = synchronized(runStateLock) {
-        val state = _state.value
-        if (
-            state.usageMode != LocalUsageMode.CHAT ||
-            state.chat.groupChat.enabled ||
-            state.loading ||
-            sessionTransitioning ||
-            activeJob?.isCompleted == false ||
-            pendingInputs.size() != 0 ||
-            !state.transcriptIndex.branchingEligible
-        ) return@synchronized false
-
-        val selected = selectChatBranchVariant(state.chat.chatBranches, messageId, targetIndex)
-            ?: return@synchronized false
-        val activeMessages = activeChatBranchMessages(selected)
-        if (activeMessages.isEmpty() || !chatBranchingEligible(activeMessages)) return@synchronized false
-
-        val snapshot = chatBranchLastSnapshot(selected)
-        val selectedContext = restoreBranchContext(
-            snapshot = chatBranchLastContext(selected),
-            legacyState = snapshot?.first,
-            previousGeneration = state.chat.chatContext.generation,
-        ).boundDurablePending(eventLog, if (state.chat.groupChat.enabled) "group" else "direct")
-        modelHistory.reset(
-            buildDurableChatModelHistory(
-                eventLog = eventLog,
-                messages = activeMessages,
-                systemPrompt = chatSystemPrompt(),
-            ),
-        )
-        updateContextMetrics()
-        _state.update { current ->
-            current.copy(
-                messages = activeMessages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
-                transcriptIndex = buildLocalTranscriptRuntimeIndex(activeMessages),
-                chat = current.chat.copy(
-                    chatState = (snapshot?.first ?: current.chat.chatState).withoutLegacyConversationContext(),
-                    chatContext = selectedContext,
-                    replySuggestions = snapshot?.second.orEmpty(),
-                    chatBranches = selected,
-                ),
-                error = null,
-            )
-        }
-        persistChatBranchState("variant-selected")
-        val activeTranscriptSequence = persistActiveChatTranscript(
-            eventLog = eventLog,
-            reason = "variant-selected",
-            activeTranscript = activeMessages,
-        )
-        transcriptProjectionCursor = maxOf(
-            transcriptProjectionCursor ?: -1L,
-            activeTranscriptSequence,
-        )
-        checkpointModelHistory("chat/variant-selected")
-        persist()
-        true
-    }
-
     /** Re-run the latest answer against the same turn; never re-execute work tools. */
     internal fun regenerateReply(messageId: String): Boolean = synchronized(runStateLock) {
         val state = _state.value
