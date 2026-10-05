@@ -11,7 +11,6 @@ import com.labteto.dshmobile.local.model.LOCAL_MODEL_TOOL_CALLS_EVENT_KEY
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelProtocol
-import com.labteto.dshmobile.local.model.LocalWorkCheckpoint
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.util.UUID
@@ -111,6 +110,16 @@ internal data class LocalAgentRunRecoveryDecision(
     val completedOutput: String? = null,
     val route: LocalAgentRunRouteIdentity? = null,
 )
+
+internal data class LocalAgentRunRecoveryContextInput(
+    val usageMode: LocalUsageMode?,
+    val modelHistory: List<JsonObject>,
+    val basePrompt: String,
+)
+
+internal fun interface LocalAgentRunRecoveryContextPolicy {
+    fun decorate(input: LocalAgentRunRecoveryContextInput): String
+}
 
 /**
  * Owns the stable scope and durable recovery checkpoints for one foreground Agent run.
@@ -272,6 +281,7 @@ internal class LocalAgentRunCoordinator(
         sessionId: String,
         repair: SessionRepairResult,
         kind: LocalAgentRunKind = LocalAgentRunKind.FOREGROUND,
+        contextPolicy: LocalAgentRunRecoveryContextPolicy? = null,
     ): LocalAgentRunRecoveryDecision? {
         val log = eventLogFor(sessionId)
         val checkpointType = eventType(kind)
@@ -290,6 +300,11 @@ internal class LocalAgentRunCoordinator(
             model = data["model"]?.jsonPrimitive?.contentOrNull.orEmpty(),
             baseUrl = data["base_url"]?.jsonPrimitive?.contentOrNull.orEmpty(),
         ).takeIf { version >= 2 && !it.profileId.isNullOrBlank() }
+        val recoveryUsageMode = data["mode"]?.jsonPrimitive?.contentOrNull?.let { encoded ->
+            LocalUsageMode.entries.firstOrNull { mode ->
+                mode.name.equals(encoded, ignoreCase = true)
+            }
+        }
 
         val requiresExecutableRecovery =
             status == LocalAgentRunCheckpointStatus.RUNNING.name.lowercase() ||
@@ -318,7 +333,7 @@ internal class LocalAgentRunCoordinator(
             )
         }
         if (status == LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase()) {
-            val continuation = recoveryContinuationPrompt(log, data)
+            val continuation = recoveryContinuationPrompt(log, recoveryUsageMode, contextPolicy)
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 queuedInput = QueuedAgentInput(
@@ -351,7 +366,7 @@ internal class LocalAgentRunCoordinator(
                     route = route,
                 )
             }
-            val continuation = recoveryContinuationPrompt(log, data)
+            val continuation = recoveryContinuationPrompt(log, recoveryUsageMode, contextPolicy)
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 queuedInput = QueuedAgentInput(
@@ -394,7 +409,7 @@ internal class LocalAgentRunCoordinator(
         val originalInput = data["memory_input"]?.jsonPrimitive?.contentOrNull
             ?: data["input"]?.jsonPrimitive?.contentOrNull
             ?: ""
-        val continuationPrompt = recoveryContinuationPrompt(log, data)
+        val continuationPrompt = recoveryContinuationPrompt(log, recoveryUsageMode, contextPolicy)
         val continuation = QueuedAgentInput(
             id = "run-recovery:$runId",
             content = continuationPrompt,
@@ -405,21 +420,23 @@ internal class LocalAgentRunCoordinator(
 
     private fun recoveryContinuationPrompt(
         log: LocalSessionEventLog,
-        runCheckpoint: JsonObject,
+        usageMode: LocalUsageMode?,
+        contextPolicy: LocalAgentRunRecoveryContextPolicy?,
     ): String {
-        if (runCheckpoint["mode"]?.jsonPrimitive?.contentOrNull != LocalUsageMode.WORK.name.lowercase()) {
-            return RECOVERY_CONTINUATION_PROMPT
-        }
-        val historyEvent = log.latest(ModelHistoryCheckpointCodec.EVENT_TYPE) ?: return RECOVERY_CONTINUATION_PROMPT
-        val messages = ModelHistoryCheckpointCodec().decode(historyEvent.data) ?: return RECOVERY_CONTINUATION_PROMPT
-        val checkpoint = LocalWorkCheckpoint.latestFrom(messages) ?: return RECOVERY_CONTINUATION_PROMPT
-        return buildString {
-            append(RECOVERY_CONTINUATION_PROMPT)
-            append("\n\n最近持久工作检查点如下。先核对当前工作区和外部状态，再继续未完成事项；不要重做已完成步骤。\n")
-            append(checkpoint.toModelBlock())
-        }
+        val policy = contextPolicy ?: return RECOVERY_CONTINUATION_PROMPT
+        val modelHistory = log.latest(ModelHistoryCheckpointCodec.EVENT_TYPE)
+            ?.let { event -> ModelHistoryCheckpointCodec().decode(event.data) }
+            .orEmpty()
+        return runCatching {
+            policy.decorate(
+                LocalAgentRunRecoveryContextInput(
+                    usageMode = usageMode,
+                    modelHistory = modelHistory,
+                    basePrompt = RECOVERY_CONTINUATION_PROMPT,
+                ),
+            )
+        }.getOrDefault(RECOVERY_CONTINUATION_PROMPT)
     }
-
     fun markRecoveryQueued(
         sessionId: String,
         runId: String,

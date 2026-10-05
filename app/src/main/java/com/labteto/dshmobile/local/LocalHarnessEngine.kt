@@ -219,6 +219,7 @@ import com.labteto.dshmobile.local.runtime.isolatedParallelMap
 import com.labteto.dshmobile.local.runtime.localForegroundStepLimitExtender
 import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.runtime.projectExecutionJobs
+import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
 import com.labteto.dshmobile.local.work.structuredWorkState
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.send.LocalPreparedSend
@@ -2345,7 +2346,11 @@ class LocalHarnessEngine @Inject internal constructor(
             .orEmpty()
         pendingInputs.restore(restoredInbox)
         val modelProfiles = modelConfiguration.readProfiles()
-        val recoveryDecision = agentRunCoordinator.recoveryDecision(sessionId, recovery)
+        val recoveryDecision = agentRunCoordinator.recoveryDecision(
+            sessionId = sessionId,
+            repair = recovery,
+            contextPolicy = LocalWorkRecoveryContextPolicy,
+        )
         val recoveryState = foregroundRecoveryCoordinator.restore(
             sessionId, recoveryDecision, modelProfiles, pendingInputs, eventLog,
         )

@@ -229,6 +229,31 @@ if "private val state: LocalInteractionStatePort" not in interaction_coordinator
 if "private val state: MutableStateFlow<LocalHarnessState>" in interaction_coordinator_source:
     die("LocalInteractionCoordinator must not own the aggregate mutable app state")
 
+agent_run_recovery_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt")
+)
+for forbidden_work_recovery_semantic in (
+    "LocalWorkCheckpoint",
+    "<work-checkpoint>",
+    "最近持久工作检查点",
+):
+    if forbidden_work_recovery_semantic in agent_run_recovery_source:
+        die(
+            "Shared Agent recovery must not interpret WorkFeature checkpoints: "
+            + forbidden_work_recovery_semantic
+        )
+if "LocalAgentRunRecoveryContextPolicy" not in agent_run_recovery_source:
+    die("Shared Agent recovery must expose a neutral continuation context policy")
+
+work_recovery_policy_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRecoveryContextPolicy.kt")
+)
+if (
+    "LocalWorkCheckpoint.latestFrom" not in work_recovery_policy_source
+    or "LocalAgentRunRecoveryContextPolicy" not in work_recovery_policy_source
+):
+    die("WorkFeature must own Work checkpoint recovery decoration")
+
 runtime_state_store_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt")
 )

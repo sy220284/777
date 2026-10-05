@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
 
 internal data class LocalAutomationWorkRecoveryPlan(
     val executionTask: String,
@@ -25,6 +26,7 @@ internal fun prepareAutomationWorkRecovery(
         sessionId = sessionId,
         repair = repair,
         kind = LocalAgentRunKind.AUTOMATION,
+        contextPolicy = LocalWorkRecoveryContextPolicy,
     ) ?: return LocalAutomationWorkRecoveryPlan(prompt)
 
     decision.completedOutput?.let { output ->

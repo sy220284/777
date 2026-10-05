@@ -17,6 +17,7 @@ import com.labteto.dshmobile.local.runtime.LocalAgentRunCheckpointStatus
 import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -97,7 +98,11 @@ class LocalAgentRunCoordinatorTest {
             )
 
             val decision = requireNotNull(
-                coordinator.recoveryDecision("s1", SessionRepairResult()),
+                coordinator.recoveryDecision(
+                    sessionId = "s1",
+                    repair = SessionRepairResult(),
+                    contextPolicy = LocalWorkRecoveryContextPolicy,
+                ),
             )
 
             val content = decision.queuedInput?.content.orEmpty()
