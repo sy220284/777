@@ -350,19 +350,10 @@ if '"to", "vision-tool"' in engine or '"multimodal/fallback"' in engine:
     violations.append("Native-image failures must not fall back to a separate vision model")
 if "当前模型不支持图片理解" not in engine:
     violations.append("Unsupported current-model image input must surface an explicit user-facing error")
-if "runGroupChatTurn(input" not in engine or "runAgentTurn(input, memoryInput" not in engine:
-    violations.append("Single chat must use the primary AgentLoop while group chat keeps multi-character orchestration")
-legacy_single_chat_step_policy = "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" in engine
-adaptive_single_chat_step_policy = (
-    re.search(
-        r"val mainStepLimit\s*=\s*if\s*\(runPolicy\.allowToolExecution\).*?else\s+1",
-        engine,
-        re.S,
-    ) is not None
-    and engine.count("maxSteps = mainStepLimit") >= 2
-)
-if not (legacy_single_chat_step_policy or adaptive_single_chat_step_policy):
-    violations.append("Single chat must remain a one-step primary-agent reply")
+if "runGroupChatTurn(input" not in engine or "runChatTurn(input" not in engine:
+    violations.append("Single chat must use the Chat-owned turn path while group chat keeps multi-character orchestration")
+if "private suspend fun runWorkAgentTurn(" not in engine or "val loop = AgentLoop(" not in engine:
+    violations.append("Work foreground execution must keep the primary AgentLoop under the Work-owned turn path")
 if "底层能力与工作界面共用同一套 Agent、工具、权限和上下文治理" in engine:
     violations.append("Chat prompt must not advertise Work tools or execution capabilities")
 if "以用户当前输入、明确纠正和当前状态为准" not in prompt_context or "当前模式只进行聊天，不执行工作任务或工具操作" not in prompt_context:
@@ -406,19 +397,27 @@ for forbidden_direct in (
             f"LocalHarnessEngine bypassed an extracted coordinator: {forbidden_direct}"
         )
 
-run_agent = re.search(
-    r"private suspend fun runAgentTurn\(.*?\n    private fun AgentToolCall",
+chat_turn = re.search(
+    r"private suspend fun runChatTurn\(.*?\n    private fun captureChatPersonaCorrection",
     engine,
     re.S,
 )
-if run_agent is None:
-    violations.append("Unified foreground Agent loop is missing")
+if chat_turn is None:
+    violations.append("Chat-owned foreground turn path is missing")
 else:
-    run_agent_body = run_agent.group(0)
-    if "cancelChatPostTurn()" not in run_agent_body:
+    chat_turn_body = chat_turn.group(0)
+    if "cancelChatPostTurn()" not in chat_turn_body:
         violations.append("Chat turns must cancel stale post-turn refresh before capturing new context")
-    if "withChatTurnContext(" not in run_agent_body:
-        violations.append("Unified Chat turns must preserve stable/dynamic context placement")
+    if "withChatTurnContext(" not in chat_turn_body:
+        violations.append("Chat turns must preserve stable/dynamic context placement")
+
+work_turn = re.search(
+    r"private suspend fun runWorkAgentTurn\(.*?\n    private fun AgentToolCall",
+    engine,
+    re.S,
+)
+if work_turn is None or "val loop = AgentLoop(" not in work_turn.group(0):
+    violations.append("Work-owned foreground AgentLoop is missing")
 if "chatReplyCoordinator.finalizeDirect(" not in engine:
     violations.append("Direct Chat replies must pass the pre-commit scene continuity guard")
 if "chatReplyCoordinator.finalizeGroup(" not in group_chat_executor:
