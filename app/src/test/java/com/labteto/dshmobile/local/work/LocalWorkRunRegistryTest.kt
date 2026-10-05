@@ -127,6 +127,36 @@ class LocalWorkRunRegistryTest {
     }
 
     @Test
+    fun cancellationTargetsOnlyTheRequestedSessionBindingAndDoesNotPublishIdleEarly() {
+        val registry = LocalWorkRunRegistry(LocalRuntimeStateStore())
+        val first = binding("session-a")
+        val second = binding("session-b")
+        val firstJob = Job()
+        val secondJob = Job()
+        first.job = firstJob
+        second.job = secondJob
+        first.state.value = first.state.value.copy(
+            kernel = first.state.value.kernel.copy(running = true),
+        )
+        second.state.value = second.state.value.copy(
+            kernel = second.state.value.kernel.copy(running = true),
+        )
+        registry.attach(first)
+        registry.attach(second)
+
+        assertTrue(registry.requestCancel("session-a"))
+        assertTrue(firstJob.isCancelled)
+        assertTrue(first.state.value.kernel.running)
+        assertFalse(secondJob.isCancelled)
+        assertTrue(second.state.value.kernel.running)
+        assertFalse(registry.requestCancel("missing"))
+
+        first.eventLog.close()
+        secondJob.cancel()
+        second.eventLog.close()
+    }
+
+    @Test
     fun attachingSameSessionReplacesPreviousBindingAtomically() {
         val registry = LocalWorkRunRegistry(LocalRuntimeStateStore())
         val first = binding("shared")
