@@ -7,7 +7,10 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
 import com.labteto.dshmobile.local.send.LocalPreparedSend
 import com.labteto.dshmobile.local.send.LocalSendResult
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import kotlinx.coroutines.Job
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -39,40 +42,68 @@ class LocalWorkExecutionCoordinatorTest {
     }
 
     @Test
-    fun regenerateDelegatesWithoutRestoringAnEngineProductEntry() {
-        val fake = RecordingTurnPort(regenerateResult = true)
-        val coordinator = coordinator(fake)
+    fun regenerateAdmissionIsOwnedByWorkFeatureBeforeStartingTheTurnBridge() {
+        val fake = RecordingTurnPort()
+        val runtime = readyRuntimeForRegeneration()
+        val coordinator = coordinator(fake, runtime)
 
         assertTrue(coordinator.regenerateReply("assistant-1"))
         assertEquals("assistant-1", fake.lastRegenerateId)
+        assertEquals(1, fake.regenerateStartCalls)
 
-        fake.regenerateResult = false
         assertFalse(coordinator.regenerateReply("assistant-2"))
+        assertEquals(1, fake.regenerateStartCalls)
     }
 
-    private fun coordinator(turn: RecordingTurnPort): LocalWorkExecutionCoordinator {
-        val runtime = LocalRuntimeStateStore()
-        runtime.initialize(
-            LocalHarnessState(
-                sessionId = "work-execution-test",
-                loading = false,
-                usageMode = LocalUsageMode.WORK,
-                modelState = LocalModelState(configured = true),
-            ),
-        )
-        return LocalWorkExecutionCoordinator(
+    private fun coordinator(
+        turn: RecordingTurnPort,
+        runtime: LocalRuntimeStateStore = defaultRuntime(),
+    ): LocalWorkExecutionCoordinator =
+        LocalWorkExecutionCoordinator(
             workRunRegistry = LocalWorkRunRegistry(runtime),
             runtimeStateStore = runtime,
             eventLogFor = { error("首轮启动不得绕回持久事件日志入口") },
             enqueueSnapshot = { error("首轮启动不得写排队快照") },
             turn = turn,
         )
-    }
 
-    private class RecordingTurnPort(
-        var regenerateResult: Boolean = false,
-    ) : LocalWorkTurnPort {
+    private fun defaultRuntime(): LocalRuntimeStateStore =
+        LocalRuntimeStateStore().also { runtime ->
+            runtime.initialize(
+                LocalHarnessState(
+                    sessionId = "work-execution-test",
+                    loading = false,
+                    usageMode = LocalUsageMode.WORK,
+                    modelState = LocalModelState(configured = true),
+                ),
+            )
+        }
+
+    private fun readyRuntimeForRegeneration(): LocalRuntimeStateStore =
+        LocalRuntimeStateStore().also { runtime ->
+            runtime.initialize(
+                LocalHarnessState(
+                    sessionId = "work-regenerate-test",
+                    loading = false,
+                    usageMode = LocalUsageMode.WORK,
+                    modelState = LocalModelState(configured = true),
+                    messages = listOf(
+                        LocalHarnessMessage("user-1", "user", "任务", createdAt = 1L),
+                        LocalHarnessMessage("assistant-1", "assistant", "结果", createdAt = 2L),
+                    ),
+                ),
+            )
+            runtime.foregroundRunHandle.modelHistory.append(
+                buildJsonObject {
+                    put("role", "assistant")
+                    put("content", "结果")
+                },
+            )
+        }
+
+    private class RecordingTurnPort : LocalWorkTurnPort {
         var startCalls: Int = 0
+        var regenerateStartCalls: Int = 0
         var lastPrepared: LocalPreparedSend? = null
         var lastRegenerateId: String? = null
 
@@ -86,9 +117,10 @@ class LocalWorkExecutionCoordinatorTest {
             return Job().also { it.complete() }
         }
 
-        override fun regenerateReply(messageId: String): Boolean {
+        override fun startRegeneration(messageId: String): Job {
+            regenerateStartCalls += 1
             lastRegenerateId = messageId
-            return regenerateResult
+            return Job().also { it.complete() }
         }
     }
 }
