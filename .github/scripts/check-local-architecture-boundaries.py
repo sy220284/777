@@ -201,6 +201,9 @@ if "runtimeStateStore.projection.setWorkPlanMode" not in work_plan_mode_source:
 if "runtimeStateStore.projection.updateContextMetrics" not in work_plan_mode_source:
     die("Work plan-mode context metrics must use LocalRuntimeProjection")
 
+engine_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
+engine = read(engine_path)
+
 work_registry_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt")
 )
@@ -302,9 +305,6 @@ if "val recallFacts = ChatMemorySelector.shouldRecall(query)" not in memory_coor
     die("precise chat facts must remain recallable in both direct and group chat")
 if "!groupAudience && ChatMemorySelector.shouldRecall(query)" in memory_coordinator:
     die("group chat must not disable precise fact recall")
-
-engine_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
-engine = read(engine_path)
 
 if "internal val state: StateFlow<LocalHarnessState>" in engine:
     die("LocalHarnessEngine must not expose aggregate runtime state")
