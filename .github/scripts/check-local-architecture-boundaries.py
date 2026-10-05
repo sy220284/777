@@ -14,7 +14,7 @@ ENGINE_MAX_INTERNAL_METHODS = 1
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
 ENGINE_MAX_COMPOSITION_BRIDGE_REFERENCES = 7
-ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 10
+ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 9
 ENGINE_STAGE3_FEATURE_METHOD_ROOTS = (
     "queueHumanTurn",
     "queueWorkTurnLocked",
@@ -25,7 +25,6 @@ ENGINE_STAGE3_FEATURE_METHOD_ROOTS = (
     "editAndResendUserMessage",
     "workSubagents",
     "runWorkflow",
-    "exitPlanMode",
     "scheduleChatPostTurn",
 )
 
@@ -319,9 +318,15 @@ if not has_call(work_plan_mode_source, "runtimeStateStore.projection", "setWorkP
     die("Work plan-mode visible projection must use LocalRuntimeProjection")
 if not has_call(work_plan_mode_source, "runtimeStateStore.projection", "updateContextMetrics"):
     die("Work plan-mode context metrics must use LocalRuntimeProjection")
+if "internal suspend fun exitWorkPlanMode(" not in work_plan_mode_source:
+    die("WorkFeature must own the active-run plan exit transaction")
 
 engine_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
 engine = read(engine_path)
+if "private suspend fun exitPlanMode(" in engine:
+    die("Work plan-exit business must not return to LocalHarnessEngine")
+if "exitWorkPlanMode(" not in engine:
+    die("Work plan-exit tool must stay routed to the Work-owned transaction")
 
 work_registry_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt")
