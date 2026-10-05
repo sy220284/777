@@ -288,11 +288,7 @@ import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.observability.DiagnosticReport
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -4576,17 +4572,3 @@ class LocalHarnessEngine @Inject internal constructor(
         }
 }
 
-
-@Module
-@InstallIn(SingletonComponent::class)
-internal object LocalFeatureExecutionPortModule {
-    @Provides
-    @Singleton
-    fun provideLocalWorkExecutionPort(engine: LocalHarnessEngine): LocalWorkExecutionPort =
-        engine.workExecutionPort
-
-    @Provides
-    @Singleton
-    fun provideLocalChatExecutionPort(engine: LocalHarnessEngine): LocalChatExecutionPort =
-        engine.chatExecutionPort
-}

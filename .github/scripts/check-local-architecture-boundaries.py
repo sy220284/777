@@ -41,7 +41,7 @@ ENGINE_CONSUMER_ALLOWLIST = {
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt",
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt",
 }
 
