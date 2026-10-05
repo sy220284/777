@@ -43,7 +43,6 @@ ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
     "scheduleChatPostTurn",
 )
 ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST = {
-    "runChatTurn",
     "runWorkAgentTurn",
 }
 
@@ -809,6 +808,9 @@ chat_execution_coordinator_source = strip_comments(
 chat_timeline_coordinator_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTimelineCoordinator.kt")
 )
+chat_direct_turn_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt")
+)
 chat_turn_port_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnPort.kt")
 )
@@ -950,6 +952,19 @@ for removed_chat_timeline_root in (
 ):
     if removed_chat_timeline_root in engine:
         die("Chat timeline business must not return to LocalHarnessEngine: " + removed_chat_timeline_root)
+for required_direct_chat_turn_owner in (
+    "internal suspend fun run(",
+    "LocalSessionRuntimeRegistry.withOwner(",
+    "modelHistory.compactChatIfNeeded(",
+    "modelRequests.complete(",
+    "replyCoordinator.finalizeDirect(",
+    "postTurn.schedule(",
+    "startNextQueuedTurnIfIdle()?.start()",
+):
+    if required_direct_chat_turn_owner not in chat_direct_turn_source:
+        die("Direct Chat main turn ownership is incomplete: " + required_direct_chat_turn_owner)
+if "private suspend fun runChatTurn(" in engine:
+    die("Direct Chat main turn must not return to LocalHarnessEngine")
 for stale_timeline_bridge in (
     "fun editAndResendUserMessage(",
     "fun regenerateReply(",
