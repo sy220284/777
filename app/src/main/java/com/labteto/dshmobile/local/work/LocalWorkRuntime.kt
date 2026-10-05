@@ -13,8 +13,10 @@ class LocalWorkRuntime @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val approvals: LocalWorkApprovalCoordinator,
 ) {
-    internal fun backgroundJobOutputForUi(jobId: String): String = engine.backgroundJobOutputForUi(jobId)
-    internal fun stopBackgroundJobForUi(jobId: String): String = engine.stopBackgroundJobForUi(jobId)
+    internal fun backgroundJobOutputForUi(jobId: String): String =
+        runtimeStateStore.jobManager.output(jobId, runtimeStateStore.currentSessionId)
+    internal fun stopBackgroundJobForUi(jobId: String): String =
+        runtimeStateStore.jobManager.kill(jobId, runtimeStateStore.currentSessionId)
     internal fun answerApproval(callId: String, approved: Boolean) {
         val binding = workRunRegistry[runtimeStateStore.currentSessionId]
         if (binding?.interactions?.answerApproval(callId, approved) == true) return
