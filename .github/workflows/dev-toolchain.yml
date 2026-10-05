@@ -283,14 +283,27 @@ jobs:
 
           QEMU_BIN="$SDK_ROOT/emulator/qemu/linux-x86_64/qemu-system-x86_64"
           test -x "$QEMU_BIN"
-          if LD_LIBRARY_PATH="$EMULATOR_HOST_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
-            ldd "$QEMU_BIN" | grep -Fq 'not found'; then
-            echo "::error title=Emulator 宿主库不完整::qemu 仍存在未解析共享库。" >&2
-            LD_LIBRARY_PATH="$EMULATOR_HOST_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ldd "$QEMU_BIN" >&2
+
+          # qemu 直接执行 ldd 时不会经过 emulator 启动器，因此必须显式加入
+          # Emulator 包内自带的 lib64 / Qt / 图形库目录；否则会把 Artifact 自带库误判成宿主缺失。
+          EMULATOR_INTERNAL_LIBRARY_PATH="$SDK_ROOT/emulator/lib64"
+          for internal_dir in \
+            "$SDK_ROOT/emulator/lib64/qt/lib" \
+            "$SDK_ROOT/emulator/lib64/gles_swiftshader" \
+            "$SDK_ROOT/emulator/lib64/vulkan"; do
+            if [ -d "$internal_dir" ]; then
+              EMULATOR_INTERNAL_LIBRARY_PATH="$EMULATOR_INTERNAL_LIBRARY_PATH:$internal_dir"
+            fi
+          done
+          QEMU_LD_LIBRARY_PATH="$EMULATOR_HOST_LIBS:$EMULATOR_INTERNAL_LIBRARY_PATH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+          if LD_LIBRARY_PATH="$QEMU_LD_LIBRARY_PATH" ldd "$QEMU_BIN" | grep -Fq 'not found'; then
+            echo "::error title=Emulator 宿主库不完整::qemu 在加入 Emulator 自带库目录后仍存在未解析共享库。" >&2
+            LD_LIBRARY_PATH="$QEMU_LD_LIBRARY_PATH" ldd "$QEMU_BIN" >&2
             exit 1
           fi
 
-          LD_LIBRARY_PATH="$EMULATOR_HOST_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+          LD_LIBRARY_PATH="$QEMU_LD_LIBRARY_PATH" \
             "$SDK_ROOT/emulator/emulator" -version >/dev/null
 
           make_component emulator "$EMULATOR_STAGE"
