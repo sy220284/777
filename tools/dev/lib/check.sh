@@ -83,10 +83,12 @@ check_environment() {
 
   if [ "$PROFILE" = full ]; then
     local node_bin="$TOOLS_ROOT/node-current/bin/node"
-    if [ -x "$node_bin" ] && [ "$("$node_bin" -p 'process.versions.node.split(".")[0]')" = 22 ]; then
-      ok "Node.js $("$node_bin" -p 'process.versions.node')"
+    if [ -x "$node_bin" ] && [ "$("$node_bin" -p 'process.versions.node')" = "$NODE_VERSION" ]; then
+      ok "Node.js $NODE_VERSION"
+    elif command -v node >/dev/null 2>&1 && [ "$(node -p 'process.versions.node' 2>/dev/null)" = "$NODE_VERSION" ]; then
+      ok "Node.js $NODE_VERSION -> $(command -v node)"
     else
-      fail "Node.js 22"
+      fail "Node.js $NODE_VERSION"
       failures=$((failures + 1))
     fi
 
@@ -120,8 +122,12 @@ check_environment() {
 
   if [ "$failures" -ne 0 ]; then
     fail "共 $failures 项必备能力未满足"
-    say "本地工具链禁止从 apt、Google、Gradle、Maven、Node 或其他外部渠道补齐。"
-    say "请重新下载与当前仓库匹配的 GitHub Actions 工具链构建产物。"
+    say "本地工具链只允许从 GitHub Actions 组件 Artifact 补齐。"
+    say "当前仍缺少："
+    while IFS= read -r component; do
+      [ -n "$component" ] || continue
+      say "  $(artifact_name_for_component "$component")"
+    done < <(missing_components "$PROFILE")
     return 1
   fi
 
