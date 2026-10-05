@@ -19,13 +19,20 @@ class AgentInputQueue(
     private val lock = Any()
     private val items = ArrayDeque<QueuedAgentInput>()
 
-    fun offer(input: QueuedAgentInput): Boolean = synchronized(lock) {
+    /** Keep a newly queued input invisible to consumers until its durable admission commits. */
+    fun offer(input: QueuedAgentInput, commit: () -> Unit = {}): Boolean = synchronized(lock) {
         if (items.size >= capacity) return@synchronized false
         if (input.id.isNotBlank() && items.any { it.id == input.id }) {
             error("输入队列存在重复编号：${input.id}")
         }
         items.addLast(input)
-        true
+        try {
+            commit()
+            true
+        } catch (error: Throwable) {
+            items.remove(input)
+            throw error
+        }
     }
 
     fun drain(): List<QueuedAgentInput> = synchronized(lock) {

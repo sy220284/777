@@ -1661,9 +1661,12 @@ class LocalHarnessEngine @Inject internal constructor(
                     runtimeStateStore.clearSendFeedback()
                     cancelChatPostTurn()
                 },
-                enqueue = { targetPending.offer(queuedInput) },
+                enqueue = {
+                    targetPending.offer(queuedInput) {
+                        recordUserTranscript(content, modelMessage, true, queuedInput, binding)
+                    }
+                },
                 onQueued = {
-                    recordUserTranscript(content, modelMessage, true, queuedInput, binding)
                     targetState.update { it.copy(kernel = it.kernel.copy(queuedInputCount = targetPending.size()), error = null) }
                     if (binding != null) persist(binding) else persist()
                 },
