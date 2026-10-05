@@ -117,6 +117,69 @@ internal class LocalRuntimeProjection(
         }
     }
 
+    internal fun updateSettingsRuntimeLimits(
+        mainMaxSteps: Int,
+        subagentMaxSteps: Int,
+        modelAttempts: Int,
+    ) {
+        state.update { current ->
+            current.copy(
+                mainMaxSteps = mainMaxSteps,
+                subagentMaxSteps = subagentMaxSteps,
+                modelState = current.modelState.copy(modelAttempts = modelAttempts),
+            )
+        }
+    }
+
+    internal fun updateSettingsWorkerProfile(profileId: String?) {
+        state.update { current ->
+            current.copy(
+                modelState = current.modelState.copy(
+                    modelSelection = current.modelState.modelSelection.copy(workerProfileId = profileId),
+                ),
+            )
+        }
+    }
+
+    internal fun updatePersonalization(
+        userRules: String,
+        autoRecall: Boolean,
+        autoMemory: Boolean,
+    ) {
+        state.update { current ->
+            current.copy(
+                userRules = userRules,
+                autoRecall = autoRecall,
+                autoMemory = autoMemory,
+            )
+        }
+    }
+
+    internal fun setChatStyleGuardEnabled(enabled: Boolean) {
+        state.update { current -> current.copy(chatStyleGuardEnabled = enabled) }
+    }
+
+    internal fun setChatStyleGuardPhrases(phrases: List<String>) {
+        state.update { current -> current.copy(chatStyleGuardCustomPhrases = phrases) }
+    }
+
+    internal fun clearStyleGuardHits() {
+        state.update { current -> current.copy(styleGuardHits = emptyList()) }
+    }
+
+    internal fun recordStyleGuardHits(violations: List<String>, maxHits: Int) {
+        if (violations.isEmpty()) return
+        state.update { current ->
+            current.copy(
+                styleGuardHits = (current.styleGuardHits + violations)
+                    .map(String::trim)
+                    .filter(String::isNotBlank)
+                    .distinct()
+                    .takeLast(maxHits),
+            )
+        }
+    }
+
     internal fun publishSessions(summaries: List<LocalSessionSummary>) {
         state.update { current -> current.copy(sessions = summaries) }
     }
