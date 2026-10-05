@@ -2410,17 +2410,20 @@ class LocalHarnessEngine @Inject internal constructor(
 
             val assistantMessage = reply.content?.takeIf(String::isNotBlank)
             if (assistantTranscript != null && assistantMessage != null) {
-                scheduleChatPostTurn(
-                    userMessage = input,
-                    assistantMessage = assistantMessage,
-                    persona = chatContext.persona,
-                    expectedSessionId = snapshot.sessionId,
-                    expectedAssistantMessageId = assistantTranscript.id,
-                    expectedBaseState = _state.value.chat.chatState,
-                    profile = snapshot.modelState.modelSelection.activeProfile,
-                    sourceUserMessageId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
-                    assistantEventSequence = assistantEvent.sequence,
-                )
+                snapshot.modelState.modelSelection.activeProfile?.let { profile ->
+                    chatContextRefreshCoordinator.schedule(
+                        userMessage = input,
+                        assistantMessage = assistantMessage,
+                        persona = chatContext.persona,
+                        expectedSessionId = snapshot.sessionId,
+                        expectedAssistantMessageId = assistantTranscript.id,
+                        expectedBaseState = _state.value.chat.chatState,
+                        boundEventLog = eventLogFor(snapshot.sessionId),
+                        profile = profile,
+                        sourceUserMessageId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
+                        assistantEventSequence = assistantEvent.sequence,
+                    )
+                }
             }
         } catch (cancelled: CancellationException) {
             eventLog.append("turn/end", buildJsonObject {
@@ -3689,32 +3692,6 @@ class LocalHarnessEngine @Inject internal constructor(
 
     private fun cancelChatPostTurn() {
         chatContextRefreshCoordinator.cancelScheduledRefresh()
-    }
-
-    private fun scheduleChatPostTurn(
-        userMessage: String,
-        assistantMessage: String,
-        persona: PersonaProfile,
-        expectedSessionId: String,
-        expectedAssistantMessageId: String,
-        expectedBaseState: ChatCharacterState,
-        profile: LocalModelProfile?,
-        sourceUserMessageId: String? = null,
-        assistantEventSequence: Long? = null,
-    ) {
-        if (profile == null) return
-        chatContextRefreshCoordinator.schedule(
-            userMessage = userMessage,
-            assistantMessage = assistantMessage,
-            persona = persona,
-            expectedSessionId = expectedSessionId,
-            expectedAssistantMessageId = expectedAssistantMessageId,
-            expectedBaseState = expectedBaseState,
-            boundEventLog = eventLogFor(expectedSessionId),
-            profile = profile,
-            sourceUserMessageId = sourceUserMessageId,
-            assistantEventSequence = assistantEventSequence,
-        )
     }
 
     private suspend fun enforceChatStyle(
