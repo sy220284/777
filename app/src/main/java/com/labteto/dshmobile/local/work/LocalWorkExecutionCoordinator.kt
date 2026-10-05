@@ -29,7 +29,8 @@ internal class LocalWorkExecutionCoordinator internal constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val eventLogFor: (String) -> LocalSessionEventLog,
     private val enqueueSnapshot: (String) -> Boolean,
-    private val turn: LocalWorkTurnPort,
+    private val startPreparedTurn: (LocalPreparedSend, com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease) -> Job,
+    private val startRegeneration: (String) -> Job,
 ) : LocalWorkExecutionPort {
     @Inject
     internal constructor(
@@ -37,12 +38,14 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         runtimeStateStore: LocalRuntimeStateStore,
         sessionStorage: LocalSessionStorageRuntime,
         turn: LocalWorkTurnPort,
+        regenerator: LocalWorkReplyRegenerator,
     ) : this(
         workRunRegistry = workRunRegistry,
         runtimeStateStore = runtimeStateStore,
         eventLogFor = sessionStorage.eventLogs::get,
         enqueueSnapshot = sessionStorage::enqueueCurrentSnapshot,
-        turn = turn,
+        startPreparedTurn = turn::startPrepared,
+        startRegeneration = regenerator::start,
     )
 
     override fun send(
@@ -122,9 +125,9 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                     }
                 },
                 onStart = { reservedLease ->
-                    started = turn.startPrepared(
-                        prepared = prepared,
-                        sessionLease = requireNotNull(reservedLease) {
+                    started = startPreparedTurn(
+                        prepared,
+                        requireNotNull(reservedLease) {
                             "Work 首轮启动前必须持有前台 Session 租约"
                         },
                     )
@@ -161,7 +164,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                     ?.contentOrNull != "assistant"
             ) return@synchronized false
 
-            started = turn.startRegeneration(messageId).also { handle.job = it }
+            started = startRegeneration(messageId).also { handle.job = it }
             true
         }
         started?.start()
