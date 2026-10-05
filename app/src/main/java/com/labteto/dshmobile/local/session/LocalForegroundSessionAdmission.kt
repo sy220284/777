@@ -77,22 +77,24 @@ internal fun coordinateOwnedLocalSend(
         sessionTransitioning = sessionTransitioning,
     )
     var leaseHandedOff = false
-    val result = coordinateLocalSend(
-        configured = configured,
-        loading = loading,
-        sessionTransitioning = sessionTransitioning,
-        activeRun = ownership.activeRun,
-        pendingCount = pendingCount,
-        pendingLimit = pendingLimit,
-        onRejected = onRejected,
-        onAccepted = onAccepted,
-        enqueue = enqueue,
-        onQueued = onQueued,
-        onStart = {
-            leaseHandedOff = true
-            onStart(ownership.reservedWorkLease)
-        },
-    )
-    if (!leaseHandedOff) ownership.reservedWorkLease?.close()
-    return result
+    return try {
+        coordinateLocalSend(
+            configured = configured,
+            loading = loading,
+            sessionTransitioning = sessionTransitioning,
+            activeRun = ownership.activeRun,
+            pendingCount = pendingCount,
+            pendingLimit = pendingLimit,
+            onRejected = onRejected,
+            onAccepted = onAccepted,
+            enqueue = enqueue,
+            onQueued = onQueued,
+            onStart = {
+                onStart(ownership.reservedWorkLease)
+                leaseHandedOff = true
+            },
+        )
+    } finally {
+        if (!leaseHandedOff) ownership.reservedWorkLease?.close()
+    }
 }

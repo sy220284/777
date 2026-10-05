@@ -1728,6 +1728,8 @@ class LocalHarnessEngine @Inject internal constructor(
                 preownedLease = sessionLease,
             )
         }
+        // A lazy run cancelled before its body starts never reaches withOwner/finally.
+        job.invokeOnCompletion { sessionLease.close() }
         binding.job = job
         return job
     }

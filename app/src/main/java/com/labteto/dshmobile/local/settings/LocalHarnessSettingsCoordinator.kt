@@ -16,6 +16,8 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -28,6 +30,25 @@ internal class LocalHarnessSettingsCoordinator @Inject constructor(
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val state get() = runtimeStateStore.state.value
+    private val personalizationGeneration = AtomicLong()
+    private val personalizationWrites = Channel<Pair<Long, UserProfile>>(Channel.CONFLATED)
+
+    init {
+        scope.launch {
+            // One writer preserves submission order; rapid edits retain only the latest pending
+            // value, so an older IO coroutine cannot overwrite newer persisted preferences.
+            for ((generation, profile) in personalizationWrites) {
+                runCatching { userProfileStore.write(profile) }
+                    .onFailure { error ->
+                        updateState { current ->
+                            if (personalizationGeneration.get() == generation) {
+                                current.copy(error = error.message ?: "个性化设置保存失败")
+                            } else current
+                        }
+                    }
+            }
+        }
+    }
 
     internal fun readUserProfile(): UserProfile = userProfileStore.read()
 
@@ -70,6 +91,7 @@ internal class LocalHarnessSettingsCoordinator @Inject constructor(
         }
     }
 
+    @Synchronized
     fun configurePersonalization(
         customRules: String,
         autoRecall: Boolean,
@@ -80,6 +102,7 @@ internal class LocalHarnessSettingsCoordinator @Inject constructor(
             autoRecall = autoRecall,
             autoMemory = autoMemory,
         )
+        val generation = personalizationGeneration.incrementAndGet()
         updateState {
             it.copy(
                 userRules = profile.customRules,
@@ -87,14 +110,7 @@ internal class LocalHarnessSettingsCoordinator @Inject constructor(
                 autoMemory = profile.autoMemory,
             )
         }
-        scope.launch {
-            runCatching { userProfileStore.write(profile) }
-                .onFailure { error ->
-                    updateState { current ->
-                        current.copy(error = error.message ?: "个性化设置保存失败")
-                    }
-                }
-        }
+        personalizationWrites.trySend(generation to profile).getOrThrow()
     }
 
     fun configureChatStyleGuard(enabled: Boolean) {

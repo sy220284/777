@@ -81,6 +81,37 @@ class LocalForegroundSessionAdmissionTest {
     }
 
     @Test
+    fun failingAdmissionCallbacksCannotLeakReservedSessionOwner() {
+        for (stage in listOf("rejected", "accepted", "start")) {
+            val sessionId = "failed-$stage-" + UUID.randomUUID()
+            val failure = IllegalStateException("disk failure")
+            val result = runCatching {
+                coordinateOwnedLocalSend(
+                    usageMode = LocalUsageMode.WORK,
+                    sessionId = sessionId,
+                    workBindingActive = false,
+                    visibleJobActive = false,
+                    configured = stage != "rejected",
+                    loading = false,
+                    sessionTransitioning = false,
+                    pendingCount = 0,
+                    pendingLimit = 8,
+                    onRejected = { if (stage == "rejected") throw failure },
+                    onAccepted = { if (stage == "accepted") throw failure },
+                    enqueue = { true },
+                    onQueued = {},
+                    onStart = { if (stage == "start") throw failure },
+                )
+            }
+            assertTrue(result.exceptionOrNull() === failure)
+            assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
+            val next = LocalSessionRuntimeRegistry.tryAcquire(sessionId, LocalSessionRuntimeKind.FOREGROUND)
+            assertNotNull(next)
+            next!!.close()
+        }
+    }
+
+    @Test
     fun startedWorkSendHandsReservationToRunOwner() {
         val sessionId = "started-" + UUID.randomUUID()
         var handedOff: LocalSessionRuntimeLease? = null
