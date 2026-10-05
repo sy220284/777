@@ -1036,7 +1036,7 @@ class LocalHarnessEngine @Inject internal constructor(
         override fun editAndResendUserMessage(
             messageId: String,
             replacement: String,
-        ): LocalChatUserEditResult = editAndResendUserMessage(messageId, replacement)
+        ): LocalChatUserEditResult = this@LocalHarnessEngine.editAndResendUserMessage(messageId, replacement)
 
         override fun regenerateReply(messageId: String): Boolean =
             regenerateReplyForMode(LocalUsageMode.CHAT, messageId)
