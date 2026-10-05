@@ -2243,6 +2243,41 @@ for removed_private_business_method in ENGINE_REMOVED_PRIVATE_BUSINESS_METHODS:
             + removed_private_business_method
         )
 
+work_turn_port_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnPort.kt")
+)
+if "startRegeneration" in work_turn_port_source:
+    die("Work regeneration must not return to the transitional Engine-backed turn port")
+
+work_reply_regenerator_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkReplyRegenerator.kt")
+)
+for required_work_regeneration_owner in (
+    "@Inject constructor(",
+    "LocalSessionRuntimeRegistry.withOwner(",
+    "LocalExecutionService.withTurn(",
+):
+    if required_work_regeneration_owner not in work_reply_regenerator_source:
+        die(
+            "WorkFeature regeneration owner is incomplete: "
+            + required_work_regeneration_owner
+        )
+if "LocalWorkReplyRegenerator(" in engine:
+    die("LocalHarnessEngine must not construct the Work regeneration owner")
+
+work_run_binding_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt")
+)
+work_turn_starter_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnStarter.kt")
+)
+if "pruneToolResult:" in work_run_binding_source or "pruneToolResult:" in work_turn_starter_source:
+    die("Work run ownership must not regain the legacy Engine tool-result pruning callback")
+if "contentAlreadyBounded = true" not in strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt")
+):
+    die("Work tool transcript projection must prove tool output is bounded before identity projection")
+
 stage3_feature_roots = {
     method
     for method in ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES
