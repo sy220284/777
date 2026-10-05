@@ -10,6 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 EXPECTED_JDK_MIN = 21
 EXPECTED_JVM_TARGET = 21
 EXPECTED_NODE_MIN = 22
+EXPECTED_ANDROID_BUILD_TOOLS = "37.0.0"
 
 
 def fail(message: str) -> None:
@@ -62,6 +63,12 @@ for build_file in sorted(ROOT.glob("*/build.gradle.kts")):
 
 if configured_modules < 8:
     fail(f"只检查到 {configured_modules} 个 JVM/Android 模块，低于当前基线 8")
+
+for relative in ("app/build.gradle.kts", "harness-device-android/build.gradle.kts"):
+    text = (ROOT / relative).read_text(encoding="utf-8")
+    expected = f'buildToolsVersion = "{EXPECTED_ANDROID_BUILD_TOOLS}"'
+    if expected not in text:
+        fail(f"{relative} 必须显式固定 Android Build Tools {EXPECTED_ANDROID_BUILD_TOOLS}")
 
 hpatch = ROOT / "app/src/main/java/com/github/sisong/HPatch.kt"
 if not hpatch.is_file():
