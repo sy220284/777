@@ -140,9 +140,12 @@ internal class LocalWorkRunBinding(
         } finally {
             state.update { current ->
                 current.copy(
-                    work = current.work.copy(pendingApproval = null, pendingQuestion = null),
+                    work = current.work.copy(
+                        pendingApproval = null,
+                        pendingQuestion = null,
+                        deviceApprovalLease = false,
+                    ),
                     kernel = current.kernel.copy(queuedInputCount = 0),
-                    deviceApprovalLease = false,
                 )
             }
         }
@@ -188,7 +191,6 @@ internal fun mirrorLocalWorkRunState(
                 messages = run.messages,
                 transcriptIndex = run.transcriptIndex,
                 work = run.work,
-                deviceApprovalLease = run.deviceApprovalLease,
                 kernel = visible.kernel.copy(
                     running = run.kernel.running,
                     queuedInputCount = run.kernel.queuedInputCount,
