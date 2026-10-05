@@ -2,6 +2,9 @@ package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.documentedContextWindowTokens
+import com.labteto.dshmobile.local.operationalInputLimitTokens
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -19,6 +22,31 @@ internal fun interface LocalModelAdmissionPort {
         request: LocalModelAdmissionRequest,
         block: suspend () -> LocalModelReply,
     ): LocalModelReply
+}
+
+/** Model-owned safety preflight that applies to every provider request, with or without Work. */
+internal fun validateModelRequestAdmission(request: LocalModelAdmissionRequest) {
+    val pressure = LocalPromptPressureMeter.measure(
+        messages = request.messages,
+        tools = request.tools,
+        operationalLimitTokens = operationalInputLimitTokens(
+            request.model,
+            request.baseUrl,
+            request.contextWindowTokensOverride,
+        ),
+        modelContextWindowTokens = documentedContextWindowTokens(
+            request.model,
+            request.baseUrl,
+            request.contextWindowTokensOverride,
+        ),
+    )
+    if (pressure.estimatedInputTokens > pressure.operationalLimitTokens) {
+        throw LocalModelException(
+            code = "MODEL_CONTEXT_BUDGET_EXCEEDED",
+            message = "预计输入 ${pressure.estimatedInputTokens} token，超过当前路由安全上限 ${pressure.operationalLimitTokens}",
+            retryable = false,
+        )
+    }
 }
 
 /**
@@ -88,6 +116,7 @@ internal class LocalAgentModelRequestRuntime(
             messages = messages,
             tools = tools,
         )
+        validateModelRequestAdmission(admissionRequest)
         return admission?.execute(admissionRequest, invokeProvider) ?: invokeProvider()
     }
 }

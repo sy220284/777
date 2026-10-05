@@ -1,8 +1,10 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelAdmissionRequest
 import com.labteto.dshmobile.local.model.LocalPromptPressure
 import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
 import com.labteto.dshmobile.local.model.LocalRequestPressureStore
+import com.labteto.dshmobile.local.model.validateModelRequestAdmission
 import com.labteto.dshmobile.local.work.assessWorkStepContext
 import com.labteto.dshmobile.local.work.toModelSnapshot
 import kotlinx.serialization.json.JsonArray
@@ -32,6 +34,28 @@ class LocalPromptPressureTest {
         )
         assertTrue(pressure.currentUserTokens > 0)
         assertTrue(pressure.historyTokens > 0)
+    }
+
+    @Test
+    fun genericModelAdmissionRejectsOversizedRequestWithoutWorkControl() {
+        val request = LocalModelAdmissionRequest(
+            routeFingerprint = "test-route",
+            model = "unknown-model",
+            baseUrl = "https://example.com/v1",
+            contextWindowTokensOverride = 4_096,
+            messages = listOf(
+                buildJsonObject {
+                    put("role", "user")
+                    put("content", "x".repeat(100_000))
+                },
+            ),
+            tools = JsonArray(emptyList()),
+        )
+
+        val failure = runCatching { validateModelRequestAdmission(request) }.exceptionOrNull()
+
+        assertTrue(failure is LocalModelException)
+        assertEquals("MODEL_CONTEXT_BUDGET_EXCEEDED", (failure as LocalModelException).code)
     }
 
     @Test

@@ -228,6 +228,12 @@ if "import com.labteto.dshmobile.local.work." in model_request_runtime_source:
     die("LocalAgentModelRequestRuntime must not depend on WorkFeature internals")
 if "admissionHandledExternally" in model_request_runtime_source:
     die("Model request runtime must not retain the legacy Work-specific admission bypass")
+if "validateModelRequestAdmission(admissionRequest)" not in model_request_runtime_source:
+    die("Every model request must keep the generic context-budget preflight before provider invocation")
+generic_preflight_pos = model_request_runtime_source.find("validateModelRequestAdmission(admissionRequest)")
+provider_invoke_pos = model_request_runtime_source.find("admission?.execute(admissionRequest, invokeProvider)")
+if generic_preflight_pos < 0 or provider_invoke_pos < 0 or generic_preflight_pos > provider_invoke_pos:
+    die("Generic model admission preflight must run before optional Feature admission/provider execution")
 
 for model_source_path in (LOCAL_SOURCE_ROOT / "model").rglob("*.kt"):
     model_source = strip_comments(model_source_path.read_text(encoding="utf-8"))
