@@ -583,8 +583,6 @@ if "internal suspend fun regenerate(messageId: String)" not in work_regenerator_
     die("WorkFeature must own final-answer regeneration")
 if "private suspend fun regenerateWorkReply(" in engine:
     die("Work regeneration business must not return to LocalHarnessEngine")
-if "workReplyRegenerator.regenerate(messageId)" not in engine:
-    die("Work regeneration call site must stay routed to WorkFeature")
 
 group_execution_owner_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatExecutionOwner.kt")
@@ -1012,7 +1010,9 @@ if "queueHumanTurn(" in work_execution_coordinator_source:
 for required_work_regeneration_owner in (
     "override fun regenerateReply(messageId: String): Boolean",
     "handle.modelHistory.lastOrNull()",
-    "turn.startRegeneration(messageId)",
+    "regenerator: LocalWorkReplyRegenerator",
+    "startRegeneration = regenerator::start",
+    "started = startRegeneration(messageId).also { handle.job = it }",
 ):
     if required_work_regeneration_owner not in work_execution_coordinator_source:
         die("WorkFeature regeneration admission is incomplete: " + required_work_regeneration_owner)
@@ -1036,7 +1036,7 @@ for required_chat_timeline_owner in (
     "LocalSessionRuntimeKind.MAINTENANCE",
     "appendTimelineRewriteCommit(",
     "modelHistory.checkpoint(",
-    "turn.startRegeneration(",
+    "directTurn.start(",
 ):
     if required_chat_timeline_owner not in chat_timeline_coordinator_source:
         die("Chat timeline ownership is incomplete: " + required_chat_timeline_owner)
