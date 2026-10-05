@@ -4,12 +4,14 @@ import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
+import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.syncForegroundJobs
+import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
 import com.labteto.dshmobile.local.runtime.MAX_PENDING_INPUTS
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
@@ -22,7 +24,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import java.util.UUID
 import javax.inject.Singleton
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Work-owned registry for session-bound foreground runs.
@@ -153,6 +158,98 @@ class LocalWorkRunRegistry internal constructor(
                 },
             )
         }
+
+    /**
+     * Finalize one Work-owned turn and either detach the completed binding or claim its next input.
+     *
+     * The registry owns binding lifecycle, durable checkpointing, queue hand-off and visible
+     * projection. The caller supplies only a lazy execution factory while the Agent loop itself is
+     * still being migrated out of the legacy engine.
+     */
+    internal fun finishTurn(
+        binding: LocalWorkRunBinding,
+        completedJob: Job?,
+        startNext: (QueuedAgentInput, LocalWorkRunBinding) -> Job,
+    ): Job? = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+        if (binding.runHandle.job !== completedJob) return@synchronized null
+
+        checkpointModelHistory(binding, "work/background-turn-end")
+        persistBinding(binding)
+
+        val next = binding.runHandle.pendingInputs.poll()
+        if (next == null) {
+            binding.runHandle.job = null
+            detach(binding)
+            binding.runHandle.projectionJob?.cancel()
+            binding.runHandle.projectionJob = null
+            if (
+                runtimeStateStore.currentSessionId == binding.sessionId &&
+                runtimeStateStore.state.value.sessionId == binding.sessionId
+            ) {
+                runtimeStateStore.foregroundRunHandle.modelHistory.reset(
+                    binding.runHandle.modelHistory.snapshot(),
+                )
+                runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor =
+                    binding.runHandle.transcriptProjectionCursor
+                mirrorVisible(binding)
+            }
+            return@synchronized null
+        }
+
+        val durableMessage = next.modelMessage ?: buildJsonObject {
+            put("role", "user")
+            put("content", next.content)
+        }
+        binding.state.update { current ->
+            current.copy(
+                kernel = current.kernel.copy(
+                    queuedInputCount = binding.runHandle.pendingInputs.size(),
+                ),
+            )
+        }
+        binding.runHandle.modelHistory.append(durableMessage)
+        refreshBindingContextMetrics(binding)
+        binding.eventLog.append(
+            LOCAL_AGENT_INBOX_EVENT_TYPE,
+            encodeLocalAgentInboxEvent(
+                action = "resumed",
+                pending = binding.runHandle.pendingInputs.snapshot(),
+                affected = listOf(next),
+                modelMessages = listOf(durableMessage),
+            ),
+        )
+        persistBinding(binding)
+        startNext(next, binding).also { nextJob ->
+            binding.runHandle.job = nextJob
+        }
+    }
+
+    private fun checkpointModelHistory(binding: LocalWorkRunBinding, reason: String) {
+        val codec = ModelHistoryCheckpointCodec()
+        binding.eventLog.append(
+            ModelHistoryCheckpointCodec.EVENT_TYPE,
+            codec.encode(
+                durableModelHistorySnapshot(binding.runHandle.modelHistory.snapshot()),
+                reason,
+            ),
+        )
+        binding.runHandle.turnsSinceModelHistoryCheckpoint = 0
+    }
+
+    private fun refreshBindingContextMetrics(binding: LocalWorkRunBinding) {
+        val resourceSnapshot = runtimeStateStore.resourceSnapshot()
+        binding.state.update { current ->
+            current.copy(
+                kernel = current.kernel.copy(
+                    contextChars = binding.runHandle.modelHistory.encodedChars,
+                    contextBudgetChars = runtimeStateStore.contextBudgetCharsFor(
+                        current.modelState,
+                        resourceSnapshot,
+                    ),
+                ),
+            )
+        }
+    }
 
     internal fun attach(binding: LocalWorkRunBinding): LocalWorkRunBinding? {
         val previous = synchronized(approvalProjectionLock) {
