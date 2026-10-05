@@ -21,7 +21,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
 
 RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 14,
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 4,
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 2,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 12,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
@@ -215,6 +215,8 @@ work_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt")
 )
 for forbidden_proxy in (
+    "engine.backgroundJobOutputForUi",
+    "engine.stopBackgroundJobForUi",
     "engine.answerApproval",
     "engine.answerQuestion",
     "engine.cancelQuestion",
@@ -222,6 +224,8 @@ for forbidden_proxy in (
     if forbidden_proxy in work_runtime_source:
         die("LocalWorkRuntime must route interaction responses without Engine: " + forbidden_proxy)
 for removed_engine_proxy in (
+    "internal fun backgroundJobOutputForUi",
+    "internal fun stopBackgroundJobForUi",
     "internal fun answerApproval",
     "internal fun answerQuestion",
     "internal fun cancelQuestion",
@@ -805,6 +809,16 @@ if "runtimeStateStore.observeResourceSnapshots(::projectResourceSnapshot)" not i
     die("WorkFeature must observe shared resource snapshots without Engine mediation")
 if "runtimeStateStore.resourceSnapshot()" not in work_run_registry:
     die("New Work bindings must project the current shared resource snapshot on attach")
+if "jobOwner = LocalRuntimeJobOwner.persistent(context, json)" not in runtime_state_store:
+    die("Shared Runtime must own the persistent process-wide background job manager")
+if "observeJobSnapshots" not in runtime_state_store:
+    die("Shared Runtime background jobs must expose snapshots without importing Feature state")
+if "runtimeStateStore.observeJobSnapshots(::projectJobSnapshot)" not in work_run_registry:
+    die("WorkFeature must observe shared background-job snapshots without Engine mediation")
+if "runtimeStateStore.jobManager.output" not in work_runtime_source or "runtimeStateStore.jobManager.kill" not in work_runtime_source:
+    die("WorkRuntime must access background jobs through the shared Runtime capability")
+if "LocalPersistentJobStore(" in engine or "LocalJobManager(scope" in engine:
+    die("LocalHarnessEngine must not own the process-wide background job manager")
 if "runtimeStateStore.observeResourceSnapshots" in engine or "projectResourceSnapshotToSessionStates" in engine:
     die("LocalHarnessEngine must not bridge Runtime resource snapshots into WorkFeature")
 work_binding_source = strip_comments(
