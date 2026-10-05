@@ -995,7 +995,8 @@ for required_work_send_owner in (
     "coordinateOwnedLocalSend(",
     "runtimeStateStore.foregroundRunHandle.pendingInputs",
     "enqueueSnapshot(sessionId)",
-    "turn.startPrepared(",
+    "startPreparedTurn = turn::startPrepared",
+    "started = startPreparedTurn(",
 ):
     if required_work_send_owner not in work_execution_coordinator_source:
         die("WorkFeature first-send ownership is incomplete: " + required_work_send_owner)
