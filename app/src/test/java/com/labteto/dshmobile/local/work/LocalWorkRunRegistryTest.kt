@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
+import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
@@ -27,6 +29,7 @@ import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -244,6 +247,112 @@ class LocalWorkRunRegistryTest {
         first.eventLog.close()
         secondJob.cancel()
         second.eventLog.close()
+    }
+
+    @Test
+    fun finishTurnDetachesIdleBindingAndMirrorsDurableHistoryToVisibleRuntime() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(
+            LocalHarnessState(
+                loading = false,
+                sessionId = "session-a",
+                usageMode = LocalUsageMode.WORK,
+                modelState = LocalModelState(configured = true),
+            ),
+        )
+        var persisted: LocalHarnessSession? = null
+        val registry = LocalWorkRunRegistry(
+            runtimeStateStore = runtime,
+            persistBinding = { binding -> persisted = binding.persistenceSnapshot() },
+        )
+        val active = binding("session-a")
+        active.runHandle.modelHistory.append(buildJsonObject {
+            put("role", "assistant")
+            put("content", "已完成")
+        })
+        active.runHandle.transcriptProjectionCursor = 42L
+        val completedJob = Job()
+        active.runHandle.job = completedJob
+        registry.attach(active)
+
+        try {
+            val next = registry.finishTurn(active, completedJob) { _, _ ->
+                error("无待处理输入时不得启动下一轮")
+            }
+
+            assertNull(next)
+            assertNull(registry["session-a"])
+            assertNull(active.runHandle.job)
+            assertEquals(
+                active.runHandle.modelHistory.snapshot(),
+                runtime.foregroundRunHandle.modelHistory.snapshot(),
+            )
+            assertEquals(42L, runtime.foregroundRunHandle.transcriptProjectionCursor)
+            assertEquals("session-a", persisted?.id)
+            assertNotNull(active.eventLog.latest(ModelHistoryCheckpointCodec.EVENT_TYPE))
+        } finally {
+            completedJob.cancel()
+            active.eventLog.close()
+        }
+    }
+
+    @Test
+    fun finishTurnClaimsQueuedInputAndKeepsBindingOwnedForNextRun() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(
+            LocalHarnessState(
+                loading = false,
+                sessionId = "session-a",
+                usageMode = LocalUsageMode.WORK,
+                modelState = LocalModelState(configured = true),
+            ),
+        )
+        var persistCount = 0
+        val registry = LocalWorkRunRegistry(
+            runtimeStateStore = runtime,
+            persistBinding = { persistCount += 1 },
+        )
+        val active = binding("session-a")
+        val completedJob = Job()
+        active.runHandle.job = completedJob
+        val queued = QueuedAgentInput(
+            content = "继续处理",
+            memoryInput = "继续处理",
+            modelMessage = buildJsonObject {
+                put("role", "user")
+                put("content", "继续处理")
+            },
+            id = "queued-next",
+        )
+        active.runHandle.pendingInputs.offer(queued) {}
+        active.state.value = active.state.value.copy(
+            kernel = active.state.value.kernel.copy(queuedInputCount = 1),
+        )
+        registry.attach(active)
+        val nextJob = Job()
+        var claimed: QueuedAgentInput? = null
+
+        try {
+            val next = registry.finishTurn(active, completedJob) { input, owner ->
+                assertSame(active, owner)
+                claimed = input
+                nextJob
+            }
+
+            assertSame(nextJob, next)
+            assertSame(nextJob, active.runHandle.job)
+            assertSame(active, registry["session-a"])
+            assertEquals("queued-next", claimed?.id)
+            assertEquals(0, active.runHandle.pendingInputs.size())
+            assertEquals(0, active.state.value.kernel.queuedInputCount)
+            assertTrue(active.runHandle.modelHistory.snapshot().last().toString().contains("继续处理"))
+            assertNotNull(active.eventLog.latest(LOCAL_AGENT_INBOX_EVENT_TYPE))
+            assertTrue(persistCount >= 2)
+        } finally {
+            completedJob.cancel()
+            nextJob.cancel()
+            active.eventLog.close()
+        }
     }
 
     @Test
