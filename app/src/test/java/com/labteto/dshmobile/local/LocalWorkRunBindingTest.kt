@@ -12,6 +12,13 @@ import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.local.work.LocalWorkState
 import com.labteto.dshmobile.local.work.mirrorLocalWorkRunState
 import java.io.File
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -142,6 +149,35 @@ class LocalWorkRunBindingTest {
                 mirror.cancel()
                 log.close()
             }
+        }
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test fun teardownRetainsRunReferenceAndRunningUntilRealJobExits() = runTest {
+        val binding = binding(LocalHarnessState(
+            sessionId = "work", kernel = LocalKernelState(running = true),
+        ))
+        val cleanupGate = CompletableDeferred<Unit>()
+        val job = launch {
+            try { awaitCancellation() }
+            finally { withContext(NonCancellable) { cleanupGate.await() } }
+        }
+        binding.job = job
+        runCurrent()
+        val teardown = async { binding.cancelAndJoin() }
+        try {
+            runCurrent()
+            assertFalse(teardown.isCompleted)
+            assertTrue(binding.state.value.kernel.running)
+            org.junit.Assert.assertSame(job, binding.job)
+            cleanupGate.complete(Unit)
+            teardown.await()
+            assertFalse(binding.state.value.kernel.running)
+            assertNull(binding.job)
+        } finally {
+            cleanupGate.complete(Unit)
+            teardown.cancel()
+            binding.eventLog.close()
         }
     }
 

@@ -2204,30 +2204,22 @@ class LocalHarnessEngine @Inject internal constructor(
         val cancelled = synchronized(runStateLock) {
             workRunRegistry.detachAll(sessionIds)
         }
-        cancelled.forEach { it.cancelAndJoin() }
+        withContext(NonCancellable) {
+            var failure: Throwable? = null
+            cancelled.forEach { binding ->
+                try {
+                    binding.cancelAndJoin()
+                } catch (error: Throwable) {
+                    if (failure == null) failure = error
+                    else if (failure !== error) failure?.addSuppressed(error)
+                }
+            }
+            failure?.let { throw it }
+        }
     }
 
     private suspend fun cancelActiveRunAndJoin() {
-        runtimeStateStore.foregroundInteractions.cancelAll()
-        val job = synchronized(runStateLock) {
-            val discarded = pendingInputs.drain()
-            if (discarded.isNotEmpty()) {
-                eventLog.append(
-                    LOCAL_AGENT_INBOX_EVENT_TYPE,
-                    encodeLocalAgentInboxEvent(
-                        action = "cancelled",
-                        pending = pendingInputs.snapshot(),
-                        affected = discarded,
-                    ),
-                )
-            }
-            _state.update { it.copy(kernel = it.kernel.copy(queuedInputCount = 0)) }
-            activeJob
-        }
-        job?.cancelAndJoin()
-        synchronized(runStateLock) {
-            if (activeJob === job) activeJob = null
-        }
+        runtimeStateStore.cancelForegroundRunAndJoin(eventLog)
     }
 
     private suspend fun captureAutoMemoryDirective(

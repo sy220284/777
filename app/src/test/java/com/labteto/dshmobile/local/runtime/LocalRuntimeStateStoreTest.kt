@@ -95,4 +95,25 @@ class LocalRuntimeStateStoreTest {
         }
     }
 
+    @Test
+    fun failedForegroundTeardownLogStillJoinsAndReleasesSharedJobReference() =
+        kotlinx.coroutines.runBlocking {
+            val store = LocalRuntimeStateStore()
+            store.initialize(LocalHarnessState(sessionId = "session-a"))
+            val job = Job()
+            store.foregroundJob = job
+            store.foregroundPendingInputs.offer(
+                com.labteto.dshmobile.harness.agent.QueuedAgentInput("queued", id = "queued"),
+            )
+            val blocked = File(temporary.root, "blocked-join").apply { writeText("not a directory") }
+            val log = LocalSessionEventLog(File(blocked, "events.jsonl"), Json)
+            try {
+                assertTrue(runCatching { store.cancelForegroundRunAndJoin(log) }.isFailure)
+                assertTrue(job.isCompleted)
+                org.junit.Assert.assertNull(store.foregroundJob)
+            } finally {
+                log.close()
+            }
+        }
+
 }

@@ -23,6 +23,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -150,12 +152,33 @@ class LocalRuntimeStateStore internal constructor(
      * The caller supplies the already-authorized Session EventLog; Runtime owns queue draining,
      * cancellation ordering and visible queued-count projection, but no Feature-specific state.
      */
-    internal fun cancelForegroundRun(eventLog: LocalSessionEventLog): Boolean {
+    internal fun cancelForegroundRun(eventLog: LocalSessionEventLog): Boolean =
+        requestForegroundCancellation(eventLog) {}
+
+    internal suspend fun cancelForegroundRunAndJoin(eventLog: LocalSessionEventLog) {
+        var owner: Job? = null
+        try {
+            requestForegroundCancellation(eventLog) { owner = it }
+        } finally {
+            withContext(NonCancellable) {
+                owner?.join()
+                synchronized(foregroundRunLock) {
+                    if (foregroundJob === owner) foregroundJob = null
+                }
+            }
+        }
+    }
+
+    private fun requestForegroundCancellation(
+        eventLog: LocalSessionEventLog,
+        captureOwner: (Job?) -> Unit,
+    ): Boolean {
         foregroundInteractions.cancelAll()
         var running: Job? = null
         try {
             synchronized(foregroundRunLock) {
                 running = foregroundJob
+                captureOwner(running)
                 val discarded = foregroundPendingInputs.drain()
                 try {
                     if (discarded.isNotEmpty()) {
