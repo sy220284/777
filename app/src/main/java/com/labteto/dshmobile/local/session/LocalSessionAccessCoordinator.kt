@@ -1,12 +1,19 @@
 package com.labteto.dshmobile.local.session
 
-import com.labteto.dshmobile.local.LocalHarnessState
+internal data class LocalSessionAccessScope(
+    val projectId: String?,
+    val lineageId: String?,
+)
+
+internal fun interface LocalActiveSessionScopeProvider {
+    fun scope(sessionId: String): LocalSessionAccessScope?
+}
 
 internal class LocalSessionAccessCoordinator(
     private val summaries: () -> List<LocalSessionSummary>,
     private val currentSessionId: () -> String,
-    private val currentState: () -> LocalHarnessState,
-    private val activeState: (String) -> LocalHarnessState?,
+    private val currentScope: () -> LocalSessionAccessScope,
+    private val activeScope: (String) -> LocalSessionAccessScope?,
     private val eventLogFor: (String) -> LocalSessionEventLog,
 ) {
     fun search(query: String, scopeSessionId: String = currentSessionId()): String {
@@ -57,16 +64,16 @@ internal class LocalSessionAccessCoordinator(
         summaries: List<LocalSessionSummary>,
     ): Pair<String?, String?>? {
         if (sessionId == currentSessionId()) {
-            val current = currentState()
-            return current.projectId to current.lineageId.ifBlank { current.sessionId }
+            return currentScope().let { it.projectId to it.lineageId }
         }
-        activeState(sessionId)?.let { active ->
-            return active.projectId to active.lineageId.ifBlank { active.sessionId }
+        activeScope(sessionId)?.let { active ->
+            return active.projectId to active.lineageId
         }
         return summaries.firstOrNull { it.id == sessionId }?.let { summary ->
             summary.projectId to summary.lineageId?.ifBlank { summary.id }
         }
     }
+
     private companion object {
         const val MAX_SESSION_SEARCH_HITS = 50
         const val MAX_SESSION_SEARCH_SCANNED = 64
