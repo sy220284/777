@@ -48,6 +48,12 @@ jobs:
           cat > "$ROOT/安装说明.txt" <<'TXT'
           777 本地开发工具链
 
+          AI / Agent 推荐：
+             bash tools/dev/ai-toolchain.sh bootstrap
+             bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug
+
+          人工使用：
+
           1. 默认只检查：
              bash tools/dev/setup-toolchain.sh --check --profile build
 
@@ -72,7 +78,7 @@ jobs:
           path: |
             ${{ runner.temp }}/777-dev-toolchain-linux.tar.gz
             ${{ runner.temp }}/777-dev-toolchain-linux.tar.gz.sha256
-          retention-days: 7
+          retention-days: 30
           if-no-files-found: error
 
   verify-install:
@@ -111,6 +117,7 @@ jobs:
           export DEV777_ANDROID_SDK_ROOT="$SDK"
           export DEV777_TOOLCHAIN_ENV_FILE="$ENV_FILE"
           export DEV777_TOOLCHAIN_STATE_DIR="$STATE_DIR"
+          export DEV777_REPO_ROOT="$GITHUB_WORKSPACE"
 
           BOOTSTRAP_JSON="$(bash "$AI_TOOLCHAIN" bootstrap --profile "$PROFILE")"
           printf '%s\n' "$BOOTSTRAP_JSON"
@@ -119,6 +126,10 @@ jobs:
           CHECK_JSON="$(bash "$AI_TOOLCHAIN" check --profile "$PROFILE")"
           printf '%s\n' "$CHECK_JSON"
           printf '%s\n' "$CHECK_JSON" | grep -F '"status": "ready"'
+
+          REPEAT_JSON="$(bash "$AI_TOOLCHAIN" bootstrap --profile "$PROFILE")"
+          printf '%s\n' "$REPEAT_JSON"
+          printf '%s\n' "$REPEAT_JSON" | grep -F '"status": "ready"'
 
           # shellcheck source=/dev/null
           source "$ENV_FILE"
@@ -132,6 +143,7 @@ jobs:
             echo "DEV777_ANDROID_SDK_ROOT=$SDK"
             echo "DEV777_TOOLCHAIN_ENV_FILE=$ENV_FILE"
             echo "DEV777_TOOLCHAIN_STATE_DIR=$STATE_DIR"
+            echo "DEV777_REPO_ROOT=$GITHUB_WORKSPACE"
             echo "AI_TOOLCHAIN=$AI_TOOLCHAIN"
           } >> "$GITHUB_ENV"
 
