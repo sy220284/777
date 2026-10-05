@@ -264,6 +264,7 @@ import com.labteto.dshmobile.local.work.asModelAdmissionPort
 import com.labteto.dshmobile.local.work.LocalWorkProgressCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
+import com.labteto.dshmobile.local.work.LocalWorkReplyRegenerator
 import com.labteto.dshmobile.local.work.LocalWorkSubagentRuntime
 import com.labteto.dshmobile.local.work.LocalWorkerModelRouter
 import com.labteto.dshmobile.local.work.LocalWorkflowCoordinator
@@ -707,6 +708,15 @@ class LocalHarnessEngine @Inject internal constructor(
             defaultSessionId = { currentSessionId },
         )
     }
+    private val workReplyRegenerator by lazy {
+        LocalWorkReplyRegenerator(
+            runtimeStateStore = runtimeStateStore,
+            sessionStorage = sessionStorageRuntime,
+            modelRequests = modelRequestCoordinator,
+            usageTracker = usageTracker,
+        )
+    }
+
     private val workTurnStarter by lazy {
         LocalWorkTurnStarter(
             runtimeStateStore = runtimeStateStore,
@@ -1434,7 +1444,7 @@ class LocalHarnessEngine @Inject internal constructor(
         scope.launch(start = CoroutineStart.LAZY) {
             LocalExecutionService.withTurn(context, state.sessionId, { _state.value.error }) {
                 if (state.usageMode == LocalUsageMode.CHAT) runChatTurn(prompt, replacingMessageId = messageId)
-                else regenerateWorkReply(messageId)
+                else workReplyRegenerator.regenerate(messageId)
             }
         }
             .also { activeJob = it; it.start() }
@@ -1462,58 +1472,6 @@ class LocalHarnessEngine @Inject internal constructor(
             put("transcript", encodeTranscriptMessages(activeTranscript))
         })
         transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, transcriptEvent.sequence)
-    }
-
-    private suspend fun regenerateWorkReply(messageId: String) {
-        _state.update { it.copy(kernel = it.kernel.copy(running = true), error = null) }
-        try {
-            val snapshot = _state.value
-            val key = modelRequestMarker()
-            val messages = withEphemeralContext(
-                modelHistory.snapshot().withoutLastCompletedAssistantReply(),
-                "基于本轮已有结果重写最终回复；不要调用工具或声称重新执行。",
-            )
-            val reply = completeWithRetry(
-                key = key,
-                snapshot = snapshot,
-                messages = messages,
-                step = 1,
-                toolsOverride = JsonArray(emptyList()),
-                publishPreview = false,
-                persistOverflowHistory = true,
-            )
-            val content = reply.content?.takeIf(String::isNotBlank) ?: error("模型没有返回可用回复")
-            usageTracker.recordForeground(snapshot, reply, TokenUsageAction.WORK_MAIN, turnId = messageId, taskLabel = "regenerate", step = 1)
-            val transcript = listOf(transcriptRuntime.newMessage("assistant", content))
-            val data = transcriptRuntime.withTranscript(reply.message, transcript)
-            val event = eventLog.append("assistant/message", JsonObject(
-                data + ("replaces" to JsonPrimitive(messageId)),
-            ))
-            modelHistory.reset(modelHistory.snapshot().withoutLastCompletedAssistantReply())
-            modelHistory.append(reply.message)
-            updateContextMetrics()
-            _state.update {
-                val retained = it.messages.filterNot { message -> message.id == messageId }
-                it.copy(
-                    messages = retained,
-                    transcriptIndex = it.transcriptIndex.copy(
-                        totalMessageCount = (it.transcriptIndex.totalMessageCount - 1L)
-                            .coerceAtLeast(0L),
-                    ),
-                )
-            }
-            transcriptRuntime.applyMessages(transcript, event.sequence)
-            checkpointModelHistory("work/regenerated")
-            persist()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            _state.update { it.copy(error = error.message ?: "重新生成失败") }
-        } finally {
-            _state.update { it.copy(kernel = it.kernel.copy(running = false)) }
-            val completedJob = currentCoroutineContext()[Job]
-            synchronized(runStateLock) { if (activeJob === completedJob) activeJob = null }
-        }
     }
 
     private fun queueHumanTurn(
