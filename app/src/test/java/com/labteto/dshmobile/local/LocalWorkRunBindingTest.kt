@@ -33,35 +33,41 @@ import org.junit.rules.TemporaryFolder
 class LocalWorkRunBindingTest {
     @get:Rule val temporary = TemporaryFolder()
 
-    @Test fun visibleWorkReflectsDeviceLeaseActivationAndRevocation() {
+    @Test fun visibleWorkReflectsDeviceLeaseActivationAndRevocation() = runTest {
         val runtime = LocalRuntimeStateStore()
         runtime.initialize(LocalHarnessState(
             sessionId = "work",
             usageMode = LocalUsageMode.WORK,
-            kernel = LocalKernelState(resources = LocalHarnessResourceState(activeAgents = 2)),
         ))
         val registry = LocalWorkRunRegistry(runtime)
-        val binding = binding(
-            runtime.state.value.copy(
-                work = runtime.state.value.work.copy(deviceApprovalLease = true),
-            ),
-        )
+        val resourceLeases = List(2) {
+            runtime.resourceScheduler.acquire(HarnessResourceKind.AGENT)
+        }
+        try {
+            val binding = binding(
+                runtime.state.value.copy(
+                    work = runtime.state.value.work.copy(deviceApprovalLease = true),
+                ),
+            )
 
-        registry.mirrorVisible(binding)
+            registry.mirrorVisible(binding)
 
-        assertTrue(runtime.state.value.toWorkSurfaceUiState().deviceApprovalLease)
-        assertEquals(2, runtime.state.value.kernel.resources.activeAgents)
-        binding.state.value = binding.state.value.copy(
-            work = binding.state.value.work.copy(deviceApprovalLease = false),
-        )
-        registry.mirrorVisible(binding)
-        assertFalse(runtime.state.value.toWorkSurfaceUiState().deviceApprovalLease)
+            assertTrue(runtime.state.value.toWorkSurfaceUiState().deviceApprovalLease)
+            assertEquals(2, runtime.state.value.kernel.resources.activeAgents)
+            binding.state.value = binding.state.value.copy(
+                work = binding.state.value.work.copy(deviceApprovalLease = false),
+            )
+            registry.mirrorVisible(binding)
+            assertFalse(runtime.state.value.toWorkSurfaceUiState().deviceApprovalLease)
+        } finally {
+            resourceLeases.forEach { it.close() }
+        }
     }
 
     @Test fun backgroundWorkCannotPublishDeviceLeaseIntoAnotherSession() {
-        val other = LocalHarnessState(sessionId = "other", usageMode = LocalUsageMode.CHAT)
         val runtime = LocalRuntimeStateStore()
-        runtime.initialize(other)
+        runtime.initialize(LocalHarnessState(sessionId = "other", usageMode = LocalUsageMode.CHAT))
+        val visibleBaseline = runtime.state.value
         val registry = LocalWorkRunRegistry(runtime)
         val binding = binding(LocalHarnessState(
             sessionId = "work",
@@ -70,11 +76,11 @@ class LocalWorkRunBindingTest {
         ))
 
         registry.mirrorVisible(binding)
-        assertEquals(other, runtime.state.value)
-        // The active Session owner can change before the visible aggregate projection catches up.
+        assertEquals(visibleBaseline, runtime.state.value)
+        // The active Session owner can change before its visible aggregate projection catches up.
         runtime.activateSession("work")
         registry.mirrorVisible(binding)
-        assertEquals(other, runtime.state.value)
+        assertEquals(visibleBaseline, runtime.state.value)
     }
 
     @Test fun teardownClearsRunInteractionAndDeviceLeaseTogether() = runTest {
