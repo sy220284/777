@@ -13,6 +13,7 @@ class LocalChatRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
     private val persistence: LocalChatPersistence,
     private val sessionRuntime: LocalSessionRuntime,
+    private val personaCorrections: LocalChatPersonaCorrectionCoordinator,
 ) {
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = engine.configureChatPersona(profile)
     internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) =
@@ -44,6 +45,10 @@ class LocalChatRuntime @Inject constructor(
     internal fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean =
         engine.selectChatMessageVariant(messageId, targetIndex)
     internal fun regenerateReply(messageId: String): Boolean = engine.regenerateReply(messageId)
-    internal fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) =
-        engine.undoChatPersonaCorrection(noticeId, personaId, correction)
+    internal fun stop() = engine.stopForegroundRun()
+    internal suspend fun undoChatPersonaCorrection(
+        noticeId: Long,
+        personaId: String,
+        correction: String,
+    ) = personaCorrections.undo(noticeId, personaId, correction)
 }
