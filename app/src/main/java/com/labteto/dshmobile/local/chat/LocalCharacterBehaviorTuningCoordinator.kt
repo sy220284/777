@@ -2,61 +2,121 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-/** Owns the durable persona edit; the shared session transition lock stays authoritative. */
-internal class LocalCharacterBehaviorTuningCoordinator(
+/**
+ * Owns durable character/persona tuning edits inside ChatFeature.
+ *
+ * The edit takes the current Session MAINTENANCE lease before touching persona/gallery files and
+ * commits the matching Session snapshot through the shared Session storage capability. No Engine
+ * callback or second transition lock participates in the transaction.
+ */
+@Singleton
+internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
     private val state: MutableStateFlow<LocalHarnessState>,
     private val personaStore: ChatPersonaStore,
     private val galleryStore: ChatPersonaGalleryStore,
-    private val transitionMutex: Mutex,
-    private val persistNow: suspend () -> Unit,
+    private val acquireLease: (String) -> AutoCloseable?,
+    private val persistNow: suspend (String) -> Boolean,
 ) {
+    @Inject
+    internal constructor(
+        runtimeStateStore: LocalRuntimeStateStore,
+        personaStore: ChatPersonaStore,
+        galleryStore: ChatPersonaGalleryStore,
+        sessionStorage: LocalSessionStorageRuntime,
+    ) : this(
+        state = runtimeStateStore.mutableState,
+        personaStore = personaStore,
+        galleryStore = galleryStore,
+        acquireLease = { sessionId ->
+            LocalSessionRuntimeRegistry.tryAcquire(
+                sessionId,
+                LocalSessionRuntimeKind.MAINTENANCE,
+            )
+        },
+        persistNow = sessionStorage::writeCurrentSnapshotNow,
+    )
+
     suspend fun configure(profile: PersonaProfile): Result<Unit> = try {
-        transitionMutex.withLock {
+        val admission = state.value
+        val lease = acquireLease(admission.sessionId)
+            ?: return Result.failure(IllegalStateException("当前会话正在运行，请稍后再保存角色设置"))
+        try {
             val snapshot = state.value
             check(
-                !snapshot.kernel.running && !snapshot.loading &&
-                    snapshot.usageMode == LocalUsageMode.CHAT && !snapshot.chat.groupChat.enabled
+                snapshot.sessionId == admission.sessionId &&
+                    !snapshot.kernel.running &&
+                    !snapshot.loading &&
+                    snapshot.usageMode == LocalUsageMode.CHAT &&
+                    !snapshot.chat.groupChat.enabled
             ) { "请在单人聊天空闲时保存角色设置" }
+
             val personaId = snapshot.chat.personaId.takeUnless {
                 it == PersonaProfile.DEFAULT_PERSONA_ID
             } ?: "persona-${UUID.randomUUID()}"
+
             val persisted = withContext(Dispatchers.IO) {
                 persistCharacterBehaviorTuning(
-                    personaStore, galleryStore, snapshot.chat.chatPersona,
-                    personaId, snapshot.chat.galleryId, profile,
+                    personaStore,
+                    galleryStore,
+                    snapshot.chat.chatPersona,
+                    personaId,
+                    snapshot.chat.galleryId,
+                    profile,
                 )
             }
             val durablePersona = persisted.persona
             val sameBoundCharacter = persisted.sameBoundCharacter
-            state.update { state ->
-                check(state.sessionId == snapshot.sessionId && state.chat.personaId == snapshot.chat.personaId &&
-                    state.chat.galleryId == snapshot.chat.galleryId) { "会话已切换，请重新保存角色设置" }
-                state.copy(
-                    chat = state.chat.copy(
+            state.update { current ->
+                check(
+                    current.sessionId == snapshot.sessionId &&
+                        current.chat.personaId == snapshot.chat.personaId &&
+                        current.chat.galleryId == snapshot.chat.galleryId
+                ) { "会话已切换，请重新保存角色设置" }
+                current.copy(
+                    chat = current.chat.copy(
                         personaId = durablePersona.id,
-                        galleryId = state.chat.galleryId.takeIf { sameBoundCharacter },
-                        galleryStoryId = state.chat.galleryStoryId.takeIf { sameBoundCharacter },
-                        gallerySaveSuppressedThrough = if (sameBoundCharacter) state.chat.gallerySaveSuppressedThrough
-                        else state.transcriptIndex.latestCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
+                        galleryId = current.chat.galleryId.takeIf { sameBoundCharacter },
+                        galleryStoryId = current.chat.galleryStoryId.takeIf { sameBoundCharacter },
+                        gallerySaveSuppressedThrough =
+                            if (sameBoundCharacter) {
+                                current.chat.gallerySaveSuppressedThrough
+                            } else {
+                                current.transcriptIndex.latestCreatedAt.takeIf { it > 0L }
+                                    ?: System.currentTimeMillis()
+                            },
                         chatPersona = durablePersona,
-                        chatState = if (sameBoundCharacter) {
-                            state.chat.chatState.copy(behaviorTuning = durablePersona.behaviorTuning)
-                        } else ChatCharacterState(behaviorTuning = durablePersona.behaviorTuning),
-                        replySuggestions = if (sameBoundCharacter) state.chat.replySuggestions else emptyList(),
+                        chatState =
+                            if (sameBoundCharacter) {
+                                current.chat.chatState.copy(
+                                    behaviorTuning = durablePersona.behaviorTuning,
+                                )
+                            } else {
+                                ChatCharacterState(
+                                    behaviorTuning = durablePersona.behaviorTuning,
+                                )
+                            },
+                        replySuggestions =
+                            if (sameBoundCharacter) current.chat.replySuggestions else emptyList(),
                     ),
-                    handoffSummary = if (sameBoundCharacter) state.handoffSummary else null,
+                    handoffSummary = if (sameBoundCharacter) current.handoffSummary else null,
                 )
             }
-            persistNow()
+            check(persistNow(snapshot.sessionId)) { "会话已切换，请重新保存角色设置" }
+        } finally {
+            lease.close()
         }
         Result.success(Unit)
     } catch (cancelled: CancellationException) {
@@ -64,5 +124,4 @@ internal class LocalCharacterBehaviorTuningCoordinator(
     } catch (error: Exception) {
         Result.failure(error)
     }
-
 }
