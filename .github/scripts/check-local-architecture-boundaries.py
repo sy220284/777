@@ -56,15 +56,15 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt": ("LocalModelRequestCoordinator", 12),
 }
 
-RUNTIME_ENGINE_REFERENCE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 0,
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 0,
-    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 0,
-    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 0,
-    "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 0,
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 0,
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 0,
-}
+RUNTIME_ENGINE_FORBIDDEN_PATHS = (
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
+)
 PROJECTION_FIELD_BUDGETS = {
     "LocalHarnessSettingsState": 17,
     "LocalHarnessTaskState": 4,
@@ -494,23 +494,15 @@ for required_automation_owner in (
     if required_automation_owner not in automation_runtime_source:
         die("AutomationRuntime must depend on Automation-owned coordinators: " + required_automation_owner)
 
-for relative, maximum in RUNTIME_ENGINE_REFERENCE_BUDGETS.items():
+for relative in RUNTIME_ENGINE_FORBIDDEN_PATHS:
     runtime_source = strip_comments(read(relative))
-    references = len(re.findall(r"\bengine\.[A-Za-z0-9_]+", runtime_source))
-    if references > maximum:
+    direct_calls = sorted(set(re.findall(r"\bengine\.([A-Za-z0-9_]+)", runtime_source)))
+    if direct_calls or has_typed_property(runtime_source, "LocalHarnessEngine"):
+        details = ", ".join(direct_calls) if direct_calls else "typed LocalHarnessEngine dependency"
         die(
-            f"{relative} has {references} direct LocalHarnessEngine references "
-            f"(ratchet: {maximum}); capability runtimes must own behavior instead of growing proxies"
+            f"{relative} reintroduced forbidden LocalHarnessEngine access: {details}; "
+            "Architecture 3.0 capability runtimes must depend only on their Feature/Shared capability"
         )
-    if maximum == 0 and has_typed_property(runtime_source, "LocalHarnessEngine"):
-        die(
-            f"{relative} retains a LocalHarnessEngine instance after its direct-reference budget reached zero; "
-            "depend on the owning Feature/Shared capability instead"
-        )
-    print(
-        f"[architecture-guard] {relative}: "
-        f"{references}/{maximum} direct engine references"
-    )
 
 # Diary privacy is a security/knowledge-boundary invariant, not a tuning preference.
 # Group prompts may receive PUBLIC diary entries only. Do not relax this to "anything except PRIVATE"
