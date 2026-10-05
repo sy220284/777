@@ -132,15 +132,29 @@ class LocalWorkProgressCoordinatorTest {
     }
 
     @Test
-    fun eventWriteFailureStopsPersistence() {
-        val state = MutableStateFlow(LocalHarnessState())
+    fun eventWriteFailureLeavesAllWorkProgressAndPersistenceUnchanged() {
+        val initial = LocalHarnessState(work = LocalWorkState(
+            plan = listOf("原计划"),
+            todos = listOf(LocalTodoItem("原任务", "completed")),
+            goal = LocalGoal("原目标"),
+        ))
+        val state = MutableStateFlow(initial)
         val parent = temporary.newFolder("not-a-directory")
         val log = eventLog(File(parent, "goal.jsonl"))
         assertTrue(parent.delete())
         assertTrue(parent.createNewFile())
         var persisted = false
         val coordinator = LocalWorkProgressCoordinator(localWorkStatePort(state), log) { persisted = true }
-        assertTrue(runCatching { coordinator.createGoal("失败场景") }.isFailure)
-        assertEquals(false, persisted)
+        val mutations = listOf<() -> Unit>(
+            { coordinator.updatePlan(buildJsonObject { put("plan", "新计划") }) },
+            { coordinator.updateTodos(buildJsonObject {}) },
+            { coordinator.createGoal("新目标") },
+            { coordinator.updateGoal("blocked", "依赖失败") },
+        )
+        mutations.forEach { mutation ->
+            assertTrue(runCatching(mutation).isFailure)
+            assertEquals(initial, state.value)
+            assertEquals(false, persisted)
+        }
     }
 }

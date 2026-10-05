@@ -1130,32 +1130,41 @@ class LocalHarnessEngine @Inject internal constructor(
                 previousMembers = snapshot.chat.groupChat.members,
                 chatPersonaStore = chatPersonaStore,
             )
-            _state.update { current ->
-                if (
-                    current.sessionId != snapshot.sessionId ||
-                    current.usageMode != LocalUsageMode.CHAT ||
-                    !current.chat.groupChat.enabled
-                ) {
-                    current
-                } else {
-                    current.copy(
-                        chat = current.chat.copy(
-                            groupChat = current.chat.groupChat.copy(members = members),
-                            replySuggestions = emptyList(),
-                            chatBranches = LocalChatBranchState(),
-                        ),
-                        error = null,
-                    )
+            synchronized(runStateLock) {
+                val lease = LocalSessionRuntimeRegistry.tryAcquire(
+                    snapshot.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
+                ) ?: return@synchronized
+                try {
+                    var applied = false
+                    _state.update { current ->
+                        applied = current.sessionId == snapshot.sessionId &&
+                            current.usageMode == LocalUsageMode.CHAT &&
+                            !current.loading && !current.kernel.running &&
+                            activeJob?.isCompleted != false && !sessionTransitioning &&
+                            current.chat.groupChat == snapshot.chat.groupChat &&
+                            current.transcriptIndex.latestDialogueMessageId ==
+                                snapshot.transcriptIndex.latestDialogueMessageId
+                        if (!applied) current else current.copy(
+                            chat = current.chat.copy(
+                                groupChat = current.chat.groupChat.copy(members = members),
+                                replySuggestions = emptyList(),
+                                chatBranches = LocalChatBranchState(),
+                            ),
+                            error = null,
+                        )
+                    }
+                    if (applied) {
+                        refreshGroupModelSystemPrompt()
+                        checkpointModelHistory("group/members-updated")
+                        eventLog.append("group/members", buildJsonObject {
+                            put("count", members.size)
+                            put("gallery_ids", JsonArray(members.map { JsonPrimitive(it.galleryId) }))
+                        })
+                        persist()
+                    }
+                } finally {
+                    lease.close()
                 }
-            }
-            if (_state.value.sessionId == snapshot.sessionId) {
-                refreshGroupModelSystemPrompt()
-                checkpointModelHistory("group/members-updated")
-                eventLog.append("group/members", buildJsonObject {
-                    put("count", members.size)
-                    put("gallery_ids", JsonArray(members.map { JsonPrimitive(it.galleryId) }))
-                })
-                persist()
             }
         }
         return true

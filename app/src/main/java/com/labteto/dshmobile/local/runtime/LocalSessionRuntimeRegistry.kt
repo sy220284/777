@@ -11,6 +11,11 @@ internal enum class LocalSessionRuntimeKind {
     MAINTENANCE,
 }
 
+internal data class LocalSessionInputAdmission(
+    val ownerActive: Boolean,
+    val inputBlocked: Boolean,
+)
+
 /** Process-local ownership; queued acquirers retain the same session mutex until they finish. */
 internal class LocalSessionRuntimeLease internal constructor(
     private val release: () -> Unit,
@@ -33,6 +38,18 @@ internal object LocalSessionRuntimeRegistry {
 
     @Synchronized
     fun hasLiveOwner(sessionId: String): Boolean = entries[sessionId]?.mutex?.isLocked == true
+
+    @Synchronized
+    internal fun inputAdmission(sessionId: String): LocalSessionInputAdmission {
+        val entry = entries[sessionId]
+        val active = entry?.mutex?.isLocked == true
+        val canConsumeQueue = entry?.owner in setOf(
+            LocalSessionRuntimeKind.FOREGROUND,
+            LocalSessionRuntimeKind.AUTOMATION_CHAT,
+            LocalSessionRuntimeKind.AUTOMATION_WORK,
+        )
+        return LocalSessionInputAdmission(active, active && !canConsumeQueue)
+    }
 
     @Synchronized
     internal fun retainedSessionCount(): Int = entries.size

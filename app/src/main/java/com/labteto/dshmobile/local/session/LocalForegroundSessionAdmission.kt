@@ -17,6 +17,7 @@ import com.labteto.dshmobile.local.send.coordinateLocalSend
 internal data class LocalForegroundSendOwnership(
     val activeRun: Boolean,
     val reservedWorkLease: LocalSessionRuntimeLease? = null,
+    val inputBlocked: Boolean = false,
 )
 
 internal fun reserveForegroundSendOwnership(
@@ -29,7 +30,8 @@ internal fun reserveForegroundSendOwnership(
     val localRunActive =
         workBindingActive ||
             (usageMode != LocalUsageMode.WORK && visibleJobActive)
-    val runtimeOwnerActive = LocalSessionRuntimeRegistry.hasLiveOwner(sessionId)
+    val admission = LocalSessionRuntimeRegistry.inputAdmission(sessionId)
+    val runtimeOwnerActive = admission.ownerActive
 
     if (
         usageMode != LocalUsageMode.WORK ||
@@ -40,6 +42,7 @@ internal fun reserveForegroundSendOwnership(
     ) {
         return LocalForegroundSendOwnership(
             activeRun = localRunActive || runtimeOwnerActive || sessionTransitioning,
+            inputBlocked = admission.inputBlocked,
         )
     }
 
@@ -50,6 +53,7 @@ internal fun reserveForegroundSendOwnership(
     return LocalForegroundSendOwnership(
         activeRun = lease == null,
         reservedWorkLease = lease,
+        inputBlocked = lease == null && LocalSessionRuntimeRegistry.inputAdmission(sessionId).inputBlocked,
     )
 }
 
@@ -81,7 +85,7 @@ internal fun coordinateOwnedLocalSend(
         coordinateLocalSend(
             configured = configured,
             loading = loading,
-            sessionTransitioning = sessionTransitioning,
+            sessionTransitioning = sessionTransitioning || ownership.inputBlocked,
             activeRun = ownership.activeRun,
             pendingCount = pendingCount,
             pendingLimit = pendingLimit,

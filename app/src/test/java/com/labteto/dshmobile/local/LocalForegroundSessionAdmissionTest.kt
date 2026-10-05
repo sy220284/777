@@ -112,6 +112,28 @@ class LocalForegroundSessionAdmissionTest {
     }
 
     @Test
+    fun maintenanceOwnerRejectsInputInsteadOfLeavingAnUnconsumedQueue() {
+        for (mode in LocalUsageMode.entries) {
+            val sessionId = "maintenance-$mode-" + UUID.randomUUID()
+            val lease = LocalSessionRuntimeRegistry.tryAcquire(sessionId, LocalSessionRuntimeKind.MAINTENANCE)!!
+            try {
+                val result = coordinateOwnedLocalSend(
+                    usageMode = mode, sessionId = sessionId,
+                    workBindingActive = false, visibleJobActive = false,
+                    configured = true, loading = false, sessionTransitioning = false,
+                    pendingCount = 0, pendingLimit = 8,
+                    onRejected = {}, onAccepted = { error("must preserve draft") },
+                    enqueue = { error("maintenance has no queue consumer") },
+                    onQueued = { error("must not queue") }, onStart = { error("must not start") },
+                )
+                assertTrue(result.disposition == LocalSendDisposition.REJECTED)
+                assertTrue(result.rejectReason == com.labteto.dshmobile.local.send.LocalSendRejectReason.SESSION_TRANSITION)
+            } finally { lease.close() }
+            assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
+        }
+    }
+
+    @Test
     fun startedWorkSendHandsReservationToRunOwner() {
         val sessionId = "started-" + UUID.randomUUID()
         var handedOff: LocalSessionRuntimeLease? = null
