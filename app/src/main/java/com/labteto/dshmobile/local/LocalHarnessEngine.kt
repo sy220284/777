@@ -256,6 +256,7 @@ import com.labteto.dshmobile.local.usage.LocalTokenUsageContextBridge
 import com.labteto.dshmobile.local.vision.LocalVisionRoute
 import com.labteto.dshmobile.local.work.LocalForegroundRecoveryCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkTurnPort
+import com.labteto.dshmobile.local.work.LocalWorkTurnStarter
 import com.labteto.dshmobile.local.work.LocalRuntimeOwnershipPolicy
 import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.work.asModelAdmissionPort
@@ -711,6 +712,24 @@ class LocalHarnessEngine @Inject internal constructor(
             defaultSessionId = { currentSessionId },
         )
     }
+    private val workTurnStarter by lazy {
+        LocalWorkTurnStarter(
+            runtimeStateStore = runtimeStateStore,
+            sessionStorage = sessionStorageRuntime,
+            workRunRegistry = workRunRegistry,
+            pruneToolResult = ::pruneToolResult,
+            runTurn = { input, memoryInput, sourceMessageId, binding, preownedLease ->
+                runWorkAgentTurn(
+                    input = input,
+                    memoryInput = memoryInput,
+                    sourceMessageId = sourceMessageId,
+                    binding = binding,
+                    preownedLease = preownedLease,
+                )
+            },
+        )
+    }
+
     private val workSubagentRuntime by lazy {
         LocalWorkSubagentRuntime(
             factory = subagentRunnerFactory,
@@ -1161,7 +1180,7 @@ class LocalHarnessEngine @Inject internal constructor(
                     { persist() },
                     { content -> transcriptRuntime.newMessage("user", content) },
                 ) { content, memoryInput, sourceMessageId ->
-                    val job = queueExistingWorkTurnLocked(
+                    val job = workTurnStarter.startExisting(
                         content = content,
                         memoryInput = memoryInput,
                         sourceMessageId = sourceMessageId,
@@ -1544,9 +1563,13 @@ class LocalHarnessEngine @Inject internal constructor(
                 },
                 onStart = { reservedWorkLease ->
                     job = if (state.usageMode == LocalUsageMode.WORK) {
-                        queueWorkTurnLocked(
-                            content, memoryInput, modelMessage,
-                            requireNotNull(reservedWorkLease) { "Work 启动前必须持有会话运行时租约" },
+                        workTurnStarter.startFresh(
+                            content = content,
+                            memoryInput = memoryInput,
+                            modelMessage = modelMessage,
+                            sessionLease = requireNotNull(reservedWorkLease) {
+                                "Work 启动前必须持有会话运行时租约"
+                            },
                         )
                     } else {
                         queueTurnLocked(content, memoryInput, modelMessage)
@@ -1557,114 +1580,6 @@ class LocalHarnessEngine @Inject internal constructor(
         job?.start()
         return result
     }
-    private fun queueWorkTurnLocked(
-        content: String,
-        memoryInput: String,
-        modelMessage: JsonObject?,
-        sessionLease: LocalSessionRuntimeLease,
-        resumedInput: QueuedAgentInput? = null,
-    ): Job? {
-        val sessionId = currentSessionId
-        val durableMessage = modelMessage ?: buildJsonObject {
-            put("role", "user")
-            put("content", content)
-        }
-        val sourceMessageId = resumedInput?.id
-            ?: recordUserTranscript(content, durableMessage, queued = false)
-        appendUserToModelHistory(durableMessage)
-        resumedInput?.let { resumed ->
-            _state.update { it.copy(kernel = it.kernel.copy(queuedInputCount = pendingInputs.size())) }
-            eventLog.append(
-                LOCAL_AGENT_INBOX_EVENT_TYPE,
-                encodeLocalAgentInboxEvent(
-                    action = "resumed",
-                    pending = pendingInputs.snapshot(),
-                    affected = listOf(resumed),
-                    modelMessages = listOf(durableMessage),
-                ),
-            )
-        }
-        persist()
-
-        val binding = LocalWorkRunBinding(
-            sessionId = sessionId,
-            initialState = _state.value.let { current ->
-                current.copy(kernel = current.kernel.copy(running = true), error = null)
-            }.toLocalWorkRunState(),
-            sessionBase = persistenceSnapshot(),
-            runHandle = LocalAgentRunHandle(
-                initialSessionId = sessionId,
-                initialHistory = modelHistory.snapshot(),
-                initialTranscriptProjectionCursor = transcriptProjectionCursor,
-                maxPendingInputs = MAX_PENDING_INPUTS,
-            ),
-            eventLog = eventLogFor(sessionId),
-            pruneToolResult = ::pruneToolResult,
-        )
-        workRunRegistry.attach(binding)
-        binding.runHandle.projectionJob = scope.launch {
-            binding.state.collect {
-                workRunRegistry.mirrorVisible(binding)
-            }
-        }
-        val job = scope.launch(start = CoroutineStart.LAZY) {
-            runWorkAgentTurn(
-                input = content,
-                memoryInput = memoryInput,
-                sourceMessageId = sourceMessageId,
-                binding = binding,
-                preownedLease = sessionLease,
-            )
-        }
-        // A lazy run cancelled before its body starts never reaches withOwner/finally.
-        job.invokeOnCompletion { sessionLease.close() }
-        binding.runHandle.job = job
-        return job
-    }
-
-
-    private fun queueExistingWorkTurnLocked(
-        content: String,
-        memoryInput: String,
-        sourceMessageId: String,
-        sessionLease: LocalSessionRuntimeLease,
-    ): Job {
-        val sessionId = currentSessionId
-        val binding = LocalWorkRunBinding(
-            sessionId = sessionId,
-            initialState = _state.value.let { current ->
-                current.copy(kernel = current.kernel.copy(running = true), error = null)
-            }.toLocalWorkRunState(),
-            sessionBase = persistenceSnapshot(),
-            runHandle = LocalAgentRunHandle(
-                initialSessionId = sessionId,
-                initialHistory = modelHistory.snapshot(),
-                initialTranscriptProjectionCursor = transcriptProjectionCursor,
-                maxPendingInputs = MAX_PENDING_INPUTS,
-            ),
-            eventLog = eventLogFor(sessionId),
-            pruneToolResult = ::pruneToolResult,
-        )
-        workRunRegistry.attach(binding)
-        binding.runHandle.projectionJob = scope.launch {
-            binding.state.collect {
-                workRunRegistry.mirrorVisible(binding)
-            }
-        }
-        val job = scope.launch(start = CoroutineStart.LAZY) {
-            runWorkAgentTurn(
-                input = content,
-                memoryInput = memoryInput,
-                sourceMessageId = sourceMessageId,
-                binding = binding,
-                preownedLease = sessionLease,
-            )
-        }
-        job.invokeOnCompletion { sessionLease.close() }
-        binding.runHandle.job = job
-        return job
-    }
-
     private fun syncVisibleWorkRun(
         sessionId: String,
         ownedBinding: LocalWorkRunBinding? = null,
@@ -2039,9 +1954,9 @@ class LocalHarnessEngine @Inject internal constructor(
             return@synchronized null
         }
         if (_state.value.usageMode == LocalUsageMode.WORK) {
-            queueWorkTurnLocked(
-                next.content, next.memoryInput, next.modelMessage,
-                requireNotNull(workLease), resumedInput = next,
+            workTurnStarter.startResumed(
+                input = next,
+                sessionLease = requireNotNull(workLease),
             )
         } else {
             val durableMessage = next.modelMessage ?: buildJsonObject {
