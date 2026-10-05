@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalSessionCoordinator
 import com.labteto.dshmobile.local.LocalSessionRepository
 import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
+import com.labteto.dshmobile.local.session.LocalSessionFilesRuntime
 import com.labteto.dshmobile.local.session.LocalSessionStorageManager
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -32,6 +33,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     json: Json,
     private val runtimeStateStore: LocalRuntimeStateStore,
     internal val eventLogs: LocalSessionEventLogRegistry,
+    internal val files: LocalSessionFilesRuntime,
     domainCodecs: Set<@JvmSuppressWildcards LocalSessionDomainCodec>,
 ) {
     private val sessionsRoot = File(context.filesDir, "local-harness/sessions").apply { mkdirs() }
