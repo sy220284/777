@@ -31,7 +31,7 @@ class LocalWorkProgressCoordinatorTest {
         val run = MutableStateFlow(LocalHarnessState(sessionId = "background"))
         val log = eventLog(File(temporary.root, "background.jsonl"))
         var writes = 0
-        val coordinator = LocalWorkProgressCoordinator(localWorkStatePort(run), log) {
+        val coordinator = LocalWorkProgressCoordinator(localAggregateWorkStatePort(run), log) {
             assertEquals("background", run.value.sessionId)
             assertEquals("goal/state", log.snapshot().last().type)
             writes++
@@ -52,7 +52,7 @@ class LocalWorkProgressCoordinatorTest {
     fun oversizedPlanAndTodosRetainExistingBoundsAndWholeListReplacement() {
         val state = MutableStateFlow(LocalHarnessState())
         val log = eventLog(File(temporary.root, "progress.jsonl"))
-        val coordinator = LocalWorkProgressCoordinator(localWorkStatePort(state), log) {}
+        val coordinator = LocalWorkProgressCoordinator(localAggregateWorkStatePort(state), log) {}
         coordinator.updatePlan(buildJsonObject {
             put("items", JsonArray(List(1000) { JsonPrimitive("步骤 $it") }))
         })
@@ -80,7 +80,7 @@ class LocalWorkProgressCoordinatorTest {
         val state = MutableStateFlow(LocalHarnessState())
         val log = eventLog(File(temporary.root, "goal.jsonl"))
         var writes = 0
-        val coordinator = LocalWorkProgressCoordinator(localWorkStatePort(state), log) { writes++ }
+        val coordinator = LocalWorkProgressCoordinator(localAggregateWorkStatePort(state), log) { writes++ }
         assertTrue(runCatching { coordinator.updateGoal("active", null) }.isFailure)
         assertTrue(runCatching { coordinator.updateGoal("invalid", null) }.isFailure)
         assertNull(state.value.work.goal)
@@ -110,7 +110,7 @@ class LocalWorkProgressCoordinatorTest {
         )
         val log = eventLog(File(temporary.root, "goal-transition.jsonl"))
         var writes = 0
-        val coordinator = LocalWorkProgressCoordinator(localWorkStatePort(state), log) { writes++ }
+        val coordinator = LocalWorkProgressCoordinator(localAggregateWorkStatePort(state), log) { writes++ }
 
         val rejected = runCatching { coordinator.updateGoal("completed", null) }
 
@@ -144,7 +144,7 @@ class LocalWorkProgressCoordinatorTest {
         assertTrue(parent.delete())
         assertTrue(parent.createNewFile())
         var persisted = false
-        val coordinator = LocalWorkProgressCoordinator(localWorkStatePort(state), log) { persisted = true }
+        val coordinator = LocalWorkProgressCoordinator(localAggregateWorkStatePort(state), log) { persisted = true }
         val mutations = listOf<() -> Unit>(
             { coordinator.updatePlan(buildJsonObject { put("plan", "新计划") }) },
             { coordinator.updateTodos(buildJsonObject {}) },
