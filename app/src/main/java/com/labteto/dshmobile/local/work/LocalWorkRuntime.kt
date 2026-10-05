@@ -12,6 +12,7 @@ class LocalWorkRuntime @Inject constructor(
     private val workRunRegistry: LocalWorkRunRegistry,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val approvals: LocalWorkApprovalCoordinator,
+    private val planMode: LocalWorkPlanModeCoordinator,
 ) {
     internal fun backgroundJobOutputForUi(jobId: String): String =
         runtimeStateStore.jobManager.output(jobId, runtimeStateStore.currentSessionId)
@@ -37,6 +38,12 @@ class LocalWorkRuntime @Inject constructor(
         if (binding?.interactions?.cancelQuestion(callId) == true) return
         runtimeStateStore.foregroundInteractions.cancelQuestion(callId)
     }
-    internal fun stop() = engine.stop()
-    internal fun setPlanMode(enabled: Boolean) = engine.setPlanMode(enabled)
+    internal fun stop() {
+        if (workRunRegistry.requestCancel(runtimeStateStore.currentSessionId)) return
+        engine.stopForegroundRun()
+    }
+
+    internal fun setPlanMode(enabled: Boolean) {
+        planMode.setEnabled(enabled)
+    }
 }
