@@ -754,13 +754,15 @@ work_progress = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt")
 )
 for required_mutation in (
-    "it.copy(work = it.work.copy(plan = normalized))",
-    "it.copy(work = it.work.copy(todos = items))",
-    "it.copy(work = it.work.copy(goal = goal))",
-    "it.copy(work = it.work.copy(goal = updated))",
+    "it.copy(plan = normalized)",
+    "it.copy(todos = items)",
+    "it.copy(goal = goal)",
+    "it.copy(goal = updated)",
 ):
     if required_mutation not in work_progress:
-        die("Work mutations must write through LocalWorkState: " + required_mutation)
+        die("Work mutations must remain owned by LocalWorkStatePort: " + required_mutation)
+if ".work." in work_progress or "LocalHarnessState" in work_progress:
+    die("LocalWorkProgressCoordinator must not reach through the aggregate state to mutate Work")
 
 model_contracts = read("app/src/main/java/com/labteto/dshmobile/local/model/LocalModelModels.kt")
 stream_state_start = model_contracts.find("data class LocalHarnessStreamingState(")
