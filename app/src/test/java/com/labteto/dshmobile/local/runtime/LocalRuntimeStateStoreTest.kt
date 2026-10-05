@@ -6,6 +6,7 @@ import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -41,6 +42,22 @@ class LocalRuntimeStateStoreTest {
             assertEquals("session-c", store.currentSessionId)
         }
     }
+    @Test
+    fun sessionTransitionIsOwnedBySharedRuntime() {
+        val store = LocalRuntimeStateStore()
+        store.initialize(LocalHarnessState(sessionId = "session-a"))
+
+        assertFalse(store.sessionTransitioning)
+        assertTrue(store.beginSessionTransition())
+        assertTrue(store.sessionTransitioning)
+        assertFalse(store.beginSessionTransition())
+
+        store.endSessionTransition()
+        assertFalse(store.sessionTransitioning)
+        assertTrue(store.beginSessionTransition())
+        store.endSessionTransition()
+    }
+
     @Test
     fun foregroundCancellationUsesSharedJobOwnerAndClearsQueuedProjection() {
         val store = LocalRuntimeStateStore()
