@@ -54,6 +54,7 @@ DEV777_TOOLS_ROOT
 DEV777_ANDROID_SDK_ROOT
 DEV777_TOOLCHAIN_ENV_FILE
 DEV777_TOOLCHAIN_STATE_DIR
+DEV777_REPO_ROOT
 ```
 
 JSON 状态示例：
@@ -62,8 +63,10 @@ JSON 状态示例：
 {
   "schema": 1,
   "status": "ready",
+  "reason": "environment_ready",
   "profile": "build",
   "exit_code": 0,
+  "repo_root": "/workspace/777",
   "env_file": "/home/user/.config/777/dev-toolchain.env",
   "sdk_root": "/home/user/.local/share/777-dev/android-sdk",
   "tools_root": "/home/user/.local/share/777-dev",
@@ -75,10 +78,10 @@ JSON 状态示例：
 
 状态值约定：
 
-- `ready`：当前 profile 已可直接使用。
-- `needs_bootstrap`：检查发现缺失项，可执行 `bootstrap`。
-- `error`：自动配置失败，需要读取 `log_file`。
-- `unknown`：尚未执行检查。
+- `ready`：当前 profile 已可直接使用，`reason=environment_ready`。
+- `needs_bootstrap`：检查发现缺失项，`reason=missing_dependencies`。
+- `error`：自动配置失败，`reason` 会区分 `bootstrap_failed`、`env_file_missing`、`post_check_failed`。
+- `unknown`：尚未执行检查，`reason=not_checked`。
 
 
 ## 两个档位
@@ -185,7 +188,7 @@ bash tools/dev/setup-toolchain.sh --check --profile build
 - `build`：验证普通 APK 构建环境。
 - `full`：额外安装 Node 22、actionlint、Android 16 / 17 模拟器组件。
 
-工具链相关 PR 会自动跑 `build` 档安装测试和真实 APK smoke build。
+工具链相关 PR 会自动跑 `build` 档安装测试、AI 入口二次幂等 bootstrap、机器状态检查和真实 APK smoke build。Artifact 默认保留 30 天。
 
 ## 自定义安装目录
 
