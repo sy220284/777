@@ -2,17 +2,8 @@ name: 开发工具链
 
 on:
   workflow_dispatch:
-    inputs:
-      profile:
-        description: 手工验证时重点检查的工具链档位
-        required: true
-        default: build
-        type: choice
-        options:
-          - build
-          - full
   schedule:
-    # Artifact 保留 30 天；每月 1 日和 20 日同时刷新 build/full 两套离线产物。
+    # Artifact 保留 30 天；每月 1 日和 20 日刷新组件产物。
     - cron: '17 3 1,20 * *'
   pull_request:
     paths:
@@ -34,35 +25,26 @@ concurrency:
 
 jobs:
   package:
-    name: 打包离线工具链（${{ matrix.profile }}）
+    name: 生成按需组件 Artifact
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        profile:
-          - build
-          - full
-
+    timeout-minutes: 70
     env:
       GRADLE_USER_HOME: ${{ github.workspace }}/.gradle-toolchain-home
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: 验证工具链脚本与离线约束
+      - name: 验证脚本、版本与组件清单
         run: |
           set -euo pipefail
           bash -n tools/dev/setup-toolchain.sh
           bash -n tools/dev/ai-toolchain.sh
           bash -n tools/dev/install.sh
-          if bash tools/dev/install.sh --help >/dev/null 2>&1; then
-            echo "仓库内 install.sh 不应在没有 Artifact payload 时进入安装流程" >&2
-            exit 1
-          fi
+          bash -n tools/dev/lib/components.sh
+          bash tools/dev/install.sh --help >/dev/null
           bash tools/dev/setup-toolchain.sh --self-test
-          if grep -RInE '^[[:space:]]*(curl|wget|apt-get)([[:space:]]|$)' tools/dev --include='*.sh' || grep -RIn 'download_verified' tools/dev --include='*.sh'; then
-            echo "本地工具链脚本出现外部下载/包管理入口；必须由 Artifact 提供依赖。" >&2
+          if grep -RInE '^[[:space:]]*(curl|wget|apt-get)([[:space:]]|$)' tools/dev --include='*.sh' ||              grep -RIn 'download_verified' tools/dev --include='*.sh'; then
+            echo "本地工具链脚本出现外部下载/包管理入口；组件只能来自 GitHub Actions Artifact。" >&2
             exit 1
           fi
 
@@ -75,8 +57,7 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
 
-      - name: full 档准备 Emulator 与 Android 16/17 镜像
-        if: matrix.profile == 'full'
+      - name: 准备 Emulator 与 Android 16/17 镜像
         run: |
           set -euo pipefail
           source tools/dev/toolchain-versions.env
@@ -84,12 +65,10 @@ jobs:
           sdkmanager emulator "$ANDROID_16_SYSTEM_IMAGE" "$ANDROID_17_SYSTEM_IMAGE"
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        if: matrix.profile == 'full'
         with:
           node-version: 22.23.3
 
-      - name: full 档准备 actionlint
-        if: matrix.profile == 'full'
+      - name: 准备 actionlint
         run: |
           set -euo pipefail
           source tools/dev/toolchain-versions.env
@@ -104,77 +83,26 @@ jobs:
       - name: 预热 Gradle、Kotlin/AGP、测试与 Runtime 构建依赖
         run: |
           set -euo pipefail
-          ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :mock-harness:test             :app:testDebugUnitTest             :reference-validation:test             :app:assembleDebug             --stacktrace
-          if [ "${{ matrix.profile }}" = full ]; then
-            ./gradlew :app:lintDebug :app:assembleDebugAndroidTest :app:assembleOptimized --stacktrace
-          fi
+          ./gradlew             :core:test             :harness-core:test             :harness-runtime-android:test             :harness-interop:test             :harness-device-android:testDebugUnitTest             :mock-harness:test             :app:testDebugUnitTest             :reference-validation:test             :app:lintDebug             :app:assembleDebug             :app:assembleDebugAndroidTest             :app:assembleOptimized             --stacktrace
 
-      - name: 生成完整离线 Artifact payload
+      - name: 拆分并校验组件包
         run: |
           set -euo pipefail
           source tools/dev/toolchain-versions.env
+          source tools/dev/toolchain-components.env
 
-          ROOT="$RUNNER_TEMP/777-dev-toolchain-${{ matrix.profile }}"
-          PAYLOAD="$RUNNER_TEMP/777-payload-${{ matrix.profile }}"
-          rm -rf "$ROOT" "$PAYLOAD"
-          mkdir -p "$ROOT/tools" "$ROOT/docs" "$ROOT/payload" "$PAYLOAD"
+          OUT="$RUNNER_TEMP/toolchain-artifacts"
+          STAGE="$RUNNER_TEMP/toolchain-stage"
+          rm -rf "$OUT" "$STAGE"
+          mkdir -p "$OUT" "$STAGE"
 
-          cp -a tools/dev "$ROOT/tools/dev"
-          cp tools/dev/install.sh "$ROOT/install.sh"
-          cp docs/DEVELOPMENT.md "$ROOT/docs/"
-
-          mkdir -p "$PAYLOAD/jdk"
-          cp -a "$JAVA_HOME"/. "$PAYLOAD/jdk/"
-
-          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-          test -n "$SDK_ROOT"
-          mkdir -p "$PAYLOAD/android-sdk"
-          cp -a "$SDK_ROOT/cmdline-tools" "$PAYLOAD/android-sdk/"
-          cp -a "$SDK_ROOT/platform-tools" "$PAYLOAD/android-sdk/"
-          mkdir -p "$PAYLOAD/android-sdk/build-tools" "$PAYLOAD/android-sdk/platforms"
-          cp -a "$SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS" "$PAYLOAD/android-sdk/build-tools/"
-          if [ -d "$SDK_ROOT/platforms/android-$ANDROID_COMPILE_API" ]; then
-            cp -a "$SDK_ROOT/platforms/android-$ANDROID_COMPILE_API" "$PAYLOAD/android-sdk/platforms/"
-          else
-            cp -a "$SDK_ROOT/platforms/android-${ANDROID_COMPILE_API}.0" "$PAYLOAD/android-sdk/platforms/"
-          fi
-          if [ -d "$SDK_ROOT/licenses" ]; then
-            cp -a "$SDK_ROOT/licenses" "$PAYLOAD/android-sdk/"
-          fi
-
-          if [ "${{ matrix.profile }}" = full ]; then
-            cp -a "$SDK_ROOT/emulator" "$PAYLOAD/android-sdk/"
-            mkdir -p "$PAYLOAD/android-sdk/system-images"
-            cp -a "$SDK_ROOT/system-images/android-36" "$PAYLOAD/android-sdk/system-images/"
-            cp -a "$SDK_ROOT/system-images/android-37.0" "$PAYLOAD/android-sdk/system-images/"
-          fi
-
-          GRADLE_BIN="$(find "$GRADLE_USER_HOME/wrapper/dists" -type f -path "*/gradle-$GRADLE_VERSION/bin/gradle" -print -quit)"
-          test -n "$GRADLE_BIN"
-          GRADLE_DIST_HOME="$(cd "$(dirname "$GRADLE_BIN")/.." && pwd)"
-          cp -a "$GRADLE_DIST_HOME" "$PAYLOAD/gradle"
-
-          rm -rf "$GRADLE_USER_HOME/daemon"
-          cp -a "$GRADLE_USER_HOME" "$PAYLOAD/gradle-user-home"
-
-          if [ -d .gradle/runtime-cache ]; then
-            cp -a .gradle/runtime-cache "$PAYLOAD/runtime-cache"
-          else
-            echo "预热后仍缺少 .gradle/runtime-cache，无法保证本地离线 Runtime 构建。" >&2
-            exit 1
-          fi
-
-          if [ "${{ matrix.profile }}" = full ]; then
-            NODE_BIN="$(readlink -f "$(command -v node)")"
-            NODE_HOME="$(cd "$(dirname "$NODE_BIN")/.." && pwd)"
-            cp -a "$NODE_HOME" "$PAYLOAD/node-current"
-            mkdir -p "$PAYLOAD/bin"
-            cp -a "$RUNNER_TEMP/actionlint-bin/actionlint" "$PAYLOAD/bin/actionlint"
-          fi
-
-          cat > "$ROOT/payload/manifest.env" <<EOF
-          ARTIFACT_SCHEMA=2
-          ARTIFACT_PROFILE=${{ matrix.profile }}
+          make_component() {
+            local component="$1" payload="$2"
+            local root="$OUT/777-toolchain-$component-latest"
+            mkdir -p "$root"
+            cat > "$root/component.env" <<EOF
+          ARTIFACT_SCHEMA=3
+          ARTIFACT_COMPONENT=$component
           ARTIFACT_ARCH=x64
           ARTIFACT_HEAD_SHA=$GITHUB_SHA
           JDK_MAJOR=$JDK_MAJOR
@@ -186,120 +114,357 @@ jobs:
           NODE_VERSION=$NODE_VERSION
           ACTIONLINT_VERSION=$ACTIONLINT_VERSION
           EOF
+            tar -C "$payload" -cf - . | gzip -1 > "$root/payload.tar.gz"
+            (
+              cd "$root"
+              sha256sum component.env payload.tar.gz > SHA256SUMS
+              sha256sum -c SHA256SUMS
+            )
+          }
 
-          cat > "$ROOT/安装说明.txt" <<EOF
-          777 本地开发工具链（${{ matrix.profile }}）
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$SDK_ROOT"
 
-          本包是完整离线构建产物。
-          包内已包含 JDK、Android SDK、Gradle、Kotlin/AGP/项目 Gradle 依赖缓存与 Runtime 构建缓存。
-          full 档额外包含 Node.js、actionlint、Android Emulator 和 Android 16/17 system image。
+          mkdir -p "$STAGE/jdk/jdk"
+          cp -a "$JAVA_HOME"/. "$STAGE/jdk/jdk/"
+          make_component jdk "$STAGE/jdk"
 
-          安装：
-            ./install.sh ${{ matrix.profile }}
+          mkdir -p "$STAGE/android-core/android-sdk"
+          cp -a "$SDK_ROOT/cmdline-tools" "$STAGE/android-core/android-sdk/"
+          cp -a "$SDK_ROOT/platform-tools" "$STAGE/android-core/android-sdk/"
+          mkdir -p "$STAGE/android-core/android-sdk/build-tools" "$STAGE/android-core/android-sdk/platforms"
+          cp -a "$SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS" "$STAGE/android-core/android-sdk/build-tools/"
+          if [ -d "$SDK_ROOT/platforms/android-$ANDROID_COMPILE_API" ]; then
+            cp -a "$SDK_ROOT/platforms/android-$ANDROID_COMPILE_API" "$STAGE/android-core/android-sdk/platforms/"
+          else
+            cp -a "$SDK_ROOT/platforms/android-${ANDROID_COMPILE_API}.0" "$STAGE/android-core/android-sdk/platforms/"
+          fi
+          if [ -d "$SDK_ROOT/licenses" ]; then
+            cp -a "$SDK_ROOT/licenses" "$STAGE/android-core/android-sdk/"
+          fi
+          make_component android-core "$STAGE/android-core"
 
-          AI / Agent：
-            bash tools/dev/ai-toolchain.sh bootstrap --profile ${{ matrix.profile }}
-            bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug
+          GRADLE_BIN="$(find "$GRADLE_USER_HOME/wrapper/dists" -type f -path "*/gradle-$GRADLE_VERSION/bin/gradle" -print -quit)"
+          test -n "$GRADLE_BIN"
+          GRADLE_DIST_HOME="$(cd "$(dirname "$GRADLE_BIN")/.." && pwd)"
+          mkdir -p "$STAGE/gradle-runtime"
+          cp -a "$GRADLE_DIST_HOME" "$STAGE/gradle-runtime/gradle"
+          make_component gradle-runtime "$STAGE/gradle-runtime"
 
-          本地安装禁止通过其他渠道补齐依赖。
+          rm -rf "$GRADLE_USER_HOME/daemon"
+          mkdir -p "$STAGE/gradle-deps"
+          cp -a "$GRADLE_USER_HOME" "$STAGE/gradle-deps/gradle-user-home"
+          make_component gradle-deps "$STAGE/gradle-deps"
+
+          test -d .gradle/runtime-cache
+          mkdir -p "$STAGE/runtime-cache"
+          cp -a .gradle/runtime-cache "$STAGE/runtime-cache/runtime-cache"
+          make_component runtime-cache "$STAGE/runtime-cache"
+
+          NODE_BIN="$(readlink -f "$(command -v node)")"
+          NODE_HOME="$(cd "$(dirname "$NODE_BIN")/.." && pwd)"
+          mkdir -p "$STAGE/node"
+          cp -a "$NODE_HOME" "$STAGE/node/node-current"
+          make_component node "$STAGE/node"
+
+          mkdir -p "$STAGE/actionlint/bin"
+          cp -a "$RUNNER_TEMP/actionlint-bin/actionlint" "$STAGE/actionlint/bin/actionlint"
+          make_component actionlint "$STAGE/actionlint"
+
+          mkdir -p "$STAGE/emulator/android-sdk"
+          cp -a "$SDK_ROOT/emulator" "$STAGE/emulator/android-sdk/emulator"
+          make_component emulator "$STAGE/emulator"
+
+          mkdir -p "$STAGE/android-image-16/android-sdk/system-images"
+          cp -a "$SDK_ROOT/system-images/android-36" "$STAGE/android-image-16/android-sdk/system-images/android-36"
+          make_component android-image-16 "$STAGE/android-image-16"
+
+          mkdir -p "$STAGE/android-image-17/android-sdk/system-images"
+          cp -a "$SDK_ROOT/system-images/android-37.0" "$STAGE/android-image-17/android-sdk/system-images/android-37.0"
+          make_component android-image-17 "$STAGE/android-image-17"
+
+          BOOT="$OUT/777-toolchain-bootstrap-latest"
+          mkdir -p "$BOOT/tools" "$BOOT/docs"
+          cp -a tools/dev "$BOOT/tools/dev"
+          cp docs/DEVELOPMENT.md "$BOOT/docs/"
+          cat > "$BOOT/组件清单.txt" <<EOF
+          build:
+            777-toolchain-jdk-latest
+            777-toolchain-android-core-latest
+            777-toolchain-gradle-runtime-latest
+            777-toolchain-gradle-deps-latest
+            777-toolchain-runtime-cache-latest
+
+          full 额外:
+            777-toolchain-node-latest
+            777-toolchain-actionlint-latest
+            777-toolchain-emulator-latest
+            777-toolchain-android-image-16-latest
+            777-toolchain-android-image-17-latest
+
+          使用 tools/dev/ai-toolchain.sh plan 只下载当前真正缺少的项。
           EOF
-
-          tar -C "$PAYLOAD" -cf - . | gzip -1 > "$ROOT/payload/toolchain.tar.gz"
-
           (
-            cd "$ROOT"
-            find install.sh tools docs payload 安装说明.txt -type f -print0               | sort -z               | xargs -0 sha256sum > SHA256SUMS
+            cd "$BOOT"
+            find tools docs 组件清单.txt -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
             sha256sum -c SHA256SUMS
           )
 
-          du -sh "$ROOT" "$ROOT/payload/toolchain.tar.gz"
+          for component in $ALL_COMPONENTS; do
+            test -s "$OUT/777-toolchain-$component-latest/payload.tar.gz"
+            du -sh "$OUT/777-toolchain-$component-latest"
+          done
+          du -sh "$BOOT"
 
-      - name: 上传 build 离线工具链产物
-        if: matrix.profile == 'build'
+      - name: 上传 bootstrap Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: 777-dev-toolchain-build-latest
-          path: ${{ runner.temp }}/777-dev-toolchain-build
+          name: 777-toolchain-bootstrap-latest
+          path: ${{ runner.temp }}/toolchain-artifacts/777-toolchain-bootstrap-latest
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: 上传 JDK Artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-toolchain-jdk-latest
+          path: ${{ runner.temp }}/toolchain-artifacts/777-toolchain-jdk-latest
           retention-days: 30
           compression-level: 0
           if-no-files-found: error
 
-      - name: 上传 full 离线工具链产物
-        if: matrix.profile == 'full'
+      - name: 上传 Android Core Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: 777-dev-toolchain-full-latest
-          path: ${{ runner.temp }}/777-dev-toolchain-full
+          name: 777-toolchain-android-core-latest
+          path: ${{ runner.temp }}/toolchain-artifacts/777-toolchain-android-core-latest
           retention-days: 30
           compression-level: 0
           if-no-files-found: error
 
-  verify-install:
-    name: 离线安装回归（${{ matrix.profile }}）
+      - name: 上传 Gradle Runtime Artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-toolchain-gradle-runtime-latest
+          path: ${{ runner.temp }}/toolchain-artifacts/777-toolchain-gradle-runtime-latest
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: 上传 Gradle 依赖 Artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-toolchain-gradle-deps-latest
+          path: ${{ runner.temp }}/toolchain-artifacts/777-toolchain-gradle-deps-latest
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: 上传 Runtime Cache Artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-toolchain-runtime-cache-latest
+          path: ${{ runner.temp }}/toolchain-artifacts/777-toolchain-runtime-cache-latest
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: 上传 Node Artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-toolchain-node-latest
+          path: ${{ runner.temp }}/toolchain-artifacts/777-toolchain-node-latest
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: 上传 actionlint Artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-toolchain-actionlint-latest
+          path: ${{ runner.temp }}/toolchain-artifacts/777-toolchain-actionlint-latest
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: 上传 Emulator Artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-toolchain-emulator-latest
+          path: ${{ runner.temp }}/toolchain-artifacts/777-toolchain-emulator-latest
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: 上传 Android 16 镜像 Artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-toolchain-android-image-16-latest
+          path: ${{ runner.temp }}/toolchain-artifacts/777-toolchain-android-image-16-latest
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: 上传 Android 17 镜像 Artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-toolchain-android-image-17-latest
+          path: ${{ runner.temp }}/toolchain-artifacts/777-toolchain-android-image-17-latest
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+  verify:
+    name: 按需下载、安装与真实离线构建
     needs: package
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        profile:
-          - build
-          - full
+    timeout-minutes: 70
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: 下载对应离线工具链产物
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: 下载 bootstrap
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: 777-dev-toolchain-${{ matrix.profile }}-latest
-          path: ${{ runner.temp }}/artifact
+          name: 777-toolchain-bootstrap-latest
+          path: ${{ runner.temp }}/bootstrap
 
-      - name: 从 Artifact 安装并复检
+      - name: 先验证计划会复用现有 JDK
+        env:
+          DEV777_TOOLS_ROOT: ${{ runner.temp }}/777-tools
+          DEV777_ANDROID_SDK_ROOT: ${{ runner.temp }}/777-tools/android-sdk
+          DEV777_GRADLE_HOME: ${{ runner.temp }}/777-tools/gradle
+          DEV777_GRADLE_USER_HOME: ${{ runner.temp }}/777-tools/gradle-user-home
+          DEV777_TOOLCHAIN_ENV_FILE: ${{ runner.temp }}/777-env
+          DEV777_TOOLCHAIN_STATE_DIR: ${{ runner.temp }}/777-state
+          DEV777_REPO_ROOT: ${{ github.workspace }}
         run: |
           set -euo pipefail
-          KIT="$RUNNER_TEMP/artifact"
-          TOOLS="$RUNNER_TEMP/777-tools"
-          ENV_FILE="$RUNNER_TEMP/777-dev-toolchain.env"
-          STATE_DIR="$RUNNER_TEMP/777-ai-state"
-
-          export DEV777_TOOLS_ROOT="$TOOLS"
-          export DEV777_ANDROID_SDK_ROOT="$TOOLS/android-sdk"
-          export DEV777_GRADLE_HOME="$TOOLS/gradle"
-          export DEV777_GRADLE_USER_HOME="$TOOLS/gradle-user-home"
-          export DEV777_TOOLCHAIN_ENV_FILE="$ENV_FILE"
-          export DEV777_TOOLCHAIN_STATE_DIR="$STATE_DIR"
-          export DEV777_REPO_ROOT="$GITHUB_WORKSPACE"
-
-          cd "$KIT"
-          sha256sum -c SHA256SUMS
-
-          if [ "${{ matrix.profile }}" = full ]; then
-            bash "$KIT/install.sh" full --create-avds
-          else
-            bash "$KIT/install.sh" build
+          cd "$GITHUB_WORKSPACE"
+          PLAN="$(bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" plan --profile build)"
+          printf '%s\n' "$PLAN"
+          printf '%s\n' "$PLAN" | grep -F '777-toolchain-android-core-latest'
+          printf '%s\n' "$PLAN" | grep -F '777-toolchain-gradle-runtime-latest'
+          printf '%s\n' "$PLAN" | grep -F '777-toolchain-gradle-deps-latest'
+          printf '%s\n' "$PLAN" | grep -F '777-toolchain-runtime-cache-latest'
+          if printf '%s\n' "$PLAN" | grep -Fq '777-toolchain-jdk-latest'; then
+            echo "已有 JDK 17 时仍要求下载 JDK，按需规划失败。" >&2
+            exit 1
           fi
 
-          # shellcheck source=/dev/null
-          source "$ENV_FILE"
+      - name: 只下载 build 当前缺失组件
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: 777-toolchain-*-latest
+          path: ${{ runner.temp }}/all-artifacts
+          merge-multiple: false
 
+      - name: 构造严格按需下载目录
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/artifacts"
+          mkdir -p "$ROOT"
+          for name in             777-toolchain-android-core-latest             777-toolchain-gradle-runtime-latest             777-toolchain-gradle-deps-latest             777-toolchain-runtime-cache-latest; do
+            cp -a "$RUNNER_TEMP/all-artifacts/$name" "$ROOT/$name"
+          done
+
+      - name: 按需安装 build 并离线构建
+        env:
+          DEV777_TOOLS_ROOT: ${{ runner.temp }}/777-tools
+          DEV777_ANDROID_SDK_ROOT: ${{ runner.temp }}/777-tools/android-sdk
+          DEV777_GRADLE_HOME: ${{ runner.temp }}/777-tools/gradle
+          DEV777_GRADLE_USER_HOME: ${{ runner.temp }}/777-tools/gradle-user-home
+          DEV777_TOOLCHAIN_ENV_FILE: ${{ runner.temp }}/777-env
+          DEV777_TOOLCHAIN_STATE_DIR: ${{ runner.temp }}/777-state
+          DEV777_REPO_ROOT: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" bootstrap             --profile build             --artifacts-dir "$RUNNER_TEMP/artifacts"
+
+          # shellcheck source=/dev/null
+          source "$DEV777_TOOLCHAIN_ENV_FILE"
           javac -version
           gradle --version
           adb version
-          test -d "$GRADLE_USER_HOME/caches/modules-2"
-          test -d "$GITHUB_WORKSPACE/.gradle/runtime-cache"
 
-          CHECK_JSON="$(bash "$KIT/tools/dev/ai-toolchain.sh" check --profile "${{ matrix.profile }}")"
-          printf '%s\n' "$CHECK_JSON"
-          printf '%s\n' "$CHECK_JSON" | grep -F '"status": "ready"'
+          AFTER="$(bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" plan --profile build)"
+          printf '%s\n' "$AFTER"
+          printf '%s\n' "$AFTER" | grep -F '"missing_artifacts":[]'
 
+          bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" gradle :app:assembleDebug --stacktrace
+
+      - name: 单独验证 JDK Artifact 真正可下载可执行
+        run: |
+          set -euo pipefail
+          JDK_ART="$RUNNER_TEMP/all-artifacts/777-toolchain-jdk-latest"
+          test -s "$JDK_ART/payload.tar.gz"
+          (
+            cd "$JDK_ART"
+            sha256sum -c SHA256SUMS
+          )
+          mkdir -p "$RUNNER_TEMP/jdk-proof"
+          tar -xzf "$JDK_ART/payload.tar.gz" -C "$RUNNER_TEMP/jdk-proof"
+          "$RUNNER_TEMP/jdk-proof/jdk/bin/javac" -version
+
+      - name: 检查 full 还缺哪些组件
+        env:
+          DEV777_TOOLS_ROOT: ${{ runner.temp }}/777-tools
+          DEV777_ANDROID_SDK_ROOT: ${{ runner.temp }}/777-tools/android-sdk
+          DEV777_GRADLE_HOME: ${{ runner.temp }}/777-tools/gradle
+          DEV777_GRADLE_USER_HOME: ${{ runner.temp }}/777-tools/gradle-user-home
+          DEV777_TOOLCHAIN_ENV_FILE: ${{ runner.temp }}/777-env
+          DEV777_TOOLCHAIN_STATE_DIR: ${{ runner.temp }}/777-state
+          DEV777_REPO_ROOT: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
           cd "$GITHUB_WORKSPACE"
-          bash "$KIT/tools/dev/ai-toolchain.sh" gradle :app:assembleDebug --stacktrace
+          PLAN="$(bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" plan --profile full)"
+          printf '%s\n' "$PLAN"
+          printf '%s\n' "$PLAN" | grep -F '777-toolchain-emulator-latest'
+          printf '%s\n' "$PLAN" | grep -F '777-toolchain-android-image-16-latest'
+          printf '%s\n' "$PLAN" | grep -F '777-toolchain-android-image-17-latest'
 
-          if [ "${{ matrix.profile }}" = full ]; then
-            node --version
-            actionlint -version
-            emulator -version | head -n 1
-            "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" list avd | grep -F 'Name: 777-android16'
-            "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" list avd | grep -F 'Name: 777-android17'
-          fi
+      - name: 加入 full 扩展组件
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/artifacts"
+          for name in             777-toolchain-node-latest             777-toolchain-actionlint-latest             777-toolchain-emulator-latest             777-toolchain-android-image-16-latest             777-toolchain-android-image-17-latest; do
+            cp -a "$RUNNER_TEMP/all-artifacts/$name" "$ROOT/$name"
+          done
+
+      - name: 安装 full 缺失组件并复检
+        env:
+          DEV777_TOOLS_ROOT: ${{ runner.temp }}/777-tools
+          DEV777_ANDROID_SDK_ROOT: ${{ runner.temp }}/777-tools/android-sdk
+          DEV777_GRADLE_HOME: ${{ runner.temp }}/777-tools/gradle
+          DEV777_GRADLE_USER_HOME: ${{ runner.temp }}/777-tools/gradle-user-home
+          DEV777_TOOLCHAIN_ENV_FILE: ${{ runner.temp }}/777-env
+          DEV777_TOOLCHAIN_STATE_DIR: ${{ runner.temp }}/777-state
+          DEV777_REPO_ROOT: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+
+          bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" bootstrap             --profile full             --artifacts-dir "$RUNNER_TEMP/artifacts"
+
+          bash "$RUNNER_TEMP/bootstrap/tools/dev/install.sh" install full             --artifacts-dir "$RUNNER_TEMP/artifacts"             --create-avds
+
+          # shellcheck source=/dev/null
+          source "$DEV777_TOOLCHAIN_ENV_FILE"
+          node --version
+          actionlint -version
+          emulator -version | head -n 1
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" list avd | grep -F 'Name: 777-android16'
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" list avd | grep -F 'Name: 777-android17'
+
+          AFTER="$(bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" plan --profile full)"
+          printf '%s\n' "$AFTER"
+          printf '%s\n' "$AFTER" | grep -F '"missing_artifacts":[]'
+
+          bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" gradle :app:assembleOptimized --stacktrace
