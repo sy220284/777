@@ -23,8 +23,6 @@ import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
-import com.labteto.dshmobile.local.work.LocalGoal
-import com.labteto.dshmobile.local.work.LocalTodoItem
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -36,7 +34,7 @@ import org.junit.Test
 
 class LocalTimelineRewriteTransactionTest {
     @Test
-    fun oneRewriteEventRestoresTranscriptModelHistoryAndControlState() {
+    fun oneRewriteEventRestoresTranscriptModelHistoryAndChatState() {
         withStores { log, _, _, _, _ ->
             val edited = LocalHarnessMessage(
                 id = "edited",
@@ -49,10 +47,6 @@ class LocalTimelineRewriteTransactionTest {
                 buildJsonObject { put("role", "user"); put("content", "新问题") },
             )
             val rewriteState = LocalTimelineRewriteState(
-                plan = listOf("新计划"),
-                todos = listOf(LocalTodoItem("继续修复", "in_progress")),
-                goal = LocalGoal("完成重写"),
-                planMode = true,
                 chatState = ChatCharacterState(mood = "稳定"),
                 chatContext = ChatContextState(generation = 7L),
                 chatBranches = LocalChatBranchState(),
@@ -87,8 +81,6 @@ class LocalTimelineRewriteTransactionTest {
                 events = listOf(event),
                 sequenceExclusive = -1L,
             )
-            assertEquals(listOf("新计划"), projected.plan)
-            assertEquals("完成重写", projected.goal?.description)
             assertEquals("稳定", projected.chatState.mood)
             assertEquals(7L, projected.chatContext.generation)
         }
@@ -111,10 +103,6 @@ class LocalTimelineRewriteTransactionTest {
                 activeTranscript = listOf(user, assistant),
                 modelHistory = history,
                 state = LocalTimelineRewriteState(
-                    plan = emptyList(),
-                    todos = emptyList(),
-                    goal = null,
-                    planMode = false,
                     chatState = ChatCharacterState(mood = "安心"),
                     chatContext = ChatContextState(generation = 9L),
                     chatBranches = LocalChatBranchState(),
@@ -179,10 +167,6 @@ class LocalTimelineRewriteTransactionTest {
                 activeTranscript = listOf(edited),
                 modelHistory = listOf(modelMessage),
                 state = LocalTimelineRewriteState(
-                    plan = emptyList(),
-                    todos = emptyList(),
-                    goal = null,
-                    planMode = false,
                     chatState = ChatCharacterState(),
                     chatContext = ChatContextState(),
                     chatBranches = LocalChatBranchState(),
@@ -219,7 +203,6 @@ class LocalTimelineRewriteTransactionTest {
                 activeTranscript = listOf(edited),
                 modelHistory = listOf(modelMessage),
                 state = LocalTimelineRewriteState(
-                    emptyList(), emptyList(), null, false,
                     ChatCharacterState(), ChatContextState(), LocalChatBranchState(), LocalGroupChatState(),
                 ),
                 projection = LocalTimelineRewriteProjectionInput("session", 1L, listOf("old")),
