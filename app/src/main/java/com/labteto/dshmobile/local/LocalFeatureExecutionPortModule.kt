@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.automation.LocalAutomationChatCoordinator
+import com.labteto.dshmobile.local.automation.LocalAutomationWorkCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
 import com.labteto.dshmobile.local.runtime.LocalDiagnosticsPort
 import com.labteto.dshmobile.local.session.LocalActiveSessionScopeProvider
@@ -25,6 +27,18 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 internal object LocalFeatureExecutionPortModule {
+    @Provides
+    @Singleton
+    fun provideLocalAutomationChatCoordinator(
+        engine: LocalHarnessEngine,
+    ): LocalAutomationChatCoordinator = engine.automationChatCoordinator
+
+    @Provides
+    @Singleton
+    fun provideLocalAutomationWorkCoordinator(
+        engine: LocalHarnessEngine,
+    ): LocalAutomationWorkCoordinator = engine.automationWorkCoordinator
+
     @Provides
     @Singleton
     fun provideLocalWorkExecutionPort(
