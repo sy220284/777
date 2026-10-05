@@ -27,7 +27,6 @@ import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
-import com.labteto.dshmobile.local.session.projectSessionControlTail
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonObject

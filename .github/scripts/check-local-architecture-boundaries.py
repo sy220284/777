@@ -158,6 +158,22 @@ session_persistence_source = strip_comments(
 if "LocalWorkRunBinding" in session_persistence_source or "com.labteto.dshmobile.local.work" in session_persistence_source:
     die("Shared Session persistence must not depend on WorkFeature runtime internals")
 
+session_control_cursor_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionControlProjection.kt")
+)
+if (
+    "com.labteto.dshmobile.local.chat" in session_control_cursor_source
+    or "com.labteto.dshmobile.local.work" in session_control_cursor_source
+    or "projectSessionControlTail" in session_control_cursor_source
+):
+    die("Shared Session control projection must own only replay cursor semantics, not Feature event interpretation")
+
+feature_control_projection_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/LocalSessionControlProjection.kt")
+)
+if "projectSessionControlTail" not in feature_control_projection_source:
+    die("Feature composition must own Chat/Work control-event projection")
+
 # The only remaining Work-side writable aggregate adapter is the foreground composition bridge.
 # Detached/foreground Work bindings themselves must own LocalWorkRunState, never LocalHarnessState.
 work_aggregate_state_allowlist = {
