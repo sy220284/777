@@ -14,6 +14,8 @@ write_env_file() {
     printf 'export DEV777_GRADLE_USER_HOME=%q\n' "$GRADLE_USER_HOME"
     printf 'export DEV777_TOOLCHAIN_OFFLINE=1\n'
     if [ "$PROFILE" = full ]; then
+      printf 'export DEV777_EMULATOR_HOST_LIB_DIR="%s/emulator/host-libs"\n' "$SDK_ROOT"
+      printf 'export LD_LIBRARY_PATH="$DEV777_EMULATOR_HOST_LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"\n'
       printf 'export PATH=%q:%q/bin:"$ANDROID_SDK_ROOT/platform-tools":"$ANDROID_SDK_ROOT/cmdline-tools/latest/bin":"$ANDROID_SDK_ROOT/emulator":"$GRADLE_HOME/bin":"$JAVA_HOME/bin":"$PATH"\n' "$TOOLS_ROOT/bin" "$TOOLS_ROOT/node-current"
     else
       printf 'export PATH=%q:"$ANDROID_SDK_ROOT/platform-tools":"$ANDROID_SDK_ROOT/cmdline-tools/latest/bin":"$GRADLE_HOME/bin":"$JAVA_HOME/bin":"$PATH"\n' "$TOOLS_ROOT/bin"
