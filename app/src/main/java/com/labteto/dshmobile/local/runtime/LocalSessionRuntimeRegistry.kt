@@ -40,6 +40,11 @@ internal object LocalSessionRuntimeRegistry {
     fun hasLiveOwner(sessionId: String): Boolean = entries[sessionId]?.mutex?.isLocked == true
 
     @Synchronized
+    internal fun hasAnyLiveOwner(): Boolean = entries.values.any { entry ->
+        entry.mutex.isLocked || entry.reservations > 0
+    }
+
+    @Synchronized
     internal fun inputAdmission(sessionId: String): LocalSessionInputAdmission {
         val entry = entries[sessionId]
         val active = entry?.mutex?.isLocked == true
