@@ -128,6 +128,33 @@ class LocalWorkApprovalCoordinatorTest {
         assertFalse(f.runtime.state.value.safeAutoApprovalEnabled)
     }
 
+    @Test fun failedSessionAuditLogCannotStrandOtherRunsAfterGlobalPolicyCommits() = runTest {
+        val f = Fixture()
+        val a = f.binding("a")
+        val blocked = java.io.File(temporary.newFolder(), "blocked").apply { writeText("file") }
+        val brokenLog = com.labteto.dshmobile.local.session.LocalSessionEventLog(
+            java.io.File(blocked, "events.jsonl"), Json,
+        )
+        val b = LocalWorkRunBinding(
+            "b", LocalHarnessState(loading = false, sessionId = "b"),
+            emptyList(), brokenLog, null, 8, { it },
+        ).also(f.runs::attach)
+        val c = f.binding("c")
+        val first = async { a.interactions.awaitApproval(approval("first")) }
+        val second = async { b.interactions.awaitApproval(approval("second")) }
+        val third = async { c.interactions.awaitApproval(approval("third")) }
+        runCurrent()
+        try {
+            f.approvals.enableAutoApprovalForPending("first")
+            assertTrue(first.await())
+            assertTrue(second.await())
+            assertTrue(third.await())
+            assertTrue(f.preferences.isSafeAutoApprovalEnabled())
+            assertNotNull(f.runtime.state.value.error)
+            assertNotNull(c.eventLog.latest("approval/mode"))
+        } finally { brokenLog.close() }
+    }
+
     @Test fun staleOrAlreadyAnsweredClickCannotChangePolicyOrGrantDeviceLease() = runTest {
         val f = Fixture()
         val a = f.binding("a")

@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -65,12 +66,21 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
             active += Target(binding.interactions, binding.eventLog)
         }
         if (active.none { it.interactions === target.interactions }) active += target
+        var logFailure: Exception? = null
         active.forEach { owner ->
             val pending = owner.interactions.pendingApproval()
-            owner.log.append("approval/mode", buildJsonObject {
-                put("mode", if (enabled) "global" else "ask")
-                pending?.toolName?.let { put("tool", it) }
-            })
+            try {
+                owner.log.append("approval/mode", buildJsonObject {
+                    put("mode", if (enabled) "global" else "ask")
+                    pending?.toolName?.let { put("tool", it) }
+                })
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                if (logFailure == null) logFailure = error
+                else logFailure?.addSuppressed(error)
+            }
+            // The device-wide preference has already committed. A failed diagnostic append in
+            // one Session cannot leave this or another Run waiting under the previous policy.
             if (
                 enabled &&
                 pending != null &&
@@ -78,6 +88,9 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
             ) {
                 owner.interactions.answerApproval(pending.callId, true)
             }
+        }
+        logFailure?.let { error ->
+            runtime.performVisibleOperation("审批策略已更新，部分会话日志保存失败") { throw error }
         }
     }
 

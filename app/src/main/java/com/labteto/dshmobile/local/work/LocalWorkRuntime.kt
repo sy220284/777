@@ -24,11 +24,18 @@ class LocalWorkRuntime @Inject internal constructor(
         if (binding?.interactions?.answerApproval(callId, approved) == true) return
         runtimeStateStore.foregroundInteractions.answerApproval(callId, approved)
     }
-    internal fun enableAutoApproval() = approvals.enableAutoApproval()
-    internal fun enableAutoApprovalForPending(callId: String) = approvals.enableAutoApprovalForPending(callId)
-    internal fun enableDeviceApprovalLease(callId: String) = approvals.enableDeviceApprovalLease(callId)
-    internal fun disableDeviceApprovalLease() = approvals.disableDeviceApprovalLease(runtimeStateStore.state.value.sessionId)
-    internal fun disableAutoApproval() = approvals.disableAutoApproval()
+    internal fun enableAutoApproval() =
+        runtimeStateStore.performVisibleOperation("审批设置保存失败") { approvals.enableAutoApproval() }
+    internal fun enableAutoApprovalForPending(callId: String) =
+        runtimeStateStore.performVisibleOperation("审批设置保存失败") { approvals.enableAutoApprovalForPending(callId) }
+    internal fun enableDeviceApprovalLease(callId: String) =
+        runtimeStateStore.performVisibleOperation("审批设置保存失败") { approvals.enableDeviceApprovalLease(callId) }
+    internal fun disableDeviceApprovalLease() =
+        runtimeStateStore.performVisibleOperation("设备授权撤销保存失败") {
+            approvals.disableDeviceApprovalLease(runtimeStateStore.state.value.sessionId)
+        }
+    internal fun disableAutoApproval() =
+        runtimeStateStore.performVisibleOperation("审批设置保存失败") { approvals.disableAutoApproval() }
     internal fun answerQuestion(callId: String, answer: String) {
         val binding = workRunRegistry[runtimeStateStore.currentSessionId]
         if (binding?.interactions?.answerQuestion(callId, answer) == true) return

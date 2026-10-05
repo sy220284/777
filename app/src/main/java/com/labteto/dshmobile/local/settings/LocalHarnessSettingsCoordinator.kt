@@ -22,13 +22,22 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @Singleton
-internal class LocalHarnessSettingsCoordinator @Inject constructor(
-    @ApplicationContext context: Context,
+internal class LocalHarnessSettingsCoordinator internal constructor(
+    private val preferences: SharedPreferences,
     private val userProfileStore: UserProfileStore,
     private val runtimeStateStore: LocalRuntimeStateStore,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
-    private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+        userProfileStore: UserProfileStore,
+        runtimeStateStore: LocalRuntimeStateStore,
+    ) : this(
+        context.getSharedPreferences("local_harness", Context.MODE_PRIVATE),
+        userProfileStore,
+        runtimeStateStore,
+    )
     private val state get() = runtimeStateStore.state.value
     private val personalizationGeneration = AtomicLong()
     private val personalizationWrites = Channel<Pair<Long, UserProfile>>(Channel.CONFLATED)
