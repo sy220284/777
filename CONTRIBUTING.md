@@ -11,7 +11,7 @@
 ## 环境
 
 - Android Studio，使用当前稳定版即可。
-- JDK 17。
+- JDK 21 或更高版本；项目 JVM 编译目标固定为 21。
 - Android SDK 36 / 37。
 - Kotlin / AGP 版本由仓库锁定，不要自行升级后顺手提交。
 

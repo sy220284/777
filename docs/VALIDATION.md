@@ -17,54 +17,49 @@
 ```text
 777: 版本以 `.github/release-version` 为准（本次基线 0.12.0-777.164）
 Android: min 36 / target 36 / compile 37
-Java: 17
+Source language: Kotlin
+Build JDK: >= 21（CI / Artifact 基线为 JDK 21 LTS）
+JVM target: 21（class major 65）
+Node: >= 22
 Local Harness semantic reference: 0.1.7-rc.2 / 477b4f420...
 Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 ```
 
 ## CI
 
-`.github/workflows/ci.yml` 先由 `scope` 按架构 3.0 语义识别改动范围，再由独立 `architecture-3-gates` 验证 Feature / Shared Capability / Runtime Kernel 的所有权和运行不变量，最终统一由 `merge-gate` 放行。混合改动取检查并集，未知路径保守回退到完整 CI。
-
-主线 `push` 不再使用 workflow 级 `paths-ignore`。所有改动先进入 `scope`；纯文档可以快速结束，但 CI、测试、门禁和架构控制文件本身必须在 main 上真实执行对应验证，避免“PR 绿、合入后控制面未验证”。
+`.github/workflows/ci.yml` 先由 `scope` 根据改动文件分配最低且完整的验证集合，最终统一由 `merge-gate` 放行。混合改动取检查并集，未知路径保守回退到完整 CI。
 
 当前任务类型：
 
 ```text
-普通纯文档 / 仓库说明
+纯文档 / 仓库说明
 → scope → merge-gate
 
-架构 3.0 权威文档 / CI 主流程 / 架构门禁控制面
-→ static-gates → architecture-3-gates → merge-gate
-
-普通 GitHub Actions / 自动化脚本
+普通 GitHub Actions / 自动化脚本 / CI 控制面
 → static-gates → merge-gate
 
-架构 3.0 范围内的 JVM / 单元测试
-→ static-gates → architecture-3-gates → unit-tests → merge-gate
-
-普通 JVM / 单元测试 / Reference Validation / Mock Harness
+纯 JVM / 单元测试 / Reference Validation / Mock Harness
 → static-gates → unit-tests → merge-gate
 
 官方 fixture / 上游锁定来源变化
 → static-gates + fixture-provenance + unit-tests → merge-gate
 
-架构 3.0 范围内的 androidTest
-→ static-gates → architecture-3-gates
+纯 androidTest
+→ static-gates
 → device-artifacts-x86
 → Android 16 + Android 17（并行，共用同一组 APK）
 → merge-gate
 
 产品源码 / 资源 / Gradle / Runtime / 未知路径
-→ static-gates → architecture-3-gates
+→ static-gates
 → unit-tests + build-arm64 + device-artifacts-x86（三路并行）
 → Android 16 + Android 17（并行，共用 device-artifacts-x86）
 → merge-gate
 ```
 
-架构 3.0 范围包括 Local 的 Chat / Work / Automation / Model / Session / Tools / Settings / Runtime、对应 UI surface，以及 Harness 的共享 Agent / Job / Tool / Android Runtime 契约。架构控制文件包括 `AGENTS.md`、`ARCHITECTURE.md`、3.0 执行计划、`VALIDATION.md`、CI 主流程和两份 3.0 门禁脚本。
+`.github/release-version` 直接参与 `versionName/versionCode` 计算，因此按完整产品变更处理，main push 不得忽略。修改 APK 结构校验或 Android 启动 smoke 脚本仍归入完整 CI。手动 `workflow_dispatch` 始终强制完整 CI，并包含 fixture provenance。
 
-`.github/release-version` 直接参与 `versionName/versionCode` 计算，因此按完整产品变更处理。修改 APK 结构校验或 Android 启动 smoke 脚本仍归入完整 CI。手动 `workflow_dispatch` 始终强制完整 CI，并包含 fixture provenance。
+主线 `push` 对纯文档、普通自动化和测试-only 改动不重复启动产品 CI；产品、构建、Runtime 与版本身份变化仍执行完整组合验证。
 
 ### static-gates
 
@@ -77,20 +72,10 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 - Gradle Wrapper distribution SHA、依赖 verification metadata、版本目录禁止动态版本。
 - 新增 Gradle 模块如存在单元测试，必须被 CI 显式覆盖。
 - Android Manifest / exported component / FileProvider / 模型 HTTPS-or-loopback 安全边界。
-- UI 硬编码、Design System、通知和 Kotlin 风险门禁。
+- UI 硬编码、Design System、通知、Kotlin 风险、性能、架构门禁。
 - Runtime 压缩器自测。
 - 发布版本格式。
 - 防止重新引入 Android 16/17 各自 `connectedDebugAndroidTest` 重复构建。
-
-### architecture-3-gates
-
-该 lane 是架构 3.0 的权威结构验证，不再依赖“某段实现必须继续位于 Engine”或单纯引用计数证明完成：
-
-- `check-local-architecture-boundaries.py` 验证 Feature / Shared / Kernel 依赖方向、领域状态所有权、可写聚合边界、Feature Catalog、迁移期 Engine 具体桥和具体业务根的单向收缩。
-- 已经清零的 Chat / Work / Session / Model / Tools / Automation / Settings Runtime → Engine 依赖为永久禁止项，不再保留“0 预算”兼容口径。
-- `check-local-performance-invariants.py` 按 Chat / Work / Session 等执行 surface 检查行为与性能不变量，不把实现位置绑死在 `LocalHarnessEngine.kt`。
-- 迁移期 Engine bridge / 业务根使用具体 allowlist；删除一项必须同步缩白名单，已经迁走的名字重新出现直接失败。
-- 架构门禁失败必须调整真实所有权或依赖关系，禁止通过增加预算、换一个同数量代理或移动文件绕过。
 
 ### fixture-provenance
 
@@ -160,7 +145,6 @@ Runtime 下载使用按 OS + ABI + Runtime 脚本哈希隔离的 Actions Cache�
 
 ```text
 static-gates
-architecture-3-gates
 unit-tests
 build-arm64
 device-artifacts-x86
@@ -184,18 +168,16 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 
 ## 架构门禁
 
-架构门禁不以 Kotlin 文件数量或单文件行数作为放行条件，也不再以 Runtime→Engine 引用数量清零作为阶段完成证明。放行依据是所有权、依赖方向、状态归属、执行提交权和旧路径是否真实退出。
-
 架构门禁至少保护：
 
-- Feature 只通过 API / capability 契约协作，禁止 cross-Feature internal 依赖和 Shared 反向依赖。
-- Chat / Work / Session / Model / Tools / Automation / Settings Runtime 永久禁止重新依赖 `LocalHarnessEngine`。
-- 迁移期 Engine 组合桥、业务根和直接消费者采用具体 allowlist 单向收缩，不能以相同数量替换绕过。
-- 领域 StatePort / Runtime Projection 保持单写边界，Feature 不重新获得完整可写 `LocalHarnessState`。
-- Feature Catalog、UI projection、Session owner、run owner、EventLog 和恢复边界继续保持单一事实源。
-- Engine 构造依赖、internal surface 和聚合状态规模只作为迁移期防回涨辅助，不能单独证明架构阶段完成。
+- `LocalHarnessEngine` public surface。
+- Engine 构造依赖。
+- 已知热点文件行数。
+- UI / Worker 直接依赖 Engine 的 allowlist。
+- capability package 边界。
+- 聚合状态规模。
 
-门禁失败应下沉职责或修复依赖方向，禁止提高预算来适配错误实现。
+门禁失败应下沉职责，不应提高预算。
 
 ## 性能门禁
 

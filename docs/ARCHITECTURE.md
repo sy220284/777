@@ -1,568 +1,314 @@
-# 架构 3.0
+# Architecture
 
-> 本文是 777 当前唯一系统架构权威文档。旧版“UI → capability runtime → LocalHarnessEngine → coordinator”的架构描述已经被本版本替代。
->
-> 架构 3.0 的目标是：**模块化单体 + 层级化 Feature 组合 + 共享能力契约 + 极薄运行内核**。迁移按阶段推进；本文同时记录目标边界和当前迁移状态，禁止把尚未完成的迁移描述成已完成。
+777 is an eight-module Android project built with Kotlin 2.2.10, Jetpack Compose, Hilt and JVM 21, using JDK 21+ as the build runtime.
 
-## 1. 核心结论
+The repository uses two levels of boundary:
 
-777 不再把“拆更多 Coordinator / Runtime”本身视为架构优化。
+- **Gradle modules** for binary, platform and protocol boundaries.
+- **Capability packages inside `app`** for product evolution without turning every feature into a new module.
 
-架构 3.0 固定以下所有权模型：
-
-```text
-子功能
-  ↓ 注册到
-所属 Feature
-  ↓ 注册到
-LocalFeatureCatalog
-  ↓ 由
-Application Shell / Feature Host
-```
-
-产品 Feature 之间禁止直接依赖内部实现。跨 Feature 协作只能通过共享能力契约或明确的 Feature Port。
-
-共享能力继续向下依赖运行内核；运行内核不理解人物、日记、计划、Todo、GitHub 等具体产品业务。
-
-## 2. 总体架构
+## Gradle modules
 
 ```text
-┌────────────────────────────────────────────────────────────┐
-│                     Application Shell                      │
-│ Android / Activity / Compose / Navigation / 生命周期宿主   │
-└───────────────────────────┬────────────────────────────────┘
-                            │
-                            ▼
-┌────────────────────────────────────────────────────────────┐
-│                    Feature Composition                     │
-│                  LocalFeatureCatalog                       │
-│                                                            │
-│   ChatFeature   WorkFeature   AutomationFeature            │
-│   ToolsFeature  SettingsFeature  FutureFeature...           │
-└───────────────┬───────────────┬───────────────┬────────────┘
-                │               │               │
-                ▼               ▼               ▼
-          Feature 内部子功能聚合与业务状态所有权
-                │               │               │
-                └───────────────┼───────────────┘
-                                ▼
-┌────────────────────────────────────────────────────────────┐
-│                  Shared Capabilities                       │
-│                                                            │
-│ Session │ Model │ Agent │ Tool │ Memory │ Resource         │
-│ Usage   │ Event │ Runtime │ Persistence │ Diagnostics      │
-└───────────────────────────┬────────────────────────────────┘
-                            │
-                            ▼
-┌────────────────────────────────────────────────────────────┐
-│                   LocalRuntimeKernel                       │
-│                                                            │
-│ Run identity / ownership / transaction / cancellation      │
-│ resource lease / recovery / lifecycle                      │
-└───────────────────────────┬────────────────────────────────┘
-                            │
-                            ▼
-┌────────────────────────────────────────────────────────────┐
-│                Platform / Infrastructure                   │
-│ harness-core / Android runtime / MCP / LSP / device        │
-│ persistence / network / third-party integrations           │
-└────────────────────────────────────────────────────────────┘
+app/                      Android composition root, local Chat / Work UI and orchestration
+core/                     pure JVM remote Harness web-client protocol
+harness-core/             platform-agnostic Agent loop, tools, jobs, capabilities and sessions
+harness-runtime-android/  Android process runtime and persistent pipe terminal
+harness-interop/          MCP HTTP / stdio and LSP
+harness-device-android/   accessibility, notifications and virtual display
+mock-harness/             Ktor Harness /api test server
+reference-validation/     official Harness semantic / conformance validation
 ```
 
-## 3. Gradle 模块边界
-
-架构 3.0 不把每个产品 Feature 都拆成 Gradle module。
-
-现有模块继续承担真正的二进制、平台和协议边界：
-
-| 模块 | 职责 |
-|---|---|
-| `app/` | Android 组合根、产品 Feature、UI、运行内核装配 |
-| `core/` | 远程 Harness Web 协议链 |
-| `harness-core/` | 平台无关 Agent、工具、资源与会话核心契约 |
-| `harness-runtime-android/` | Android 进程运行时与持久终端 |
-| `harness-interop/` | MCP / LSP / GitHub 等互通能力 |
-| `harness-device-android/` | Android 设备能力 |
-| `mock-harness/` | 协议与行为测试服务端 |
-| `reference-validation/` | 官方语义与差分验证 |
-
-只有当某个能力拥有明显更小且稳定的依赖集合、独立测试/发布价值，并且不会制造循环依赖时，才升级为新的 Gradle module。
-
-## 4. Feature 层
-
-Feature 是产品业务的一级所有权边界。
-
-一个 Feature 必须拥有：
-
-- 自己的业务状态；
-- 自己的子功能组合；
-- 自己的领域规则；
-- 自己的 UI / 路由贡献；
-- 自己的持久化适配边界；
-- 自己的诊断与测试；
-- 对外最小 API 或 Port。
-
-Feature 不得：
-
-- 直接读取另一个 Feature 的 Store / Coordinator / mutable state；
-- 把跨 Feature 规则复制到多个入口；
-- 为调用方便直接穿透到 `LocalHarnessEngine`；
-- 通过全局 Service Locator 获取任意内部对象；
-- 把 UI 页面本身当成业务所有权。
-
-### 4.1 ChatFeature
-
-目标聚合：
+Main dependency direction:
 
 ```text
-ChatFeature
-├─ Persona
-├─ Gallery
-├─ GroupChat
-├─ Diary
-├─ CharacterMemory
-├─ CharacterLife
-├─ BehaviorTuning
-├─ ReplySuggestion
-├─ ChatSend
-├─ ChatRecovery
-└─ ChatQuality
+app
+├─ harness-device-android
+├─ harness-interop
+├─ harness-runtime-android
+└─ harness-core
+
+core  ← remote Harness protocol path; independent from the local Agent kernel
 ```
 
-人物、图集、日记、关系、生活状态和群聊属于 Chat 领域。其他 Feature 只能通过 Chat 暴露的能力契约使用这些行为。
+A new Gradle module is added only when a capability can own a meaningfully smaller dependency set. Otherwise, package boundaries and CI ratchets are preferred.
 
-### 4.2 WorkFeature
-
-目标聚合：
+## Local Android architecture
 
 ```text
-WorkFeature
-├─ WorkSend
-├─ Plan
-├─ Todo
-├─ Goal
-├─ Approval
-├─ Question
-├─ RunCenter
-├─ BackgroundJob
-├─ WorkContext
-├─ WorkRecovery
-└─ OutputQuality
+Compose UI / ViewModels
+        │
+        ▼
+local.presentation
+  ├─ LocalUiRuntime
+  ├─ Chat / Work surface projections
+  ├─ Settings projection
+  └─ Task projection
+        │
+        ▼
+capability runtimes
+  ├─ local.chat
+  ├─ local.work
+  ├─ local.session
+  ├─ local.model
+  ├─ local.tools
+  ├─ local.automation
+  └─ local.usage
+        │
+        ▼
+LocalHarnessEngine
+  cross-capability turn/session orchestration
+        │
+        ▼
+Coordinators / Stores / Repositories
+        │
+        ▼
+harness-core / Android runtime / MCP / device providers
 ```
 
-Work 的计划、Todo、目标、审批、问答和运行中心属于同一业务域，不继续散落在 Engine、UI 和 jobs 包之间形成多点所有权。
+### UI projections
 
-### 4.3 AutomationFeature
+Chat and Work are projections of one runtime, not two independent engines.
 
-目标聚合：
+`LocalConversationSurfaceState` exposes only the fields relevant to the product surface. Fields owned by the other mode stay at stable defaults, and projections use `distinctUntilChanged`, so Chat-only churn does not wake Work UI and vice versa.
+
+High-frequency streaming preview is kept separate from aggregate state, avoiding full state rewrites for token-by-token output. The preview is transient but not anonymous: every visible stream is owned by an explicit `sessionId + requestId + usageMode`, and UI surfaces render only a matching owner. Late deltas or completion from an older request therefore cannot overwrite or clear a newer preview.
+
+### Capability runtimes
+
+`LocalUiRuntime` is a dependency-only aggregator. Ownership remains in narrow runtimes such as `LocalChatRuntime`, `LocalWorkRuntime`, `LocalSessionRuntime`, `LocalModelRuntime`, `LocalToolsRuntime` and `LocalAutomationRuntime`.
+
+New UI and worker code should enter through the relevant capability runtime instead of calling `LocalHarnessEngine` directly.
+
+### Orchestration boundaries
+
+`LocalHarnessEngine` owns consistency across a local turn/session. Focused behavior lives in extracted coordinators for model transport, tool execution, Chat preparation/finalization, Session persistence, Agent run recovery, automation, group Chat and sending.
+
+Work 的计划、待办和目标变更由 `local.work.LocalWorkProgressCoordinator` 统一处理，包括输入规整、数量/长度上限、状态更新、事件 payload 和持久化调用顺序。Engine 只选择本次调用绑定的状态、事件日志和持久化回调；后台 Work 始终使用原 run 的会话，不跟随当前可见会话。
+
+Automation 的顶层执行使用两级所有权：`AutomationExecutionRegistry` 保证同一任务的定时触发与“立即运行”不能并发；租约冲突时“立即运行”保留为 WorkManager 重试，不能以成功状态静默丢弃。Worker 在抢任务租约前先校验 `scheduleGeneration`，拿到租约后再复核一次；修改、暂停或删除会取消旧 Worker，模型与工具边界在新副作用开始前及迟到结果提交前继续检查协程取消。已经发送到外部且不可逆的动作不声明可回滚，但取消后不得继续开启新的副作用或提交旧结果。
+
+`LocalSessionRuntimeRegistry` 统一串行化前台单聊、群聊、Work、Automation、维护写和会话删除。前台 Work 在用户消息落盘、模型历史捕获和 `LocalWorkRunBinding` 创建之前就原子预占 Session owner，并把同一租约交给整轮执行；Automation 占用时前台输入只进入持久队列，待 owner 释放后基于最新状态创建 binding。Automation Chat 与前台统一按“可见 turn → Session owner”的顺序取锁，等待 Session owner 的时间计入该次 Automation 总超时；主动消息在提交前复核本轮生成期间的用户消息/持久 inbox 序号，有新用户活动则丢弃旧上下文生成结果。会话删除使用 `SESSION_DELETE` owner 等待并封锁所有运行者，直到 Session、EventLog 和删除 tombstone 交接全部完成；Automation 拿到 owner 后必须重新读取 Session，不能使用等待前的旧快照复活已删除会话。
+
+普通会话加载跳过活跃事件尾恢复，活跃 owner 时禁止加载流程重写 checkpoint / session 持久结果；`submitWhenIdle` 通过单 Session 维护租约执行实际写入，不能在 Registry 全局 monitor 内执行 IO。前台 runId 的迟到提交栅栏仍由 `LocalAgentRunCoordinator` 管理。Chat 用户活动持续记录 `lastUserActivityAt`，用于裁决 `waiting_user` 与用户回复的并发窗口。Automation 事件规划继续复用 Engine 唯一 `HarnessResourceScheduler` 的 `MODEL_REQUEST` 租约，不创建第二套资源调度事实源。
+
+角色设置的确认保存由 `local.chat.LocalCharacterBehaviorTuningCoordinator` 编排：复用 Engine 的会话转换锁，检查会话和人物归属，等待人物、人物库与会话快照落盘后才返回成功。`CharacterBehaviorTuningPersistence` 只负责调节版本合并与持久副本收敛；单聊/群聊恢复不会借用默认人物的身份回写。界面保存锁按弹窗生命周期保持，不随初始值回显重置。
+
+The Engine has CI-enforced line, dependency and public-surface ratchets. New responsibilities must move outward rather than expanding the central orchestration surface.
+
+### Model accounts and transport
+
+本机模型运行时把账户、路由、通用语义和供应商线协议拆成独立边界：
 
 ```text
-AutomationFeature
-├─ TaskCatalog
-├─ Scheduler
-├─ Planner
-├─ ChatAutomation
-├─ WorkAutomation
-├─ Webhook
-├─ Settlement
-└─ Recovery
+Chat / Work / Agent / Automation / Vision
+                  │
+                  ▼
+          LocalModelGateway
+                  │
+        resolve once per run/request
+                  ▼
+        LocalResolvedModelRoute
+      ├─ profile / auth identity
+      ├─ provider / model / baseUrl
+      ├─ protocol / capabilities
+      └─ replay route fingerprint
+                  │
+                  ▼
+       Canonical model vocabulary
+      ├─ message/content/reasoning
+      ├─ tool definition/call/result
+      └─ provider-neutral replay envelope
+                  │
+                  ▼
+       LocalModelAdapterRegistry
+      ├─ OpenAI-compatible Chat Completions
+      ├─ OpenAI Responses
+      └─ Anthropic Messages
 ```
 
-Automation 不允许进入 Chat / Work 内部实现。需要执行聊天或工作时，依赖明确 Port，例如 `ChatExecutionPort`、`WorkExecutionPort`。
+API Key 档案继续兼容既有 `model + baseUrl` 标识；ChatGPT 套餐档案额外绑定认证类型和账户身份，避免同一 OpenAI 模型在 API Key 与套餐登录之间覆盖凭据。ChatGPT 登录后的模型目录以 OpenAI 返回的可见模型为准，不把套餐模型永久写死在客户端预设中。
 
-### 4.4 ToolsFeature / SettingsFeature
+模型调用开始后，前台 Agent、子代理及其工具通过 `LocalModelRunContext` 继承冻结的 profile；Vision 优先读取同一运行上下文，禁止在一个已启动 Run 内重新查询可变 active profile。普通设置页连通测试等非 Run 操作才按显式 profile 或当前活动档案解析。
 
-ToolsFeature 负责工具管理、MCP 集成和用户可见工具入口；运行时真正的 Tool execution contract 属于 Shared Capability。
+上层 Agent、历史压缩和恢复逻辑依赖 Canonical 消息/工具语义，不把供应商私有字段作为控制协议。供应商继续执行请求所需的私有状态存放在 `LocalModelReplayEnvelope`；它绑定 adapter、认证类型、profile、base URL 和 model 的路由指纹。同一路由可无损重放 Responses continuation、Anthropic thinking/signature 等状态；模型、协议、地址或账户变化时自动丢弃私有 replay，只保留通用文本和工具语义。
 
-SettingsFeature 负责设置体验和配置入口；模型身份、凭据解析、运行时资源等真实能力仍由对应 Shared Capability 所有。
+ChatGPT 套餐始终使用 OpenAI Responses；普通 Responses API Key 保持自己的 base URL。DeepSeek、MiniMax、Kimi、GLM、Gemini OpenAI-compatible 与 Qwen 继续走既有 Chat Completions 客户端，不因新增协议改变 payload、reasoning、工具调用或流式语义。官方 Claude 档案使用 Anthropic Messages，旧官方 Claude 档案在加载时迁移；自定义兼容代理不会被强制改协议。
 
-## 5. 子功能注册与 LocalFeatureCatalog
+Responses、Chat Completions 与 Anthropic 的工具 schema、流事件、错误、取消和 provider-private replay 都封装在各自 Adapter/Client 内。ChatGPT 套餐的 SIWC 限制仍只作用于 OpenAI Responses Adapter，不传播到其他供应商。
 
-架构 3.0 将“功能页列表”升级成正式的产品功能组合关系。
+### Send path
 
-规则：
-
-1. 每个子功能路由必须且只能属于一个 Feature。
-2. Feature 注册到启动期不可变 `LocalFeatureCatalog`。
-3. Catalog 是产品功能组合事实源，不负责具体业务执行。
-4. Catalog 在应用运行期间不可动态增删。
-5. 新 Feature 可以通过编译期组合加入系统，但不能靠运行时任意 `register/unregister` 改变产品结构。
-
-当前第一阶段已经建立：
+`LocalSendCoordinator` is the single local admission policy:
 
 ```text
-LocalFeatureCatalog
-├─ Shell
-│  └─ Home
-├─ Chat
-│  ├─ PersonaGallery
-│  └─ Diary
-├─ Work
-│  ├─ Workspace
-│  └─ RunCenter
-├─ Automation
-│  └─ Tasks
-├─ Tools
-│  └─ Tools
-└─ Settings
-   └─ Settings
+draft
+→ validate configuration / transition / queue capacity
+→ STARTED | QUEUED | REJECTED
+→ explicit UI feedback
 ```
 
-当前 Catalog 已成为本机功能导航解析和功能页面状态枚举的事实源；页面渲染贡献将在后续阶段继续从中央 `when` 分发下沉到各 Feature。
+The composer keeps the draft when runtime rejects a send. Queue-full, session-transition, loading and unconfigured states remain distinct facts.
 
-## 6. Shared Capability 层
+### Agent run context and recovery
 
-Shared Capability 是多个 Feature 可以安全复用的纯能力边界。
-
-### Session Capability
-
-`LocalSessionStorageRuntime` 统一持有 Session snapshot Repository/Coordinator，并复用唯一 `LocalSessionEventLogRegistry`；Feature 的持久化不得再借道 Engine 私有 Session 对象。
-
-
-负责：
-
-- Session 读取、写入与生命周期；
-- Session owner / lease；
-- 删除与维护事务；
-- EventLog / transcript 权威事实；
-- 恢复时的所有权裁决。
-
-Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建立第二套 Session 所有权。
-
-### Model Capability
-
-负责：
-
-- profile / account / auth identity；
-- provider / protocol / base URL；
-- 冻结 route；
-- provider adapter；
-- streaming / replay；
-- 模型能力快照。
-
-一次 Run 启动后模型身份不可因前台设置变化而漂移。
-
-### Agent Capability
-
-负责：
-
-- Agent run identity；
-- 主 / 子代理运行契约；
-- checkpoint；
-- continuation；
-- run recovery；
-- tool result continuation 语义。
-
-### Tool Capability
-
-负责：
-
-- 工具注册；
-- capability exposure；
-- approval boundary；
-- tool execution；
-- structured result；
-- side-effect 语义。
-
-产品 ToolsFeature 与 Tool Capability 必须区分：前者是产品功能，后者是运行能力。
-
-### Memory / Resource / Usage / Event
-
-这些能力继续保持单一事实源，并允许多个 Feature 复用；任何 Feature 不得为了局部方便复制第二套账本、调度器或事件源。
-
-## 7. LocalRuntimeKernel
-
-`LocalRuntimeKernel` 是架构 3.0 最底部的跨 Feature 运行时核心。
-
-最终只保留：
-
-- Run identity；
-- Session / run ownership；
-- 跨域事务边界；
-- cancellation propagation；
-- resource lease；
-- recovery 入口；
-- 系统启动、关闭与 Feature 生命周期协调。
-
-Kernel 明确不应该理解：
-
-- 人物、图集、日记；
-- 群聊成员；
-- Work 计划 / Todo / Goal；
-- GitHub Token；
-- MCP 设置页面；
-- 具体 UI 页面。
-
-当前 `LocalHarnessEngine` 仍承担一部分 Feature 业务和共享能力编排，因此它是迁移中的旧中心，不是架构 3.0 的最终形态。
-
-## 8. 状态模型
-
-现有 `LocalHarnessState` 仍是迁移中的聚合状态。目标是拆成领域状态并由 UI 按需投影：
+Foreground, subagent and automation execution share `LocalAgentRunCoordinator` checkpoints.
 
 ```text
-KernelState
-├─ lifecycle
-├─ owner
-└─ resources
-
-ChatState
-├─ persona
-├─ gallery binding
-├─ continuity
-├─ group
-└─ reply suggestions
-
-WorkState
-├─ plan
-├─ todo
-├─ goal
-├─ approval
-├─ question
-└─ jobs
-
-ModelState
-└─ route / profiles / configuration
+sessionId
+→ turnId / runId
+→ parentRunId
+→ agentId
+→ tool call
 ```
 
-UI 继续只消费窄投影，例如 Chat surface、Work surface、Shell state；高频 streaming 保持独立，不重新塞回聚合状态。
+Recovery does not blindly replay side effects. A started tool whose result is unknown becomes `TOOL_OUTCOME_UNKNOWN`; one that never started becomes `TOOL_NOT_STARTED`.
 
-## 9. UI 与导航
+Work 请求由 `LocalWorkRequestContextProjection` 生成：完整历史持久保留，模型侧采用可信任务检查点与最近因果链，超过 2 KiB 的 Work 工具结果先写入 Session 私有输出存储，模型只保留约 1 KiB 的可恢复预览，并通过 `call_id` 分页恢复。Work Prompt 分成稳定前缀与动态尾部：固定运行时事实和长期规则紧跟基础 system，当前查询召回的记忆/交接信息只放到当前 user 前，避免每个新 turn 改写历史前端。未知/自定义路由继续使用 28k 稳态目标与 36k 绝对触发；DeepSeek 官方与 OpenAI 官方按冻结路由的 `LocalPromptCachePolicy` 使用更晚的模型窗口比例阈值。DeepSeek 的 `APPEND_ONLY` 能力在运行时生效：system 规则更新追加到历史，已暴露工具保持原顺序与原 schema，新能力只能追加；工具撤销或 schema 变化视为权威边界，立即切换新工具面。Work 同时保存原始 source pressure 与实际 request pressure，增长判断只比较同一 source 坐标。正常 Work turn 只在入口和持久 turn 边界主动语义压缩，轮中依赖 provider overflow recovery 作为硬安全例外；overflow 成功后的最终 `activeMessages` 才能成为下一请求的缓存连续性基线。DeepSeek 依赖服务端自动前缀缓存；OpenAI 官方 GPT-5.6+ API Key Responses 可使用稳定 `prompt_cache_key` 与 `prompt_cache_options.ttl=30m`。ChatGPT 套餐继续遵守 SIWC 限制，不发送这些 API Key 专属字段。
 
-UI 只依赖 Feature API / projection，不依赖 Store、Coordinator 或 Kernel 内部实现。
+### Chat / Work 共享智能体底座
 
-目标导航链：
+Chat 与 Work 继续保留各自领域策略，但高阶运行能力通过共享契约回流：`projectLocalRequestContext` 是统一请求上下文治理入口，当前只由 Work 启用语义稳态投影，Chat 明确保留自身阈值与连续性策略；请求压力按 usage mode 保存 request/source 两套坐标，避免模式专属诊断继续渗入共享请求协调器。
+
+历史压缩使用带 `work/chat` 类型的统一可信 checkpoint envelope；旧 `_dsh_work_checkpoint_source=history_compactor_v1` 继续只读兼容，新 Chat 压缩不再伪装成 Work checkpoint。模型提出的状态变化通过 `RuntimeStateTransitionPolicy` 交给运行时裁决：Chat 的长期人物状态仍由运行时拥有，Work 目标在存在未完成 Todo 时不能直接落为 completed。输出质量守卫也采用共享协议：Chat 可做高置信最小修复，Work 对“完成声明与运行时状态冲突”记录结构化诊断，并在交付时局部修正整体完成结论，保留成果链接、局部进度和剩余阻塞。
+
+Agent 运行时继续向下收敛：一次 Run 的模型身份与能力由 `LocalRunModelSurface` 冻结，主 Agent 与子代理的真实 provider 调用统一经过 `LocalAgentModelRequestRuntime` 获取模型请求资源租约并执行统一 admission；二者的 bounded retry、取消传播与恢复外循环由 `LocalAgentModelStepRuntime` 统一治理，具体 overflow、结构修复和 continuation 含义仍由领域策略决定。Chat 定时事件规划也复用同一 `LocalAgentModelRequestRuntime` 与 Step 生命周期、冻结路由和输入 admission；辅助调用不创建第二套 Engine 资源调度器，设备资源配额仍只有 Engine 一个事实源。Work 与子代理对 post-admission 中断统一使用有界 `LocalAgentContinuationPolicy`，只创建新的 continuation 请求，不重放状态未知的原请求。大工具结果统一通过 `projectRecoverableToolResult` 完成 durable spill、有界模型预览和 `call_id` 恢复提示，避免前台与子代理继续维护两套截断语义。
+
+输出质量由 `LocalOutputQualityPipeline` 统一调度，领域 Guard 仍各自拥有规则：Chat 的人物异常只做高置信最小修复，Work 在 Todo 未完成或 Goal blocked 时会在最终交付前阻止整体完成声明。Automation 规划候选携带 `sessionId + latestDialogueMessageId + ChatContext generation` 版本快照，并通过 `RuntimeStateTransitionPolicy` 裁决；规划期间即使仍在同一会话，只要对话或连续性 generation 已变化，旧候选也不得落盘。
+
+持久事件遍历统一使用 `LocalSessionEventLog.withEvents` 的作用域快照；读取期间固定字节边界，遍历提前返回、消费者异常和正常完成均关闭全部文件与解压器，流不能逃逸作用域。
+
+### Tool and plugin composition
+
+Platform-specific providers are built by `LocalPluginCompositionFactory` / `LocalPluginComposition`, not by the Engine.
+
+`LocalToolPolicy` 统一声明内置工具的暴露策略；常用执行工具常驻，低频工具仍完整注册，通过任务意图预激活或 `capability_search` 按需暴露。`LocalToolExecutionCoordinator` 持有每次 Work 的激活编排，GitHub 只读取当前及有限最近真实用户意图；计划模式在投影前执行原权限过滤。
+
+Built-in plugins are described by `PluginDescriptor` and registered in a `PluginCatalog`. `PluginManager` resolves dependency order and minimum versions before lifecycle mutation, prevents disabling providers with active dependents, and keeps descriptor/catalog state synchronized with the live registry. Runtime replacement uses `PluginRegistry.replace`: registry mutations are staged and published together after admitted tool calls drain (up to 30 seconds). Failed replacements clean up the candidate and reinstall the previous plugin, publishing the newly created resources instead of old closed references. If resource restoration or cleanup fails, tools fail closed until the failed plugin is successfully disabled. UI management resolves the active instance under the lifecycle mutation lock. The Android composition rejects hot replacement or disabling of runtime/device providers that are also retained by long-lived owners; changing these providers requires restarting the runtime.
+
+Startup plugin installation remains atomic. Dynamic MCP disconnect stops new admission, drains in-flight calls, unregisters tools, then closes transport. Downstream Agent code depends on capability contracts rather than Android UI classes. External DEX/JAR loading is intentionally outside this trust boundary until the plugin API is stable; the current hot-swap contract applies to trusted in-process plugin definitions.
+
+### Web capability boundaries
+
+`LocalWebProvider` 保留网页获取、通用 HTTP 请求与下载入口。`local.web.LocalWebSearchClient` 负责 DeepSeek 辅助搜索协议、结果格式化和真实 API usage 归属；`LocalWebDiagnostics` 负责 DNS/代理/VPN 事实及有上限的 HTTP/TLS 探测。获取与诊断共用同一个 `LocalWebTargetResolver`，安全地址判断与路由构造仍只有一个实现；`LocalWebHttpPolicy` 提供搜索与 HTTP 共用的有界响应读取、User-Agent 和传输错误分类。搜索、诊断与通用 HTTP 保留各自的重试边界。
+
+### Chat continuity and memory
+
+Chat keeps persona definition, relationship memory, scene continuity, character evolution and user behavior tuning as separate concerns.
+
+Relationship memory uses a stable subject key; Gallery identity wins over copied persona identity. `CharacterBehaviorTuning` changes expression and pacing but cannot rewrite trust, shared events or other historical facts.
+
+### Character diary and cross-chat memory
+
+角色日记是 Chat 的长期叙事记忆投影，不是第二份事实源。原始事实继续以 `SessionEventLog` 为准，当前场景与待续状态继续由 `ChatContextState` 维护，精确关系事实继续进入 `MemoryStore`，长期人格变化继续由 `CharacterEvolution` 维护。
+
+日记复用现有 post-turn 状态整理请求生成稀疏的 `diaryDelta`，不为普通回合增加额外模型请求。只有具备跨会话价值的经历才允许落盘；条目区分客观事件锚点、角色感受、未说出口的心理活动、关系意义和仍会影响后续的余波。每条落盘日记必须至少包含感受或未说出口的心理活动之一，重大事件也不能退化成只有 event 的事件清单；缺少主观层时由事实/连续性层继续承载客观信息。日记优先使用角色第一人称内在表述，禁止逐句复述和流水账式时间串联，也禁止把角色对用户动机的推测升格为客观事实。
+
+单聊与群聊使用同一稳定角色 `subjectKey` 形成连续的人物经历。群聊状态整理为实际发言角色更新隐藏状态并生成主观日记，同时在同一次模型请求中为在场未发言角色生成只含日记的观察投影；同一公开事件可以形成不同角色视角，且不增加额外模型调用。只有已取得明确公开授权并落为 `PUBLIC` 的单聊经历可在后续群聊召回；群聊公开经历仍可在后续单聊召回。披露边界与“角色是否记得”分离：`PRIVATE` 只允许留在该角色自己的单聊记忆；`SHAREABLE` 仅代表普通单聊经历，也不得进入群聊 Prompt；只有 `PUBLIC` 可以进入群聊。单聊条目只有出现明确公开授权证据时才能升级为 `PUBLIC`，保密证据始终优先并强制保持 `PRIVATE`。禁止以后通过“隐私余波”“态度提示”或其他旁路把 PRIVATE/SHAREABLE 重新注入群聊。
+
+精确事实与人物日记使用不同边界：用户明确陈述并经 MemoryPolicy 落盘的精确事实（关系状态、关系对象、稳定偏好/稳定信息等）允许在单聊和群聊双向召回，仍按当前人物 subjectKey、lineage 与语义门控筛选；群聊不得因为 `groupAudience` 关闭事实召回。人物日记继续单独受披露级别约束，群聊只接受 `PUBLIC`。
+
+召回统一受模型上下文窗口预算约束。长期事实与日记共享有上限的 Chat 长期记忆预算，日记不会全量常驻 Prompt；普通输入只召回语义相关条目，显式“以前/上次/那天”等回忆请求才放宽候选。所有最终注入文本再次按模型 Token 估算硬裁剪。 Chat→Chat 继续会话不再复制旧对话生成叙事 handoff；当前场景、待续和未归并事实由迁移后的 `ChatContextState` 承接，长期经历按需从日记召回。Work 的任务 handoff 保持不变。
+
+日记保存来源会话、用户/角色消息 ID 和 generation。聊天分支编辑、历史重写或回滚时，与被丢弃消息关联的日记同步失效，避免“幽灵记忆”残留。相近经历在短时间内优先精炼已有条目，保留更完整的感受、心理和关系意义，而不是每轮追加重复记录。
+
+人物迁移档案 v4 将该人物的日记与人物设定、记忆摘要和已归档对话一起迁移。导出保留日记正文、披露级别、来源模式、修订、generation、有效/失效状态及替代关系，但移除设备内会话/消息来源引用，并清空旧 `subjectKey`；导入完成人物身份合并后，再按目标 Gallery 身份重新绑定稳定 `subjectKey`，避免跨设备残留旧人物 ID 或被不存在的旧会话回滚。v3 人物档案继续只读兼容，缺少日记时按空日记处理。人物迁移与正常聊天复用同一个进程级 `ChatDiaryStore` 写入所有者；导入先规划目标 Gallery 身份，再在日记写锁内提交日记和 Gallery，Gallery 提交失败时恢复导入前日记文档和人物冷对话归档，跨人物日记 ID 冲突使用确定性重映射保证重复导入幂等。
+
+### Token usage and observability
+
+`TokenUsageAnalyticsStore` migrates the legacy JSONL ledger transactionally into SQLite. Request insertion, deduplication and lifetime totals commit together; a failed write can be retried with the same request id. Request details retain at most 90 days and 10,000 records (shrinking to 9,000 after overflow), with a 4 KiB per-record bound. Lifetime totals are retained independently. The bounded projection updates incrementally; reopening, retention cleanup and time-zone changes rebuild it from the retained window. Averages, action splits and groups describe that window, while headline aggregates remain lifetime totals. Deduplication covers retained request identities; callers must use a new id for a new request and avoid replaying expired requests. API-reported input/output usage is the total; prompt sections are diagnostic attribution only and are not added again.
+
+`LocalTokenUsageContextBridge` maps internal model-consuming actions such as Web and Vision back to their parent run. 每个成功模型回复同时携带不含密钥的实际 route identity（profile/provider/model/baseUrl/auth/protocol/fingerprint）；Token 账本用它区分同名模型、多账户和代理地址。官方价格只在供应商与官方地址同时匹配时估算，未知或第三方路由保留实际 API usage 并记为未定价。
 
 ```text
-Compose Shell
-  ↓
-LocalFeatureCatalog
-  ↓
-Feature route contribution
-  ↓
-Feature UI
+requestId
+→ session / turn
+→ run / parentRun
+→ agent
+→ action
 ```
 
-阶段 1 已把路由归属和页面状态枚举切到 `LocalFeatureCatalog`。
+This supports daily, session, task, main-agent/subagent and action-level views without double counting.
 
-后续阶段将继续删除中央 `LocalFeaturePageContent` 的巨大 `when`，由 Feature 自己贡献页面渲染、Back ownership、入口和恢复策略。
+## Persistence and performance
 
-## 10. Product Feature 与 Runtime Plugin 的区别
+The local Session event log is the durable fact stream. Snapshots are bounded materializations, not a second full transcript authority.
 
-两种扩展机制禁止混为一套：
+Important invariants:
 
-| 机制 | 适用对象 | 生命周期 |
-|---|---|---|
-| Feature Catalog | Chat / Work / Automation / Tools 等产品功能 | 启动期组合，运行时不可变 |
-| PluginCatalog / PluginManager / PluginRegistry | MCP、设备、运行时 provider、可替换工具插件 | 支持受控运行时启停/替换 |
+- historical reads use paging;
+- runtime transcript windows stay bounded;
+- foreground transcript paging uses user-visible dialogue as its quota; reasoning, tool, progress and system traffic stays inside the bounded runtime/event layer and cannot evict the user/assistant history the UI promises to show; each bootstrap/older batch also has a total page/raw-message scan budget and preserves its cursor for later continuation when that budget is reached;
+- model-history writes go through the dedicated buffer;
+- tool output is bounded in model context, with recoverable spill storage where required;
+- streaming updates do not rebuild aggregate state;
+- caches and logs have explicit limits.
 
-产品 Feature 不采用任意热卸载，避免 Session 正在运行时业务解释器突然消失。
+CI performance guards reject known hot-path regressions and full-history scans.
 
-## 11. 单向依赖规则
+## Remote Harness architecture
 
-允许：
+远程 wire DTO 按协议功能组织：`LlmContent.kt` 承载内容块、流式 chunk 及其原样透传序列化器，`LlmMessages.kt` 承载消息、来源、终态和 usage，`LlmRequests.kt` 承载模型请求配置与工具 schema。会话 payload 分为回合、控制/审批、工作流/子代理、调度和压缩；`Events.kt` 只保留事件 envelope 与统一类型分派。既有 package、类型名、wire 字段及未知类型原样保留契约保持一致。
+
+The remote path stays separate from the local native Agent kernel.
 
 ```text
-UI
-↓
-Feature API
-↓
-Feature internal
-↓
-Shared Capability
-↓
-Kernel / Platform
+HTTPS relay
+→ /api/remote.mux
+→ ConnectionManager
+→ SessionStore
+→ ConversationSnapshot / projections
+→ Compose UI
 ```
 
-禁止：
+`SessionStore` remains the single remote stream/fold owner. The live assistant attempt is presentation data; durable settlement retires it, while reconnect restores partial output from the follow baseline. Session/host-scoped catalog and subagent RPC results are published only when the captured host/session scope is still current; late success and late failure are both discarded. Remembered landing-session writes are serialized so an older slow write cannot overwrite a newer session selection on the same host.
 
-```text
-Kernel → Feature
-Shared Capability → Feature
-Chat internal → Work internal
-Work internal → Chat internal
-Automation → Chat/Work internal
-UI → Coordinator / Store
-Feature Runtime → LocalHarnessEngine 纯转发继续增长
-```
+The current **remote protocol baseline** is `0.1.6-alpha.1` at
+`0d1f50007f9bca3f52b06e1c3074fa14d5fb0720` (`DshCore.PROTOCOL_BASELINE`).
 
-跨 Feature 调用必须通过稳定 Port，且 Port 归属于提供能力的一侧。
+The separate **local semantic reference** is pinned by `upstream/deepseek-harness.lock.json` at
+`0.1.7-rc.2 / 477b4f420553e8a52c2fbccc464d7561b239c443`.
 
-## 12. 迁移阶段
+Do not confuse the remote wire baseline with the local differential-validation baseline.
 
-### 阶段 1：冻结 Kernel / Shared Capability 边界
+## Architecture ratchets
 
-状态：**已完成。**
+CI treats architectural boundaries as executable constraints, including:
 
-- Session ownership 正式进入 `local.runtime` 共享运行层，前台、Automation、维护和删除继续共用同一 owner 事实源；
-- Agent run identity、迟到提交栅栏与 recovery coordinator 正式进入 `local.runtime`，Feature 不拥有第二套 run owner；
-- 进程唯一 `HarnessResourceScheduler` 从 `LocalHarnessEngine` 移交 `LocalRuntimeStateStore`；
-- 前台 transcript 投影游标由 `LocalRuntimeStateStore` 统一持有，Feature 后续持久化不再依赖 Engine 私有游标；
-- 共享 Runtime 自行投影可见 Kernel 资源状态；`LocalWorkRunRegistry` 单向订阅资源快照并维护脱离前台的 Work 绑定，`LocalHarnessEngine` 不再承担 Runtime → Work 的资源桥接；
-- Automation 规划模型请求直接从共享 Runtime 获取 `MODEL_REQUEST` 租约，对应 Engine 转发入口删除；
-- cancellation / recovery 继续以 Session owner、Agent run checkpoint、Foreground interaction owner 为共享边界；
-- 门禁锁定上述所有权，禁止 Engine 重新持有资源调度器。
+- line-count ratchets for known hotspots;
+- zero public methods on `LocalHarnessEngine`;
+- bounded Engine constructor dependencies;
+- bounded aggregate state;
+- allowlists for direct Engine consumers;
+- capability-package boundaries;
+- streaming, transcript paging and model-history performance invariants.
 
-### 阶段 2：领域状态拆分
+When a ratchet fails, the fix is to move responsibility to the correct boundary—not to raise the budget.
 
-状态：**已完成，继续保持单一事实源。**
+See [AGENTS.md](../AGENTS.md) for repository-wide engineering and merge rules.
 
-- `LocalHarnessState` 已拆出 Chat / Work / Kernel / Model 领域状态；
-- UI 已通过 Chat / Work / Shell 投影消费状态，高频 streaming preview 独立；
-- 已迁字段禁止重新平铺回聚合状态，不保留长期双读/双写。
+### Pending chat continuity
 
-### 阶段 3：建立 ChatFeature / WorkFeature
+The request-time pending window retains at most 64 turns with 4,000 characters per message. Full pending facts are persisted as `chat/pending-turn` events before eviction; consolidation reads paged events after the processed cursor and selects the oldest unfinished batch with bounded memory. Direct, proactive and group chat use the same store with separate scopes. Legacy active queues are archived before bounding. Continuations copy unfinished facts in bounded batches into the new session log and assign its sequences; old processed cursors are reset. Imported prefix facts remain available across branches in the new conversation. Branch restoration filters archived facts by active message ids when alternatives exist. A consolidation commit preserves newer pending turns and deterministic scene updates and rejects competing cursor changes.
 
-状态：**进行中。**
+### 人物生命运行时 V3
 
-- Runtime 的 `engine.xxx()` 行为逐项迁入所属 Feature；
-- 每迁走一项立即删除对应 Engine 入口；
-- Feature internal 只依赖 Shared Capability / Kernel 契约；
-- 禁止用“Port → Engine 原样转发”冒充完成；
-- 完成时 ChatRuntime / WorkRuntime 对 `LocalHarnessEngine` 直接引用必须为 0。
+Chat 人物运行时采用“稳定人物底色 → 独立生活/记忆/关系状态 → 本轮注意力 → 动态模式 → 最终对话”的单一路径。`PersonaProfile` 只保存少量长期人物资料，不保存固定思维/行为/表达模板；`ChatCharacterState` 保存会话内状态和可持续演变；请求时由 `CharacterRuntimeProjector` 统一投影给单聊、群聊和主动互动，禁止各入口维护平行人物 Prompt。
 
-当前 Work 审批与后台任务子阶段已落实：
+独立生活由 `CharacterLifeRuntime` 基于 `lifeContext`、当前日程、挂念与未完事项推进。时间推进采用请求时 catch-up：即使用户一段时间没有打开聊天，下一次人物被调用时也会按真实时间推进生活节拍；只允许从既有人物生活资料或已发生事件延展低风险日常状态，禁止凭空生成重大人生事件、关系事实或不可逆变化。生活事件有来源、类型、开始/更新时间和过期边界，并可为主动互动提供自然理由。
 
-- `LocalWorkApprovalCoordinator` 拥有全局自动审批切换、待审批授权、回合设备授权及撤销；WorkRuntime 直接消费该能力，Engine 对应业务入口删除。
-- `LocalApprovalPreferences` 与 `LocalSessionEventLogRegistry` 为共享注入对象；全局自动审批以设备级持久配置为权威，Session 快照不再为审批配置变化重复写盘。
-- 待审批操作在交互所有者内校验真实、未完成的等待者；过期或已回答点击不能改变全局模式或授予设备授权。开启全局自动批准会同步所有活跃 Work 状态并结算其审批等待。
-- 设备授权只修改目标会话的运行绑定；撤销不影响其他会话，前台恢复与后台取消继续使用各自交互所有者。
-- 插件组合根持有 GitHub 凭据操作和 Web 工具构造，Engine 不再直接依赖对应平台存储/Provider；构造依赖预算维持 17。
-- 进程唯一后台任务管理器由共享 Runtime 持有并继续使用原 `local-harness/jobs.json` 持久化；Work 单向订阅任务快照负责会话投影和前台通知，Engine 删除后台任务 UI 代理与任务管理器所有权。
-- WorkRuntime 对 Engine 的直接引用已由 4 → 2 → 1 → 0 清零；前台 Job、pending inbox、投影游标及取消顺序由 Shared Runtime 接管，Work 停止通过共享运行所有者执行。Engine 仍有迁移期访问器，后续必须继续收缩，不能据此宣称 Kernel 已完成。
-- 前台与 Work 取消时，即使 inbox 取消日志写入失败，也必须取消真实 Job、清理排队投影和交互授权；Work teardown 等待真实 Job/mirror 退出后再发布空闲并释放运行引用，写盘错误继续向调用方反馈。
-- 计划模式由 `LocalWorkPlanModeCoordinator` 持有，维护租约隔离前台/Automation；先提交 `plan/mode` 权威事件，再发布 Work 状态与更新模型历史，事件写入失败不得留下已切换的界面。
-- Chat 已迁出人物选择、图集绑定、默认人物同步、行为调节、纠正撤销、回复建议结果提交、群聊成员配置/移除、前台停止及分支变体选择；ChatRuntime 对 Engine 的直接引用已清零。该数字只表示 Runtime 边界收口，组合根仍存在迁移期 Engine-backed Port，发送/回合/群聊执行等业务实现仍须按 3-B～3-E 继续迁出。
-- 后台任务快照的通知与持久化按统一提交顺序执行；Work 订阅重放和绑定接入在投影锁内读取当前任务事实，防止旧快照覆盖取消或完成终态。任务返回后再次验证取消状态与合法终态提交权，阻塞执行的迟到成功或异常均不得覆盖已取消终态。回归覆盖晚接入绑定、跨会话隔离、重启中断投影、并发取消与迟到成功/异常。
-- 已迁出的 Chat 领域写入统一采用“Session MAINTENANCE owner → durable Chat domain/timeline event → runtime projection → Session snapshot cache”提交顺序。人物/行为调节等跨文档写入在权威事件提交前失败必须恢复原文档；群聊成员、回复建议和分支选择不得再出现 UI 已更新但 EventLog/模型历史仍停留旧状态的半提交。
-- 回归覆盖多会话等待、全局模式启停、过期/已完成点击、设备授权隔离/撤销、显式审批工具与前台切换；本子阶段须通过最终 Head 的完整 CI 验证。
+人物对用户的主观认识使用持久 `currentUserImpression`。它只在出现新证据时修正，不参与短期 TTL；旧 `recentImpression` 只在存储读取边界做一次迁移，迁入后立即清空，不再参与提示词、状态更新或新数据写入。人物注意力由 `CharacterAttentionResolver` 每轮从输入中选择最多两个优先关注点，并结合人物盲点形成软倾向；明确问题、边界和重要事实始终优先。`CharacterBehaviorResolver` 现作为动态模式解析器，只根据真实运行时状态与用户显式调节调整联想、推演、情绪驱动、感官、言外敏感、自由度、主动、自我分享、回应覆盖、压缩、玩心与改口等连续倾向；自然人物描述直接由模型理解，不通过“嘴硬/理性/害羞”等关键词表硬映射到固定话术或动作。模式是概率场，不是候选菜单，同一人物可随话题和状态自然切换脑回路。
 
-当前阶段三已知 Engine Feature 业务根已清零，Chat / Work 的发送、主回合、时间线 / 分支、Work AgentLoop 与 Tool runtime 等真实实现已归所属 Feature；Shared Context 也已改为中立 Policy / DTO，由 Feature 提供策略。阶段 3 仍不能标记完成：组合根尚有 `chatTurnPort`、`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort` 五个 Engine bridge，Session / 可见 Work 投影等横向适配仍待迁出。Automation 的两个 Engine coordinator bridge 属于阶段 4，单独验收。
 
-### 阶段 4：建立 AutomationFeature
+长期成长继续保留主动、开放、安全感三个粗粒度基线，同时为 `mutableTraits` 维护独立证据计数、动量、反证和权重。单轮不能改写人格；只有多次真实经历才能缓慢改变可变倾向，稳定特质与硬约束不参与关系热度漂移。关系数值仅作为派生诊断，阶段、共同经历、共同物、真实行为证据优先。
 
-状态：**待完成。**
+Token 预算在投影层硬限制：稳定人物前缀最多 520 Token，本轮“此刻”最多 230 Token，本轮动态模式最多 330 Token；硬事实、明确边界与用户纠正优先于模式细节保留。长期事实单独封顶 500 Token，人物日记封顶 800 Token。普通闲聊默认不召回日记，轻相关最多 1 条，明确回忆请求最多 3 条。人物日记、生活流与模式投影均复用现有模型回合，不增加独立模型调用。
 
-- Automation 只通过 `ChatExecutionPort` / `WorkExecutionPort` / Session Capability 工作；
-- 不进入 Chat / Work internal Coordinator；
-- Session owner、scheduleGeneration、run ownership 与迟到提交栅栏继续属于共享运行边界。
+角色回复最终仍经过已有字面风格过滤与重复守卫，并增加 `CharacterReplyAnomalyGuard`。异常守卫只对绑定人物启用，只做高置信度、最小结构修复（解释式标题、过度罗列、连续重复等）；正常文本不重写，检测到但无法安全自动修复的结构只记录诊断。
 
-### 阶段 5：FeatureCatalog + UI Contribution
+### 审计修复边界
 
-状态：**部分基础已提前落地，待按本阶段完成验收。**
+远端异步目录与子代理请求携带会话代次及独立请求序号，关闭、切换与更新后旧回调不能覆盖新状态。Automation 的领域版本变化取消旧规划请求，各加载标记由所属请求的 finally 清理；任务 UI 订阅同一持久 Store 写入后的 StateFlow。工具消息持久携带结构化错误结果，新消息不得从正文猜测失败；旧数据才使用兼容推断。过程聚合中的失败表示“含失败尝试”，不等同于最终任务失败。
 
-- 不可变 `LocalFeatureCatalog` 与唯一 route owner 继续保留；
-- 页面渲染、Back ownership、Drawer 入口、Settings/Diagnostics contribution 迁入 Feature；
-- 删除中央 `LocalFeaturePageContent` 巨大分发。
-
-### 阶段 6：收缩为 LocalRuntimeKernel
-
-状态：**待完成。**
-
-- `LocalHarnessEngine` 的 Feature 业务规则、Feature API 与迁移期代理全部退出；
-- Kernel 只保留 Session/run ownership、跨域事务、取消传播、资源租约、run identity、recovery 与生命周期协调；
-- Engine 构造依赖、internal API、直接消费者门禁持续向下 ratchet，最终更名/替换为 `LocalRuntimeKernel`；
-- Kernel 不得理解 Persona / Gallery / Todo / GitHub Token / UI 页面。
-
-## 13. 迁移约束
-
-迁移必须遵守：
-
-```text
-新边界接管
-→ 调用方切换
-→ 旧路径删除
-→ 测试/门禁锁定
-→ 再进入下一块
-```
-
-禁止长期：
-
-- 双读；
-- 双写；
-- 新旧状态互相同步；
-- Feature 和 Engine 同时拥有同一业务事实；
-- 为通过门禁只移动代码不移动所有权。
-
-## 14. 当前必须保留的系统不变量
-
-架构迁移不得破坏已经验证的核心行为：
-
-- `LocalSessionRuntimeRegistry` 的 Session owner 单一所有权；
-- Automation `scheduleGeneration` 的提交权；
-- `LocalAgentRunCoordinator` 的迟到结果栅栏；
-- 模型 Run 冻结 profile / route identity；
-- Tool side-effect 不明时禁止盲目重放；
-- EventLog 继续作为持久事实流；
-- Chat / Work UI projection 隔离；
-- streaming preview 独立；
-- Token ledger 单一账本；
-- Plugin lifecycle 继续由 PluginManager 管理。
-
-## 15. 架构门禁
-
-CI 已将架构 3.0 从通用静态检查中独立为 `architecture-3-gates`。范围分类器识别 Feature / Shared Capability / Runtime Kernel 及架构控制文件；完整产品改动必须通过该 lane，main push 也必须重新执行对应控制面验证。
-
-架构 3.0 不设置 Kotlin 文件数量门禁，也不设置单文件行数门禁。拆成几个文件、每个文件多少行都不能证明所有权正确；CI 只约束真实的架构边界、依赖方向、状态归属和运行不变量。已经清零的依赖使用永久禁止规则，尚在迁移的桥和业务根使用具体 allowlist 单向收缩。
-
-阶段 1 已增加：
-
-- Chat / Work / Automation / Tools / Settings 一级模块存在性；
-- 重复路由注册拒绝；
-- 所有路由必须唯一归属；
-- 导航必须通过 Catalog 解析；
-- Shell 页面状态枚举必须来自 Catalog。
-
-包名与领域契约收口已增加：
-
-- Local 生产源码的 Kotlin package 必须与物理目录一致；
-- Local 架构敏感源码禁止 wildcard import；
-- 根层 `LocalHarnessModels.kt` 仅声明 `LocalHarnessState` 与跨 Feature 的 `LocalUsageMode`；
-- Work 的计划、目标和任务清单归属 Work；审批/问答与后台任务类型分别归属共享 Interaction / Jobs 契约，避免 Runtime 反向依赖 Work internal；
-- 模型响应、会话/消息、附件、工具文件、Automation 结果与资源状态归位到对应契约目录，既有序列化字段与枚举值保持兼容。
-
-这轮包名和契约归位不代表运行状态边界已经完成。仍须移除 Feature 的完整可写聚合状态、收紧 Work run 所有权、建立审批配置的单一流式投影，并在实现完成后锁定跨 Feature internal 与聚合写入口门禁。
-
-后续随迁移继续增加：
-
-- Feature 禁止互相导入 internal package；
-- UI 禁止引用领域 Store / Coordinator；
-- Chat / Work / Session / Model / Tools / Automation / Settings Runtime 已清零的 Engine 依赖永久禁止回归，不再保留“0 预算”兼容口径；
-- 迁移期 Engine composition bridge、Feature 业务根和直接消费者采用具体 allowlist 单向收缩，删除后不得以同数量的新代理替代；
-- `LocalHarnessState` 字段与可写入口持续收缩；
-- Engine 构造依赖 / internal API 等热点上限仅用于防止重新中心化，不能单独作为阶段完成证明。
-
-## 16. 验证与完成标准
-
-架构阶段完成不以“文件移动完成”为准。
-
-每一阶段必须完成：
-
-```text
-实现
-→ 单元测试
-→ 架构门禁
-→ 关联回归
-→ Android 构建/设备验证
-→ 最新 main + 当前 PR head 完整 CI
-```
-
-整个架构 3.0 只有在以下条件同时成立时才完成：
-
-- Feature 拥有真实业务所有权，不是 Engine proxy；
-- Feature 之间只通过能力契约协作；
-- 共享能力只有一个事实源；
-- Kernel 不包含产品业务；
-- UI 由 Feature contribution 驱动；
-- 旧 Engine 业务入口退出；
-- 没有长期兼容双路；
-- 架构门禁能够阻止重新中心化。
-
-## 17. 相关权威文档
-
-- #448 后续实施计划：[`ARCHITECTURE-3-EXECUTION-PLAN.zh-CN.md`](ARCHITECTURE-3-EXECUTION-PLAN.zh-CN.md)；仅记录执行工作包与验收，不替代本架构定义。
-- 系统执行规则：[`../AGENTS.md`](../AGENTS.md)
-- 系统联审：[`SYSTEM-AUDIT-GUIDE.zh-CN.md`](SYSTEM-AUDIT-GUIDE.zh-CN.md)
-- 验证规则：[`VALIDATION.md`](VALIDATION.md)
-- 安全边界：[`SECURITY.md`](SECURITY.md)
-- UI / UX：[`UI-UX.zh-CN.md`](UI-UX.zh-CN.md)
-- 本机 Harness 当前状态：[`ANDROID-HARNESS-STATUS.zh-CN.md`](ANDROID-HARNESS-STATUS.zh-CN.md)
+压缩事件段由全局有界 LRU 缓存共享解压结果，以文件身份失效，单次解压也必须执行大小上限；分页仍只构造请求范围的行。角色回复链共享两次修复预算，重复诊断不删除用户需要的确认内容。人物生活事件的相同来源不因投影或其他状态更新而续期；故事时间优先于设备时钟，生活习惯只能作为可能性。群聊未交付成员持久记录并展示重试入口，不能把部分成功隐去。
