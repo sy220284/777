@@ -85,11 +85,15 @@ internal class LocalToolOutputStore(
         callId: String,
         startByte: Int = 0,
         maxBytes: Int = DEFAULT_READ_BYTES,
+        visibleLimitBytes: Int = WORK_TOOL_RECOVERY_PAGE_BYTES,
     ): String {
         require(startByte >= 0) { "start_byte 必须大于等于 0" }
         require(maxBytes in MIN_READ_BYTES..MAX_READ_BYTES) {
             "max_bytes 必须在 $MIN_READ_BYTES–$MAX_READ_BYTES 之间"
         }
+        // A page larger than what the model can actually see would be re-truncated downstream while
+        // next_byte still advanced by the requested amount, silently skipping the trimmed bytes.
+        val pageBytes = maxBytes.coerceAtMost(visibleLimitBytes.coerceAtLeast(MIN_READ_BYTES))
 
         val source = File(sessionDir(sessionId), key(callId) + ".txt")
         if (!source.isFile) return "未找到该工具调用的完整保留结果：$callId"
@@ -109,7 +113,7 @@ internal class LocalToolOutputStore(
             }
             if (alignedStart >= totalBytes) return "工具结果没有可从第 $startByte 个字节开始读取的完整字符"
 
-            val requested = minOf(maxBytes, totalBytes - alignedStart)
+            val requested = minOf(pageBytes, totalBytes - alignedStart)
             val bytes = ByteArray(requested)
             file.seek(alignedStart.toLong())
             file.readFully(bytes)
