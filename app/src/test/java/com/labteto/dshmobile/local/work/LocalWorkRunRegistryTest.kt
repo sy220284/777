@@ -5,9 +5,13 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalPersistentJobStore
+import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
 import com.labteto.dshmobile.local.runtime.LocalRuntimeJobOwner
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.send.LocalPreparedSend
+import com.labteto.dshmobile.local.send.LocalSendRejectReason
+import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
@@ -18,6 +22,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -125,6 +131,89 @@ class LocalWorkRunRegistryTest {
 
         first.eventLog.close()
         second.eventLog.close()
+    }
+
+    @Test
+    fun liveWorkBindingOwnsAdditionalInputQueueAndDurableProjection() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(
+            LocalHarnessState(
+                loading = false,
+                sessionId = "session-a",
+                usageMode = LocalUsageMode.WORK,
+                modelState = LocalModelState(configured = true),
+            ),
+        )
+        var persisted: LocalHarnessSession? = null
+        val registry = LocalWorkRunRegistry(
+            runtimeStateStore = runtime,
+            persistBinding = { binding -> persisted = binding.persistenceSnapshot() },
+        )
+        val active = binding("session-a")
+        val activeJob = Job()
+        active.runHandle.job = activeJob
+        registry.attach(active)
+        try {
+            val result = registry.enqueueIntoLiveRun(
+                LocalPreparedSend(
+                    content = "追加条件",
+                    memoryInput = "追加条件",
+                    modelMessage = buildJsonObject {
+                        put("role", "user")
+                        put("content", "追加条件")
+                    },
+                ),
+            )
+
+            assertEquals(LocalSendResult.Queued, result)
+            assertEquals(1, active.runHandle.pendingInputs.size())
+            assertEquals(1, active.state.value.kernel.queuedInputCount)
+            assertEquals("追加条件", active.state.value.messages.last().content)
+            assertEquals("session-a", persisted?.id)
+            assertEquals(1, persisted?.transcriptWindow?.size)
+        } finally {
+            activeJob.cancel()
+            active.eventLog.close()
+        }
+    }
+
+    @Test
+    fun liveWorkBindingRejectsAdditionalInputDuringSessionTransition() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(
+            LocalHarnessState(
+                loading = false,
+                sessionId = "session-a",
+                usageMode = LocalUsageMode.WORK,
+                modelState = LocalModelState(configured = true),
+            ),
+        )
+        val registry = LocalWorkRunRegistry(runtime)
+        val active = binding("session-a")
+        val activeJob = Job()
+        active.runHandle.job = activeJob
+        registry.attach(active)
+        assertTrue(runtime.beginSessionTransition())
+        try {
+            val result = registry.enqueueIntoLiveRun(
+                LocalPreparedSend(
+                    content = "不能现在排队",
+                    memoryInput = "不能现在排队",
+                    modelMessage = buildJsonObject {
+                        put("role", "user")
+                        put("content", "不能现在排队")
+                    },
+                ),
+            )
+
+            assertEquals(LocalSendRejectReason.SESSION_TRANSITION, result?.rejectReason)
+            assertEquals(0, active.runHandle.pendingInputs.size())
+            assertEquals(0, active.state.value.kernel.queuedInputCount)
+        } finally {
+            runtime.endSessionTransition()
+            activeJob.cancel()
+            active.eventLog.close()
+        }
     }
 
     @Test
