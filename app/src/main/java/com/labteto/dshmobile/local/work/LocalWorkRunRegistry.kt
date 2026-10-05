@@ -11,7 +11,6 @@ import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.update
 
 /**
  * Work-owned registry for session-bound foreground runs.
@@ -108,11 +107,10 @@ class LocalWorkRunRegistry internal constructor(
         // Initial subscription replay and binding attach can race a job callback. Read the
         // authoritative snapshot inside the projection lock instead of replaying a captured list.
         val snapshot = runtimeStateStore.jobManager.snapshotInfos()
-        projectJobSnapshotToSessionStates(snapshot, runtimeStateStore.mutableState, this)
+        runtimeStateStore.projection.projectJobs(snapshot)
+        projectJobSnapshotToRunStates(snapshot, this)
         if (notify) {
-            notifyJobs(snapshot) { message ->
-                runtimeStateStore.mutableState.update { it.copy(error = message) }
-            }
+            notifyJobs(snapshot, runtimeStateStore.projection::publishError)
         }
     }
 
