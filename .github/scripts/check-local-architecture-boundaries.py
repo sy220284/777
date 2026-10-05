@@ -14,12 +14,11 @@ ENGINE_MAX_INTERNAL_METHODS = 1
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
 ENGINE_MAX_COMPOSITION_BRIDGE_REFERENCES = 7
-ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 6
+ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 5
 ENGINE_STAGE3_FEATURE_METHOD_ROOTS = (
     "queueHumanTurn",
     "runWorkAgentTurn",
     "runChatTurn",
-    "runGroupChatTurn",
     "regenerateWorkReply",
     "editAndResendUserMessage",
 )
@@ -319,6 +318,18 @@ if "internal suspend fun exitWorkPlanMode(" not in work_plan_mode_source:
 
 engine_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
 engine = read(engine_path)
+group_execution_owner_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatExecutionOwner.kt")
+)
+if "internal suspend fun runOwnedGroupChatTurn(" not in group_execution_owner_source:
+    die("ChatFeature must own group-chat foreground admission")
+if "LocalSessionRuntimeRegistry.withOwner(" not in group_execution_owner_source:
+    die("Group Chat must retain Shared Session ownership")
+if "private suspend fun runGroupChatTurn(" in engine:
+    die("Group-chat foreground execution proxy must not return to LocalHarnessEngine")
+if "runOwnedGroupChatTurn(" not in engine:
+    die("Group-chat Engine migration call sites must route to Chat-owned execution")
+
 work_turn_starter_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnStarter.kt")
 )
