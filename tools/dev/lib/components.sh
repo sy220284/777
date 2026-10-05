@@ -1,5 +1,30 @@
+component_part_count() {
+  case "$1" in
+    gradle-deps) printf '%s\n' "$GRADLE_DEPS_PARTS" ;;
+    android-image-16) printf '%s\n' "$ANDROID_IMAGE_16_PARTS" ;;
+    android-image-17) printf '%s\n' "$ANDROID_IMAGE_17_PARTS" ;;
+    *) printf '1\n' ;;
+  esac
+}
+
+artifact_names_for_component() {
+  local component="$1" parts i
+  parts="$(component_part_count "$component")"
+  if [ "$parts" -eq 1 ]; then
+    printf '777-toolchain-%s-latest\n' "$component"
+    return 0
+  fi
+
+  i=1
+  while [ "$i" -le "$parts" ]; do
+    printf '777-toolchain-%s-part-%02d-latest\n' "$component" "$i"
+    i=$((i + 1))
+  done
+}
+
+# 兼容旧调用；分片组件会输出多行 Artifact 名称。
 artifact_name_for_component() {
-  printf '777-toolchain-%s-latest\n' "$1"
+  artifact_names_for_component "$1"
 }
 
 required_components() {
@@ -82,17 +107,25 @@ missing_components() {
   done < <(required_components "$profile")
 }
 
-component_artifacts_json() {
-  local profile="$1" first=true component
-  printf '['
+missing_artifacts() {
+  local profile="$1" component
   while IFS= read -r component; do
     [ -n "$component" ] || continue
+    artifact_names_for_component "$component"
+  done < <(missing_components "$profile")
+}
+
+component_artifacts_json() {
+  local profile="$1" first=true artifact
+  printf '['
+  while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
     if [ "$first" = true ]; then
       first=false
     else
       printf ','
     fi
-    printf '"%s"' "$(artifact_name_for_component "$component")"
-  done < <(missing_components "$profile")
+    printf '"%s"' "$artifact"
+  done < <(missing_artifacts "$profile")
   printf ']'
 }
