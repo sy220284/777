@@ -56,10 +56,10 @@ jobs:
           bash -n tools/dev/setup-toolchain.sh
           bash -n tools/dev/ai-toolchain.sh
           bash -n tools/dev/install.sh
-          bash tools/dev/install.sh --help >/dev/null 2>&1 && {
+          if bash tools/dev/install.sh --help >/dev/null 2>&1; then
             echo "仓库内 install.sh 不应在没有 Artifact payload 时进入安装流程" >&2
             exit 1
-          } || true
+          fi
           bash tools/dev/setup-toolchain.sh --self-test
           if grep -RInE '\b(curl|wget|apt-get)\b|download_verified' tools/dev --include='*.sh'; then
             echo "本地工具链脚本出现外部下载/包管理入口；必须由 Artifact 提供依赖。" >&2
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         if: matrix.profile == 'full'
         with:
-          node-version: 22
+          node-version: 22.23.3
 
       - name: full 档准备 actionlint
         if: matrix.profile == 'full'
