@@ -14,7 +14,7 @@ ENGINE_MAX_INTERNAL_METHODS = 1
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
 ENGINE_MAX_COMPOSITION_BRIDGE_REFERENCES = 7
-ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 7
+ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 6
 ENGINE_STAGE3_FEATURE_METHOD_ROOTS = (
     "queueHumanTurn",
     "queueWorkTurnLocked",
@@ -23,7 +23,6 @@ ENGINE_STAGE3_FEATURE_METHOD_ROOTS = (
     "runGroupChatTurn",
     "regenerateWorkReply",
     "editAndResendUserMessage",
-    "scheduleChatPostTurn",
 )
 
 HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
@@ -1770,6 +1769,10 @@ if "profileId = runSnapshot.modelState.modelSelection.activeProfileId" not in en
     die("Foreground runs must freeze the exact selected model profile id")
 if "messages = chatPostTurnModelMessages(prompt)" not in engine:
     die("Chat post-turn requests must include a real model input, not system-only instructions")
+if "private fun scheduleChatPostTurn(" in engine:
+    die("Chat PostTurn scheduling proxy must not return to LocalHarnessEngine")
+if "chatContextRefreshCoordinator.schedule(" not in engine:
+    die("Chat turn completion must stay wired to the Chat PostTurn coordinator")
 if "modelRequestMarkerOrNull()?.let" in engine[engine.find("requestPlanner ="):engine.find("private val chatReplyCoordinator")]:
     die("Chat post-turn planner must not re-read mutable active model identity")
 
