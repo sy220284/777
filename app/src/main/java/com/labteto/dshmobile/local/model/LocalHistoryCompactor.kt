@@ -4,7 +4,6 @@ import com.labteto.dshmobile.local.LocalHistoryBudget
 import com.labteto.dshmobile.local.context.LocalContextCheckpointKind
 import com.labteto.dshmobile.local.context.buildTrustedContextCheckpointModelMessage
 import com.labteto.dshmobile.local.context.isTrustedContextCheckpointModelMessage
-import com.labteto.dshmobile.local.runtime.structuredWorkState
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject

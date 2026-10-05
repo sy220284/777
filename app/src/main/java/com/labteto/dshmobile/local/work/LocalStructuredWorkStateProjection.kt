@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local.runtime
+package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode

@@ -9,7 +9,6 @@ import com.labteto.dshmobile.local.context.LocalRequestContextProjection
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalStructuredWorkState
 import com.labteto.dshmobile.local.model.LocalWorkContextAssessmentSnapshot
-import com.labteto.dshmobile.local.runtime.structuredWorkState
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 
 /** WorkFeature implementation of the Shared request-context policy contract. */

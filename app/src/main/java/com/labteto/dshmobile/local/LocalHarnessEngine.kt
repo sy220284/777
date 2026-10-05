@@ -219,7 +219,7 @@ import com.labteto.dshmobile.local.runtime.isolatedParallelMap
 import com.labteto.dshmobile.local.runtime.localForegroundStepLimitExtender
 import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.runtime.projectExecutionJobs
-import com.labteto.dshmobile.local.runtime.structuredWorkState
+import com.labteto.dshmobile.local.work.structuredWorkState
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.send.LocalPreparedSend
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
