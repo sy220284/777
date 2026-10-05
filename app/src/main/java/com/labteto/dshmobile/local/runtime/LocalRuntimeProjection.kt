@@ -4,7 +4,7 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.model.LocalImageInputMode
-import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.LocalSessionSummary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
