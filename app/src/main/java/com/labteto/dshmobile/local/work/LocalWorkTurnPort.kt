@@ -1,16 +1,20 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
 import com.labteto.dshmobile.local.send.LocalPreparedSend
-import com.labteto.dshmobile.local.send.LocalSendResult
+import kotlinx.coroutines.Job
 
 /**
- * Transitional low-level Work turn bridge.
+ * Transitional low-level Work turn start bridge.
  *
- * WorkExecutionPort is owned by WorkFeature. This bridge exists only while the remaining foreground
- * admission/binding/run implementation is migrated out of the composition root.
+ * WorkFeature owns product send admission and durable inbox semantics. This bridge only starts the
+ * already-admitted first turn until the Work Agent loop itself leaves the composition root.
  */
 internal interface LocalWorkTurnPort {
-    fun sendPrepared(prepared: LocalPreparedSend): LocalSendResult
+    fun startPrepared(
+        prepared: LocalPreparedSend,
+        sessionLease: LocalSessionRuntimeLease,
+    ): Job
 
     fun regenerateReply(messageId: String): Boolean
 }
