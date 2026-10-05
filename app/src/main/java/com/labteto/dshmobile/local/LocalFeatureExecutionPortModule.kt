@@ -1,7 +1,10 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
+import com.labteto.dshmobile.local.session.LocalActiveSessionScopeProvider
+import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.work.LocalWorkExecutionPort
+import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -26,4 +29,17 @@ internal object LocalFeatureExecutionPortModule {
     @Singleton
     fun provideLocalChatExecutionPort(engine: LocalHarnessEngine): LocalChatExecutionPort =
         engine.chatExecutionPort
+
+    @Provides
+    @Singleton
+    fun provideLocalActiveSessionScopeProvider(
+        workRunRegistry: LocalWorkRunRegistry,
+    ): LocalActiveSessionScopeProvider = LocalActiveSessionScopeProvider { sessionId ->
+        workRunRegistry.state(sessionId)?.let { active ->
+            LocalSessionAccessScope(
+                projectId = active.projectId,
+                lineageId = active.lineageId.ifBlank { active.sessionId },
+            )
+        }
+    }
 }
