@@ -146,6 +146,15 @@ for forbidden_work_timeline_type in ("LocalGoal", "LocalTodoItem"):
             + forbidden_work_timeline_type
         )
 
+for shared_context_path in (LOCAL_SOURCE_ROOT / "context").rglob("*.kt"):
+    shared_context_source = strip_comments(shared_context_path.read_text(encoding="utf-8"))
+    if "import com.labteto.dshmobile.local.work." in shared_context_source:
+        relative = shared_context_path.relative_to(ROOT).as_posix()
+        die(
+            f"{relative} makes Shared Context depend on WorkFeature internals; "
+            "inject a neutral context projection policy from composition instead"
+        )
+
 chat_user_activity_contract_path = (
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatUserActivityPort.kt"
 )
