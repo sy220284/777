@@ -431,7 +431,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 - WorkRuntime 对 Engine 的直接引用已由 4 → 2 → 1 → 0 清零；前台 Job、pending inbox、投影游标及取消顺序由 Shared Runtime 接管，Work 停止通过共享运行所有者执行。Engine 仍有迁移期访问器，后续必须继续收缩，不能据此宣称 Kernel 已完成。
 - 前台与 Work 取消时，即使 inbox 取消日志写入失败，也必须取消真实 Job、清理排队投影和交互授权；Work teardown 等待真实 Job/mirror 退出后再发布空闲并释放运行引用，写盘错误继续向调用方反馈。
 - 计划模式由 `LocalWorkPlanModeCoordinator` 持有，维护租约隔离前台/Automation；先提交 `plan/mode` 权威事件，再发布 Work 状态与更新模型历史，事件写入失败不得留下已切换的界面。
-- Chat 已迁出人物选择、图集绑定、默认人物同步、行为调节、纠正撤销和回复建议结果提交；ChatRuntime 的直接 Engine 引用预算降至 8。人物选择与默认同步持有 Session 维护租约至快照写入完成，按会话、模式、人物/图集/故事身份、上下文代次及最新对话拒绝迟到结果；取消与失败必须释放租约。
+- Chat 已迁出人物选择、图集绑定、默认人物同步、行为调节、纠正撤销、回复建议结果提交、群聊成员配置/移除及前台停止；ChatRuntime 的直接 Engine 引用预算降至 5。人物选择与默认同步持有 Session 维护租约至快照写入完成，按会话、模式、人物/图集/故事身份、上下文代次及最新对话拒绝迟到结果；取消与失败必须释放租约。
 - 后台任务快照的通知与持久化按统一提交顺序执行；Work 订阅重放和绑定接入在投影锁内读取当前任务事实，防止旧快照覆盖取消或完成终态。任务返回后再次验证取消状态与合法终态提交权，阻塞执行的迟到成功或异常均不得覆盖已取消终态。回归覆盖晚接入绑定、跨会话隔离、重启中断投影、并发取消与迟到成功/异常。
 - 回归覆盖多会话等待、全局模式启停、过期/已完成点击、设备授权隔离/撤销、显式审批工具与前台切换；本子阶段须通过最终 Head 的完整 CI 验证。
 
@@ -557,6 +557,7 @@ CI 必须逐步从“控制热点不继续变大”升级为“证明 3.0 边界
 
 ## 17. 相关权威文档
 
+- #448 后续实施计划：[`ARCHITECTURE-3-EXECUTION-PLAN.zh-CN.md`](ARCHITECTURE-3-EXECUTION-PLAN.zh-CN.md)；仅记录执行工作包与验收，不替代本架构定义。
 - 系统执行规则：[`../AGENTS.md`](../AGENTS.md)
 - 系统联审：[`SYSTEM-AUDIT-GUIDE.zh-CN.md`](SYSTEM-AUDIT-GUIDE.zh-CN.md)
 - 验证规则：[`VALIDATION.md`](VALIDATION.md)

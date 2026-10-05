@@ -98,6 +98,8 @@ audit metadata
 
 ## 5. Engine 继续收敛
 
+架构 3.0 的 #448 当前基线、功能迁移矩阵、后续阶段与验收出口见 [架构 3.0 后续执行方案](ARCHITECTURE-3-EXECUTION-PLAN.zh-CN.md)。
+
 `LocalHarnessEngine` 保留跨能力编排。
 
 持续下沉：
