@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import android.content.Context
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.syncForegroundJobs
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -134,7 +135,7 @@ class LocalWorkRunRegistry internal constructor(
         binding.state.update { current ->
             current.copy(
                 kernel = current.kernel.copy(
-                    resources = snapshot.toLocalHarnessResourceState(current.usageMode),
+                    resources = snapshot.toLocalHarnessResourceState(LocalUsageMode.WORK),
                     contextBudgetChars = runtimeStateStore.contextBudgetCharsFor(current.modelState, snapshot),
                 ),
             )
