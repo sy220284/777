@@ -65,9 +65,11 @@ ARCHITECTURE_3_CONTROL_FILES = {
     "AGENTS.md",
     "docs/ARCHITECTURE.md",
     "docs/ARCHITECTURE-3-EXECUTION-PLAN.zh-CN.md",
+    "docs/SYSTEM-AUDIT-GUIDE.zh-CN.md",
     "docs/VALIDATION.md",
     ".github/workflows/ci.yml",
     ".github/scripts/classify-ci-scope.py",
+    ".github/scripts/check-ci-repository-integrity.py",
     ".github/scripts/check-local-architecture-boundaries.py",
     ".github/scripts/check-local-performance-invariants.py",
 }
@@ -248,6 +250,10 @@ def self_test() -> None:
         ),
         (
             ["docs/ARCHITECTURE.md"],
+            CiPlan("architecture-control", True, True, False, False, False, False, False, False),
+        ),
+        (
+            [".github/scripts/check-ci-repository-integrity.py"],
             CiPlan("architecture-control", True, True, False, False, False, False, False, False),
         ),
         (
