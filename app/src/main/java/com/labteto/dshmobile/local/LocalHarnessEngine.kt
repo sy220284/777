@@ -3600,7 +3600,7 @@ class LocalHarnessEngine @Inject internal constructor(
         }
         return toolSchemaProjection.modelSchemas(
             policy = runPolicy,
-            state = binding?.state?.value ?: _state.value,
+            state = binding?.aggregateSnapshot() ?: _state.value,
             history = binding?.modelHistory?.snapshot() ?: modelHistory.snapshot(),
             enabledOptional = enabledOptional,
         )
