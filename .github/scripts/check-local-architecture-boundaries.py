@@ -511,6 +511,19 @@ if "engine.streamingState" in session_runtime_source:
     die("LocalSessionRuntime must not reach through LocalHarnessEngine for streaming preview state")
 if "createSession(mode, state.value.usageMode)" not in session_runtime_source:
     die("LocalSessionRuntime convenience session creation must stay inside the Session capability")
+if (
+    "createGroupChatSession" in session_runtime_source
+    or "createSingleChatSession" in session_runtime_source
+    or "MIN_GROUP_CHAT_MEMBERS" in session_runtime_source
+    or "MAX_GROUP_CHAT_MEMBERS" in session_runtime_source
+):
+    die("SessionRuntime must not own Chat session/member admission rules")
+if (
+    "MIN_GROUP_CHAT_MEMBERS" not in chat_runtime_source
+    or "MAX_GROUP_CHAT_MEMBERS" not in chat_runtime_source
+    or "sessionRuntime.createSession(" not in chat_runtime_source
+):
+    die("ChatRuntime must own group-session admission and use generic Session creation")
 if "private val streamingPreviewStore = LocalStreamingPreviewStore()" in engine:
     die("LocalHarnessEngine must not own the process-wide streaming preview store")
 if "MutableStateFlow(LocalSendFeedbackState())" in engine:

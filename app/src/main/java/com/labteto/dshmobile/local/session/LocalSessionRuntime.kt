@@ -6,8 +6,6 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.LocalChatMode
-import com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_MEMBERS
-import com.labteto.dshmobile.local.chat.MIN_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -45,27 +43,6 @@ class LocalSessionRuntime @Inject constructor(
         freshGalleryStory = freshGalleryStory,
         chatMode = chatMode,
         groupEntries = groupEntries,
-    )
-
-    internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean {
-        val selected = entries
-            .distinctBy(PersonaGalleryEntry::id)
-            .take(MAX_GROUP_CHAT_MEMBERS)
-        if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
-        val snapshot = state.value
-        if (snapshot.loading || snapshot.kernel.running) return false
-        return createSession(
-            mode = LocalConversationMode.INDEPENDENT,
-            usageMode = LocalUsageMode.CHAT,
-            chatMode = LocalChatMode.GROUP,
-            groupEntries = selected,
-        )
-    }
-
-    internal fun createSingleChatSession(): Boolean = createSession(
-        mode = LocalConversationMode.INDEPENDENT,
-        usageMode = LocalUsageMode.CHAT,
-        chatMode = LocalChatMode.SINGLE,
     )
 
     internal fun switchChatMode(mode: LocalChatMode) = engine.switchChatMode(mode)

@@ -37,8 +37,27 @@ class LocalChatRuntime @Inject internal constructor(
     ) = personaCoordinator.clearGalleryBinding(expectedGalleryId, expectedStoryId, keepCharacter)
     internal suspend fun syncDefaultChatPersona(profile: PersonaProfile): PersonaProfile =
         personaCoordinator.syncDefault(profile)
-    internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean = sessionRuntime.createGroupChatSession(entries)
-    internal fun createSingleChatSession() = sessionRuntime.createSingleChatSession()
+    internal fun createGroupChatSession(entries: List<PersonaGalleryEntry>): Boolean {
+        val selected = entries
+            .distinctBy(PersonaGalleryEntry::id)
+            .take(MAX_GROUP_CHAT_MEMBERS)
+        if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
+        val snapshot = chatState.value
+        if (snapshot.loading || snapshot.kernel.running) return false
+        return sessionRuntime.createSession(
+            mode = com.labteto.dshmobile.local.session.LocalConversationMode.INDEPENDENT,
+            usageMode = com.labteto.dshmobile.local.LocalUsageMode.CHAT,
+            chatMode = LocalChatMode.GROUP,
+            groupEntries = selected,
+        )
+    }
+
+    internal fun createSingleChatSession(): Boolean = sessionRuntime.createSession(
+        mode = com.labteto.dshmobile.local.session.LocalConversationMode.INDEPENDENT,
+        usageMode = com.labteto.dshmobile.local.LocalUsageMode.CHAT,
+        chatMode = LocalChatMode.SINGLE,
+    )
+
     internal fun switchChatMode(mode: LocalChatMode) = sessionRuntime.switchChatMode(mode)
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean =
         groupMembership.configure(entries)
