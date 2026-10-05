@@ -20,7 +20,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
 }
 
 RUNTIME_ENGINE_REFERENCE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 14,
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 10,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 12,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
@@ -393,6 +393,32 @@ if "engine.undoChatPersonaCorrection" in chat_runtime_source:
     die("Persona-correction undo must stay inside ChatFeature")
 if "personaCorrections.undo" not in chat_runtime_source:
     die("ChatRuntime must route persona-correction undo through its Chat coordinator")
+for forbidden_persona_proxy in (
+    "engine.selectChatPersona",
+    "engine.bindChatGallery",
+    "engine.clearChatGalleryBinding",
+    "engine.syncDefaultChatPersona",
+):
+    if forbidden_persona_proxy in chat_runtime_source:
+        die("ChatRuntime must route persona/gallery state through LocalChatPersonaCoordinator: " + forbidden_persona_proxy)
+for removed_persona_api in (
+    "internal fun selectChatPersona(",
+    "internal fun bindChatGallery(",
+    "internal fun clearChatGalleryBinding(",
+    "internal suspend fun syncDefaultChatPersona(",
+):
+    if removed_persona_api in engine:
+        die("LocalHarnessEngine must not reintroduce Chat persona/gallery API: " + removed_persona_api)
+chat_persona_coordinator = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersonaCoordinator.kt")
+)
+for required_persona_dependency in (
+    "LocalRuntimeStateStore",
+    "LocalSessionStorageRuntime",
+    "ChatPersonaStore",
+):
+    if required_persona_dependency not in chat_persona_coordinator:
+        die("Chat persona ownership is incomplete: " + required_persona_dependency)
 
 model_configuration = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt")
