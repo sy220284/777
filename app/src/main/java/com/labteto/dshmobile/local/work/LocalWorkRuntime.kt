@@ -1,16 +1,18 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalHarnessEngine
+import com.labteto.dshmobile.local.LocalSessionEventLogRegistry
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.update
 
 /** Work/interaction capability boundary for the local UI. */
 @Singleton
 class LocalWorkRuntime @Inject constructor(
-    private val engine: LocalHarnessEngine,
     private val workRunRegistry: LocalWorkRunRegistry,
     private val runtimeStateStore: LocalRuntimeStateStore,
+    private val eventLogs: LocalSessionEventLogRegistry,
     private val approvals: LocalWorkApprovalCoordinator,
     private val planMode: LocalWorkPlanModeCoordinator,
 ) {
@@ -39,8 +41,24 @@ class LocalWorkRuntime @Inject constructor(
         runtimeStateStore.foregroundInteractions.cancelQuestion(callId)
     }
     internal fun stop() {
-        if (workRunRegistry.requestCancel(runtimeStateStore.currentSessionId)) return
-        engine.stopForegroundRun()
+        val sessionId = runtimeStateStore.currentSessionId
+        val snapshot = runtimeStateStore.state.value
+        if (snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK) return
+        if (workRunRegistry.requestCancel(sessionId)) return
+
+        runtimeStateStore.cancelForegroundRun(eventLogs.get(sessionId))
+        runtimeStateStore.mutableState.update { current ->
+            if (current.sessionId != sessionId || current.usageMode != LocalUsageMode.WORK) {
+                current
+            } else {
+                current.copy(
+                    work = current.work.copy(
+                        pendingApproval = null,
+                        pendingQuestion = null,
+                    ),
+                )
+            }
+        }
     }
 
     internal fun setPlanMode(enabled: Boolean) {
