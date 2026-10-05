@@ -158,16 +158,8 @@ internal class LocalChatContextRefreshCoordinator(
     private val persistBranchState: (String) -> Unit,
     private val persist: () -> Unit,
 ) {
-    private val scheduledRefreshLock = Any()
-    private var scheduledRefreshJob: Job? = null
-
     fun cancelScheduledRefresh() {
-        val job = synchronized(scheduledRefreshLock) {
-            val current = scheduledRefreshJob
-            scheduledRefreshJob = null
-            current
-        }
-        job?.cancel()
+        LocalChatPostTurnJobOwner.cancel()
     }
 
     fun schedule(
@@ -203,12 +195,8 @@ internal class LocalChatContextRefreshCoordinator(
                 profile = profile,
             )
         }
-        synchronized(scheduledRefreshLock) { scheduledRefreshJob = job }
-        job.invokeOnCompletion {
-            synchronized(scheduledRefreshLock) {
-                if (scheduledRefreshJob === job) scheduledRefreshJob = null
-            }
-        }
+        LocalChatPostTurnJobOwner.replace(job)
+        job.invokeOnCompletion { LocalChatPostTurnJobOwner.clearIf(job) }
         job.start()
     }
 
@@ -251,12 +239,8 @@ internal class LocalChatContextRefreshCoordinator(
                 retryAttempt = retryAttempt + 1,
             )
         }
-        synchronized(scheduledRefreshLock) { scheduledRefreshJob = job }
-        job.invokeOnCompletion {
-            synchronized(scheduledRefreshLock) {
-                if (scheduledRefreshJob === job) scheduledRefreshJob = null
-            }
-        }
+        LocalChatPostTurnJobOwner.replace(job)
+        job.invokeOnCompletion { LocalChatPostTurnJobOwner.clearIf(job) }
         job.start()
     }
 
