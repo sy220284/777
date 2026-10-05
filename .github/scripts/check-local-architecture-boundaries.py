@@ -24,7 +24,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
 RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 0,
-    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 5,
+    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 5,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 3,
@@ -42,7 +42,6 @@ ENGINE_CONSUMER_ALLOWLIST = {
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt",
 }
 
 UI_AGGREGATE_STATE_ALLOWLIST = {
@@ -602,6 +601,19 @@ if "engine.streamingState" in session_runtime_source:
     die("LocalSessionRuntime must not reach through LocalHarnessEngine for streaming preview state")
 if "createSession(mode, state.value.usageMode)" not in session_runtime_source:
     die("LocalSessionRuntime convenience session creation must stay inside the Session capability")
+if "LocalHarnessEngine" in session_runtime_source:
+    die("LocalSessionRuntime must not depend on LocalHarnessEngine after Session lifecycle port migration")
+if not has_typed_property(session_runtime_source, "LocalSessionLifecyclePort"):
+    die("LocalSessionRuntime must depend on the Session-owned lifecycle port")
+for required_lifecycle_delegate in (
+    "lifecycle.createSession(",
+    "lifecycle.switchDomainMode(command)",
+    "lifecycle.switchUsageMode(mode)",
+    "lifecycle.switchSession(sessionId)",
+    "lifecycle.deleteSessions(ids)",
+):
+    if required_lifecycle_delegate not in session_runtime_source:
+        die("Session lifecycle entry must route through LocalSessionLifecyclePort: " + required_lifecycle_delegate)
 for required_session_delegate in (
     "sessionFiles.importAttachment(uri)",
     "sessionFiles.workspaceFiles()",
@@ -1364,6 +1376,38 @@ feature_execution_port_module_source = strip_comments(
 )
 if "provideLocalActiveSessionScopeProvider" not in feature_execution_port_module_source:
     die("app composition root must adapt active Work session scope into the Shared Session access contract")
+if "provideLocalSessionLifecyclePort" not in feature_execution_port_module_source:
+    die("app composition root must provide the Session lifecycle port")
+if "engine.sessionLifecyclePort" not in feature_execution_port_module_source:
+    die("Session lifecycle composition must expose the migrated lifecycle port, not Engine proxy methods")
+
+session_lifecycle_port_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionLifecyclePort.kt")
+)
+for required_lifecycle_contract in (
+    "interface LocalSessionLifecyclePort",
+    "fun createSession(",
+    "fun switchDomainMode(",
+    "fun switchUsageMode(",
+    "fun switchSession(",
+    "suspend fun deleteSessions(",
+):
+    if required_lifecycle_contract not in session_lifecycle_port_source:
+        die("Session lifecycle port contract is incomplete: " + required_lifecycle_contract)
+if "LocalHarnessEngine" in session_lifecycle_port_source or "LocalHarnessState" in session_lifecycle_port_source:
+    die("Session lifecycle port must not expose Engine or writable aggregate state")
+for removed_engine_lifecycle_proxy in (
+    "internal fun createSession(",
+    "internal fun newSession()",
+    "internal fun switchSessionDomainMode(",
+    "internal fun switchUsageMode(",
+    "internal fun switchSession(",
+    "internal suspend fun deleteSessions(",
+):
+    if removed_engine_lifecycle_proxy in engine:
+        die("LocalHarnessEngine must not restore Session lifecycle proxy API: " + removed_engine_lifecycle_proxy)
+if "internal val sessionLifecyclePort: LocalSessionLifecyclePort" not in engine:
+    die("Engine composition bridge must expose one Session lifecycle port during Stage 3 migration")
 
 conversation_files_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/session/LocalConversationFilesCoordinator.kt")
