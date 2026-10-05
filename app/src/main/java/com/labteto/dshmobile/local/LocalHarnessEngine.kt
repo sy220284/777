@@ -916,11 +916,6 @@ class LocalHarnessEngine @Inject internal constructor(
         }
     }
 
-    internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> =
-        LocalCharacterBehaviorTuningCoordinator(
-            _state, chatPersonaStore, chatPersonaGalleryStore, sessionTransitionMutex, ::persistNow,
-        ).configure(profile)
-
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean {
         val snapshot = _state.value
         if (
