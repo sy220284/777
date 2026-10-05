@@ -576,13 +576,13 @@ internal class LocalGroupChatTurnExecutor(
                 work = it.work.copy(
                     pendingApproval = null,
                     pendingQuestion = null,
+                    deviceApprovalLease = false,
                 ),
                 error = null,
                 chat = it.chat.copy(
                     replySuggestions = emptyList(),
                     groupActiveSpeakerName = null,
                 ),
-                deviceApprovalLease = false,
             )
         }
         try {
@@ -874,9 +874,9 @@ internal class LocalGroupChatTurnExecutor(
                     work = it.work.copy(
                         pendingApproval = null,
                         pendingQuestion = null,
+                        deviceApprovalLease = false,
                     ),
                     chat = it.chat.copy(groupActiveSpeakerName = null),
-                    deviceApprovalLease = false,
                 )
             }
             persist()
