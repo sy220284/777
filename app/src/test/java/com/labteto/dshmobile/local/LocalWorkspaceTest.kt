@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.work.LocalFileObservationCache
-import com.labteto.dshmobile.local.work.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import org.junit.After
