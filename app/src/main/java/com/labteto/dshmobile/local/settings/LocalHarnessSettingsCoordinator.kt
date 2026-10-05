@@ -18,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.atomic.AtomicLong
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @Singleton
@@ -62,7 +61,7 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
     internal fun readUserProfile(): UserProfile = userProfileStore.read()
 
     private fun updateState(transform: (LocalHarnessState) -> LocalHarnessState) {
-        runtimeStateStore.mutableState.update(transform)
+        runtimeStateStore.projection.update(transform)
     }
     fun configureRuntimeLimits(
         mainMaxSteps: Int,
