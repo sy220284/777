@@ -71,7 +71,6 @@ class LocalWorkApprovalCoordinatorTest {
                 maxPendingInputs = 8,
             ),
             eventLog = events.get(id),
-            pruneToolResult = { it },
         ).also(runs::attach)
     }
 
@@ -164,7 +163,6 @@ class LocalWorkApprovalCoordinatorTest {
                 maxPendingInputs = 8,
             ),
             eventLog = brokenLog,
-            pruneToolResult = { it },
         ).also(f.runs::attach)
         val c = f.binding("c")
         val first = async { a.interactions.awaitApproval(approval("first")) }
