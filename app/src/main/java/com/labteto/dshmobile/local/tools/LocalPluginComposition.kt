@@ -35,7 +35,7 @@ import com.labteto.dshmobile.local.vision.LocalVisionPlugin
 import com.labteto.dshmobile.local.vision.LocalVisionRoute
 import com.labteto.dshmobile.local.vision.VisionClient
 import com.labteto.dshmobile.local.web.LocalWebTools
-import com.labteto.dshmobile.local.work.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import com.labteto.dshmobile.runtime.AndroidRuntimePlugin
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
