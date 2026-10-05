@@ -21,6 +21,8 @@ self_test() {
 
   grep -Fq "minSdk = $ANDROID_MIN_API" "$root/app/build.gradle.kts" || { echo "ANDROID_MIN_API 与 app/build.gradle.kts 不一致" >&2; return 1; }
   grep -Fq "compileSdk = $ANDROID_COMPILE_API" "$root/app/build.gradle.kts" || { echo "ANDROID_COMPILE_API 与 app/build.gradle.kts 不一致" >&2; return 1; }
+  grep -Fq "buildToolsVersion = \"$ANDROID_BUILD_TOOLS\"" "$root/app/build.gradle.kts" || { echo "ANDROID_BUILD_TOOLS 与 app/build.gradle.kts 不一致" >&2; return 1; }
+  grep -Fq "buildToolsVersion = \"$ANDROID_BUILD_TOOLS\"" "$root/harness-device-android/build.gradle.kts" || { echo "ANDROID_BUILD_TOOLS 与 harness-device-android/build.gradle.kts 不一致" >&2; return 1; }
   grep -Fq "JavaVersion.VERSION_$JVM_TARGET" "$root/app/build.gradle.kts" || { echo "JVM_TARGET 与 app/build.gradle.kts 不一致" >&2; return 1; }
   grep -Fq "java-version: $BUILD_JDK_MIN_MAJOR" "$root/.github/workflows/ci.yml" || { echo "BUILD_JDK_MIN_MAJOR 与 CI 不一致" >&2; return 1; }
   grep -Fq "$ANDROID_PLATFORM_PACKAGE" "$root/.github/workflows/ci.yml" || { echo "Android platform package 与 CI 不一致" >&2; return 1; }
