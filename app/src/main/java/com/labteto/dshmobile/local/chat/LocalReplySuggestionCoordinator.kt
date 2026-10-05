@@ -3,37 +3,41 @@ package com.labteto.dshmobile.local.chat
 import com.labteto.dshmobile.local.LocalChatTurnCoordinator
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.TokenUsageAction
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.LocalAuxiliaryModelRequestRuntime
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.model.LocalModelProfile
-import com.labteto.dshmobile.local.model.LocalModelReply
-import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.recordForeground
+import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Owns the model-assisted reply-suggestion transaction end to end: frozen route resolution,
- * protocol-safe input construction, parsing, stale-result rejection, diagnostics and state commit.
+ * Owns reply-suggestion generation and commit inside ChatFeature.
+ *
+ * Model work runs outside the Session lease on a frozen route. The final state/durable commit takes
+ * the shared MAINTENANCE lease and revalidates the exact assistant/character generation target.
  */
-internal class LocalReplySuggestionCoordinator(
-    private val state: MutableStateFlow<LocalHarnessState>,
+@Singleton
+internal class LocalReplySuggestionCoordinator @Inject constructor(
+    private val runtimeStateStore: LocalRuntimeStateStore,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
     private val modelGateway: LocalModelGateway,
-    private val requestModel: suspend (
-        snapshot: LocalHarnessState,
-        messages: List<JsonObject>,
-        eventLog: LocalSessionEventLog,
-        profile: LocalModelProfile,
-    ) -> LocalModelReply,
-    private val recordUsage: (LocalHarnessState, LocalModelReply) -> Unit,
-    private val eventLogFor: (String) -> LocalSessionEventLog,
-    private val persistBranchState: (String) -> Unit,
-    private val persist: () -> Unit,
+    private val requestRuntime: LocalAuxiliaryModelRequestRuntime,
+    private val usageTracker: DeepSeekUsageTracker,
+    private val sessionStorage: LocalSessionStorageRuntime,
+    private val branchCoordinator: LocalChatBranchCoordinator,
 ) {
     suspend fun generate(): Boolean {
+        val state = runtimeStateStore.mutableState
         val snapshot = state.value
         if (
             snapshot.loading ||
@@ -48,7 +52,7 @@ internal class LocalReplySuggestionCoordinator(
         } ?: return false
         val expectedSessionId = snapshot.sessionId
         val expectedAssistantMessageId = assistantMessage.id
-        val boundEventLog = eventLogFor(expectedSessionId)
+        val boundEventLog = sessionStorage.eventLogs.get(expectedSessionId)
         val profile = try {
             modelGateway.profileForRoute(
                 profileId = snapshot.modelState.modelSelection.activeProfileId,
@@ -59,9 +63,11 @@ internal class LocalReplySuggestionCoordinator(
             throw cancelled
         } catch (error: Throwable) {
             updateError(
+                state,
                 snapshot,
                 expectedAssistantMessageId,
-                error.message?.takeIf(String::isNotBlank) ?: "回复建议需要可用的模型账户或 API Key",
+                error.message?.takeIf(String::isNotBlank)
+                    ?: "回复建议需要可用的模型账户或 API Key",
             )
             return false
         }
@@ -73,11 +79,12 @@ internal class LocalReplySuggestionCoordinator(
             latestAssistantMessageId = expectedAssistantMessageId,
         )
         val reply = try {
-            requestModel(
-                snapshot,
-                chatReplySuggestionModelMessages(prompt),
-                boundEventLog,
-                profile,
+            requestRuntime.complete(
+                snapshot = snapshot,
+                profile = profile,
+                messages = chatReplySuggestionModelMessages(prompt),
+                eventLog = boundEventLog,
+                operation = "chat/reply-suggestions",
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -87,13 +94,20 @@ internal class LocalReplySuggestionCoordinator(
                 put("detail", error.message.orEmpty().take(1_000))
             })
             updateError(
+                state,
                 snapshot,
                 expectedAssistantMessageId,
                 error.message?.takeIf(String::isNotBlank) ?: "回复建议生成失败，请重试",
             )
             return false
         }
-        recordUsage(snapshot, reply)
+        usageTracker.recordForeground(
+            snapshot = snapshot,
+            reply = reply,
+            action = TokenUsageAction.REPLY_SUGGESTIONS,
+            turnId = snapshot.transcriptIndex.latestUserMessageId,
+            step = CHAT_POST_TURN_MODEL_STEP + 1,
+        )
 
         val suggestions = chatTurnCoordinator.parseReplySuggestions(reply.content.orEmpty())
         if (suggestions.isNullOrEmpty()) {
@@ -101,32 +115,57 @@ internal class LocalReplySuggestionCoordinator(
                 put("status", "parse-failed")
                 put("content", reply.content.orEmpty().take(2_000))
             })
-            updateError(snapshot, expectedAssistantMessageId, "回复建议返回格式异常，请重试")
+            updateError(state, snapshot, expectedAssistantMessageId, "回复建议返回格式异常，请重试")
             return false
         }
 
-        val applied = commitReplySuggestions(state, snapshot, expectedAssistantMessageId, suggestions)
-        if (!applied) {
+        val lease = LocalSessionRuntimeRegistry.tryAcquire(
+            expectedSessionId,
+            LocalSessionRuntimeKind.MAINTENANCE,
+        )
+        if (lease == null) {
             boundEventLog.append("chat/reply-suggestions", buildJsonObject {
                 put("status", "stale-discarded")
                 put("assistant_message_id", expectedAssistantMessageId)
+                put("reason", "session-busy")
             })
             return false
         }
+        try {
+            val applied = commitReplySuggestions(
+                state,
+                snapshot,
+                expectedAssistantMessageId,
+                suggestions,
+            )
+            if (!applied) {
+                boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                    put("status", "stale-discarded")
+                    put("assistant_message_id", expectedAssistantMessageId)
+                })
+                return false
+            }
 
-        boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-            put("status", "updated")
-            put("assistant_message_id", expectedAssistantMessageId)
-            put("suggestion_count", suggestions.size)
-        })
-        if (hasChatBranchAlternatives(state.value.chat.chatBranches)) {
-            persistBranchState("chat/reply-suggestions-updated")
+            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                put("status", "updated")
+                put("assistant_message_id", expectedAssistantMessageId)
+                put("suggestion_count", suggestions.size)
+            })
+            if (hasChatBranchAlternatives(state.value.chat.chatBranches)) {
+                branchCoordinator.persistCurrentProjection(
+                    expectedSessionId,
+                    "chat/reply-suggestions-updated",
+                )
+            }
+            sessionStorage.enqueueCurrentSnapshot(expectedSessionId)
+            return true
+        } finally {
+            lease.close()
         }
-        persist()
-        return true
     }
 
     private fun updateError(
+        state: MutableStateFlow<LocalHarnessState>,
         snapshot: LocalHarnessState,
         expectedAssistantMessageId: String,
         message: String,
