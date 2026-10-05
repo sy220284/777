@@ -208,10 +208,6 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                     activeTranscript = rewritten,
                     modelHistory = rewrittenHistory,
                     state = LocalTimelineRewriteState(
-                        plan = state.work.plan,
-                        todos = state.work.todos,
-                        goal = state.work.goal,
-                        planMode = state.work.planMode,
                         chatState = committedChatState,
                         chatContext = committedChatContext,
                         chatBranches = LocalChatBranchState(),
