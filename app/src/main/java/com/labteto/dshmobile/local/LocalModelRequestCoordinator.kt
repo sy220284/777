@@ -622,6 +622,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                     })
                                 }
                             }
+                            reply
                 }
             } finally {
                 previewOwner?.let(streamingPreviewStore::clear)
