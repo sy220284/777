@@ -46,6 +46,30 @@ internal class LocalRuntimeProjection(
     override fun update(transform: (LocalHarnessState) -> LocalHarnessState) {
         state.update(transform)
     }
+    internal fun projectVisibleWorkRun(
+        sessionId: String,
+        snapshot: LocalHarnessState,
+    ) {
+        state.update { visible ->
+            if (visible.sessionId != sessionId) {
+                visible
+            } else {
+                visible.copy(
+                    messages = snapshot.messages,
+                    transcriptIndex = snapshot.transcriptIndex,
+                    work = snapshot.work,
+                    kernel = visible.kernel.copy(
+                        running = snapshot.kernel.running,
+                        queuedInputCount = snapshot.kernel.queuedInputCount,
+                        contextChars = snapshot.kernel.contextChars,
+                        contextBudgetChars = snapshot.kernel.contextBudgetChars,
+                    ),
+                    error = snapshot.error,
+                )
+            }
+        }
+    }
+
     internal fun setWorkPlanMode(sessionId: String, enabled: Boolean) {
         state.update { current ->
             if (
