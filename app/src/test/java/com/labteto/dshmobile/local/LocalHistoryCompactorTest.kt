@@ -8,7 +8,7 @@ import com.labteto.dshmobile.local.model.LocalWorkCheckpoint
 import com.labteto.dshmobile.local.model.applyOverflowCompaction
 import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.local.model.retainTextForModel
-import com.labteto.dshmobile.local.runtime.structuredWorkState
+import com.labteto.dshmobile.local.work.structuredWorkState
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
