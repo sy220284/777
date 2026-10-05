@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
@@ -13,15 +14,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Owns direct-chat persona selection and gallery binding for ChatFeature. */
 @Singleton
 internal class LocalChatPersonaCoordinator internal constructor(
-    private val state: MutableStateFlow<LocalHarnessState>,
+    private val state: LocalAggregateProjectionPort,
     private val savePersona: suspend (PersonaProfile) -> PersonaProfile,
     private val persistNow: suspend (String) -> Boolean,
     private val enqueueSnapshot: (String) -> Boolean,
@@ -32,7 +31,7 @@ internal class LocalChatPersonaCoordinator internal constructor(
         personaStore: ChatPersonaStore,
         sessionStorage: LocalSessionStorageRuntime,
     ) : this(
-        state = runtimeStateStore.mutableState,
+        state = runtimeStateStore.projection,
         savePersona = { profile -> withContext(Dispatchers.IO) { personaStore.upsert(profile) } },
         persistNow = sessionStorage::writeCurrentSnapshotNow,
         enqueueSnapshot = sessionStorage::enqueueCurrentSnapshot,
