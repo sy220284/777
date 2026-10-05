@@ -9,7 +9,6 @@ import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -50,18 +49,7 @@ internal class LocalWorkPlanModeCoordinator @Inject constructor(
             val log = eventLogs.get(sessionId)
             log.append("plan/mode", buildJsonObject { put("active", enabled) })
 
-            runtimeStateStore.mutableState.update { current ->
-                if (
-                    current.sessionId == sessionId &&
-                    current.usageMode == LocalUsageMode.WORK &&
-                    !current.loading &&
-                    !current.kernel.running
-                ) {
-                    current.copy(work = current.work.copy(planMode = enabled))
-                } else {
-                    current
-                }
-            }
+            runtimeStateStore.projection.setWorkPlanMode(sessionId, enabled)
             val after = runtimeStateStore.state.value
             if (
                 after.sessionId != sessionId ||
@@ -78,21 +66,11 @@ internal class LocalWorkPlanModeCoordinator @Inject constructor(
                     log = log,
                 )
                 val resources = runtimeStateStore.resourceSnapshot()
-                runtimeStateStore.mutableState.update { current ->
-                    if (current.sessionId != sessionId) {
-                        current
-                    } else {
-                        current.copy(
-                            kernel = current.kernel.copy(
-                                contextChars = history.encodedChars,
-                                contextBudgetChars = runtimeStateStore.contextBudgetCharsFor(
-                                    current,
-                                    resources,
-                                ),
-                            ),
-                        )
-                    }
-                }
+                runtimeStateStore.projection.updateContextMetrics(
+                    sessionId = sessionId,
+                    contextChars = history.encodedChars,
+                    contextBudgetChars = runtimeStateStore.contextBudgetCharsFor(after, resources),
+                )
             }
             true
         } finally {
