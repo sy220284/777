@@ -20,7 +20,7 @@ import kotlinx.serialization.json.put
 @Singleton
 internal class LocalChatPersonaCorrectionCoordinator @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
-    private val persistence: LocalChatPersistence,
+    private val personaStore: ChatPersonaStore,
     private val eventLogs: LocalSessionEventLogRegistry,
 ) {
     internal suspend fun undo(
@@ -39,7 +39,7 @@ internal class LocalChatPersonaCorrectionCoordinator @Inject constructor(
 
         val boundEventLog = eventLogs.get(snapshot.sessionId)
         val updated = withContext(Dispatchers.IO) {
-            persistence.personaStore.removeCorrection(personaId, correction)
+            personaStore.removeCorrection(personaId, correction)
         } ?: return
 
         runtimeStateStore.mutableState.update { current ->
