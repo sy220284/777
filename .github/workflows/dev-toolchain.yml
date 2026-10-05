@@ -1,0 +1,145 @@
+name: 开发工具链
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 要生成并验证的本地工具链档位
+        required: true
+        default: build
+        type: choice
+        options:
+          - build
+          - full
+  pull_request:
+    paths:
+      - 'tools/dev/**'
+      - '.github/workflows/dev-toolchain.yml'
+      - '.github/workflows/ci.yml'
+      - 'docs/DEVELOPMENT.md'
+      - 'docs/README.md'
+      - 'CONTRIBUTING.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-toolchain-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: 验证工具链清单与脚本
+        run: |
+          bash -n tools/dev/setup-toolchain.sh
+          bash tools/dev/setup-toolchain.sh --self-test
+      - name: 生成可下载工具链包
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/777-dev-toolchain"
+          mkdir -p "$ROOT/tools/dev" "$ROOT/docs"
+          cp -a tools/dev/. "$ROOT/tools/dev/"
+          cp docs/DEVELOPMENT.md "$ROOT/docs/"
+          cat > "$ROOT/安装说明.txt" <<'TXT'
+          777 本地开发工具链
+
+          1. 默认只检查：
+             bash tools/dev/setup-toolchain.sh --check --profile build
+
+          2. 自动配置 APK 构建环境：
+             bash tools/dev/setup-toolchain.sh --auto --profile build --accept-android-licenses --configure-shell
+
+          3. 自动配置完整验证环境：
+             bash tools/dev/setup-toolchain.sh --auto --profile full --accept-android-licenses --create-avds --configure-shell
+
+          详细说明见 docs/DEVELOPMENT.md。
+          TXT
+          chmod +x "$ROOT/tools/dev/setup-toolchain.sh"
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/777-dev-toolchain-linux.tar.gz" 777-dev-toolchain
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum 777-dev-toolchain-linux.tar.gz > 777-dev-toolchain-linux.tar.gz.sha256
+          )
+      - name: 上传工具链产物
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-dev-toolchain-linux
+          path: |
+            ${{ runner.temp }}/777-dev-toolchain-linux.tar.gz
+            ${{ runner.temp }}/777-dev-toolchain-linux.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  verify-install:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: 下载刚生成的工具链产物
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-dev-toolchain-linux
+          path: ${{ runner.temp }}/artifact
+      - name: 从产物自动安装并复检
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_PROFILE: ${{ inputs.profile }}
+        run: |
+          set -euo pipefail
+          PROFILE=build
+          if [ "$EVENT_NAME" = workflow_dispatch ] && [ -n "$DISPATCH_PROFILE" ]; then
+            PROFILE="$DISPATCH_PROFILE"
+          fi
+          echo "TOOLCHAIN_PROFILE=$PROFILE" >> "$GITHUB_ENV"
+
+          cd "$RUNNER_TEMP/artifact"
+          sha256sum -c 777-dev-toolchain-linux.tar.gz.sha256
+          tar -xzf 777-dev-toolchain-linux.tar.gz -C "$RUNNER_TEMP"
+          KIT="$RUNNER_TEMP/777-dev-toolchain"
+          SDK="$RUNNER_TEMP/777-android-sdk"
+          TOOLS="$RUNNER_TEMP/777-tools"
+          ENV_FILE="$RUNNER_TEMP/777-dev-toolchain.env"
+
+          bash "$KIT/tools/dev/setup-toolchain.sh" \
+            --auto \
+            --profile "$PROFILE" \
+            --sdk-root "$SDK" \
+            --tools-root "$TOOLS" \
+            --env-file "$ENV_FILE" \
+            --accept-android-licenses
+
+          source "$ENV_FILE"
+          bash "$KIT/tools/dev/setup-toolchain.sh" \
+            --check \
+            --profile "$PROFILE" \
+            --sdk-root "$SDK" \
+            --tools-root "$TOOLS" \
+            --env-file "$ENV_FILE"
+
+          echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          printf '%s\n' "$JAVA_HOME/bin" >> "$GITHUB_PATH"
+          printf '%s\n' "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          printf '%s\n' "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          printf '%s\n' "$ANDROID_SDK_ROOT/emulator" >> "$GITHUB_PATH"
+          printf '%s\n' "$TOOLS/bin" >> "$GITHUB_PATH"
+          if [ "$PROFILE" = full ]; then
+            printf '%s\n' "$TOOLS/node-current/bin" >> "$GITHUB_PATH"
+          fi
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .gradle/runtime-cache
+          key: dev-toolchain-${{ runner.os }}-${{ hashFiles('tools/runtime/prepare-termux-*.sh', 'tools/runtime/prepare-hdiffpatch.sh') }}
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+      - name: 真实构建 smoke test
+        run: |
+          set -euo pipefail
+          java -version
+          ./gradlew --version
+          ./gradlew :app:assembleDebug --stacktrace
