@@ -6,6 +6,8 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalJobInfo
+import com.labteto.dshmobile.local.LocalJobManager
 import com.labteto.dshmobile.local.LocalInteractionCoordinator
 import com.labteto.dshmobile.local.localHistoryBudgetFor
 import com.labteto.dshmobile.local.localResourceBudgetForMemoryClass
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.Json
 
 /**
  * Process-wide owner of shared local runtime state and scarce-resource scheduling.
@@ -29,10 +32,15 @@ import kotlinx.coroutines.flow.update
 @Singleton
 class LocalRuntimeStateStore internal constructor(
     internal val memoryClassMb: Int = 256,
+    private val jobOwner: LocalRuntimeJobOwner = LocalRuntimeJobOwner.inMemory(),
 ) {
     @Inject
-    internal constructor(@ApplicationContext context: Context) : this(
+    internal constructor(
+        @ApplicationContext context: Context,
+        json: Json,
+    ) : this(
         memoryClassMb = context.getSystemService(ActivityManager::class.java)?.memoryClass ?: 256,
+        jobOwner = LocalRuntimeJobOwner.persistent(context, json),
     )
     private val mutable = MutableStateFlow(LocalHarnessState())
     private val sendFeedbackMutable = MutableStateFlow(LocalSendFeedbackState())
@@ -46,6 +54,8 @@ class LocalRuntimeStateStore internal constructor(
 
     internal val foregroundInteractions = LocalInteractionCoordinator(mutable)
     internal val streamingPreviewStore = LocalStreamingPreviewStore()
+    internal val jobManager: LocalJobManager
+        get() = jobOwner.manager
     @Volatile private var initialized = false
     @Volatile private var foregroundSessionId: String? = null
 
@@ -60,6 +70,10 @@ class LocalRuntimeStateStore internal constructor(
     internal fun observeResourceSnapshots(observer: (HarnessResourceSnapshot) -> Unit) {
         resourceObservers += observer
         runCatching { observer(resourceScheduler.snapshot()) }
+    }
+
+    internal fun observeJobSnapshots(observer: (List<LocalJobInfo>) -> Unit) {
+        jobOwner.observe(observer)
     }
 
     internal fun resourceSnapshot(): HarnessResourceSnapshot = resourceScheduler.snapshot()
