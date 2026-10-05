@@ -365,9 +365,9 @@ else
   fi
 fi
 
-java_home="$(find_java17_home || true)"
+java_home="$(find_compatible_java_home || true)"
 if [ -z "$java_home" ]; then
-  echo "[777-install] 安装后仍未找到 JDK $JDK_MAJOR。" >&2
+  echo "[777-install] 安装后仍未找到 JDK >= $BUILD_JDK_MIN_MAJOR。" >&2
   exit 1
 fi
 
