@@ -113,14 +113,16 @@ json_escape() {
 }
 
 write_status() {
-  local status="$1" exit_code="$2" log_file="$3" next_action="$4"
+  local status="$1" reason="$2" exit_code="$3" log_file="$4" next_action="$5"
   local tmp="$STATUS_FILE.tmp"
   cat > "$tmp" <<EOF
 {
   "schema": 1,
   "status": "$(json_escape "$status")",
+  "reason": "$(json_escape "$reason")",
   "profile": "$(json_escape "$PROFILE")",
   "exit_code": $exit_code,
+  "repo_root": "$(json_escape "$REPO_ROOT")",
   "env_file": "$(json_escape "$ENV_FILE")",
   "sdk_root": "$(json_escape "$SDK_ROOT")",
   "tools_root": "$(json_escape "$TOOLS_ROOT")",
@@ -148,10 +150,10 @@ setup_args() {
 run_check() {
   setup_args
   if bash "$SETUP" --check "${SETUP_ARGS[@]}" >"$CHECK_LOG" 2>&1; then
-    write_status ready 0 "$CHECK_LOG" "bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug"
+    write_status ready environment_ready 0 "$CHECK_LOG" "bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug"
     return 0
   fi
-  write_status needs_bootstrap 1 "$CHECK_LOG" "bash tools/dev/ai-toolchain.sh bootstrap --profile $PROFILE"
+  write_status needs_bootstrap missing_dependencies 1 "$CHECK_LOG" "bash tools/dev/ai-toolchain.sh bootstrap --profile $PROFILE"
   return 1
 }
 
@@ -187,20 +189,20 @@ bootstrap_toolchain() {
   fi
 
   if ! bash "$SETUP" "${args[@]}" > >(tee "$BOOTSTRAP_LOG" >&2) 2> >(tee -a "$BOOTSTRAP_LOG" >&2); then
-    write_status error 1 "$BOOTSTRAP_LOG" "查看日志并修复宿主权限/网络/平台问题后重新执行 bootstrap"
+    write_status error bootstrap_failed 1 "$BOOTSTRAP_LOG" "查看日志并修复宿主权限/网络/平台问题后重新执行 bootstrap"
     [ "$emit_json" = true ] && emit_status
     return 1
   fi
 
   load_env || {
-    write_status error 1 "$BOOTSTRAP_LOG" "检查环境文件生成失败"
+    write_status error env_file_missing 1 "$BOOTSTRAP_LOG" "检查环境文件生成失败"
     [ "$emit_json" = true ] && emit_status
     return 1
   }
 
   if ! run_check; then
     cat "$CHECK_LOG" >&2
-    write_status error 1 "$CHECK_LOG" "自动配置后检查仍失败；查看 check.log"
+    write_status error post_check_failed 1 "$CHECK_LOG" "自动配置后检查仍失败；查看 check.log"
     [ "$emit_json" = true ] && emit_status
     return 1
   fi
@@ -235,7 +237,7 @@ case "$COMMAND" in
     ;;
   status)
     if [ ! -f "$STATUS_FILE" ]; then
-      write_status unknown 3 "$CHECK_LOG" "bash tools/dev/ai-toolchain.sh check"
+      write_status unknown not_checked 3 "$CHECK_LOG" "bash tools/dev/ai-toolchain.sh check"
     fi
     emit_status
     ;;
