@@ -87,6 +87,37 @@ declared_contracts = set(re.findall(
 ))
 if declared_contracts != aggregate_contracts:
     die(f"root aggregate may only declare shared aggregate contracts: {sorted(declared_contracts - aggregate_contracts)}")
+if "deviceApprovalLease" in domain_models:
+    die("device approval lease is Work-owned state and must not return to LocalHarnessState")
+
+work_state_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkState.kt")
+)
+if "val deviceApprovalLease: Boolean" not in work_state_source:
+    die("device approval lease must stay owned by LocalWorkState")
+
+interaction_coordinator_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/interaction/LocalInteractionCoordinator.kt")
+)
+if "private val state: LocalInteractionStatePort" not in interaction_coordinator_source:
+    die("LocalInteractionCoordinator must depend on its narrow interaction state port")
+if "private val state: MutableStateFlow<LocalHarnessState>" in interaction_coordinator_source:
+    die("LocalInteractionCoordinator must not own the aggregate mutable app state")
+
+# Work still has two explicit aggregate-state migration seams. Freeze that debt: no third writer.
+work_aggregate_state_allowlist = {
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt",
+}
+work_root = LOCAL_SOURCE_ROOT / "work"
+for source_path in work_root.rglob("*.kt"):
+    source = strip_comments(source_path.read_text(encoding="utf-8"))
+    relative = source_path.relative_to(ROOT).as_posix()
+    if "MutableStateFlow<LocalHarnessState>" in source and relative not in work_aggregate_state_allowlist:
+        die(
+            f"{relative} introduces a new writable LocalHarnessState seam inside WorkFeature; "
+            "depend on Work-owned state or a narrow Shared Capability instead"
+        )
 
 
 approval_preferences_source = read("app/src/main/java/com/labteto/dshmobile/local/interaction/LocalApprovalPreferences.kt")
@@ -95,6 +126,17 @@ if "StateFlow<Boolean>" not in approval_preferences_source or "mode.value = enab
     die("Approval preferences must publish the single global mode flow")
 if re.search(r"copy\(\s*safeAutoApprovalEnabled\s*=", approval_coordinator_source):
     die("Approval coordinator must not fan out writable global mode copies")
+for forbidden_approval_aggregate in (
+    "MutableStateFlow<LocalHarnessState>",
+    "runtime.mutableState",
+    "binding.state",
+    "target.state",
+):
+    if forbidden_approval_aggregate in approval_coordinator_source:
+        die(
+            "Work approval must use LocalInteractionCoordinator instead of aggregate mutable state: "
+            + forbidden_approval_aggregate
+        )
 
 
 def constructor_dependency_count(relative: str, class_name: str) -> int:
