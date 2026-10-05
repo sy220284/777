@@ -2,17 +2,15 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
-import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecovery
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecoveryPolicy
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
-import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
-import com.labteto.dshmobile.local.agent.localAgentRunPolicy
 import com.labteto.dshmobile.local.chat.ChatStreamFilter
 import com.labteto.dshmobile.local.context.historySummaryMode
 import com.labteto.dshmobile.local.context.projectLocalRequestContext
 import com.labteto.dshmobile.local.model.LocalAgentModelRequestRuntime
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
+import com.labteto.dshmobile.local.model.LocalForegroundHistoryCompactionRuntime
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.LocalModelGateway
@@ -22,13 +20,13 @@ import com.labteto.dshmobile.local.model.LocalPromptCacheBaselineStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheContinuityStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheMode
 import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
-import com.labteto.dshmobile.local.model.LocalRequestPressureStore
 import com.labteto.dshmobile.local.model.LocalStreamPreview
-import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.redactModelImages
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.toRunModelSurface
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.structuredWorkState
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
@@ -40,6 +38,8 @@ import com.labteto.dshmobile.local.work.workRequestProjectionTriggerTokens
 import com.labteto.dshmobile.observability.AppLog
 import java.security.MessageDigest
 import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -54,20 +54,24 @@ import kotlinx.serialization.json.put
  * Owns foreground model transport semantics: request logging, retry, streaming preview and overflow
  * recovery. The engine supplies only current product state and the durable compaction callback.
  */
-internal class LocalModelRequestCoordinator(
+@Singleton
+internal class LocalModelRequestCoordinator @Inject constructor(
     private val modelGateway: LocalModelGateway,
-    private val resourceScheduler: HarnessResourceScheduler,
-    private val historyCompactor: LocalHistoryCompactor,
-    private val toolSchemas: (LocalAgentRunPolicy) -> JsonArray,
-    private val defaultEventLog: () -> LocalSessionEventLog,
-    private val streamingPreviewStore: LocalStreamingPreviewStore,
-    private val persistOverflowCompaction: (LocalHarnessState, LocalHistorySummaryMode) -> Unit,
-    private val pressureStore: LocalRequestPressureStore = LocalRequestPressureStore(),
-    private val promptCacheBaselines: LocalPromptCacheBaselineStore = LocalPromptCacheBaselineStore(),
-    private val promptCacheContinuity: LocalPromptCacheContinuityStore = LocalPromptCacheContinuityStore(),
-    private val maxStreamPreviewChars: Int = 4_096,
-    private val streamPreviewIntervalMs: Long = 50L,
+    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val sessionStorage: LocalSessionStorageRuntime,
+    private val foregroundCompaction: LocalForegroundHistoryCompactionRuntime,
 ) {
+    private val resourceScheduler
+        get() = runtimeStateStore.resourceScheduler
+    private val streamingPreviewStore
+        get() = runtimeStateStore.streamingPreviewStore
+    private val pressureStore
+        get() = runtimeStateStore.requestPressureStore
+    private val historyCompactor = LocalHistoryCompactor()
+    private val promptCacheBaselines = LocalPromptCacheBaselineStore()
+    private val promptCacheContinuity = LocalPromptCacheContinuityStore()
+    private val maxStreamPreviewChars: Int = 4_096
+    private val streamPreviewIntervalMs: Long = 50L
     private val requestRuntime = LocalAgentModelRequestRuntime(modelGateway, resourceScheduler)
     private val modelStepRuntime = LocalAgentModelStepRuntime()
 
@@ -88,8 +92,8 @@ internal class LocalModelRequestCoordinator(
         overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
         executionControl: LocalWorkExecutionControl? = null,
     ): LocalModelReply {
-        val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
-        val log = requestLog ?: defaultEventLog()
+        val tools = toolsOverride ?: JsonArray(emptyList())
+        val log = requestLog ?: sessionStorage.eventLogs.get(snapshot.sessionId)
         val frozenProfile = profile ?: modelGateway.profileForRoute(
             snapshot.modelState.modelSelection.activeProfileId,
             snapshot.modelState.model,
@@ -454,7 +458,7 @@ internal class LocalModelRequestCoordinator(
                     } else {
                         overflowRound += 1
                         if (persistOverflowHistory) {
-                            (overflowPersister ?: persistOverflowCompaction)(snapshot, summaryMode)
+                            (overflowPersister ?: foregroundCompaction::persistOverflowCompaction)(snapshot, summaryMode)
                         }
                         log.append("request/context-overflow-recovery", buildJsonObject {
                             put("step", step)
