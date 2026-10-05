@@ -1994,6 +1994,10 @@ class LocalHarnessEngine @Inject internal constructor(
         if (snapshot.usageMode == LocalUsageMode.CHAT) {
             captureChatPersonaCorrection(memoryInput)
             hydrateNewChatStateFromRelationshipMemory()
+            LocalExecutionService.withTurn(context, snapshot.sessionId, { _state.value.error }) {
+                runChatTurn(input, sourceMessageId = sourceMessageId)
+            }
+            return
         }
         runAgentTurn(input, memoryInput, sourceMessageId)
     }
