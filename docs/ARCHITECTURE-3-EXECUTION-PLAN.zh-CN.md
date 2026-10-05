@@ -24,19 +24,15 @@
 | 5：UI contribution | Catalog 不可变，路由归属及页面枚举已接管 | 中央页面 `when`、页面依赖、Back、入口及恢复仍待下沉 |
 | 6：Runtime Kernel | 共享运行状态已接管部分运行事实 | Engine 仍含产品规则、构造装配和代理，不具备最终 Kernel 条件 |
 
-当前守卫计数：
+当前守卫基线已经切换到架构 3.0：
 
-| 消费入口 | 直接 Engine 引用预算 | 达标位置 |
-|---|---:|---|
-| ChatRuntime | 4 | 阶段 3-C / 3-D 结束为 0 |
-| WorkRuntime | 0 | 保持 0；继续迁出 Engine 内 Work 主链 |
-| SessionRuntime | 12 | 阶段 3-E 结束为 0 |
-| ModelRuntime | 3 | 阶段 3-E 结束为 0 |
-| ToolsRuntime | 8 | 阶段 3-E 结束为 0 |
-| AutomationRuntime | 3 | 阶段 4 结束为 0 |
-| SettingsRuntime | 7 | 阶段 3-E 结束为 0 |
+- Chat / Work / Session / Model / Tools / Automation / Settings Runtime → `LocalHarnessEngine` 已归零路径全部为永久禁止项，不再保留“0 预算”兼容规则。
+- App 组合根仍处于迁移期的 Engine bridge 使用具体 allowlist；删除一项必须同步缩白名单，不能用新代理替换旧代理维持相同数量。
+- Engine 内仍存的阶段三 Feature 业务根使用具体 allowlist；已经迁出的业务根重新出现直接失败。
+- Engine 直接消费者使用具体 allowlist；Feature / UI / Worker 新增 Engine 依赖直接失败。
+- Engine 构造依赖、internal surface、聚合状态字段等数值只作为迁移期防回涨辅助，不作为阶段完成证据。
 
-Engine 当前 17 个构造依赖、45 个 internal 方法、0 个 public 方法；聚合状态实际 27 个字段。数字只用于约束回退，不能证明所有权迁移完成，也不能用增加间接代理把计数降为 0。
+阶段完成必须由真实 Feature 所有权、Shared 依赖方向、领域单写、旧入口删除和 `architecture-3-gates` 共同证明。
 
 尤其需要补齐三项：
 
@@ -58,10 +54,10 @@ Engine 当前 17 个构造依赖、45 个 internal 方法、0 个 public 方法�
 
 进入后续迁移前完成以下收口：
 
-- [ ] 当前产品 Head 完整 CI：单测 / conformance、arm64 lint 与 APK、x86_64 测试产物、Android 16 / 17、merge-gate 全部成功。
+- [ ] 当前产品 Head 完整 CI：static-gates、architecture-3-gates、单测 / conformance、arm64 lint 与 APK、x86_64 测试产物、Android 16 / 17、merge-gate 全部成功。
 - [ ] 确认本轮修复回归：取消日志故障仍停止真实 Job；维护发送保留草稿；启动失败释放租约；入队落盘前不能消费；资源重入不回放旧预算；设备授权撤销不残留；全局审批日志故障不阻断其他等待者；Work 进度先落盘；群聊异步结果不能覆盖新运行；设置最新值持久化。
 - [ ] 核对 WorkStatePort / InteractionStatePort 的全部生产调用方与测试迁移，无旧字段或旧构造残留；复验新迁出的群聊成员、Chat stop / post-turn Job 所有权及取消时序。
-- [ ] 补齐本次必要的故障 / 时序用例，不降低既有门禁预算或跳过设备 lane。
+- [ ] 补齐本次必要的故障 / 时序用例，不扩大迁移期 allowlist / 热点上限，不绕过 architecture-3-gates 或设备 lane。
 - [ ] 更新 #448 描述中的 Head、进度、验证与未完成项。当前“编译修复已提交”不能代替“当前 Head 编译和测试通过”。
 
 P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修复后重新锁定基线。
@@ -138,7 +134,7 @@ P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修�
 | D3 群聊 | 成员配置 / 移除已由 `LocalGroupChatMembershipCoordinator` 接管；继续迁公告、`runGroupChatTurn` 工厂、群聊人物纠正和系统提示刷新 | ChatGroup API 接管剩余链路；复验已迁成员能力；SessionRuntime 不再决定群聊成员规则；删剩余 Engine 群聊工厂 / 回调 | 部分 / 全部失败、单成员重试、异步成员修改、公告持久化、删除人物、单聊切换 |
 | D4 人物关联功能 | 图集 / 故事、导入导出、日记、生活状态、关系记忆、行为调节与纠正撤销 | 已迁出能力先保留；清理 UI 直连 Store、跨 Feature 内部调用及聚合写适配 | 历史兼容、资料删除、肖像引用、晚间故事、生活事件续期、回滚与导入事务 |
 
-这四包均要同时处理前台、后台、历史恢复、导入导出和 UI 入口。D4 是完整性及边界收口，不把已有能力再重写一遍。ChatRuntime 最终 4 → 0，并删除 Engine 构造 Chat 业务 coordinator 的回调组合。
+这四包均要同时处理前台、后台、历史恢复、导入导出和 UI 入口。D4 是完整性及边界收口，不把已有能力再重写一遍。ChatRuntime 已永久保持 Engine 依赖为 0；后续重点删除组合根迁移桥、Engine 内剩余 Chat 业务根和 coordinator 回调组合。
 
 ## 9. 阶段 3-E：其他代理出口及横向边界
 
