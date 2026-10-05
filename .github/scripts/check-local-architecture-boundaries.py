@@ -856,6 +856,25 @@ if (
 work_execution_coordinator_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionCoordinator.kt")
 )
+chat_turn_port_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnPort.kt")
+)
+if "startRegeneration" in chat_turn_port_source:
+    die("Chat regeneration must not return to the transitional Engine-backed turn port")
+
+chat_direct_turn_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt")
+)
+for required_direct_turn_owner in (
+    "@ApplicationContext private val context: Context",
+    "LocalSessionRuntimeRegistry.withOwner(",
+    "LocalExecutionService.withTurn(",
+):
+    if required_direct_turn_owner not in chat_direct_turn_source:
+        die("Chat direct turn ownership is incomplete: " + required_direct_turn_owner)
+if "override fun startRegeneration" in engine:
+    die("LocalHarnessEngine must not restore Chat/Work regeneration through a turn bridge")
+
 work_turn_port_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnPort.kt")
 )
