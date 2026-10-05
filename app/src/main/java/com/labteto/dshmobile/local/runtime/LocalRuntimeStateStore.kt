@@ -152,26 +152,33 @@ class LocalRuntimeStateStore internal constructor(
      */
     internal fun cancelForegroundRun(eventLog: LocalSessionEventLog): Boolean {
         foregroundInteractions.cancelAll()
-        val running = synchronized(foregroundRunLock) {
-            val discarded = foregroundPendingInputs.drain()
-            if (discarded.isNotEmpty()) {
-                eventLog.append(
-                    LOCAL_AGENT_INBOX_EVENT_TYPE,
-                    encodeLocalAgentInboxEvent(
-                        action = "cancelled",
-                        pending = foregroundPendingInputs.snapshot(),
-                        affected = discarded,
-                    ),
-                )
+        var running: Job? = null
+        try {
+            synchronized(foregroundRunLock) {
+                running = foregroundJob
+                val discarded = foregroundPendingInputs.drain()
+                try {
+                    if (discarded.isNotEmpty()) {
+                        eventLog.append(
+                            LOCAL_AGENT_INBOX_EVENT_TYPE,
+                            encodeLocalAgentInboxEvent(
+                                action = "cancelled",
+                                pending = foregroundPendingInputs.snapshot(),
+                                affected = discarded,
+                            ),
+                        )
+                    }
+                } finally {
+                    mutable.update { current ->
+                        current.copy(kernel = current.kernel.copy(queuedInputCount = 0))
+                    }
+                }
             }
-            mutable.update { current ->
-                current.copy(kernel = current.kernel.copy(queuedInputCount = 0))
-            }
-            foregroundJob
+            return running?.isCompleted == false
+        } finally {
+            // Durable cancellation diagnostics may fail; that cannot veto the real stop request.
+            running?.cancel()
         }
-        val wasRunning = running?.isCompleted == false
-        running?.cancel()
-        return wasRunning
     }
 
     @Synchronized

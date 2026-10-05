@@ -100,6 +100,51 @@ class LocalWorkRunBindingTest {
         assertEquals(initialBudget, binding.state.value.kernel.contextBudgetChars)
     }
 
+    @Test fun failedCancellationLogCannotPreventRealWorkStopOrTeardown() = runTest {
+        for (join in listOf(false, true)) {
+            val blocked = File(temporary.newFolder(), "blocked").apply { writeText("not a directory") }
+            val log = LocalSessionEventLog(File(blocked, "events.jsonl"), Json)
+            val binding = LocalWorkRunBinding(
+                sessionId = "work",
+                initialState = LocalHarnessState(
+                    kernel = LocalKernelState(running = true, queuedInputCount = 1),
+                    deviceApprovalLease = true,
+                ),
+                initialHistory = emptyList(), eventLog = log,
+                initialTranscriptProjectionCursor = null, maxPendingInputs = 4,
+                pruneToolResult = { it },
+            )
+            val job = kotlinx.coroutines.Job()
+            val mirror = kotlinx.coroutines.Job()
+            binding.job = job
+            binding.mirrorJob = mirror
+            binding.pendingInputs.offer(
+                com.labteto.dshmobile.harness.agent.QueuedAgentInput("queued", id = "queued"),
+            )
+            try {
+                assertTrue(runCatching {
+                    if (join) binding.cancelAndJoin() else binding.requestCancel()
+                }.isFailure)
+                assertTrue(job.isCancelled)
+                assertEquals(0, binding.state.value.kernel.queuedInputCount)
+                assertFalse(binding.state.value.deviceApprovalLease)
+                if (join) {
+                    assertTrue(mirror.isCancelled)
+                    assertNull(binding.job)
+                    assertNull(binding.mirrorJob)
+                    assertFalse(binding.state.value.kernel.running)
+                } else {
+                    assertFalse(mirror.isCancelled)
+                    assertTrue(binding.state.value.kernel.running)
+                }
+            } finally {
+                job.cancel()
+                mirror.cancel()
+                log.close()
+            }
+        }
+    }
+
     private fun binding(initial: LocalHarnessState) = LocalWorkRunBinding(
         sessionId = initial.sessionId,
         initialState = initial,

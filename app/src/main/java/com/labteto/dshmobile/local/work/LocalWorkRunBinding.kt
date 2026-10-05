@@ -13,7 +13,8 @@ import com.labteto.dshmobile.local.runtime.projectExecutionJobs
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntime
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
@@ -91,46 +92,59 @@ internal class LocalWorkRunBinding(
      */
     internal fun requestCancel(): Boolean {
         val activeJob = job?.takeIf { it.isCompleted == false } ?: return false
-        clearPendingForCancellation(markStopped = false)
-        activeJob.cancel()
+        try {
+            clearPendingForCancellation()
+        } finally {
+            activeJob.cancel()
+        }
         return true
     }
 
     /** Tear down only this session-owned runtime; other Work conversations keep running. */
     suspend fun cancelAndJoin() {
-        stopApprovalProjection()
-        clearPendingForCancellation(markStopped = true)
-        val activeJob = job.also { job = null }
-        val activeMirror = mirrorJob.also { mirrorJob = null }
-        activeJob?.cancelAndJoin()
-        activeMirror?.cancelAndJoin()
+        val activeJob = job
+        val activeMirror = mirrorJob
+        try {
+            clearPendingForCancellation()
+        } finally {
+            // Cleanup must complete even when inbox persistence fails or the caller is cancelled.
+            withContext(NonCancellable) {
+                activeJob?.cancel()
+                activeMirror?.cancel()
+                activeJob?.join()
+                activeMirror?.join()
+                stopApprovalProjection()
+                if (job === activeJob) job = null
+                if (mirrorJob === activeMirror) mirrorJob = null
+                state.update { current ->
+                    current.copy(kernel = current.kernel.copy(running = false))
+                }
+            }
+        }
     }
 
-    private fun clearPendingForCancellation(markStopped: Boolean) {
+    private fun clearPendingForCancellation() {
         interactions.cancelAll()
         val discarded = pendingInputs.drain()
-        if (discarded.isNotEmpty()) {
-            eventLog.append(
-                LOCAL_AGENT_INBOX_EVENT_TYPE,
-                encodeLocalAgentInboxEvent(
-                    action = "cancelled",
-                    pending = emptyList(),
-                    affected = discarded,
-                ),
-            )
-        }
-        state.update { current ->
-            current.copy(
-                work = current.work.copy(
-                    pendingApproval = null,
-                    pendingQuestion = null,
-                ),
-                kernel = current.kernel.copy(
-                    running = if (markStopped) false else current.kernel.running,
-                    queuedInputCount = 0,
-                ),
-                deviceApprovalLease = false,
-            )
+        try {
+            if (discarded.isNotEmpty()) {
+                eventLog.append(
+                    LOCAL_AGENT_INBOX_EVENT_TYPE,
+                    encodeLocalAgentInboxEvent(
+                        action = "cancelled",
+                        pending = emptyList(),
+                        affected = discarded,
+                    ),
+                )
+            }
+        } finally {
+            state.update { current ->
+                current.copy(
+                    work = current.work.copy(pendingApproval = null, pendingQuestion = null),
+                    kernel = current.kernel.copy(queuedInputCount = 0),
+                    deviceApprovalLease = false,
+                )
+            }
         }
     }
 }

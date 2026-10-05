@@ -70,4 +70,29 @@ class LocalRuntimeStateStoreTest {
         }
     }
 
+    @Test
+    fun failedInboxCancellationWriteStillCancelsJobAndClearsVisibleQueue() {
+        val store = LocalRuntimeStateStore()
+        store.initialize(LocalHarnessState(
+            sessionId = "session-a",
+            kernel = LocalKernelState(running = true, queuedInputCount = 1),
+        ))
+        val job = Job()
+        store.foregroundJob = job
+        store.foregroundPendingInputs.offer(
+            com.labteto.dshmobile.harness.agent.QueuedAgentInput("queued", id = "queued"),
+        )
+        val blocked = File(temporary.root, "blocked").apply { writeText("not a directory") }
+        val log = LocalSessionEventLog(File(blocked, "events.jsonl"), Json)
+        try {
+            assertTrue(runCatching { store.cancelForegroundRun(log) }.isFailure)
+            assertTrue(job.isCancelled)
+            assertTrue(store.state.value.kernel.running)
+            assertEquals(0, store.state.value.kernel.queuedInputCount)
+            assertEquals(0, store.foregroundPendingInputs.size())
+        } finally {
+            log.close()
+        }
+    }
+
 }
