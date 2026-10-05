@@ -15,6 +15,7 @@ COMMAND="${1:-help}"
 if [ "$#" -gt 0 ]; then shift; fi
 
 PROFILE=build
+ARTIFACTS_DIR="${DEV777_ARTIFACTS_DIR:-}"
 ENV_FILE="${DEV777_TOOLCHAIN_ENV_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/777/dev-toolchain.env}"
 if [ -f "$ENV_FILE" ]; then
   # shellcheck disable=SC1090
@@ -33,6 +34,7 @@ usage() {
   cat <<'USAGE'
 777 AI 开发工具链入口
 
+  bash tools/dev/ai-toolchain.sh plan
   bash tools/dev/ai-toolchain.sh bootstrap
   bash tools/dev/ai-toolchain.sh check
   bash tools/dev/ai-toolchain.sh status
@@ -40,7 +42,8 @@ usage() {
   bash tools/dev/ai-toolchain.sh run -- <command> [args...]
 
 命令：
-  bootstrap                 只从当前 GitHub Actions Artifact payload 安装/修复；输出 JSON
+  plan                      输出当前真正缺失的组件 Artifact；JSON
+  bootstrap                 从已下载的组件 Artifact 目录按需安装；输出 JSON
   check                     只检查，不修改机器；输出 JSON
   status                    输出最近一次机器可读状态
   gradle [tasks...]         使用产物内 Gradle + --offline 执行
@@ -50,11 +53,13 @@ usage() {
 
 选项：
   --profile build|full      默认 build
+  --artifacts-dir PATH      已下载并解压的组件 Artifact 根目录
 
 约定：
 - 禁止通过 apt、curl、sdkmanager、Gradle/Maven、Node 或其他外部渠道补齐。
-- bootstrap 缺少 payload 时直接失败，并要求先下载 GitHub Actions 工具链构建产物。
-- Gradle 命令固定使用产物内 Gradle 和离线依赖缓存。
+- plan 只列缺失组件，已有正确版本不会要求重新下载。
+- bootstrap 只消费 --artifacts-dir 中的 GitHub Actions 组件 Artifact。
+- Gradle 命令固定使用组件 Artifact 安装的 Gradle 和离线依赖缓存。
 USAGE
 }
 
@@ -63,6 +68,10 @@ while [ "$#" -gt 0 ]; do
     --profile)
       shift
       PROFILE="${1:-}"
+      ;;
+    --artifacts-dir)
+      shift
+      ARTIFACTS_DIR="${1:-}"
       ;;
     --)
       shift
@@ -162,12 +171,6 @@ load_env() {
   GRADLE_USER_HOME="${DEV777_GRADLE_USER_HOME:-${GRADLE_USER_HOME:-$TOOLS_ROOT/gradle-user-home}}"
 }
 
-artifact_payload_available() {
-  [ -f "$PACKAGE_ROOT/payload/manifest.env" ] &&
-    [ -f "$PACKAGE_ROOT/payload/toolchain.tar.gz" ] &&
-    [ -f "$PACKAGE_ROOT/SHA256SUMS" ]
-}
-
 bootstrap_toolchain() {
   local emit_json="${1:-true}"
   if run_check; then
@@ -176,24 +179,28 @@ bootstrap_toolchain() {
     return 0
   fi
 
-  if ! artifact_payload_available; then
-    cat "$CHECK_LOG" >&2
-    write_status error artifact_required 2 "$CHECK_LOG" "下载 777-dev-toolchain-$PROFILE-latest Artifact，解压后从产物目录执行 tools/dev/ai-toolchain.sh bootstrap"
-    [ "$emit_json" = true ] && emit_status
+  if [ -z "$ARTIFACTS_DIR" ] || [ ! -d "$ARTIFACTS_DIR" ]; then
+    local missing_json
+    missing_json="$(DEV777_REPO_ROOT="$REPO_ROOT" DEV777_TOOLS_ROOT="$TOOLS_ROOT" DEV777_ANDROID_SDK_ROOT="$SDK_ROOT" DEV777_GRADLE_HOME="$GRADLE_HOME" DEV777_GRADLE_USER_HOME="$GRADLE_USER_HOME" bash "$INSTALL" plan "$PROFILE" | awk 'BEGIN{printf "["} {if(NR>1)printf ","; printf "\\\"%s\\\"",$0} END{print "]"}')"
+    write_status error artifact_required 2 "$CHECK_LOG" "下载 plan 返回的 GitHub Actions 组件 Artifact，解压到同一目录后执行 bootstrap --artifacts-dir PATH"
+    if [ "$emit_json" = true ]; then
+      emit_status | sed '$d'
+      printf '  ,"missing_artifacts": %s\n}\n' "$missing_json"
+    fi
     return 2
   fi
 
-  echo "[777-ai] 从当前 GitHub Actions Artifact payload 安装 profile=$PROFILE。" >&2
+  echo "[777-ai] 从已下载的 GitHub Actions 组件 Artifact 按需安装 profile=$PROFILE。" >&2
   DEV777_REPO_ROOT="$REPO_ROOT" \
   DEV777_TOOLS_ROOT="$TOOLS_ROOT" \
   DEV777_ANDROID_SDK_ROOT="$SDK_ROOT" \
   DEV777_GRADLE_HOME="$GRADLE_HOME" \
   DEV777_GRADLE_USER_HOME="$GRADLE_USER_HOME" \
   DEV777_TOOLCHAIN_ENV_FILE="$ENV_FILE" \
-    bash "$INSTALL" "$PROFILE" > >(tee "$BOOTSTRAP_LOG" >&2) 2> >(tee -a "$BOOTSTRAP_LOG" >&2)
+    bash "$INSTALL" install "$PROFILE" --artifacts-dir "$ARTIFACTS_DIR" > >(tee "$BOOTSTRAP_LOG" >&2) 2> >(tee -a "$BOOTSTRAP_LOG" >&2)
   local install_status=$?
   if [ "$install_status" -ne 0 ]; then
-    write_status error artifact_install_failed "$install_status" "$BOOTSTRAP_LOG" "检查 Artifact 完整性、架构和宿主基础命令后重新安装"
+    write_status error artifact_install_failed "$install_status" "$BOOTSTRAP_LOG" "按 plan 补齐缺失 Artifact，检查完整性、架构和宿主基础命令后重新安装"
     [ "$emit_json" = true ] && emit_status
     return "$install_status"
   fi
@@ -227,6 +234,17 @@ ensure_build_ready() {
 }
 
 case "$COMMAND" in
+  plan)
+    PLAN_OUTPUT="$(DEV777_REPO_ROOT="$REPO_ROOT" DEV777_TOOLS_ROOT="$TOOLS_ROOT" DEV777_ANDROID_SDK_ROOT="$SDK_ROOT" DEV777_GRADLE_HOME="$GRADLE_HOME" DEV777_GRADLE_USER_HOME="$GRADLE_USER_HOME" bash "$INSTALL" plan "$PROFILE")"
+    printf '{"schema":1,"profile":"%s","missing_artifacts":[' "$PROFILE"
+    first=true
+    while IFS= read -r artifact; do
+      [ -n "$artifact" ] || continue
+      if [ "$first" = true ]; then first=false; else printf ','; fi
+      printf '"%s"' "$(json_escape "$artifact")"
+    done <<< "$PLAN_OUTPUT"
+    printf ']}\n'
+    ;;
   bootstrap)
     bootstrap_toolchain true
     ;;
