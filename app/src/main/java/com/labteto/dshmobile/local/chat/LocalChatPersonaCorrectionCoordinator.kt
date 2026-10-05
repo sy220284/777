@@ -42,7 +42,7 @@ internal class LocalChatPersonaCorrectionCoordinator @Inject constructor(
             personaStore.removeCorrection(personaId, correction)
         } ?: return
 
-        runtimeStateStore.mutableState.update { current ->
+        runtimeStateStore.projection.update { current ->
             if (
                 current.sessionId == snapshot.sessionId &&
                 current.chat.personaId == personaId &&
