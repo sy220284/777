@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
 
@@ -154,7 +155,7 @@ class LocalHarnessEngine @Inject internal constructor(
     private val workRunRegistry: LocalWorkRunRegistry,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val approvalPreferences: LocalApprovalPreferences,
-    private val eventLogRegistry: LocalSessionEventLogRegistry,
+    private val sessionStorageRuntime: LocalSessionStorageRuntime,
 ) {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val chatPersonaStore get() = chatPersistence.personaStore
@@ -186,19 +187,10 @@ class LocalHarnessEngine @Inject internal constructor(
     )
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
     private val sessionStorageManager by lazy { LocalSessionStorageManager(sessionsRoot, json) }
-    private val sessionRepository by lazy {
-        LocalSessionRepository(sessionsRoot, json, scope,
-            onWritten = { _state.update { it.copy(sessions = sessionSummaries()) } },
-            onError = { error -> _state.update { it.copy(error = error.message ?: "会话写入失败") } },
-        )
-    }
-    private val sessionCoordinator by lazy {
-        LocalSessionCoordinator(
-            repository = sessionRepository,
-            eventLogFor = ::eventLogFor,
-            runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
-        )
-    }
+    private val eventLogRegistry: LocalSessionEventLogRegistry
+        get() = sessionStorageRuntime.eventLogs
+    private val sessionCoordinator: LocalSessionCoordinator
+        get() = sessionStorageRuntime.coordinator
     private val sessionAccessCoordinator by lazy {
         LocalSessionAccessCoordinator(
             summaries = ::sessionSummaries,
