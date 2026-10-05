@@ -271,6 +271,7 @@ import com.labteto.dshmobile.local.work.LocalWorkflowCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkflowProgress
 import com.labteto.dshmobile.local.work.LocalWorkspace
 import com.labteto.dshmobile.local.work.guardWorkCompletionDelivery
+import com.labteto.dshmobile.local.work.localWorkStatePort
 import com.labteto.dshmobile.local.work.mirrorLocalWorkRunState
 import com.labteto.dshmobile.local.work.queueAutomaticWorkContinuation
 import com.labteto.dshmobile.local.work.recordWorkCompletionQuality
@@ -4091,7 +4092,7 @@ class LocalHarnessEngine @Inject internal constructor(
     }
 
     private fun workProgress(binding: LocalWorkRunBinding?) = LocalWorkProgressCoordinator(
-        state = binding?.state ?: _state,
+        state = binding?.workState ?: localWorkStatePort(_state),
         eventLog = binding?.eventLog ?: eventLog,
         persist = { persist(binding) },
     )
