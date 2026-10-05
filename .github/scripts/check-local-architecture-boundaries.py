@@ -893,7 +893,10 @@ if "runtimeStateStore.jobManager.output" not in work_runtime_source or "runtimeS
     die("WorkRuntime must access background jobs through the shared Runtime capability")
 if "LocalWorkPlanModeCoordinator" not in work_runtime_source or "engine.setPlanMode" in work_runtime_source:
     die("Work plan-mode ownership must stay inside WorkFeature")
-if "workRunRegistry.requestCancel(runtimeStateStore.currentSessionId)" not in work_runtime_source:
+if (
+    "val sessionId = runtimeStateStore.currentSessionId" not in work_runtime_source
+    or "workRunRegistry.requestCancel(sessionId)" not in work_runtime_source
+):
     die("Work session-bound cancellation must stay inside WorkFeature")
 if "foregroundModelHistory = LocalModelHistoryBuffer()" not in runtime_state_store:
     die("Shared Runtime must own the visible foreground model-history state")
