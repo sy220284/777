@@ -574,38 +574,6 @@ class LocalHarnessEngine @Inject internal constructor(
         )
     }
 
-    private val replySuggestionCoordinator by lazy {
-        LocalReplySuggestionCoordinator(
-            state = _state,
-            chatTurnCoordinator = chatTurnCoordinator,
-            modelGateway = modelGateway,
-            requestModel = { snapshot, messages, requestLog, profile ->
-                completeWithRetry(
-                    key = profile.id,
-                    snapshot = snapshot,
-                    messages = messages,
-                    step = CHAT_POST_TURN_MODEL_STEP + 1,
-                    toolsOverride = JsonArray(emptyList()),
-                    publishPreview = false,
-                    requestLog = requestLog,
-                    profile = profile,
-                )
-            },
-            recordUsage = { snapshot, reply ->
-                usageTracker.recordForeground(
-                    snapshot,
-                    reply,
-                    TokenUsageAction.REPLY_SUGGESTIONS,
-                    turnId = snapshot.transcriptIndex.latestUserMessageId,
-                    step = CHAT_POST_TURN_MODEL_STEP + 1,
-                )
-            },
-            eventLogFor = ::eventLogFor,
-            persistBranchState = ::persistChatBranchState,
-            persist = ::persist,
-        )
-    }
-
     private val chatReplyCoordinator by lazy {
         LocalChatReplyCoordinator(
             chatTurnCoordinator = chatTurnCoordinator,
@@ -1110,9 +1078,6 @@ class LocalHarnessEngine @Inject internal constructor(
     }
 
     /** Generate reply suggestions only on explicit user request. */
-    internal suspend fun generateReplySuggestions(): Boolean =
-        replySuggestionCoordinator.generate()
-
     /** Queue one human turn for the on-device agent, optionally citing files imported into the workspace. */
     internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult {
         val prepared = prepareLocalSend(text, attachments) ?: return LocalSendResult.Empty
