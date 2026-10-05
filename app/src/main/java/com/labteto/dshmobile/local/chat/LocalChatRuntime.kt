@@ -11,7 +11,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 /** Chat/persona capability boundary for the local UI. */
 @Singleton
-class LocalChatRuntime @Inject constructor(
+class LocalChatRuntime @Inject internal constructor(
     private val engine: LocalHarnessEngine,
     private val persistence: LocalChatPersistence,
     private val sessionRuntime: LocalSessionRuntime,
