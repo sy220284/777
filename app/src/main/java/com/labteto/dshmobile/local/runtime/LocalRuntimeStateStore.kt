@@ -64,6 +64,7 @@ class LocalRuntimeStateStore internal constructor(
     internal val foregroundRunLock = Any()
     internal val foregroundPendingInputs = AgentInputQueue(MAX_PENDING_INPUTS)
     @Volatile internal var foregroundJob: Job? = null
+    @Volatile internal var foregroundTranscriptProjectionCursor: Long? = null
     internal val jobManager: LocalJobManager
         get() = jobOwner.manager
     @Volatile private var initialized = false
