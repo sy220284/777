@@ -2,8 +2,7 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
+import com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort
 
 /** Results and errors belong to the same frozen character, scene generation and dialogue. */
 private fun LocalHarnessState.matchesReplySuggestionTarget(
@@ -20,7 +19,7 @@ private fun LocalHarnessState.matchesReplySuggestionTarget(
         chat.chatContext.generation == before.chat.chatContext.generation
 
 internal fun commitReplySuggestions(
-    state: MutableStateFlow<LocalHarnessState>,
+    state: LocalAggregateProjectionPort,
     before: LocalHarnessState,
     assistantMessageId: String,
     suggestions: List<ChatReplySuggestion>,
@@ -49,7 +48,7 @@ internal fun commitReplySuggestions(
 }
 
 internal fun commitReplySuggestionError(
-    state: MutableStateFlow<LocalHarnessState>,
+    state: LocalAggregateProjectionPort,
     before: LocalHarnessState,
     assistantMessageId: String,
     message: String,
