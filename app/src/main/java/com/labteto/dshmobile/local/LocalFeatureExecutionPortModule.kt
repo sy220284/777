@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
 import com.labteto.dshmobile.local.session.LocalActiveSessionScopeProvider
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.session.LocalSessionLifecyclePort
+import com.labteto.dshmobile.local.tools.LocalToolsManagementPort
 import com.labteto.dshmobile.local.work.LocalWorkExecutionPort
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import dagger.Module
@@ -35,6 +36,11 @@ internal object LocalFeatureExecutionPortModule {
     @Singleton
     fun provideLocalSessionLifecyclePort(engine: LocalHarnessEngine): LocalSessionLifecyclePort =
         engine.sessionLifecyclePort
+
+    @Provides
+    @Singleton
+    fun provideLocalToolsManagementPort(engine: LocalHarnessEngine): LocalToolsManagementPort =
+        engine.toolsManagementPort
 
     @Provides
     @Singleton
