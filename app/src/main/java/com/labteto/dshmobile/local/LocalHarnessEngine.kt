@@ -764,15 +764,6 @@ class LocalHarnessEngine @Inject internal constructor(
             defaultSessionId = { currentSessionId },
         )
     }
-    private val workReplyRegenerator by lazy {
-        LocalWorkReplyRegenerator(
-            runtimeStateStore = runtimeStateStore,
-            sessionStorage = sessionStorageRuntime,
-            modelRequests = modelRequestCoordinator,
-            usageTracker = usageTracker,
-        )
-    }
-
     private val workMemoryRuntime by lazy {
         LocalWorkMemoryRuntime(memoryManager)
     }
@@ -1207,26 +1198,6 @@ class LocalHarnessEngine @Inject internal constructor(
             sessionLease = sessionLease,
         )
 
-        override fun startRegeneration(messageId: String): Job {
-            val sessionId = currentSessionId
-            return scope.launch(start = CoroutineStart.LAZY) {
-                LocalSessionRuntimeRegistry.withOwner(
-                    sessionId,
-                    LocalSessionRuntimeKind.FOREGROUND,
-                ) { ownedSessionId ->
-                    if (currentSessionId != ownedSessionId) {
-                        throw CancellationException("会话已切换")
-                    }
-                    LocalExecutionService.withTurn(
-                        context,
-                        ownedSessionId,
-                        { _state.value.error },
-                    ) {
-                        workReplyRegenerator.regenerate(messageId)
-                    }
-                }
-            }
-        }
     }
 
     internal val chatTurnPort: LocalChatTurnPort = object : LocalChatTurnPort {
