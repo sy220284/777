@@ -46,6 +46,10 @@ import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
 import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.LocalChatPersistence
 import com.labteto.dshmobile.local.chat.LocalChatState
+import com.labteto.dshmobile.local.chat.LocalChatStatePort
+import com.labteto.dshmobile.local.chat.LocalChatPersonaCorrectionCoordinator
+import com.labteto.dshmobile.local.chat.LocalChatRelationshipHydrator
+import com.labteto.dshmobile.local.chat.LocalChatTurnDispatcher
 import com.labteto.dshmobile.local.chat.LocalChatTurnPort
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
@@ -539,6 +543,36 @@ class LocalHarnessEngine @Inject internal constructor(
 
     private val currentSessionId: String
         get() = runtimeStateStore.currentSessionId
+
+    private val engineChatStatePort by lazy { LocalChatStatePort(_state) }
+    private val engineChatPersonaCorrections by lazy {
+        LocalChatPersonaCorrectionCoordinator(
+            chatState = engineChatStatePort,
+            personaStore = chatPersonaStore,
+            eventLogs = eventLogRegistry,
+            sessionStorage = sessionStorageRuntime,
+        )
+    }
+    private val engineChatRelationshipHydrator by lazy {
+        LocalChatRelationshipHydrator(
+            chatState = engineChatStatePort,
+            memoryStore = memoryStore,
+            eventLogs = eventLogRegistry,
+            sessionStorage = sessionStorageRuntime,
+        )
+    }
+    private val chatTurnDispatcher by lazy {
+        LocalChatTurnDispatcher(
+            context = context,
+            runtimeStateStore = runtimeStateStore,
+            personaCorrections = engineChatPersonaCorrections,
+            relationshipHydrator = engineChatRelationshipHydrator,
+            groupExecutor = groupChatTurnExecutor,
+            directTurn = { input, sourceMessageId ->
+                runChatTurn(input, sourceMessageId = sourceMessageId)
+            },
+        )
+    }
 
     /**
      * Architecture 3.0 migration bridge kept only at the composition root.
@@ -1125,7 +1159,7 @@ class LocalHarnessEngine @Inject internal constructor(
             memoryInput: String,
             sourceMessageId: String,
         ): Job = scope.launch(start = CoroutineStart.LAZY) {
-            runTurn(content, memoryInput, sourceMessageId)
+            chatTurnDispatcher.run(content, memoryInput, sourceMessageId)
         }
 
         override fun editAndResendUserMessage(
@@ -1364,23 +1398,11 @@ class LocalHarnessEngine @Inject internal constructor(
         )
 
         scope.launch(start = CoroutineStart.LAZY) {
-            if (state.chat.groupChat.enabled) {
-                captureGroupPersonaCorrections(requestedText)
-                runOwnedGroupChatTurn(
-                    context = context,
-                    sessionId = currentSessionId,
-                    currentSessionId = { currentSessionId },
-                    currentError = { _state.value.error },
-                    executor = groupChatTurnExecutor,
-                    input = content,
-                )
-            } else {
-                captureChatPersonaCorrection(requestedText)
-                hydrateNewChatStateFromRelationshipMemory()
-                LocalExecutionService.withTurn(context, state.sessionId, { _state.value.error }) {
-                    runChatTurn(content, sourceMessageId = edited.id)
-                }
-            }
+            chatTurnDispatcher.run(
+                input = content,
+                memoryInput = requestedText,
+                sourceMessageId = edited.id,
+            )
         }.also { activeJob = it; it.start() }
         LocalChatUserEditResult.SENT
     }
@@ -1685,9 +1707,6 @@ class LocalHarnessEngine @Inject internal constructor(
         snapshot: LocalHarnessState,
     ): String = memoryCoordinator.chatRelationshipMemoryContext(query, snapshot)
 
-    private fun hydrateNewChatStateFromRelationshipMemory() =
-        memoryCoordinator.hydrateNewChatStateFromRelationshipMemory()
-
     private suspend fun drainPendingInputsIntoHistory(binding: LocalWorkRunBinding? = null) {
         val targetPending = binding?.runHandle?.pendingInputs ?: pendingInputs
         val targetHistory = binding?.runHandle?.modelHistory ?: modelHistory
@@ -1765,117 +1784,8 @@ class LocalHarnessEngine @Inject internal constructor(
             )
             persist()
             scope.launch(start = CoroutineStart.LAZY) {
-                runTurn(next.content, next.memoryInput, next.id)
+                chatTurnDispatcher.run(next.content, next.memoryInput, next.id)
             }.also { activeJob = it }
-        }
-    }
-
-    private suspend fun runTurn(
-        input: String,
-        memoryInput: String = input,
-        sourceMessageId: String? = null,
-    ) {
-        val snapshot = _state.value
-        if (snapshot.usageMode == LocalUsageMode.CHAT && snapshot.chat.groupChat.enabled) {
-            captureGroupPersonaCorrections(memoryInput)
-            runOwnedGroupChatTurn(
-                context = context,
-                sessionId = currentSessionId,
-                currentSessionId = { currentSessionId },
-                currentError = { _state.value.error },
-                executor = groupChatTurnExecutor,
-                input = input,
-                sourceMessageId = sourceMessageId,
-            )
-            return
-        }
-        check(snapshot.usageMode == LocalUsageMode.CHAT) {
-            "Chat 回合入口只能处理 Chat 模式"
-        }
-        captureChatPersonaCorrection(memoryInput)
-        hydrateNewChatStateFromRelationshipMemory()
-        LocalExecutionService.withTurn(context, snapshot.sessionId, { _state.value.error }) {
-            runChatTurn(input, sourceMessageId = sourceMessageId)
-        }
-    }
-
-    private fun captureChatPersonaCorrection(text: String) {
-        val snapshot = _state.value
-        if (snapshot.usageMode != LocalUsageMode.CHAT || text.isBlank()) return
-        val updated = chatPersonaStore.captureExplicitCorrection(snapshot.chat.personaId, text) ?: return
-        if (updated.corrections == snapshot.chat.chatPersona.corrections) return
-
-        val correction = updated.corrections.lastOrNull().orEmpty()
-        val notice = ChatPersonaCorrectionNotice(
-            id = System.nanoTime(),
-            personaId = updated.id,
-            correction = correction,
-        )
-        _state.update { current ->
-            if (current.chat.personaId == updated.id) {
-                current.copy(
-                    chat = current.chat.copy(
-                        chatPersona = updated,
-                        personaCorrectionNotice = notice,
-                    ),
-                )
-            } else {
-                current
-            }
-        }
-        eventLog.append("chat/persona-correction", buildJsonObject {
-            put("persona_id", updated.id)
-            put("count", updated.corrections.size)
-            put("latest", correction)
-        })
-        persist()
-        scope.launch {
-            delay(PERSONA_CORRECTION_UNDO_MILLIS)
-            _state.update { current ->
-                if (current.chat.personaCorrectionNotice?.id == notice.id) {
-                    current.copy(chat = current.chat.copy(personaCorrectionNotice = null))
-                } else {
-                    current
-                }
-            }
-        }
-    }
-
-    private fun captureGroupPersonaCorrections(text: String) {
-        val snapshot = _state.value
-        if (
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            !snapshot.chat.groupChat.enabled ||
-            text.isBlank()
-        ) return
-
-        snapshot.chat.groupChat.members.forEach { member ->
-            val current = chatPersonaStore.get(member.personaId)
-            if (current.name.isBlank() || current.name !in text) return@forEach
-            val updated = chatPersonaStore.captureExplicitCorrection(member.personaId, text)
-                ?: return@forEach
-            if (updated.corrections == current.corrections) return@forEach
-            _state.update { state ->
-                state.copy(
-                    chat = state.chat.copy(
-                        groupChat = state.chat.groupChat.copy(
-                            members = state.chat.groupChat.members.map { existing ->
-                                if (existing.galleryId == member.galleryId) {
-                                    existing.copy(displayName = updated.name)
-                                } else {
-                                    existing
-                                }
-                            },
-                        ),
-                    ),
-                )
-            }
-            eventLog.append("group/persona-correction", buildJsonObject {
-                put("gallery_id", member.galleryId)
-                put("persona_id", member.personaId)
-                put("count", updated.corrections.size)
-                put("latest", updated.corrections.lastOrNull().orEmpty())
-            })
         }
     }
 
