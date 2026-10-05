@@ -22,20 +22,20 @@ import kotlinx.coroutines.flow.update
  * never imports Work.
  */
 @Singleton
-class LocalWorkRunRegistry private constructor(
+class LocalWorkRunRegistry internal constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
-    private val appContext: Context?,
-    @Suppress("UNUSED_PARAMETER") constructorMarker: Unit,
+    private val notifyJobs: (List<LocalJobInfo>, (String) -> Unit) -> Unit = { _, _ -> },
 ) {
     @Inject
     internal constructor(
         runtimeStateStore: LocalRuntimeStateStore,
         @ApplicationContext context: Context,
-    ) : this(runtimeStateStore, context.applicationContext, Unit)
-
-    internal constructor(runtimeStateStore: LocalRuntimeStateStore) : this(runtimeStateStore, null, Unit)
+    ) : this(runtimeStateStore, { jobs, onFailure ->
+        syncForegroundJobs(context.applicationContext, jobs, onFailure)
+    })
 
     private val bindings = java.util.concurrent.ConcurrentHashMap<String, LocalWorkRunBinding>()
+    private val jobProjectionLock = Any()
 
     init {
         runtimeStateStore.observeResourceSnapshots(::projectResourceSnapshot)
@@ -52,11 +52,7 @@ class LocalWorkRunRegistry private constructor(
     internal fun attach(binding: LocalWorkRunBinding): LocalWorkRunBinding? {
         val previous = bindings.put(binding.sessionId, binding)
         projectResourceSnapshot(binding, runtimeStateStore.resourceSnapshot())
-        projectJobSnapshotToSessionStates(
-            runtimeStateStore.jobManager.snapshotInfos(),
-            runtimeStateStore.mutableState,
-            this,
-        )
+        refreshJobProjection(notify = false)
         return previous
     }
 
@@ -78,10 +74,17 @@ class LocalWorkRunRegistry private constructor(
         bindings.entries.toList().forEach { (sessionId, binding) -> block(sessionId, binding) }
     }
 
-    private fun projectJobSnapshot(snapshot: List<LocalJobInfo>) {
+    private fun projectJobSnapshot(@Suppress("UNUSED_PARAMETER") snapshot: List<LocalJobInfo>) {
+        refreshJobProjection()
+    }
+
+    private fun refreshJobProjection(notify: Boolean = true) = synchronized(jobProjectionLock) {
+        // Initial subscription replay and binding attach can race a job callback. Read the
+        // authoritative snapshot inside the projection lock instead of replaying a captured list.
+        val snapshot = runtimeStateStore.jobManager.snapshotInfos()
         projectJobSnapshotToSessionStates(snapshot, runtimeStateStore.mutableState, this)
-        appContext?.let { context ->
-            syncForegroundJobs(context, snapshot) { message ->
+        if (notify) {
+            notifyJobs(snapshot) { message ->
                 runtimeStateStore.mutableState.update { it.copy(error = message) }
             }
         }

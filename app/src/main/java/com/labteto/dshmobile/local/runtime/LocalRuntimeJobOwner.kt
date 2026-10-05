@@ -19,7 +19,7 @@ import kotlinx.serialization.json.Json
  * Product features observe job snapshots in the allowed Feature -> Shared Capability direction.
  * The owner never imports Feature state or presentation code.
  */
-internal class LocalRuntimeJobOwner private constructor(
+internal class LocalRuntimeJobOwner internal constructor(
     scope: CoroutineScope,
     store: LocalPersistentJobStore?,
 ) {

@@ -67,6 +67,9 @@ class HarnessJobManager(
     )
 
     private val lock = Any()
+    // Capture and commit in one order. Otherwise an older callback/write can arrive after a
+    // terminal snapshot and restore a running UI or durable record.
+    private val publicationLock = Any()
     private val records = linkedMapOf<String, Record>()
     private val removingOwners = mutableSetOf<String>()
 
@@ -515,7 +518,7 @@ class HarnessJobManager(
         throw IllegalStateException("后台任务终态持久化失败", lastFailure)
     }
 
-    private fun publish() {
+    private fun publish() = synchronized(publicationLock) {
         val infos: List<JobInfo>
         val snapshots: List<JobSnapshot>
         synchronized(lock) {
@@ -529,11 +532,11 @@ class HarnessJobManager(
         runCatching { onSnapshotsChanged(snapshots) }
     }
 
-    private fun notifyChanged() {
+    private fun notifyChanged() = synchronized(publicationLock) {
         onChanged(snapshotRecords())
     }
 
-    private fun persistCurrentSnapshots() {
+    private fun persistCurrentSnapshots() = synchronized(publicationLock) {
         onSnapshotsChanged(synchronized(lock) { records.values.map(::snapshot) })
     }
 
