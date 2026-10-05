@@ -6,6 +6,8 @@ import com.labteto.dshmobile.local.LocalHistoryBudget
 import com.labteto.dshmobile.local.LocalToolOutputStore
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.adaptiveToolResultBudget
+import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.compact
@@ -18,6 +20,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.structuredWorkState
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -34,6 +37,7 @@ internal class LocalWorkTurnHistoryRuntime(
     private val sessionStorage: LocalSessionStorageRuntime,
     private val workspacePath: String,
     private val toolOutputStore: LocalToolOutputStore,
+    private val workMemory: LocalWorkMemoryRuntime,
 ) {
     private val compactor = LocalHistoryCompactor()
     private val checkpointCodec = ModelHistoryCheckpointCodec()
@@ -48,6 +52,44 @@ internal class LocalWorkTurnHistoryRuntime(
         })
         binding.eventLog.append("system/prompt", buildJsonObject { put("content", prompt) })
         updateContextMetrics(binding)
+    }
+
+    internal suspend fun drainPendingInputs(binding: LocalWorkRunBinding) {
+        val pending = binding.runHandle.pendingInputs
+        val queued = pending.drain()
+        if (queued.isEmpty()) return
+
+        val history = binding.runHandle.modelHistory
+        val durableMessages = mutableListOf<JsonObject>()
+        queued.forEach { input ->
+            val durableMessage = input.modelMessage ?: buildJsonObject {
+                put("role", "user")
+                put("content", input.content)
+            }
+            history.append(durableMessage)
+            durableMessages += durableMessage
+            workMemory.captureAutoMemoryDirective(
+                text = input.memoryInput,
+                sourceMessageId = input.id,
+                binding = binding,
+            )
+        }
+        binding.state.update { current ->
+            current.copy(
+                kernel = current.kernel.copy(queuedInputCount = pending.size()),
+            )
+        }
+        binding.eventLog.append(
+            LOCAL_AGENT_INBOX_EVENT_TYPE,
+            encodeLocalAgentInboxEvent(
+                action = "claimed",
+                pending = pending.snapshot(),
+                affected = queued,
+                modelMessages = durableMessages,
+            ),
+        )
+        updateContextMetrics(binding)
+        persist(binding)
     }
 
     internal fun currentBudget(binding: LocalWorkRunBinding): LocalHistoryBudget =
