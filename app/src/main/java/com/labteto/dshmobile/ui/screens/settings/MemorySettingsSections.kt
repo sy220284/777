@@ -1,8 +1,12 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -38,6 +42,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -62,6 +69,8 @@ import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsIconBox
+import com.labteto.dshmobile.ui.components.DsIconFamily
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
@@ -70,6 +79,7 @@ import com.labteto.dshmobile.ui.components.DsValueRow
 import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
+import com.labteto.dshmobile.ui.theme.Ds
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -93,24 +103,261 @@ internal fun MemoryOverviewCard(
     local: LocalHarnessSettingsState,
     recordCount: Int,
 ) {
+    val colors = DsTheme.colors
     SettingsCard(stringResource(R.string.advanced_memory_overview), Icons.Outlined.Memory) {
-        Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-            DsStatusPill(
-                state = if (local.autoRecall) DsStatus.Done else DsStatus.Neutral,
-                label = stringResource(
-                    if (local.autoRecall) R.string.advanced_auto_recall_on
-                    else R.string.advanced_auto_recall_off,
-                ),
-            )
-            DsStatusPill(
-                state = if (local.autoMemory) DsStatus.Done else DsStatus.Neutral,
-                label = stringResource(
-                    if (local.autoMemory) R.string.advanced_auto_memory_on
-                    else R.string.advanced_auto_memory_off,
-                ),
-            )
-            DsPill(text = stringResource(R.string.advanced_memory_active_count, recordCount))
+        MemoryAuraPanel {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(DsShapes.cube)
+                        .background(
+                            Brush.radialGradient(
+                                listOf(
+                                    colors.accent.copy(alpha = 0.34f),
+                                    Ds.FamilyCyan.copy(alpha = 0.14f),
+                                    Ds.FamilyPurple.copy(alpha = 0.06f),
+                                ),
+                            ),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.Memory,
+                        contentDescription = null,
+                        tint = colors.accent,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.advanced_memory_active_count, recordCount),
+                        style = DsType.large20.withReadingWeight(),
+                        color = colors.labelPrimary,
+                    )
+                    Text(
+                        stringResource(R.string.advanced_memory_manage_hint),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = colors.labelTertiary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                MemorySignalTile(
+                    text = stringResource(
+                        if (local.autoRecall) R.string.advanced_auto_recall_on
+                        else R.string.advanced_auto_recall_off,
+                    ),
+                    enabled = local.autoRecall,
+                    modifier = Modifier.weight(1f),
+                )
+                MemorySignalTile(
+                    text = stringResource(
+                        if (local.autoMemory) R.string.advanced_auto_memory_on
+                        else R.string.advanced_auto_memory_off,
+                    ),
+                    enabled = local.autoMemory,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun MemoryAuraPanel(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = DsTheme.colors
+    val edge = Brush.linearGradient(
+        listOf(
+            colors.accent.copy(alpha = 0.78f),
+            Ds.FamilyCyan.copy(alpha = 0.54f),
+            Ds.FamilyPurple.copy(alpha = 0.50f),
+            colors.accent.copy(alpha = 0.30f),
+        ),
+    )
+    val wash = Brush.linearGradient(
+        listOf(
+            colors.accent.copy(alpha = 0.12f),
+            Ds.FamilyPurple.copy(alpha = 0.07f),
+            Color.Transparent,
+        ),
+    )
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(DsShapes.block)
+            .background(edge)
+            .padding(1.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(DsShapes.block)
+                .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
+                .background(wash)
+                .padding(DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun MemorySignalTile(
+    text: String,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = DsTheme.colors
+    val tone = if (enabled) colors.accent else colors.labelCaption
+    Surface(
+        modifier = modifier.heightIn(min = 48.dp),
+        shape = DsShapes.row,
+        color = tone.copy(alpha = if (enabled) 0.10f else 0.06f),
+        border = BorderStroke(
+            1.dp,
+            if (enabled) tone.copy(alpha = 0.28f) else colors.borderL1,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        ) {
+            Box(
+                Modifier
+                    .size(7.dp)
+                    .clip(DsShapes.pillFull)
+                    .background(tone),
+            )
+            Text(
+                text,
+                style = DsType.caption11Strong.withReadingWeight(),
+                color = if (enabled) colors.labelPrimary else colors.labelTertiary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MemoryToggleRow(
+    icon: ImageVector,
+    family: DsIconFamily,
+    title: String,
+    hint: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val colors = DsTheme.colors
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = DsShapes.row,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING),
+        border = BorderStroke(
+            1.dp,
+            if (checked) colors.accent.copy(alpha = 0.22f) else colors.borderL1,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = DsSpacing.small, vertical = DsSpacing.xsmall),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            DsIconBox(
+                icon = icon,
+                family = family,
+            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    style = DsType.small13Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                )
+                Text(
+                    hint,
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelTertiary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MemoryRecordSurface(
+    kind: MemoryKind,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = DsTheme.colors
+    val tone = when (kind) {
+        MemoryKind.RULE,
+        MemoryKind.CONSTRAINT,
+        -> colors.accent
+
+        MemoryKind.PREFERENCE,
+        MemoryKind.RELATIONSHIP_PREFERENCE,
+        -> Ds.FamilyPurple
+
+        MemoryKind.RELATIONSHIP_FACT,
+        MemoryKind.RELATIONSHIP_STATE,
+        -> Ds.FamilyCyan
+
+        MemoryKind.DECISION -> colors.warn
+        else -> colors.labelTertiary
+    }
+    val edge = Brush.linearGradient(
+        listOf(
+            tone.copy(alpha = 0.58f),
+            tone.copy(alpha = 0.18f),
+            colors.borderL1,
+        ),
+    )
+    val wash = Brush.horizontalGradient(
+        listOf(
+            tone.copy(alpha = 0.09f),
+            Color.Transparent,
+        ),
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(DsShapes.block)
+            .background(edge)
+            .padding(1.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(DsShapes.block)
+                .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
+                .background(wash)
+                .padding(DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            content = content,
+        )
     }
 }
 
@@ -149,40 +396,28 @@ internal fun LocalMemorySettingsCard(
             hint = stringResource(R.string.advanced_user_rules_hint),
             onClick = { showRulesEditor = true },
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.advanced_auto_recall), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
-                Text(stringResource(R.string.advanced_auto_recall_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
-            }
-            Switch(
-                checked = local.autoRecall,
-                onCheckedChange = { next ->
-                    viewModel.configureLocalMemory(userRules, next, local.autoMemory)
-                    report(memorySavedMessage)
-                },
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.advanced_auto_memory), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
-                Text(stringResource(R.string.advanced_auto_memory_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
-            }
-            Switch(
-                checked = local.autoMemory,
-                onCheckedChange = { next ->
-                    viewModel.configureLocalMemory(userRules, local.autoRecall, next)
-                    report(memorySavedMessage)
-                },
-            )
-        }
+        MemoryToggleRow(
+            icon = Icons.Outlined.Memory,
+            family = DsIconFamily.Cyan,
+            title = stringResource(R.string.advanced_auto_recall),
+            hint = stringResource(R.string.advanced_auto_recall_hint),
+            checked = local.autoRecall,
+            onCheckedChange = { next ->
+                viewModel.configureLocalMemory(userRules, next, local.autoMemory)
+                report(memorySavedMessage)
+            },
+        )
+        MemoryToggleRow(
+            icon = Icons.Outlined.Tune,
+            family = DsIconFamily.Purple,
+            title = stringResource(R.string.advanced_auto_memory),
+            hint = stringResource(R.string.advanced_auto_memory_hint),
+            checked = local.autoMemory,
+            onCheckedChange = { next ->
+                viewModel.configureLocalMemory(userRules, local.autoRecall, next)
+                report(memorySavedMessage)
+            },
+        )
     }
 
     if (showRulesEditor) {
@@ -307,15 +542,7 @@ internal fun MemoryManagementCard(
         }
 
         visibleRecords.forEach { record ->
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = DsShapes.block,
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-            ) {
-                Column(
-                    modifier = Modifier.padding(DsSpacing.medium),
-                    verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                ) {
+            MemoryRecordSurface(record.kind) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
                         verticalAlignment = Alignment.CenterVertically,
@@ -362,7 +589,6 @@ internal fun MemoryManagementCard(
                         )
                     }
                 }
-            }
         }
         if (visibleRecords.size < filteredRecords.size) {
             val remaining = filteredRecords.size - visibleRecords.size
