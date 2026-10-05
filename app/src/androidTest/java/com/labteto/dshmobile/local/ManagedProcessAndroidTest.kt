@@ -3,7 +3,7 @@ package com.labteto.dshmobile.local
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.harness.capability.ProcessRequest
-import com.labteto.dshmobile.local.work.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
 import java.io.File
