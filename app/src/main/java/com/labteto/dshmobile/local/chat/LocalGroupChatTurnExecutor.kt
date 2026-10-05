@@ -3,21 +3,22 @@ package com.labteto.dshmobile.local.chat
 import com.labteto.dshmobile.local.LocalChatReplyCoordinator
 import com.labteto.dshmobile.local.LocalChatTurnCoordinator
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalModelRequestCoordinator
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.boundedGroupChatRequestHistory
 import com.labteto.dshmobile.local.buildTokenUsageContext
 import com.labteto.dshmobile.local.finalizeGroupContextAfterRefresh
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
-import com.labteto.dshmobile.local.model.LocalImageCapabilityRegistry
+import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
 import com.labteto.dshmobile.local.model.LocalImageInputMode
-import com.labteto.dshmobile.local.model.LocalImageRequestBudget
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.model.estimateModelTokens
+import com.labteto.dshmobile.local.model.groupChatSystemPrompt
 import com.labteto.dshmobile.local.model.hasLocalImageRefs
 import com.labteto.dshmobile.local.model.imageInputUnsupported
+import com.labteto.dshmobile.local.model.localImageRequestBudgetForModelConcurrency
 import com.labteto.dshmobile.local.model.prepareLocalMultimodalMessages
 import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
 import com.labteto.dshmobile.local.model.withChatTurnContext
@@ -28,16 +29,15 @@ import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
 import com.labteto.dshmobile.local.runtime.CHAT_ROLEPLAY_TEMPERATURE
 import com.labteto.dshmobile.local.runtime.GROUP_POST_TURN_PENDING_BATCH
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.local.session.LocalTranscriptRuntime
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -56,62 +56,82 @@ import kotlinx.serialization.json.put
  * together here instead of expanding LocalHarnessEngine.
  */
 internal class LocalGroupChatTurnExecutor(
-    private val _state: MutableStateFlow<LocalHarnessState>,
+    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val chatState: LocalChatStatePort,
     private val modelGateway: LocalModelGateway,
+    private val modelRequests: LocalModelRequestCoordinator,
+    private val modelHistoryRuntime: LocalForegroundModelHistoryRuntime,
+    private val sessionStorage: LocalSessionStorageRuntime,
+    private val chatMemory: LocalChatMemoryRuntime,
+    private val branchCoordinator: LocalChatBranchCoordinator,
+    private val transcriptRuntime: LocalChatTranscriptRuntime,
     private val chatPersonaStore: ChatPersonaStore,
-    private val chatPersonaGalleryStore: ChatPersonaGalleryStore,
+    private val chatPersistence: LocalChatPersistence,
     private val chatReplyCoordinator: LocalChatReplyCoordinator,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
-    private val diaryStore: ChatDiaryStore,
     private val usageTracker: DeepSeekUsageTracker,
     private val json: Json,
-    private val modelHistory: LocalModelHistoryBuffer,
-    private val transcriptRuntime: LocalTranscriptRuntime,
-    private val imageCapabilities: LocalImageCapabilityRegistry,
-    private val imageRequestBudget: LocalImageRequestBudget,
-    private val workspacePath: String,
-    private val eventLogProvider: () -> LocalSessionEventLog,
-    private val completeModel: suspend (
-        String,
-        LocalHarnessState,
-        List<JsonObject>,
-        Int,
-        JsonArray?,
-        Boolean,
-        Int?,
-        Boolean,
-        Double?,
-    ) -> LocalModelReply,
-    private val ensureSystemMessageAction: () -> Unit,
-    private val captureAutoMemoryAction: suspend (String, String?) -> Unit,
-    private val chatMemoryContextAction: (String, LocalHarnessState, String, String) -> String,
-    private val compactHistoryAction: (Int) -> Unit,
-    private val updateContextMetricsAction: () -> Unit,
-    private val persistBranchStateAction: (String) -> Unit,
-    private val checkpointHistoryAction: (String) -> Unit,
-    private val persistAction: () -> Unit,
-    private val persistNowAction: suspend () -> Unit,
     private val finishTurn: (Job?) -> Unit,
 ) {
+    private val sessionId: String
+        get() = runtimeStateStore.currentSessionId
     private val eventLog: LocalSessionEventLog
-        get() = eventLogProvider()
+        get() = sessionStorage.eventLogs.get(sessionId)
+    private val modelHistory
+        get() = modelHistoryRuntime.history
+    private val chatPersonaGalleryStore
+        get() = chatPersistence.galleryStore
+    private val diaryStore
+        get() = chatPersistence.diaryStore
+    private val imageCapabilities
+        get() = runtimeStateStore.imageCapabilities
+    private val imageRequestBudget by lazy {
+        localImageRequestBudgetForModelConcurrency(runtimeStateStore.resourceBudget.maxModelRequests)
+    }
+    private val workspacePath: String
+        get() = sessionStorage.files.workspace.path
 
-    private fun ensureSystemMessage() = ensureSystemMessageAction()
+    private fun ensureSystemMessage() {
+        check(modelHistoryRuntime.ensureSystemPrompt(sessionId, groupChatSystemPrompt())) {
+            "群聊 system prompt 写入时前台会话已切换"
+        }
+    }
 
     private suspend fun captureAutoMemoryDirective(text: String, sourceMessageId: String? = null) =
-        captureAutoMemoryAction(text, sourceMessageId)
+        chatMemory.captureAutoMemoryDirective(text, sourceMessageId)
 
-    private fun compactHistoryIfNeeded(extraTokens: Int = 0) = compactHistoryAction(extraTokens)
+    private fun compactHistoryIfNeeded(extraTokens: Int = 0) {
+        check(modelHistoryRuntime.compactChatIfNeeded(sessionId, extraTokens)) {
+            "群聊历史压缩时前台会话已切换"
+        }
+    }
 
-    private fun updateContextMetrics() = updateContextMetricsAction()
+    private fun updateContextMetrics() {
+        check(modelHistoryRuntime.refreshMetrics(sessionId)) {
+            "群聊历史指标更新时前台会话已切换"
+        }
+    }
 
-    private fun persistChatBranchState(reason: String) = persistBranchStateAction(reason)
+    private fun persistChatBranchState(reason: String) =
+        branchCoordinator.persistCurrentProjection(sessionId, reason)
 
-    private fun checkpointModelHistory(reason: String) = checkpointHistoryAction(reason)
+    private fun checkpointModelHistory(reason: String) {
+        check(modelHistoryRuntime.checkpoint(sessionId, reason)) {
+            "群聊模型历史检查点写入时前台会话已切换"
+        }
+    }
 
-    private fun persist() = persistAction()
+    private fun persist() {
+        check(sessionStorage.enqueueCurrentSnapshot(sessionId)) {
+            "群聊快照排队时前台会话已切换"
+        }
+    }
 
-    private suspend fun persistNow() = persistNowAction()
+    private suspend fun persistNow() {
+        check(sessionStorage.writeCurrentSnapshotNow(sessionId)) {
+            "群聊快照写入时前台会话已切换"
+        }
+    }
 
     private fun projectGalleryState(groupChat: LocalGroupChatState, phase: String) {
         projectGroupGalleryState(groupChat, chatPersonaGalleryStore).failures.forEach { failure ->
@@ -133,16 +153,20 @@ internal class LocalGroupChatTurnExecutor(
         maxAttemptsOverride: Int? = null,
         allowContextOverflowRecovery: Boolean = true,
         temperature: Double? = null,
-    ): LocalModelReply = completeModel(
-        key,
-        snapshot,
-        messages,
-        step,
-        toolsOverride,
-        publishPreview,
-        maxAttemptsOverride,
-        allowContextOverflowRecovery,
-        temperature,
+    ): LocalModelReply = modelRequests.complete(
+        snapshot = snapshot,
+        messages = messages,
+        step = step,
+        toolsOverride = toolsOverride,
+        publishPreviewEnabled = publishPreview,
+        maxAttemptsOverride = maxAttemptsOverride,
+        allowContextOverflowRecovery = allowContextOverflowRecovery,
+        requestLog = eventLog,
+        temperature = temperature,
+        previewGuard = {
+            runtimeStateStore.currentSessionId == snapshot.sessionId &&
+                runtimeStateStore.state.value.sessionId == snapshot.sessionId
+        },
     )
 
     private suspend fun generateGroupReply(
