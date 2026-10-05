@@ -23,6 +23,7 @@ internal class LocalChatRelationshipHydrator @Inject constructor(
         val snapshot = chatState.value
         if (
             snapshot.usageMode != LocalUsageMode.CHAT ||
+            !snapshot.autoRecall ||
             snapshot.chat.chatState.updatedAt != 0L
         ) return
 
@@ -46,7 +47,7 @@ internal class LocalChatRelationshipHydrator @Inject constructor(
                     relationshipMemoryMatchesSubject(
                         memory = it,
                         currentSubjectKey = subjectKey,
-                        currentLineageId = null,
+                        currentLineageId = aggregate.lineageId,
                         subjectLabel = aggregate.chat.chatPersona.name,
                     ) &&
                     it.content.startsWith(prefix)
