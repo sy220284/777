@@ -55,7 +55,11 @@ check_environment() {
       say "  bash tools/dev/ai-toolchain.sh bootstrap --profile $PROFILE"
     else
       say "这些缺失项可自动配置。推荐执行："
-      say "  bash tools/dev/install.sh $PROFILE"
+      if [ -x "$SCRIPT_DIR/../../install.sh" ]; then
+        say "  ./install.sh $PROFILE"
+      else
+        say "  bash tools/dev/install.sh $PROFILE"
+      fi
       say "或使用底层命令："
       say "  bash tools/dev/setup-toolchain.sh --auto --profile $PROFILE --accept-android-licenses --configure-shell"
     fi
