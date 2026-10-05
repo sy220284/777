@@ -110,6 +110,39 @@ runtime_state_store_source = strip_comments(
 if re.search(r"\binternal\s+val\s+mutableState\s*:", runtime_state_store_source):
     die("LocalRuntimeStateStore must not expose its writable aggregate state")
 
+# Architecture 3.0 migration seam: aggregate projection access is temporary and consumer-frozen.
+# New code must use a domain StatePort or an explicit Shared Runtime projection command instead.
+aggregate_projection_migration_allowlist = {
+    "app/src/main/java/com/labteto/dshmobile/local/chat/GroupAnnouncementSaveCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalCharacterBehaviorTuningCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatBranchCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersonaCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersonaCorrectionCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatMembershipCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalReplySuggestionCommit.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalReplySuggestionCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt",
+}
+for source_path in LOCAL_SOURCE_ROOT.rglob("*.kt"):
+    relative = source_path.relative_to(ROOT).as_posix()
+    source = strip_comments(source_path.read_text(encoding="utf-8"))
+    if "runtimeStateStore.mutableState" in source or "runtime.mutableState" in source:
+        die(f"{relative} bypasses Runtime projection with the removed writable aggregate state")
+    uses_migration_port = (
+        "LocalAggregateProjectionPort" in source
+        or "runtimeStateStore.projection.update(" in source
+    )
+    if (
+        uses_migration_port
+        and relative != "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt"
+        and relative not in aggregate_projection_migration_allowlist
+    ):
+        die(
+            f"{relative} introduces a new aggregate projection migration consumer; "
+            "use a domain StatePort or explicit Runtime projection command"
+        )
+
 work_binding_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt")
 )
