@@ -4179,8 +4179,8 @@ class LocalHarnessEngine @Inject internal constructor(
             reconcileCharacterBehaviorTuning(
                 chatPersonaStore,
                 chatPersonaGalleryStore,
-                stored.personaId,
-                stored.galleryId,
+                projectedControls.personaId,
+                projectedControls.galleryId,
                 projectedControls.chatState,
             )
         }
@@ -4231,20 +4231,20 @@ class LocalHarnessEngine @Inject internal constructor(
             sessionId = sessionId,
             usageMode = stored.usageMode,
             chat = LocalChatState(
-                personaId = stored.personaId,
-                galleryId = stored.galleryId,
-                galleryStoryId = stored.galleryStoryId,
-                gallerySaveSuppressedThrough = stored.gallerySaveSuppressedThrough,
+                personaId = projectedControls.personaId,
+                galleryId = projectedControls.galleryId,
+                galleryStoryId = projectedControls.galleryStoryId,
+                gallerySaveSuppressedThrough = projectedControls.gallerySaveSuppressedThrough,
                 chatPersona = restoredBehavior.persona,
                 chatState = restoredBehavior.chatState,
                 chatContext = projectedControls.chatContext.boundDurablePending(eventLog),
-                replySuggestions = stored.replySuggestions,
-                chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !stored.groupChat.enabled) {
+                replySuggestions = projectedControls.replySuggestions,
+                chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !projectedControls.groupChat.enabled) {
                     restoreMaterializedChatBranchState(
                         current = projectedControls.chatBranches,
                         activeMessages = restoredTranscript.messages,
                         chatState = restoredBehavior.chatState,
-                        replySuggestions = stored.replySuggestions,
+                        replySuggestions = projectedControls.replySuggestions,
                     )
                 } else {
                     LocalChatBranchState()
@@ -4257,7 +4257,7 @@ class LocalHarnessEngine @Inject internal constructor(
             parentSessionId = stored.parentSessionId,
             lineageId = restoredLineageId,
             projectId = restoredProjectId,
-            handoffSummary = stored.handoffSummary,
+            handoffSummary = projectedControls.handoffSummary,
             userRules = profile.customRules,
             autoRecall = profile.autoRecall,
             autoMemory = profile.autoMemory,

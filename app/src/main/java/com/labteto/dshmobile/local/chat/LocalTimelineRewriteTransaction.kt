@@ -33,6 +33,7 @@ internal data class LocalTimelineRewriteState(
     val chatContext: ChatContextState,
     val chatBranches: LocalChatBranchState,
     val groupChat: LocalGroupChatState,
+    val replySuggestions: List<ChatReplySuggestion>? = null,
 )
 
 @Serializable
@@ -73,6 +74,22 @@ private val timelineRewriteJson = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
 }
+
+internal fun appendChatProjectionCommit(
+    eventLog: LocalSessionEventLog,
+    reason: String,
+    activeTranscript: List<LocalHarnessMessage>,
+    modelHistory: List<JsonObject>,
+    state: LocalTimelineRewriteState,
+): LocalSessionEventLog.Event = eventLog.append("chat/active-transcript", buildJsonObject {
+    put("reason", reason)
+    put("transcript", encodeTranscriptMessages(activeTranscript))
+    put(LOCAL_TIMELINE_REWRITE_MODEL_HISTORY_KEY, JsonArray(modelHistory))
+    put(
+        LOCAL_TIMELINE_REWRITE_STATE_KEY,
+        timelineRewriteJson.encodeToJsonElement(LocalTimelineRewriteState.serializer(), state),
+    )
+})
 
 internal fun appendTimelineRewriteCommit(
     eventLog: LocalSessionEventLog,

@@ -144,6 +144,20 @@ class ChatPersonaStore internal constructor(
         read().personas.firstOrNull { it.id == id } ?: PersonaProfile()
 
     @Synchronized
+    internal fun find(id: String): PersonaProfile? =
+        read().personas.firstOrNull { it.id == id }
+
+    @Synchronized
+    internal fun restore(id: String, previous: PersonaProfile?) {
+        require(previous == null || previous.id == id) { "人物回滚编号不一致" }
+        val document = read()
+        val restored = document.personas.filterNot { it.id == id }.toMutableList()
+        previous?.let(restored::add)
+        if (restored.isEmpty()) restored += PersonaProfile()
+        write(document.copy(personas = restored))
+    }
+
+    @Synchronized
     fun upsert(profile: PersonaProfile): PersonaProfile {
         val clean = sanitize(profile).copy(updatedAt = System.currentTimeMillis())
         val document = read()

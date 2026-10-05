@@ -29,6 +29,19 @@ class ChatPersonaGalleryStore internal constructor(
     fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
 
     @Synchronized
+    internal fun findEntry(id: String): PersonaGalleryEntry? =
+        readNormalized().entries.firstOrNull { it.id == id }
+
+    @Synchronized
+    internal fun restoreEntry(id: String, previous: PersonaGalleryEntry?) {
+        require(previous == null || previous.id == id) { "人物图集回滚编号不一致" }
+        val document = readNormalized()
+        val restored = document.entries.filterNot { it.id == id }.toMutableList()
+        previous?.let(restored::add)
+        documentStore.write(document.copy(version = 5, entries = restored))
+    }
+
+    @Synchronized
     internal fun loadStoryHistory(
         id: String,
         storyId: String,

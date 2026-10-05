@@ -2,9 +2,12 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatReplySuggestion
+import com.labteto.dshmobile.local.chat.LOCAL_CHAT_DOMAIN_STATE_EVENT_TYPE
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
 import com.labteto.dshmobile.local.chat.decodeChatBranchStateEvent
+import com.labteto.dshmobile.local.chat.decodeChatDomainStateEvent
 import com.labteto.dshmobile.local.chat.decodeTimelineRewriteState
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
@@ -27,6 +30,12 @@ internal data class LocalSessionControlProjection(
     val todos: List<LocalTodoItem>,
     val goal: LocalGoal?,
     val planMode: Boolean,
+    val personaId: String,
+    val galleryId: String?,
+    val galleryStoryId: String?,
+    val gallerySaveSuppressedThrough: Long,
+    val replySuggestions: List<ChatReplySuggestion>,
+    val handoffSummary: String?,
     val chatBranches: LocalChatBranchState,
     val chatState: ChatCharacterState,
     val chatContext: ChatContextState,
@@ -42,6 +51,12 @@ internal fun projectSessionControlTail(
     var todos = snapshot.todos
     var goal = snapshot.goal
     var planMode = snapshot.planMode
+    var personaId = snapshot.personaId
+    var galleryId = snapshot.galleryId
+    var galleryStoryId = snapshot.galleryStoryId
+    var gallerySaveSuppressedThrough = snapshot.gallerySaveSuppressedThrough
+    var replySuggestions = snapshot.replySuggestions
+    var handoffSummary = snapshot.handoffSummary
     var chatBranches = snapshot.chatBranches
     var chatState = snapshot.chatState
     var chatContext = snapshot.chatContext
@@ -63,6 +78,21 @@ internal fun projectSessionControlTail(
                         chatState = rewrite.chatState
                         chatContext = rewrite.chatContext
                         groupChat = rewrite.groupChat
+                        rewrite.replySuggestions?.let { replySuggestions = it }
+                    }
+                }
+                LOCAL_CHAT_DOMAIN_STATE_EVENT_TYPE -> {
+                    decodeChatDomainStateEvent(event.data)?.let { domain ->
+                        personaId = domain.personaId
+                        galleryId = domain.galleryId
+                        galleryStoryId = domain.galleryStoryId
+                        gallerySaveSuppressedThrough = domain.gallerySaveSuppressedThrough
+                        replySuggestions = domain.replySuggestions
+                        handoffSummary = domain.handoffSummary
+                        chatBranches = domain.chatBranches
+                        chatState = domain.chatState
+                        chatContext = domain.chatContext
+                        groupChat = domain.groupChat
                     }
                 }
                 "plan/state" -> decodePlanState(event.data)?.let { plan = it }
@@ -95,6 +125,12 @@ internal fun projectSessionControlTail(
         todos = todos,
         goal = goal,
         planMode = planMode,
+        personaId = personaId,
+        galleryId = galleryId,
+        galleryStoryId = galleryStoryId,
+        gallerySaveSuppressedThrough = gallerySaveSuppressedThrough,
+        replySuggestions = replySuggestions,
+        handoffSummary = handoffSummary,
         chatBranches = chatBranches,
         chatState = chatState,
         chatContext = chatContext,
