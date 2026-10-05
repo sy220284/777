@@ -8,7 +8,7 @@ import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
 import com.labteto.dshmobile.local.model.LocalStructuredWorkState
 import com.labteto.dshmobile.local.model.LocalWorkCheckpoint
 import com.labteto.dshmobile.local.model.estimateModelTokens
-import com.labteto.dshmobile.local.runtime.structuredWorkState
+import com.labteto.dshmobile.local.work.structuredWorkState
 import com.labteto.dshmobile.local.work.LocalWorkRequestProjection
 import com.labteto.dshmobile.local.work.projectWorkRequestContext
 import com.labteto.dshmobile.local.work.workRequestProjectionTriggerTokens
