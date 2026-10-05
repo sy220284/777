@@ -279,6 +279,7 @@ import com.labteto.dshmobile.local.work.shouldProactivelyCompactBeforeModelStep
 import com.labteto.dshmobile.local.work.validateWorkspacePatchPaths
 import com.labteto.dshmobile.local.work.withWorkTurnContext
 import com.labteto.dshmobile.local.work.workSteadyStateHistoryBudget
+import com.labteto.dshmobile.local.work.exitWorkPlanMode
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.observability.DiagnosticReport
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
@@ -3449,7 +3450,17 @@ class LocalHarnessEngine @Inject internal constructor(
                 searchCapabilities(args.string("query"), binding.enabledOptionalTools)
             }
             "update_plan" -> workProgress(binding).updatePlan(args)
-            "exit_plan_mode" -> exitPlanMode(call, args.string("plan"), binding)
+            "exit_plan_mode" -> exitWorkPlanMode(
+                call = call,
+                plan = args.string("plan"),
+                state = binding?.workState ?: localAggregateWorkStatePort(_state),
+                interactions = binding?.interactions ?: runtimeStateStore.foregroundInteractions,
+                aggregateSnapshot = { binding?.aggregateSnapshot() ?: _state.value },
+                history = binding?.runHandle?.modelHistory ?: modelHistory,
+                eventLog = binding?.eventLog ?: eventLog,
+                persist = { persist(binding) },
+                updateContextMetrics = { updateContextMetrics(binding) },
+            )
             "todo_write" -> workProgress(binding).updateTodos(args)
             "create_goal" -> workProgress(binding).createGoal(args.string("description"))
             "get_goal" -> workProgress(binding).getGoal()
@@ -3648,47 +3659,6 @@ class LocalHarnessEngine @Inject internal constructor(
     ): String = (binding?.interactions ?: runtimeStateStore.foregroundInteractions).awaitQuestion(
         LocalQuestion(call.id, question.take(2_000), options.take(6)),
     )
-
-    private suspend fun exitPlanMode(
-        call: LocalToolCall,
-        plan: String,
-        binding: LocalWorkRunBinding? = null,
-    ): String {
-        val targetState = aggregateRunState(binding)
-        val log = binding?.eventLog ?: eventLog
-        val history = binding?.runHandle?.modelHistory ?: modelHistory
-        if (!targetState.value.work.planMode) return "当前未启用规划模式"
-        val answer = askUser(
-            call,
-            "Harness 已完成计划，是否批准并进入执行模式？\n\n${plan.take(8_000)}",
-            listOf("批准并进入执行模式", "继续规划"),
-            binding,
-        )
-        return if (answer == "批准并进入执行模式") {
-            val approvedPlan = plan.lines().map(String::trim).filter(String::isNotEmpty).take(20)
-            targetState.update { current ->
-                current.copy(
-                    work = current.work.copy(
-                        planMode = false,
-                        plan = approvedPlan,
-                    ),
-                )
-            }
-            log.append("plan/state", buildJsonObject {
-                put("items", JsonArray(approvedPlan.map { item -> JsonPrimitive(item) }))
-            })
-            log.append("plan/mode", buildJsonObject { put("active", false) })
-            if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
-                val prompt = systemPrompt(binding)
-                recordRuntimeSystemPromptUpdate(history, prompt, targetState.value, log)
-                updateContextMetrics(binding)
-            }
-            persist(binding)
-            "计划已获批准，已进入执行模式"
-        } else {
-            "用户要求继续规划。反馈：$answer"
-        }
-    }
 
     private fun workSubagents(binding: LocalWorkRunBinding): LocalSubagentRunner =
         subagentRunnerFactory.createBound(
