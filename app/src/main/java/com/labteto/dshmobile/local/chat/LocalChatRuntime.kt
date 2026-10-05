@@ -45,7 +45,7 @@ class LocalChatRuntime @Inject internal constructor(
     internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> {
         val sessionId = runtimeStateStore.currentSessionId
         return saveGroupChatAnnouncement(
-            state = runtimeStateStore.mutableState,
+            state = runtimeStateStore.projection,
             text = text,
             sessionId = sessionId,
             transcriptProjectedThroughSequence =
@@ -70,7 +70,7 @@ class LocalChatRuntime @Inject internal constructor(
         val sessionId = runtimeStateStore.currentSessionId
         LocalChatPostTurnJobOwner.cancel()
         runtimeStateStore.cancelForegroundRun(sessionStorage.eventLogs.get(sessionId))
-        runtimeStateStore.mutableState.update { current ->
+        runtimeStateStore.projection.update { current ->
             if (current.sessionId != sessionId) current else current.copy(
                 work = current.work.copy(
                     pendingApproval = null,
