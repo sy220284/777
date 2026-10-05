@@ -61,7 +61,7 @@ jobs:
             exit 1
           fi
           bash tools/dev/setup-toolchain.sh --self-test
-          if grep -RInE '^[[:space:]]*(curl|wget|apt-get)([[:space:]]|$)|^[[:space:]]*download_verified([[:space:]]|\\()' tools/dev --include='*.sh'; then
+          if grep -RInE '^[[:space:]]*(curl|wget|apt-get)([[:space:]]|$)' tools/dev --include='*.sh' || grep -RIn 'download_verified' tools/dev --include='*.sh'; then
             echo "本地工具链脚本出现外部下载/包管理入口；必须由 Artifact 提供依赖。" >&2
             exit 1
           fi
