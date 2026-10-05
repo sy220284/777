@@ -44,7 +44,6 @@ data class LocalHarnessState(
     val work: LocalWorkState = LocalWorkState(),
     val kernel: LocalKernelState = LocalKernelState(),
     val safeAutoApprovalEnabled: Boolean = false,
-    val deviceApprovalLease: Boolean = false,
     val usage: DeepSeekUsageSnapshot = DeepSeekUsageSnapshot(),
     val error: String? = null,
 ) {
