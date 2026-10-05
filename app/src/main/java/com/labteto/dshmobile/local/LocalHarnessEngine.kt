@@ -629,8 +629,8 @@ class LocalHarnessEngine @Inject internal constructor(
     private val chatReplyCoordinator by lazy {
         LocalChatReplyCoordinator(
             chatTurnCoordinator = chatTurnCoordinator,
-            recordUsage = { snapshot, reply, usageContext -> usageTracker.record(snapshot, reply, usageContext) },
-            recordStyleGuardHits = ::recordStyleGuardHits,
+            usageTracker = usageTracker,
+            runtimeStateStore = runtimeStateStore,
         )
     }
 
