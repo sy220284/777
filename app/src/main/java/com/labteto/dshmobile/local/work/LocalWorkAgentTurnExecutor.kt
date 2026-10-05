@@ -34,7 +34,7 @@ import com.labteto.dshmobile.local.model.imageInputUnsupported
 import com.labteto.dshmobile.local.model.localImageRequestBudgetForModelConcurrency
 import com.labteto.dshmobile.local.model.localToolHistoryMessage
 import com.labteto.dshmobile.local.model.prepareLocalMultimodalMessages
-import com.labteto.dshmobile.local.model.recordForeground
+import com.labteto.dshmobile.local.recordForeground
 import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
 import com.labteto.dshmobile.local.model.toRunModelSurface
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
