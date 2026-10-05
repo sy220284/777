@@ -46,6 +46,7 @@ import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
 import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.LocalChatPersistence
 import com.labteto.dshmobile.local.chat.LocalChatState
+import com.labteto.dshmobile.local.chat.LocalChatTurnPort
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
 import com.labteto.dshmobile.local.chat.LocalGroupChatTurnExecutor
@@ -1118,31 +1119,23 @@ class LocalHarnessEngine @Inject internal constructor(
             regenerateReplyForMode(LocalUsageMode.WORK, messageId)
     }
 
-    internal val chatExecutionPort: LocalChatExecutionPort = object : LocalChatExecutionPort {
-        override fun send(text: String, attachments: List<LocalImportedAttachment>): LocalSendResult =
-            sendChat(text, attachments)
+    internal val chatTurnPort: LocalChatTurnPort = object : LocalChatTurnPort {
+        override fun start(
+            content: String,
+            memoryInput: String,
+            sourceMessageId: String,
+        ): Job = scope.launch(start = CoroutineStart.LAZY) {
+            runTurn(content, memoryInput, sourceMessageId)
+        }
 
         override fun editAndResendUserMessage(
             messageId: String,
             replacement: String,
-        ): LocalChatUserEditResult = this@LocalHarnessEngine.editAndResendUserMessage(messageId, replacement)
+        ): LocalChatUserEditResult =
+            this@LocalHarnessEngine.editAndResendUserMessage(messageId, replacement)
 
         override fun regenerateReply(messageId: String): Boolean =
             regenerateReplyForMode(LocalUsageMode.CHAT, messageId)
-    }
-
-    /** Queue one Chat turn while the Chat execution path is still migrating. */
-    private fun sendChat(
-        text: String,
-        attachments: List<LocalImportedAttachment> = emptyList(),
-    ): LocalSendResult {
-        val prepared = prepareLocalSend(text, attachments) ?: return LocalSendResult.Empty
-        return queueHumanTurn(
-            prepared.content,
-            prepared.memoryInput,
-            prepared.modelMessage,
-            expectedMode = LocalUsageMode.CHAT,
-        )
     }
 
     /**
@@ -1476,73 +1469,6 @@ class LocalHarnessEngine @Inject internal constructor(
         transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, transcriptEvent.sequence)
     }
 
-    private fun queueHumanTurn(
-        content: String,
-        memoryInput: String = content,
-        modelMessage: JsonObject? = null,
-        expectedMode: LocalUsageMode? = null,
-    ): LocalSendResult {
-        var job: Job? = null
-        val result = synchronized(runStateLock) {
-            val state = _state.value
-            if (expectedMode != null && state.usageMode != expectedMode) {
-                return@synchronized LocalSendResult.rejected(LocalSendRejectReason.SESSION_TRANSITION)
-            }
-            check(state.usageMode == LocalUsageMode.CHAT) {
-                "queueHumanTurn 已收窄为 Chat 发送入口"
-            }
-            val queuedInput = QueuedAgentInput(
-                content,
-                memoryInput,
-                modelMessage,
-                UUID.randomUUID().toString(),
-            )
-            coordinateOwnedLocalSend(
-                usageMode = LocalUsageMode.CHAT,
-                sessionId = state.sessionId,
-                workBindingActive = false,
-                visibleJobActive = activeJob?.isCompleted == false,
-                configured = state.modelState.configured,
-                loading = state.loading,
-                sessionTransitioning = sessionTransitioning,
-                pendingCount = pendingInputs.size(),
-                pendingLimit = MAX_PENDING_INPUTS,
-                onRejected = { rejected ->
-                    runtimeStateStore.publishSendFeedback(
-                        com.labteto.dshmobile.local.send.LocalSendFeedbackState(
-                            sessionId = state.sessionId,
-                            rejectReason = rejected.rejectReason,
-                            rejectLimit = rejected.rejectLimit,
-                        ),
-                    )
-                },
-                onAccepted = {
-                    runtimeStateStore.clearSendFeedback()
-                    cancelChatPostTurn()
-                },
-                enqueue = {
-                    pendingInputs.offer(queuedInput) {
-                        recordUserTranscript(content, modelMessage, true, queuedInput)
-                    }
-                },
-                onQueued = {
-                    _state.update {
-                        it.copy(
-                            kernel = it.kernel.copy(queuedInputCount = pendingInputs.size()),
-                            error = null,
-                        )
-                    }
-                    persist()
-                },
-                onStart = {
-                    job = queueTurnLocked(content, memoryInput, modelMessage)
-                },
-            )
-        }
-        job?.start()
-        return result
-    }
-
     private fun syncVisibleWorkRun(
         sessionId: String,
         ownedBinding: LocalWorkRunBinding? = null,
@@ -1564,106 +1490,6 @@ class LocalHarnessEngine @Inject internal constructor(
         )
         modelHistory.reset(binding.runHandle.modelHistory.snapshot())
         transcriptProjectionCursor = binding.runHandle.transcriptProjectionCursor
-    }
-
-    private fun queueTurn(
-        content: String,
-        memoryInput: String = content,
-        modelMessage: JsonObject? = null,
-    ): Job? = synchronized(runStateLock) {
-        if (sessionTransitioning || activeJob?.isCompleted == false) return@synchronized null
-        queueTurnLocked(content, memoryInput, modelMessage)
-    }
-
-    private fun queueTurnLocked(
-        content: String,
-        memoryInput: String,
-        modelMessage: JsonObject?,
-    ): Job {
-        val durableMessage = modelMessage ?: buildJsonObject {
-            put("role", "user")
-            put("content", content)
-        }
-        val sourceMessageId = recordUserTranscript(content, durableMessage, queued = false)
-        appendUserToModelHistory(durableMessage)
-        persist()
-        return scope.launch(start = CoroutineStart.LAZY) {
-            runTurn(content, memoryInput, sourceMessageId)
-        }.also { activeJob = it }
-    }
-
-    private fun recordUserTranscript(
-        content: String,
-        modelMessage: JsonObject?,
-        queued: Boolean,
-        queuedInput: QueuedAgentInput? = null,
-        binding: LocalWorkRunBinding? = null,
-    ): String {
-        val targetState = aggregateRunState(binding)
-        val targetLog = binding?.eventLog ?: eventLog
-        val targetTranscript = binding?.transcriptRuntime ?: transcriptRuntime
-        val targetPending = binding?.runHandle?.pendingInputs ?: pendingInputs
-        val before = targetState.value
-        persistChatTimelineBaseline(targetLog, json, before)
-        val durableInput = queuedInput.takeIf { queued }
-        val transcriptMessage = targetTranscript.newMessage("user", content).let { message ->
-            durableInput?.id
-                ?.takeIf(String::isNotBlank)
-                ?.let { durableId -> message.copy(id = durableId) }
-                ?: message
-        }
-        val userEvent = if (queued) {
-            val durableInput = requireNotNull(durableInput) { "排队消息缺少持久编号" }
-            targetLog.append(
-                LOCAL_AGENT_INBOX_EVENT_TYPE,
-                encodeLocalAgentInboxEvent(
-                    action = "queued",
-                    pending = targetPending.snapshot(),
-                    affected = listOf(durableInput),
-                    transcript = listOf(transcriptMessage),
-                ),
-            )
-        } else {
-            targetLog.append("user/message", buildJsonObject {
-                put("content", content)
-                modelMessage?.let { put("model_message", it) }
-                put("queued", false)
-                put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
-            })
-        }
-        targetTranscript.applyMessages(listOf(transcriptMessage), userEvent.sequence)
-        if (before.usageMode == LocalUsageMode.CHAT && !before.chat.groupChat.enabled) {
-            automationScheduler.onChatUserActivity(
-                sessionId = before.sessionId,
-                userMessageAt = transcriptMessage.createdAt,
-            )
-        }
-        if (
-            before.usageMode == LocalUsageMode.CHAT &&
-            before.chat.chatBranches.nodes.isNotEmpty() &&
-            before.transcriptIndex.branchingEligible
-        ) {
-            val branches = appendMaterializedChatBranchMessage(
-                current = before.chat.chatBranches,
-                activeMessages = before.messages,
-                message = transcriptMessage,
-                parentId = before.transcriptIndex.latestDialogueMessageId,
-                chatState = before.chat.chatState,
-                chatContext = before.chat.chatContext,
-                replySuggestions = before.chat.replySuggestions,
-            )
-            targetState.update {
-                it.copy(
-                    chat = it.chat.copy(
-                        replySuggestions = emptyList(),
-                        chatBranches = branches,
-                    ),
-                )
-            }
-        } else if (before.usageMode == LocalUsageMode.CHAT) {
-            targetState.update { it.copy(chat = it.chat.copy(replySuggestions = emptyList())) }
-        }
-        return transcriptMessage.id
     }
 
     private fun appendUserToModelHistory(
