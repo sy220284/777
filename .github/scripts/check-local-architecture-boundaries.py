@@ -481,11 +481,9 @@ if "foregroundInteractions = LocalInteractionCoordinator(mutable)" not in runtim
 if "private val interactions = LocalInteractionCoordinator" in engine:
     die("LocalHarnessEngine must not own a second foreground interaction coordinator")
 for required_runtime_owner in (
-    "foregroundRunLock = Any()",
-    "foregroundPendingInputs = AgentInputQueue(MAX_PENDING_INPUTS)",
-    "foregroundJob: Job?",
-    "foregroundTranscriptProjectionCursor: Long?",
+    "foregroundRunHandle = LocalAgentRunHandle(",
     "cancelForegroundRun(eventLog: LocalSessionEventLog)",
+    "cancelForegroundRunAndJoin(eventLog: LocalSessionEventLog)",
 ):
     if required_runtime_owner not in runtime_state_store:
         die("Shared Runtime foreground-run ownership is incomplete: " + required_runtime_owner)
