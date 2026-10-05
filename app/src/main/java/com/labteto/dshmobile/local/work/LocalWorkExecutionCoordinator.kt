@@ -13,6 +13,7 @@ import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.send.prepareLocalSend
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.coordinateOwnedLocalSend
 import java.util.UUID
 import javax.inject.Inject
@@ -21,12 +22,27 @@ import kotlinx.coroutines.Job
 
 /** Work-owned product execution entry. */
 @Singleton
-internal class LocalWorkExecutionCoordinator @Inject constructor(
+internal class LocalWorkExecutionCoordinator internal constructor(
     private val workRunRegistry: LocalWorkRunRegistry,
     private val runtimeStateStore: LocalRuntimeStateStore,
-    private val sessionStorage: LocalSessionStorageRuntime,
+    private val eventLogFor: (String) -> LocalSessionEventLog,
+    private val enqueueSnapshot: (String) -> Boolean,
     private val turn: LocalWorkTurnPort,
 ) : LocalWorkExecutionPort {
+    @Inject
+    internal constructor(
+        workRunRegistry: LocalWorkRunRegistry,
+        runtimeStateStore: LocalRuntimeStateStore,
+        sessionStorage: LocalSessionStorageRuntime,
+        turn: LocalWorkTurnPort,
+    ) : this(
+        workRunRegistry = workRunRegistry,
+        runtimeStateStore = runtimeStateStore,
+        eventLogFor = sessionStorage.eventLogs::get,
+        enqueueSnapshot = sessionStorage::enqueueCurrentSnapshot,
+        turn = turn,
+    )
+
     override fun send(
         text: String,
         attachments: List<LocalImportedAttachment>,
@@ -74,7 +90,7 @@ internal class LocalWorkExecutionCoordinator @Inject constructor(
                             content = prepared.content,
                             createdAt = System.currentTimeMillis(),
                         )
-                        val event = sessionStorage.eventLogs.get(sessionId).append(
+                        val event = eventLogFor(sessionId).append(
                             LOCAL_AGENT_INBOX_EVENT_TYPE,
                             encodeLocalAgentInboxEvent(
                                 action = "queued",
@@ -99,7 +115,7 @@ internal class LocalWorkExecutionCoordinator @Inject constructor(
                         sessionId = sessionId,
                         count = pending.size(),
                     )
-                    check(sessionStorage.enqueueCurrentSnapshot(sessionId)) {
+                    check(enqueueSnapshot(sessionId)) {
                         "Work 排队保存时前台会话已切换"
                     }
                 },

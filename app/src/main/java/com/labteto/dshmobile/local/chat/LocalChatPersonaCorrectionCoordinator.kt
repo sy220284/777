@@ -22,12 +22,25 @@ import kotlinx.serialization.json.put
  * trail. The visible notice is a bounded Chat projection and expires without involving Engine.
  */
 @Singleton
-internal class LocalChatPersonaCorrectionCoordinator @Inject constructor(
+internal class LocalChatPersonaCorrectionCoordinator internal constructor(
     private val chatState: LocalChatStatePort,
     private val personaStore: ChatPersonaStore,
     private val eventLogs: LocalSessionEventLogRegistry,
-    private val sessionStorage: LocalSessionStorageRuntime,
+    private val enqueueSnapshot: (String) -> Boolean,
 ) {
+    @Inject
+    internal constructor(
+        chatState: LocalChatStatePort,
+        personaStore: ChatPersonaStore,
+        eventLogs: LocalSessionEventLogRegistry,
+        sessionStorage: LocalSessionStorageRuntime,
+    ) : this(
+        chatState = chatState,
+        personaStore = personaStore,
+        eventLogs = eventLogs,
+        enqueueSnapshot = sessionStorage::enqueueCurrentSnapshot,
+    )
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     internal fun captureDirect(text: String) {
@@ -61,7 +74,7 @@ internal class LocalChatPersonaCorrectionCoordinator @Inject constructor(
             put("count", updated.corrections.size)
             put("latest", correction)
         })
-        sessionStorage.enqueueCurrentSnapshot(snapshot.sessionId)
+        enqueueSnapshot(snapshot.sessionId)
 
         scope.launch {
             delay(PERSONA_CORRECTION_UNDO_MILLIS)
