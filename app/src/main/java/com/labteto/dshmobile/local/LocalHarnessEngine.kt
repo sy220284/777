@@ -42,8 +42,10 @@ import com.labteto.dshmobile.local.chat.LocalCharacterBehaviorTuningCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatBranchCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatBranchNode
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.chat.LocalChatDirectTurnExecutor
 import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
 import com.labteto.dshmobile.local.chat.LocalChatMode
+import com.labteto.dshmobile.local.chat.LocalChatMemoryRuntime
 import com.labteto.dshmobile.local.chat.LocalChatPersistence
 import com.labteto.dshmobile.local.chat.LocalChatState
 import com.labteto.dshmobile.local.chat.LocalChatStatePort
@@ -548,6 +550,16 @@ class LocalHarnessEngine @Inject internal constructor(
             sessionStorage = sessionStorageRuntime,
         )
     }
+    private val engineChatMemoryRuntime by lazy {
+        LocalChatMemoryRuntime(
+            runtimeStateStore = runtimeStateStore,
+            memoryStore = memoryStore,
+            memoryManager = memoryManager,
+            persistence = chatPersistence,
+            sessionStorage = sessionStorageRuntime,
+        )
+    }
+
     private val chatTurnDispatcher by lazy {
         LocalChatTurnDispatcher(
             context = context,
@@ -556,7 +568,10 @@ class LocalHarnessEngine @Inject internal constructor(
             relationshipHydrator = engineChatRelationshipHydrator,
             groupExecutor = groupChatTurnExecutor,
             directTurn = { input, sourceMessageId ->
-                runChatTurn(input, sourceMessageId = sourceMessageId)
+                engineChatDirectTurnExecutor.run(
+                    input = input,
+                    sourceMessageId = sourceMessageId,
+                )
             },
         )
     }
@@ -638,6 +653,21 @@ class LocalHarnessEngine @Inject internal constructor(
             chatTurnCoordinator = chatTurnCoordinator,
             usageTracker = usageTracker,
             runtimeStateStore = runtimeStateStore,
+        )
+    }
+
+    private val engineChatDirectTurnExecutor by lazy {
+        LocalChatDirectTurnExecutor(
+            runtimeStateStore = runtimeStateStore,
+            chatState = engineChatStatePort,
+            sessionStorage = sessionStorageRuntime,
+            modelHistory = engineForegroundModelHistoryRuntime,
+            modelRequests = modelRequestCoordinator,
+            chatTurnCoordinator = chatTurnCoordinator,
+            chatMemory = engineChatMemoryRuntime,
+            replyCoordinator = chatReplyCoordinator,
+            branchCoordinator = engineChatBranchCoordinator,
+            postTurn = chatContextRefreshCoordinator,
         )
     }
 
@@ -1183,7 +1213,7 @@ class LocalHarnessEngine @Inject internal constructor(
                     sessionId,
                     { _state.value.error },
                 ) {
-                    runChatTurn(
+                    engineChatDirectTurnExecutor.run(
                         input = prompt,
                         replacingMessageId = replacingMessageId,
                     )
@@ -1537,287 +1567,6 @@ class LocalHarnessEngine @Inject internal constructor(
             modelHistory.prepend(system)
         }
         updateContextMetrics()
-    }
-
-    private suspend fun runChatTurn(
-        input: String,
-        replacingMessageId: String? = null,
-        sourceMessageId: String? = null,
-    ) = LocalSessionRuntimeRegistry.withOwner(currentSessionId, LocalSessionRuntimeKind.FOREGROUND) { ownedSessionId ->
-        if (currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
-        cancelChatPostTurn()
-        _state.update {
-            it.copy(
-                work = it.work.copy(
-                    pendingApproval = null,
-                    pendingQuestion = null,
-                    deviceApprovalLease = false,
-                ),
-                kernel = it.kernel.copy(running = true),
-                error = null,
-            )
-        }
-        try {
-            ensureSystemMessage()
-            val snapshot = _state.value
-            val branchEligible = snapshot.transcriptIndex.branchingEligible
-            val branchParentId = snapshot.transcriptIndex.latestUserMessageId
-            val branchBase = snapshot.chat.chatBranches
-            captureAutoMemoryDirective(input, sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId)
-            val relationshipMemory = chatRelationshipMemoryContext(input, snapshot)
-            val preparedChat = chatTurnCoordinator.prepare(
-                snapshot = snapshot,
-                input = input,
-                relationshipMemory = relationshipMemory,
-            )
-            val chatContext = preparedChat.context
-            val dynamicContext = preparedChat.dynamicContext
-            compactHistoryIfNeeded(
-                extraTokens = estimateModelTokens(chatContext.stablePrompt) +
-                    estimateModelTokens(dynamicContext),
-            )
-            val key = modelRequestMarker()
-            val durableRequestMessages = withChatTurnContext(
-                history = boundedChatRequestHistory(
-                    if (replacingMessageId == null) modelHistory.snapshot() else modelHistory.snapshot().withoutLastCompletedAssistantReply(),
-                    recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
-                    currentFacts = snapshot.chat.chatContext
-                        .canonicalFactLines(),
-                ),
-                stableContext = chatContext.stablePrompt,
-                dynamicContext = dynamicContext,
-            )
-            val selectedMode = resolveLocalImageInputMode(
-                snapshot.modelState.imageInputMode,
-                imageCapabilities,
-                snapshot.modelState.baseUrl,
-                snapshot.modelState.model,
-            )
-            if (
-                hasLocalImageRefs(durableRequestMessages) &&
-                imageCapabilities.state(snapshot.modelState.baseUrl, snapshot.modelState.model) ==
-                    LocalImageCapability.UNSUPPORTED
-            ) {
-                throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
-            }
-            val requestMessages = prepareLocalMultimodalMessages(
-                messages = durableRequestMessages,
-                workspaceRoot = File(workspace.path),
-                mode = selectedMode,
-                budget = imageRequestBudget,
-                maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.modelState.model, snapshot.modelState.baseUrl),
-            )
-            val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
-
-            eventLog.append("turn/start", buildJsonObject {
-                put("model", snapshot.modelState.model)
-                put("mode", "chat")
-                put("persona_id", chatContext.persona.id)
-            })
-
-            val rawReply = try {
-                completeWithRetry(
-                    key = key,
-                    snapshot = snapshot,
-                    messages = requestMessages,
-                    step = 1,
-                    toolsOverride = JsonArray(emptyList()),
-                    // Chat candidates must pass style/repetition/scene guards before anything is shown.
-                    publishPreview = false,
-                    streamFilterPhrases = chatStreamFilterPhrases(snapshot, chatContext.persona),
-                    persistOverflowHistory = true,
-                    temperature = CHAT_ROLEPLAY_TEMPERATURE,
-                ).also {
-                    if (nativeImagesSent) {
-                        imageCapabilities.markSupported(snapshot.modelState.baseUrl, snapshot.modelState.model)
-                    }
-                }
-            } catch (error: Throwable) {
-                val nativeImageRejected = nativeImagesSent && imageInputUnsupported(error)
-                if (nativeImageRejected) {
-                    imageCapabilities.markUnsupported(snapshot.modelState.baseUrl, snapshot.modelState.model)
-                    throw IllegalStateException(
-                        "当前模型不支持图片理解，请切换支持图片的模型后重试。",
-                        error,
-                    )
-                }
-                throw error
-            }
-
-            val reply = chatReplyCoordinator.finalizeDirect(
-                snapshot = snapshot, reply = rawReply,
-                userMessage = input,
-                step = 1, usage = ForegroundTokenUsageSeed(turnId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId),
-                retryRaw = { repairHint ->
-                    completeWithRetry(
-                        key = key,
-                        snapshot = snapshot,
-                        messages = withEphemeralContext(requestMessages, repairHint),
-                        step = 1,
-                        toolsOverride = JsonArray(emptyList()),
-                        publishPreview = false,
-                        maxAttemptsOverride = 1,
-                        allowContextOverflowRecovery = false,
-                        temperature = CHAT_ROLEPLAY_TEMPERATURE,
-                    )
-                },
-                appendEvent = { type, data ->
-                    eventLog.append(type, data)
-                },
-            )
-
-            if (replacingMessageId != null && reply.content.isNullOrBlank()) {
-                error("模型没有返回可用回复")
-            }
-
-            val transcriptMessages = buildList {
-                reply.content?.takeIf(String::isNotBlank)?.let { content ->
-                    add(transcriptRuntime.newMessage("assistant", content))
-                }
-            }
-            val assistantData = transcriptRuntime.withTranscript(reply.message, transcriptMessages)
-            val assistantEvent = eventLog.append(
-                "assistant/message",
-                if (replacingMessageId == null) assistantData else JsonObject(
-                    assistantData + ("replaces" to JsonPrimitive(replacingMessageId)),
-                ),
-            )
-            if (replacingMessageId != null) {
-                modelHistory.reset(modelHistory.snapshot().withoutLastCompletedAssistantReply())
-                _state.update { state ->
-                    val retained = state.messages.filterNot { it.id == replacingMessageId }
-                    state.copy(
-                        messages = retained,
-                        transcriptIndex = state.transcriptIndex.copy(
-                            totalMessageCount = (state.transcriptIndex.totalMessageCount - 1L)
-                                .coerceAtLeast(0L),
-                        ),
-                    )
-                }
-            }
-            modelHistory.append(reply.message)
-            updateContextMetrics()
-            transcriptRuntime.applyMessages(
-                transcriptMessages,
-                assistantEvent.sequence,
-            )
-            val assistantTranscript = transcriptMessages.lastOrNull()
-            if (
-                branchEligible &&
-                branchBase.nodes.isNotEmpty() &&
-                assistantTranscript != null &&
-                branchParentId != null
-            ) {
-                val branches = upsertChatBranchNode(
-                    branchBase,
-                    LocalChatBranchNode(
-                        message = assistantTranscript,
-                        parentId = branchParentId,
-                        chatStateAfter = snapshot.chat.chatState,
-                    ),
-                    select = true,
-                )
-                _state.update { it.copy(chat = it.chat.copy(chatBranches = branches)) }
-                if (hasChatBranchAlternatives(branches)) {
-                    persistChatBranchState(
-                        if (replacingMessageId != null) "assistant-regenerated" else "assistant-branch-completed",
-                    )
-                }
-            }
-            eventLog.append("turn/end", buildJsonObject {
-                put("reason", "completed")
-                put("steps", 1)
-                put("messages", _state.value.transcriptIndex.totalMessageCount)
-                put("mode", "chat")
-            })
-            if (replacingMessageId != null) checkpointModelHistory("chat/regenerated")
-            else checkpointModelHistoryAtTurnBoundary("chat/completed")
-
-            _state.update {
-                it.copy(
-                    work = it.work.copy(
-                        pendingApproval = null,
-                        pendingQuestion = null,
-                        deviceApprovalLease = false,
-                    ),
-                    kernel = it.kernel.copy(running = false),
-                )
-            }
-            persist()
-
-            val assistantMessage = reply.content?.takeIf(String::isNotBlank)
-            if (assistantTranscript != null && assistantMessage != null) {
-                snapshot.modelState.modelSelection.activeProfile?.let { profile ->
-                    chatContextRefreshCoordinator.schedule(
-                        userMessage = input,
-                        assistantMessage = assistantMessage,
-                        persona = chatContext.persona,
-                        expectedSessionId = snapshot.sessionId,
-                        expectedAssistantMessageId = assistantTranscript.id,
-                        expectedBaseState = _state.value.chat.chatState,
-                        boundEventLog = eventLogFor(snapshot.sessionId),
-                        profile = profile,
-                        sourceUserMessageId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
-                        assistantEventSequence = assistantEvent.sequence,
-                    )
-                }
-            }
-        } catch (cancelled: CancellationException) {
-            eventLog.append("turn/end", buildJsonObject {
-                put("reason", "aborted")
-                put("mode", "chat")
-            })
-            checkpointModelHistoryAtTurnBoundary("chat/cancelled")
-            persist()
-            throw cancelled
-        } catch (error: Exception) {
-            if (replacingMessageId != null) {
-                val oldNode = _state.value.chat.chatBranches.nodes.firstOrNull {
-                    it.message.id == replacingMessageId
-                }
-                oldNode?.chatStateAfter?.let { restoredState ->
-                    _state.update { current ->
-                        current.copy(
-                            chat = current.chat.copy(
-                                chatState = restoredState,
-                                chatContext = restoreBranchContext(
-                                    snapshot = oldNode.chatContextAfter,
-                                    legacyState = oldNode.chatStateAfter,
-                                    previousGeneration = current.chat.chatContext.generation,
-                                ).boundDurablePending(eventLog),
-                                replySuggestions = oldNode.replySuggestionsAfter,
-                            ),
-                        )
-                    }
-                }
-            }
-            val detail = error.message ?: "聊天请求失败"
-            _state.update { it.copy(error = detail) }
-            eventLog.append("turn/end", buildJsonObject {
-                put("reason", "error")
-                put("detail", detail.take(2_000))
-                put("mode", "chat")
-            })
-            checkpointModelHistoryAtTurnBoundary("chat/failed")
-            persist()
-        } finally {
-            _state.update {
-                it.copy(
-                    work = it.work.copy(
-                        pendingApproval = null,
-                        pendingQuestion = null,
-                        deviceApprovalLease = false,
-                    ),
-                    kernel = it.kernel.copy(running = false),
-                )
-            }
-            persist()
-            val completedJob = currentCoroutineContext()[Job]
-            synchronized(runStateLock) {
-                if (activeJob === completedJob) activeJob = null
-            }
-            startNextQueuedTurnIfIdle()?.start()
-        }
     }
 
     private suspend fun runWorkAgentTurn(
