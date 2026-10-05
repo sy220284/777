@@ -664,6 +664,7 @@ class LocalHarnessEngine @Inject internal constructor(
 
     private val engineChatDirectTurnExecutor by lazy {
         LocalChatDirectTurnExecutor(
+            context = context,
             runtimeStateStore = runtimeStateStore,
             chatState = engineChatStatePort,
             sessionStorage = sessionStorageRuntime,
@@ -1208,24 +1209,6 @@ class LocalHarnessEngine @Inject internal constructor(
             chatTurnDispatcher.run(content, memoryInput, sourceMessageId)
         }
 
-        override fun startRegeneration(
-            prompt: String,
-            replacingMessageId: String,
-        ): Job {
-            val sessionId = currentSessionId
-            return scope.launch(start = CoroutineStart.LAZY) {
-                LocalExecutionService.withTurn(
-                    context,
-                    sessionId,
-                    { _state.value.error },
-                ) {
-                    engineChatDirectTurnExecutor.run(
-                        input = prompt,
-                        replacingMessageId = replacingMessageId,
-                    )
-                }
-            }
-        }
     }
 
     private fun syncVisibleWorkRun(
