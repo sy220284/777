@@ -38,11 +38,11 @@ check_environment() {
     failures=$((failures + 1))
   fi
 
-  java_home="$(find_java17_home || true)"
-  if [ -n "$java_home" ] && [ "$(java_major "$java_home")" = "$JDK_MAJOR" ] && [ -x "$java_home/bin/javac" ]; then
-    ok "JDK $JDK_MAJOR（含 javac）-> $java_home"
+  java_home="$(find_compatible_java_home || true)"
+  if [ -n "$java_home" ] && [ "$(java_major "$java_home")" -ge "$BUILD_JDK_MIN_MAJOR" ] && [ -x "$java_home/bin/javac" ]; then
+    ok "JDK $(java_major "$java_home")（要求 >= $BUILD_JDK_MIN_MAJOR，含 javac）-> $java_home"
   else
-    fail "JDK $JDK_MAJOR（必须包含 javac，单独 JRE 不满足）"
+    fail "JDK >= $BUILD_JDK_MIN_MAJOR（必须包含 javac，单独 JRE 不满足）"
     failures=$((failures + 1))
   fi
 
@@ -82,13 +82,19 @@ check_environment() {
   fi
 
   if [ "$PROFILE" = full ]; then
-    local node_bin="$TOOLS_ROOT/node-current/bin/node"
-    if [ -x "$node_bin" ] && [ "$("$node_bin" -p 'process.versions.node')" = "$NODE_VERSION" ]; then
-      ok "Node.js $NODE_VERSION"
-    elif command -v node >/dev/null 2>&1 && [ "$(node -p 'process.versions.node' 2>/dev/null)" = "$NODE_VERSION" ]; then
-      ok "Node.js $NODE_VERSION -> $(command -v node)"
+    local node_bin="$TOOLS_ROOT/node-current/bin/node" node_path="" installed_node_major=""
+    if [ -x "$node_bin" ]; then
+      node_path="$node_bin"
+    elif command -v node >/dev/null 2>&1; then
+      node_path="$(command -v node)"
+    fi
+    if [ -n "$node_path" ]; then
+      installed_node_major="$(node_major "$node_path" || true)"
+    fi
+    if [[ "$installed_node_major" =~ ^[0-9]+$ ]] && [ "$installed_node_major" -ge "$NODE_MIN_MAJOR" ]; then
+      ok "Node.js $("$node_path" -p 'process.versions.node')（要求 >= $NODE_MIN_MAJOR）-> $node_path"
     else
-      fail "Node.js $NODE_VERSION"
+      fail "Node.js >= $NODE_MIN_MAJOR"
       failures=$((failures + 1))
     fi
 
