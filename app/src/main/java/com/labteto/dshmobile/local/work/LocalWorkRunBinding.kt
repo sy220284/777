@@ -60,8 +60,29 @@ internal class LocalWorkRunBinding(
         },
     )
 
+    /**
+     * Request cancellation of this session-owned Work run without waiting for teardown.
+     *
+     * The run remains visibly running until its coroutine crosses the real cancellation boundary;
+     * publishing idle before the Session owner releases would admit conflicting user actions.
+     */
+    internal fun requestCancel(): Boolean {
+        val activeJob = job?.takeIf { it.isCompleted == false } ?: return false
+        clearPendingForCancellation(markStopped = false)
+        activeJob.cancel()
+        return true
+    }
+
     /** Tear down only this session-owned runtime; other Work conversations keep running. */
     suspend fun cancelAndJoin() {
+        clearPendingForCancellation(markStopped = true)
+        val activeJob = job.also { job = null }
+        val activeMirror = mirrorJob.also { mirrorJob = null }
+        activeJob?.cancelAndJoin()
+        activeMirror?.cancelAndJoin()
+    }
+
+    private fun clearPendingForCancellation(markStopped: Boolean) {
         interactions.cancelAll()
         val discarded = pendingInputs.drain()
         if (discarded.isNotEmpty()) {
@@ -74,23 +95,19 @@ internal class LocalWorkRunBinding(
                 ),
             )
         }
-        state.update {
-            it.copy(
-                work = it.work.copy(
+        state.update { current ->
+            current.copy(
+                work = current.work.copy(
                     pendingApproval = null,
                     pendingQuestion = null,
                 ),
-                kernel = it.kernel.copy(
-                    running = false,
+                kernel = current.kernel.copy(
+                    running = if (markStopped) false else current.kernel.running,
                     queuedInputCount = 0,
                 ),
                 deviceApprovalLease = false,
             )
         }
-        val activeJob = job.also { job = null }
-        val activeMirror = mirrorJob.also { mirrorJob = null }
-        activeJob?.cancelAndJoin()
-        activeMirror?.cancelAndJoin()
     }
 }
 
