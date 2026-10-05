@@ -7,6 +7,7 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalHistoryBudget
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
@@ -124,10 +125,22 @@ class LocalRuntimeStateStore internal constructor(
 
     internal fun resourceSnapshot(): HarnessResourceSnapshot = resourceScheduler.snapshot()
 
+    internal fun historyBudgetFor(
+        state: LocalHarnessState,
+        snapshot: HarnessResourceSnapshot = resourceScheduler.snapshot(),
+    ): LocalHistoryBudget = localHistoryBudgetFor(
+        memoryClassMb = memoryClassMb,
+        pressure = snapshot.pressure,
+        model = state.modelState.model,
+        baseUrl = state.modelState.baseUrl,
+        contextWindowTokensOverride =
+            state.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
+    )
+
     internal fun contextBudgetCharsFor(
         state: LocalHarnessState,
         snapshot: HarnessResourceSnapshot,
-    ): Int = contextBudgetCharsFor(state.modelState, snapshot)
+    ): Int = historyBudgetFor(state, snapshot).maxHistoryChars
 
     internal fun contextBudgetCharsFor(
         modelState: LocalModelState,
