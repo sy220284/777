@@ -42,13 +42,27 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
         val reached = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val lock = Mutex()
-        val coordinator = LocalCharacterBehaviorTuningCoordinator(state, personas, gallery, lock) {
-            assertEquals(tuning, personas.get(original.id).behaviorTuning)
-            assertEquals(tuning, ChatPersonaGalleryStore(galleryFile, Json).list().single().persona.behaviorTuning)
-            assertEquals(tuning, state.value.chat.chatState.behaviorTuning)
-            reached.complete(Unit)
-            release.await()
-        }
+        val coordinator = LocalCharacterBehaviorTuningCoordinator(
+            state = state,
+            personaStore = personas,
+            galleryStore = gallery,
+            acquireLease = {
+                check(lock.tryLock())
+                object : AutoCloseable {
+                    override fun close() {
+                        lock.unlock()
+                    }
+                }
+            },
+            persistNow = {
+                assertEquals(tuning, personas.get(original.id).behaviorTuning)
+                assertEquals(tuning, ChatPersonaGalleryStore(galleryFile, Json).list().single().persona.behaviorTuning)
+                assertEquals(tuning, state.value.chat.chatState.behaviorTuning)
+                reached.complete(Unit)
+                release.await()
+                true
+            },
+        )
         val saving = async { coordinator.configure(original.copy(behaviorTuning = tuning)) }
         withTimeout(2_000) { reached.await() }
         assertFalse(saving.isCompleted)
@@ -64,9 +78,20 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
         val gallery = ChatPersonaGalleryStore(File(temporary.root, "gallery.json"), Json)
         val state = MutableStateFlow(LocalHarnessState(loading = false, usageMode = LocalUsageMode.CHAT))
         val lock = Mutex()
-        val coordinator = LocalCharacterBehaviorTuningCoordinator(state, personas, gallery, lock) {
-            throw IOException("disk full")
-        }
+        val coordinator = LocalCharacterBehaviorTuningCoordinator(
+            state = state,
+            personaStore = personas,
+            galleryStore = gallery,
+            acquireLease = {
+                check(lock.tryLock())
+                object : AutoCloseable {
+                    override fun close() {
+                        lock.unlock()
+                    }
+                }
+            },
+            persistNow = { throw IOException("disk full") },
+        )
         val result = coordinator.configure(PersonaProfile(behaviorTuning = CharacterBehaviorTuning(openness = 75)))
         assertTrue(result.exceptionOrNull() is IOException)
         assertFalse(lock.isLocked)
@@ -80,7 +105,13 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
         val gallery = ChatPersonaGalleryStore(File(temporary.root, "gallery.json"), Json)
         val state = MutableStateFlow(LocalHarnessState(loading = false, kernel = LocalKernelState(running = true), usageMode = LocalUsageMode.CHAT))
         var writes = 0
-        val coordinator = LocalCharacterBehaviorTuningCoordinator(state, personas, gallery, Mutex()) { writes++ }
+        val coordinator = LocalCharacterBehaviorTuningCoordinator(
+            state = state,
+            personaStore = personas,
+            galleryStore = gallery,
+            acquireLease = { object : AutoCloseable { override fun close() = Unit } },
+            persistNow = { writes++; true },
+        )
         assertTrue(coordinator.configure(PersonaProfile()).isFailure)
         assertEquals(listOf(PersonaProfile()), personas.list())
         assertEquals(0, writes)
