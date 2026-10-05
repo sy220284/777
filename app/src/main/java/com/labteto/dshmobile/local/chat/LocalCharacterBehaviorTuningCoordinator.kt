@@ -1,9 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort
-import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
@@ -23,7 +20,7 @@ import kotlinx.coroutines.withContext
  */
 @Singleton
 internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
-    private val state: LocalAggregateProjectionPort,
+    private val state: LocalChatStatePort,
     private val personaStore: ChatPersonaStore,
     private val galleryStore: ChatPersonaGalleryStore,
     private val acquireLease: (String) -> AutoCloseable?,
@@ -31,12 +28,12 @@ internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
 ) {
     @Inject
     internal constructor(
-        runtimeStateStore: LocalRuntimeStateStore,
+        chatState: LocalChatStatePort,
         personaStore: ChatPersonaStore,
         galleryStore: ChatPersonaGalleryStore,
         sessionStorage: LocalSessionStorageRuntime,
     ) : this(
-        state = runtimeStateStore.projection,
+        state = chatState,
         personaStore = personaStore,
         galleryStore = galleryStore,
         acquireLease = { sessionId ->

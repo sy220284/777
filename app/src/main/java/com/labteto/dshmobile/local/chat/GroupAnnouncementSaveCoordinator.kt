@@ -1,10 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalSessionCoordinator
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort
-import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -15,12 +11,10 @@ import kotlinx.coroutines.CancellationException
  * announcement when no newer edit has replaced it.
  */
 internal suspend fun saveGroupChatAnnouncement(
-    state: LocalAggregateProjectionPort,
+    state: LocalChatStatePort,
     text: String,
     sessionId: String,
-    transcriptProjectedThroughSequence: Long?,
-    sessionCoordinator: LocalSessionCoordinator,
-    eventLog: LocalSessionEventLog,
+    persistNow: suspend (String) -> Boolean,
 ): Result<Unit> {
     val before = state.value
     if (
@@ -43,22 +37,13 @@ internal suspend fun saveGroupChatAnnouncement(
             current
         }
     }
-    // Match the common persistence boundary: capture the durable cursor before mutable state.
-    val controlProjectedThroughSequence = eventLog.latestSequence()
     val updated = state.value
     if (updated.sessionId != sessionId || updated.chat.groupChat.announcement != announcement) {
         return Result.failure(IllegalStateException("会话状态已变化，请重新保存群公告"))
     }
 
     return try {
-        sessionCoordinator.writeNow(
-            sessionCoordinator.snapshot(
-                sessionId = sessionId,
-                state = updated,
-                controlProjectedThroughSequence = controlProjectedThroughSequence,
-                transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
-            ),
-        )
+        check(persistNow(sessionId)) { "会话状态已变化，请重新保存群公告" }
         Result.success(Unit)
     } catch (cancelled: CancellationException) {
         rollbackGroupAnnouncement(state, before, announcement)
@@ -70,8 +55,8 @@ internal suspend fun saveGroupChatAnnouncement(
 }
 
 private fun rollbackGroupAnnouncement(
-    state: LocalAggregateProjectionPort,
-    before: LocalHarnessState,
+    state: LocalChatStatePort,
+    before: LocalChatProjectionState,
     failedAnnouncement: String,
 ) {
     state.update { current ->

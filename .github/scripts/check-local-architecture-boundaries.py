@@ -109,18 +109,10 @@ runtime_state_store_source = strip_comments(
 if re.search(r"\binternal\s+val\s+mutableState\s*:", runtime_state_store_source):
     die("LocalRuntimeStateStore must not expose its writable aggregate state")
 
-# Architecture 3.0 migration seam: aggregate projection access is temporary and consumer-frozen.
-# New code must use a domain StatePort or an explicit Shared Runtime projection command instead.
+# ChatFeature owns the only remaining generic aggregate-write bridge.
+# All Chat coordinators consume LocalChatStatePort; Settings/Model/Work already use explicit domain ports.
 aggregate_projection_migration_allowlist = {
-    "app/src/main/java/com/labteto/dshmobile/local/chat/GroupAnnouncementSaveCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalCharacterBehaviorTuningCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatBranchCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersonaCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersonaCorrectionCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatMembershipCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalReplySuggestionCommit.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalReplySuggestionCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatStatePort.kt",
 }
 for source_path in LOCAL_SOURCE_ROOT.rglob("*.kt"):
     relative = source_path.relative_to(ROOT).as_posix()
@@ -140,6 +132,15 @@ for source_path in LOCAL_SOURCE_ROOT.rglob("*.kt"):
             f"{relative} introduces a new aggregate projection migration consumer; "
             "use a domain StatePort or explicit Runtime projection command"
         )
+
+chat_state_port_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatStatePort.kt")
+)
+if "runtimeStateStore.projection.update(transform)" not in chat_state_port_source:
+    die("ChatFeature aggregate projection bridge must stay centralized in LocalChatStatePort")
+for forbidden in ("work =", "mainMaxSteps =", "subagentMaxSteps =", "userRules =", "safeAutoApprovalEnabled ="):
+    if forbidden in chat_state_port_source:
+        die(f"LocalChatStatePort must not write non-Chat aggregate field: {forbidden}")
 
 work_binding_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt")

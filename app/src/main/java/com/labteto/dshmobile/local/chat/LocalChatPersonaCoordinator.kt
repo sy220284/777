@@ -1,9 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort
-import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
@@ -20,18 +17,18 @@ import kotlinx.coroutines.withContext
 /** Owns direct-chat persona selection and gallery binding for ChatFeature. */
 @Singleton
 internal class LocalChatPersonaCoordinator internal constructor(
-    private val state: LocalAggregateProjectionPort,
+    private val state: LocalChatStatePort,
     private val savePersona: suspend (PersonaProfile) -> PersonaProfile,
     private val persistNow: suspend (String) -> Boolean,
     private val enqueueSnapshot: (String) -> Boolean,
 ) {
     @Inject
     internal constructor(
-        runtimeStateStore: LocalRuntimeStateStore,
+        chatState: LocalChatStatePort,
         personaStore: ChatPersonaStore,
         sessionStorage: LocalSessionStorageRuntime,
     ) : this(
-        state = runtimeStateStore.projection,
+        state = chatState,
         savePersona = { profile -> withContext(Dispatchers.IO) { personaStore.upsert(profile) } },
         persistNow = sessionStorage::writeCurrentSnapshotNow,
         enqueueSnapshot = sessionStorage::enqueueCurrentSnapshot,
@@ -58,7 +55,7 @@ internal class LocalChatPersonaCoordinator internal constructor(
     }
 
     internal suspend fun selectNow(
-        snapshot: LocalHarnessState,
+        snapshot: LocalChatProjectionState,
         profile: PersonaProfile,
         galleryId: String? = null,
     ): Boolean {
@@ -193,12 +190,12 @@ internal class LocalChatPersonaCoordinator internal constructor(
     }
 }
 
-private fun LocalHarnessState.canEditPersona(requireEmptyDialogue: Boolean = false): Boolean =
+private fun LocalChatProjectionState.canEditPersona(requireEmptyDialogue: Boolean = false): Boolean =
     !kernel.running && !loading && usageMode == LocalUsageMode.CHAT &&
         !chat.groupChat.enabled && (!requireEmptyDialogue || !transcriptIndex.hasDialogue)
 
-private fun LocalHarnessState.matchesPersonaEdit(
-    before: LocalHarnessState,
+private fun LocalChatProjectionState.matchesPersonaEdit(
+    before: LocalChatProjectionState,
     requireEmptyDialogue: Boolean = false,
 ): Boolean = canEditPersona(requireEmptyDialogue) && sessionId == before.sessionId &&
     chat.personaId == before.chat.personaId && chat.chatPersona == before.chat.chatPersona &&

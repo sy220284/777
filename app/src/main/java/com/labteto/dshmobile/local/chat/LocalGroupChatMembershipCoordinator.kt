@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local.chat
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
 import com.labteto.dshmobile.local.model.groupChatSystemPrompt
-import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
@@ -13,7 +12,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -28,7 +26,7 @@ import kotlinx.serialization.json.put
  */
 @Singleton
 internal class LocalGroupChatMembershipCoordinator @Inject constructor(
-    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val chatState: LocalChatStatePort,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val personaStore: ChatPersonaStore,
     private val modelHistoryRuntime: LocalForegroundModelHistoryRuntime,
@@ -36,7 +34,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     internal fun configure(entries: List<PersonaGalleryEntry>): Boolean {
-        val snapshot = runtimeStateStore.state.value
+        val snapshot = chatState.value
         if (
             snapshot.loading ||
             snapshot.kernel.running ||
@@ -62,7 +60,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
             ) ?: return@launch
             try {
                 var applied = false
-                runtimeStateStore.projection.update { current ->
+                chatState.update { current ->
                     applied =
                         current.sessionId == snapshot.sessionId &&
                             current.usageMode == LocalUsageMode.CHAT &&
@@ -96,7 +94,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
-                runtimeStateStore.projection.update { current ->
+                chatState.update { current ->
                     if (current.sessionId == snapshot.sessionId && current.usageMode == snapshot.usageMode) {
                         current.copy(
                             error = error.message?.takeIf(String::isNotBlank)
@@ -110,7 +108,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
     }
 
     internal fun remove(galleryId: String) {
-        val snapshot = runtimeStateStore.state.value
+        val snapshot = chatState.value
         if (
             snapshot.loading ||
             snapshot.kernel.running ||
@@ -126,7 +124,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
         try {
             var applied = false
             var memberCount = 0
-            runtimeStateStore.projection.update { current ->
+            chatState.update { current ->
                 applied =
                     current.sessionId == snapshot.sessionId &&
                         current.usageMode == LocalUsageMode.CHAT &&

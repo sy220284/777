@@ -1,12 +1,10 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort
 
 /** Results and errors belong to the same frozen character, scene generation and dialogue. */
-private fun LocalHarnessState.matchesReplySuggestionTarget(
-    before: LocalHarnessState,
+private fun LocalChatProjectionState.matchesReplySuggestionTarget(
+    before: LocalChatProjectionState,
     assistantMessageId: String,
 ): Boolean =
     sessionId == before.sessionId && !loading && !kernel.running &&
@@ -19,8 +17,8 @@ private fun LocalHarnessState.matchesReplySuggestionTarget(
         chat.chatContext.generation == before.chat.chatContext.generation
 
 internal fun commitReplySuggestions(
-    state: LocalAggregateProjectionPort,
-    before: LocalHarnessState,
+    state: LocalChatStatePort,
+    before: LocalChatProjectionState,
     assistantMessageId: String,
     suggestions: List<ChatReplySuggestion>,
 ): Boolean {
@@ -48,8 +46,8 @@ internal fun commitReplySuggestions(
 }
 
 internal fun commitReplySuggestionError(
-    state: LocalAggregateProjectionPort,
-    before: LocalHarnessState,
+    state: LocalChatStatePort,
+    before: LocalChatProjectionState,
     assistantMessageId: String,
     message: String,
 ) {

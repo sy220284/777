@@ -12,7 +12,6 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -20,11 +19,12 @@ import kotlinx.serialization.json.JsonPrimitive
 @Singleton
 internal class LocalChatBranchCoordinator @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
+    private val chatState: LocalChatStatePort,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val modelHistoryRuntime: LocalForegroundModelHistoryRuntime,
 ) {
     internal fun persistCurrentProjection(expectedSessionId: String, reason: String): Boolean {
-        val state = runtimeStateStore.state.value
+        val state = chatState.value
         if (state.sessionId != expectedSessionId) return false
         val eventLog = sessionStorage.eventLogs.get(expectedSessionId)
         eventLog.append(
@@ -49,7 +49,7 @@ internal class LocalChatBranchCoordinator @Inject constructor(
     }
 
     internal fun selectVariant(messageId: String, targetIndex: Int): Boolean {
-        val before = runtimeStateStore.state.value
+        val before = chatState.value
         if (
             before.usageMode != LocalUsageMode.CHAT ||
             before.chat.groupChat.enabled ||
@@ -103,7 +103,7 @@ internal class LocalChatBranchCoordinator @Inject constructor(
                 )
             ) return false
 
-            runtimeStateStore.projection.update { current ->
+            chatState.update { current ->
                 if (current.sessionId != state.sessionId) current else current.copy(
                     messages = activeMessages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                     transcriptIndex = buildLocalTranscriptRuntimeIndex(activeMessages),

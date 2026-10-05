@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalChatTurnCoordinator
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
@@ -9,7 +8,6 @@ import com.labteto.dshmobile.local.model.LocalAuxiliaryModelRequestRuntime
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.recordForeground
 import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
-import com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
@@ -29,6 +27,7 @@ import kotlinx.serialization.json.put
 @Singleton
 internal class LocalReplySuggestionCoordinator @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
+    private val chatState: LocalChatStatePort,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
     private val modelGateway: LocalModelGateway,
     private val requestRuntime: LocalAuxiliaryModelRequestRuntime,
@@ -37,8 +36,8 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
     private val branchCoordinator: LocalChatBranchCoordinator,
 ) {
     suspend fun generate(): Boolean {
-        val state: LocalAggregateProjectionPort = runtimeStateStore.projection
-        val snapshot = state.value
+        val aggregateSnapshot = runtimeStateStore.state.value
+        val snapshot = aggregateSnapshot.toLocalChatProjectionState()
         if (
             snapshot.loading ||
             !snapshot.modelState.configured ||
@@ -63,7 +62,6 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
             throw cancelled
         } catch (error: Throwable) {
             updateError(
-                state,
                 snapshot,
                 expectedAssistantMessageId,
                 error.message?.takeIf(String::isNotBlank)
@@ -80,7 +78,7 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
         )
         val reply = try {
             requestRuntime.complete(
-                snapshot = snapshot,
+                snapshot = aggregateSnapshot,
                 profile = profile,
                 messages = chatReplySuggestionModelMessages(prompt),
                 eventLog = boundEventLog,
@@ -94,7 +92,6 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
                 put("detail", error.message.orEmpty().take(1_000))
             })
             updateError(
-                state,
                 snapshot,
                 expectedAssistantMessageId,
                 error.message?.takeIf(String::isNotBlank) ?: "回复建议生成失败，请重试",
@@ -102,7 +99,7 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
             return false
         }
         usageTracker.recordForeground(
-            snapshot = snapshot,
+            snapshot = aggregateSnapshot,
             reply = reply,
             action = TokenUsageAction.REPLY_SUGGESTIONS,
             turnId = snapshot.transcriptIndex.latestUserMessageId,
@@ -115,7 +112,7 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
                 put("status", "parse-failed")
                 put("content", reply.content.orEmpty().take(2_000))
             })
-            updateError(state, snapshot, expectedAssistantMessageId, "回复建议返回格式异常，请重试")
+            updateError(snapshot, expectedAssistantMessageId, "回复建议返回格式异常，请重试")
             return false
         }
 
@@ -133,7 +130,7 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
         }
         try {
             val applied = commitReplySuggestions(
-                state,
+                chatState,
                 snapshot,
                 expectedAssistantMessageId,
                 suggestions,
@@ -151,7 +148,7 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
                 put("assistant_message_id", expectedAssistantMessageId)
                 put("suggestion_count", suggestions.size)
             })
-            if (hasChatBranchAlternatives(state.value.chat.chatBranches)) {
+            if (hasChatBranchAlternatives(chatState.value.chat.chatBranches)) {
                 branchCoordinator.persistCurrentProjection(
                     expectedSessionId,
                     "chat/reply-suggestions-updated",
@@ -165,9 +162,8 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
     }
 
     private fun updateError(
-        state: LocalAggregateProjectionPort,
-        snapshot: LocalHarnessState,
+        snapshot: LocalChatProjectionState,
         expectedAssistantMessageId: String,
         message: String,
-    ) = commitReplySuggestionError(state, snapshot, expectedAssistantMessageId, message)
+    ) = commitReplySuggestionError(chatState, snapshot, expectedAssistantMessageId, message)
 }

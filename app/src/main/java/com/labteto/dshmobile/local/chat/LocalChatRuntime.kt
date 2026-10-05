@@ -9,7 +9,6 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.update
 /** Chat/persona capability boundary for the local UI. */
 @Singleton
 class LocalChatRuntime @Inject internal constructor(
@@ -18,6 +17,7 @@ class LocalChatRuntime @Inject internal constructor(
     private val sessionRuntime: LocalSessionRuntime,
     private val personaCorrections: LocalChatPersonaCorrectionCoordinator,
     private val behaviorTuning: LocalCharacterBehaviorTuningCoordinator,
+    private val chatState: LocalChatStatePort,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val personaCoordinator: LocalChatPersonaCoordinator,
@@ -45,13 +45,10 @@ class LocalChatRuntime @Inject internal constructor(
     internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> {
         val sessionId = runtimeStateStore.currentSessionId
         return saveGroupChatAnnouncement(
-            state = runtimeStateStore.projection,
+            state = chatState,
             text = text,
             sessionId = sessionId,
-            transcriptProjectedThroughSequence =
-                runtimeStateStore.foregroundTranscriptProjectionCursor,
-            sessionCoordinator = sessionStorage.coordinator,
-            eventLog = sessionStorage.eventLogs.get(sessionId),
+            persistNow = sessionStorage::writeCurrentSnapshotNow,
         )
     }
     internal fun removeGroupChatMemberByGalleryId(galleryId: String) =
@@ -70,14 +67,6 @@ class LocalChatRuntime @Inject internal constructor(
         val sessionId = runtimeStateStore.currentSessionId
         LocalChatPostTurnJobOwner.cancel()
         runtimeStateStore.cancelForegroundRun(sessionStorage.eventLogs.get(sessionId))
-        runtimeStateStore.projection.update { current ->
-            if (current.sessionId != sessionId) current else current.copy(
-                work = current.work.copy(
-                    pendingApproval = null,
-                    pendingQuestion = null,
-                ),
-            )
-        }
     }
     internal suspend fun undoChatPersonaCorrection(
         noticeId: Long,

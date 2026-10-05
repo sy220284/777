@@ -57,7 +57,7 @@ class LocalChatPersonaCorrectionCoordinatorTest {
             sessionsRoot = File(temporary.root, "sessions").apply { mkdirs() },
             json = json,
         )
-        val coordinator = LocalChatPersonaCorrectionCoordinator(runtime, personaStore, logs)
+        val coordinator = LocalChatPersonaCorrectionCoordinator(LocalChatStatePort(runtime), personaStore, logs)
 
         coordinator.undo(notice.id, notice.personaId, notice.correction)
 
@@ -105,7 +105,7 @@ class LocalChatPersonaCorrectionCoordinatorTest {
             sessionsRoot = File(temporary.root, "sessions-mismatch").apply { mkdirs() },
             json = json,
         )
-        val coordinator = LocalChatPersonaCorrectionCoordinator(runtime, personaStore, logs)
+        val coordinator = LocalChatPersonaCorrectionCoordinator(LocalChatStatePort(runtime), personaStore, logs)
 
         coordinator.undo(10L, persona.id, correction)
 

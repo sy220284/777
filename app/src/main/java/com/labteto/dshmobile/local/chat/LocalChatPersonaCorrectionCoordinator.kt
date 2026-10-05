@@ -1,11 +1,9 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -19,7 +17,7 @@ import kotlinx.serialization.json.put
  */
 @Singleton
 internal class LocalChatPersonaCorrectionCoordinator @Inject constructor(
-    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val chatState: LocalChatStatePort,
     private val personaStore: ChatPersonaStore,
     private val eventLogs: LocalSessionEventLogRegistry,
 ) {
@@ -28,7 +26,7 @@ internal class LocalChatPersonaCorrectionCoordinator @Inject constructor(
         personaId: String,
         correction: String,
     ) {
-        val snapshot = runtimeStateStore.state.value
+        val snapshot = chatState.value
         val notice = snapshot.chat.personaCorrectionNotice
         if (
             notice == null ||
@@ -42,7 +40,7 @@ internal class LocalChatPersonaCorrectionCoordinator @Inject constructor(
             personaStore.removeCorrection(personaId, correction)
         } ?: return
 
-        runtimeStateStore.projection.update { current ->
+        chatState.update { current ->
             if (
                 current.sessionId == snapshot.sessionId &&
                 current.chat.personaId == personaId &&

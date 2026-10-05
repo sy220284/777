@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local.chat
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalKernelState
-import com.labteto.dshmobile.local.runtime.localAggregateProjectionPort
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
@@ -44,7 +43,7 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
         val release = CompletableDeferred<Unit>()
         val lock = Mutex()
         val coordinator = LocalCharacterBehaviorTuningCoordinator(
-            state = localAggregateProjectionPort(state),
+            state = LocalChatStatePort(state),
             personaStore = personas,
             galleryStore = gallery,
             acquireLease = {
@@ -80,7 +79,7 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
         val state = MutableStateFlow(LocalHarnessState(loading = false, usageMode = LocalUsageMode.CHAT))
         val lock = Mutex()
         val coordinator = LocalCharacterBehaviorTuningCoordinator(
-            state = localAggregateProjectionPort(state),
+            state = LocalChatStatePort(state),
             personaStore = personas,
             galleryStore = gallery,
             acquireLease = {
@@ -107,7 +106,7 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
         val state = MutableStateFlow(LocalHarnessState(loading = false, kernel = LocalKernelState(running = true), usageMode = LocalUsageMode.CHAT))
         var writes = 0
         val coordinator = LocalCharacterBehaviorTuningCoordinator(
-            state = localAggregateProjectionPort(state),
+            state = LocalChatStatePort(state),
             personaStore = personas,
             galleryStore = gallery,
             acquireLease = { object : AutoCloseable { override fun close() = Unit } },
