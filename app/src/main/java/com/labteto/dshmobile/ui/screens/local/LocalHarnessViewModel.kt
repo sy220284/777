@@ -201,14 +201,22 @@ class LocalHarnessViewModel @Inject constructor(
     fun disableAutoApproval() = runtime.work.disableAutoApproval()
     fun answerQuestion(callId: String, answer: String) = runtime.work.answerQuestion(callId, answer)
     fun cancelQuestion(callId: String) = runtime.work.cancelQuestion(callId)
-    fun stop() = runtime.work.stop()
+    fun stop() {
+        when (state.value.usageMode) {
+            LocalUsageMode.CHAT -> runtime.chat.stop()
+            LocalUsageMode.WORK -> runtime.work.stop()
+        }
+    }
     fun newSession() = runtime.session.createSession(LocalConversationMode.INDEPENDENT)
     fun createSession(mode: LocalConversationMode) = runtime.session.createSession(mode)
     fun setPlanMode(enabled: Boolean) = runtime.work.setPlanMode(enabled)
     fun switchUsageMode(mode: LocalUsageMode) = runtime.session.switchUsageMode(mode)
     suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = personaGalleryController.configureChatPersona(profile)
-    fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) =
-        runtime.chat.undoChatPersonaCorrection(noticeId, personaId, correction)
+    fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) {
+        viewModelScope.launch {
+            runtime.chat.undoChatPersonaCorrection(noticeId, personaId, correction)
+        }
+    }
 
     suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> =
         chatModelAssistController.autoFillCurrentPersona(description)
