@@ -708,8 +708,11 @@ if (
     or "LocalUsageMode.WORK -> runtime.work.stop()" not in local_view_model_source
 ):
     die("Local UI stop action must route to the owning Chat/Work Feature")
-if not has_call(chat_runtime_source, "sessionRuntime", "switchChatMode"):
-    die("Chat mode switching must route through Session capability")
+if (
+    not has_call(chat_runtime_source, "sessionRuntime", "switchDomainMode")
+    or "LocalChatSessionModeCommand(" not in chat_runtime_source
+):
+    die("Chat mode switching must route through the generic Session domain command capability")
 if "engine.createGroupChatSession" in chat_runtime_source or "engine.createSingleChatSession" in chat_runtime_source:
     die("Chat session creation must route through Session capability")
 if "engine.undoChatPersonaCorrection" in chat_runtime_source:
