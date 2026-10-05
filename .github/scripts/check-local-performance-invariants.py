@@ -364,19 +364,21 @@ if not ordered_in_any(
     violations.append(
         "Live session-bound Work runtime must rebind before any durable recovery path"
     )
-if not contains_any(
-    work_execution_sources,
-    "executeSafely(call.toLocalToolCall(), allowMutation = true, binding = binding)",
+if (
+    not contains_any(work_execution_sources, "workTurnToolRuntime.execute(")
+    or not contains_any(work_execution_sources, "binding = binding,")
+    or not contains_any(work_execution_sources, "sessionId = binding.sessionId,")
 ):
     violations.append(
-        "Bound Work single-tool execution must keep the originating session binding"
+        "Bound Work single-tool execution must keep the originating session binding through the Work-owned tool runtime"
     )
 if (
-    not contains_any(work_execution_sources, "binding = binding,")
-    or not contains_any(work_execution_sources, "executeToolBatch(")
+    not contains_any(work_execution_sources, "workTurnToolRuntime.executeBatch(")
+    or not contains_any(work_execution_sources, "calls = calls.map { it.toLocalToolCall() },")
+    or not contains_any(work_execution_sources, "calls.map { call -> call to execute(binding, call, allowMutation) }")
 ):
     violations.append(
-        "Bound Work tool batches must keep the originating session binding"
+        "Bound Work tool batches must keep the originating session binding through the Work-owned tool runtime"
     )
 if not contains_any(work_execution_sources, "LocalRuntimeOwnershipPolicy.allowVisibleQueuedTurn("):
     violations.append(
