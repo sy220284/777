@@ -14,6 +14,7 @@ import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.localHistoryBudgetFor
+import com.labteto.dshmobile.local.model.LocalImageCapabilityRegistry
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
@@ -72,6 +73,7 @@ class LocalRuntimeStateStore internal constructor(
     private val resourceProjectionLock = Any()
     private val resourceObservers = CopyOnWriteArrayList<(HarnessResourceSnapshot) -> Unit>()
 
+    internal val imageCapabilities = LocalImageCapabilityRegistry()
     internal val resourceBudget = localResourceBudgetForMemoryClass(memoryClassMb)
     internal val resourceScheduler = HarnessResourceScheduler(
         budget = resourceBudget,
