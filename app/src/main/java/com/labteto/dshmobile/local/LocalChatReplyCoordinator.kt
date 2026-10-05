@@ -9,8 +9,13 @@ import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.LocalGroupChatMember
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.stripGroupSpeakerPrefix
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.settings.LocalHarnessSettingsCoordinator
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -23,10 +28,11 @@ import kotlinx.serialization.json.put
  * The engine owns scheduling and persistence. This coordinator owns style finalization plus the
  * deterministic continuity guard that must pass before a reply becomes durable/visible.
  */
-internal class LocalChatReplyCoordinator(
+@Singleton
+internal class LocalChatReplyCoordinator @Inject constructor(
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
-    private val recordUsage: (LocalHarnessState, LocalModelReply, TokenUsageContext) -> Unit,
-    private val recordStyleGuardHits: (List<String>) -> Unit,
+    private val usageTracker: DeepSeekUsageTracker,
+    private val runtimeStateStore: LocalRuntimeStateStore,
 ) {
     suspend fun finalizeDirect(
         snapshot: LocalHarnessState,
@@ -50,7 +56,7 @@ internal class LocalChatReplyCoordinator(
             step = step,
         )
         if (snapshot.usageMode != LocalUsageMode.CHAT || reply.toolCalls.isNotEmpty()) {
-            recordUsage(snapshot, reply, usageContext)
+            usageTracker.record(snapshot, reply, usageContext)
             return reply
         }
         val persona = chatTurnCoordinator.persona(snapshot)
@@ -340,6 +346,19 @@ internal class LocalChatReplyCoordinator(
         )
     }
 
+    private fun recordStyleGuardHits(violations: List<String>) {
+        if (violations.isEmpty()) return
+        runtimeStateStore.projection.update { current ->
+            current.copy(
+                styleGuardHits = (current.styleGuardHits + violations)
+                    .map(String::trim)
+                    .filter(String::isNotBlank)
+                    .distinct()
+                    .takeLast(LocalHarnessSettingsCoordinator.MAX_STYLE_GUARD_HITS),
+            )
+        }
+    }
+
     private suspend fun finalizeStyled(
         snapshot: LocalHarnessState,
         persona: PersonaProfile,
@@ -352,7 +371,7 @@ internal class LocalChatReplyCoordinator(
         reply = reply,
         recordUsage = { finalizedReply ->
             // Preserve request id and diagnostic prompt composition through the finalization boundary.
-            recordUsage(snapshot, finalizedReply, usageContext)
+            usageTracker.record(snapshot, finalizedReply, usageContext)
         },
         onGuardEvent = { action, violations ->
             recordStyleGuardHits(violations)
