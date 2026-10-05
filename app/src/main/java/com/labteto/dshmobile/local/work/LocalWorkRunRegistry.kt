@@ -96,6 +96,17 @@ class LocalWorkRunRegistry internal constructor(
 
     internal fun anyLive(): Boolean = bindings.values.any { it.job?.isCompleted == false }
 
+    internal fun mirrorVisible(binding: LocalWorkRunBinding) {
+        if (
+            runtimeStateStore.currentSessionId != binding.sessionId ||
+            runtimeStateStore.state.value.sessionId != binding.sessionId
+        ) return
+        runtimeStateStore.projection.projectVisibleWorkRun(
+            sessionId = binding.sessionId,
+            snapshot = binding.aggregateSnapshot(),
+        )
+    }
+
     internal fun forEachBinding(block: (LocalWorkRunBinding) -> Unit) {
         bindings.values.toList().forEach(block)
     }
