@@ -5,7 +5,9 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelState
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.session.appendLocalTranscriptRuntimeIndex
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
@@ -82,6 +84,42 @@ internal class LocalRuntimeProjection(
                 current.copy(work = current.work.copy(planMode = enabled))
             } else {
                 current
+            }
+        }
+    }
+
+    internal fun appendForegroundTranscript(
+        sessionId: String,
+        messages: List<LocalHarnessMessage>,
+    ) {
+        if (messages.isEmpty()) return
+        state.update { current ->
+            if (current.sessionId != sessionId) {
+                current
+            } else {
+                current.copy(
+                    messages = (current.messages + messages)
+                        .takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
+                    transcriptIndex = appendLocalTranscriptRuntimeIndex(
+                        current.transcriptIndex,
+                        messages,
+                    ),
+                )
+            }
+        }
+    }
+
+    internal fun setForegroundQueuedInputCount(
+        sessionId: String,
+        count: Int,
+    ) {
+        state.update { current ->
+            if (current.sessionId != sessionId) {
+                current
+            } else {
+                current.copy(
+                    kernel = current.kernel.copy(queuedInputCount = count.coerceAtLeast(0)),
+                )
             }
         }
     }
