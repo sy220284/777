@@ -206,6 +206,12 @@ work_registry_source = strip_comments(
 )
 if "runtimeStateStore.projection.projectJobs" not in work_registry_source:
     die("Work visible job projection must use LocalRuntimeProjection")
+if "runtimeStateStore.projection.projectVisibleWorkRun" not in work_registry_source:
+    die("Work visible run projection must be owned by LocalWorkRunRegistry through Shared Runtime")
+if "private fun mirrorVisibleWorkRun" in engine:
+    die("LocalHarnessEngine must not own Work visible run projection")
+if "workRunRegistry.mirrorVisible(binding)" not in engine:
+    die("Engine migration call sites must delegate Work visible projection to LocalWorkRunRegistry")
 if "projectJobSnapshotToSessionStates" in work_registry_source:
     die("legacy Work job projection must not regain direct aggregate-state access")
 
