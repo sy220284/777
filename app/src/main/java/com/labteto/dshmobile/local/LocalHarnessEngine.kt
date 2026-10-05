@@ -264,8 +264,10 @@ import com.labteto.dshmobile.local.usage.LocalTokenUsageContextBridge
 import com.labteto.dshmobile.local.vision.LocalVisionRoute
 import com.labteto.dshmobile.local.work.LocalForegroundRecoveryCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkTurnPort
+import com.labteto.dshmobile.local.work.LocalWorkMemoryRuntime
+import com.labteto.dshmobile.local.work.LocalWorkModelHistoryRuntime
+import com.labteto.dshmobile.local.work.LocalWorkToolResultRuntime
 import com.labteto.dshmobile.local.work.LocalWorkTurnStarter
-import com.labteto.dshmobile.local.work.LocalWorkTurnHistoryRuntime
 import com.labteto.dshmobile.local.work.LocalRuntimeOwnershipPolicy
 import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.work.LocalWorkRequestContextPolicy
@@ -777,11 +779,21 @@ class LocalHarnessEngine @Inject internal constructor(
         )
     }
 
-    private val workTurnHistoryRuntime by lazy {
-        LocalWorkTurnHistoryRuntime(
+    private val workMemoryRuntime by lazy {
+        LocalWorkMemoryRuntime(memoryManager)
+    }
+
+    private val workModelHistoryRuntime by lazy {
+        LocalWorkModelHistoryRuntime(
             runtimeStateStore = runtimeStateStore,
             sessionStorage = sessionStorageRuntime,
-            workspacePath = workspace.path,
+            workMemory = workMemoryRuntime,
+        )
+    }
+
+    private val workToolResultRuntime by lazy {
+        LocalWorkToolResultRuntime(
+            runtimeStateStore = runtimeStateStore,
             toolOutputStore = toolOutputStore,
         )
     }
@@ -1718,7 +1730,7 @@ class LocalHarnessEngine @Inject internal constructor(
                 // Persistent history stays compact; user rules, recalled memory and handoff are
                 // assembled per request and are deliberately never written back into runHistory.
                 if (!requestPrepared) {
-                    workTurnHistoryRuntime.ensureSystemMessage(binding)
+                    workModelHistoryRuntime.ensureSystemMessage(binding)
                     val snapshot = runState.value
                     workPromptContext = contextComposer.composeWorkTurnContext(input, snapshot, workspace.path)
                     captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
@@ -1734,7 +1746,7 @@ class LocalHarnessEngine @Inject internal constructor(
                     estimateModelTokens(workPromptContext.stable) +
                         estimateModelTokens(workPromptContext.dynamic)
                 if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
-                    workTurnHistoryRuntime.compactIfNeeded(
+                    workModelHistoryRuntime.compactIfNeeded(
                         binding = binding,
                         extraTokens = productContextTokens + estimateModelTokens(tools.toString()),
                     )
@@ -1887,9 +1899,9 @@ class LocalHarnessEngine @Inject internal constructor(
                                 .withModelToolCallEventData(reply.toolCalls),
                         )
                         runHistory.append(reply.message)
-                        workTurnHistoryRuntime.updateContextMetrics(binding)
+                        workModelHistoryRuntime.updateContextMetrics(binding)
                         runTranscript.applyMessages(transcriptMessages, assistantEvent.sequence)
-                        workTurnHistoryRuntime.persist(binding)
+                        workModelHistoryRuntime.persist(binding)
                     }
                     is AgentEvent.ToolStarted -> {
                         runEventLog.append("tool/call", buildJsonObject {
@@ -1902,7 +1914,7 @@ class LocalHarnessEngine @Inject internal constructor(
                     }
                     is AgentEvent.ToolFinished -> {
                         progressTracker.recordToolResult(event.call, event.output, event.isError)
-                        val boundedContent = workTurnHistoryRuntime.retainToolResult(
+                        val boundedContent = workToolResultRuntime.retain(
                             binding = binding,
                             callId = event.call.id,
                             result = event.output,
@@ -1945,9 +1957,9 @@ class LocalHarnessEngine @Inject internal constructor(
                         })
                         runHistory.append(localToolHistoryMessage(event.call.id, modelOutput, event.retention))
                         completedToolCallIds += event.call.id
-                        workTurnHistoryRuntime.updateContextMetrics(binding)
+                        workModelHistoryRuntime.updateContextMetrics(binding)
                         runTranscript.applyMessages(listOf(transcriptMessage), toolEvent.sequence)
-                        workTurnHistoryRuntime.persist(binding)
+                        workModelHistoryRuntime.persist(binding)
                     }
                     is AgentEvent.StepFinished -> {
                         runEventLog.append("step/end", buildJsonObject {
@@ -1964,7 +1976,7 @@ class LocalHarnessEngine @Inject internal constructor(
                             put("steps", event.steps)
                             put("messages", runState.value.transcriptIndex.totalMessageCount)
                         })
-                        workTurnHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/completed")
+                        workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/completed")
                     }
                     is AgentEvent.TurnStepLimit -> {
                         val transcriptMessage = runTranscript.newMessage(
@@ -1978,8 +1990,8 @@ class LocalHarnessEngine @Inject internal constructor(
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
-                        workTurnHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/step-limit")
-                        workTurnHistoryRuntime.persist(binding)
+                        workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/step-limit")
+                        workModelHistoryRuntime.persist(binding)
                     }
                     is AgentEvent.TurnFailed -> {
                         settlePendingTools("failed")
@@ -1996,7 +2008,7 @@ class LocalHarnessEngine @Inject internal constructor(
                                 put("detail", detail)
                                 put("messages", runState.value.transcriptIndex.totalMessageCount)
                             })
-                            workTurnHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/stream-interrupted")
+                            workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/stream-interrupted")
                         } else {
                             val transcriptMessage = runTranscript.newMessage("system", "执行失败：$detail")
                             val turnEnd = runEventLog.append("turn/end", buildJsonObject {
@@ -2006,9 +2018,9 @@ class LocalHarnessEngine @Inject internal constructor(
                                 put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                             })
                             runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
-                            workTurnHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/failed")
+                            workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/failed")
                         }
-                        workTurnHistoryRuntime.persist(binding)
+                        workModelHistoryRuntime.persist(binding)
                     }
                     is AgentEvent.TurnCancelled -> {
                         settlePendingTools("cancelled")
@@ -2019,8 +2031,8 @@ class LocalHarnessEngine @Inject internal constructor(
                             put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                         })
                         runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
-                        workTurnHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/cancelled")
-                        workTurnHistoryRuntime.persist(binding)
+                        workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/cancelled")
+                        workModelHistoryRuntime.persist(binding)
                     }
                 }
                 agentRunCoordinator.recordEvent(runContext, event)
@@ -2085,7 +2097,7 @@ class LocalHarnessEngine @Inject internal constructor(
                     kernel = it.kernel.copy(running = false),
                 )
             }
-            workTurnHistoryRuntime.persist(binding)
+            workModelHistoryRuntime.persist(binding)
             val completedJob = currentCoroutineContext()[Job]
             LocalExecutionService.releaseTurn(context, foregroundSessionId, foregroundOutcome)
             workRunRegistry.finishTurn(binding, completedJob) { next, ownedBinding ->
