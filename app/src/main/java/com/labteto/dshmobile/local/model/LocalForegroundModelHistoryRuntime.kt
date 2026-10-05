@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
-import com.labteto.dshmobile.local.durableModelHistorySnapshot
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
