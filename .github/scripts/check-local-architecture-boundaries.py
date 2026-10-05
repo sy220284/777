@@ -393,6 +393,34 @@ for required_neutral_model_policy in (
     if required_neutral_model_policy not in model_request_coordinator_source:
         die("Shared model request coordinator lost its neutral Feature extension point: " + required_neutral_model_policy)
 
+request_context_contract_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/context/LocalRequestContextProjection.kt")
+)
+for forbidden_shared_context_work_contract in (
+    "LocalStructuredWorkState",
+    "LocalWorkContextAssessmentSnapshot",
+    "structuredState(",
+):
+    if forbidden_shared_context_work_contract in request_context_contract_source:
+        die(
+            "Shared Context contract must remain Work-agnostic: "
+            + forbidden_shared_context_work_contract
+        )
+for retired_runtime_work_semantic in (
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalStructuredWorkStateProjection.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalWorkStateCueExtractor.kt",
+):
+    if (ROOT / retired_runtime_work_semantic).exists():
+        die(
+            "Work semantic interpretation must stay in WorkFeature, not Shared Runtime: "
+            + retired_runtime_work_semantic
+        )
+prompt_pressure_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptPressure.kt")
+)
+if "LocalWorkContextAssessmentSnapshot" in prompt_pressure_source:
+    die("Shared request pressure store must use the neutral request-context assessment DTO")
+
 work_context_policy_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRequestContextPolicy.kt")
 )

@@ -6,7 +6,7 @@ import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
 import com.labteto.dshmobile.local.model.LocalRequestPressureStore
 import com.labteto.dshmobile.local.model.validateModelRequestAdmission
 import com.labteto.dshmobile.local.work.assessWorkStepContext
-import com.labteto.dshmobile.local.work.toModelSnapshot
+import com.labteto.dshmobile.local.work.toRequestContextAssessment
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -82,13 +82,19 @@ class LocalPromptPressureTest {
             targetTokens = 28_000,
             baseTriggerTokens = 36_000,
         )
-        val assessmentSnapshot = assessment.toModelSnapshot()
+        val assessmentSnapshot = assessment.toRequestContextAssessment()
 
         val sourcePressure = pressure.copy(
             estimatedInputTokens = 42_000,
             historyTokens = 34_000,
         )
-        store.record("work", pressure, assessmentSnapshot, workSourcePressure = sourcePressure)
+        store.record(
+            sessionId = "work",
+            pressure = pressure,
+            contextAssessment = assessmentSnapshot,
+            usageMode = LocalUsageMode.WORK,
+            sourcePressure = sourcePressure,
+        )
         val laterChatPressure = pressure.copy(
             estimatedInputTokens = 9_000,
             historyTokens = 3_000,

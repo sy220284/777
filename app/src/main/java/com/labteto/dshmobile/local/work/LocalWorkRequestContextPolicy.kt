@@ -1,15 +1,11 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.context.LocalRequestContextAssessment
 import com.labteto.dshmobile.local.context.LocalRequestContextAssessmentInput
 import com.labteto.dshmobile.local.context.LocalRequestContextPolicy
 import com.labteto.dshmobile.local.context.LocalRequestContextPolicyInput
 import com.labteto.dshmobile.local.context.LocalRequestContextProjection
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
-import com.labteto.dshmobile.local.model.LocalStructuredWorkState
-import com.labteto.dshmobile.local.model.LocalWorkContextAssessmentSnapshot
-import com.labteto.dshmobile.local.session.LocalSessionEventLog
 
 /** WorkFeature implementation of the Shared request-context policy contract. */
 internal object LocalWorkRequestContextPolicy : LocalRequestContextPolicy {
@@ -47,7 +43,7 @@ internal object LocalWorkRequestContextPolicy : LocalRequestContextPolicy {
 
     override fun assess(
         input: LocalRequestContextAssessmentInput,
-    ): LocalWorkContextAssessmentSnapshot =
+    ): LocalRequestContextAssessment =
         assessWorkStepContext(
             current = input.current,
             previous = input.previous,
@@ -61,10 +57,5 @@ internal object LocalWorkRequestContextPolicy : LocalRequestContextPolicy {
             ),
             growthCurrent = input.growthCurrent,
             allowAdaptiveEarlyCompaction = input.cachePolicy.allowAdaptiveEarlyCompaction,
-        ).toModelSnapshot()
-
-    override fun structuredState(
-        snapshot: LocalHarnessState,
-        eventLog: LocalSessionEventLog,
-    ): LocalStructuredWorkState = structuredWorkState(snapshot, eventLog)
+        ).toRequestContextAssessment()
 }

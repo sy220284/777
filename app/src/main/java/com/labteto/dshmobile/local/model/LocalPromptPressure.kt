@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.context.LocalRequestContextAssessment
 import com.labteto.dshmobile.local.record
 import java.util.LinkedHashMap
 import kotlinx.serialization.json.JsonArray
@@ -80,20 +81,6 @@ internal data class LocalContextWindowSnapshot(
     val peakInputTokens: Int,
 )
 
-/** Shared diagnostic projection recorded by model/request infrastructure without depending on WorkFeature internals. */
-internal data class LocalWorkContextAssessmentSnapshot(
-    val status: String,
-    val estimatedInputTokens: Int,
-    val historyTokens: Int,
-    val toolDefinitionTokens: Int,
-    val historyRatioPermille: Int,
-    val toolRatioPermille: Int,
-    val inputGrowthTokens: Int,
-    val historyGrowthTokens: Int,
-    val effectiveProjectionTriggerTokens: Int,
-    val reasons: List<String>,
-)
-
 /**
  * Last real request projection plus context-window generations.
  *
@@ -114,7 +101,7 @@ internal class LocalRequestPressureStore(
 
     private data class SessionEntry(
         var latest: LocalPromptPressure? = null,
-        var latestWorkAssessment: LocalWorkContextAssessmentSnapshot? = null,
+        val latestContextAssessmentByMode: MutableMap<LocalUsageMode, LocalRequestContextAssessment> = mutableMapOf(),
         val latestRequestPressureByMode: MutableMap<LocalUsageMode, LocalPromptPressure> = mutableMapOf(),
         val latestSourcePressureByMode: MutableMap<LocalUsageMode, LocalPromptPressure> = mutableMapOf(),
         val window: MutableWindow = MutableWindow(),
@@ -131,8 +118,7 @@ internal class LocalRequestPressureStore(
     fun record(
         sessionId: String,
         pressure: LocalPromptPressure,
-        workAssessment: LocalWorkContextAssessmentSnapshot? = null,
-        workSourcePressure: LocalPromptPressure? = null,
+        contextAssessment: LocalRequestContextAssessment? = null,
         usageMode: LocalUsageMode? = null,
         sourcePressure: LocalPromptPressure? = null,
     ) {
@@ -142,10 +128,8 @@ internal class LocalRequestPressureStore(
             entry.latestRequestPressureByMode[mode] = pressure
             sourcePressure?.let { entry.latestSourcePressureByMode[mode] = it }
         }
-        if (workAssessment != null) {
-            entry.latestWorkAssessment = workAssessment
-            entry.latestRequestPressureByMode[LocalUsageMode.WORK] = pressure
-            entry.latestSourcePressureByMode[LocalUsageMode.WORK] = workSourcePressure ?: pressure
+        if (contextAssessment != null && usageMode != null) {
+            entry.latestContextAssessmentByMode[usageMode] = contextAssessment
         }
         val window = entry.window
         if (window.prefillTokens <= 0L) window.prefillTokens = pressure.estimatedInputTokens.toLong()
@@ -195,8 +179,15 @@ internal class LocalRequestPressureStore(
         latestSource(sessionId, LocalUsageMode.WORK)
 
     @Synchronized
-    fun workAssessment(sessionId: String): LocalWorkContextAssessmentSnapshot? =
-        sessions[sessionId]?.latestWorkAssessment
+    fun contextAssessment(
+        sessionId: String,
+        usageMode: LocalUsageMode,
+    ): LocalRequestContextAssessment? =
+        sessions[sessionId]?.latestContextAssessmentByMode?.get(usageMode)
+
+    @Synchronized
+    fun workAssessment(sessionId: String): LocalRequestContextAssessment? =
+        contextAssessment(sessionId, LocalUsageMode.WORK)
 
     @Synchronized
     fun window(sessionId: String): LocalContextWindowSnapshot? = sessions[sessionId]?.window?.let { value ->

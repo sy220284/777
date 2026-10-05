@@ -172,7 +172,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 modelContextWindowTokens = modelContextWindow,
             )
         } else baselinePressure
-        val workContextAssessment = if (
+        val contextAssessment = if (
             contextPolicy != null && snapshot.usageMode == LocalUsageMode.WORK
         ) {
             contextPolicy.assess(
@@ -190,9 +190,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         pressureStore.record(
             sessionId = snapshot.sessionId,
             pressure = pressure,
-            workAssessment = workContextAssessment,
-            workSourcePressure = if (workContextAssessment != null) baselinePressure else null,
-            usageMode = snapshot.usageMode,
+            contextAssessment = contextAssessment,
+                        usageMode = snapshot.usageMode,
             sourcePressure = baselinePressure,
         )
         val contextWindow = pressureStore.window(snapshot.sessionId)
@@ -448,7 +447,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     val compacted = historyCompactor.compactForOverflow(
                         history = activeMessages,
                         summaryMode = summaryMode,
-                        structuredWorkState = contextPolicy?.structuredState(snapshot, log),
                     )
                     val madeProgress = compacted != null &&
                         compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&

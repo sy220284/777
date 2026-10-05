@@ -4,8 +4,6 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
 import com.labteto.dshmobile.local.model.LocalPromptPressure
-import com.labteto.dshmobile.local.model.LocalStructuredWorkState
-import com.labteto.dshmobile.local.model.LocalWorkContextAssessmentSnapshot
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -13,9 +11,14 @@ import kotlinx.serialization.json.JsonObject
 /** Work-agnostic diagnostics emitted by an optional Feature-owned semantic projector. */
 internal data class LocalRequestContextAssessment(
     val status: String,
-    val effectiveProjectionTriggerTokens: Int,
+    val estimatedInputTokens: Int = 0,
+    val historyTokens: Int = 0,
+    val toolDefinitionTokens: Int = 0,
     val historyRatioPermille: Int,
+    val toolRatioPermille: Int = 0,
+    val inputGrowthTokens: Int = 0,
     val historyGrowthTokens: Int,
+    val effectiveProjectionTriggerTokens: Int,
     val reasons: List<String>,
 )
 
@@ -56,12 +59,7 @@ internal data class LocalRequestContextAssessmentInput(
 internal interface LocalRequestContextPolicy {
     fun project(input: LocalRequestContextPolicyInput): LocalRequestContextProjection
 
-    fun assess(input: LocalRequestContextAssessmentInput): LocalWorkContextAssessmentSnapshot?
-
-    fun structuredState(
-        snapshot: LocalHarnessState,
-        eventLog: LocalSessionEventLog,
-    ): LocalStructuredWorkState?
+    fun assess(input: LocalRequestContextAssessmentInput): LocalRequestContextAssessment?
 }
 
 /**

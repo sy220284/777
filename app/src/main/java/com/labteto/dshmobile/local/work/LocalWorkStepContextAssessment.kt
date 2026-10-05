@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.context.LocalRequestContextAssessment
 import com.labteto.dshmobile.local.model.LocalPromptPressure
-import com.labteto.dshmobile.local.model.LocalWorkContextAssessmentSnapshot
 
 /**
  * Evaluates whether one Work request carries a reasonable amount of model-visible context.
@@ -32,8 +32,8 @@ internal data class LocalWorkStepContextAssessment(
         get() = status == LocalWorkStepContextStatus.COMPACT
 }
 
-internal fun LocalWorkStepContextAssessment.toModelSnapshot() =
-    LocalWorkContextAssessmentSnapshot(
+internal fun LocalWorkStepContextAssessment.toRequestContextAssessment() =
+    LocalRequestContextAssessment(
         status = status.name.lowercase(),
         estimatedInputTokens = estimatedInputTokens,
         historyTokens = historyTokens,
