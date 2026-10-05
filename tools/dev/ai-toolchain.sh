@@ -136,6 +136,40 @@ emit_status() {
   cat "$STATUS_FILE"
 }
 
+plan_output() {
+  DEV777_REPO_ROOT="$REPO_ROOT" \
+  DEV777_TOOLS_ROOT="$TOOLS_ROOT" \
+  DEV777_ANDROID_SDK_ROOT="$SDK_ROOT" \
+  DEV777_GRADLE_HOME="$GRADLE_HOME" \
+  DEV777_GRADLE_USER_HOME="$GRADLE_USER_HOME" \
+    bash "$INSTALL" plan "$PROFILE"
+}
+
+emit_plan_json() {
+  local output first=true artifact
+  output="$(plan_output)"
+  printf '{"schema":1,"profile":"%s","missing_artifacts":[' "$(json_escape "$PROFILE")"
+  while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
+    if [ "$first" = true ]; then first=false; else printf ','; fi
+    printf '"%s"' "$(json_escape "$artifact")"
+  done <<< "$output"
+  printf ']}\n'
+}
+
+emit_status_with_plan() {
+  local output first=true artifact
+  output="$(plan_output)"
+  sed '$d' "$STATUS_FILE"
+  printf '  ,"missing_artifacts": ['
+  while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
+    if [ "$first" = true ]; then first=false; else printf ','; fi
+    printf '"%s"' "$(json_escape "$artifact")"
+  done <<< "$output"
+  printf ']\n}\n'
+}
+
 setup_args() {
   SETUP_ARGS=(
     --check
@@ -156,7 +190,7 @@ run_check() {
     write_status ready environment_ready 0 "$CHECK_LOG" "bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug"
     return 0
   fi
-  write_status needs_bootstrap missing_dependencies 1 "$CHECK_LOG" "下载 GitHub Actions 工具链 Artifact 后执行其中的 tools/dev/ai-toolchain.sh bootstrap --profile $PROFILE"
+  write_status needs_bootstrap missing_dependencies 1 "$CHECK_LOG" "执行 plan，下载缺失的 GitHub Actions 组件 Artifact 后再 bootstrap"
   return 1
 }
 
@@ -180,13 +214,8 @@ bootstrap_toolchain() {
   fi
 
   if [ -z "$ARTIFACTS_DIR" ] || [ ! -d "$ARTIFACTS_DIR" ]; then
-    local missing_json
-    missing_json="$(DEV777_REPO_ROOT="$REPO_ROOT" DEV777_TOOLS_ROOT="$TOOLS_ROOT" DEV777_ANDROID_SDK_ROOT="$SDK_ROOT" DEV777_GRADLE_HOME="$GRADLE_HOME" DEV777_GRADLE_USER_HOME="$GRADLE_USER_HOME" bash "$INSTALL" plan "$PROFILE" | awk 'BEGIN{printf "["} {if(NR>1)printf ","; printf "\\\"%s\\\"",$0} END{print "]"}')"
     write_status error artifact_required 2 "$CHECK_LOG" "下载 plan 返回的 GitHub Actions 组件 Artifact，解压到同一目录后执行 bootstrap --artifacts-dir PATH"
-    if [ "$emit_json" = true ]; then
-      emit_status | sed '$d'
-      printf '  ,"missing_artifacts": %s\n}\n' "$missing_json"
-    fi
+    [ "$emit_json" = true ] && emit_status_with_plan
     return 2
   fi
 
@@ -235,15 +264,7 @@ ensure_build_ready() {
 
 case "$COMMAND" in
   plan)
-    PLAN_OUTPUT="$(DEV777_REPO_ROOT="$REPO_ROOT" DEV777_TOOLS_ROOT="$TOOLS_ROOT" DEV777_ANDROID_SDK_ROOT="$SDK_ROOT" DEV777_GRADLE_HOME="$GRADLE_HOME" DEV777_GRADLE_USER_HOME="$GRADLE_USER_HOME" bash "$INSTALL" plan "$PROFILE")"
-    printf '{"schema":1,"profile":"%s","missing_artifacts":[' "$PROFILE"
-    first=true
-    while IFS= read -r artifact; do
-      [ -n "$artifact" ] || continue
-      if [ "$first" = true ]; then first=false; else printf ','; fi
-      printf '"%s"' "$(json_escape "$artifact")"
-    done <<< "$PLAN_OUTPUT"
-    printf ']}\n'
+    emit_plan_json
     ;;
   bootstrap)
     bootstrap_toolchain true
