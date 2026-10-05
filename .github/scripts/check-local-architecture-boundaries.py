@@ -709,11 +709,15 @@ for required_work_send_owner in (
     "workRunRegistry.enqueueIntoLiveRun(prepared)",
     "coordinateOwnedLocalSend(",
     "runtimeStateStore.foregroundRunHandle.pendingInputs",
-    "sessionStorage.enqueueCurrentSnapshot(sessionId)",
+    "enqueueSnapshot(sessionId)",
     "turn.startPrepared(",
 ):
     if required_work_send_owner not in work_execution_coordinator_source:
         die("WorkFeature first-send ownership is incomplete: " + required_work_send_owner)
+if "eventLogFor = sessionStorage.eventLogs::get" not in work_execution_coordinator_source:
+    die("WorkFeature must adapt Shared Session EventLog access at its injection boundary")
+if "enqueueSnapshot = sessionStorage::enqueueCurrentSnapshot" not in work_execution_coordinator_source:
+    die("WorkFeature must adapt Shared Session snapshot persistence at its injection boundary")
 if work_execution_coordinator_source.find("workRunRegistry.enqueueIntoLiveRun(prepared)") > work_execution_coordinator_source.find("coordinateOwnedLocalSend("):
     die("Work-owned live-run queue must be checked before first-turn admission")
 if "queueHumanTurn(" in work_execution_coordinator_source:
