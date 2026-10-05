@@ -105,7 +105,9 @@ check_environment() {
       failures=$((failures + 1))
     fi
 
-    if [ -x "$SDK_ROOT/emulator/emulator" ] && "$SDK_ROOT/emulator/emulator" -version >/dev/null 2>&1; then
+    if [ -x "$SDK_ROOT/emulator/emulator" ] && \
+      LD_LIBRARY_PATH="$SDK_ROOT/emulator/host-libs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+        "$SDK_ROOT/emulator/emulator" -version >/dev/null 2>&1; then
       ok "Android emulator 可执行"
     else
       fail "Android emulator 可执行性（含宿主动态库）"
