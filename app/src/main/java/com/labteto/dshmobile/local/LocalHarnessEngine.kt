@@ -866,7 +866,8 @@ class LocalHarnessEngine @Inject internal constructor(
     private val pendingInputs: AgentInputQueue
         get() = runtimeStateStore.foregroundRunHandle.pendingInputs
     private val sessionTransitionMutex = Mutex()
-    private var sessionTransitioning = false
+    private val sessionTransitioning: Boolean
+        get() = runtimeStateStore.sessionTransitioning
     private var activeJob: Job?
         get() = runtimeStateStore.foregroundRunHandle.job
         set(value) {
@@ -1891,18 +1892,13 @@ class LocalHarnessEngine @Inject internal constructor(
 
     internal suspend fun diagnoseNetwork(target: String): String = webTools.diagnose(target)
 
-    private fun beginSessionTransition(): Boolean {
-        val started = synchronized(runStateLock) {
-            if (_state.value.loading || sessionTransitioning) return@synchronized false
-            sessionTransitioning = true
-            true
+    private fun beginSessionTransition(): Boolean =
+        runtimeStateStore.beginSessionTransition().also { started ->
+            if (started) cancelChatPostTurn()
         }
-        if (started) cancelChatPostTurn()
-        return started
-    }
 
     private fun endSessionTransition() {
-        synchronized(runStateLock) { sessionTransitioning = false }
+        runtimeStateStore.endSessionTransition()
     }
 
     private suspend fun cancelWorkRunsAndJoin(sessionIds: Set<String>) {
