@@ -5,7 +5,6 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.update
 
 /** Work/interaction capability boundary for the local UI. */
 @Singleton
@@ -47,18 +46,6 @@ class LocalWorkRuntime @Inject internal constructor(
         if (workRunRegistry.requestCancel(sessionId)) return@performVisibleOperation
 
         runtimeStateStore.cancelForegroundRun(eventLogs.get(sessionId))
-        runtimeStateStore.mutableState.update { current ->
-            if (current.sessionId != sessionId || current.usageMode != LocalUsageMode.WORK) {
-                current
-            } else {
-                current.copy(
-                    work = current.work.copy(
-                        pendingApproval = null,
-                        pendingQuestion = null,
-                    ),
-                )
-            }
-        }
     }
 
     internal fun setPlanMode(enabled: Boolean) =
