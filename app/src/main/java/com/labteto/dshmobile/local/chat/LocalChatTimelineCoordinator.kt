@@ -28,8 +28,7 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * Historical edit commits the durable timeline rewrite while holding Session MAINTENANCE ownership,
  * then updates Chat/model-history projections and releases maintenance before starting a new turn.
- * Regeneration owns Chat branch rollback/admission and delegates only the already-prepared direct
- * model turn through [LocalChatTurnPort].
+ * Regeneration owns Chat branch rollback/admission and starts the Chat-owned direct executor.
  */
 @Singleton
 internal class LocalChatTimelineCoordinator @Inject constructor(
@@ -41,6 +40,7 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
     private val memoryStore: MemoryStore,
     private val userActivity: LocalChatUserActivityPort,
     private val turn: LocalChatTurnPort,
+    private val directTurn: LocalChatDirectTurnExecutor,
     private val json: Json,
 ) {
     internal fun editAndResendUserMessage(
@@ -411,8 +411,8 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
                     }
                 }
 
-                started = turn.startRegeneration(
-                    prompt = promptMessage.content,
+                started = directTurn.start(
+                    input = promptMessage.content,
                     replacingMessageId = messageId,
                 ).also { handle.job = it }
                 true
