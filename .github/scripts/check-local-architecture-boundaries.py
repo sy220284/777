@@ -42,9 +42,7 @@ ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
     "exitPlanMode",
     "scheduleChatPostTurn",
 )
-ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST = {
-    "runWorkAgentTurn",
-}
+ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST = set()
 
 HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": ("LocalGroupChatTurnExecutor", 26),
@@ -506,6 +504,9 @@ if re.search(r"\brunOwnedGroupChatTurn\s*\(", strip_comments(engine)):
 work_turn_starter_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnStarter.kt")
 )
+work_agent_turn_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentTurnExecutor.kt")
+)
 for required_work_turn_owner in (
     "internal fun startFresh(",
     "internal fun startResumed(",
@@ -519,6 +520,22 @@ if "private fun queueWorkTurnLocked(" in engine or "private fun queueExistingWor
     die("Work first-turn binding must not return to LocalHarnessEngine")
 if "workTurnStarter.startFresh(" not in engine or "workTurnStarter.startResumed(" not in engine:
     die("Engine migration call sites must route Work start/resume to WorkFeature")
+for required_work_agent_owner in (
+    "internal suspend fun run(",
+    "LocalSessionRuntimeRegistry.withOwner(",
+    "val loop = AgentLoop(",
+    "modelRequests.complete(",
+    "workTurnToolRuntime.execute(",
+    "workModelHistoryRuntime.checkpointAtTurnBoundary(",
+    "queueAutomaticWorkContinuation(",
+    "workRunRegistry.finishTurn(",
+):
+    if required_work_agent_owner not in work_agent_turn_source:
+        die("Work Agent main-loop ownership is incomplete: " + required_work_agent_owner)
+if "private suspend fun runWorkAgentTurn(" in engine:
+    die("Work Agent main loop must not return to LocalHarnessEngine")
+if "workAgentTurnExecutor.run(" not in engine:
+    die("Work first-turn composition must route execution to WorkFeature")
 
 work_subagent_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt")
@@ -2127,7 +2144,7 @@ if "messages = chatPostTurnModelMessages(prompt)" not in chat_refresh:
     die("Chat post-turn requests must include a real model input, not system-only instructions")
 if "modelRequestMarkerOrNull()?.let" in chat_refresh:
     die("Chat post-turn planner must not re-read mutable active model identity")
-if "profileId = runSnapshot.modelState.modelSelection.activeProfileId" not in engine:
+if "profileId = runSnapshot.modelState.modelSelection.activeProfileId" not in work_agent_turn_source:
     die("Work foreground runs must freeze the exact selected model profile id")
 if "private fun scheduleChatPostTurn(" in engine:
     die("Chat PostTurn scheduling proxy must not return to LocalHarnessEngine")
