@@ -512,7 +512,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                         activePressure,
                         usageMode = snapshot.usageMode,
                     )
-                    try {
+                    val reply = try {
                         requestRuntime.complete(
                                 surface = runSurface,
                                 messages = activeMessages,
@@ -564,7 +564,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 }
                             })
                             throw error
-                        }.also { reply ->
+                        }
                             streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
                             streamPreview.flush()
                             activePrefixAssessment?.let { cache ->
@@ -622,7 +622,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                     })
                                 }
                             }
-                    }
                 }
             } finally {
                 previewOwner?.let(streamingPreviewStore::clear)
