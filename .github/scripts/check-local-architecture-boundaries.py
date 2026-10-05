@@ -20,7 +20,7 @@ HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
 }
 
 RUNTIME_ENGINE_REFERENCE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 10,
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 9,
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 12,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 3,
@@ -393,6 +393,10 @@ if "engine.undoChatPersonaCorrection" in chat_runtime_source:
     die("Persona-correction undo must stay inside ChatFeature")
 if "personaCorrections.undo" not in chat_runtime_source:
     die("ChatRuntime must route persona-correction undo through its Chat coordinator")
+if "behaviorTuning.configure(profile)" not in chat_runtime_source or "engine.configureChatPersona" in chat_runtime_source:
+    die("Chat persona tuning must stay inside ChatFeature")
+if "internal suspend fun configureChatPersona(" in engine:
+    die("LocalHarnessEngine must not reintroduce Chat persona tuning API")
 for forbidden_persona_proxy in (
     "engine.selectChatPersona",
     "engine.bindChatGallery",
