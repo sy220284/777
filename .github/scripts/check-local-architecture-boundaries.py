@@ -43,6 +43,19 @@ ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
     "scheduleChatPostTurn",
 )
 ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST = set()
+ENGINE_REMOVED_PRIVATE_BUSINESS_METHODS = {
+    "chatStreamFilterPhrases",
+    "compactHistoryIfNeeded",
+    "enforceChatStyle",
+    "ensureSystemMessage",
+    "executeToolBatch",
+    "modelRequestMarker",
+    "modelToolSchemas",
+    "persistChatBranchState",
+    "persistNow",
+    "rebuildGroupModelHistoryFromTranscript",
+    "sessionFileFor",
+}
 
 HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": ("LocalGroupChatTurnExecutor", 16),
@@ -2203,6 +2216,16 @@ if stale_engine_bridges:
         + ", ".join(stale_engine_bridges)
         + "; tighten the ratchet in the same migration that removes the bridge"
     )
+
+for removed_private_business_method in ENGINE_REMOVED_PRIVATE_BUSINESS_METHODS:
+    if re.search(
+        rf"\bprivate\s+(?:suspend\s+)?fun\s+{re.escape(removed_private_business_method)}\s*\(",
+        engine,
+    ):
+        die(
+            "Removed Engine private business/helper implementation must not return: "
+            + removed_private_business_method
+        )
 
 stage3_feature_roots = {
     method
