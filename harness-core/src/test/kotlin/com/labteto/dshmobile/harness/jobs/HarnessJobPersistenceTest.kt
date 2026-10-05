@@ -28,6 +28,30 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class HarnessJobPersistenceTest {
     @Test
+    fun cancelledJobKeepsCancellationWhenBlockingWorkThrowsLate() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val manager = HarnessJobManager(scope, {})
+        try {
+            val id = manager.start("blocking", ownerId = "session-a") { _, _ ->
+                entered.countDown()
+                check(release.await(5, TimeUnit.SECONDS))
+                error("late failure")
+            }.substringAfterLast('：')
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            manager.kill(id, "session-a")
+            release.countDown()
+            runBlocking { manager.stopAllAndJoin() }
+            assertTrue(manager.snapshots().single().status == "cancelled")
+            assertFalse(manager.output(id).contains("late failure"))
+        } finally {
+            release.countDown()
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun cancelledJobCannotCommitSuccessWhenBlockingWorkReturnsLate() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val entered = CountDownLatch(1)

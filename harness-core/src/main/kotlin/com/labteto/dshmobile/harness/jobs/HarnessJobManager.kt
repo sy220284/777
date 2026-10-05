@@ -299,6 +299,7 @@ class HarnessJobManager(
                 throw cancelled
             } catch (error: Exception) {
                 synchronized(lock) {
+                    if (record.status != "running") return@synchronized
                     record.status = "failed"
                     record.output = "任务失败：${error.message ?: error::class.java.simpleName}"
                     record.updatedAt = System.currentTimeMillis()
