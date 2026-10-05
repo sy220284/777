@@ -7,7 +7,7 @@ import javax.inject.Singleton
 
 /** Narrow MCP/plugin capability used by the Tools screen. */
 @Singleton
-class LocalToolsRuntime @Inject constructor(
+class LocalToolsRuntime @Inject internal constructor(
     private val engine: LocalHarnessEngine,
     private val githubCredentials: LocalGitHubCredentialManager,
 ) {
