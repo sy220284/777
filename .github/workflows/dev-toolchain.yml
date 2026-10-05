@@ -51,7 +51,7 @@ jobs:
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
 
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
         with:
@@ -66,7 +66,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22.23.3
+          node-version: 22
 
       - name: 准备 actionlint
         run: |
@@ -105,13 +105,14 @@ jobs:
           ARTIFACT_HEAD_SHA=$GITHUB_SHA
           ARTIFACT_PART=$part
           ARTIFACT_PARTS=$parts
-          JDK_MAJOR=$JDK_MAJOR
+          BUILD_JDK_MIN_MAJOR=$BUILD_JDK_MIN_MAJOR
+          JVM_TARGET=$JVM_TARGET
           ANDROID_COMPILE_API=$ANDROID_COMPILE_API
           ANDROID_BUILD_TOOLS=$ANDROID_BUILD_TOOLS
           GRADLE_VERSION=$GRADLE_VERSION
           KOTLIN_VERSION=$KOTLIN_VERSION
           AGP_VERSION=$AGP_VERSION
-          NODE_VERSION=$NODE_VERSION
+          NODE_MIN_MAJOR=$NODE_MIN_MAJOR
           ACTIONLINT_VERSION=$ACTIONLINT_VERSION
           EOF
           }
@@ -531,7 +532,7 @@ jobs:
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
 
       - name: 下载 bootstrap
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -556,7 +557,7 @@ jobs:
           printf '%s\n' "$PLAN"
 
           if printf '%s\n' "$PLAN" | grep -Fq '777-toolchain-jdk-latest'; then
-            echo "已有 JDK 17 时仍要求下载 JDK，按需规划失败。" >&2
+            echo "已有 JDK 21+ 时仍要求下载 JDK，按需规划失败。" >&2
             exit 1
           fi
 
