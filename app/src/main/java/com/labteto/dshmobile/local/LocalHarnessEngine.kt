@@ -161,10 +161,6 @@ class LocalHarnessEngine @Inject internal constructor(
     private val chatPersonaGalleryStore get() = chatPersistence.galleryStore
     private val chatDiaryStore get() = chatPersistence.diaryStore
     private val memoryClassMb get() = runtimeStateStore.memoryClassMb
-    private val persistentJobStore = LocalPersistentJobStore(
-        file = File(root, "jobs.json"),
-        json = json,
-    )
     private val workspace = LocalWorkspace(
         root = File(root, "workspace"),
         extraSearchPaths = bundledRuntimeManager::searchPaths,
@@ -492,12 +488,8 @@ class LocalHarnessEngine @Inject internal constructor(
         localImageRequestBudgetForModelConcurrency(resourceBudget.maxModelRequests)
     private fun liveWorkRun(sessionId: String): LocalWorkRunBinding? =
         workRunRegistry.live(sessionId)
-    private val jobs = LocalJobManager(scope, persistentJobStore) { snapshot ->
-        projectJobSnapshotToSessionStates(snapshot, _state, workRunRegistry)
-        syncForegroundJobs(context, snapshot) { message ->
-            _state.update { it.copy(error = message) }
-        }
-    }
+    private val jobs: LocalJobManager
+        get() = runtimeStateStore.jobManager
 
     private val memoryTools = LocalMemoryTools(memoryStore, memoryManager, { _state.value }, { currentSessionId })
 
@@ -2040,10 +2032,6 @@ class LocalHarnessEngine @Inject internal constructor(
         pluginComposition.disconnectMcp(serverId)
 
     internal fun installedPluginIdsForUi(): List<String> = pluginComposition.installedPluginIds()
-
-    internal fun backgroundJobOutputForUi(jobId: String): String = jobs.output(jobId, currentSessionId)
-
-    internal fun stopBackgroundJobForUi(jobId: String): String = jobs.kill(jobId, currentSessionId)
 
     /** Stop only the run owned by the currently visible conversation. */
     internal fun stop() {
