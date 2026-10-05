@@ -11,36 +11,37 @@
 - 规则依据：[AGENTS.md](../AGENTS.md)、[系统联审](SYSTEM-AUDIT-GUIDE.zh-CN.md)、[架构 3.0](ARCHITECTURE.md)、[验证](VALIDATION.md)、[安全](SECURITY.md)、[UI / UX](UI-UX.zh-CN.md)、[协议](PROTOCOL.md)、[兼容性](COMPATIBILITY.md)。
 - 实现事实由当前代码、构建配置、锁定文件和 CI 确认；文档中的旧版本号及旧 Engine 链路描述不能覆盖新架构和当前代码。
 
-截至编制时，本地架构、性能及 Kotlin 风险门禁通过；此前安全、仓库完整性、UI 和通知门禁已通过。此前产品代码 [完整 CI #4426](https://github.com/sy220284/777/actions/runs/37257428366) 暴露 WorkRunRegistry 缺少 flow `update` 导入，修复已进入 `9e82f358`，该失败 run 不构成当前 Head 的验收；当前产品基线的 [完整 CI #4444](https://github.com/sy220284/777/actions/runs/37258128774) 已被后续提交取消，仍须重新跑完，不能以纯文档 CI 替代。任何后续产品代码变化均需重新验证当前 main + 当前 Head。
+当前最近一次有远端执行结果的产品 Head 为 `d3b115b`：CI #4792 的 scope / static-gates 已通过，Architecture 3.0 所有权门禁也通过，失败来自性能门禁仍匹配旧 Engine 工具调用字面串；该门禁已改为验证 `LocalWorkTurnToolRuntime` 的真实 session binding。开发工具链 #282 的真实构建另暴露 `LocalWorkToolResultRuntime` 仍引用迁移前的 `adaptiveToolResultBudget` 包路径，该编译错误也已修复。当前 Head 已继续前进，因此以上失败 run 只能作为已修问题证据，不能替代当前 Head 的完整验收；当前接口未能为后续 API 推送触发新的 pull_request Actions run，仍须取得最新 Head 的完整 CI 结果后才能关闭阶段。
 
 ## 2. 当前进度与真实剩余量
 
 | 官方阶段 | 当前事实 | 后续处理 |
 |---|---|---|
-| 1：共享能力 / Kernel 边界 | Session owner、run identity/recovery、资源调度和 Session 存储已有统一所有者 | 保留已建立边界；修清仍反向引用 Feature internal 的共享实现 |
-| 2：领域状态 | Chat / Work / Kernel / Model 已嵌套拆分；设备审批租约已归 Work | 继续从“嵌套字段”推进到领域单写所有权；聚合状态仍属迁移适配层 |
-| 3：Chat / Work Feature | WorkRuntime 对 Engine 引用为 0；Chat 人物、群聊成员和前台停止等部分业务迁出 | 主执行、发送、分支、群聊、恢复和部分业务编排仍待迁出 |
-| 4：Automation Feature | 规划资源边界已有共享入口；执行仍走 Engine 和领域内部实现 | 建立真实 ChatExecutionPort / WorkExecutionPort 并切换所有后台入口 |
-| 5：UI contribution | Catalog 不可变，路由归属及页面枚举已接管 | 中央页面 `when`、页面依赖、Back、入口及恢复仍待下沉 |
-| 6：Runtime Kernel | 共享运行状态已接管部分运行事实 | Engine 仍含产品规则、构造装配和代理，不具备最终 Kernel 条件 |
+| 1：共享能力 / Kernel 边界 | Session owner、run identity/recovery、资源调度和 Session 存储已有统一所有者 | 保留已建立边界；继续删除残留跨层适配 |
+| 2：领域状态 | Chat / Work / Kernel / Model 已拆分；Chat timeline rewrite 已停止承载 Work plan/todo/goal/planMode | 继续收缩聚合状态迁移适配层 |
+| 3：Chat / Work Feature | 7 类 Runtime→Engine 依赖永久归零；已知阶段三 Engine 业务根已清零；Work 主 AgentLoop、工具运行、发送/重生成与 Chat 发送、直聊回合、时间线/分支等真实实现已归 Feature | 清零 5 个阶段三 Engine 组合桥：`chatTurnPort`、`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort`；继续收口 Session / 可见 Work 投影等横向适配 |
+| 4：Automation Feature | Automation Runtime→Engine 已永久归零，但组合根仍由 Engine 提供 Automation Chat / Work coordinator | 迁出 `automationChatCoordinator`、`automationWorkCoordinator` 两个阶段四桥并切换后台入口 |
+| 5：UI contribution | Catalog 不可变，路由归属及页面枚举已接管 | 中央页面 `when`、页面依赖、Back、入口及恢复继续下沉 |
+| 6：Runtime Kernel | 共享运行状态已接管运行身份、资源、前台句柄等事实 | 删除剩余产品装配/迁移适配后再替换 Engine；仅更名不算完成 |
 
 当前守卫基线已经切换到架构 3.0：
 
-- Chat / Work / Session / Model / Tools / Automation / Settings Runtime → `LocalHarnessEngine` 已归零路径全部为永久禁止项，不再保留“0 预算”兼容规则。
-- App 组合根仍处于迁移期的 Engine bridge 使用具体 allowlist；删除一项必须同步缩白名单，不能用新代理替换旧代理维持相同数量。
-- Engine 内仍存的阶段三 Feature 业务根使用具体 allowlist；已经迁出的业务根重新出现直接失败。
-- Engine 直接消费者使用具体 allowlist；Feature / UI / Worker 新增 Engine 依赖直接失败。
-- Engine 构造依赖、internal surface、聚合状态字段等数值只作为迁移期防回涨辅助，不作为阶段完成证据。
+- Chat / Work / Session / Model / Tools / Automation / Settings Runtime → `LocalHarnessEngine` 已归零路径全部为永久禁止项。
+- `ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST` 已为空；已迁出的 `sendChat`、`runAgentTurn`、`runChatTurn`、`runWorkAgentTurn`、`regenerate*`、`workSubagents` 等旧业务根重新出现直接失败。
+- 阶段三组合桥与阶段四 Automation 桥分开维护具体 allowlist，只能缩小，不能用等量新代理替换。
+- Chat / Work provider Feature 禁止导入 sibling Feature internal；Shared Context 已改为中立 `LocalRequestContextPolicy` / DTO，由 Work 提供语义投影策略。
+- Chat timeline durable state 只承载 Chat 领域状态，不再通过 Chat event 写回 Work 控制状态。
+- 已删除的 Engine 迁移死代码建立永久禁止回归集合；Engine 直接消费者、构造依赖、internal surface 和聚合状态规模继续作为防回涨辅助。
 
-阶段完成必须由真实 Feature 所有权、Shared 依赖方向、领域单写、旧入口删除和 `architecture-3-gates` 共同证明。
+阶段完成必须由真实 Feature 所有权、Shared 依赖方向、领域单写、旧实现删除、组合桥清零和当前 Head `architecture-3-gates` / 完整 CI 共同证明。
 
-尤其需要补齐三项：
+当前需要补齐：
 
-1. `LocalHarnessViewModel.send` 和 `regenerateReply` 当前都经 ChatRuntime；Work 行为在 Engine 内分流。后续必须把 Work 发送、重新生成路由到 Work API。
-2. WorkRuntime 清零只完成 UI 访问边界。`runAgentTurn`、binding 创建、主 / 子代理、workflow、Work 恢复及工具编排仍有 Engine 所有权。
-3. ChatRuntime 当前剩余 4 项直接入口是建议生成、send、用户编辑重发和 regenerate；stop、群聊成员及分支变体选择入口已移出。
-4. 前台模型历史共享能力 `LocalForegroundModelHistoryRuntime` 已建立，群聊成员已切换使用；分支变体选择已切换 `LocalChatBranchCoordinator`，Engine 对应入口已删除；用户编辑重发和重新生成仍未迁完，不能记作整个分支功能完成。
-5. `local.session` / `local.runtime` 仍有对 Chat、Work 类型及内部实现的依赖；Automation Chat 仍直接使用人物 Store 和领域函数。这些不能作为最终 Shared Capability 形态保留。
+1. 清零阶段三 5 个 Engine 组合桥；其中 Chat / Work turn 的真实业务实现已在 Feature，剩余主要是启动、Session owner 与 Hilt 装配壳。
+2. 将 Session 生命周期、可见 Work 投影、诊断和 Tools 管理的剩余 Engine 横向适配迁入明确 capability / composition owner。
+3. 阶段四单独处理 Automation 两个 Engine coordinator bridge，以及 persistent / automation subagent 等后台装配，不再混入阶段三进度。
+4. 继续删除迁移后无调用旧实现，并同步收紧门禁。
+5. 取得当前产品 Head 的完整 CI；旧 Head 成功、失败或取消均不能替代。
 
 ## 3. 总体推进顺序
 
@@ -92,13 +93,13 @@ P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修�
 | 功能 | 现有入口 / 核心实现 | 目标归属 | 必须一起迁移的关联链 |
 |---|---|---|---|
 | 发送 / 排队 / 附件 | `queueHumanTurn`、`queueWorkTurnLocked`、`recordUserTranscript` | WorkSend + Shared admission / inbox / transcript | UI Work 发送、Automation 后排队续跑、草稿反馈、落盘失败、取消前启动 |
-| 主代理运行 | `runAgentTurn`、`finishBoundWorkTurn`、`syncVisibleWorkRun` | Work 执行协调器 + Shared Agent / run handle | 多 step、完成、失败、步数延长、切换前台、结束快照、排队下一轮 |
+| 主代理运行 | `LocalWorkAgentTurnExecutor` 已接管 AgentLoop；Engine 仍有 `syncVisibleWorkRun` 等横向投影适配 | Work 执行协调器 + Shared Agent / run handle | 多 step、完成、失败、步数延长、切换前台、结束快照、排队下一轮 |
 | 工具与审批 | `executeBuiltin`、`approve`、`askUser`、`exitPlanMode` | Shared Tool execution + Work 工具贡献 / 审批策略 | step 暴露集合、参数副作用、设备授权、Plan/Todo/Goal、问答、恢复 |
 | 子代理 / workflow | `workSubagents`、持久子代理工厂、`runWorkflow` | Shared Agent 执行 + Work workflow 策略 | 普通 / fork / 持久子代理、并行 / 流水线、父子取消、子代理模型身份 |
 | 上下文 / 输出 | history budget、Work request projection、compaction、quality | Shared Model / context 机制 + Work 策略 | prefix cache、工具结果 spill / read、完成声明门禁、typed checkpoint |
 | 重新生成 / 恢复 | `regenerateWorkReply`、中断恢复与 safe-job 入口 | WorkRecovery + Shared recovery adjudication | 未开始 / 结果未知副作用、历史重建、重复提交、进程死亡、任务恢复 |
 
-实施顺序：Work send 接管 → 单次 run 生命周期 → 子代理 / workflow / Tool 贡献 → 上下文 / 输出 / 恢复。每次迁移都切换真实消费者并删除 Engine 对应私有实现，不以 WorkRuntime 当前为 0 跳过这些工作。
+当前 Work send、主 AgentLoop、Work-owned Tool runtime、重生成和请求上下文策略已经迁出 Engine；后续集中清理 `workTurnPort` 装配桥、可见 Work 投影 / Session 横向适配，以及阶段四才处理的 persistent / automation subagent 装配。每次删除旧路径同步缩紧门禁。
 
 建立提供方拥有的 `WorkExecutionPort`：接收明确目标会话、输入、超时 / 恢复选项，返回结构化完成 / 阻塞 / 取消 / 失败结果。所有实际执行复用唯一 Session owner、run coordinator、冻结模型身份和 Tool execution；端口不提供 `MutableStateFlow<LocalHarnessState>`、binding 或内部 runner 给调用方。
 
@@ -111,7 +112,7 @@ P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修�
 
 ## 7. 阶段 3-C：Chat 发送和回合执行
 
-迁移 `send` 的 Chat 分支、`queueTurnLocked`、`runTurn` / `runChatTurn`、foreground inbox 续跑、停止链中的剩余领域清理适配、人物纠正捕获、质量守卫和 post-turn 调度。
+Chat send、直聊回合、人物纠正、关系恢复、时间线编辑 / regenerate、分支和 post-turn 已有 Feature owner；`runChatTurn` 等旧 Engine 业务根已清零。当前重点是移除 `chatTurnPort` 装配桥并继续清理群聊 / Session 横向适配，保持 foreground owner 与迟到提交语义不变。
 
 目标分工：
 
@@ -134,7 +135,7 @@ P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修�
 | D3 群聊 | 成员配置 / 移除已由 `LocalGroupChatMembershipCoordinator` 接管；继续迁公告、`runGroupChatTurn` 工厂、群聊人物纠正和系统提示刷新 | ChatGroup API 接管剩余链路；复验已迁成员能力；SessionRuntime 不再决定群聊成员规则；删剩余 Engine 群聊工厂 / 回调 | 部分 / 全部失败、单成员重试、异步成员修改、公告持久化、删除人物、单聊切换 |
 | D4 人物关联功能 | 图集 / 故事、导入导出、日记、生活状态、关系记忆、行为调节与纠正撤销 | 已迁出能力先保留；清理 UI 直连 Store、跨 Feature 内部调用及聚合写适配 | 历史兼容、资料删除、肖像引用、晚间故事、生活事件续期、回滚与导入事务 |
 
-这四包均要同时处理前台、后台、历史恢复、导入导出和 UI 入口。D4 是完整性及边界收口，不把已有能力再重写一遍。ChatRuntime 已永久保持 Engine 依赖为 0；后续重点删除组合根迁移桥、Engine 内剩余 Chat 业务根和 coordinator 回调组合。
+这四包均要同时处理前台、后台、历史恢复、导入导出和 UI 入口。D4 是完整性及边界收口，不把已有能力再重写一遍。ChatRuntime 已永久保持 Engine 依赖为 0，阶段三已知 Chat 业务根也已清零；后续重点删除 `chatTurnPort` 组合桥、群聊 / Session 横向适配和残余 coordinator 回调装配。
 
 ## 9. 阶段 3-E：其他代理出口及横向边界
 
@@ -250,10 +251,10 @@ P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修�
 
 ## 15. 下一步可直接执行的任务
 
-1. 跟进 P0 当前产品 CI，关闭失败与未通过专项回归；维持 #448 Draft。
-2. 建立 3-A 的实际所有权 / 反向 import / 可写状态入口清单，优先处理 Work binding 与 Session persistence / diagnostics 的耦合。
-3. 实现 WorkSend 和运行句柄接管，首先迁走 `queueWorkTurnLocked`，同时切换 UI Work send / regenerate 的真实入口。
-4. 以已接管的 Work 生命周期实现 WorkExecutionPort，再推进主 / 子代理、Tool 贡献和恢复，删除对应 Engine 实现。
-5. 完成该工作包的完整验收后进入 ChatSend；禁止同时复制第二套 Agent / Model / Session 实现来加速表面清零。
+1. 取得当前产品 Head 的完整 CI；已修复 #4792 性能门禁假红与 #282 Kotlin 编译残留，任何新的失败继续按真实日志闭环。
+2. 先清零 `chatTurnPort` / `workTurnPort` 两个阶段三核心装配桥，使已迁出的 Chat / Work 执行不再由 Engine 提供启动 Port。
+3. 再迁 `sessionLifecyclePort`，同步收口 `syncVisibleWorkRun`、transition / cancel / load / snapshot 等横向适配，保持 detached Work 与前台切换语义。
+4. 迁出 `toolsManagementPort` 与 `diagnosticsPort`，完成阶段三 5 个组合桥清零并收紧 allowlist。
+5. 阶段三通过最新完整 CI 后进入阶段四，单独处理 `automationChatCoordinator` / `automationWorkCoordinator` 和后台 subagent 装配。
 
 后续执行者按已完成工作包和出口条件更新本方案，不以正文计划或某次旧 CI 判断架构 3.0 已完成。
