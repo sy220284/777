@@ -25,7 +25,6 @@ ENGINE_COMPOSITION_BRIDGE_ALLOWLIST = {
 ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
     "queueWorkTurnLocked",
     "queueExistingWorkTurnLocked",
-    "runTurn",
     "runAgentTurn",
     "runWorkAgentTurn",
     "runChatTurn",
@@ -696,6 +695,15 @@ chat_execution_coordinator_source = strip_comments(
 chat_turn_port_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnPort.kt")
 )
+chat_turn_dispatcher_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnDispatcher.kt")
+)
+chat_persona_correction_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersonaCorrectionCoordinator.kt")
+)
+chat_relationship_hydrator_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRelationshipHydrator.kt")
+)
 if "LocalHarnessEngine" in work_execution_coordinator_source:
     die("WorkExecutionPort implementation must stay inside WorkFeature without Engine")
 if "prepareLocalSend(text, attachments)" not in work_execution_coordinator_source:
@@ -739,6 +747,41 @@ if "interface LocalChatTurnPort" not in chat_turn_port_source:
     die("Chat turn migration port contract is missing")
 if "LocalHarnessEngine" in chat_turn_port_source or "LocalHarnessState" in chat_turn_port_source:
     die("Chat turn migration port must not expose Engine or aggregate state")
+for required_chat_turn_owner in (
+    "internal suspend fun run(",
+    "personaCorrections.captureGroup(memoryInput)",
+    "personaCorrections.captureDirect(memoryInput)",
+    "relationshipHydrator.hydrate()",
+    "runOwnedGroupChatTurn(",
+    "LocalExecutionService.withTurn(",
+):
+    if required_chat_turn_owner not in chat_turn_dispatcher_source:
+        die("Chat turn dispatcher ownership is incomplete: " + required_chat_turn_owner)
+for required_persona_owner in (
+    "internal fun captureDirect(text: String)",
+    "internal fun captureGroup(text: String)",
+    'boundLog.append("chat/persona-correction"',
+    'boundLog.append("group/persona-correction"',
+):
+    if required_persona_owner not in chat_persona_correction_source:
+        die("Chat persona-correction ownership is incomplete: " + required_persona_owner)
+for required_relationship_owner in (
+    "internal fun hydrate()",
+    "!snapshot.autoRecall",
+    "currentLineageId = aggregate.lineageId",
+    'append("chat/relationship-hydrate"',
+):
+    if required_relationship_owner not in chat_relationship_hydrator_source:
+        die("Chat relationship hydration ownership is incomplete: " + required_relationship_owner)
+for removed_chat_turn_root in (
+    "private suspend fun runTurn(",
+    "private fun captureChatPersonaCorrection(",
+    "private fun captureGroupPersonaCorrections(",
+    "private fun hydrateNewChatStateFromRelationshipMemory(",
+):
+    if removed_chat_turn_root in engine:
+        die("Chat turn preparation must not return to LocalHarnessEngine: " + removed_chat_turn_root)
+
 if "provideLocalChatExecutionPort" not in feature_execution_port_module_source:
     die("app composition root must bind the Chat-owned execution implementation")
 if "coordinator: LocalChatExecutionCoordinator" not in feature_execution_port_module_source:
