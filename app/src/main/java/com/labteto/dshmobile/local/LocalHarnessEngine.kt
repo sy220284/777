@@ -2032,9 +2032,9 @@ class LocalHarnessEngine @Inject internal constructor(
                     work = current.work.copy(
                         pendingApproval = null,
                         pendingQuestion = null,
+                        deviceApprovalLease = false,
                     ),
                     kernel = current.kernel.copy(running = false),
-                    deviceApprovalLease = false,
                 )
             } else {
                 current
@@ -2531,10 +2531,10 @@ class LocalHarnessEngine @Inject internal constructor(
                 work = it.work.copy(
                     pendingApproval = null,
                     pendingQuestion = null,
+                    deviceApprovalLease = false,
                 ),
                 kernel = it.kernel.copy(running = true),
                 error = null,
-                deviceApprovalLease = false,
             )
         }
         try {
@@ -2687,9 +2687,9 @@ class LocalHarnessEngine @Inject internal constructor(
                     work = it.work.copy(
                         pendingApproval = null,
                         pendingQuestion = null,
+                        deviceApprovalLease = false,
                     ),
                     kernel = it.kernel.copy(running = false),
-                    deviceApprovalLease = false,
                 )
             }
             persist()
@@ -2752,9 +2752,9 @@ class LocalHarnessEngine @Inject internal constructor(
                     work = it.work.copy(
                         pendingApproval = null,
                         pendingQuestion = null,
+                        deviceApprovalLease = false,
                     ),
                     kernel = it.kernel.copy(running = false),
-                    deviceApprovalLease = false,
                 )
             }
             persist()
@@ -2800,10 +2800,12 @@ class LocalHarnessEngine @Inject internal constructor(
         LocalExecutionService.holdTurn(context, foregroundSessionId)
         runState.update {
             it.copy(
-                work = it.work.copy(workflowProgress = null),
+                work = it.work.copy(
+                    workflowProgress = null,
+                    deviceApprovalLease = false,
+                ),
                 kernel = it.kernel.copy(running = true),
                 error = null,
-                deviceApprovalLease = false,
             )
         }
         val repliesByStep = mutableMapOf<Int, LocalModelReply>()
@@ -3409,9 +3411,9 @@ class LocalHarnessEngine @Inject internal constructor(
                     work = it.work.copy(
                         pendingApproval = null,
                         pendingQuestion = null,
+                        deviceApprovalLease = false,
                     ),
                     kernel = it.kernel.copy(running = false),
-                    deviceApprovalLease = false,
                 )
             }
             persist(binding)
@@ -4014,7 +4016,7 @@ class LocalHarnessEngine @Inject internal constructor(
         summary: String,
         tool: HarnessTool,
     ): Boolean {
-        if (_state.value.deviceApprovalLease && canUseDeviceApprovalLease(tool)) {
+        if (_state.value.work.deviceApprovalLease && canUseDeviceApprovalLease(tool)) {
             eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
@@ -4054,7 +4056,7 @@ class LocalHarnessEngine @Inject internal constructor(
         tool: HarnessTool,
     ): Boolean {
         val snapshot = binding.state.value
-        if (snapshot.deviceApprovalLease && canUseDeviceApprovalLease(tool)) {
+        if (snapshot.work.deviceApprovalLease && canUseDeviceApprovalLease(tool)) {
             binding.eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
