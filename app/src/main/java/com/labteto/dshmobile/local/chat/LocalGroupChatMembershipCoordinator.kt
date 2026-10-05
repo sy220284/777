@@ -1,8 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.durableModelHistorySnapshot
+import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
 import com.labteto.dshmobile.local.model.groupChatSystemPrompt
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
@@ -19,8 +18,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -34,8 +31,8 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val personaStore: ChatPersonaStore,
+    private val modelHistoryRuntime: LocalForegroundModelHistoryRuntime,
 ) {
-    private val checkpointCodec = ModelHistoryCheckpointCodec()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     internal fun configure(entries: List<PersonaGalleryEntry>): Boolean {
@@ -86,8 +83,8 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
                 if (!applied) return@launch
 
                 val eventLog = sessionStorage.eventLogs.get(snapshot.sessionId)
-                refreshGroupSystemHistory()
-                checkpointForegroundHistory(eventLog, "group/members-updated")
+                modelHistoryRuntime.replaceSystemPrompt(snapshot.sessionId, groupChatSystemPrompt())
+                modelHistoryRuntime.checkpoint(snapshot.sessionId, "group/members-updated")
                 eventLog.append("group/members", buildJsonObject {
                     put("count", members.size)
                     put("gallery_ids", JsonArray(members.map { JsonPrimitive(it.galleryId) }))
@@ -158,8 +155,8 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
             if (!applied) return
 
             val eventLog = sessionStorage.eventLogs.get(snapshot.sessionId)
-            refreshGroupSystemHistory()
-            checkpointForegroundHistory(eventLog, "group/member-deleted")
+            modelHistoryRuntime.replaceSystemPrompt(snapshot.sessionId, groupChatSystemPrompt())
+            modelHistoryRuntime.checkpoint(snapshot.sessionId, "group/member-deleted")
             eventLog.append("group/members", buildJsonObject {
                 put("action", "member-deleted")
                 put("gallery_id", galleryId)
@@ -171,45 +168,5 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
         }
     }
 
-    private fun refreshGroupSystemHistory() {
-        val history = runtimeStateStore.foregroundModelHistory
-        val system = buildJsonObject {
-            put("role", "system")
-            put("content", groupChatSystemPrompt())
-        }
-        if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
-            history.replaceSystem(system)
-        } else {
-            history.prepend(system)
-        }
-        val state = runtimeStateStore.state.value
-        val budget = runtimeStateStore.contextBudgetCharsFor(
-            state,
-            runtimeStateStore.resourceSnapshot(),
-        )
-        runtimeStateStore.mutableState.update { current ->
-            if (current.sessionId == state.sessionId) {
-                current.copy(
-                    kernel = current.kernel.copy(
-                        contextChars = history.encodedChars,
-                        contextBudgetChars = budget,
-                    ),
-                )
-            } else current
-        }
-    }
 
-    private fun checkpointForegroundHistory(
-        eventLog: com.labteto.dshmobile.local.session.LocalSessionEventLog,
-        reason: String,
-    ) {
-        eventLog.append(
-            ModelHistoryCheckpointCodec.EVENT_TYPE,
-            checkpointCodec.encode(
-                durableModelHistorySnapshot(runtimeStateStore.foregroundModelHistory.snapshot()),
-                reason,
-            ),
-        )
-        runtimeStateStore.foregroundTurnsSinceModelHistoryCheckpoint = 0
-    }
 }
