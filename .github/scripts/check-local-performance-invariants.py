@@ -29,6 +29,7 @@ MODEL_HISTORY_BUFFER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/mod
 ENGINE_DEFAULTS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt"
 TRANSCRIPT_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt"
 SESSION_PERSISTENCE_PROJECTION = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionPersistenceProjection.kt"
+SESSION_STORAGE_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt"
 AUTOMATION_CHAT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt"
 PROMPT_CONTEXT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt"
 TOOL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
@@ -120,6 +121,7 @@ model_coordinator = MODEL_COORDINATOR.read_text(encoding="utf-8")
 model_history_buffer = MODEL_HISTORY_BUFFER.read_text(encoding="utf-8")
 engine_defaults = ENGINE_DEFAULTS.read_text(encoding="utf-8")
 session_persistence_projection = SESSION_PERSISTENCE_PROJECTION.read_text(encoding="utf-8")
+session_storage_runtime = SESSION_STORAGE_RUNTIME.read_text(encoding="utf-8")
 transcript_runtime = TRANSCRIPT_RUNTIME.read_text(encoding="utf-8")
 automation_chat = AUTOMATION_CHAT.read_text(encoding="utf-8")
 prompt_context = PROMPT_CONTEXT.read_text(encoding="utf-8")
@@ -342,8 +344,9 @@ if "transcriptForBranchMaterialization(" not in engine or "restoreMaterializedCh
 if "(current.messages + messages).takeLast(runtimeWindowMessages)" not in transcript_runtime:
     violations.append("Runtime transcript must stay bounded inside LocalTranscriptRuntime")
 if (
-    "LocalSessionCoordinator(" not in engine
+    "LocalSessionCoordinator(" not in session_storage_runtime
     or "sessionCoordinator.snapshot(" not in session_persistence_projection
+    or "coordinator.snapshot(" not in session_storage_runtime
     or "localSessionPersistenceSnapshot(" not in engine
 ):
     violations.append("Session snapshot writes must stay routed through LocalSessionCoordinator")
