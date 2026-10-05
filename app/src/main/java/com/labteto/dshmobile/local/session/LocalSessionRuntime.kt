@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /** Session/file capability boundary for the local UI. */
 @Singleton
-class LocalSessionRuntime @Inject constructor(
+class LocalSessionRuntime @Inject internal constructor(
     private val lifecycle: LocalSessionLifecyclePort,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionFiles: LocalSessionFilesRuntime,
