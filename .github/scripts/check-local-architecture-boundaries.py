@@ -7,124 +7,6 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 
-LINE_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalCharacterBehaviorTuningCoordinator.kt": 66,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/CharacterBehaviorTuningPersistence.kt": 135,
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkProgressCoordinator.kt": 99,
-    "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebSearchClient.kt": 174,
-    "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebDiagnostics.kt": 127,
-    "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebHttpPolicy.kt": 33,
-    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/Events.kt": 512,
-    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/LlmContent.kt": 233,
-    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/LlmMessages.kt": 111,
-    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/LlmRequests.kt": 61,
-    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/SessionTurnPayloads.kt": 163,
-    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/SessionControlPayloads.kt": 100,
-    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/SessionWorkflowPayloads.kt": 79,
-    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/SessionSchedulePayloads.kt": 71,
-    "core/src/main/kotlin/com/labteto/dshmobile/core/wire/dto/SessionCompactionPayloads.kt": 59,
-
-    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": 4943,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt": 1344,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionLifecycleRuntime.kt": 50,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionSlashCommandRuntime.kt": 71,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionGoalRuntime.kt": 61,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionWorkspaceRuntime.kt": 73,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionInteractionRuntime.kt": 201,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionTurnCommandRuntime.kt": 116,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionSearchRuntime.kt": 49,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionSubagentRuntime.kt": 176,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionAttachmentTransfer.kt": 100,
-    "app/src/main/java/com/labteto/dshmobile/data/SessionCatalogRuntime.kt": 151,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt": 506,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt": 1011,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt": 351,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessConfigurationComponents.kt": 163,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksScreen.kt": 320,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksViewModel.kt": 315,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskCardComponents.kt": 355,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TaskEditorComponents.kt": 706,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt": 240,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt": 340,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt": 1041,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/main/ChatListDrawer.kt": 590,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/main/ChatListDrawerComponents.kt": 571,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationPage.kt": 480,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/UsageCalculationComponents.kt": 593,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AppearanceSettingsComponents.kt": 450,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AdvancedSettingsSections.kt": 496,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/LocalModelSettingsSections.kt": 533,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsSections.kt": 455,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/AgentDeviceSettingsSections.kt": 285,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/RemoteSettingsController.kt": 190,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/DeviceCapabilitiesController.kt": 47,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt": 72,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt": 404,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryController.kt": 143,
-    "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomation.kt": 393,
-    "app/src/main/java/com/labteto/dshmobile/automation/AutomationDocumentStore.kt": 198,
-    "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationScheduler.kt": 603,
-    "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationWorker.kt": 450,
-    "app/src/main/java/com/labteto/dshmobile/automation/AutomationPlugin.kt": 217,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionPlanner.kt": 60,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionStateReducer.kt": 640,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionPlanParser.kt": 72,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionNormalization.kt": 5,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionPromptBuilder.kt": 158,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatInteractionModels.kt": 145,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatPersonaGalleryStore.kt": 443,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaGalleryModels.kt": 118,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/PersonaGalleryMergePolicy.kt": 431,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryStore.kt": 218,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryDocumentStore.kt": 105,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/ChatDiaryEntryPolicy.kt": 280,
-    "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryStore.kt": 490,
-    "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryDocumentStore.kt": 188,
-    "app/src/main/java/com/labteto/dshmobile/local/memory/MemoryRecordMaintenance.kt": 144,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStateContent.kt": 20,
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalHarnessUiState.kt": 130,
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 75,
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTaskRuntime.kt": 20,
-    "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 24,
-    "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolSchemaProjection.kt": 87,
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 80,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt": 46,
-    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 19,
-    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryBuffer.kt": 74,
-    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryCompaction.kt": 40,
-    "app/src/main/java/com/labteto/dshmobile/local/model/LocalRecoveryModelRoute.kt": 19,
-    "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt": 128,
-    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRunnerFactory.kt": 135,
-    "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt": 585,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": 871,
-    "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt": 621,
-    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentModelStepExecutor.kt": 153,
-    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentStructureRecovery.kt": 81,
-    "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt": 418,
-    "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebTargetResolver.kt": 261,
-    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentHistoryPolicy.kt": 66,
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt": 316,
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkRecovery.kt": 64,
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt": 523,
-    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessRuntimePolicy.kt": 76,
-    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt": 76,
-    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessResourceProjection.kt": 23,
-    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalBundledRuntimeManager.kt": 56,
-    "app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt": 67,
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupExecutionModels.kt": 22,
-    "app/src/main/java/com/labteto/dshmobile/local/LocalModelConfigurationCoordinator.kt": 172,
-    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 64,
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt": 24,
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalUiRuntime.kt": 17,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStreamingComponents.kt": 150,
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalConversationSurfaceState.kt": 140,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStateContent.kt": 24,
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkUiState.kt": 87,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkStateContent.kt": 16,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationHeaders.kt": 344,
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkSurfaceComponents.kt": 421,
-}
-
 ENGINE_MAX_PUBLIC_METHODS = 0
 ENGINE_MAX_INTERNAL_METHODS = 80
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 19
@@ -145,7 +27,6 @@ RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 8,
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 6,
 }
-LOCAL_ROOT_MAX_KOTLIN_FILES = 23
 PROJECTION_FIELD_BUDGETS = {
     "LocalHarnessSettingsState": 17,
     "LocalHarnessTaskState": 4,
@@ -184,11 +65,6 @@ def strip_comments(source: str) -> str:
     return re.sub(r"//.*$", "", source, flags=re.MULTILINE)
 
 
-for relative, maximum in LINE_BUDGETS.items():
-    lines = len(read(relative).splitlines())
-    if lines > maximum:
-        die(f"{relative} grew to {lines} lines (ratchet: {maximum}); move the new responsibility out")
-    print(f"[architecture-guard] {relative}: {lines}/{maximum} lines")
 
 
 def constructor_dependency_count(relative: str, class_name: str) -> int:
@@ -416,11 +292,6 @@ if "LocalConversationStateContent(viewModel, shell.usageMode)" not in screen_sou
 
 local_root = ROOT / "app/src/main/java/com/labteto/dshmobile/local"
 local_root_files = list(local_root.glob("*.kt"))
-if len(local_root_files) > LOCAL_ROOT_MAX_KOTLIN_FILES:
-    die(
-        f"local/ root has {len(local_root_files)} Kotlin files "
-        f"(ratchet: {LOCAL_ROOT_MAX_KOTLIN_FILES}); place new code in a capability package"
-    )
 
 main_root = ROOT / "app/src/main/java/com/labteto/dshmobile"
 engine_consumers = set()

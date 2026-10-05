@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.model.WORK_TOOL_RECOVERY_PAGE_BYTES
 import java.io.File
 import java.io.FileOutputStream
 import java.io.RandomAccessFile

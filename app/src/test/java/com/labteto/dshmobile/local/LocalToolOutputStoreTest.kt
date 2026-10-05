@@ -5,7 +5,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import com.labteto.dshmobile.local.model.WORK_TOOL_INLINE_BYTES
 import org.junit.rules.TemporaryFolder
 
 class LocalToolOutputStoreTest {
