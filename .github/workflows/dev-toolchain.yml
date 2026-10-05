@@ -45,7 +45,7 @@ jobs:
           - full
 
     env:
-      GRADLE_USER_HOME: ${{ runner.temp }}/777-gradle-home
+      GRADLE_USER_HOME: ${{ github.workspace }}/.gradle-toolchain-home
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
