@@ -6,11 +6,12 @@ import com.labteto.dshmobile.local.presentation.toWorkSurfaceUiState
 import com.labteto.dshmobile.local.runtime.LocalHarnessResourceState
 import com.labteto.dshmobile.local.runtime.LocalKernelState
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.local.work.LocalWorkState
-import com.labteto.dshmobile.local.work.mirrorLocalWorkRunState
+import com.labteto.dshmobile.local.work.toLocalWorkRunState
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
@@ -19,7 +20,6 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -34,31 +34,47 @@ class LocalWorkRunBindingTest {
     @get:Rule val temporary = TemporaryFolder()
 
     @Test fun visibleWorkReflectsDeviceLeaseActivationAndRevocation() {
-        val visible = MutableStateFlow(LocalHarnessState(
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(
             sessionId = "work",
+            usageMode = LocalUsageMode.WORK,
             kernel = LocalKernelState(resources = LocalHarnessResourceState(activeAgents = 2)),
         ))
-        val binding = binding(visible.value.copy(work = visible.value.work.copy(deviceApprovalLease = true)))
+        val registry = LocalWorkRunRegistry(runtime)
+        val binding = binding(
+            runtime.state.value.copy(
+                work = runtime.state.value.work.copy(deviceApprovalLease = true),
+            ),
+        )
 
-        mirrorLocalWorkRunState("work", visible, binding)
+        registry.mirrorVisible(binding)
 
-        assertTrue(visible.value.toWorkSurfaceUiState().deviceApprovalLease)
-        assertEquals(2, visible.value.kernel.resources.activeAgents)
-        binding.state.value = binding.state.value.copy(work = binding.state.value.work.copy(deviceApprovalLease = false))
-        mirrorLocalWorkRunState("work", visible, binding)
-        assertFalse(visible.value.toWorkSurfaceUiState().deviceApprovalLease)
+        assertTrue(runtime.state.value.toWorkSurfaceUiState().deviceApprovalLease)
+        assertEquals(2, runtime.state.value.kernel.resources.activeAgents)
+        binding.state.value = binding.state.value.copy(
+            work = binding.state.value.work.copy(deviceApprovalLease = false),
+        )
+        registry.mirrorVisible(binding)
+        assertFalse(runtime.state.value.toWorkSurfaceUiState().deviceApprovalLease)
     }
 
     @Test fun backgroundWorkCannotPublishDeviceLeaseIntoAnotherSession() {
         val other = LocalHarnessState(sessionId = "other", usageMode = LocalUsageMode.CHAT)
-        val visible = MutableStateFlow(other)
-        val binding = binding(LocalHarnessState(sessionId = "work", work = LocalWorkState(deviceApprovalLease = true)))
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(other)
+        val registry = LocalWorkRunRegistry(runtime)
+        val binding = binding(LocalHarnessState(
+            sessionId = "work",
+            usageMode = LocalUsageMode.WORK,
+            work = LocalWorkState(deviceApprovalLease = true),
+        ))
 
-        mirrorLocalWorkRunState("other", visible, binding)
-        assertEquals(other, visible.value)
-        // The visible session can change after the caller reads its current session ID.
-        mirrorLocalWorkRunState("work", visible, binding)
-        assertEquals(other, visible.value)
+        registry.mirrorVisible(binding)
+        assertEquals(other, runtime.state.value)
+        // The active Session owner can change before the visible aggregate projection catches up.
+        runtime.activateSession("work")
+        registry.mirrorVisible(binding)
+        assertEquals(other, runtime.state.value)
     }
 
     @Test fun teardownClearsRunInteractionAndDeviceLeaseTogether() = runTest {
@@ -96,7 +112,7 @@ class LocalWorkRunBindingTest {
         assertFalse(visible.value.kernel.running)
         assertEquals(2, binding.state.value.kernel.queuedInputCount)
         assertEquals(32_000, binding.state.value.kernel.contextChars)
-        mirrorLocalWorkRunState("chat", visible, binding)
+        registry.mirrorVisible(binding)
         assertEquals("chat", visible.value.sessionId)
         assertFalse(visible.value.kernel.running)
         } finally {
@@ -129,7 +145,7 @@ class LocalWorkRunBindingTest {
             assertEquals(1, observedModels)
             assertEquals(1, binding.state.value.kernel.resources.activeModelRequests)
             assertEquals(
-                runtime.contextBudgetCharsFor(binding.state.value, runtime.resourceSnapshot()),
+                runtime.contextBudgetCharsFor(binding.state.value.modelState, runtime.resourceSnapshot()),
                 binding.state.value.kernel.contextBudgetChars,
             )
         } finally {
@@ -147,9 +163,12 @@ class LocalWorkRunBindingTest {
             val binding = LocalWorkRunBinding(
                 sessionId = "work",
                 initialState = LocalHarnessState(
+                    sessionId = "work",
+                    usageMode = LocalUsageMode.WORK,
                     kernel = LocalKernelState(running = true, queuedInputCount = 1),
                     work = LocalWorkState(deviceApprovalLease = true),
-                ),
+                ).toLocalWorkRunState(),
+                sessionBase = LocalHarnessSession(id = "work", usageMode = LocalUsageMode.WORK),
                 initialHistory = emptyList(), eventLog = log,
                 initialTranscriptProjectionCursor = null, maxPendingInputs = 4,
                 pruneToolResult = { it },
@@ -214,13 +233,20 @@ class LocalWorkRunBindingTest {
         }
     }
 
-    private fun binding(initial: LocalHarnessState) = LocalWorkRunBinding(
-        sessionId = initial.sessionId,
-        initialState = initial,
-        initialHistory = emptyList(),
-        eventLog = LocalSessionEventLog(File(temporary.newFolder(), "events.jsonl"), Json),
-        initialTranscriptProjectionCursor = null,
-        maxPendingInputs = 4,
-        pruneToolResult = { it },
-    )
+    private fun binding(initial: LocalHarnessState): LocalWorkRunBinding {
+        val workState = initial.copy(usageMode = LocalUsageMode.WORK)
+        return LocalWorkRunBinding(
+            sessionId = workState.sessionId,
+            initialState = workState.toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(
+                id = workState.sessionId,
+                usageMode = LocalUsageMode.WORK,
+            ),
+            initialHistory = emptyList(),
+            eventLog = LocalSessionEventLog(File(temporary.newFolder(), "events.jsonl"), Json),
+            initialTranscriptProjectionCursor = null,
+            maxPendingInputs = 4,
+            pruneToolResult = { it },
+        )
+    }
 }
