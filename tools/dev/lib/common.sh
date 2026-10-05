@@ -21,13 +21,14 @@ self_test() {
 
   grep -Fq "minSdk = $ANDROID_MIN_API" "$root/app/build.gradle.kts" || { echo "ANDROID_MIN_API 与 app/build.gradle.kts 不一致" >&2; return 1; }
   grep -Fq "compileSdk = $ANDROID_COMPILE_API" "$root/app/build.gradle.kts" || { echo "ANDROID_COMPILE_API 与 app/build.gradle.kts 不一致" >&2; return 1; }
-  grep -Fq "JavaVersion.VERSION_$JDK_MAJOR" "$root/app/build.gradle.kts" || { echo "JDK_MAJOR 与 app/build.gradle.kts 不一致" >&2; return 1; }
+  grep -Fq "JavaVersion.VERSION_$JVM_TARGET" "$root/app/build.gradle.kts" || { echo "JVM_TARGET 与 app/build.gradle.kts 不一致" >&2; return 1; }
+  grep -Fq "java-version: $BUILD_JDK_MIN_MAJOR" "$root/.github/workflows/ci.yml" || { echo "BUILD_JDK_MIN_MAJOR 与 CI 不一致" >&2; return 1; }
   grep -Fq "$ANDROID_PLATFORM_PACKAGE" "$root/.github/workflows/ci.yml" || { echo "Android platform package 与 CI 不一致" >&2; return 1; }
   grep -Fq "build-tools;$ANDROID_BUILD_TOOLS" "$root/.github/workflows/ci.yml" || { echo "Android build-tools 与 CI 不一致" >&2; return 1; }
   grep -Fq "gradle-$GRADLE_VERSION-bin.zip" "$root/gradle/wrapper/gradle-wrapper.properties" || { echo "Gradle 版本与 Wrapper 不一致" >&2; return 1; }
   grep -Fq "agp = \"$AGP_VERSION\"" "$root/gradle/libs.versions.toml" || { echo "AGP_VERSION 与版本目录不一致" >&2; return 1; }
   grep -Fq "kotlin = \"$KOTLIN_VERSION\"" "$root/gradle/libs.versions.toml" || { echo "KOTLIN_VERSION 与版本目录不一致" >&2; return 1; }
-  grep -Fq "node-version: 22" "$root/.github/workflows/ci.yml" || { echo "Node 主版本与 CI 不一致" >&2; return 1; }
+  grep -Fq "node-version: $NODE_MIN_MAJOR" "$root/.github/workflows/ci.yml" || { echo "NODE_MIN_MAJOR 与 CI 不一致" >&2; return 1; }
   grep -Fq "VERSION=$ACTIONLINT_VERSION" "$root/.github/workflows/ci.yml" || { echo "actionlint 版本与 CI 不一致" >&2; return 1; }
   grep -Fq "SHA256=\"$ACTIONLINT_LINUX_X64_SHA256\"" "$root/.github/workflows/ci.yml" || { echo "actionlint SHA-256 与 CI 不一致" >&2; return 1; }
   ok "工具链版本清单与当前 app / CI / Gradle 基线一致"
@@ -49,7 +50,7 @@ java_major() {
   "$1/bin/java" -version 2>&1 | sed -n 's/.*version "\([0-9][0-9]*\).*/\1/p' | head -n 1
 }
 
-find_java17_home() {
+find_compatible_java_home() {
   local candidates=() home major
   if [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ]; then
     candidates+=("$JAVA_HOME")
@@ -58,24 +59,31 @@ find_java17_home() {
     candidates+=("${DEV777_TOOLS_ROOT}/jdk")
   fi
   if [ -d /usr/lib/jvm ]; then
-    while IFS= read -r path; do candidates+=("$path"); done < <(find /usr/lib/jvm -mindepth 1 -maxdepth 1 -type d -name '*17*' | sort)
+    while IFS= read -r path; do candidates+=("$path"); done < <(
+      find /usr/lib/jvm -mindepth 1 -maxdepth 1 \( -type d -o -type l \) | sort
+    )
   fi
   for home in "${candidates[@]}"; do
     [ -x "$home/bin/java" ] && [ -x "$home/bin/javac" ] || continue
     major="$(java_major "$home")"
-    if [ "$major" = "$JDK_MAJOR" ]; then
+    if [[ "$major" =~ ^[0-9]+$ ]] && [ "$major" -ge "$BUILD_JDK_MIN_MAJOR" ]; then
       printf '%s\n' "$home"
       return 0
     fi
   done
   if command -v javac >/dev/null 2>&1; then
     home="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
-    if [ "$(java_major "$home")" = "$JDK_MAJOR" ]; then
+    major="$(java_major "$home")"
+    if [[ "$major" =~ ^[0-9]+$ ]] && [ "$major" -ge "$BUILD_JDK_MIN_MAJOR" ]; then
       printf '%s\n' "$home"
       return 0
     fi
   fi
   return 1
+}
+
+node_major() {
+  "$1" -p 'process.versions.node.split(".")[0]' 2>/dev/null
 }
 
 required_host_commands() {
