@@ -1,10 +1,7 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.tools.optionalString
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -17,7 +14,7 @@ import kotlinx.serialization.json.put
 
 /** Plan, todo and goal mutations for one captured session; never resolves the visible session. */
 internal class LocalWorkProgressCoordinator(
-    private val state: MutableStateFlow<LocalHarnessState>,
+    private val state: LocalWorkStatePort,
     private val eventLog: LocalSessionEventLog,
     private val persist: () -> Unit,
 ) {
@@ -28,7 +25,7 @@ internal class LocalWorkProgressCoordinator(
             ?: args.optionalString("plan")?.lines()?.filter { it.isNotBlank() }
             ?: emptyList()
         val normalized = items.take(20)
-        state.update { it.copy(work = it.work.copy(plan = normalized)) }
+        state.update { it.copy(plan = normalized) }
         eventLog.append("plan/state", buildJsonObject {
             put("items", JsonArray(normalized.map { item -> JsonPrimitive(item) }))
         })
@@ -46,7 +43,7 @@ internal class LocalWorkProgressCoordinator(
             val status = item["status"]?.jsonPrimitive?.contentOrNull.orEmpty()
             if (content.isEmpty() || status !in allowed) null else LocalTodoItem(content.take(500), status)
         }.take(50)
-        state.update { it.copy(work = it.work.copy(todos = items)) }
+        state.update { it.copy(todos = items) }
         eventLog.append("todo/state", buildJsonObject {
             put("items", JsonArray(items.map { item ->
                 buildJsonObject {
@@ -63,7 +60,7 @@ internal class LocalWorkProgressCoordinator(
         description: String,
     ): String {
         val goal = LocalGoal(description.trim().take(2_000))
-        state.update { it.copy(work = it.work.copy(goal = goal)) }
+        state.update { it.copy(goal = goal) }
         eventLog.append("goal/state", buildJsonObject {
             put("description", goal.description)
             put("status", goal.status)
@@ -74,7 +71,7 @@ internal class LocalWorkProgressCoordinator(
     }
 
     fun getGoal(): String {
-        val goal = state.value.work.goal ?: return "当前会话没有目标"
+        val goal = state.snapshot().goal ?: return "当前会话没有目标"
         return "目标：[${goal.status}] ${goal.description}${goal.note?.let { "\n说明：$it" }.orEmpty()}"
     }
 
@@ -83,8 +80,8 @@ internal class LocalWorkProgressCoordinator(
         note: String?,
     ): String {
         require(status in setOf("active", "paused", "completed", "blocked")) { "目标状态无效" }
-        val updated = resolveWorkGoalUpdate(state.value.work, status, note, eventLog)
-        state.update { it.copy(work = it.work.copy(goal = updated)) }
+        val updated = resolveWorkGoalUpdate(state.snapshot(), status, note, eventLog)
+        state.update { it.copy(goal = updated) }
         eventLog.append("goal/state", buildJsonObject {
             put("description", updated.description)
             put("status", updated.status)
