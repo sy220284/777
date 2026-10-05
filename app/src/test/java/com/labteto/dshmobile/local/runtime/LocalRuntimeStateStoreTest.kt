@@ -116,4 +116,21 @@ class LocalRuntimeStateStoreTest {
             }
         }
 
+    @Test
+    fun visibleOperationReportsFailureWithoutCrashingOrLeakingToAnotherSession() {
+        val store = LocalRuntimeStateStore()
+        store.initialize(LocalHarnessState(sessionId = "session-a"))
+        store.performVisibleOperation("操作失败") { throw java.io.IOException("disk full") }
+        assertTrue(store.state.value.error.orEmpty().contains("disk full"))
+        store.performVisibleOperation("旧操作失败") {
+            store.mutableState.value = store.state.value.copy(sessionId = "session-b", error = null)
+            throw java.io.IOException("old failure")
+        }
+        org.junit.Assert.assertNull(store.state.value.error)
+        val cancelled = kotlinx.coroutines.CancellationException("cancel")
+        assertSame(cancelled, runCatching {
+            store.performVisibleOperation("不能吞取消") { throw cancelled }
+        }.exceptionOrNull())
+    }
+
 }

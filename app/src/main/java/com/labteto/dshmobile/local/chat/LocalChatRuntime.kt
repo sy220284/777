@@ -62,7 +62,9 @@ class LocalChatRuntime @Inject internal constructor(
     internal fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean =
         engine.selectChatMessageVariant(messageId, targetIndex)
     internal fun regenerateReply(messageId: String): Boolean = engine.regenerateReply(messageId)
-    internal fun stop() = engine.stopForegroundRun()
+    internal fun stop() = runtimeStateStore.performVisibleOperation("停止聊天时保存失败") {
+        engine.stopForegroundRun()
+    }
     internal suspend fun undoChatPersonaCorrection(
         noticeId: Long,
         personaId: String,

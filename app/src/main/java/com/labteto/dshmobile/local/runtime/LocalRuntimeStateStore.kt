@@ -22,6 +22,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.CopyOnWriteArrayList
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -144,6 +145,22 @@ class LocalRuntimeStateStore internal constructor(
 
     internal fun clearSendFeedback() {
         sendFeedbackMutable.value = LocalSendFeedbackState()
+    }
+
+    /** UI-bound operations report failure only to the originating visible Session. */
+    internal fun performVisibleOperation(failureMessage: String, block: () -> Unit) {
+        val before = state.value
+        try {
+            block()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            mutable.update { current ->
+                if (current.sessionId == before.sessionId && current.usageMode == before.usageMode) {
+                    current.copy(error = "$failureMessage：${error.message ?: error::class.java.simpleName}")
+                } else current
+            }
+        }
     }
 
     /**

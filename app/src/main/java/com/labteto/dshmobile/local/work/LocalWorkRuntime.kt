@@ -40,11 +40,11 @@ class LocalWorkRuntime @Inject internal constructor(
         if (binding?.interactions?.cancelQuestion(callId) == true) return
         runtimeStateStore.foregroundInteractions.cancelQuestion(callId)
     }
-    internal fun stop() {
+    internal fun stop() = runtimeStateStore.performVisibleOperation("停止任务时保存失败") {
         val sessionId = runtimeStateStore.currentSessionId
         val snapshot = runtimeStateStore.state.value
-        if (snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK) return
-        if (workRunRegistry.requestCancel(sessionId)) return
+        if (snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK) return@performVisibleOperation
+        if (workRunRegistry.requestCancel(sessionId)) return@performVisibleOperation
 
         runtimeStateStore.cancelForegroundRun(eventLogs.get(sessionId))
         runtimeStateStore.mutableState.update { current ->
@@ -61,7 +61,8 @@ class LocalWorkRuntime @Inject internal constructor(
         }
     }
 
-    internal fun setPlanMode(enabled: Boolean) {
-        planMode.setEnabled(enabled)
-    }
+    internal fun setPlanMode(enabled: Boolean) =
+        runtimeStateStore.performVisibleOperation("计划模式切换失败") {
+            planMode.setEnabled(enabled)
+        }
 }
