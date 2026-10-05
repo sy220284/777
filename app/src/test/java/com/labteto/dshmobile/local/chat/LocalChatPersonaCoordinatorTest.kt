@@ -106,7 +106,7 @@ class LocalChatPersonaCoordinatorTest {
 
         val fresh = initialState()
         val failure = LocalChatPersonaCoordinator(
-            state = localAggregateProjectionPort(fresh), savePersona = { it },
+            state = LocalChatStatePort(fresh), savePersona = { it },
             persistNow = { throw java.io.IOException("disk full") }, enqueueSnapshot = { true },
         )
         assertTrue(runCatching { failure.selectNow(fresh.value.toLocalChatProjectionState(), PersonaProfile(id = "new")) }.isFailure)
