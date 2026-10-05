@@ -14,12 +14,11 @@ ENGINE_MAX_INTERNAL_METHODS = 1
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
 ENGINE_MAX_COMPOSITION_BRIDGE_REFERENCES = 7
-ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 5
+ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 4
 ENGINE_STAGE3_FEATURE_METHOD_ROOTS = (
     "queueHumanTurn",
     "runWorkAgentTurn",
     "runChatTurn",
-    "regenerateWorkReply",
     "editAndResendUserMessage",
 )
 
@@ -318,6 +317,16 @@ if "internal suspend fun exitWorkPlanMode(" not in work_plan_mode_source:
 
 engine_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
 engine = read(engine_path)
+work_regenerator_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkReplyRegenerator.kt")
+)
+if "internal suspend fun regenerate(messageId: String)" not in work_regenerator_source:
+    die("WorkFeature must own final-answer regeneration")
+if "private suspend fun regenerateWorkReply(" in engine:
+    die("Work regeneration business must not return to LocalHarnessEngine")
+if "workReplyRegenerator.regenerate(messageId)" not in engine:
+    die("Work regeneration call site must stay routed to WorkFeature")
+
 group_execution_owner_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatExecutionOwner.kt")
 )
