@@ -2052,15 +2052,14 @@ class LocalHarnessEngine @Inject internal constructor(
             runGroupChatTurn(input, sourceMessageId)
             return
         }
-        if (snapshot.usageMode == LocalUsageMode.CHAT) {
-            captureChatPersonaCorrection(memoryInput)
-            hydrateNewChatStateFromRelationshipMemory()
-            LocalExecutionService.withTurn(context, snapshot.sessionId, { _state.value.error }) {
-                runChatTurn(input, sourceMessageId = sourceMessageId)
-            }
-            return
+        check(snapshot.usageMode == LocalUsageMode.CHAT) {
+            "Chat 回合入口只能处理 Chat 模式"
         }
-        runWorkAgentTurn(input, memoryInput, sourceMessageId)
+        captureChatPersonaCorrection(memoryInput)
+        hydrateNewChatStateFromRelationshipMemory()
+        LocalExecutionService.withTurn(context, snapshot.sessionId, { _state.value.error }) {
+            runChatTurn(input, sourceMessageId = sourceMessageId)
+        }
     }
 
     private fun captureChatPersonaCorrection(text: String) {
@@ -2460,26 +2459,25 @@ class LocalHarnessEngine @Inject internal constructor(
         input: String,
         memoryInput: String = input,
         sourceMessageId: String? = null,
-        binding: LocalWorkRunBinding? = null,
+        binding: LocalWorkRunBinding,
         preownedLease: LocalSessionRuntimeLease? = null,
     ): Unit = LocalSessionRuntimeRegistry.withOwner(
-        binding?.sessionId ?: currentSessionId,
+        binding.sessionId,
         LocalSessionRuntimeKind.FOREGROUND,
         preownedLease,
-    ) { ownedSessionId ->
-        if (binding == null && currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
+    ) {
         val runState = aggregateRunState(binding)
-        val runEventLog = binding?.eventLog ?: eventLog
-        val runHistory = binding?.runHandle?.modelHistory ?: modelHistory
-        val runTranscript = binding?.transcriptRuntime ?: transcriptRuntime
-        val runSessionId = binding?.sessionId ?: currentSessionId
+        val runEventLog = binding.eventLog
+        val runHistory = binding.runHandle.modelHistory
+        val runTranscript = binding.transcriptRuntime
+        val runSessionId = binding.sessionId
         check(runState.value.usageMode == LocalUsageMode.WORK) {
             "Work Agent 回合只能处理 Work 模式"
         }
         val runPolicy = localAgentRunPolicy(LocalUsageMode.WORK)
         clearRunCapabilities(binding)
         toolExecutionCoordinator.prepareWorkTurnCapabilities(
-            input, runHistory.snapshot(), pluginComposition::githubConfigured, binding?.enabledOptionalTools,
+            input, runHistory.snapshot(), pluginComposition::githubConfigured, binding.enabledOptionalTools,
         )
         val foregroundSessionId = runSessionId
         var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
@@ -2514,8 +2512,8 @@ class LocalHarnessEngine @Inject internal constructor(
                 kind = LocalAgentRunKind.FOREGROUND,
             )
         } else 1
-        val continuationParentRunId = binding?.continuationParentRunId
-        if (binding != null) binding.continuationParentRunId = null
+        val continuationParentRunId = binding.continuationParentRunId
+        binding.continuationParentRunId = null
         val runContext = agentRunCoordinator.start(
             sessionId = foregroundSessionId,
             usageMode = runSnapshot.usageMode,
@@ -2861,12 +2859,11 @@ class LocalHarnessEngine @Inject internal constructor(
                         settlePendingTools("failed")
                         val detail = event.reason.take(2_000)
                         val continuationEligible =
-                            binding != null &&
-                                shouldAutoContinueWorkFailure(
-                                    error = lastModelError,
-                                    automaticContinuationCount = binding.automaticContinuationCount,
-                                    pendingInputs = binding.runHandle.pendingInputs.size(),
-                                )
+                            shouldAutoContinueWorkFailure(
+                                error = lastModelError,
+                                automaticContinuationCount = binding.automaticContinuationCount,
+                                pendingInputs = binding.runHandle.pendingInputs.size(),
+                            )
                         if (continuationEligible) {
                             runEventLog.append("turn/end", buildJsonObject {
                                 put("reason", "stream_interrupted_continuation")
@@ -2929,11 +2926,9 @@ class LocalHarnessEngine @Inject internal constructor(
                 code = "WORK_SLICE_TIMEOUT",
                 message = "本轮执行达到 15 分钟切片上限",
                 retryable = false,
-                continuationEligible = binding != null,
+                continuationEligible = true,
             )
-            val queued = binding?.let {
-                queueAutomaticWorkContinuation(it, runContext.runId, timeoutError)
-            } == true
+            val queued = queueAutomaticWorkContinuation(binding, runContext.runId, timeoutError)
             if (!queued) {
                 runState.update { it.copy(error = "本轮执行超过 15 分钟，已暂停并保留已有进度") }
             }
@@ -2943,7 +2938,7 @@ class LocalHarnessEngine @Inject internal constructor(
         } catch (error: Exception) {
             foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
             val modelError = error as? LocalModelException
-            val queued = if (binding != null && modelError != null) {
+            val queued = if (modelError != null) {
                 queueAutomaticWorkContinuation(binding, runContext.runId, modelError)
             } else {
                 false
@@ -2953,7 +2948,7 @@ class LocalHarnessEngine @Inject internal constructor(
             }
             // TurnFailed has already settled tool side effects and checkpointed model-visible state.
         } finally {
-            if (binding != null) binding.interactions.cancelAll() else runtimeStateStore.foregroundInteractions.cancelAll()
+            binding.interactions.cancelAll()
             runState.update {
                 it.copy(
                     work = it.work.copy(
@@ -2966,25 +2961,17 @@ class LocalHarnessEngine @Inject internal constructor(
             }
             persist(binding)
             val completedJob = currentCoroutineContext()[Job]
-            if (binding == null) {
-                synchronized(runStateLock) {
-                    if (activeJob === completedJob) activeJob = null
+            LocalExecutionService.releaseTurn(context, foregroundSessionId, foregroundOutcome)
+            workRunRegistry.finishTurn(binding, completedJob) { next, ownedBinding ->
+                scope.launch(start = CoroutineStart.LAZY) {
+                    runWorkAgentTurn(
+                        input = next.content,
+                        memoryInput = next.memoryInput,
+                        sourceMessageId = next.id,
+                        binding = ownedBinding,
+                    )
                 }
-                LocalExecutionService.releaseTurn(context, foregroundSessionId, foregroundOutcome)
-                startNextQueuedTurnIfIdle()?.start()
-            } else {
-                LocalExecutionService.releaseTurn(context, foregroundSessionId, foregroundOutcome)
-                workRunRegistry.finishTurn(binding, completedJob) { next, ownedBinding ->
-                    scope.launch(start = CoroutineStart.LAZY) {
-                        runWorkAgentTurn(
-                            input = next.content,
-                            memoryInput = next.memoryInput,
-                            sourceMessageId = next.id,
-                            binding = ownedBinding,
-                        )
-                    }
-                }?.start()
-            }
+            }?.start()
         }
     }
 
