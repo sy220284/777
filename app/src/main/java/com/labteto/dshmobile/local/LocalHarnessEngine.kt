@@ -1125,15 +1125,6 @@ class LocalHarnessEngine @Inject internal constructor(
         }
     }
 
-    private fun chatStreamFilterPhrases(
-        snapshot: LocalHarnessState,
-        persona: PersonaProfile = snapshot.chat.chatPersona,
-    ): List<String> = ChatStyleGuard.activePhrases(
-        customPhrases = snapshot.chatStyleGuardCustomPhrases,
-        personaPhrases = persona.bannedPhrases,
-        enabled = snapshot.usageMode == LocalUsageMode.CHAT && snapshot.chatStyleGuardEnabled,
-    )
-
     private fun recordStyleGuardHits(violations: List<String>) {
         if (violations.isEmpty()) return
         _state.update { current ->
@@ -1266,20 +1257,6 @@ class LocalHarnessEngine @Inject internal constructor(
                 }
             }
         }
-    }
-
-    private fun persistChatBranchState(reason: String) {
-        val state = _state.value
-        eventLog.append("chat/branch-state", JsonObject(
-            encodeChatBranchStateEvent(state.chat.chatBranches) + ("reason" to JsonPrimitive(reason)),
-        ))
-        val activeTranscript = activeChatBranchMessages(state.chat.chatBranches)
-            .ifEmpty { state.messages }
-        val transcriptEvent = eventLog.append("chat/active-transcript", buildJsonObject {
-            put("reason", reason)
-            put("transcript", encodeTranscriptMessages(activeTranscript))
-        })
-        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, transcriptEvent.sequence)
     }
 
     private fun syncVisibleWorkRun(
@@ -1549,28 +1526,6 @@ class LocalHarnessEngine @Inject internal constructor(
         }
     }
 
-    private fun rebuildGroupModelHistoryFromTranscript(messages: List<LocalHarnessMessage>) {
-        val rebuilt = buildList {
-            add(buildJsonObject {
-                put("role", "system")
-                put("content", groupChatSystemPrompt())
-            })
-            messages.forEach { message ->
-                if (message.role == "user" || message.role == "assistant") {
-                    add(buildJsonObject {
-                        put("role", message.role)
-                        put(
-                            "content",
-                            if (message.role == "assistant") groupTranscriptLine(message) else message.content,
-                        )
-                    })
-                }
-            }
-        }
-        modelHistory.reset(rebuilt)
-        updateContextMetrics()
-    }
-
     private fun refreshGroupModelSystemPrompt() {
         val system = buildJsonObject {
             put("role", "system")
@@ -1590,29 +1545,6 @@ class LocalHarnessEngine @Inject internal constructor(
         arguments = arguments,
         rawArguments = rawArguments,
     )
-
-    private suspend fun executeToolBatch(
-        calls: List<LocalToolCall>,
-        allowMutation: Boolean,
-        binding: LocalWorkRunBinding? = null,
-    ): List<Pair<LocalToolCall, AgentToolResult>> {
-        val parallelSubagents = calls.size > 1 && calls.all { it.name in PARALLEL_SUBAGENT_TOOLS }
-        if (!parallelSubagents) {
-            return calls.map { call -> call to executeSafely(call, allowMutation, binding) }
-        }
-        return isolatedParallelMap(calls) { call ->
-            call to executeSafely(call, allowMutation, binding)
-        }.mapIndexed { index, result ->
-            result.getOrElse { error ->
-                val call = calls[index]
-                call to toolFailureResult(
-                    call,
-                    "PARALLEL_TASK_ERROR",
-                    error.message ?: error::class.java.simpleName,
-                )
-            }
-        }
-    }
 
     private suspend fun executeSafely(
         call: LocalToolCall,
@@ -1863,21 +1795,6 @@ class LocalHarnessEngine @Inject internal constructor(
             approval = { call, tool, summary ->
                 approve(binding, call, summary, tool)
             },
-        )
-    }
-
-    private fun modelToolSchemas(
-        runPolicy: LocalAgentRunPolicy,
-        binding: LocalWorkRunBinding? = null,
-    ): JsonArray {
-        val enabledOptional = binding?.let { run ->
-            synchronized(run.enabledOptionalTools) { run.enabledOptionalTools.toSet() }
-        }
-        return toolSchemaProjection.modelSchemas(
-            policy = runPolicy,
-            state = binding?.aggregateSnapshot() ?: _state.value,
-            history = binding?.runHandle?.modelHistory?.snapshot() ?: modelHistory.snapshot(),
-            enabledOptional = enabledOptional,
         )
     }
 
@@ -2265,36 +2182,6 @@ class LocalHarnessEngine @Inject internal constructor(
         chatContextRefreshCoordinator.cancelScheduledRefresh()
     }
 
-    private suspend fun enforceChatStyle(
-        key: String,
-        snapshot: LocalHarnessState,
-        messages: List<JsonObject>,
-        step: Int,
-        reply: LocalModelReply,
-        userMessage: String, usage: ForegroundTokenUsageSeed,
-    ): LocalModelReply = chatReplyCoordinator.finalizeDirect(
-        snapshot = snapshot,
-        reply = reply,
-        userMessage = userMessage,
-        step = step, usage = usage,
-        retryRaw = { repairHint ->
-            completeWithRetry(
-                key = key,
-                snapshot = snapshot,
-                messages = withEphemeralContext(messages, repairHint),
-                step = step,
-                toolsOverride = JsonArray(emptyList()),
-                publishPreview = false,
-                maxAttemptsOverride = 1,
-                allowContextOverflowRecovery = false,
-                temperature = CHAT_ROLEPLAY_TEMPERATURE,
-            )
-        },
-        appendEvent = { type, data ->
-            eventLog.append(type, data)
-        },
-    )
-
     private suspend fun modelRequestMarkerOrNull(): String? {
         val snapshot = _state.value
         val profileId = snapshot.modelState.modelSelection.activeProfileId ?: return null
@@ -2305,8 +2192,6 @@ class LocalHarnessEngine @Inject internal constructor(
         ).id
     }
 
-    private suspend fun modelRequestMarker(): String =
-        modelRequestMarkerOrNull() ?: error("请先配置模型账户或 API Key")
     private suspend fun completeWithRetry(
         key: String,
         snapshot: LocalHarnessState,
@@ -2424,77 +2309,6 @@ class LocalHarnessEngine @Inject internal constructor(
             callId = callId,
             spill = { id, value -> toolOutputStore.store(sessionId, id, value) != null },
         ).text
-    }
-
-    private fun compactHistoryIfNeeded(
-        extraTokens: Int = 0,
-        binding: LocalWorkRunBinding? = null,
-    ) {
-        val baseBudget = currentHistoryBudget(binding)
-        val history = binding?.runHandle?.modelHistory ?: modelHistory
-        val targetState = aggregateRunState(binding)
-        val log = binding?.eventLog ?: eventLog
-        val workMode = targetState.value.usageMode == LocalUsageMode.WORK
-        val budget = if (workMode) {
-            workSteadyStateHistoryBudget(baseBudget, history.estimatedTokens, extraTokens, targetState.value)
-        } else {
-            baseBudget
-        }
-        val workSteadyStateApplied = workMode && budget.maxHistoryTokens != baseBudget.maxHistoryTokens
-        val summaryMode = if (targetState.value.usageMode == LocalUsageMode.CHAT) {
-            LocalHistorySummaryMode.CHAT
-        } else {
-            LocalHistorySummaryMode.WORK
-        }
-        val compaction = history.compact(
-            compactor = historyCompactor,
-            budget = budget,
-            extraTokens = extraTokens,
-            summaryMode = summaryMode,
-            structuredWorkState = if (summaryMode == LocalHistorySummaryMode.WORK) {
-                structuredWorkState(targetState.value, log)
-            } else {
-                null
-            },
-        ) ?: run {
-            updateContextMetrics(binding)
-            return
-        }
-        requestPressureStore.advanceGeneration(
-            binding?.sessionId ?: targetState.value.sessionId,
-            compaction.estimatedTokensAfter,
-        )
-        log.append(
-            "session/compaction",
-            buildJsonObject {
-                put("omitted_messages", compaction.omittedMessages)
-                put("summary", compaction.summary)
-                put("estimated_tokens_before", compaction.estimatedTokensBefore)
-                put("estimated_tokens_after", compaction.estimatedTokensAfter)
-                put("extra_request_tokens", extraTokens)
-                put("work_steady_state", workSteadyStateApplied)
-                budget.maxHistoryTokens?.let { put("history_budget_tokens", it) }
-                budget.tailTokens?.let { put("tail_budget_tokens", it) }
-            },
-        )
-        checkpointModelHistory("session/compaction", binding)
-        updateContextMetrics(binding)
-        persist(binding)
-    }
-
-    private fun ensureSystemMessage(binding: LocalWorkRunBinding? = null) {
-        val history = binding?.runHandle?.modelHistory ?: modelHistory
-        val log = binding?.eventLog ?: eventLog
-        if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") return
-        val prompt = systemPrompt(binding)
-        history.prepend(
-            buildJsonObject {
-                put("role", "system")
-                put("content", prompt)
-            },
-        )
-        log.append("system/prompt", buildJsonObject { put("content", prompt) })
-        updateContextMetrics(binding)
     }
 
     private fun systemPrompt(binding: LocalWorkRunBinding? = null): String {
@@ -2781,13 +2595,6 @@ class LocalHarnessEngine @Inject internal constructor(
     private fun persist(binding: LocalWorkRunBinding? = null) {
         sessionCoordinator.enqueue(persistenceSnapshot(binding))
     }
-
-    private suspend fun persistNow() {
-        sessionCoordinator.writeNow(persistenceSnapshot())
-    }
-
-
-    private fun sessionFileFor(id: String) = File(sessionsRoot, "$id.json")
 
     private fun eventLogFor(id: String) = eventLogRegistry.get(id)
 
