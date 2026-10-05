@@ -214,6 +214,7 @@ import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.runtime.projectExecutionJobs
 import com.labteto.dshmobile.local.runtime.structuredWorkState
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
+import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.send.prepareLocalSend
 import com.labteto.dshmobile.local.session.LocalConversationFiles
