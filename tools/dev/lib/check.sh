@@ -55,8 +55,8 @@ check_environment() {
       say "  bash tools/dev/ai-toolchain.sh bootstrap --profile $PROFILE"
     else
       say "这些缺失项可自动配置。推荐执行："
-      if [ -x "$SCRIPT_DIR/../../install.sh" ]; then
-        say "  ./install.sh $PROFILE"
+      if [ -f "$SCRIPT_DIR/../../install.sh" ]; then
+        say "  bash install.sh $PROFILE"
       else
         say "  bash tools/dev/install.sh $PROFILE"
       fi
