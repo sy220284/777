@@ -262,6 +262,7 @@ import com.labteto.dshmobile.local.work.asModelAdmissionPort
 import com.labteto.dshmobile.local.work.LocalWorkProgressCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
+import com.labteto.dshmobile.local.work.LocalWorkSubagentRuntime
 import com.labteto.dshmobile.local.work.LocalWorkerModelRouter
 import com.labteto.dshmobile.local.work.LocalWorkflowCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkflowProgress
@@ -710,6 +711,29 @@ class LocalHarnessEngine @Inject internal constructor(
             defaultSessionId = { currentSessionId },
         )
     }
+    private val workSubagentRuntime by lazy {
+        LocalWorkSubagentRuntime(
+            factory = subagentRunnerFactory,
+            schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
+                toolSchemaProjection.subagentSchemas(
+                    allowMutation = allowMutation,
+                    allowVirtualScreen = allowVirtualScreen,
+                    enabledOptional = enabledOptional,
+                )
+            },
+            executeTool = { binding, call, allowMutation, boundMemoryTools, enabledOptional ->
+                executePersistentSubagentTool(
+                    call = call,
+                    allowMutation = allowMutation,
+                    sessionId = binding.sessionId,
+                    memoryTools = boundMemoryTools,
+                    enabledOptionalTools = enabledOptional,
+                )
+            },
+            pruneOutput = ::pruneToolResult,
+        )
+    }
+
     private val persistentJobRecoveryCoordinator by lazy {
         LocalPersistentJobRecoveryCoordinator(
             scope = scope,
@@ -3493,7 +3517,7 @@ class LocalHarnessEngine @Inject internal constructor(
                         historySnapshot = binding?.runHandle?.modelHistory?.let { history -> history::snapshot }
                             ?: modelHistory::snapshot,
                     )
-                } else (binding?.let(::workSubagents) ?: subagents).run(
+                } else (binding?.let(workSubagentRuntime::runner) ?: subagents).run(
                     task = task,
                     inheritHistory = false,
                     allowMutation = false,
@@ -3503,7 +3527,7 @@ class LocalHarnessEngine @Inject internal constructor(
                 )
             }
             "subagent_fork", "fork_subagent" ->
-                (binding?.let(::workSubagents) ?: subagents).run(
+                (binding?.let(workSubagentRuntime::runner) ?: subagents).run(
                     task = args.string("task"),
                     inheritHistory = true,
                     allowMutation = allowMutation,
@@ -3515,12 +3539,15 @@ class LocalHarnessEngine @Inject internal constructor(
             "list_agents" -> jobs.listAgents(boundSessionId)
             "send_message" -> jobs.send(args.string("agent_id"), args.string("message"), boundSessionId)
             "interrupt_agent" -> jobs.kill(args.string("agent_id"), boundSessionId)
-            "workflow" -> runWorkflow(
-                args["tasks"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
-                args.optionalString("mode") ?: "parallel",
-                args["required_evidence"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
-                args.optionalString("model"),
-                binding,
+            "workflow" -> workSubagentRuntime.runWorkflow(
+                tasks = args["tasks"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
+                mode = args.optionalString("mode") ?: "parallel",
+                requiredEvidence = args["required_evidence"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
+                modelOverride = args.optionalString("model"),
+                state = binding?.workState ?: localAggregateWorkStatePort(_state),
+                snapshot = { binding?.aggregateSnapshot() ?: _state.value },
+                sessionId = binding?.sessionId ?: currentSessionId,
+                runner = binding?.let(workSubagentRuntime::runner) ?: subagents,
             )
             "session_search" -> sessionAccessCoordinator.search(args.string("query"), boundSessionId)
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
@@ -3659,71 +3686,6 @@ class LocalHarnessEngine @Inject internal constructor(
     ): String = (binding?.interactions ?: runtimeStateStore.foregroundInteractions).awaitQuestion(
         LocalQuestion(call.id, question.take(2_000), options.take(6)),
     )
-
-    private fun workSubagents(binding: LocalWorkRunBinding): LocalSubagentRunner =
-        subagentRunnerFactory.createBound(
-            sessionId = binding.sessionId,
-            boundState = binding.aggregateSnapshot(),
-            runKind = LocalAgentRunKind.SUBAGENT,
-            schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
-            toolSchemaProjection.subagentSchemas(
-                allowMutation = allowMutation,
-                allowVirtualScreen = allowVirtualScreen,
-                enabledOptional = enabledOptional,
-            )
-        },
-            executeTool = { call, allowMutation, boundMemoryTools, enabledOptional ->
-                executePersistentSubagentTool(
-                    call = call,
-                    allowMutation = allowMutation,
-                    sessionId = binding.sessionId,
-                    memoryTools = boundMemoryTools,
-                    enabledOptionalTools = enabledOptional,
-                )
-            },
-            historySnapshot = binding.runHandle.modelHistory::snapshot,
-            modelAdmission = binding.executionControl.asModelAdmissionPort(),
-        )
-
-    private suspend fun runWorkflow(
-        tasks: List<String>,
-        mode: String,
-        requiredEvidence: List<String>,
-        modelOverride: String? = null,
-        binding: LocalWorkRunBinding? = null,
-    ): String {
-        val targetState = aggregateRunState(binding)
-        val runner = binding?.let(::workSubagents) ?: subagents
-        val workerSelection = LocalWorkerModelRouter.resolve(modelOverride, targetState.value)
-        targetState.update { it.copy(work = it.work.copy(workflowProgress = null)) }
-        return LocalWorkflowCoordinator(
-            execute = { prompt -> runner.runResult(
-                task = prompt,
-                inheritHistory = false,
-                allowMutation = false,
-                modelOverride = workerSelection,
-                maxSteps = targetState.value.subagentMaxSteps,
-            ).requireCompletedOutput() },
-            pruneOutput = ::pruneToolResult,
-            onProgress = { progress -> targetState.update { state ->
-                val previousBlock = state.work.workflowProgress?.takeIf { it.needsUserAction }
-                val blocked = progress.stage == "受阻"
-                state.copy(
-                    work = state.work.copy(
-                        workflowProgress = LocalWorkflowProgress(
-                            sessionId = binding?.sessionId ?: currentSessionId,
-                            stage = progress.stage,
-                            task = progress.task,
-                            completed = progress.completed,
-                            total = progress.total,
-                            blockedReason = if (blocked) progress.detail else previousBlock?.blockedReason,
-                            needsUserAction = blocked || previousBlock != null,
-                        ),
-                    ),
-                )
-            } },
-        ).run(tasks, mode, requiredEvidence)
-    }
 
     private fun cancelChatPostTurn() {
         chatContextRefreshCoordinator.cancelScheduledRefresh()
