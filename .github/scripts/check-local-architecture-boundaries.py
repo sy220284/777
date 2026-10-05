@@ -197,6 +197,9 @@ if dependency_count > ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES:
 runtime_state_store = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt")
 )
+session_storage_runtime = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt")
+)
 work_run_registry = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt")
 )
@@ -258,6 +261,19 @@ if "runtimeStateStore.initialize(" not in engine:
     die("LocalHarnessEngine must initialize state through LocalRuntimeStateStore")
 if "private val runtimeStateStore: LocalRuntimeStateStore" not in constructor.group(1):
     die("LocalHarnessEngine must receive the shared LocalRuntimeStateStore by injection")
+if "private val sessionStorageRuntime: LocalSessionStorageRuntime" not in constructor.group(1):
+    die("LocalHarnessEngine must consume the shared Session storage capability")
+if "private val eventLogRegistry: LocalSessionEventLogRegistry" in constructor.group(1):
+    die("LocalHarnessEngine must not inject Session EventLog storage separately from LocalSessionStorageRuntime")
+if "LocalSessionRepository(" in engine or "LocalSessionCoordinator(" in engine:
+    die("LocalHarnessEngine must not construct Session persistence owners")
+for required_session_storage in (
+    "LocalSessionRepository(",
+    "LocalSessionCoordinator(",
+    "eventLogs: LocalSessionEventLogRegistry",
+):
+    if required_session_storage not in session_storage_runtime:
+        die("Shared Session storage ownership is incomplete: " + required_session_storage)
 if "foregroundSessionId" not in runtime_state_store or "activateSession(sessionId: String)" not in runtime_state_store:
     die("LocalRuntimeStateStore must own foreground Session identity")
 if "private var currentSessionId" in engine:
