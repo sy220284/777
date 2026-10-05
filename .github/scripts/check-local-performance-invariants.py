@@ -34,7 +34,7 @@ CHAT_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalCh
 CHAT_REPLY_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatReplyCoordinator.kt"
 CHAT_HISTORY_WINDOW = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatHistoryWindow.kt"
 CHAT_EDIT_SUPPORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatEditSupport.kt"
-CHAT_CONTEXT_REFRESH = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt"
+CHAT_CONTEXT_REFRESH = ROOT / "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatContextRefreshCoordinator.kt"
 GROUP_CHAT_EXECUTOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt"
 SUBAGENT_RUNNER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt"
 TOKEN_USAGE_ANALYTICS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
@@ -152,7 +152,7 @@ chat_execution_sources = merge_sources(
         "app/src/main/java/com/labteto/dshmobile/local/LocalChatReplyCoordinator.kt": chat_reply_coordinator,
         "app/src/main/java/com/labteto/dshmobile/local/LocalChatHistoryWindow.kt": chat_history_window,
         "app/src/main/java/com/labteto/dshmobile/local/LocalChatEditSupport.kt": chat_edit_support,
-        "app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt": chat_context_refresh,
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatContextRefreshCoordinator.kt": chat_context_refresh,
     },
     kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/chat"),
 )

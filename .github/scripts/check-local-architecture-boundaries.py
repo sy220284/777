@@ -90,10 +90,7 @@ ENGINE_CONSUMER_ALLOWLIST = {
     "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt",
 }
 
-UI_AGGREGATE_STATE_ALLOWLIST = {
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt",
-    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessStateContent.kt",
-}
+UI_AGGREGATE_STATE_ALLOWLIST = set()
 
 
 def die(message: str) -> None:
@@ -2203,7 +2200,7 @@ if "synchronizeCredentialSelection(profile)" not in model_configuration:
     die("Model profile selection must synchronize the bound ChatGPT account registration")
 
 chat_refresh = strip_comments(
-    read("app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt")
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatContextRefreshCoordinator.kt")
 )
 if "profile: LocalModelProfile" not in chat_refresh or "requestPlanner(before, prompt, boundEventLog, profile)" not in chat_refresh:
     die("Chat post-turn refresh and retries must retain the originating model profile")
@@ -2358,6 +2355,14 @@ if unexpected_ui_consumers:
     die(
         "UI must consume projected state instead of LocalHarnessState: "
         + ", ".join(unexpected_ui_consumers)
+    )
+
+stale_ui_consumers = sorted(UI_AGGREGATE_STATE_ALLOWLIST - aggregate_ui_consumers)
+if stale_ui_consumers:
+    die(
+        "stale UI aggregate-state allowlist entries: "
+        + ", ".join(stale_ui_consumers)
+        + "; remove exemptions as soon as UI moves to projected state"
     )
 
 android_device_provider_allowlist = {

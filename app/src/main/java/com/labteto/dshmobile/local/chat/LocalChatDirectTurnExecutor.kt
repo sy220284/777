@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local.chat
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.local.ForegroundTokenUsageSeed
-import com.labteto.dshmobile.local.LocalChatContextRefreshCoordinator
 import com.labteto.dshmobile.local.LocalChatReplyCoordinator
 import com.labteto.dshmobile.local.LocalChatTurnCoordinator
 import com.labteto.dshmobile.local.LocalModelRequestCoordinator
