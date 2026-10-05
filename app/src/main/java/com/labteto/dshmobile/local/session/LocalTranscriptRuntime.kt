@@ -12,12 +12,41 @@ import kotlinx.serialization.json.JsonObject
  * Durable transcript facts still live in Session Event; this runtime only maintains the hot window
  * shown by LocalHarnessState and advances the caller-owned durable projection cursor.
  */
+internal interface LocalTranscriptStatePort {
+    fun appendMessages(messages: List<LocalHarnessMessage>, runtimeWindowMessages: Int)
+}
+
+internal fun localAggregateTranscriptStatePort(
+    state: MutableStateFlow<LocalHarnessState>,
+): LocalTranscriptStatePort = object : LocalTranscriptStatePort {
+    override fun appendMessages(messages: List<LocalHarnessMessage>, runtimeWindowMessages: Int) {
+        state.update { current ->
+            current.copy(
+                messages = (current.messages + messages).takeLast(runtimeWindowMessages),
+                transcriptIndex = appendLocalTranscriptRuntimeIndex(current.transcriptIndex, messages),
+            )
+        }
+    }
+}
+
 internal class LocalTranscriptRuntime(
-    private val state: MutableStateFlow<LocalHarnessState>,
+    private val state: LocalTranscriptStatePort,
     private val pruneToolResult: (String) -> String,
     private val runtimeWindowMessages: Int,
     private val onProjected: (Long) -> Unit,
 ) {
+    constructor(
+        state: MutableStateFlow<LocalHarnessState>,
+        pruneToolResult: (String) -> String,
+        runtimeWindowMessages: Int,
+        onProjected: (Long) -> Unit,
+    ) : this(
+        state = localAggregateTranscriptStatePort(state),
+        pruneToolResult = pruneToolResult,
+        runtimeWindowMessages = runtimeWindowMessages,
+        onProjected = onProjected,
+    )
+
     fun newMessage(
         role: String,
         content: String,
@@ -51,12 +80,7 @@ internal class LocalTranscriptRuntime(
         eventSequence: Long,
     ) {
         if (messages.isNotEmpty()) {
-            state.update { current ->
-                current.copy(
-                    messages = (current.messages + messages).takeLast(runtimeWindowMessages),
-                    transcriptIndex = appendLocalTranscriptRuntimeIndex(current.transcriptIndex, messages),
-                )
-            }
+            state.appendMessages(messages, runtimeWindowMessages)
         }
         onProjected(eventSequence)
     }

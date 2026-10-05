@@ -270,8 +270,8 @@ import com.labteto.dshmobile.local.work.LocalWorkflowCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkflowProgress
 import com.labteto.dshmobile.local.work.LocalWorkspace
 import com.labteto.dshmobile.local.work.guardWorkCompletionDelivery
-import com.labteto.dshmobile.local.work.localWorkStatePort
-import com.labteto.dshmobile.local.work.mirrorLocalWorkRunState
+import com.labteto.dshmobile.local.work.localAggregateWorkStatePort
+import com.labteto.dshmobile.local.work.toLocalWorkRunState
 import com.labteto.dshmobile.local.work.queueAutomaticWorkContinuation
 import com.labteto.dshmobile.local.work.recordWorkCompletionQuality
 import com.labteto.dshmobile.local.work.shouldAutoContinueWorkFailure
@@ -536,6 +536,38 @@ class LocalHarnessEngine @Inject internal constructor(
     private val currentSessionId: String
         get() = runtimeStateStore.currentSessionId
 
+    /**
+     * Architecture 3.0 migration bridge kept only at the composition root.
+     *
+     * Work owns LocalWorkRunState; legacy Engine execution code may request an ephemeral aggregate
+     * snapshot, but no Feature stores or receives a writable LocalHarnessState.
+     */
+    private interface LocalAggregateRunState {
+        val value: LocalHarnessState
+        fun update(transform: (LocalHarnessState) -> LocalHarnessState)
+    }
+
+    private val foregroundAggregateRunState = object : LocalAggregateRunState {
+        override val value: LocalHarnessState
+            get() = _state.value
+
+        override fun update(transform: (LocalHarnessState) -> LocalHarnessState) {
+            _state.update(transform)
+        }
+    }
+
+    private fun aggregateRunState(binding: LocalWorkRunBinding?): LocalAggregateRunState =
+        binding?.let { workBinding ->
+            object : LocalAggregateRunState {
+                override val value: LocalHarnessState
+                    get() = workBinding.aggregateSnapshot()
+
+                override fun update(transform: (LocalHarnessState) -> LocalHarnessState) {
+                    workBinding.state.value = transform(workBinding.aggregateSnapshot()).toLocalWorkRunState()
+                }
+            }
+        } ?: foregroundAggregateRunState
+
     private val modelAccountStateCoordinator by lazy {
         LocalModelAccountStateCoordinator(modelConfiguration, modelGateway, _state, ::isModelIdentityLocked)
     }
@@ -655,7 +687,7 @@ class LocalHarnessEngine @Inject internal constructor(
             LocalMemoryTools(
                 memoryStore,
                 memoryManager,
-                { runBinding.state.value },
+                { runBinding.aggregateSnapshot() },
                 { runBinding.sessionId },
             )
         } ?: memoryTools
@@ -1452,7 +1484,7 @@ class LocalHarnessEngine @Inject internal constructor(
                 workRunRegistry[state.sessionId]?.takeIf { it.job?.isCompleted == false }
             } else null
             val targetPending = binding?.pendingInputs ?: pendingInputs
-            val targetState = binding?.state ?: _state
+            val targetState = aggregateRunState(binding)
             val queuedInput = QueuedAgentInput(content, memoryInput, modelMessage, UUID.randomUUID().toString())
             coordinateOwnedLocalSend(
                 state.usageMode, state.sessionId,
@@ -1530,8 +1562,9 @@ class LocalHarnessEngine @Inject internal constructor(
         val binding = LocalWorkRunBinding(
             sessionId = sessionId,
             initialState = _state.value.let { current ->
-                    current.copy(kernel = current.kernel.copy(running = true), error = null)
-                },
+                current.copy(kernel = current.kernel.copy(running = true), error = null)
+            }.toLocalWorkRunState(),
+            sessionBase = persistenceSnapshot(),
             initialHistory = modelHistory.snapshot(),
             eventLog = eventLogFor(sessionId),
             initialTranscriptProjectionCursor = transcriptProjectionCursor,
@@ -1541,7 +1574,7 @@ class LocalHarnessEngine @Inject internal constructor(
         workRunRegistry.attach(binding)
         binding.mirrorJob = scope.launch {
             binding.state.collect {
-                mirrorLocalWorkRunState(currentSessionId, _state, binding)
+                mirrorVisibleWorkRun(binding)
             }
         }
         val job = scope.launch(start = CoroutineStart.LAZY) {
@@ -1560,12 +1593,35 @@ class LocalHarnessEngine @Inject internal constructor(
     }
 
 
+    private fun mirrorVisibleWorkRun(binding: LocalWorkRunBinding) {
+        if (currentSessionId != binding.sessionId || _state.value.sessionId != binding.sessionId) return
+        val run = binding.state.value
+        _state.update { visible ->
+            if (visible.sessionId != binding.sessionId) {
+                visible
+            } else {
+                visible.copy(
+                    messages = run.messages,
+                    transcriptIndex = run.transcriptIndex,
+                    work = run.work,
+                    kernel = visible.kernel.copy(
+                        running = run.kernel.running,
+                        queuedInputCount = run.kernel.queuedInputCount,
+                        contextChars = run.kernel.contextChars,
+                        contextBudgetChars = run.kernel.contextBudgetChars,
+                    ),
+                    error = run.error,
+                )
+            }
+        }
+    }
+
     private fun syncVisibleWorkRun(
         sessionId: String,
         ownedBinding: LocalWorkRunBinding? = null,
     ) {
         val binding = ownedBinding ?: liveWorkRun(sessionId) ?: return
-        val liveState = binding.state.value
+        val liveState = binding.aggregateSnapshot()
         liveState.modelState.modelSelection.activeProfile
             ?.takeIf { liveState.modelState.configured }
             ?.let(modelGateway::activate)
@@ -1616,7 +1672,7 @@ class LocalHarnessEngine @Inject internal constructor(
         queuedInput: QueuedAgentInput? = null,
         binding: LocalWorkRunBinding? = null,
     ): String {
-        val targetState = binding?.state ?: _state
+        val targetState = aggregateRunState(binding)
         val targetLog = binding?.eventLog ?: eventLog
         val targetTranscript = binding?.transcriptRuntime ?: transcriptRuntime
         val targetPending = binding?.pendingInputs ?: pendingInputs
@@ -2054,7 +2110,7 @@ class LocalHarnessEngine @Inject internal constructor(
             return
         }
         LocalMemoryCoordinator(
-            state = binding.state,
+            state = MutableStateFlow(binding.aggregateSnapshot()),
             memoryStore = memoryStore,
             memoryManager = memoryManager,
             diaryStore = chatDiaryStore,
@@ -2075,7 +2131,7 @@ class LocalHarnessEngine @Inject internal constructor(
     private suspend fun drainPendingInputsIntoHistory(binding: LocalWorkRunBinding? = null) {
         val targetPending = binding?.pendingInputs ?: pendingInputs
         val targetHistory = binding?.modelHistory ?: modelHistory
-        val targetState = binding?.state ?: _state
+        val targetState = aggregateRunState(binding)
         val targetLog = binding?.eventLog ?: eventLog
         val queued = targetPending.drain()
         if (queued.isEmpty()) return
@@ -2124,7 +2180,7 @@ class LocalHarnessEngine @Inject internal constructor(
             if (currentSessionId == binding.sessionId && _state.value.sessionId == binding.sessionId) {
                 modelHistory.reset(binding.modelHistory.snapshot())
                 transcriptProjectionCursor = binding.transcriptProjectionCursor
-                mirrorLocalWorkRunState(currentSessionId, _state, binding)
+                mirrorVisibleWorkRun(binding)
             }
             return@synchronized null
         }
@@ -2600,7 +2656,7 @@ class LocalHarnessEngine @Inject internal constructor(
         preownedLease,
     ) { ownedSessionId ->
         if (binding == null && currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
-        val runState = binding?.state ?: _state
+        val runState = aggregateRunState(binding)
         val runEventLog = binding?.eventLog ?: eventLog
         val runHistory = binding?.modelHistory ?: modelHistory
         val runTranscript = binding?.transcriptRuntime ?: transcriptRuntime
@@ -3573,7 +3629,7 @@ class LocalHarnessEngine @Inject internal constructor(
     ): String {
         val args = call.arguments
         val binding = executionSessionId?.let(workRunRegistry::get)
-        val executionState = binding?.state ?: _state
+        val executionState = aggregateRunState(binding)
         val boundSessionId = binding?.sessionId ?: currentSessionId
         if (executionState.value.work.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
             return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
@@ -3877,7 +3933,6 @@ class LocalHarnessEngine @Inject internal constructor(
         summary: String,
         tool: HarnessTool,
     ): Boolean {
-        val snapshot = binding.state.value
         if (binding.interactions.deviceApprovalLeaseEnabled() && canUseDeviceApprovalLease(tool)) {
             binding.eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
@@ -3912,7 +3967,7 @@ class LocalHarnessEngine @Inject internal constructor(
     }
 
     private fun workProgress(binding: LocalWorkRunBinding?) = LocalWorkProgressCoordinator(
-        state = binding?.workState ?: localWorkStatePort(_state),
+        state = binding?.workState ?: localAggregateWorkStatePort(_state),
         eventLog = binding?.eventLog ?: eventLog,
         persist = { persist(binding) },
     )
@@ -3931,7 +3986,7 @@ class LocalHarnessEngine @Inject internal constructor(
         plan: String,
         binding: LocalWorkRunBinding? = null,
     ): String {
-        val targetState = binding?.state ?: _state
+        val targetState = aggregateRunState(binding)
         val log = binding?.eventLog ?: eventLog
         val history = binding?.modelHistory ?: modelHistory
         if (!targetState.value.work.planMode) return "当前未启用规划模式"
@@ -3970,7 +4025,7 @@ class LocalHarnessEngine @Inject internal constructor(
     private fun workSubagents(binding: LocalWorkRunBinding): LocalSubagentRunner =
         subagentRunnerFactory.createBound(
             sessionId = binding.sessionId,
-            boundState = binding.state.value,
+            boundState = binding.aggregateSnapshot(),
             runKind = LocalAgentRunKind.SUBAGENT,
             schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
             toolSchemaProjection.subagentSchemas(
@@ -3999,7 +4054,7 @@ class LocalHarnessEngine @Inject internal constructor(
         modelOverride: String? = null,
         binding: LocalWorkRunBinding? = null,
     ): String {
-        val targetState = binding?.state ?: _state
+        val targetState = aggregateRunState(binding)
         val runner = binding?.let(::workSubagents) ?: subagents
         val workerSelection = LocalWorkerModelRouter.resolve(modelOverride, targetState.value)
         targetState.update { it.copy(work = it.work.copy(workflowProgress = null)) }
@@ -4196,7 +4251,7 @@ class LocalHarnessEngine @Inject internal constructor(
     }
 
     private fun currentHistoryBudget(binding: LocalWorkRunBinding? = null): LocalHistoryBudget {
-        val snapshot = binding?.state?.value ?: _state.value
+        val snapshot = binding?.aggregateSnapshot() ?: _state.value
         return localHistoryBudgetFor(
             memoryClassMb = memoryClassMb,
             pressure = resourceScheduler.snapshot().pressure,
@@ -4209,7 +4264,7 @@ class LocalHarnessEngine @Inject internal constructor(
     private fun updateContextMetrics(binding: LocalWorkRunBinding? = null) {
         val budget = currentHistoryBudget(binding)
         val history = binding?.modelHistory ?: modelHistory
-        val targetState = binding?.state ?: _state
+        val targetState = aggregateRunState(binding)
         targetState.update {
             it.copy(
                 kernel = it.kernel.copy(
@@ -4244,7 +4299,7 @@ class LocalHarnessEngine @Inject internal constructor(
         return projectRecoverableToolResult(
             value = result,
             retention = retention,
-            usageMode = (binding?.state?.value ?: _state.value).usageMode,
+            usageMode = if (binding != null) LocalUsageMode.WORK else _state.value.usageMode,
             budget = budget,
             callId = callId,
             spill = { id, value -> toolOutputStore.store(sessionId, id, value) != null },
@@ -4257,7 +4312,7 @@ class LocalHarnessEngine @Inject internal constructor(
     ) {
         val baseBudget = currentHistoryBudget(binding)
         val history = binding?.modelHistory ?: modelHistory
-        val targetState = binding?.state ?: _state
+        val targetState = aggregateRunState(binding)
         val log = binding?.eventLog ?: eventLog
         val workMode = targetState.value.usageMode == LocalUsageMode.WORK
         val budget = if (workMode) {
@@ -4323,7 +4378,7 @@ class LocalHarnessEngine @Inject internal constructor(
     }
 
     private fun systemPrompt(binding: LocalWorkRunBinding? = null): String {
-        val snapshot = binding?.state?.value ?: _state.value
+        val snapshot = binding?.aggregateSnapshot() ?: _state.value
         return when {
             snapshot.usageMode != LocalUsageMode.CHAT ->
                 workSystemPrompt(workspace.path, snapshot.work.planMode)
@@ -4598,7 +4653,7 @@ class LocalHarnessEngine @Inject internal constructor(
         reason: String,
         binding: LocalWorkRunBinding? = null,
     ) {
-        if ((binding?.state?.value ?: _state.value).usageMode == LocalUsageMode.WORK) {
+        if (binding != null || _state.value.usageMode == LocalUsageMode.WORK) {
             compactHistoryIfNeeded(binding = binding)
         }
         if (binding != null) {
@@ -4615,13 +4670,12 @@ class LocalHarnessEngine @Inject internal constructor(
     }
 
     private fun persistenceSnapshot(binding: LocalWorkRunBinding? = null): LocalHarnessSession =
-        localSessionPersistenceSnapshot(
+        binding?.persistenceSnapshot() ?: localSessionPersistenceSnapshot(
             sessionCoordinator = sessionCoordinator,
             currentSessionId = currentSessionId,
             currentState = { _state.value },
             eventLog = eventLog,
             transcriptProjectionCursor = transcriptProjectionCursor,
-            binding = binding,
         )
 
     private fun persist(binding: LocalWorkRunBinding? = null) {

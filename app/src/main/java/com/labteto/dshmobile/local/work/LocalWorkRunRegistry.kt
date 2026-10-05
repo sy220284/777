@@ -56,7 +56,7 @@ class LocalWorkRunRegistry internal constructor(
 
     internal operator fun get(sessionId: String): LocalWorkRunBinding? = bindings[sessionId]
 
-    internal fun state(sessionId: String): LocalHarnessState? = bindings[sessionId]?.state?.value
+    internal fun state(sessionId: String): LocalHarnessState? = bindings[sessionId]?.aggregateSnapshot()
 
     internal fun live(sessionId: String): LocalWorkRunBinding? =
         bindings[sessionId]?.takeIf { it.job?.isCompleted == false }
@@ -135,7 +135,7 @@ class LocalWorkRunRegistry internal constructor(
             current.copy(
                 kernel = current.kernel.copy(
                     resources = snapshot.toLocalHarnessResourceState(current.usageMode),
-                    contextBudgetChars = runtimeStateStore.contextBudgetCharsFor(current, snapshot),
+                    contextBudgetChars = runtimeStateStore.contextBudgetCharsFor(current.modelState, snapshot),
                 ),
             )
         }

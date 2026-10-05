@@ -104,9 +104,31 @@ if "private val state: LocalInteractionStatePort" not in interaction_coordinator
 if "private val state: MutableStateFlow<LocalHarnessState>" in interaction_coordinator_source:
     die("LocalInteractionCoordinator must not own the aggregate mutable app state")
 
-# Work still has two explicit aggregate-state migration seams. Freeze that debt: no third writer.
+runtime_state_store_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt")
+)
+if re.search(r"\binternal\s+val\s+mutableState\s*:", runtime_state_store_source):
+    die("LocalRuntimeStateStore must not expose its writable aggregate state")
+
+work_binding_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt")
+)
+if "MutableStateFlow<LocalHarnessState>" in work_binding_source or "initialState: LocalHarnessState" in work_binding_source:
+    die("LocalWorkRunBinding must own LocalWorkRunState instead of writable aggregate app state")
+if "val state = MutableStateFlow(initialState)" not in work_binding_source:
+    die("LocalWorkRunBinding must keep one Work-owned mutable run state")
+if "sessionBase: LocalHarnessSession" not in work_binding_source or "persistenceSnapshot()" not in work_binding_source:
+    die("Work run persistence must materialize from its Session envelope without Session depending on Work")
+
+session_persistence_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionPersistenceProjection.kt")
+)
+if "LocalWorkRunBinding" in session_persistence_source or "com.labteto.dshmobile.local.work" in session_persistence_source:
+    die("Shared Session persistence must not depend on WorkFeature runtime internals")
+
+# The only remaining Work-side writable aggregate adapter is the foreground composition bridge.
+# Detached/foreground Work bindings themselves must own LocalWorkRunState, never LocalHarnessState.
 work_aggregate_state_allowlist = {
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt",
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkStatePort.kt",
 }
 work_root = LOCAL_SOURCE_ROOT / "work"

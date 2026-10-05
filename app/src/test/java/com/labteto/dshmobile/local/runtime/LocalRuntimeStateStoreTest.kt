@@ -24,7 +24,7 @@ class LocalRuntimeStateStoreTest {
 
         val mutable = store.initialize(initial)
 
-        assertSame(mutable, store.mutableState)
+        assertEquals("session-a", mutable.value.sessionId)
         assertEquals("session-a", store.state.value.sessionId)
         assertEquals("session-a", store.currentSessionId)
 
@@ -119,11 +119,11 @@ class LocalRuntimeStateStoreTest {
     @Test
     fun visibleOperationReportsFailureWithoutCrashingOrLeakingToAnotherSession() {
         val store = LocalRuntimeStateStore()
-        store.initialize(LocalHarnessState(sessionId = "session-a"))
+        val ownerState = store.initialize(LocalHarnessState(sessionId = "session-a"))
         store.performVisibleOperation("操作失败") { throw java.io.IOException("disk full") }
         assertTrue(store.state.value.error.orEmpty().contains("disk full"))
         store.performVisibleOperation("旧操作失败") {
-            store.mutableState.value = store.state.value.copy(sessionId = "session-b", error = null)
+            ownerState.value = store.state.value.copy(sessionId = "session-b", error = null)
             throw java.io.IOException("old failure")
         }
         org.junit.Assert.assertNull(store.state.value.error)

@@ -2,9 +2,11 @@ package com.labteto.dshmobile.local.work
 
 import android.content.SharedPreferences
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -48,14 +50,26 @@ class LocalWorkApprovalCoordinatorTest {
     private inner class Fixture {
         val preferences = Preferences().store
         val events = LocalSessionEventLogRegistry(temporary.newFolder(), Json)
-        val runtime = LocalRuntimeStateStore().apply {
-            initialize(LocalHarnessState(loading = false, sessionId = "a", safeAutoApprovalEnabled = false))
-        }
+        val runtime = LocalRuntimeStateStore()
+        val runtimeOwnerState = runtime.initialize(
+            LocalHarnessState(loading = false, sessionId = "a", safeAutoApprovalEnabled = false),
+        )
         val runs = LocalWorkRunRegistry(runtime)
         val approvals = LocalWorkApprovalCoordinator(preferences, events, runtime, runs)
         fun binding(id: String) = LocalWorkRunBinding(
-            id, LocalHarnessState(loading = false, sessionId = id, safeAutoApprovalEnabled = false),
-            emptyList(), events.get(id), null, 8, { it },
+            id,
+            LocalHarnessState(
+                loading = false,
+                sessionId = id,
+                usageMode = LocalUsageMode.WORK,
+                safeAutoApprovalEnabled = false,
+            ).toLocalWorkRunState(),
+            LocalHarnessSession(id = id, usageMode = LocalUsageMode.WORK),
+            emptyList(),
+            events.get(id),
+            null,
+            8,
+            { it },
         ).also(runs::attach)
     }
 
@@ -136,8 +150,18 @@ class LocalWorkApprovalCoordinatorTest {
             java.io.File(blocked, "events.jsonl"), Json,
         )
         val b = LocalWorkRunBinding(
-            "b", LocalHarnessState(loading = false, sessionId = "b"),
-            emptyList(), brokenLog, null, 8, { it },
+            "b",
+            LocalHarnessState(
+                loading = false,
+                sessionId = "b",
+                usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            LocalHarnessSession(id = "b", usageMode = LocalUsageMode.WORK),
+            emptyList(),
+            brokenLog,
+            null,
+            8,
+            { it },
         ).also(f.runs::attach)
         val c = f.binding("c")
         val first = async { a.interactions.awaitApproval(approval("first")) }
@@ -188,11 +212,11 @@ class LocalWorkApprovalCoordinatorTest {
         assertFalse(f.preferences.isSafeAutoApprovalEnabled())
 
         f.runtime.activateSession("b")
-        f.runtime.mutableState.value = f.runtime.state.value.copy(sessionId = "b")
+        f.runtimeOwnerState.value = f.runtime.state.value.copy(sessionId = "b")
         f.approvals.disableDeviceApprovalLease(f.runtime.state.value.sessionId)
         assertTrue(a.state.value.work.deviceApprovalLease)
         f.runtime.activateSession("a")
-        f.runtime.mutableState.value = f.runtime.state.value.copy(sessionId = "a", work = f.runtime.state.value.work.copy(deviceApprovalLease = true))
+        f.runtimeOwnerState.value = f.runtime.state.value.copy(sessionId = "a", work = f.runtime.state.value.work.copy(deviceApprovalLease = true))
         f.approvals.disableDeviceApprovalLease(f.runtime.state.value.sessionId)
         assertFalse(a.state.value.work.deviceApprovalLease)
         assertFalse(f.runtime.state.value.work.deviceApprovalLease)
@@ -204,7 +228,7 @@ class LocalWorkApprovalCoordinatorTest {
         val b = f.binding("b")
         a.state.value = a.state.value.copy(work = a.state.value.work.copy(deviceApprovalLease = true))
         b.state.value = b.state.value.copy(work = b.state.value.work.copy(deviceApprovalLease = true))
-        f.runtime.mutableState.value = f.runtime.state.value.copy(
+        f.runtimeOwnerState.value = f.runtime.state.value.copy(
             sessionId = "a",
             work = f.runtime.state.value.work.copy(deviceApprovalLease = true),
         )

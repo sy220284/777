@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalPersistentJobStore
 import com.labteto.dshmobile.local.runtime.LocalRuntimeJobOwner
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
@@ -109,7 +110,7 @@ class LocalWorkRunRegistryTest {
         assertNull(registry.attach(first))
         assertNull(registry.attach(second))
         assertSame(first, registry["session-a"])
-        assertSame(first.state.value, registry.state("session-a"))
+        assertEquals(first.aggregateSnapshot(), registry.state("session-a"))
         assertSame(first, registry.live("session-a"))
         assertTrue(registry.anyLive())
 
@@ -176,7 +177,14 @@ class LocalWorkRunRegistryTest {
     private fun binding(sessionId: String): LocalWorkRunBinding =
         LocalWorkRunBinding(
             sessionId = sessionId,
-            initialState = LocalHarnessState(usageMode = LocalUsageMode.WORK),
+            initialState = LocalHarnessState(
+                sessionId = sessionId,
+                usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(
+                id = sessionId,
+                usageMode = LocalUsageMode.WORK,
+            ),
             initialHistory = emptyList(),
             eventLog = LocalSessionEventLog(
                 file = File(temporary.root, "$sessionId.events.jsonl"),

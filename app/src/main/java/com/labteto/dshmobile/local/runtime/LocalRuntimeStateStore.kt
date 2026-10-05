@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.localHistoryBudgetFor
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
@@ -92,9 +93,6 @@ class LocalRuntimeStateStore internal constructor(
 
     internal val state: StateFlow<LocalHarnessState> = mutable.asStateFlow()
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = sendFeedbackMutable.asStateFlow()
-    internal val mutableState: MutableStateFlow<LocalHarnessState>
-        get() = mutable
-
     internal val currentSessionId: String
         get() = foregroundSessionId ?: error("LocalRuntimeStateStore 尚未初始化")
 
@@ -114,13 +112,18 @@ class LocalRuntimeStateStore internal constructor(
     internal fun contextBudgetCharsFor(
         state: LocalHarnessState,
         snapshot: HarnessResourceSnapshot,
+    ): Int = contextBudgetCharsFor(state.modelState, snapshot)
+
+    internal fun contextBudgetCharsFor(
+        modelState: LocalModelState,
+        snapshot: HarnessResourceSnapshot,
     ): Int = localHistoryBudgetFor(
         memoryClassMb = memoryClassMb,
         pressure = snapshot.pressure,
-        model = state.modelState.model,
-        baseUrl = state.modelState.baseUrl,
+        model = modelState.model,
+        baseUrl = modelState.baseUrl,
         contextWindowTokensOverride =
-            state.modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
+            modelState.modelSelection.activeProfile?.contextWindowTokensOverride,
     ).maxHistoryChars
 
     internal suspend fun <T> withModelRequestResource(block: suspend () -> T): T =

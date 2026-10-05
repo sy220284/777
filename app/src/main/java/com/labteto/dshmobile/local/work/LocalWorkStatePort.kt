@@ -16,8 +16,19 @@ internal interface LocalWorkStatePort {
  * Keep this adapter at the boundary; Work domain coordinators must depend on LocalWorkStatePort
  * rather than MutableStateFlow<LocalHarnessState>.
  */
-internal fun localWorkStatePort(
+internal fun localAggregateWorkStatePort(
     state: MutableStateFlow<LocalHarnessState>,
+): LocalWorkStatePort = object : LocalWorkStatePort {
+    override fun snapshot(): LocalWorkState = state.value.work
+
+    override fun update(transform: (LocalWorkState) -> LocalWorkState) {
+        state.update { current -> current.copy(work = transform(current.work)) }
+    }
+}
+
+
+internal fun localWorkRunStatePort(
+    state: MutableStateFlow<LocalWorkRunState>,
 ): LocalWorkStatePort = object : LocalWorkStatePort {
     override fun snapshot(): LocalWorkState = state.value.work
 

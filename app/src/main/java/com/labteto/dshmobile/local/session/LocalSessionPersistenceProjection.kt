@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local.session
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalSessionCoordinator
-import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 
 /**
  * Session-owned durable projections used by the local runtime composition root.
@@ -17,18 +16,15 @@ internal fun localSessionPersistenceSnapshot(
     currentState: () -> LocalHarnessState,
     eventLog: LocalSessionEventLog,
     transcriptProjectionCursor: Long?,
-    binding: LocalWorkRunBinding? = null,
 ): LocalHarnessSession {
     // Capture durable projection boundaries before reading mutable state. If a concurrent update
     // lands afterwards, replaying its event is safe and idempotent. Reading state first could
     // instead persist old state with a newer cursor and make recovery skip that event.
-    val log = binding?.eventLog ?: eventLog
-    val controlProjectedThroughSequence = log.latestSequence()
-    val transcriptProjectedThroughSequence =
-        binding?.transcriptProjectionCursor ?: transcriptProjectionCursor
-    val state = binding?.state?.value ?: currentState()
+    val controlProjectedThroughSequence = eventLog.latestSequence()
+    val transcriptProjectedThroughSequence = transcriptProjectionCursor
+    val state = currentState()
     return sessionCoordinator.snapshot(
-        sessionId = binding?.sessionId ?: currentSessionId,
+        sessionId = currentSessionId,
         state = state,
         controlProjectedThroughSequence = controlProjectedThroughSequence,
         transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
