@@ -131,7 +131,7 @@ internal suspend fun exitWorkPlanMode(
         )
     }
     eventLog.append("plan/state", buildJsonObject {
-        put("items", JsonArray(approvedPlan.map(::JsonPrimitive)))
+        put("items", JsonArray(approvedPlan.map { item -> JsonPrimitive(item) }))
     })
     eventLog.append("plan/mode", buildJsonObject { put("active", false) })
 
