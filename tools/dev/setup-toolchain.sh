@@ -14,60 +14,62 @@ for library in common android optional check; do
   source "$SCRIPT_DIR/lib/$library.sh"
 done
 
-MODE=check
 PROFILE=build
-TOOLS_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/777-dev"
-SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$TOOLS_ROOT/android-sdk}}"
-ENV_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/777/dev-toolchain.env"
-CONFIGURE_SHELL=false
-ACCEPT_ANDROID_LICENSES=false
-CREATE_AVDS=false
-SKIP_SYSTEM_PACKAGES=false
+TOOLS_ROOT="${DEV777_TOOLS_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/777-dev}"
+SDK_ROOT="${DEV777_ANDROID_SDK_ROOT:-${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$TOOLS_ROOT/android-sdk}}}"
+GRADLE_HOME="${DEV777_GRADLE_HOME:-${GRADLE_HOME:-$TOOLS_ROOT/gradle}}"
+GRADLE_USER_HOME="${DEV777_GRADLE_USER_HOME:-${GRADLE_USER_HOME:-$TOOLS_ROOT/gradle-user-home}}"
+ENV_FILE="${DEV777_TOOLCHAIN_ENV_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/777/dev-toolchain.env}"
 SELF_TEST=false
-NON_INTERACTIVE=false
+CREATE_AVDS=false
 
 usage() {
   cat <<'USAGE'
-777 本地开发工具链检查 / 自动配置（Linux / WSL）
+777 本地开发工具链检查器（Linux / WSL）
+
+本脚本只做检查，不再负责联网安装。
 
 用法：
-  bash tools/dev/setup-toolchain.sh [选项]
-
-默认只检查，不修改本机。
+  bash tools/dev/setup-toolchain.sh --check [选项]
 
 选项：
-  --check                       仅检查当前环境（默认）
-  --auto                        自动安装 / 配置缺失工具
-  --profile build|full          build=APK 构建；full=再含 Node 22、actionlint、Android 16/17 模拟器
-  --tools-root PATH             可移植工具目录（默认 ~/.local/share/777-dev）
+  --check                       检查当前环境（默认）
+  --profile build|full          build=APK 构建；full=再含 Node/actionlint/Android 16/17 模拟器
+  --tools-root PATH             工具安装根目录
   --sdk-root PATH               Android SDK 目录
-  --env-file PATH               生成的环境变量文件
-  --configure-shell             将 env-file 以幂等方式接入当前 shell rc
-  --accept-android-licenses     非交互接受 Android SDK licenses；必须显式传入
-  --create-avds                 full 档创建 777-android16 / 777-android17 AVD
-  --skip-system-packages        不调用 apt-get，仅配置可移植工具 / Android SDK
-  --self-test                   只验证脚本清单与仓库基线一致性
-  --non-interactive             禁止任何交互；sudo 需要密码时立即失败
+  --gradle-home PATH            构建产物内 Gradle 目录
+  --gradle-user-home PATH       构建产物内 Gradle 离线缓存目录
+  --env-file PATH               环境变量文件
+  --self-test                   只验证工具链版本清单与仓库基线一致性
+  --create-avds                 full 档使用产物内 system image 创建 AVD
   -h, --help                    显示帮助
+
+安装必须使用 GitHub Actions 工具链构建产物中的 install.sh。
+本地禁止通过 apt、curl、sdkmanager、Gradle/Maven 或其他渠道补齐依赖。
 USAGE
 }
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --check) MODE=check ;;
-    --auto) MODE=auto ;;
+    --check) ;;
     --profile) shift; PROFILE="${1:-}" ;;
     --tools-root) shift; TOOLS_ROOT="${1:-}" ;;
     --sdk-root) shift; SDK_ROOT="${1:-}" ;;
+    --gradle-home) shift; GRADLE_HOME="${1:-}" ;;
+    --gradle-user-home) shift; GRADLE_USER_HOME="${1:-}" ;;
     --env-file) shift; ENV_FILE="${1:-}" ;;
-    --configure-shell) CONFIGURE_SHELL=true ;;
-    --accept-android-licenses) ACCEPT_ANDROID_LICENSES=true ;;
-    --create-avds) CREATE_AVDS=true ;;
-    --skip-system-packages) SKIP_SYSTEM_PACKAGES=true ;;
     --self-test) SELF_TEST=true ;;
-    --non-interactive) NON_INTERACTIVE=true ;;
+    --create-avds) CREATE_AVDS=true ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "[777-toolchain] 未知参数：$1" >&2; usage >&2; exit 2 ;;
+    --auto|--accept-android-licenses|--skip-system-packages|--configure-shell|--non-interactive)
+      echo "[777-toolchain] 已禁用本地联网自动安装参数：$1；请使用 GitHub Actions 构建产物 install.sh。" >&2
+      exit 2
+      ;;
+    *)
+      echo "[777-toolchain] 未知参数：$1" >&2
+      usage >&2
+      exit 2
+      ;;
   esac
   shift
 done
@@ -76,44 +78,22 @@ if [ "$PROFILE" != build ] && [ "$PROFILE" != full ]; then
   echo "[777-toolchain] --profile 只支持 build 或 full：$PROFILE" >&2
   exit 2
 fi
-if [ -z "$TOOLS_ROOT" ] || [ -z "$SDK_ROOT" ] || [ -z "$ENV_FILE" ]; then
-  echo "[777-toolchain] tools/sdk/env 路径不能为空" >&2
+if [ -z "$TOOLS_ROOT" ] || [ -z "$SDK_ROOT" ] || [ -z "$GRADLE_HOME" ] || [ -z "$GRADLE_USER_HOME" ] || [ -z "$ENV_FILE" ]; then
+  echo "[777-toolchain] tools/sdk/gradle/env 路径不能为空" >&2
   exit 2
 fi
+
+detect_host_arch
 
 if [ "$SELF_TEST" = true ]; then
   self_test
   exit 0
 fi
 
-detect_host_arch
-
-if [ "$MODE" = auto ]; then
-  install_system_packages
-  java_home="$(find_java17_home || true)"
-  if [ -z "$java_home" ]; then
-    echo "[777-toolchain] 自动安装后仍未找到 JDK $JDK_MAJOR" >&2
-    exit 1
-  fi
-  export JAVA_HOME="$java_home"
-  export PATH="$JAVA_HOME/bin:$PATH"
-
-  mkdir -p "$TOOLS_ROOT" "$SDK_ROOT"
-  install_android_commandline_tools
-  export ANDROID_SDK_ROOT="$SDK_ROOT"
-  export ANDROID_HOME="$SDK_ROOT"
-  export PATH="$SDK_ROOT/platform-tools:$SDK_ROOT/cmdline-tools/latest/bin:$SDK_ROOT/emulator:$PATH"
-  install_android_packages
-  install_node22
-  install_actionlint
-  if [ "$PROFILE" = full ]; then
-    export PATH="$TOOLS_ROOT/bin:$TOOLS_ROOT/node-current/bin:$PATH"
-  else
-    export PATH="$TOOLS_ROOT/bin:$PATH"
-  fi
-  create_avds
-  write_env_file "$java_home"
-  configure_shell
+if [ -f "$ENV_FILE" ]; then
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
 fi
 
 check_environment
+create_avds
