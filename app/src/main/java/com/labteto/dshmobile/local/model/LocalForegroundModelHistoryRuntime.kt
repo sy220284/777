@@ -5,7 +5,6 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -55,14 +54,11 @@ internal class LocalForegroundModelHistoryRuntime @Inject constructor(
             state,
             runtimeStateStore.resourceSnapshot(),
         )
-        runtimeStateStore.mutableState.update { current ->
-            if (current.sessionId != expectedSessionId) current else current.copy(
-                kernel = current.kernel.copy(
-                    contextChars = history.encodedChars,
-                    contextBudgetChars = budget,
-                ),
-            )
-        }
+        runtimeStateStore.projection.updateContextMetrics(
+            sessionId = expectedSessionId,
+            contextChars = history.encodedChars,
+            contextBudgetChars = budget,
+        )
         return true
     }
 
