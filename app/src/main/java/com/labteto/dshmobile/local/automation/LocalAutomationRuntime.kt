@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.automation
 
-import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -10,7 +9,8 @@ import kotlinx.coroutines.flow.map
 /** Automation execution plus the bounded chat snapshot used by the event planner. */
 @Singleton
 class LocalAutomationRuntime @Inject constructor(
-    private val engine: LocalHarnessEngine,
+    private val chatCoordinator: LocalAutomationChatCoordinator,
+    private val workCoordinator: LocalAutomationWorkCoordinator,
     private val runtimeStateStore: LocalRuntimeStateStore,
 ) {
     private val runtimeState = runtimeStateStore.state
@@ -31,13 +31,13 @@ class LocalAutomationRuntime @Inject constructor(
 
 
     internal suspend fun prepareWorkSession(text: String, preferredSessionId: String? = null): String =
-        engine.prepareAutomationWorkSession(text, preferredSessionId)
+        workCoordinator.prepareWorkSession(text, preferredSessionId)
     internal suspend fun runWork(
         text: String,
         preferredSessionId: String? = null,
         timeoutMillis: Long = 5 * 60_000L,
         recoverInterrupted: Boolean = false,
-    ): LocalAutomationRunResult = engine.runAutomationWork(
+    ): LocalAutomationRunResult = workCoordinator.runWork(
         text = text,
         preferredSessionId = preferredSessionId,
         timeoutMillis = timeoutMillis,
@@ -59,7 +59,7 @@ class LocalAutomationRuntime @Inject constructor(
         minimumSilenceMinutes: Long? = null,
         silenceReferenceAt: Long? = null,
         bypassProactivePolicy: Boolean = false,
-    ): LocalAutomationRunResult = engine.runAutomationChat(
+    ): LocalAutomationRunResult = chatCoordinator.run(
         instruction, targetSessionId, timeoutMillis, recoverInterrupted, recoveryStartedAt,
         quietHoursEnabled, quietStartHour, quietStartMinute, quietEndHour, quietEndMinute,
         proactiveMinGapMinutes, proactiveMaxUnanswered, minimumSilenceMinutes,
