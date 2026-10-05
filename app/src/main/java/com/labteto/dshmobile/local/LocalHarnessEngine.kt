@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local
 
 import android.content.Context
-import com.labteto.dshmobile.automation.HarnessAutomationScheduler
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
@@ -347,7 +346,7 @@ class LocalHarnessEngine @Inject internal constructor(
     private val usageTracker: DeepSeekUsageTracker,
     private val bundledRuntimeManager: LocalBundledRuntimeManager,
     private val json: Json,
-    private val automationScheduler: HarnessAutomationScheduler,
+    private val modelRequestCoordinator: LocalModelRequestCoordinator,
     private val pluginCompositionFactory: LocalPluginCompositionFactory,
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
@@ -448,7 +447,8 @@ class LocalHarnessEngine @Inject internal constructor(
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
-    private val requestPressureStore = LocalRequestPressureStore()
+    private val requestPressureStore
+        get() = runtimeStateStore.requestPressureStore
     private val environmentInfoCoordinator by lazy {
         LocalEnvironmentInfoCoordinator(
             workspacePath = { workspace.path },
@@ -472,20 +472,6 @@ class LocalHarnessEngine @Inject internal constructor(
             foregroundWorkBudget = { sessionId ->
                 workRunRegistry[sessionId]?.executionControl?.budget?.snapshot()?.toEnvironmentWorkBudget()
             },
-        )
-    }
-    private val modelRequestCoordinator by lazy {
-        LocalModelRequestCoordinator(
-            modelGateway = modelGateway,
-            resourceScheduler = resourceScheduler,
-            historyCompactor = historyCompactor,
-            toolSchemas = ::modelToolSchemas,
-            defaultEventLog = { eventLog },
-            streamingPreviewStore = runtimeStateStore.streamingPreviewStore,
-            persistOverflowCompaction = ::persistForegroundOverflowCompaction,
-            pressureStore = requestPressureStore,
-            maxStreamPreviewChars = MAX_STREAM_PREVIEW_CHARS,
-            streamPreviewIntervalMs = STREAM_PREVIEW_INTERVAL_MS,
         )
     }
     private val tokenUsageBridge by lazy { LocalTokenUsageContextBridge(_state, workRunRegistry, ::eventLogFor) { currentSessionId } }
@@ -3116,18 +3102,6 @@ class LocalHarnessEngine @Inject internal constructor(
         },
         executionControl = binding?.executionControl,
     )
-
-    private fun persistForegroundOverflowCompaction(
-        snapshot: LocalHarnessState,
-        summaryMode: LocalHistorySummaryMode,
-    ) {
-        if (snapshot.sessionId != currentSessionId || snapshot.chat.groupChat.enabled) return
-        persistOverflowCompaction(
-            snapshot = snapshot,
-            summaryMode = summaryMode,
-            binding = null,
-        )
-    }
 
     private fun persistOverflowCompaction(
         snapshot: LocalHarnessState,
