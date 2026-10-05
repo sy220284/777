@@ -6,7 +6,9 @@ import com.labteto.dshmobile.local.session.LocalActiveSessionScopeProvider
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.session.LocalSessionLifecyclePort
 import com.labteto.dshmobile.local.tools.LocalToolsManagementPort
+import com.labteto.dshmobile.local.work.LocalWorkExecutionCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkExecutionPort
+import com.labteto.dshmobile.local.work.LocalWorkTurnPort
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import dagger.Module
 import dagger.Provides
@@ -25,8 +27,14 @@ import javax.inject.Singleton
 internal object LocalFeatureExecutionPortModule {
     @Provides
     @Singleton
-    fun provideLocalWorkExecutionPort(engine: LocalHarnessEngine): LocalWorkExecutionPort =
-        engine.workExecutionPort
+    fun provideLocalWorkExecutionPort(
+        coordinator: LocalWorkExecutionCoordinator,
+    ): LocalWorkExecutionPort = coordinator
+
+    @Provides
+    @Singleton
+    fun provideLocalWorkTurnPort(engine: LocalHarnessEngine): LocalWorkTurnPort =
+        engine.workTurnPort
 
     @Provides
     @Singleton
