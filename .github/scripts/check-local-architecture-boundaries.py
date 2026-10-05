@@ -121,7 +121,6 @@ aggregate_projection_migration_allowlist = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatMembershipCoordinator.kt",
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalReplySuggestionCommit.kt",
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalReplySuggestionCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt",
 }
 for source_path in LOCAL_SOURCE_ROOT.rglob("*.kt"):
     relative = source_path.relative_to(ROOT).as_posix()
@@ -193,6 +192,25 @@ for source_path in work_root.rglob("*.kt"):
             f"{relative} writes the Runtime aggregate directly; "
             "use LocalRuntimeProjection or a narrower capability instead"
         )
+
+settings_coordinator_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt")
+)
+if "private val statePort: LocalSettingsStatePort" not in settings_coordinator_source:
+    die("LocalHarnessSettingsCoordinator must depend on its narrow Settings state port")
+if (
+    "runtimeStateStore.projection.update(" in settings_coordinator_source
+    or "LocalAggregateProjectionPort" in settings_coordinator_source
+):
+    die("LocalHarnessSettingsCoordinator must not mutate the aggregate Runtime projection directly")
+
+settings_state_port_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/settings/LocalSettingsStatePort.kt")
+)
+if "interface LocalSettingsStatePort" not in settings_state_port_source:
+    die("SettingsFeature must keep an explicit LocalSettingsStatePort boundary")
+if "LocalHarnessState" in settings_state_port_source or "LocalAggregateProjectionPort" in settings_state_port_source:
+    die("LocalSettingsStatePort must expose only Settings-owned projection data")
 
 model_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt")
