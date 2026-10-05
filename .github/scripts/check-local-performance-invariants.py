@@ -487,23 +487,23 @@ for forbidden_direct in (
         )
 
 chat_execution_text = "\n".join(chat_execution_sources.values())
-chat_turn = re.search(
-    r"(?:private|internal)?\s*suspend fun runChatTurn\(.*?(?=\n\s*(?:private|internal|public)?\s*(?:suspend\s+)?fun |\Z)",
-    chat_execution_text,
-    re.S,
+chat_direct_turn = chat_execution_sources.get(
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatDirectTurnExecutor.kt",
+    "",
 )
-if chat_turn is None:
-    violations.append("Chat foreground turn implementation is missing from the Chat execution surface")
+if "internal suspend fun run(" not in chat_direct_turn:
+    violations.append("Chat foreground turn implementation is missing from ChatFeature")
 else:
-    chat_turn_body = chat_turn.group(0)
-    if "cancelChatPostTurn()" not in chat_turn_body:
+    if "LocalChatPostTurnJobOwner.cancel()" not in chat_direct_turn:
         violations.append("Chat turns must cancel stale post-turn refresh before capturing new context")
-    if "withChatTurnContext(" not in chat_turn_body:
+    if "withChatTurnContext(" not in chat_direct_turn:
         violations.append("Chat turns must preserve stable/dynamic context placement")
+    if "modelRequests.complete(" not in chat_direct_turn:
+        violations.append("Direct Chat model transport must use the shared model request coordinator")
 
 if not contains_any(work_execution_sources, "val loop = AgentLoop("):
     violations.append("Work foreground AgentLoop is missing from the Work execution surface")
-if not contains_any(chat_execution_sources, "chatReplyCoordinator.finalizeDirect("):
+if "replyCoordinator.finalizeDirect(" not in chat_direct_turn:
     violations.append("Direct Chat replies must pass the pre-commit scene continuity guard")
 if "chatReplyCoordinator.finalizeGroup(" not in group_chat_executor:
     violations.append("Group Chat replies must pass the shared-scene continuity guard")
