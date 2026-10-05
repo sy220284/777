@@ -11,6 +11,7 @@ import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.update
 
 /**
  * Work-owned registry for session-bound foreground runs.
