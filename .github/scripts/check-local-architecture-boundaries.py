@@ -14,7 +14,7 @@ ENGINE_MAX_INTERNAL_METHODS = 1
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
 ENGINE_MAX_COMPOSITION_BRIDGE_REFERENCES = 7
-ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 9
+ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 7
 ENGINE_STAGE3_FEATURE_METHOD_ROOTS = (
     "queueHumanTurn",
     "queueWorkTurnLocked",
@@ -23,8 +23,6 @@ ENGINE_STAGE3_FEATURE_METHOD_ROOTS = (
     "runGroupChatTurn",
     "regenerateWorkReply",
     "editAndResendUserMessage",
-    "workSubagents",
-    "runWorkflow",
     "scheduleChatPostTurn",
 )
 
@@ -323,6 +321,18 @@ if "internal suspend fun exitWorkPlanMode(" not in work_plan_mode_source:
 
 engine_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
 engine = read(engine_path)
+work_subagent_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt")
+)
+if "internal fun runner(binding: LocalWorkRunBinding)" not in work_subagent_runtime_source:
+    die("WorkFeature must own bound subagent runner composition")
+if "internal suspend fun runWorkflow(" not in work_subagent_runtime_source:
+    die("WorkFeature must own workflow execution and progress projection")
+if "private fun workSubagents(" in engine or "private suspend fun runWorkflow(" in engine:
+    die("Work subagent/workflow business must not return to LocalHarnessEngine")
+if "workSubagentRuntime.runWorkflow(" not in engine:
+    die("Work workflow tool must stay routed to the Work-owned runtime")
+
 if "private suspend fun exitPlanMode(" in engine:
     die("Work plan-exit business must not return to LocalHarnessEngine")
 if "exitWorkPlanMode(" not in engine:
