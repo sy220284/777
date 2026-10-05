@@ -105,7 +105,12 @@ check_environment() {
       failures=$((failures + 1))
     fi
 
-    check_android_package "Android emulator" "$SDK_ROOT/emulator/emulator" || failures=$((failures + 1))
+    if [ -x "$SDK_ROOT/emulator/emulator" ] && "$SDK_ROOT/emulator/emulator" -version >/dev/null 2>&1; then
+      ok "Android emulator 可执行"
+    else
+      fail "Android emulator 可执行性（含宿主动态库）"
+      failures=$((failures + 1))
+    fi
     if find "$SDK_ROOT/system-images" -type d -path '*android-36*google_apis*x86_64' -print -quit 2>/dev/null | grep -q .; then
       ok "Android 16 x86_64 system image"
     else
