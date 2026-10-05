@@ -2155,22 +2155,37 @@ class LocalHarnessEngine @Inject internal constructor(
                     estimateModelTokens(dynamicContext),
             )
             val key = modelRequestMarker()
-            val requestMessages = prepareLocalMultimodalMessages(
-                messages = withChatTurnContext(
-                    history = boundedChatRequestHistory(
-                        if (replacingMessageId == null) modelHistory.snapshot() else modelHistory.snapshot().withoutLastCompletedAssistantReply(),
-                        recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
-                        currentFacts = snapshot.chat.chatContext
-                            .canonicalFactLines(),
-                    ),
-                    stableContext = chatContext.stablePrompt,
-                    dynamicContext = dynamicContext,
+            val durableRequestMessages = withChatTurnContext(
+                history = boundedChatRequestHistory(
+                    if (replacingMessageId == null) modelHistory.snapshot() else modelHistory.snapshot().withoutLastCompletedAssistantReply(),
+                    recentMessages = CHAT_RECENT_HISTORY_MESSAGES,
+                    currentFacts = snapshot.chat.chatContext
+                        .canonicalFactLines(),
                 ),
+                stableContext = chatContext.stablePrompt,
+                dynamicContext = dynamicContext,
+            )
+            val selectedMode = resolveLocalImageInputMode(
+                snapshot.modelState.imageInputMode,
+                imageCapabilities,
+                snapshot.modelState.baseUrl,
+                snapshot.modelState.model,
+            )
+            if (
+                hasLocalImageRefs(durableRequestMessages) &&
+                imageCapabilities.state(snapshot.modelState.baseUrl, snapshot.modelState.model) ==
+                    LocalImageCapability.UNSUPPORTED
+            ) {
+                throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
+            }
+            val requestMessages = prepareLocalMultimodalMessages(
+                messages = durableRequestMessages,
                 workspaceRoot = File(workspace.path),
-                mode = LocalImageInputMode.NATIVE,
+                mode = selectedMode,
                 budget = imageRequestBudget,
                 maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.modelState.model, snapshot.modelState.baseUrl),
             )
+            val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
 
             eventLog.append("turn/start", buildJsonObject {
                 put("model", snapshot.modelState.model)
@@ -2178,18 +2193,34 @@ class LocalHarnessEngine @Inject internal constructor(
                 put("persona_id", chatContext.persona.id)
             })
 
-            val rawReply = completeWithRetry(
-                key = key,
-                snapshot = snapshot,
-                messages = requestMessages,
-                step = 1,
-                toolsOverride = JsonArray(emptyList()),
-                // Chat candidates must pass style/repetition/scene guards before anything is shown.
-                publishPreview = false,
-                streamFilterPhrases = chatStreamFilterPhrases(snapshot, chatContext.persona),
-                persistOverflowHistory = true,
-                temperature = CHAT_ROLEPLAY_TEMPERATURE,
-            )
+            val rawReply = try {
+                completeWithRetry(
+                    key = key,
+                    snapshot = snapshot,
+                    messages = requestMessages,
+                    step = 1,
+                    toolsOverride = JsonArray(emptyList()),
+                    // Chat candidates must pass style/repetition/scene guards before anything is shown.
+                    publishPreview = false,
+                    streamFilterPhrases = chatStreamFilterPhrases(snapshot, chatContext.persona),
+                    persistOverflowHistory = true,
+                    temperature = CHAT_ROLEPLAY_TEMPERATURE,
+                ).also {
+                    if (nativeImagesSent) {
+                        imageCapabilities.markSupported(snapshot.modelState.baseUrl, snapshot.modelState.model)
+                    }
+                }
+            } catch (error: Throwable) {
+                val nativeImageRejected = nativeImagesSent && imageInputUnsupported(error)
+                if (nativeImageRejected) {
+                    imageCapabilities.markUnsupported(snapshot.modelState.baseUrl, snapshot.modelState.model)
+                    throw IllegalStateException(
+                        "当前模型不支持图片理解，请切换支持图片的模型后重试。",
+                        error,
+                    )
+                }
+                throw error
+            }
 
             val reply = chatReplyCoordinator.finalizeDirect(
                 snapshot = snapshot, reply = rawReply,
