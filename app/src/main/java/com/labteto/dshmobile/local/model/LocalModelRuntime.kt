@@ -118,7 +118,7 @@ class LocalModelRuntime @Inject constructor(
         val snapshot = runtimeStateStore.state.value
         return snapshot.loading ||
             snapshot.kernel.running ||
-            runtimeStateStore.foregroundJob?.isCompleted == false ||
+            runtimeStateStore.foregroundRunHandle.hasLiveJob() ||
             LocalSessionRuntimeRegistry.hasAnyLiveOwner()
     }
 

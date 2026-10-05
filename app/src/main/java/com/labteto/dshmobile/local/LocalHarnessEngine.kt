@@ -1038,7 +1038,7 @@ class LocalHarnessEngine @Inject internal constructor(
             state.kernel.running ||
             sessionTransitioning ||
             activeJob?.isCompleted == false ||
-            workRunRegistry[state.sessionId]?.job?.isCompleted == false ||
+            workRunRegistry.live(state.sessionId) != null ||
             pendingInputs.size() != 0
         ) return@synchronized LocalChatUserEditResult.BUSY
         recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)

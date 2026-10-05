@@ -57,7 +57,7 @@ internal class LocalWorkPlanModeCoordinator @Inject constructor(
                 after.work.planMode != enabled
             ) return false
 
-            val history = runtimeStateStore.foregroundModelHistory
+            val history = runtimeStateStore.foregroundRunHandle.modelHistory
             if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
                 recordRuntimeSystemPromptUpdate(
                     history = history,

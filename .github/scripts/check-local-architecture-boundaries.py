@@ -1266,6 +1266,31 @@ for required_run_fact in (
         die(f"Shared LocalAgentRunHandle is missing runtime ownership fact: {required_run_fact}")
 if "com.labteto.dshmobile.local.work." in run_handle_source:
     die("Shared LocalAgentRunHandle must not depend on WorkFeature internals")
+
+for runtime_consumer_path in LOCAL_SOURCE_ROOT.rglob("*.kt"):
+    runtime_consumer = strip_comments(runtime_consumer_path.read_text(encoding="utf-8"))
+    for removed_runtime_access in (
+        "runtimeStateStore.foregroundModelHistory",
+        "runtimeStateStore.foregroundRunLock",
+        "runtimeStateStore.foregroundPendingInputs",
+        "runtimeStateStore.foregroundJob",
+        "runtimeStateStore.foregroundTranscriptProjectionCursor",
+        "runtimeStateStore.foregroundTurnsSinceModelHistoryCheckpoint",
+    ):
+        if removed_runtime_access in runtime_consumer:
+            relative = runtime_consumer_path.relative_to(ROOT).as_posix()
+            die(f"{relative} still consumes removed foreground run fact: {removed_runtime_access}")
+
+for removed_work_binding_access in (
+    "binding.modelHistory",
+    "binding.pendingInputs",
+    "binding.job",
+    "binding.mirrorJob",
+    "binding.transcriptProjectionCursor",
+    "binding.turnsSinceModelHistoryCheckpoint",
+):
+    if removed_work_binding_access in engine:
+        die(f"LocalHarnessEngine still consumes removed Work binding fact: {removed_work_binding_access}")
 if "AutomationExecutionRegistry.tryAcquire(id)" not in automation_worker:
     die("Automation scheduled/manual execution must share one task runtime lease")
 if "AutomationExecutionRegistry.tryAcquire(id) ?: return Result.retry()" not in automation_worker:
