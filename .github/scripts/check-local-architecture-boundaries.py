@@ -118,6 +118,33 @@ for source_path in work_root.rglob("*.kt"):
             f"{relative} introduces a new writable LocalHarnessState seam inside WorkFeature; "
             "depend on Work-owned state or a narrow Shared Capability instead"
         )
+    if "runtimeStateStore.mutableState" in source or "runtime.mutableState" in source:
+        die(
+            f"{relative} writes the Runtime aggregate directly; "
+            "use LocalRuntimeProjection or a narrower capability instead"
+        )
+
+runtime_projection_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt")
+)
+if "private val state: MutableStateFlow<LocalHarnessState>" not in runtime_projection_source:
+    die("LocalRuntimeProjection must remain the narrow writable aggregate projection owner")
+
+work_plan_mode_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkPlanModeCoordinator.kt")
+)
+if "runtimeStateStore.projection.setWorkPlanMode" not in work_plan_mode_source:
+    die("Work plan-mode visible projection must use LocalRuntimeProjection")
+if "runtimeStateStore.projection.updateContextMetrics" not in work_plan_mode_source:
+    die("Work plan-mode context metrics must use LocalRuntimeProjection")
+
+work_registry_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt")
+)
+if "runtimeStateStore.projection.projectJobs" not in work_registry_source:
+    die("Work visible job projection must use LocalRuntimeProjection")
+if "projectJobSnapshotToSessionStates" in work_registry_source:
+    die("legacy Work job projection must not regain direct aggregate-state access")
 
 
 approval_preferences_source = read("app/src/main/java/com/labteto/dshmobile/local/interaction/LocalApprovalPreferences.kt")
