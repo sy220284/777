@@ -240,6 +240,33 @@ jobs:
           EMULATOR_STAGE="$(new_stage emulator)"
           mkdir -p "$EMULATOR_STAGE/android-sdk"
           ln -s "$SDK_ROOT/emulator" "$EMULATOR_STAGE/android-sdk/emulator"
+
+          # Android Emulator 的 qemu 可执行文件依赖 libpulse.so.0。
+          # 本地安装禁止 apt，因此在 Actions 生成 Artifact 时把所需 Pulse 动态库一起封装。
+          PULSE_DEB_DIR="$RUNNER_TEMP/emulator-pulse-debs"
+          PULSE_ROOT="$RUNNER_TEMP/emulator-pulse-root"
+          rm -rf "$PULSE_DEB_DIR" "$PULSE_ROOT"
+          mkdir -p "$PULSE_DEB_DIR" "$PULSE_ROOT"
+          (
+            cd "$PULSE_DEB_DIR"
+            apt-get download libpulse0
+          )
+          for deb in "$PULSE_DEB_DIR"/*.deb; do
+            dpkg-deb -x "$deb" "$PULSE_ROOT"
+          done
+
+          EMULATOR_HOST_LIBS="$SDK_ROOT/emulator/host-libs"
+          rm -rf "$EMULATOR_HOST_LIBS"
+          mkdir -p "$EMULATOR_HOST_LIBS"
+          while IFS= read -r -d '' lib; do
+            cp -L "$lib" "$EMULATOR_HOST_LIBS/$(basename "$lib")"
+          done < <(find "$PULSE_ROOT" \( -type f -o -type l \) -name 'libpulse*.so*' -print0)
+
+          test -s "$EMULATOR_HOST_LIBS/libpulse.so.0"
+          test -n "$(find "$EMULATOR_HOST_LIBS" -maxdepth 1 -name 'libpulsecommon-*.so' -print -quit)"
+          LD_LIBRARY_PATH="$EMULATOR_HOST_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+            "$SDK_ROOT/emulator/emulator" -version >/dev/null
+
           make_component emulator "$EMULATOR_STAGE"
 
           test -d "$SDK_ROOT/system-images/android-36"
