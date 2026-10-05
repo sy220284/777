@@ -52,6 +52,7 @@ import com.labteto.dshmobile.local.chat.LocalChatStatePort
 import com.labteto.dshmobile.local.chat.LocalChatPersonaCorrectionCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatRelationshipHydrator
 import com.labteto.dshmobile.local.chat.LocalChatTurnDispatcher
+import com.labteto.dshmobile.local.chat.LocalChatTranscriptRuntime
 import com.labteto.dshmobile.local.chat.LocalChatTurnPort
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
@@ -678,36 +679,28 @@ class LocalHarnessEngine @Inject internal constructor(
         )
     }
 
+    private val engineChatTranscriptRuntime by lazy {
+        LocalChatTranscriptRuntime(runtimeStateStore)
+    }
+
     private val groupChatTurnExecutor by lazy {
         LocalGroupChatTurnExecutor(
-            _state, modelGateway, chatPersonaStore, chatPersonaGalleryStore, chatReplyCoordinator,
-            chatTurnCoordinator, chatDiaryStore, usageTracker, json, modelHistory, transcriptRuntime,
-            imageCapabilities, imageRequestBudget, workspace.path, { eventLog },
-            { key, snapshot, messages, step, tools, preview, attempts, overflow, temperature ->
-                completeWithRetry(
-                    key = key, snapshot = snapshot, messages = messages, step = step,
-                    toolsOverride = tools, publishPreview = preview, maxAttemptsOverride = attempts,
-                    allowContextOverflowRecovery = overflow, temperature = temperature,
-                )
-            },
-            ::ensureSystemMessage,
-            { text, sourceMessageId -> captureAutoMemoryDirective(text, sourceMessageId) },
-            { query, snapshot, subjectKey, viewerName ->
-                memoryCoordinator.chatMemoryContext(
-                    query = query,
-                    snapshot = snapshot,
-                    viewerSubjectKey = subjectKey,
-                    viewerName = viewerName,
-                    groupAudience = true,
-                )
-            },
-            { extraTokens -> compactHistoryIfNeeded(extraTokens) },
-            ::updateContextMetrics,
-            ::persistChatBranchState,
-            ::checkpointModelHistory,
-            ::persist,
-            ::persistNow,
-            { completedJob ->
+            runtimeStateStore = runtimeStateStore,
+            chatState = engineChatStatePort,
+            modelGateway = modelGateway,
+            modelRequests = modelRequestCoordinator,
+            modelHistoryRuntime = engineForegroundModelHistoryRuntime,
+            sessionStorage = sessionStorageRuntime,
+            chatMemory = engineChatMemoryRuntime,
+            branchCoordinator = engineChatBranchCoordinator,
+            transcriptRuntime = engineChatTranscriptRuntime,
+            chatPersonaStore = chatPersonaStore,
+            chatPersistence = chatPersistence,
+            chatReplyCoordinator = chatReplyCoordinator,
+            chatTurnCoordinator = chatTurnCoordinator,
+            usageTracker = usageTracker,
+            json = json,
+            finishTurn = { completedJob ->
                 synchronized(runStateLock) { if (activeJob === completedJob) activeJob = null }
                 startNextQueuedTurnIfIdle()?.start()
             },
