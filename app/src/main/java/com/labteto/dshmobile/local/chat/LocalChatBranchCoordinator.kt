@@ -23,6 +23,31 @@ internal class LocalChatBranchCoordinator @Inject constructor(
     private val sessionStorage: LocalSessionStorageRuntime,
     private val modelHistoryRuntime: LocalForegroundModelHistoryRuntime,
 ) {
+    internal fun persistCurrentProjection(expectedSessionId: String, reason: String): Boolean {
+        val state = runtimeStateStore.state.value
+        if (state.sessionId != expectedSessionId) return false
+        val eventLog = sessionStorage.eventLogs.get(expectedSessionId)
+        eventLog.append(
+            "chat/branch-state",
+            JsonObject(
+                encodeChatBranchStateEvent(state.chat.chatBranches) +
+                    ("reason" to JsonPrimitive(reason)),
+            ),
+        )
+        val activeTranscript = activeChatBranchMessages(state.chat.chatBranches)
+            .ifEmpty { state.messages }
+        val transcriptSequence = com.labteto.dshmobile.local.persistActiveChatTranscript(
+            eventLog = eventLog,
+            reason = reason,
+            activeTranscript = activeTranscript,
+        )
+        runtimeStateStore.foregroundTranscriptProjectionCursor = maxOf(
+            runtimeStateStore.foregroundTranscriptProjectionCursor ?: -1L,
+            transcriptSequence,
+        )
+        return true
+    }
+
     internal fun selectVariant(messageId: String, targetIndex: Int): Boolean {
         val before = runtimeStateStore.state.value
         if (
