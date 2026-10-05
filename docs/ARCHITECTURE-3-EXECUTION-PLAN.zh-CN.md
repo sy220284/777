@@ -7,11 +7,11 @@
 - 编制日期：2026-10-05。
 - 目标 PR：[#448](https://github.com/sy220284/777/pull/448)，分支 `refactor/architecture-3-feature-layer-phase1`，保持 Draft。
 - 主线基线：`6e1b96369ef7701c1acd74527b04a2a766f51721`。
-- 本方案核对的产品代码：`704f1bc85773c24161e62e2964a5feb8c410fc71`。
+- 本方案核对的产品代码：`f849150113e363bb172fbded70fe18c3ecc4d549`。
 - 规则依据：[AGENTS.md](../AGENTS.md)、[系统联审](SYSTEM-AUDIT-GUIDE.zh-CN.md)、[架构 3.0](ARCHITECTURE.md)、[验证](VALIDATION.md)、[安全](SECURITY.md)、[UI / UX](UI-UX.zh-CN.md)、[协议](PROTOCOL.md)、[兼容性](COMPATIBILITY.md)。
 - 实现事实由当前代码、构建配置、锁定文件和 CI 确认；文档中的旧版本号及旧 Engine 链路描述不能覆盖新架构和当前代码。
 
-截至编制时，本地架构、性能及 Kotlin 风险门禁通过；此前安全、仓库完整性、UI 和通知门禁已通过。此前产品代码 [完整 CI #4426](https://github.com/sy220284/777/actions/runs/37257428366) 暴露 WorkRunRegistry 缺少 flow `update` 导入，修复已进入 `9e82f358`，该失败 run 不构成当前 Head 的验收；当前产品基线仍须通过其最新完整 CI。任何后续产品代码变化均需重新验证当前 main + 当前 Head。
+截至编制时，本地架构、性能及 Kotlin 风险门禁通过；此前安全、仓库完整性、UI 和通知门禁已通过。此前产品代码 [完整 CI #4426](https://github.com/sy220284/777/actions/runs/37257428366) 暴露 WorkRunRegistry 缺少 flow `update` 导入，修复已进入 `9e82f358`，该失败 run 不构成当前 Head 的验收；当前产品基线的 [完整 CI #4444](https://github.com/sy220284/777/actions/runs/37258128774) 已被后续提交取消，仍须重新跑完，不能以纯文档 CI 替代。任何后续产品代码变化均需重新验证当前 main + 当前 Head。
 
 ## 2. 当前进度与真实剩余量
 
@@ -28,7 +28,7 @@
 
 | 消费入口 | 直接 Engine 引用预算 | 达标位置 |
 |---|---:|---|
-| ChatRuntime | 5 | 阶段 3-C / 3-D 结束为 0 |
+| ChatRuntime | 4 | 阶段 3-C / 3-D 结束为 0 |
 | WorkRuntime | 0 | 保持 0；继续迁出 Engine 内 Work 主链 |
 | SessionRuntime | 12 | 阶段 3-E 结束为 0 |
 | ModelRuntime | 3 | 阶段 3-E 结束为 0 |
@@ -36,14 +36,14 @@
 | AutomationRuntime | 3 | 阶段 4 结束为 0 |
 | SettingsRuntime | 7 | 阶段 3-E 结束为 0 |
 
-Engine 当前 17 个构造依赖、46 个 internal 方法、0 个 public 方法；聚合状态实际 27 个字段。数字只用于约束回退，不能证明所有权迁移完成，也不能用增加间接代理把计数降为 0。
+Engine 当前 17 个构造依赖、45 个 internal 方法、0 个 public 方法；聚合状态实际 27 个字段。数字只用于约束回退，不能证明所有权迁移完成，也不能用增加间接代理把计数降为 0。
 
 尤其需要补齐三项：
 
 1. `LocalHarnessViewModel.send` 和 `regenerateReply` 当前都经 ChatRuntime；Work 行为在 Engine 内分流。后续必须把 Work 发送、重新生成路由到 Work API。
 2. WorkRuntime 清零只完成 UI 访问边界。`runAgentTurn`、binding 创建、主 / 子代理、workflow、Work 恢复及工具编排仍有 Engine 所有权。
-3. ChatRuntime 当前剩余 5 项直接入口是建议生成、send、用户编辑重发、分支变体选择和 regenerate；stop 与群聊成员入口已移出。
-4. 前台模型历史共享能力 `LocalForegroundModelHistoryRuntime` 已建立，群聊成员已切换使用；`LocalChatBranchCoordinator` 已新增，但此基线的变体选择调用方仍走 Engine，不能记作分支迁移完成。
+3. ChatRuntime 当前剩余 4 项直接入口是建议生成、send、用户编辑重发和 regenerate；stop、群聊成员及分支变体选择入口已移出。
+4. 前台模型历史共享能力 `LocalForegroundModelHistoryRuntime` 已建立，群聊成员已切换使用；分支变体选择已切换 `LocalChatBranchCoordinator`，Engine 对应入口已删除；用户编辑重发和重新生成仍未迁完，不能记作整个分支功能完成。
 5. `local.session` / `local.runtime` 仍有对 Chat、Work 类型及内部实现的依赖；Automation Chat 仍直接使用人物 Store 和领域函数。这些不能作为最终 Shared Capability 形态保留。
 
 ## 3. 总体推进顺序
@@ -132,11 +132,11 @@ P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修�
 | 工作包 | 迁移对象 | 调用方 / 旧路径删除 | 专项验收 |
 |---|---|---|---|
 | D1 回复建议 | `generateReplySuggestions` 的生成和调度；保留已有结果提交 fence | ChatRuntime 改调 Chat 建议能力；删 Engine 建议入口及工厂桥接 | 会话 / 人物 / 对话 revision 变化作废；失败可见；冻结 profile |
-| D2 时间线与分支 | `editAndResendUserMessage`、`selectChatMessageVariant`、Chat regenerate、分支物化及日志重写 | UI 改用 ChatTimeline API，发送复用 3-C；删 Engine 分支入口和重建回调 | 编辑历史、切分支、重生成、回放、图片和工具结果保留；分页有界；失败不半提交 |
+| D2 时间线与分支 | 变体选择已有 ChatBranchCoordinator；继续迁 `editAndResendUserMessage`、Chat regenerate、分支物化及日志重写 | UI 改用 ChatTimeline API，发送复用 3-C；删 Engine 分支入口和重建回调 | 编辑历史、切分支、重生成、回放、图片和工具结果保留；分页有界；失败不半提交 |
 | D3 群聊 | 成员配置 / 移除已由 `LocalGroupChatMembershipCoordinator` 接管；继续迁公告、`runGroupChatTurn` 工厂、群聊人物纠正和系统提示刷新 | ChatGroup API 接管剩余链路；复验已迁成员能力；SessionRuntime 不再决定群聊成员规则；删剩余 Engine 群聊工厂 / 回调 | 部分 / 全部失败、单成员重试、异步成员修改、公告持久化、删除人物、单聊切换 |
 | D4 人物关联功能 | 图集 / 故事、导入导出、日记、生活状态、关系记忆、行为调节与纠正撤销 | 已迁出能力先保留；清理 UI 直连 Store、跨 Feature 内部调用及聚合写适配 | 历史兼容、资料删除、肖像引用、晚间故事、生活事件续期、回滚与导入事务 |
 
-这四包均要同时处理前台、后台、历史恢复、导入导出和 UI 入口。D4 是完整性及边界收口，不把已有能力再重写一遍。ChatRuntime 最终 5 → 0，并删除 Engine 构造 Chat 业务 coordinator 的回调组合。
+这四包均要同时处理前台、后台、历史恢复、导入导出和 UI 入口。D4 是完整性及边界收口，不把已有能力再重写一遍。ChatRuntime 最终 4 → 0，并删除 Engine 构造 Chat 业务 coordinator 的回调组合。
 
 ## 9. 阶段 3-E：其他代理出口及横向边界
 
