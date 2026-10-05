@@ -6,8 +6,8 @@ import com.labteto.dshmobile.local.send.LocalSendResult
 /**
  * Work-owned product execution entrypoint.
  *
- * The UI calls this contract directly in Work mode. Its implementation is composed at the app
- * boundary while the stage-3 migration moves the remaining Work turn ownership out of Engine.
+ * The UI calls this contract directly in Work mode. WorkFeature owns the implementation; only the
+ * lower-level turn bridge remains temporarily composed at the app boundary during stage-3 migration.
  */
 internal interface LocalWorkExecutionPort {
     fun send(
