@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.chat.ChatSceneState
 import com.labteto.dshmobile.local.chat.LocalChatBranchNode
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
 import com.labteto.dshmobile.local.chat.LocalChatMode
+import com.labteto.dshmobile.local.chat.LocalChatSessionDomainCodec
 import com.labteto.dshmobile.local.chat.LocalChatState
 import com.labteto.dshmobile.local.chat.LocalGroupChatMember
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
@@ -42,6 +43,7 @@ class LocalSessionCoordinatorTest {
             repository = repository,
             eventLogFor = { id -> LocalSessionEventLog(File(sessions, "$id.events.jsonl"), json) },
             runtimeWindowMessages = 2,
+            domainCodecs = listOf(LocalChatSessionDomainCodec),
         )
         val legacy = LocalHarnessSession(
             id = "legacy",
@@ -67,6 +69,7 @@ class LocalSessionCoordinatorTest {
             repository = repository,
             eventLogFor = { id -> LocalSessionEventLog(File(sessions, "$id.events.jsonl"), json) },
             runtimeWindowMessages = 2,
+            domainCodecs = listOf(LocalChatSessionDomainCodec),
         )
         repository.writeNow(
             LocalHarnessSession(
@@ -90,6 +93,7 @@ class LocalSessionCoordinatorTest {
             repository = repository,
             eventLogFor = { id -> LocalSessionEventLog(File(sessions, "$id.events.jsonl"), json) },
             runtimeWindowMessages = 2,
+            domainCodecs = listOf(LocalChatSessionDomainCodec),
         )
         val state = LocalHarnessState(
             loading = false,
@@ -144,7 +148,10 @@ class LocalSessionCoordinatorTest {
         val sessions = temporary.newFolder("domain-round-trip")
         val repository = LocalSessionRepository(sessions, json, backgroundScope, {}, {})
         val coordinator = LocalSessionCoordinator(
-            repository, { id -> LocalSessionEventLog(File(sessions, "$id.events.jsonl"), json) }, 2,
+            repository,
+            { id -> LocalSessionEventLog(File(sessions, "$id.events.jsonl"), json) },
+            2,
+            listOf(LocalChatSessionDomainCodec),
         )
         val context = ChatContextState(scene = ChatSceneState(location = "庭院"), generation = 7L)
         val suggestions = listOf(ChatReplySuggestion("继续", "然后呢？"))
@@ -176,7 +183,10 @@ class LocalSessionCoordinatorTest {
         // A fresh repository must decode disk, rather than returning the writer's cached snapshot.
         val coldRepository = LocalSessionRepository(sessions, json, backgroundScope, {}, {})
         val coldCoordinator = LocalSessionCoordinator(
-            coldRepository, { id -> LocalSessionEventLog(File(sessions, "$id.events.jsonl"), json) }, 2,
+            coldRepository,
+            { id -> LocalSessionEventLog(File(sessions, "$id.events.jsonl"), json) },
+            2,
+            listOf(LocalChatSessionDomainCodec),
         )
         val restored = requireNotNull(coldCoordinator.read("round-trip"))
         assertEquals(snapshot, restored)
@@ -195,7 +205,12 @@ class LocalSessionCoordinatorTest {
         val sessions = temporary.newFolder("cursor-order")
         val log = LocalSessionEventLog(File(sessions, "s1.events.jsonl"), json)
         val repository = LocalSessionRepository(sessions, json, backgroundScope, {}, {})
-        val coordinator = LocalSessionCoordinator(repository, { log }, 2)
+        val coordinator = LocalSessionCoordinator(
+            repository,
+            { log },
+            2,
+            listOf(LocalChatSessionDomainCodec),
+        )
         val capturedSequence = log.latestSequence()
         var stateReads = 0
 

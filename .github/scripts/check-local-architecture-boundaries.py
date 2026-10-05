@@ -1165,6 +1165,42 @@ if "import com.labteto.dshmobile.local.runtime.LocalAgentRunRouteIdentity" not i
 session_lifecycle = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt")
 )
+session_coordinator_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/LocalSessionCoordinator.kt")
+)
+session_storage_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt")
+)
+session_domain_codec_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionDomainCodec.kt")
+)
+chat_session_codec_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatSessionDomainCodec.kt")
+)
+if "import com.labteto.dshmobile.local.chat." in session_coordinator_source:
+    die("Session coordinator must not execute ChatFeature internal migration rules")
+if "List<LocalSessionDomainCodec>" not in session_coordinator_source or "domainCodecs.fold(session)" not in session_coordinator_source:
+    die("Session coordinator must normalize Feature data through injected domain codecs")
+if "Set<@JvmSuppressWildcards LocalSessionDomainCodec>" not in session_storage_runtime_source:
+    die("Shared Session storage must receive Feature codecs through the Session contract")
+if "com.labteto.dshmobile.local.chat." in session_storage_runtime_source:
+    die("Shared Session storage must not import ChatFeature internals")
+for required_contract in (
+    "val id: String",
+    "fun normalizeLoaded(session: LocalHarnessSession): LocalHarnessSession",
+):
+    if required_contract not in session_domain_codec_source:
+        die(f"Session domain codec contract is incomplete: {required_contract}")
+for required_chat_migration in (
+    "canonicalizeLegacyCharacterState()",
+    "withLegacyFallback(session.chatState)",
+    "canonicalizeLegacyChatBranchState()",
+    "migrateLegacyConversationContext()",
+):
+    if required_chat_migration not in chat_session_codec_source:
+        die(f"ChatFeature Session codec lost migration rule: {required_chat_migration}")
+if "@IntoSet" not in chat_session_codec_source or "LocalChatSessionDomainCodec" not in chat_session_codec_source:
+    die("ChatFeature must contribute its Session codec through DI multibinding")
 transcript_history_loader = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryLoader.kt")
 )

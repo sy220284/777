@@ -1,12 +1,8 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
-import com.labteto.dshmobile.local.chat.canonicalizeLegacyChatBranchState
-import com.labteto.dshmobile.local.chat.migrateLegacyConversationContext
-import com.labteto.dshmobile.local.chat.withLegacyFallback
-import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
@@ -35,13 +31,14 @@ internal class LocalSessionCoordinator(
     private val repository: LocalSessionRepository,
     private val eventLogFor: (String) -> LocalSessionEventLog,
     private val runtimeWindowMessages: Int,
+    private val domainCodecs: List<LocalSessionDomainCodec>,
 ) {
     fun read(id: String): LocalHarnessSession? =
-        repository.read(id)?.canonicalizeLegacyChatState()
+        repository.read(id)?.let(::normalizeLoaded)
 
     fun readWithLegacyApproval(id: String): LocalSessionRead? =
         repository.readWithLegacyApproval(id)?.let { loaded ->
-            loaded.copy(session = loaded.session.canonicalizeLegacyChatState())
+            loaded.copy(session = normalizeLoaded(loaded.session))
         }
 
     fun enqueue(snapshot: LocalHarnessSession) = repository.enqueue(snapshot)
@@ -164,13 +161,8 @@ internal class LocalSessionCoordinator(
         transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
     )
 
-    private fun LocalHarnessSession.canonicalizeLegacyChatState(): LocalHarnessSession =
-        copy(
-            chatState = chatState.canonicalizeLegacyCharacterState().withoutLegacyConversationContext(),
-            chatContext = chatContext.withLegacyFallback(chatState),
-            chatBranches = chatBranches.canonicalizeLegacyChatBranchState(),
-            groupChat = groupChat.migrateLegacyConversationContext(),
-        )
+    private fun normalizeLoaded(session: LocalHarnessSession): LocalHarnessSession =
+        domainCodecs.fold(session) { current, codec -> codec.normalizeLoaded(current) }
 
     private companion object {
         const val LEGACY_TRANSCRIPT_PROJECTION_BASELINE_EVENT =

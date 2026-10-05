@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.runtime
 import android.content.Context
 import com.labteto.dshmobile.local.LocalSessionCoordinator
 import com.labteto.dshmobile.local.LocalSessionRepository
+import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.session.LocalSessionStorageManager
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
@@ -31,6 +32,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     json: Json,
     private val runtimeStateStore: LocalRuntimeStateStore,
     internal val eventLogs: LocalSessionEventLogRegistry,
+    domainCodecs: Set<@JvmSuppressWildcards LocalSessionDomainCodec>,
 ) {
     private val sessionsRoot = File(context.filesDir, "local-harness/sessions").apply { mkdirs() }
     private val scope = CoroutineScope(
@@ -61,6 +63,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             repository = repository,
             eventLogFor = eventLogs::get,
             runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
+            domainCodecs = domainCodecs.sortedBy(LocalSessionDomainCodec::id),
         )
     }
 
