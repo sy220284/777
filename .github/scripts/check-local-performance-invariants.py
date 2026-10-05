@@ -241,7 +241,12 @@ if "RandomAccessFile(source, \"r\")" not in event_log or "REVERSE_READ_BUFFER_BY
 if "fun pageBefore(" not in event_log or "forEachEventReverseUnsafe" not in event_log:
     violations.append("SessionEventLog must keep bounded reverse paging for infinite-session history")
 
-if "summaryCache" not in repository or "snapshot.toSummary()" not in repository:
+if (
+    "summaryCache" not in repository
+    or "LocalSessionSummaryIndex" not in repository
+    or "cacheSummaryLocked(" not in repository
+    or "summaryIndex.read(" not in repository
+):
     violations.append("LocalSessionRepository must keep lightweight session-summary caching")
 
 if "localSessionPersistenceSnapshot(" not in engine:
