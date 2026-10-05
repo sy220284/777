@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+import android.content.Context
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.local.ForegroundTokenUsageSeed
 import com.labteto.dshmobile.local.LocalChatContextRefreshCoordinator
@@ -26,12 +27,14 @@ import com.labteto.dshmobile.local.model.withoutLastCompletedAssistantReply
 import com.labteto.dshmobile.local.model.chatSystemPrompt
 import com.labteto.dshmobile.local.runtime.CHAT_RECENT_HISTORY_MESSAGES
 import com.labteto.dshmobile.local.runtime.CHAT_ROLEPLAY_TEMPERATURE
+import com.labteto.dshmobile.local.runtime.LocalExecutionService
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -61,6 +64,7 @@ import kotlinx.serialization.json.put
  */
 @Singleton
 internal class LocalChatDirectTurnExecutor @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val chatState: LocalChatStatePort,
     private val sessionStorage: LocalSessionStorageRuntime,
@@ -109,13 +113,19 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             if (runtimeStateStore.currentSessionId != ownedSessionId) {
                 throw CancellationException("会话已切换")
             }
-            runOwned(
+            LocalExecutionService.withTurn(
+                context = context,
                 sessionId = ownedSessionId,
-                input = input,
-                memoryInput = memoryInput,
-                sourceMessageId = sourceMessageId,
-                replacingMessageId = replacingMessageId,
-            )
+                error = { runtimeStateStore.state.value.error },
+            ) {
+                runOwned(
+                    sessionId = ownedSessionId,
+                    input = input,
+                    memoryInput = memoryInput,
+                    sourceMessageId = sourceMessageId,
+                    replacingMessageId = replacingMessageId,
+                )
+            }
         }
     }
 
