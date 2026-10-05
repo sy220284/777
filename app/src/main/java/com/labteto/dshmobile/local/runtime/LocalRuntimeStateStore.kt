@@ -85,11 +85,29 @@ class LocalRuntimeStateStore internal constructor(
         get() = jobOwner.manager
     @Volatile private var initialized = false
     @Volatile private var foregroundSessionId: String? = null
+    @Volatile private var sessionTransitionInProgress = false
 
     internal val state: StateFlow<LocalHarnessState> = mutable.asStateFlow()
     internal val sendFeedbackState: StateFlow<LocalSendFeedbackState> = sendFeedbackMutable.asStateFlow()
     internal val currentSessionId: String
         get() = foregroundSessionId ?: error("LocalRuntimeStateStore 尚未初始化")
+    internal val sessionTransitioning: Boolean
+        get() = sessionTransitionInProgress
+
+    internal fun beginSessionTransition(): Boolean = synchronized(foregroundRunHandle.lock) {
+        if (state.value.loading || sessionTransitionInProgress) {
+            false
+        } else {
+            sessionTransitionInProgress = true
+            true
+        }
+    }
+
+    internal fun endSessionTransition() {
+        synchronized(foregroundRunHandle.lock) {
+            sessionTransitionInProgress = false
+        }
+    }
 
     internal fun observeResourceSnapshots(observer: (HarnessResourceSnapshot) -> Unit) {
         synchronized(resourceProjectionLock) {
