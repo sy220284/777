@@ -3,7 +3,9 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETUP="$SCRIPT_DIR/setup-toolchain.sh"
-DEFAULT_REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+INSTALL="$SCRIPT_DIR/install.sh"
+PACKAGE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+DEFAULT_REPO_ROOT="$PACKAGE_ROOT"
 if [ -x "$PWD/gradlew" ] && [ -f "$PWD/app/build.gradle.kts" ]; then
   DEFAULT_REPO_ROOT="$PWD"
 fi
@@ -13,14 +15,15 @@ COMMAND="${1:-help}"
 if [ "$#" -gt 0 ]; then shift; fi
 
 PROFILE=build
-SKIP_SYSTEM_PACKAGES=false
 ENV_FILE="${DEV777_TOOLCHAIN_ENV_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/777/dev-toolchain.env}"
 if [ -f "$ENV_FILE" ]; then
   # shellcheck disable=SC1090
   source "$ENV_FILE"
 fi
 TOOLS_ROOT="${DEV777_TOOLS_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/777-dev}"
-SDK_ROOT="${DEV777_ANDROID_SDK_ROOT:-${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$TOOLS_ROOT/android-sdk}}}"
+SDK_ROOT="${DEV777_ANDROID_SDK_ROOT:-${ANDROID_SDK_ROOT:-$TOOLS_ROOT/android-sdk}}"
+GRADLE_HOME="${DEV777_GRADLE_HOME:-${GRADLE_HOME:-$TOOLS_ROOT/gradle}}"
+GRADLE_USER_HOME="${DEV777_GRADLE_USER_HOME:-${GRADLE_USER_HOME:-$TOOLS_ROOT/gradle-user-home}}"
 STATE_DIR="${DEV777_TOOLCHAIN_STATE_DIR:-$REPO_ROOT/.777/toolchain}"
 STATUS_FILE="$STATE_DIR/status.json"
 CHECK_LOG="$STATE_DIR/check.log"
@@ -30,8 +33,6 @@ usage() {
   cat <<'USAGE'
 777 AI 开发工具链入口
 
-AI / Agent 推荐只记这个脚本：
-
   bash tools/dev/ai-toolchain.sh bootstrap
   bash tools/dev/ai-toolchain.sh check
   bash tools/dev/ai-toolchain.sh status
@@ -39,30 +40,21 @@ AI / Agent 推荐只记这个脚本：
   bash tools/dev/ai-toolchain.sh run -- <command> [args...]
 
 命令：
-  bootstrap                 非交互检查；缺什么自动配置什么；成功后输出 JSON
-  check                     只检查，不修改机器；输出 JSON，失败时退出码为 1
-  status                    只输出最近一次机器可读状态 JSON
-  gradle [tasks...]         自动确保 build 环境就绪后执行仓库 Gradle Wrapper
-  run -- <command> [...]    自动确保 build 环境就绪后，在工具链环境中执行任意命令
-  env                       只输出环境文件路径
+  bootstrap                 只从当前 GitHub Actions Artifact payload 安装/修复；输出 JSON
+  check                     只检查，不修改机器；输出 JSON
+  status                    输出最近一次机器可读状态
+  gradle [tasks...]         使用产物内 Gradle + --offline 执行
+  run -- <command> [...]    在已安装的工具链环境中执行任意命令
+  env                       输出环境文件路径
   help                      显示帮助
 
 选项：
   --profile build|full      默认 build
-  --skip-system-packages    不调用 apt-get；系统依赖必须已经存在
-
-环境变量（用于 CI / 沙箱覆盖默认目录）：
-  DEV777_TOOLS_ROOT
-  DEV777_ANDROID_SDK_ROOT
-  DEV777_TOOLCHAIN_ENV_FILE
-  DEV777_TOOLCHAIN_STATE_DIR
-  DEV777_REPO_ROOT
 
 约定：
-- 全程非交互，不修改 shell rc。
-- Android licenses 由 AI 入口显式接受。
-- sudo 只使用非交互模式；需要密码时立即失败，不等待输入。
-- bootstrap / check / status 的 stdout 是 JSON；诊断日志写 stderr 和 STATE_DIR。
+- 禁止通过 apt、curl、sdkmanager、Gradle/Maven、Node 或其他外部渠道补齐。
+- bootstrap 缺少 payload 时直接失败，并要求先下载 GitHub Actions 工具链构建产物。
+- Gradle 命令固定使用产物内 Gradle 和离线依赖缓存。
 USAGE
 }
 
@@ -71,9 +63,6 @@ while [ "$#" -gt 0 ]; do
     --profile)
       shift
       PROFILE="${1:-}"
-      ;;
-    --skip-system-packages)
-      SKIP_SYSTEM_PACKAGES=true
       ;;
     --)
       shift
@@ -89,9 +78,7 @@ while [ "$#" -gt 0 ]; do
           ;;
       esac
       ;;
-    *)
-      break
-      ;;
+    *) break ;;
   esac
   shift
 done
@@ -117,7 +104,7 @@ write_status() {
   local tmp="$STATUS_FILE.tmp"
   cat > "$tmp" <<EOF
 {
-  "schema": 1,
+  "schema": 2,
   "status": "$(json_escape "$status")",
   "reason": "$(json_escape "$reason")",
   "profile": "$(json_escape "$PROFILE")",
@@ -126,6 +113,8 @@ write_status() {
   "env_file": "$(json_escape "$ENV_FILE")",
   "sdk_root": "$(json_escape "$SDK_ROOT")",
   "tools_root": "$(json_escape "$TOOLS_ROOT")",
+  "gradle_home": "$(json_escape "$GRADLE_HOME")",
+  "gradle_user_home": "$(json_escape "$GRADLE_USER_HOME")",
   "state_dir": "$(json_escape "$STATE_DIR")",
   "log_file": "$(json_escape "$log_file")",
   "next_action": "$(json_escape "$next_action")"
@@ -140,20 +129,25 @@ emit_status() {
 
 setup_args() {
   SETUP_ARGS=(
+    --check
     --profile "$PROFILE"
     --tools-root "$TOOLS_ROOT"
     --sdk-root "$SDK_ROOT"
+    --gradle-home "$GRADLE_HOME"
+    --gradle-user-home "$GRADLE_USER_HOME"
     --env-file "$ENV_FILE"
   )
 }
 
 run_check() {
   setup_args
-  if bash "$SETUP" --check "${SETUP_ARGS[@]}" >"$CHECK_LOG" 2>&1; then
+  DEV777_REPO_ROOT="$REPO_ROOT" bash "$SETUP" "${SETUP_ARGS[@]}" >"$CHECK_LOG" 2>&1
+  local status=$?
+  if [ "$status" -eq 0 ]; then
     write_status ready environment_ready 0 "$CHECK_LOG" "bash tools/dev/ai-toolchain.sh gradle :app:assembleDebug"
     return 0
   fi
-  write_status needs_bootstrap missing_dependencies 1 "$CHECK_LOG" "bash tools/dev/ai-toolchain.sh bootstrap --profile $PROFILE"
+  write_status needs_bootstrap missing_dependencies 1 "$CHECK_LOG" "下载 GitHub Actions 工具链 Artifact 后执行其中的 tools/dev/ai-toolchain.sh bootstrap --profile $PROFILE"
   return 1
 }
 
@@ -164,6 +158,14 @@ load_env() {
   fi
   # shellcheck disable=SC1090
   source "$ENV_FILE"
+  GRADLE_HOME="${DEV777_GRADLE_HOME:-${GRADLE_HOME:-$TOOLS_ROOT/gradle}}"
+  GRADLE_USER_HOME="${DEV777_GRADLE_USER_HOME:-${GRADLE_USER_HOME:-$TOOLS_ROOT/gradle-user-home}}"
+}
+
+artifact_payload_available() {
+  [ -f "$PACKAGE_ROOT/payload/manifest.env" ] &&
+    [ -f "$PACKAGE_ROOT/payload/toolchain.tar.gz" ] &&
+    [ -f "$PACKAGE_ROOT/SHA256SUMS" ]
 }
 
 bootstrap_toolchain() {
@@ -174,40 +176,42 @@ bootstrap_toolchain() {
     return 0
   fi
 
-  echo "[777-ai] 环境未就绪，开始非交互自动配置（profile=$PROFILE）。" >&2
-  cat "$CHECK_LOG" >&2
-
-  setup_args
-  local args=(
-    --auto
-    "${SETUP_ARGS[@]}"
-    --accept-android-licenses
-    --non-interactive
-  )
-  if [ "$SKIP_SYSTEM_PACKAGES" = true ]; then
-    args+=(--skip-system-packages)
+  if ! artifact_payload_available; then
+    cat "$CHECK_LOG" >&2
+    write_status error artifact_required 2 "$CHECK_LOG" "下载 777-dev-toolchain-$PROFILE-latest Artifact，解压后从产物目录执行 tools/dev/ai-toolchain.sh bootstrap"
+    [ "$emit_json" = true ] && emit_status
+    return 2
   fi
 
-  if ! bash "$SETUP" "${args[@]}" > >(tee "$BOOTSTRAP_LOG" >&2) 2> >(tee -a "$BOOTSTRAP_LOG" >&2); then
-    write_status error bootstrap_failed 1 "$BOOTSTRAP_LOG" "查看日志并修复宿主权限/网络/平台问题后重新执行 bootstrap"
+  echo "[777-ai] 从当前 GitHub Actions Artifact payload 安装 profile=$PROFILE。" >&2
+  DEV777_REPO_ROOT="$REPO_ROOT" \
+  DEV777_TOOLS_ROOT="$TOOLS_ROOT" \
+  DEV777_ANDROID_SDK_ROOT="$SDK_ROOT" \
+  DEV777_GRADLE_HOME="$GRADLE_HOME" \
+  DEV777_GRADLE_USER_HOME="$GRADLE_USER_HOME" \
+  DEV777_TOOLCHAIN_ENV_FILE="$ENV_FILE" \
+    bash "$INSTALL" "$PROFILE" > >(tee "$BOOTSTRAP_LOG" >&2) 2> >(tee -a "$BOOTSTRAP_LOG" >&2)
+  local install_status=$?
+  if [ "$install_status" -ne 0 ]; then
+    write_status error artifact_install_failed "$install_status" "$BOOTSTRAP_LOG" "检查 Artifact 完整性、架构和宿主基础命令后重新安装"
+    [ "$emit_json" = true ] && emit_status
+    return "$install_status"
+  fi
+
+  if ! load_env; then
+    write_status error env_file_missing 1 "$BOOTSTRAP_LOG" "检查 Artifact 安装后的环境文件生成"
     [ "$emit_json" = true ] && emit_status
     return 1
   fi
-
-  load_env || {
-    write_status error env_file_missing 1 "$BOOTSTRAP_LOG" "检查环境文件生成失败"
-    [ "$emit_json" = true ] && emit_status
-    return 1
-  }
 
   if ! run_check; then
     cat "$CHECK_LOG" >&2
-    write_status error post_check_failed 1 "$CHECK_LOG" "自动配置后检查仍失败；查看 check.log"
+    write_status error post_check_failed 1 "$CHECK_LOG" "Artifact 安装后检查仍失败；查看 check.log"
     [ "$emit_json" = true ] && emit_status
     return 1
   fi
 
-  echo "[777-ai] 工具链已就绪。" >&2
+  echo "[777-ai] Artifact 工具链已就绪。" >&2
   [ "$emit_json" = true ] && emit_status
 }
 
@@ -248,12 +252,12 @@ case "$COMMAND" in
     if ! ensure_build_ready; then
       exit 1
     fi
-    if [ ! -x "$REPO_ROOT/gradlew" ]; then
-      echo "[777-ai] 未找到仓库 Gradle Wrapper：$REPO_ROOT/gradlew" >&2
+    if [ ! -x "$GRADLE_HOME/bin/gradle" ]; then
+      echo "[777-ai] 产物内 Gradle 不存在：$GRADLE_HOME/bin/gradle" >&2
       exit 2
     fi
     cd "$REPO_ROOT"
-    exec ./gradlew "$@"
+    exec "$GRADLE_HOME/bin/gradle" --offline "$@"
     ;;
   run)
     if [ "${1:-}" = "--" ]; then shift; fi
@@ -264,6 +268,7 @@ case "$COMMAND" in
     if ! ensure_build_ready; then
       exit 1
     fi
+    cd "$REPO_ROOT"
     exec "$@"
     ;;
   help|-h|--help)
