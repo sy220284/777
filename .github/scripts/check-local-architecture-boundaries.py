@@ -549,6 +549,35 @@ for removed_engine_proxy in (
         die("LocalHarnessEngine must not reintroduce Work interaction proxy API: " + removed_engine_proxy)
 if "LocalHarnessEngine" in work_runtime_source or "engine." in work_runtime_source:
     die("LocalWorkRuntime must not depend on LocalHarnessEngine")
+
+work_execution_coordinator_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionCoordinator.kt")
+)
+work_turn_port_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnPort.kt")
+)
+if "LocalHarnessEngine" in work_execution_coordinator_source:
+    die("WorkExecutionPort implementation must stay inside WorkFeature without Engine")
+if "prepareLocalSend(text, attachments)" not in work_execution_coordinator_source:
+    die("WorkFeature must own Work input preparation")
+if "turn.sendPrepared(prepared)" not in work_execution_coordinator_source:
+    die("WorkFeature must delegate only the prepared turn to the migration bridge")
+if "interface LocalWorkTurnPort" not in work_turn_port_source:
+    die("Work turn migration port contract is missing")
+if "LocalHarnessEngine" in work_turn_port_source or "LocalHarnessState" in work_turn_port_source:
+    die("Work turn migration port must not expose Engine or aggregate state")
+if "provideLocalWorkExecutionPort" not in feature_execution_port_module_source:
+    die("app composition root must bind the Work-owned execution implementation")
+if "coordinator: LocalWorkExecutionCoordinator" not in feature_execution_port_module_source:
+    die("WorkExecutionPort must be implemented by LocalWorkExecutionCoordinator")
+if "engine.workExecutionPort" in feature_execution_port_module_source or "internal val workExecutionPort" in engine:
+    die("LocalHarnessEngine must not own the Work product execution port")
+if "provideLocalWorkTurnPort" not in feature_execution_port_module_source:
+    die("app composition root must expose the temporary Work turn bridge")
+if "engine.workTurnPort" not in feature_execution_port_module_source:
+    die("Work turn composition must use the explicit migration bridge")
+if "internal val workTurnPort: LocalWorkTurnPort" not in engine:
+    die("Engine migration code must expose the narrow Work turn bridge")
 if not has_call(work_runtime_source, "runtimeStateStore", "cancelForegroundRun"):
     die("Work visible-run cancellation must use the shared Runtime owner")
 if "check(!initialized)" not in runtime_state_store:
