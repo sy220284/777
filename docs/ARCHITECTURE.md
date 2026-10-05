@@ -436,7 +436,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 - 已迁出的 Chat 领域写入统一采用“Session MAINTENANCE owner → durable Chat domain/timeline event → runtime projection → Session snapshot cache”提交顺序。人物/行为调节等跨文档写入在权威事件提交前失败必须恢复原文档；群聊成员、回复建议和分支选择不得再出现 UI 已更新但 EventLog/模型历史仍停留旧状态的半提交。
 - 回归覆盖多会话等待、全局模式启停、过期/已完成点击、设备授权隔离/撤销、显式审批工具与前台切换；本子阶段须通过最终 Head 的完整 CI 验证。
 
-剩余：Chat 的分支、发送、群聊与部分运行协调仍依赖 Engine；其他 Feature 的代理、跨 Feature 内部引用和完整可写聚合状态还需按阶段收敛。WorkRuntime 引用清零只证明本次 Work UI 边界迁移，不能把阶段 3 或整个架构 3.0 标记为完成。
+当前阶段三已知 Engine Feature 业务根已清零，Chat / Work 的发送、主回合、时间线 / 分支、Work AgentLoop 与 Tool runtime 等真实实现已归所属 Feature；Shared Context 也已改为中立 Policy / DTO，由 Feature 提供策略。阶段 3 仍不能标记完成：组合根尚有 `chatTurnPort`、`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort` 五个 Engine bridge，Session / 可见 Work 投影等横向适配仍待迁出。Automation 的两个 Engine coordinator bridge 属于阶段 4，单独验收。
 
 ### 阶段 4：建立 AutomationFeature
 
