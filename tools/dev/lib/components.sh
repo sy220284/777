@@ -93,7 +93,8 @@ component_ready() {
         actionlint -version 2>/dev/null | grep -Fq "$ACTIONLINT_VERSION"
       ;;
     emulator)
-      [ -x "$SDK_ROOT/emulator/emulator" ]
+      [ -x "$SDK_ROOT/emulator/emulator" ] &&
+        "$SDK_ROOT/emulator/emulator" -version >/dev/null 2>&1
       ;;
     android-image-16)
       find "$SDK_ROOT/system-images" -type d -path '*android-36*google_apis*x86_64' -print -quit 2>/dev/null | grep -q .
