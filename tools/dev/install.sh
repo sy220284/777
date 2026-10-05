@@ -60,7 +60,7 @@ usage() {
   - plan 只检查本机，输出真正缺失的 Artifact 名称。
   - install 只安装缺失组件；已经满足版本要求的组件直接复用。
   - 组件来源只允许 GitHub Actions Artifact。
-  - 组件 Artifact 名称固定为 777-toolchain-<component>-latest。
+  - 大组件会拆成多个 part Artifact；同一组件缺失时需下载 plan 列出的全部 part。
   - 本地不会从 apt、Google SDK、Gradle/Maven、Node 等其他渠道补齐。
 USAGE
 }
@@ -115,10 +115,7 @@ if [ "$ARCH_KIND" != x64 ]; then
 fi
 
 if [ "$COMMAND" = plan ]; then
-  missing_components "$PROFILE" | while IFS= read -r component; do
-    [ -n "$component" ] || continue
-    artifact_name_for_component "$component"
-  done
+  missing_artifacts "$PROFILE"
   exit 0
 fi
 
@@ -136,7 +133,7 @@ if [ -z "$ARTIFACTS_DIR" ] || [ ! -d "$ARTIFACTS_DIR" ]; then
   exit 2
 fi
 
-for command_name in sha256sum tar gzip cp rm mkdir mktemp uname; do
+for command_name in sha256sum tar gzip cat cp rm mkdir mktemp uname sed head; do
   command -v "$command_name" >/dev/null 2>&1 || {
     echo "[777-install] 宿主缺少基础命令：$command_name；不会从其他渠道安装。" >&2
     exit 1
@@ -156,32 +153,37 @@ safe_root "$GRADLE_HOME" GRADLE_HOME
 safe_root "$GRADLE_USER_HOME" GRADLE_USER_HOME
 if [ -n "$REPO_ROOT" ]; then safe_root "$REPO_ROOT" REPO_ROOT; fi
 
-find_component_dir() {
-  local component="$1" artifact direct declared_component
-  artifact="$(artifact_name_for_component "$component")"
-  for direct in "$ARTIFACTS_DIR/$artifact" "$ARTIFACTS_DIR/$component" "$ARTIFACTS_DIR"; do
-    if [ -f "$direct/component.env" ]; then
-      # 校验前绝不 source 下载内容；只把 ARTIFACT_COMPONENT 当纯文本读取，
-      # 等 SHA-256 通过后再加载完整元数据。
-      declared_component="$(sed -n 's/^ARTIFACT_COMPONENT=//p' "$direct/component.env" | head -n 1)"
-      if [ "$declared_component" = "$component" ]; then
-        printf '%s\n' "$direct"
-        return 0
-      fi
-    fi
-  done
+find_artifact_dir() {
+  local artifact="$1"
+  if [ -f "$ARTIFACTS_DIR/$artifact/component.env" ]; then
+    printf '%s\n' "$ARTIFACTS_DIR/$artifact"
+    return 0
+  fi
+
+  # 兼容用户只解压了单个 Artifact，并直接把该目录传给 --artifacts-dir。
+  if [ -f "$ARTIFACTS_DIR/component.env" ]; then
+    printf '%s\n' "$ARTIFACTS_DIR"
+    return 0
+  fi
   return 1
 }
 
-install_component() {
-  local component="$1" dir archive tmp artifact_component artifact_arch
-  dir="$(find_component_dir "$component" || true)"
-  if [ -z "$dir" ]; then
-    echo "[777-install] 缺少组件 Artifact：$(artifact_name_for_component "$component")" >&2
+verify_artifact_dir() {
+  local component="$1" dir="$2" expected_part="$3" expected_parts="$4"
+  local artifact_component artifact_arch artifact_part artifact_parts payload_file
+
+  if [ ! -f "$dir/SHA256SUMS" ] || [ ! -f "$dir/component.env" ]; then
+    echo "[777-install] Artifact 不完整：$dir" >&2
     return 3
   fi
-  if [ ! -f "$dir/SHA256SUMS" ] || [ ! -f "$dir/payload.tar.gz" ]; then
-    echo "[777-install] 组件 Artifact 不完整：$dir" >&2
+
+  if [ "$expected_parts" -eq 1 ]; then
+    payload_file="payload.tar.gz"
+  else
+    payload_file="payload.part"
+  fi
+  if [ ! -f "$dir/$payload_file" ]; then
+    echo "[777-install] Artifact 缺少 $payload_file：$dir" >&2
     return 3
   fi
 
@@ -190,10 +192,15 @@ install_component() {
     sha256sum -c SHA256SUMS
   )
 
+  # 只有 SHA-256 通过后才加载 Actions 生成的元数据。
+  unset ARTIFACT_COMPONENT ARTIFACT_ARCH ARTIFACT_PART ARTIFACT_PARTS
   # shellcheck disable=SC1090
   source "$dir/component.env"
   artifact_component="${ARTIFACT_COMPONENT:-}"
   artifact_arch="${ARTIFACT_ARCH:-}"
+  artifact_part="${ARTIFACT_PART:-1}"
+  artifact_parts="${ARTIFACT_PARTS:-1}"
+
   [ "$artifact_component" = "$component" ] || {
     echo "[777-install] 组件身份不匹配：期望 $component，实际 $artifact_component" >&2
     return 3
@@ -202,9 +209,58 @@ install_component() {
     echo "[777-install] 组件架构不匹配：$artifact_arch / $ARCH_KIND" >&2
     return 3
   }
+  [ "$artifact_part" = "$expected_part" ] || {
+    echo "[777-install] 分片序号不匹配：$component 期望 $expected_part，实际 $artifact_part" >&2
+    return 3
+  }
+  [ "$artifact_parts" = "$expected_parts" ] || {
+    echo "[777-install] 分片总数不匹配：$component 期望 $expected_parts，实际 $artifact_parts" >&2
+    return 3
+  }
+}
 
+materialize_component_archive() {
+  local component="$1" target="$2"
+  local parts artifact dir part=1
+  parts="$(component_part_count "$component")"
+
+  rm -f "$target"
+  : > "$target"
+
+  while IFS= read -r artifact; do
+    [ -n "$artifact" ] || continue
+    dir="$(find_artifact_dir "$artifact" || true)"
+    if [ -z "$dir" ]; then
+      echo "[777-install] 缺少组件 Artifact：$artifact" >&2
+      return 3
+    fi
+    verify_artifact_dir "$component" "$dir" "$part" "$parts" || return $?
+
+    if [ "$parts" -eq 1 ]; then
+      cat "$dir/payload.tar.gz" > "$target"
+    else
+      cat "$dir/payload.part" >> "$target"
+    fi
+    part=$((part + 1))
+  done < <(artifact_names_for_component "$component")
+
+  if [ "$part" -ne $((parts + 1)) ]; then
+    echo "[777-install] $component 分片数量不完整。" >&2
+    return 3
+  fi
+  gzip -t "$target"
+}
+
+install_component() {
+  local component="$1" tmp archive
   tmp="$(mktemp -d)"
-  archive="$dir/payload.tar.gz"
+  archive="$tmp/payload.tar.gz"
+
+  if ! materialize_component_archive "$component" "$archive"; then
+    rm -rf "$tmp"
+    return 3
+  fi
+
   tar -xzf "$archive" -C "$tmp"
 
   case "$component" in
@@ -304,10 +360,7 @@ else
 
   if [ "$failed" -ne 0 ]; then
     echo "[777-install] 仍缺少以下 Artifact：" >&2
-    missing_components "$PROFILE" | while IFS= read -r component; do
-      [ -n "$component" ] || continue
-      artifact_name_for_component "$component" >&2
-    done
+    missing_artifacts "$PROFILE" >&2
     exit 3
   fi
 fi
