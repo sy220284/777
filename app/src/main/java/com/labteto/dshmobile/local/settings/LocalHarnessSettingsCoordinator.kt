@@ -24,20 +24,33 @@ import kotlinx.coroutines.launch
 internal class LocalHarnessSettingsCoordinator internal constructor(
     private val preferences: SharedPreferences,
     private val userProfileStore: UserProfileStore,
-    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val statePort: LocalSettingsStatePort,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
+    internal constructor(
+        preferences: SharedPreferences,
+        userProfileStore: UserProfileStore,
+        runtimeStateStore: LocalRuntimeStateStore,
+        scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    ) : this(
+        preferences = preferences,
+        userProfileStore = userProfileStore,
+        statePort = localSettingsStatePort(runtimeStateStore),
+        scope = scope,
+    )
+
     @Inject
     constructor(
         @ApplicationContext context: Context,
         userProfileStore: UserProfileStore,
         runtimeStateStore: LocalRuntimeStateStore,
     ) : this(
-        context.getSharedPreferences("local_harness", Context.MODE_PRIVATE),
-        userProfileStore,
-        runtimeStateStore,
+        preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE),
+        userProfileStore = userProfileStore,
+        statePort = localSettingsStatePort(runtimeStateStore),
     )
-    private val state get() = runtimeStateStore.state.value
+
+    private val state get() = statePort.value
     private val personalizationGeneration = AtomicLong()
     private val personalizationWrites = Channel<Pair<Long, UserProfile>>(Channel.CONFLATED)
 
@@ -48,10 +61,8 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
             for ((generation, profile) in personalizationWrites) {
                 runCatching { userProfileStore.write(profile) }
                     .onFailure { error ->
-                        updateState { current ->
-                            if (personalizationGeneration.get() == generation) {
-                                current.copy(error = error.message ?: "个性化设置保存失败")
-                            } else current
+                        if (personalizationGeneration.get() == generation) {
+                            statePort.publishError(error.message ?: "个性化设置保存失败")
                         }
                     }
             }
@@ -60,9 +71,6 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
 
     internal fun readUserProfile(): UserProfile = userProfileStore.read()
 
-    private fun updateState(transform: (LocalHarnessState) -> LocalHarnessState) {
-        runtimeStateStore.projection.update(transform)
-    }
     fun configureRuntimeLimits(
         mainMaxSteps: Int,
         subagentMaxSteps: Int,
@@ -76,13 +84,11 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
             .putInt(KEY_SUBAGENT_MAX_STEPS, subagent)
             .putInt(KEY_MODEL_ATTEMPTS, attempts)
             .apply()
-        updateState {
-            it.copy(
-                mainMaxSteps = main,
-                subagentMaxSteps = subagent,
-                modelState = it.modelState.copy(modelAttempts = attempts),
-            )
-        }
+        statePort.updateRuntimeLimits(
+            mainMaxSteps = main,
+            subagentMaxSteps = subagent,
+            modelAttempts = attempts,
+        )
     }
 
     fun configureWorkerProfile(profileId: String?) {
@@ -94,9 +100,7 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
         preferences.edit().apply {
             if (normalized == null) remove(KEY_WORKER_PROFILE_ID) else putString(KEY_WORKER_PROFILE_ID, normalized)
         }.apply()
-        updateState {
-            it.copy(modelState = it.modelState.copy(modelSelection = it.modelState.modelSelection.copy(workerProfileId = normalized)))
-        }
+        statePort.updateWorkerProfile(normalized)
     }
 
     @Synchronized
@@ -111,19 +115,17 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
             autoMemory = autoMemory,
         )
         val generation = personalizationGeneration.incrementAndGet()
-        updateState {
-            it.copy(
-                userRules = profile.customRules,
-                autoRecall = profile.autoRecall,
-                autoMemory = profile.autoMemory,
-            )
-        }
+        statePort.updatePersonalization(
+            userRules = profile.customRules,
+            autoRecall = profile.autoRecall,
+            autoMemory = profile.autoMemory,
+        )
         personalizationWrites.trySend(generation to profile).getOrThrow()
     }
 
     fun configureChatStyleGuard(enabled: Boolean) {
         preferences.edit().putBoolean(KEY_CHAT_STYLE_GUARD, enabled).apply()
-        updateState { it.copy(chatStyleGuardEnabled = enabled) }
+        statePort.setChatStyleGuardEnabled(enabled)
     }
 
     fun addChatStyleGuardPhrase(value: String): Boolean {
@@ -132,7 +134,7 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
         if (phrase in current || current.size >= MAX_CUSTOM_CHAT_FILTERS) return false
         val updated = current + phrase
         persistChatStyleGuardPhrases(updated)
-        updateState { it.copy(chatStyleGuardCustomPhrases = updated) }
+        statePort.setChatStyleGuardPhrases(updated)
         return true
     }
 
@@ -143,11 +145,11 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
         val updated = current.filterNot { it == phrase }
         if (updated == current) return
         persistChatStyleGuardPhrases(updated)
-        updateState { it.copy(chatStyleGuardCustomPhrases = updated) }
+        statePort.setChatStyleGuardPhrases(updated)
     }
 
     fun clearChatStyleGuardHits() {
-        updateState { it.copy(styleGuardHits = emptyList()) }
+        statePort.clearStyleGuardHits()
     }
 
     fun chatStreamFilterPhrases(
@@ -160,16 +162,7 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
     )
 
     fun recordStyleGuardHits(violations: List<String>) {
-        if (violations.isEmpty()) return
-        updateState { current ->
-            current.copy(
-                styleGuardHits = (current.styleGuardHits + violations)
-                    .map(String::trim)
-                    .filter(String::isNotBlank)
-                    .distinct()
-                    .takeLast(MAX_STYLE_GUARD_HITS),
-            )
-        }
+        statePort.recordStyleGuardHits(violations, MAX_STYLE_GUARD_HITS)
     }
 
     private fun persistChatStyleGuardPhrases(phrases: List<String>) {
