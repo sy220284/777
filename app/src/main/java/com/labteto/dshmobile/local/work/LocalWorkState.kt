@@ -14,4 +14,5 @@ data class LocalWorkState(
     val workflowProgress: LocalWorkflowProgress? = null,
     val pendingApproval: LocalApproval? = null,
     val pendingQuestion: LocalQuestion? = null,
+    val deviceApprovalLease: Boolean = false,
 )
