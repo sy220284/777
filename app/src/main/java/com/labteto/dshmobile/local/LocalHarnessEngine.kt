@@ -4016,7 +4016,7 @@ class LocalHarnessEngine @Inject internal constructor(
         summary: String,
         tool: HarnessTool,
     ): Boolean {
-        if (_state.value.work.deviceApprovalLease && canUseDeviceApprovalLease(tool)) {
+        if (runtimeStateStore.foregroundInteractions.deviceApprovalLeaseEnabled() && canUseDeviceApprovalLease(tool)) {
             eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
@@ -4056,7 +4056,7 @@ class LocalHarnessEngine @Inject internal constructor(
         tool: HarnessTool,
     ): Boolean {
         val snapshot = binding.state.value
-        if (snapshot.work.deviceApprovalLease && canUseDeviceApprovalLease(tool)) {
+        if (binding.interactions.deviceApprovalLeaseEnabled() && canUseDeviceApprovalLease(tool)) {
             binding.eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
