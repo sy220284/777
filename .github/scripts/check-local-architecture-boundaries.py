@@ -110,16 +110,40 @@ def has_call(source: str, receiver: str, method: str) -> bool:
     ) is not None
 
 
-# ChatFeature must not depend on AutomationFeature internals.
-# Cross-feature user-activity notification is inverted through a Chat-owned contract and
-# bound to an Automation adapter only at the app composition root.
-for chat_source_path in (LOCAL_SOURCE_ROOT / "chat").rglob("*.kt"):
-    chat_source = strip_comments(chat_source_path.read_text(encoding="utf-8"))
-    if "import com.labteto.dshmobile.local.automation." in chat_source:
-        relative = chat_source_path.relative_to(ROOT).as_posix()
+# Provider Features must not import sibling product internals.
+# Cross-feature collaboration goes through provider-owned APIs/Ports or Shared Capabilities.
+for feature_name, forbidden_prefixes in (
+    ("chat", (
+        "com.labteto.dshmobile.local.work.",
+        "com.labteto.dshmobile.local.automation.",
+    )),
+    ("work", (
+        "com.labteto.dshmobile.local.chat.",
+        "com.labteto.dshmobile.local.automation.",
+    )),
+):
+    for feature_source_path in (LOCAL_SOURCE_ROOT / feature_name).rglob("*.kt"):
+        feature_source = strip_comments(feature_source_path.read_text(encoding="utf-8"))
+        relative = feature_source_path.relative_to(ROOT).as_posix()
+        for forbidden_prefix in forbidden_prefixes:
+            if re.search(
+                rf"^import\s+{re.escape(forbidden_prefix)}",
+                feature_source,
+                re.MULTILINE,
+            ):
+                die(
+                    f"{relative} imports sibling Feature internals through {forbidden_prefix}; "
+                    "depend on a provider-owned API/Port or Shared Capability instead"
+                )
+
+timeline_rewrite_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalTimelineRewriteTransaction.kt")
+)
+for forbidden_work_timeline_type in ("LocalGoal", "LocalTodoItem"):
+    if forbidden_work_timeline_type in timeline_rewrite_source:
         die(
-            f"{relative} makes ChatFeature depend on AutomationFeature internals; "
-            "publish through a Chat-owned contract and bind the observer at composition"
+            "Chat timeline rewrite state must not persist WorkFeature controls: "
+            + forbidden_work_timeline_type
         )
 
 chat_user_activity_contract_path = (
