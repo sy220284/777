@@ -328,7 +328,7 @@ class LocalHarnessEngine @Inject internal constructor(
         )
     }
     private var transcriptProjectionCursor: Long? = null
-    private val modelHistory = LocalModelHistoryBuffer()
+    private val modelHistory = runtimeStateStore.foregroundModelHistory
     private var turnsSinceModelHistoryCheckpoint = 0
     private val _state = runtimeStateStore.initialize(
         LocalHarnessState(
@@ -2033,36 +2033,13 @@ class LocalHarnessEngine @Inject internal constructor(
 
     internal fun installedPluginIdsForUi(): List<String> = pluginComposition.installedPluginIds()
 
-    /** Stop only the run owned by the currently visible conversation. */
-    internal fun stop() {
+    /**
+     * Stop the legacy visible foreground slot.
+     *
+     * Session-bound Work runs are owned and cancelled by WorkFeature before this fallback is used.
+     */
+    internal fun stopForegroundRun() {
         cancelChatPostTurn()
-        val binding = workRunRegistry[currentSessionId]
-        if (binding?.job?.isCompleted == false) {
-            binding.interactions.cancelAll()
-            val discarded = binding.pendingInputs.drain()
-            if (discarded.isNotEmpty()) {
-                binding.eventLog.append(
-                    LOCAL_AGENT_INBOX_EVENT_TYPE,
-                    encodeLocalAgentInboxEvent(
-                        action = "cancelled",
-                        pending = binding.pendingInputs.snapshot(),
-                        affected = discarded,
-                    ),
-                )
-            }
-            binding.state.update {
-                it.copy(
-                    work = it.work.copy(
-                        pendingApproval = null,
-                        pendingQuestion = null,
-                    ),
-                    kernel = it.kernel.copy(queuedInputCount = 0),
-                )
-            }
-            binding.job?.cancel()
-            return
-        }
-
         runtimeStateStore.foregroundInteractions.cancelAll()
         val running = synchronized(runStateLock) {
             val discarded = pendingInputs.drain()
@@ -2365,23 +2342,6 @@ class LocalHarnessEngine @Inject internal constructor(
                 runTurn(next.content, next.memoryInput, next.id)
             }.also { activeJob = it }
         }
-    }
-
-    /** Switch between inspection-only planning and normal execution. */
-    internal fun setPlanMode(enabled: Boolean) {
-        if (
-            _state.value.usageMode == LocalUsageMode.CHAT ||
-            isRunBusy() ||
-            workRunRegistry[currentSessionId]?.job?.isCompleted == false
-        ) return
-        _state.update { it.copy(work = it.work.copy(planMode = enabled)) }
-        eventLog.append("plan/mode", buildJsonObject { put("active", enabled) })
-        if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
-            val prompt = systemPrompt()
-            recordRuntimeSystemPromptUpdate(modelHistory, prompt, _state.value, eventLog)
-            updateContextMetrics()
-        }
-        persist()
     }
 
     private suspend fun runTurn(
