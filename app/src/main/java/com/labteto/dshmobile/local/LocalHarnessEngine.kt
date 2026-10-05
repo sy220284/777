@@ -39,6 +39,7 @@ import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatPersonaCorrectionNotice
 import com.labteto.dshmobile.local.chat.ChatStyleGuard
 import com.labteto.dshmobile.local.chat.LocalCharacterBehaviorTuningCoordinator
+import com.labteto.dshmobile.local.chat.LocalChatBranchCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatBranchNode
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
 import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
@@ -111,6 +112,7 @@ import com.labteto.dshmobile.local.memory.LocalMemoryTools
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.LocalImageCapability
@@ -602,27 +604,32 @@ class LocalHarnessEngine @Inject internal constructor(
         )
     }
 
+    private val engineForegroundModelHistoryRuntime by lazy {
+        LocalForegroundModelHistoryRuntime(
+            runtimeStateStore = runtimeStateStore,
+            sessionStorage = sessionStorageRuntime,
+        )
+    }
+
+    private val engineChatBranchCoordinator by lazy {
+        LocalChatBranchCoordinator(
+            runtimeStateStore = runtimeStateStore,
+            chatState = engineChatStatePort,
+            sessionStorage = sessionStorageRuntime,
+            modelHistoryRuntime = engineForegroundModelHistoryRuntime,
+        )
+    }
+
     private val chatContextRefreshCoordinator by lazy {
         LocalChatContextRefreshCoordinator(
-            state = _state,
-            scope = scope,
+            runtimeStateStore = runtimeStateStore,
+            chatState = engineChatStatePort,
             chatTurnCoordinator = chatTurnCoordinator,
-            diaryStore = chatDiaryStore,
-            requestPlanner = { snapshot, prompt, requestLog, profile ->
-                completeWithRetry(
-                    key = profile.id,
-                    snapshot = snapshot,
-                    messages = chatPostTurnModelMessages(prompt),
-                    step = CHAT_POST_TURN_MODEL_STEP,
-                    toolsOverride = JsonArray(emptyList()),
-                    publishPreview = false,
-                    requestLog = requestLog,
-                    profile = profile,
-                )
-            },
-            recordUsage = { snapshot, reply -> usageTracker.recordForeground(snapshot, reply, TokenUsageAction.CHAT_STATE_REFRESH) },
-            persistBranchState = ::persistChatBranchState,
-            persist = ::persist,
+            persistence = chatPersistence,
+            modelRequests = modelRequestCoordinator,
+            usageTracker = usageTracker,
+            sessionStorage = sessionStorageRuntime,
+            branchCoordinator = engineChatBranchCoordinator,
         )
     }
 
