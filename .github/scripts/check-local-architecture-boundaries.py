@@ -563,6 +563,10 @@ for removed_engine_proxy in (
 if "LocalHarnessEngine" in work_runtime_source or "engine." in work_runtime_source:
     die("LocalWorkRuntime must not depend on LocalHarnessEngine")
 
+feature_execution_port_module_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt")
+)
+
 work_execution_coordinator_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionCoordinator.kt")
 )
