@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local
 
 import android.content.Context
-import android.net.Uri
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
@@ -32,7 +31,6 @@ import com.labteto.dshmobile.local.agent.decodeLocalAgentInboxPending
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.agent.localAgentRunPolicy
 import com.labteto.dshmobile.local.agent.requireCompletedOutput
-import com.labteto.dshmobile.local.attachment.LocalAttachmentImporter
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.automation.LocalAutomationChatCoordinator
 import com.labteto.dshmobile.local.automation.LocalAutomationRunResult
@@ -187,7 +185,6 @@ import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
-import com.labteto.dshmobile.local.runtime.MAX_ATTACHMENT_BYTES
 import com.labteto.dshmobile.local.runtime.MAX_DOWNLOAD_BYTES
 import com.labteto.dshmobile.local.runtime.MAX_EVENT_CHARS
 import com.labteto.dshmobile.local.runtime.MAX_HANDOFF_CHARS
@@ -209,7 +206,6 @@ import com.labteto.dshmobile.local.runtime.canAutoApproveSafely
 import com.labteto.dshmobile.local.runtime.canUseDeviceApprovalLease
 import com.labteto.dshmobile.local.runtime.isolatedParallelMap
 import com.labteto.dshmobile.local.runtime.localForegroundStepLimitExtender
-import com.labteto.dshmobile.local.runtime.localSharedStorageRoots
 import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.runtime.projectExecutionJobs
 import com.labteto.dshmobile.local.runtime.structuredWorkState
@@ -217,21 +213,18 @@ import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.send.prepareLocalSend
-import com.labteto.dshmobile.local.session.LocalConversationFiles
-import com.labteto.dshmobile.local.session.LocalConversationFilesCoordinator
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalSessionDomainCreateSpec
 import com.labteto.dshmobile.local.session.LocalSessionDomainModeCommand
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionAccessCoordinator
+import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.session.LocalSessionArchiveMaintenance
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
-import com.labteto.dshmobile.local.session.LocalTranscriptPage
-import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntime
 import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.coordinateOwnedLocalSend
@@ -245,12 +238,9 @@ import com.labteto.dshmobile.local.tools.LocalFileInspector
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
 import com.labteto.dshmobile.local.tools.LocalPluginCompositionFactory
 import com.labteto.dshmobile.local.tools.LocalRunToolSurface
-import com.labteto.dshmobile.local.tools.LocalSandboxBoundary
 import com.labteto.dshmobile.local.tools.LocalShellTool
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
-import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
-import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.long
@@ -271,7 +261,7 @@ import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.local.work.LocalWorkerModelRouter
 import com.labteto.dshmobile.local.work.LocalWorkflowCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkflowProgress
-import com.labteto.dshmobile.local.work.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.local.work.guardWorkCompletionDelivery
 import com.labteto.dshmobile.local.work.localAggregateWorkStatePort
 import com.labteto.dshmobile.local.work.toLocalWorkRunState
@@ -361,21 +351,9 @@ class LocalHarnessEngine @Inject internal constructor(
     private val chatPersonaGalleryStore get() = chatPersistence.galleryStore
     private val chatDiaryStore get() = chatPersistence.diaryStore
     private val memoryClassMb get() = runtimeStateStore.memoryClassMb
-    private val workspace = LocalWorkspace(
-        root = File(root, "workspace"),
-        extraSearchPaths = bundledRuntimeManager::searchPaths,
-        environmentProvider = bundledRuntimeManager::environment,
-        boundary = LocalSandboxBoundary(
-            workspaceRoot = File(root, "workspace"),
-            userRoots = localSharedStorageRoots(),
-        ),
-    )
+    private val workspace: LocalWorkspace
+        get() = sessionStorageRuntime.files.workspace
     private val fileInspector = LocalFileInspector(File(workspace.path))
-    private val attachmentImporter = LocalAttachmentImporter(
-        context = context,
-        workspace = workspace,
-        maxAttachmentBytes = MAX_ATTACHMENT_BYTES,
-    )
     private val toolOutputStore = LocalToolOutputStore(
         File(context.noBackupFilesDir, "local-harness/tool-output"),
     )
@@ -393,8 +371,22 @@ class LocalHarnessEngine @Inject internal constructor(
         LocalSessionAccessCoordinator(
             summaries = ::sessionSummaries,
             currentSessionId = { currentSessionId },
-            currentState = { _state.value },
-            activeState = workRunRegistry::state,
+            currentScope = {
+                _state.value.let { current ->
+                    LocalSessionAccessScope(
+                        projectId = current.projectId,
+                        lineageId = current.lineageId.ifBlank { current.sessionId },
+                    )
+                }
+            },
+            activeScope = { sessionId ->
+                workRunRegistry.state(sessionId)?.let { active ->
+                    LocalSessionAccessScope(
+                        projectId = active.projectId,
+                        lineageId = active.lineageId.ifBlank { active.sessionId },
+                    )
+                }
+            },
             eventLogFor = ::eventLogFor,
         )
     }
@@ -512,15 +504,8 @@ class LocalHarnessEngine @Inject internal constructor(
     // Opening the log scans its latest segment. The startup coroutine initializes it after any
     // legacy migration, before the loading screen admits session actions.
     @Volatile private lateinit var eventLog: LocalSessionEventLog
-    private val conversationFilesCoordinator by lazy {
-        LocalConversationFilesCoordinator(
-            workspaceFilesProvider = workspace::files,
-            previewWorkspaceFile = workspace::preview,
-            eventLogFor = ::eventLogFor,
-            currentSessionId = { currentSessionId },
-            currentEventLog = { eventLog },
-        )
-    }
+    private val conversationFilesCoordinator
+        get() = sessionStorageRuntime.files.coordinator
     private var transcriptProjectionCursor: Long?
         get() = runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor
         set(value) {
@@ -982,21 +967,6 @@ class LocalHarnessEngine @Inject internal constructor(
             }
         }
     }
-
-    /** Read-only file views used by the local Harness UI. Heavy filesystem work stays off main. */
-    internal suspend fun workspaceFilesForUi(): List<LocalWorkspaceFile> = withContext(Dispatchers.IO) {
-        conversationFilesCoordinator.workspaceFiles()
-    }
-
-    internal suspend fun conversationFilesForUi(sessionId: String = currentSessionId): LocalConversationFiles =
-        withContext(Dispatchers.IO) {
-            conversationFilesCoordinator.conversationFiles(sessionId)
-        }
-
-    internal suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =
-        withContext(Dispatchers.IO) {
-            conversationFilesCoordinator.preview(path)
-        }
 
     private fun chatStreamFilterPhrases(
         snapshot: LocalHarnessState,
@@ -1857,10 +1827,6 @@ class LocalHarnessEngine @Inject internal constructor(
         startNextQueuedTurnIfIdle()?.start()
     }
 
-
-    /** Copy a picked image/file into the app-private workspace before the model sees it. */
-    internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment =
-        withContext(Dispatchers.IO) { attachmentImporter.import(uri) }
 
     internal suspend fun diagnoseNetwork(target: String): String = webTools.diagnose(target)
 
@@ -3955,30 +3921,6 @@ class LocalHarnessEngine @Inject internal constructor(
             } },
         ).run(tasks, mode, requiredEvidence)
     }
-
-    internal fun transcriptPageForUi(
-        sessionId: String,
-        cursor: LocalTranscriptPageCursor? = null,
-        limit: Int = 200,
-    ): LocalTranscriptPage = LocalSessionTranscriptPager(
-        eventLog = sessionAccessCoordinator.authorizedLog(sessionId),
-    ).page(
-        cursor = cursor,
-        limit = limit,
-    )
-
-    internal fun transcriptTailForUi(
-        sessionId: String,
-        limit: Int,
-    ): List<LocalHarnessMessage> = LocalSessionTranscriptPager(
-        eventLog = sessionAccessCoordinator.authorizedLog(sessionId),
-    ).page(limit = limit).messages
-
-    internal fun completeTranscriptForUi(
-        sessionId: String,
-    ): List<LocalHarnessMessage> = LocalSessionTranscriptPager(
-        eventLog = sessionAccessCoordinator.authorizedLog(sessionId),
-    ).all()
 
     private fun cancelChatPostTurn() {
         chatContextRefreshCoordinator.cancelScheduledRefresh()
