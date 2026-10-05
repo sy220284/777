@@ -357,21 +357,29 @@ jobs:
             exit 1
           fi
 
-      - name: 只下载 build 当前缺失组件
+      - name: 下载 Android Core
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          pattern: 777-toolchain-*-latest
-          path: ${{ runner.temp }}/all-artifacts
-          merge-multiple: false
+          name: 777-toolchain-android-core-latest
+          path: ${{ runner.temp }}/artifacts/777-toolchain-android-core-latest
 
-      - name: 构造严格按需下载目录
-        run: |
-          set -euo pipefail
-          ROOT="$RUNNER_TEMP/artifacts"
-          mkdir -p "$ROOT"
-          for name in             777-toolchain-android-core-latest             777-toolchain-gradle-runtime-latest             777-toolchain-gradle-deps-latest             777-toolchain-runtime-cache-latest; do
-            cp -a "$RUNNER_TEMP/all-artifacts/$name" "$ROOT/$name"
-          done
+      - name: 下载 Gradle Runtime
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-toolchain-gradle-runtime-latest
+          path: ${{ runner.temp }}/artifacts/777-toolchain-gradle-runtime-latest
+
+      - name: 下载 Gradle 依赖
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-toolchain-gradle-deps-latest
+          path: ${{ runner.temp }}/artifacts/777-toolchain-gradle-deps-latest
+
+      - name: 下载 Runtime Cache
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-toolchain-runtime-cache-latest
+          path: ${{ runner.temp }}/artifacts/777-toolchain-runtime-cache-latest
 
       - name: 按需安装 build 并离线构建
         env:
@@ -385,7 +393,7 @@ jobs:
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
-          bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" bootstrap             --profile build             --artifacts-dir "$RUNNER_TEMP/artifacts"
+          bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" bootstrap --profile build --artifacts-dir "$RUNNER_TEMP/artifacts"
 
           # shellcheck source=/dev/null
           source "$DEV777_TOOLCHAIN_ENV_FILE"
@@ -399,10 +407,16 @@ jobs:
 
           bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" gradle :app:assembleDebug --stacktrace
 
+      - name: 单独下载 JDK Artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-toolchain-jdk-latest
+          path: ${{ runner.temp }}/jdk-proof-artifact
+
       - name: 单独验证 JDK Artifact 真正可下载可执行
         run: |
           set -euo pipefail
-          JDK_ART="$RUNNER_TEMP/all-artifacts/777-toolchain-jdk-latest"
+          JDK_ART="$RUNNER_TEMP/jdk-proof-artifact"
           test -s "$JDK_ART/payload.tar.gz"
           (
             cd "$JDK_ART"
@@ -430,13 +444,35 @@ jobs:
           printf '%s\n' "$PLAN" | grep -F '777-toolchain-android-image-16-latest'
           printf '%s\n' "$PLAN" | grep -F '777-toolchain-android-image-17-latest'
 
-      - name: 加入 full 扩展组件
-        run: |
-          set -euo pipefail
-          ROOT="$RUNNER_TEMP/artifacts"
-          for name in             777-toolchain-node-latest             777-toolchain-actionlint-latest             777-toolchain-emulator-latest             777-toolchain-android-image-16-latest             777-toolchain-android-image-17-latest; do
-            cp -a "$RUNNER_TEMP/all-artifacts/$name" "$ROOT/$name"
-          done
+      - name: 下载 Node
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-toolchain-node-latest
+          path: ${{ runner.temp }}/artifacts/777-toolchain-node-latest
+
+      - name: 下载 actionlint
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-toolchain-actionlint-latest
+          path: ${{ runner.temp }}/artifacts/777-toolchain-actionlint-latest
+
+      - name: 下载 Emulator
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-toolchain-emulator-latest
+          path: ${{ runner.temp }}/artifacts/777-toolchain-emulator-latest
+
+      - name: 下载 Android 16 镜像
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-toolchain-android-image-16-latest
+          path: ${{ runner.temp }}/artifacts/777-toolchain-android-image-16-latest
+
+      - name: 下载 Android 17 镜像
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-toolchain-android-image-17-latest
+          path: ${{ runner.temp }}/artifacts/777-toolchain-android-image-17-latest
 
       - name: 安装 full 缺失组件并复检
         env:
@@ -451,9 +487,8 @@ jobs:
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
 
-          bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" bootstrap             --profile full             --artifacts-dir "$RUNNER_TEMP/artifacts"
-
-          bash "$RUNNER_TEMP/bootstrap/tools/dev/install.sh" install full             --artifacts-dir "$RUNNER_TEMP/artifacts"             --create-avds
+          bash "$RUNNER_TEMP/bootstrap/tools/dev/ai-toolchain.sh" bootstrap --profile full --artifacts-dir "$RUNNER_TEMP/artifacts"
+          bash "$RUNNER_TEMP/bootstrap/tools/dev/install.sh" install full --artifacts-dir "$RUNNER_TEMP/artifacts" --create-avds
 
           # shellcheck source=/dev/null
           source "$DEV777_TOOLCHAIN_ENV_FILE"
