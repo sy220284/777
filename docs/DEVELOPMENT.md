@@ -2,6 +2,34 @@
 
 777 的标准开发宿主是 **Linux / WSL2 Ubuntu**。仓库构建脚本会把 Node / Python / Git Android Runtime 打进 APK，因此本机除了 Android Studio / JDK / SDK，还必须具备 GNU/Linux 命令行工具。
 
+## 人工使用推荐入口
+
+从仓库内使用：
+
+```sh
+bash tools/dev/install.sh
+```
+
+从 GitHub Actions 下载工具链 Artifact 后，解压一次进入目录，直接：
+
+```sh
+./install.sh
+```
+
+无参数会进入向导；也可以直接：
+
+```sh
+./install.sh build
+./install.sh full
+./install.sh check build
+```
+
+`build` 用于日常 APK 开发；`full` 会额外安装 Node.js 22、actionlint、Android Emulator、Android 16 / 17 system image，并创建 `777-android16`、`777-android17` 两个 AVD。
+
+`full` 开始下载前会展示安装内容并检查剩余磁盘空间：低于 6 GiB 会停止，低于 12 GiB 会提示空间偏紧。
+
+检查发现缺失项时会直接给出推荐修复命令；KVM 这类宿主能力会明确标成需要人工处理。
+
 ## AI / Agent 推荐入口
 
 AI、Codex、自动化 Agent 不需要直接拼接底层 `setup-toolchain.sh` 参数，统一使用：
@@ -121,7 +149,7 @@ bash tools/dev/setup-toolchain.sh --check --profile build
 bash tools/dev/setup-toolchain.sh --check --profile full
 ```
 
-检查模式不会安装软件、不会修改 shell 配置。
+检查模式不会安装软件、不会修改 shell 配置。缺失时会直接显示推荐安装命令。
 
 ## 自动配置
 
@@ -148,7 +176,7 @@ bash tools/dev/setup-toolchain.sh \
 
 自动模式当前支持 Debian / Ubuntu 系 Linux 与 WSL。系统包通过 `apt-get` 安装；Android command-line tools、Node 22 和 actionlint 使用仓库固定版本与 SHA-256 校验后安装。
 
-`--accept-android-licenses` 必须显式传入。没有该参数时，交互终端会显示 Android SDK license 确认；非交互环境会直接停止。
+`--accept-android-licenses` 仍是底层非交互参数。人工通过 `install.sh` 使用时由 sdkmanager 在终端中显示 license 并确认；AI / CI 使用显式非交互接受。
 
 默认安装位置：
 
@@ -162,33 +190,58 @@ Android SDK  ~/.local/share/777-dev/android-sdk
 
 ## 从 GitHub Actions 产物安装
 
-仓库工作流 **开发工具链** 会生成：
+仓库工作流 **开发工具链** 会生成同名 Artifact：
 
 ```text
-777-dev-toolchain-linux/
-├─ 777-dev-toolchain-linux.tar.gz
-└─ 777-dev-toolchain-linux.tar.gz.sha256
+777-dev-toolchain-latest
 ```
 
-工作流会先生成产物，再在一台 GitHub Ubuntu runner 上 **从这个产物解压 → 自动配置全新 SDK 目录 → 再次检查 → 实际执行 `:app:assembleDebug`**。因此产物不是只打包脚本，安装链本身也会被回归。
+GitHub 下载的是 ZIP，ZIP 内直接包含：
 
-下载后：
+```text
+install.sh
+SHA256SUMS
+安装说明.txt
+tools/
+docs/
+```
+
+因此只需要解压一次：
 
 ```sh
-sha256sum -c 777-dev-toolchain-linux.tar.gz.sha256
-tar -xzf 777-dev-toolchain-linux.tar.gz
+unzip <下载的 Artifact ZIP> -d 777-dev-toolchain
 cd 777-dev-toolchain
-bash tools/dev/setup-toolchain.sh --check --profile build
+./install.sh
 ```
 
-确认无误后再选择 `--auto`。
+`install.sh` 会先用 `SHA256SUMS` 校验包内文件，再进入安装 / 检查流程。
 
-在 GitHub Actions 页面手动运行 **开发工具链** 时可以选择：
+工具链相关 PR 会自动执行两条回归：
+
+```text
+build
+→ Artifact 下载
+→ SHA-256 校验
+→ AI bootstrap
+→ check
+→ 第二次 bootstrap 幂等检查
+→ :app:assembleDebug
+
+full
+→ 同一 Artifact 下载
+→ SHA-256 校验
+→ full 自动安装
+→ Node / actionlint / Emulator / Android 16 / 17 image
+→ 创建 Android 16 / 17 AVD
+→ full 再检查
+```
+
+Artifact 单份保留 30 天。GitHub Actions Artifact 不能直接延长原文件到期时间，因此工作流会在默认分支每月 **1 日和 20 日**自动重新生成一份新的 `777-dev-toolchain-latest`。最长刷新间隔 19 天，旧产物到期前会有新产物接替，相当于自动续期。
+
+在 GitHub Actions 页面手动运行 **开发工具链** 时仍可选择：
 
 - `build`：验证普通 APK 构建环境。
-- `full`：额外安装 Node 22、actionlint、Android 16 / 17 模拟器组件。
-
-工具链相关 PR 会自动跑 `build` 档安装测试、AI 入口二次幂等 bootstrap、机器状态检查和真实 APK smoke build。Artifact 默认保留 30 天。
+- `full`：验证完整工具链环境。
 
 ## 自定义安装目录
 
