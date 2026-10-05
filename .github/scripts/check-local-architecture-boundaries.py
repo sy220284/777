@@ -66,9 +66,9 @@ def strip_comments(source: str) -> str:
 
 
 def has_typed_property(source: str, type_name: str) -> bool:
-    """Match a retained Kotlin property by type without coupling the guard to its variable name."""
+    """Match a retained Kotlin property by type, including generics, without coupling to its variable name."""
     return re.search(
-        rf"\b(?:(?:private|internal|public|protected)\s+)?(?:val|var)\s+[A-Za-z0-9_]+\s*:\s*{re.escape(type_name)}\b",
+        rf"\b(?:(?:private|internal|public|protected)\s+)?(?:val|var)\s+[A-Za-z0-9_]+\s*:\s*{re.escape(type_name)}(?![A-Za-z0-9_])",
         source,
     ) is not None
 
