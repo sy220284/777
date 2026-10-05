@@ -13,15 +13,15 @@ bash tools/dev/install.sh
 从 GitHub Actions 下载工具链 Artifact 后，解压一次进入目录，直接：
 
 ```sh
-./install.sh
+bash install.sh
 ```
 
 无参数会进入向导；也可以直接：
 
 ```sh
-./install.sh build
-./install.sh full
-./install.sh check build
+bash install.sh build
+bash install.sh full
+bash install.sh check build
 ```
 
 `build` 用于日常 APK 开发；`full` 会额外安装 Node.js 22、actionlint、Android Emulator、Android 16 / 17 system image，并创建 `777-android16`、`777-android17` 两个 AVD。
