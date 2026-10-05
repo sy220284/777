@@ -1742,10 +1742,10 @@ class LocalHarnessEngine @Inject internal constructor(
                     workModelHistoryRuntime.ensureSystemMessage(binding)
                     val snapshot = runState.value
                     workPromptContext = contextComposer.composeWorkTurnContext(input, snapshot, workspace.path)
-                    captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
+                    workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                     requestPrepared = true
                 }
-                drainPendingInputsIntoHistory(binding)
+                workModelHistoryRuntime.drainPendingInputs(binding)
                 val key = modelRequestMarker()
                 val snapshot = runState.value
                 val tools = modelToolStepSurface.capture(
