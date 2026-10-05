@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Classify changed paths into the minimum safe CI lanes and release impact."""
+"""Classify changed paths into Architecture 3.0-aware CI lanes and release impact."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from typing import Iterable
 class CiPlan:
     scope: str
     run_static: bool
+    run_architecture: bool
     run_unit: bool
     run_build: bool
     run_device: bool
@@ -24,6 +25,7 @@ class CiPlan:
         return {
             "scope": self.scope,
             "run_static": str(self.run_static).lower(),
+            "run_architecture": str(self.run_architecture).lower(),
             "run_unit": str(self.run_unit).lower(),
             "run_build": str(self.run_build).lower(),
             "run_device": str(self.run_device).lower(),
@@ -59,6 +61,32 @@ CI_CONTROL_FILES = {
     ".github/scripts/check-ci-repository-integrity.py",
     ".github/scripts/check-android-security-boundaries.py",
 }
+ARCHITECTURE_3_CONTROL_FILES = {
+    "AGENTS.md",
+    "docs/ARCHITECTURE.md",
+    "docs/ARCHITECTURE-3-EXECUTION-PLAN.zh-CN.md",
+    "docs/VALIDATION.md",
+    ".github/workflows/ci.yml",
+    ".github/scripts/classify-ci-scope.py",
+    ".github/scripts/check-local-architecture-boundaries.py",
+    ".github/scripts/check-local-performance-invariants.py",
+}
+ARCHITECTURE_3_PREFIXES = (
+    "app/src/main/java/com/labteto/dshmobile/local/",
+    "app/src/test/java/com/labteto/dshmobile/local/",
+    "app/src/androidTest/java/com/labteto/dshmobile/local/",
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/",
+    "app/src/test/java/com/labteto/dshmobile/ui/screens/local/",
+    "app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/",
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/",
+    "app/src/test/java/com/labteto/dshmobile/ui/screens/settings/",
+    "app/src/main/java/com/labteto/dshmobile/automation/",
+    "app/src/test/java/com/labteto/dshmobile/automation/",
+    "harness-core/src/",
+    "harness-runtime-android/src/",
+    "harness-interop/src/",
+    "harness-device-android/src/",
+)
 
 
 def normalize(path: str) -> str:
@@ -105,9 +133,14 @@ def is_automation(path: str) -> bool:
     return path.startswith(".github/workflows/") or path.startswith(".github/scripts/")
 
 
+def is_architecture_3_path(path: str) -> bool:
+    return path in ARCHITECTURE_3_CONTROL_FILES or path.startswith(ARCHITECTURE_3_PREFIXES)
+
+
 def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
     automation = False
     ci_control = False
+    architecture = force_full
     unit = False
     android = False
     fixture = force_full
@@ -119,11 +152,16 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
         if not path:
             continue
 
+        architecture_path = is_architecture_3_path(path)
+        architecture = architecture or architecture_path
+
+        if path in ARCHITECTURE_3_CONTROL_FILES and is_documentation(path):
+            continue
+
         if is_documentation(path) or is_repository_metadata(path):
             continue
 
         if path == ".github/release-version":
-            # versionName/versionCode are read directly by app/build.gradle.kts.
             full = True
             affects_release = True
             continue
@@ -159,7 +197,8 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
         full = True
         affects_release = True
 
-    run_static = automation or unit or android or full
+    run_static = automation or architecture or unit or android or full
+    run_architecture = architecture or full
     run_unit = unit or full
     run_build = full
     run_device = android or full
@@ -167,8 +206,14 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
 
     if full:
         scope = "full"
-    elif ci_control and not (unit or android):
-        scope = "ci-control"
+    elif architecture and ci_control:
+        scope = "architecture-control"
+    elif architecture and android:
+        scope = "architecture-android"
+    elif architecture and unit:
+        scope = "architecture-unit"
+    elif architecture:
+        scope = "architecture-control"
     else:
         active = sum((automation, unit, android))
         if active == 0:
@@ -185,6 +230,7 @@ def classify(paths: Iterable[str], *, force_full: bool = False) -> CiPlan:
     return CiPlan(
         scope=scope,
         run_static=run_static,
+        run_architecture=run_architecture,
         run_unit=run_unit,
         run_build=run_build,
         run_device=run_device,
@@ -198,59 +244,67 @@ def self_test() -> None:
     cases = [
         (
             ["README.md"],
-            CiPlan("docs", False, False, False, False, False, False, False),
+            CiPlan("docs", False, False, False, False, False, False, False, False),
         ),
         (
-            ["docs/VALIDATION.md", "screen.png"],
-            CiPlan("docs", False, False, False, False, False, False, False),
+            ["docs/ARCHITECTURE.md"],
+            CiPlan("architecture-control", True, True, False, False, False, False, False, False),
         ),
         (
             [".github/workflows/release.yml"],
-            CiPlan("automation", True, False, False, False, False, False, False),
+            CiPlan("automation", True, False, False, False, False, False, False, False),
         ),
         (
             [".github/workflows/ci.yml"],
-            CiPlan("ci-control", True, False, False, False, False, False, False),
+            CiPlan("architecture-control", True, True, False, False, False, False, False, False),
         ),
         (
-            [".github/scripts/check-local-performance-invariants.py"],
-            CiPlan("ci-control", True, False, False, False, False, False, False),
+            [".github/scripts/check-local-architecture-boundaries.py"],
+            CiPlan("architecture-control", True, True, False, False, False, False, False, False),
         ),
         (
             [".github/release-version"],
-            CiPlan("full", True, True, True, True, True, False, True),
+            CiPlan("full", True, True, True, True, True, True, False, True),
         ),
         (
-            ["app/src/test/java/example/Test.kt"],
-            CiPlan("unit-test", True, True, False, False, False, False, False),
+            ["app/src/test/java/com/labteto/dshmobile/local/ExampleTest.kt"],
+            CiPlan("architecture-unit", True, True, True, False, False, False, False, False),
         ),
         (
-            ["app/src/androidTest/java/example/Test.kt"],
-            CiPlan("android-test", True, False, False, True, True, False, False),
+            ["app/src/androidTest/java/com/labteto/dshmobile/local/ExampleTest.kt"],
+            CiPlan("architecture-android", True, True, False, False, True, True, False, False),
+        ),
+        (
+            ["harness-core/src/test/kotlin/example/Test.kt"],
+            CiPlan("architecture-unit", True, True, True, False, False, False, False, False),
         ),
         (
             ["upstream/deepseek-harness.lock.json"],
-            CiPlan("unit-test", True, True, False, False, False, True, False),
+            CiPlan("unit-test", True, False, True, False, False, False, True, False),
+        ),
+        (
+            ["app/src/main/java/com/labteto/dshmobile/local/chat/ChatFeature.kt"],
+            CiPlan("full", True, True, True, True, True, True, False, True),
         ),
         (
             ["app/src/main/java/example/App.kt"],
-            CiPlan("full", True, True, True, True, True, False, True),
+            CiPlan("full", True, True, True, True, True, True, False, True),
         ),
         (
             ["build.gradle.kts"],
-            CiPlan("full", True, True, True, True, True, False, True),
+            CiPlan("full", True, True, True, True, True, True, False, True),
         ),
         (
             ["README.md", "app/src/main/java/example/App.kt"],
-            CiPlan("full", True, True, True, True, True, False, True),
+            CiPlan("full", True, True, True, True, True, True, False, True),
         ),
         (
             [".github/workflows/release.yml", "app/src/test/java/example/Test.kt"],
-            CiPlan("mixed-light", True, True, False, False, False, False, False),
+            CiPlan("mixed-light", True, False, True, False, False, False, False, False),
         ),
         (
             [".github/scripts/verify-android16-apk.sh"],
-            CiPlan("full", True, True, True, True, True, False, False),
+            CiPlan("full", True, True, True, True, True, True, False, False),
         ),
     ]
     for paths, expected in cases:
