@@ -278,7 +278,7 @@ if "currentState: () -> LocalHarnessState" not in session_persistence_projection
     violations.append("Session snapshot must defer foreground state reads until after cursor capture")
 
 control_pos = session_persistence_projection.find(
-    "val controlProjectedThroughSequence = log.latestSequence()"
+    "val controlProjectedThroughSequence = eventLog.latestSequence()"
 )
 transcript_pos = session_persistence_projection.find("val transcriptProjectedThroughSequence")
 state_pos = session_persistence_projection.find(
