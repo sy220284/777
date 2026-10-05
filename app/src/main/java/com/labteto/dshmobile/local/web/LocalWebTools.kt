@@ -6,7 +6,7 @@ import com.labteto.dshmobile.local.LocalWebProvider
 import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.runtime.MAX_TOOL_RESULT_CHARS
 import com.labteto.dshmobile.local.tools.resolveJsonPath
-import com.labteto.dshmobile.local.work.LocalWorkspace
+import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
