@@ -24,7 +24,6 @@ import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.harness.session.SessionRecovery
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
-import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
@@ -1834,11 +1833,6 @@ class LocalHarnessEngine @Inject internal constructor(
             appLogs = appLogs,
         )
     }
-
-    internal suspend fun githubConnectorConfiguredForUi(): Boolean = pluginComposition.githubConfigured()
-    internal suspend fun configureGitHubConnectorForUi(token: String): GitHubConnectorStatus =
-        pluginComposition.configureGitHubCredential(token)
-    internal suspend fun clearGitHubConnectorForUi() = pluginComposition.clearGitHubCredential()
 
     internal suspend fun mcpServersForUi(): List<McpServerSnapshot> = pluginComposition.mcpServers()
 
