@@ -152,18 +152,10 @@ internal class LocalWorkRunBinding(
     }
 }
 
-internal fun projectJobSnapshotToSessionStates(
+internal fun projectJobSnapshotToRunStates(
     jobs: List<LocalJobInfo>,
-    visibleState: MutableStateFlow<LocalHarnessState>,
     activeRuns: LocalWorkRunRegistry,
 ) {
-    visibleState.update { current ->
-        current.copy(
-            work = current.work.copy(
-                jobs = projectExecutionJobs(current.usageMode, current.sessionId, jobs),
-            ),
-        )
-    }
     activeRuns.forEachEntry { sessionId, binding ->
         binding.state.update { current ->
             current.copy(
