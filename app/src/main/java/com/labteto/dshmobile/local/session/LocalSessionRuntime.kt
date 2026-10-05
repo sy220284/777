@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.StateFlow
 class LocalSessionRuntime @Inject constructor(
     private val engine: LocalHarnessEngine,
     private val runtimeStateStore: LocalRuntimeStateStore,
+    private val sessionFiles: LocalSessionFilesRuntime,
+    private val sessionRead: LocalSessionReadRuntime,
 ) {
     internal val state: StateFlow<LocalHarnessState> = runtimeStateStore.state
     internal val streamingState: StateFlow<LocalHarnessStreamingState> = runtimeStateStore.streamingPreviewStore.state
@@ -40,19 +42,19 @@ class LocalSessionRuntime @Inject constructor(
     internal fun switchUsageMode(mode: LocalUsageMode) = engine.switchUsageMode(mode)
     internal fun switchSession(sessionId: String) = engine.switchSession(sessionId)
     internal suspend fun deleteSessions(ids: Set<String>): Int = engine.deleteSessions(ids)
-    internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment = engine.importAttachment(uri)
-    internal suspend fun workspaceFilesForUi(): List<LocalWorkspaceFile> = engine.workspaceFilesForUi()
+    internal suspend fun importAttachment(uri: Uri): LocalImportedAttachment = sessionFiles.importAttachment(uri)
+    internal suspend fun workspaceFilesForUi(): List<LocalWorkspaceFile> = sessionFiles.workspaceFiles()
     internal suspend fun conversationFilesForUi(sessionId: String): LocalConversationFiles =
-        engine.conversationFilesForUi(sessionId)
+        sessionFiles.conversationFiles(sessionId)
     internal suspend fun previewWorkspaceFileForUi(path: String): LocalWorkspaceFilePreview =
-        engine.previewWorkspaceFileForUi(path)
+        sessionFiles.previewWorkspaceFile(path)
     internal fun transcriptPageForUi(
         sessionId: String,
         cursor: LocalTranscriptPageCursor? = null,
         limit: Int = 200,
-    ): LocalTranscriptPage = engine.transcriptPageForUi(sessionId, cursor, limit)
+    ): LocalTranscriptPage = sessionRead.transcriptPage(sessionId, cursor, limit)
     internal fun transcriptTailForUi(sessionId: String, limit: Int) =
-        engine.transcriptTailForUi(sessionId, limit)
+        sessionRead.transcriptTail(sessionId, limit)
     internal fun completeTranscriptForUi(sessionId: String) =
-        engine.completeTranscriptForUi(sessionId)
+        sessionRead.completeTranscript(sessionId)
 }
