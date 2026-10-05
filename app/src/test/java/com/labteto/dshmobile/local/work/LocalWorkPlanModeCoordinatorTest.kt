@@ -75,7 +75,7 @@ class LocalWorkPlanModeCoordinatorTest {
     @Test
     fun chatOrLoadingStateCannotEnterWorkPlanMode() {
         val runtime = LocalRuntimeStateStore()
-        runtime.initialize(
+        val ownerState = runtime.initialize(
             LocalHarnessState(
                 loading = false,
                 sessionId = "chat",
@@ -91,7 +91,7 @@ class LocalWorkPlanModeCoordinatorTest {
         val coordinator = LocalWorkPlanModeCoordinator(runtime, registry, logs)
 
         assertFalse(coordinator.setEnabled(true))
-        runtime.mutableState.value = runtime.state.value.copy(
+        ownerState.value = runtime.state.value.copy(
             usageMode = LocalUsageMode.WORK,
             loading = true,
         )
