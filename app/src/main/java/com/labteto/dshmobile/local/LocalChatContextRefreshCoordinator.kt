@@ -9,6 +9,9 @@ import com.labteto.dshmobile.local.chat.ChatDiaryWriteRequest
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.LocalChatPostTurnJobOwner
+import com.labteto.dshmobile.local.chat.LocalChatBranchCoordinator
+import com.labteto.dshmobile.local.chat.LocalChatPersistence
+import com.labteto.dshmobile.local.chat.LocalChatStatePort
 import com.labteto.dshmobile.local.chat.activeChatBranchMessages
 import com.labteto.dshmobile.local.chat.applySceneTurn
 import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
@@ -20,19 +23,26 @@ import com.labteto.dshmobile.local.chat.loadPendingBatch
 import com.labteto.dshmobile.local.chat.updateChatBranchNodeSnapshot
 import com.labteto.dshmobile.local.chat.withContextForPlanner
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -144,21 +154,36 @@ internal fun shouldRetryChatPostTurnRequest(error: Throwable): Boolean =
         else -> false
     }
 
-internal class LocalChatContextRefreshCoordinator(
-    private val state: MutableStateFlow<LocalHarnessState>,
-    private val scope: CoroutineScope,
+@Singleton
+internal class LocalChatContextRefreshCoordinator @Inject constructor(
+    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val chatState: LocalChatStatePort,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
-    private val diaryStore: ChatDiaryStore,
-    private val requestPlanner: suspend (
+    private val persistence: LocalChatPersistence,
+    private val modelRequests: LocalModelRequestCoordinator,
+    private val usageTracker: DeepSeekUsageTracker,
+    private val sessionStorage: LocalSessionStorageRuntime,
+    private val branchCoordinator: LocalChatBranchCoordinator,
+) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val diaryStore: ChatDiaryStore
+        get() = persistence.diaryStore
+
+    private suspend fun requestPlanner(
         snapshot: LocalHarnessState,
         prompt: String,
         eventLog: LocalSessionEventLog,
         profile: LocalModelProfile,
-    ) -> LocalModelReply?,
-    private val recordUsage: (LocalHarnessState, LocalModelReply) -> Unit,
-    private val persistBranchState: (String) -> Unit,
-    private val persist: () -> Unit,
-) {
+    ): LocalModelReply? = modelRequests.complete(
+        snapshot = snapshot,
+        messages = chatPostTurnModelMessages(prompt),
+        step = CHAT_POST_TURN_MODEL_STEP,
+        toolsOverride = JsonArray(emptyList()),
+        publishPreviewEnabled = false,
+        requestLog = eventLog,
+        profile = profile,
+    )
+
     fun cancelScheduledRefresh() {
         LocalChatPostTurnJobOwner.cancel()
     }
@@ -213,7 +238,7 @@ internal class LocalChatContextRefreshCoordinator(
         if (retryAttempt >= MAX_REFRESH_RETRIES) return
         val job = scope.launch(start = CoroutineStart.LAZY) {
             delay(RETRY_BASE_DELAY_MS * (retryAttempt + 1L))
-            val latest = state.value
+            val latest = runtimeStateStore.state.value
             val stillPending = latest.chat.chatContext.pendingTurns.any { pending ->
                 pending.sequence > latest.chat.chatContext.processedThroughSequence &&
                     pending.generation == expectedGeneration
@@ -254,7 +279,7 @@ internal class LocalChatContextRefreshCoordinator(
         sourceUserMessageId: String? = null,
         assistantEventSequence: Long? = null,
     ): Long? {
-        if (state.value.sessionId != expectedSessionId) return null
+        if (runtimeStateStore.state.value.sessionId != expectedSessionId) return null
         val sequence = assistantEventSequence ?: findTranscriptEventSequence(
             eventLog = boundEventLog,
             type = "assistant/message",
@@ -277,7 +302,7 @@ internal class LocalChatContextRefreshCoordinator(
 
         var generation: Long? = null
         var branchSnapshotUpdated = false
-        state.update { current ->
+        chatState.update { current ->
             generation = null
             branchSnapshotUpdated = false
             if (current.sessionId != expectedSessionId) {
@@ -324,10 +349,10 @@ internal class LocalChatContextRefreshCoordinator(
             }
         }
         if (generation != null) {
-            if (branchSnapshotUpdated && hasChatBranchAlternatives(state.value.chat.chatBranches)) {
-                persistBranchState("chat/pending-enqueued")
+            if (branchSnapshotUpdated && hasChatBranchAlternatives(runtimeStateStore.state.value.chat.chatBranches)) {
+                branchCoordinator.persistCurrentProjection(expectedSessionId, "chat/pending-enqueued")
             }
-            persist()
+            sessionStorage.enqueueCurrentSnapshot(expectedSessionId)
         }
         return generation
     }
@@ -341,7 +366,7 @@ internal class LocalChatContextRefreshCoordinator(
         profile: LocalModelProfile,
         retryAttempt: Int = 0,
     ) {
-        val before = state.value
+        val before = runtimeStateStore.state.value
         if (before.usageMode != LocalUsageMode.CHAT || before.sessionId != expectedSessionId) return
         val baseContext = before.chat.chatContext
         if (baseContext.generation != expectedGeneration) return
@@ -393,7 +418,7 @@ internal class LocalChatContextRefreshCoordinator(
             )
             return
         }
-        recordUsage(before, plannerReply)
+        usageTracker.recordForeground(before, plannerReply, TokenUsageAction.CHAT_STATE_REFRESH)
 
         val plan = chatTurnCoordinator.parsePostTurn(
             text = plannerReply.content.orEmpty(),
@@ -423,7 +448,7 @@ internal class LocalChatContextRefreshCoordinator(
         val deterministicState = plan.state.withoutLegacyConversationContext()
         var nextContext = baseContext
         var applied = false
-        state.update { current ->
+        chatState.update { current ->
             applied = false
             val currentContext = current.chat.chatContext
             if (
@@ -517,10 +542,10 @@ internal class LocalChatContextRefreshCoordinator(
             put("processed_through_sequence", throughSequence)
             put("remaining_pending", nextContext.pendingTurns.size)
         })
-        if (hasChatBranchAlternatives(state.value.chat.chatBranches)) {
-            persistBranchState("chat/post-turn-updated")
+        if (hasChatBranchAlternatives(runtimeStateStore.state.value.chat.chatBranches)) {
+            branchCoordinator.persistCurrentProjection(expectedSessionId, "chat/post-turn-updated")
         }
-        persist()
+        sessionStorage.enqueueCurrentSnapshot(expectedSessionId)
         if (nextContext.pendingTurns.any { pending ->
                 pending.sequence > nextContext.processedThroughSequence &&
                     pending.generation == expectedGeneration
