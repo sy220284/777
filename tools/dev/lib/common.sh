@@ -29,7 +29,7 @@ self_test() {
   grep -Fq "kotlin = \"$KOTLIN_VERSION\"" "$root/gradle/libs.versions.toml" || { echo "KOTLIN_VERSION 与版本目录不一致" >&2; return 1; }
   grep -Fq "node-version: 22" "$root/.github/workflows/ci.yml" || { echo "Node 主版本与 CI 不一致" >&2; return 1; }
   grep -Fq "VERSION=$ACTIONLINT_VERSION" "$root/.github/workflows/ci.yml" || { echo "actionlint 版本与 CI 不一致" >&2; return 1; }
-  grep -Fq "SHA256=\\"$ACTIONLINT_LINUX_X64_SHA256\\"" "$root/.github/workflows/ci.yml" || { echo "actionlint SHA-256 与 CI 不一致" >&2; return 1; }
+  grep -Fq "SHA256=\"$ACTIONLINT_LINUX_X64_SHA256\"" "$root/.github/workflows/ci.yml" || { echo "actionlint SHA-256 与 CI 不一致" >&2; return 1; }
   ok "工具链版本清单与当前 app / CI / Gradle 基线一致"
 }
 
