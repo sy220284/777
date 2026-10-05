@@ -24,6 +24,7 @@ ACCEPT_ANDROID_LICENSES=false
 CREATE_AVDS=false
 SKIP_SYSTEM_PACKAGES=false
 SELF_TEST=false
+NON_INTERACTIVE=false
 
 usage() {
   cat <<'USAGE'
@@ -46,6 +47,7 @@ usage() {
   --create-avds                 full 档创建 777-android16 / 777-android17 AVD
   --skip-system-packages        不调用 apt-get，仅配置可移植工具 / Android SDK
   --self-test                   只验证脚本清单与仓库基线一致性
+  --non-interactive             禁止任何交互；sudo 需要密码时立即失败
   -h, --help                    显示帮助
 USAGE
 }
@@ -63,6 +65,7 @@ while [ "$#" -gt 0 ]; do
     --create-avds) CREATE_AVDS=true ;;
     --skip-system-packages) SKIP_SYSTEM_PACKAGES=true ;;
     --self-test) SELF_TEST=true ;;
+    --non-interactive) NON_INTERACTIVE=true ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[777-toolchain] 未知参数：$1" >&2; usage >&2; exit 2 ;;
   esac
