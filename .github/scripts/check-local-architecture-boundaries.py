@@ -482,8 +482,8 @@ if "configuration.test(apiKey, model, baseUrl, protocol, profileId)" not in mode
     die("LocalModelRuntime must own model connection testing through Model configuration capability")
 if "engine.configureImageInputMode" in model_runtime_source:
     die("LocalModelRuntime must not route image input settings through LocalHarnessEngine")
-if "KEY_IMAGE_INPUT_MODE" not in model_settings_source or "runtimeStateStore.mutableState.update" not in model_settings_source:
-    die("LocalModelSettingsCoordinator must own image input persistence and ModelState projection")
+if "KEY_IMAGE_INPUT_MODE" not in model_settings_source or "runtimeStateStore.projection.setImageInputMode(mode)" not in model_settings_source:
+    die("LocalModelSettingsCoordinator must own image input persistence and use the ModelState projection command")
 
 task_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/presentation/LocalTaskRuntime.kt")
