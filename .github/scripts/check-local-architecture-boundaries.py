@@ -43,8 +43,6 @@ ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
     "scheduleChatPostTurn",
 )
 ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST = {
-    "editAndResendUserMessage",
-    "regenerateReplyForMode",
     "runChatTurn",
     "runWorkAgentTurn",
 }
@@ -689,6 +687,9 @@ chat_send_coordinator_source = strip_comments(
 chat_execution_coordinator_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatExecutionCoordinator.kt")
 )
+chat_timeline_coordinator_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTimelineCoordinator.kt")
+)
 chat_turn_port_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnPort.kt")
 )
@@ -722,6 +723,15 @@ if work_execution_coordinator_source.find("workRunRegistry.enqueueIntoLiveRun(pr
     die("Work-owned live-run queue must be checked before first-turn admission")
 if "queueHumanTurn(" in work_execution_coordinator_source:
     die("Work send must not route through the Engine Chat queue")
+for required_work_regeneration_owner in (
+    "override fun regenerateReply(messageId: String): Boolean",
+    "handle.modelHistory.lastOrNull()",
+    "turn.startRegeneration(messageId)",
+):
+    if required_work_regeneration_owner not in work_execution_coordinator_source:
+        die("WorkFeature regeneration admission is incomplete: " + required_work_regeneration_owner)
+if "regenerateReply(messageId: String): Boolean" in work_turn_port_source:
+    die("Work turn bridge must not own regeneration eligibility")
 if "interface LocalWorkTurnPort" not in work_turn_port_source:
     die("Work turn migration port contract is missing")
 if "LocalHarnessEngine" in work_turn_port_source or "LocalHarnessState" in work_turn_port_source:
@@ -734,6 +744,20 @@ if "engine.workExecutionPort" in feature_execution_port_module_source or "intern
     die("LocalHarnessEngine must not own the Work product execution port")
 if "LocalHarnessEngine" in chat_execution_coordinator_source:
     die("ChatExecutionPort implementation must stay inside ChatFeature without Engine")
+for required_chat_timeline_owner in (
+    "internal fun editAndResendUserMessage(",
+    "internal fun regenerateReply(messageId: String): Boolean",
+    "LocalSessionRuntimeKind.MAINTENANCE",
+    "appendTimelineRewriteCommit(",
+    "modelHistory.checkpoint(",
+    "turn.startRegeneration(",
+):
+    if required_chat_timeline_owner not in chat_timeline_coordinator_source:
+        die("Chat timeline ownership is incomplete: " + required_chat_timeline_owner)
+if "turn.editAndResendUserMessage(" in chat_execution_coordinator_source or "turn.regenerateReply(" in chat_execution_coordinator_source:
+    die("ChatExecutionPort must route timeline actions to the Chat-owned timeline coordinator")
+if "timeline.editAndResendUserMessage(" not in chat_execution_coordinator_source or "timeline.regenerateReply(" not in chat_execution_coordinator_source:
+    die("ChatExecutionPort must expose the Chat-owned timeline coordinator")
 for required_chat_send_owner in (
     "prepareLocalSend(text, attachments)",
     "coordinateOwnedLocalSend(",
@@ -800,6 +824,19 @@ for removed_chat_send_root in (
 ):
     if removed_chat_send_root in engine:
         die("Chat send business must not return to LocalHarnessEngine: " + removed_chat_send_root)
+for removed_chat_timeline_root in (
+    "private fun editAndResendUserMessage(",
+    "private fun regenerateReplyForMode(",
+    "private fun transcriptForBranchMaterialization(",
+):
+    if removed_chat_timeline_root in engine:
+        die("Chat timeline business must not return to LocalHarnessEngine: " + removed_chat_timeline_root)
+for stale_timeline_bridge in (
+    "fun editAndResendUserMessage(",
+    "fun regenerateReply(",
+):
+    if stale_timeline_bridge in chat_turn_port_source:
+        die("Chat turn bridge must stay start-only: " + stale_timeline_bridge)
 
 if "provideLocalWorkTurnPort" not in feature_execution_port_module_source:
     die("app composition root must expose the temporary Work turn bridge")
