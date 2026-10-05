@@ -1574,7 +1574,7 @@ class LocalHarnessEngine @Inject internal constructor(
         workRunRegistry.attach(binding)
         binding.mirrorJob = scope.launch {
             binding.state.collect {
-                mirrorVisibleWorkRun(binding)
+                workRunRegistry.mirrorVisible(binding)
             }
         }
         val job = scope.launch(start = CoroutineStart.LAZY) {
@@ -1592,29 +1592,6 @@ class LocalHarnessEngine @Inject internal constructor(
         return job
     }
 
-
-    private fun mirrorVisibleWorkRun(binding: LocalWorkRunBinding) {
-        if (currentSessionId != binding.sessionId || _state.value.sessionId != binding.sessionId) return
-        val run = binding.state.value
-        _state.update { visible ->
-            if (visible.sessionId != binding.sessionId) {
-                visible
-            } else {
-                visible.copy(
-                    messages = run.messages,
-                    transcriptIndex = run.transcriptIndex,
-                    work = run.work,
-                    kernel = visible.kernel.copy(
-                        running = run.kernel.running,
-                        queuedInputCount = run.kernel.queuedInputCount,
-                        contextChars = run.kernel.contextChars,
-                        contextBudgetChars = run.kernel.contextBudgetChars,
-                    ),
-                    error = run.error,
-                )
-            }
-        }
-    }
 
     private fun syncVisibleWorkRun(
         sessionId: String,
@@ -2180,7 +2157,7 @@ class LocalHarnessEngine @Inject internal constructor(
             if (currentSessionId == binding.sessionId && _state.value.sessionId == binding.sessionId) {
                 modelHistory.reset(binding.modelHistory.snapshot())
                 transcriptProjectionCursor = binding.transcriptProjectionCursor
-                mirrorVisibleWorkRun(binding)
+                workRunRegistry.mirrorVisible(binding)
             }
             return@synchronized null
         }
