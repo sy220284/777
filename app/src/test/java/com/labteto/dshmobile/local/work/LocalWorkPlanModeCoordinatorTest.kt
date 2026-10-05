@@ -29,7 +29,7 @@ class LocalWorkPlanModeCoordinatorTest {
     @Test
     fun planModeCommitsInWorkBoundaryAndUpdatesForegroundPrompt() {
         val fixture = fixture()
-        fixture.runtime.foregroundModelHistory.prepend(buildJsonObject {
+        fixture.runtime.foregroundRunHandle.modelHistory.prepend(buildJsonObject {
             put("role", "system")
             put("content", workSystemPrompt("/workspace", false))
         })
@@ -40,7 +40,7 @@ class LocalWorkPlanModeCoordinatorTest {
             fixture.logs.get("work").latest("plan/mode")
                 ?.data?.get("active")?.jsonPrimitive?.booleanOrNull == true,
         )
-        val promptText = fixture.runtime.foregroundModelHistory.snapshot()
+        val promptText = fixture.runtime.foregroundRunHandle.modelHistory.snapshot()
             .mapNotNull { it["content"]?.jsonPrimitive?.contentOrNull }
             .joinToString("\n")
         assertTrue(promptText.contains("规划模式"))
@@ -105,11 +105,11 @@ class LocalWorkPlanModeCoordinatorTest {
         runtime.initialize(LocalHarnessState(
             loading = false, sessionId = "broken", usageMode = LocalUsageMode.WORK,
         ))
-        runtime.foregroundModelHistory.prepend(buildJsonObject {
+        runtime.foregroundRunHandle.modelHistory.prepend(buildJsonObject {
             put("role", "system")
             put("content", workSystemPrompt("/workspace", false))
         })
-        val originalHistory = runtime.foregroundModelHistory.snapshot()
+        val originalHistory = runtime.foregroundRunHandle.modelHistory.snapshot()
         val root = File(temporary.root, "blocked-log-root").apply { writeText("file, not directory") }
         val logs = LocalSessionEventLogRegistry(root, json)
         val coordinator = LocalWorkPlanModeCoordinator(runtime, LocalWorkRunRegistry(runtime), logs)
@@ -117,7 +117,7 @@ class LocalWorkPlanModeCoordinatorTest {
         val failure = runCatching { coordinator.setEnabled(true) }.exceptionOrNull()
         assertTrue(failure != null)
         assertFalse(runtime.state.value.work.planMode)
-        org.junit.Assert.assertEquals(originalHistory, runtime.foregroundModelHistory.snapshot())
+        org.junit.Assert.assertEquals(originalHistory, runtime.foregroundRunHandle.modelHistory.snapshot())
         assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner("broken"))
     }
 

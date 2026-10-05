@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalPersistentJobStore
+import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
 import com.labteto.dshmobile.local.runtime.LocalRuntimeJobOwner
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.session.LocalHarnessSession
@@ -104,8 +105,8 @@ class LocalWorkRunRegistryTest {
         val first = binding("session-a")
         val second = binding("session-b")
         val firstJob = Job()
-        first.job = firstJob
-        second.job = Job()
+        first.runHandle.job = firstJob
+        second.runHandle.job = Job()
 
         assertNull(registry.attach(first))
         assertNull(registry.attach(second))
@@ -133,8 +134,8 @@ class LocalWorkRunRegistryTest {
         val second = binding("session-b")
         val firstJob = Job()
         val secondJob = Job()
-        first.job = firstJob
-        second.job = secondJob
+        first.runHandle.job = firstJob
+        second.runHandle.job = secondJob
         first.state.value = first.state.value.copy(
             kernel = first.state.value.kernel.copy(running = true),
         )
@@ -185,14 +186,15 @@ class LocalWorkRunRegistryTest {
                 id = sessionId,
                 usageMode = LocalUsageMode.WORK,
             ),
-            initialHistory = emptyList(),
+            runHandle = LocalAgentRunHandle(
+                initialSessionId = sessionId,
+                maxPendingInputs = 8,
+            ),
             eventLog = LocalSessionEventLog(
                 file = File(temporary.root, "$sessionId.events.jsonl"),
                 json = json,
                 sessionId = sessionId,
             ),
-            initialTranscriptProjectionCursor = null,
-            maxPendingInputs = 8,
             pruneToolResult = { it },
         )
 }

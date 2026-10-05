@@ -54,7 +54,7 @@ class LocalRuntimeStateStoreTest {
             ),
         )
         val job = Job()
-        store.foregroundJob = job
+        store.foregroundRunHandle.job = job
         val log = LocalSessionEventLog(
             file = File(temporary.root, "session-a.events.jsonl"),
             json = Json { ignoreUnknownKeys = true },
@@ -78,8 +78,8 @@ class LocalRuntimeStateStoreTest {
             kernel = LocalKernelState(running = true, queuedInputCount = 1),
         ))
         val job = Job()
-        store.foregroundJob = job
-        store.foregroundPendingInputs.offer(
+        store.foregroundRunHandle.job = job
+        store.foregroundRunHandle.pendingInputs.offer(
             com.labteto.dshmobile.harness.agent.QueuedAgentInput("queued", id = "queued"),
         )
         val blocked = File(temporary.root, "blocked").apply { writeText("not a directory") }
@@ -89,7 +89,7 @@ class LocalRuntimeStateStoreTest {
             assertTrue(job.isCancelled)
             assertTrue(store.state.value.kernel.running)
             assertEquals(0, store.state.value.kernel.queuedInputCount)
-            assertEquals(0, store.foregroundPendingInputs.size())
+            assertEquals(0, store.foregroundRunHandle.pendingInputs.size())
         } finally {
             log.close()
         }
@@ -101,8 +101,8 @@ class LocalRuntimeStateStoreTest {
             val store = LocalRuntimeStateStore()
             store.initialize(LocalHarnessState(sessionId = "session-a"))
             val job = Job()
-            store.foregroundJob = job
-            store.foregroundPendingInputs.offer(
+            store.foregroundRunHandle.job = job
+            store.foregroundRunHandle.pendingInputs.offer(
                 com.labteto.dshmobile.harness.agent.QueuedAgentInput("queued", id = "queued"),
             )
             val blocked = File(temporary.root, "blocked-join").apply { writeText("not a directory") }
@@ -110,7 +110,7 @@ class LocalRuntimeStateStoreTest {
             try {
                 assertTrue(runCatching { store.cancelForegroundRunAndJoin(log) }.isFailure)
                 assertTrue(job.isCompleted)
-                org.junit.Assert.assertNull(store.foregroundJob)
+                org.junit.Assert.assertNull(store.foregroundRunHandle.job)
             } finally {
                 log.close()
             }

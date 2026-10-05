@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.presentation.toWorkSurfaceUiState
+import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
 import com.labteto.dshmobile.local.runtime.LocalHarnessResourceState
 import com.labteto.dshmobile.local.runtime.LocalKernelState
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -175,15 +176,18 @@ class LocalWorkRunBindingTest {
                     work = LocalWorkState(deviceApprovalLease = true),
                 ).toLocalWorkRunState(),
                 sessionBase = LocalHarnessSession(id = "work", usageMode = LocalUsageMode.WORK),
-                initialHistory = emptyList(), eventLog = log,
-                initialTranscriptProjectionCursor = null, maxPendingInputs = 4,
+                runHandle = LocalAgentRunHandle(
+                    initialSessionId = "work",
+                    maxPendingInputs = 4,
+                ),
+                eventLog = log,
                 pruneToolResult = { it },
             )
             val job = kotlinx.coroutines.Job()
             val mirror = kotlinx.coroutines.Job()
-            binding.job = job
-            binding.mirrorJob = mirror
-            binding.pendingInputs.offer(
+            binding.runHandle.job = job
+            binding.runHandle.projectionJob = mirror
+            binding.runHandle.pendingInputs.offer(
                 com.labteto.dshmobile.harness.agent.QueuedAgentInput("queued", id = "queued"),
             )
             try {
@@ -195,8 +199,8 @@ class LocalWorkRunBindingTest {
                 assertFalse(binding.state.value.work.deviceApprovalLease)
                 if (join) {
                     assertTrue(mirror.isCancelled)
-                    assertNull(binding.job)
-                    assertNull(binding.mirrorJob)
+                    assertNull(binding.runHandle.job)
+                    assertNull(binding.runHandle.projectionJob)
                     assertFalse(binding.state.value.kernel.running)
                 } else {
                     assertFalse(mirror.isCancelled)
@@ -220,18 +224,18 @@ class LocalWorkRunBindingTest {
             try { awaitCancellation() }
             finally { withContext(NonCancellable) { cleanupGate.await() } }
         }
-        binding.job = job
+        binding.runHandle.job = job
         runCurrent()
         val teardown = async { binding.cancelAndJoin() }
         try {
             runCurrent()
             assertFalse(teardown.isCompleted)
             assertTrue(binding.state.value.kernel.running)
-            org.junit.Assert.assertSame(job, binding.job)
+            org.junit.Assert.assertSame(job, binding.runHandle.job)
             cleanupGate.complete(Unit)
             teardown.await()
             assertFalse(binding.state.value.kernel.running)
-            assertNull(binding.job)
+            assertNull(binding.runHandle.job)
         } finally {
             cleanupGate.complete(Unit)
             teardown.cancel()
@@ -248,10 +252,11 @@ class LocalWorkRunBindingTest {
                 id = workState.sessionId,
                 usageMode = LocalUsageMode.WORK,
             ),
-            initialHistory = emptyList(),
+            runHandle = LocalAgentRunHandle(
+                initialSessionId = workState.sessionId,
+                maxPendingInputs = 4,
+            ),
             eventLog = LocalSessionEventLog(File(temporary.newFolder(), "events.jsonl"), Json),
-            initialTranscriptProjectionCursor = null,
-            maxPendingInputs = 4,
             pruneToolResult = { it },
         )
     }

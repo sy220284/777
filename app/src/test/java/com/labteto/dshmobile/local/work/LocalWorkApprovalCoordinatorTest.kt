@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
+import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
@@ -57,19 +58,20 @@ class LocalWorkApprovalCoordinatorTest {
         val runs = LocalWorkRunRegistry(runtime)
         val approvals = LocalWorkApprovalCoordinator(preferences, events, runtime, runs)
         fun binding(id: String) = LocalWorkRunBinding(
-            id,
-            LocalHarnessState(
+            sessionId = id,
+            initialState = LocalHarnessState(
                 loading = false,
                 sessionId = id,
                 usageMode = LocalUsageMode.WORK,
                 safeAutoApprovalEnabled = false,
             ).toLocalWorkRunState(),
-            LocalHarnessSession(id = id, usageMode = LocalUsageMode.WORK),
-            emptyList(),
-            events.get(id),
-            null,
-            8,
-            { it },
+            sessionBase = LocalHarnessSession(id = id, usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(
+                initialSessionId = id,
+                maxPendingInputs = 8,
+            ),
+            eventLog = events.get(id),
+            pruneToolResult = { it },
         ).also(runs::attach)
     }
 
@@ -150,18 +152,19 @@ class LocalWorkApprovalCoordinatorTest {
             java.io.File(blocked, "events.jsonl"), Json,
         )
         val b = LocalWorkRunBinding(
-            "b",
-            LocalHarnessState(
+            sessionId = "b",
+            initialState = LocalHarnessState(
                 loading = false,
                 sessionId = "b",
                 usageMode = LocalUsageMode.WORK,
             ).toLocalWorkRunState(),
-            LocalHarnessSession(id = "b", usageMode = LocalUsageMode.WORK),
-            emptyList(),
-            brokenLog,
-            null,
-            8,
-            { it },
+            sessionBase = LocalHarnessSession(id = "b", usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(
+                initialSessionId = "b",
+                maxPendingInputs = 8,
+            ),
+            eventLog = brokenLog,
+            pruneToolResult = { it },
         ).also(f.runs::attach)
         val c = f.binding("c")
         val first = async { a.interactions.awaitApproval(approval("first")) }
