@@ -177,6 +177,7 @@ import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.runtime.LocalAgentRunResourceBudget
 import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
+import com.labteto.dshmobile.local.runtime.LocalDiagnosticsPort
 import com.labteto.dshmobile.local.runtime.LocalEnvironmentInfoCoordinator
 import com.labteto.dshmobile.local.runtime.LocalExecutionService
 import com.labteto.dshmobile.local.runtime.LocalProcessExitStatus
@@ -1013,6 +1014,24 @@ class LocalHarnessEngine @Inject internal constructor(
 
         override suspend fun deleteSessions(ids: Set<String>): Int =
             sessionLifecycle.deleteSessions(ids)
+    }
+
+    internal val diagnosticsPort: LocalDiagnosticsPort = object : LocalDiagnosticsPort {
+        override suspend fun environmentInfo(): String = withContext(Dispatchers.IO) {
+            environmentInfoCoordinator.build(null)
+        }
+
+        override suspend fun diagnosticReport(): String = withContext(Dispatchers.IO) {
+            val appLogs = AppLog.exportSnapshot()
+            val baseReport = DiagnosticReport.build(appLogs, environmentInfoCoordinator.build(null))
+            appendLocalDiagnosticDetails(
+                baseReport = baseReport,
+                sessionId = currentSessionId,
+                eventLog = eventLogFor(currentSessionId),
+                usageTracker = usageTracker,
+                appLogs = appLogs,
+            )
+        }
     }
 
     internal val toolsManagementPort: LocalToolsManagementPort = object : LocalToolsManagementPort {
@@ -1871,22 +1890,6 @@ class LocalHarnessEngine @Inject internal constructor(
 
 
     internal suspend fun diagnoseNetwork(target: String): String = webTools.diagnose(target)
-
-    internal suspend fun environmentInfoForUi(): String = withContext(Dispatchers.IO) {
-        environmentInfoCoordinator.build(null)
-    }
-
-    internal suspend fun diagnosticReportForUi(): String = withContext(Dispatchers.IO) {
-        val appLogs = AppLog.exportSnapshot()
-        val baseReport = DiagnosticReport.build(appLogs, environmentInfoCoordinator.build(null))
-        appendLocalDiagnosticDetails(
-            baseReport = baseReport,
-            sessionId = currentSessionId,
-            eventLog = eventLogFor(currentSessionId),
-            usageTracker = usageTracker,
-            appLogs = appLogs,
-        )
-    }
 
     private fun beginSessionTransition(): Boolean {
         val started = synchronized(runStateLock) {
