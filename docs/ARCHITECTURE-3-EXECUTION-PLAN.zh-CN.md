@@ -80,6 +80,8 @@ P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修�
 
 契约名可随实现调整，但职责固定。`LocalRuntimeProjection` 只投影已确定的事实，不能承接 Chat / Work 业务规则；新 Port 的实现不得继续调用 Engine 同名方法。Session envelope 可以存领域数据，Session 基础设施不得通过领域内部解码函数执行业务决策。
 
+已迁出的 Chat 写入口统一遵守：先取得 Session MAINTENANCE 所有权，再提交 Feature-owned durable domain/timeline event，随后发布运行态，最后物化 Session snapshot 缓存。跨人物库/图集等多文档写入在权威事件提交前失败必须按原值回滚；EventLog 已成功后，snapshot/checkpoint 失败只能作为派生投影故障处理，不能把已提交事实回报成未执行。
+
 ### 出口
 
 - [ ] Shared Capability 不反向依赖 Feature internal；领域 codec / Port 在组合根注入。

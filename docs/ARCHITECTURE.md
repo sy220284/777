@@ -431,8 +431,9 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 - WorkRuntime 对 Engine 的直接引用已由 4 → 2 → 1 → 0 清零；前台 Job、pending inbox、投影游标及取消顺序由 Shared Runtime 接管，Work 停止通过共享运行所有者执行。Engine 仍有迁移期访问器，后续必须继续收缩，不能据此宣称 Kernel 已完成。
 - 前台与 Work 取消时，即使 inbox 取消日志写入失败，也必须取消真实 Job、清理排队投影和交互授权；Work teardown 等待真实 Job/mirror 退出后再发布空闲并释放运行引用，写盘错误继续向调用方反馈。
 - 计划模式由 `LocalWorkPlanModeCoordinator` 持有，维护租约隔离前台/Automation；先提交 `plan/mode` 权威事件，再发布 Work 状态与更新模型历史，事件写入失败不得留下已切换的界面。
-- Chat 已迁出人物选择、图集绑定、默认人物同步、行为调节、纠正撤销、回复建议结果提交、群聊成员配置/移除、前台停止及分支变体选择；ChatRuntime 的直接 Engine 引用预算降至 4。人物选择与默认同步持有 Session 维护租约至快照写入完成，按会话、模式、人物/图集/故事身份、上下文代次及最新对话拒绝迟到结果；取消与失败必须释放租约。
+- Chat 已迁出人物选择、图集绑定、默认人物同步、行为调节、纠正撤销、回复建议结果提交、群聊成员配置/移除、前台停止及分支变体选择；ChatRuntime 对 Engine 的直接引用已清零。该数字只表示 Runtime 边界收口，组合根仍存在迁移期 Engine-backed Port，发送/回合/群聊执行等业务实现仍须按 3-B～3-E 继续迁出。
 - 后台任务快照的通知与持久化按统一提交顺序执行；Work 订阅重放和绑定接入在投影锁内读取当前任务事实，防止旧快照覆盖取消或完成终态。任务返回后再次验证取消状态与合法终态提交权，阻塞执行的迟到成功或异常均不得覆盖已取消终态。回归覆盖晚接入绑定、跨会话隔离、重启中断投影、并发取消与迟到成功/异常。
+- 已迁出的 Chat 领域写入统一采用“Session MAINTENANCE owner → durable Chat domain/timeline event → runtime projection → Session snapshot cache”提交顺序。人物/行为调节等跨文档写入在权威事件提交前失败必须恢复原文档；群聊成员、回复建议和分支选择不得再出现 UI 已更新但 EventLog/模型历史仍停留旧状态的半提交。
 - 回归覆盖多会话等待、全局模式启停、过期/已完成点击、设备授权隔离/撤销、显式审批工具与前台切换；本子阶段须通过最终 Head 的完整 CI 验证。
 
 剩余：Chat 的分支、发送、群聊与部分运行协调仍依赖 Engine；其他 Feature 的代理、跨 Feature 内部引用和完整可写聚合状态还需按阶段收敛。WorkRuntime 引用清零只证明本次 Work UI 边界迁移，不能把阶段 3 或整个架构 3.0 标记为完成。

@@ -13,6 +13,21 @@ ENGINE_MAX_PUBLIC_METHODS = 0
 ENGINE_MAX_INTERNAL_METHODS = 1
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
+ENGINE_MAX_COMPOSITION_BRIDGE_REFERENCES = 7
+ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS = 10
+ENGINE_STAGE3_FEATURE_METHOD_ROOTS = (
+    "queueHumanTurn",
+    "queueWorkTurnLocked",
+    "runAgentTurn",
+    "runChatTurn",
+    "runGroupChatTurn",
+    "regenerateWorkReply",
+    "editAndResendUserMessage",
+    "workSubagents",
+    "runWorkflow",
+    "exitPlanMode",
+    "scheduleChatPostTurn",
+)
 
 HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": ("LocalGroupChatTurnExecutor", 26),
@@ -1742,6 +1757,41 @@ if "messages = chatPostTurnModelMessages(prompt)" not in engine:
     die("Chat post-turn requests must include a real model input, not system-only instructions")
 if "modelRequestMarkerOrNull()?.let" in engine[engine.find("requestPlanner ="):engine.find("private val chatReplyCoordinator")]:
     die("Chat post-turn planner must not re-read mutable active model identity")
+
+engine_bridge_reference_count = len(re.findall(r"\bengine\s*\.", feature_execution_port_module_source))
+if engine_bridge_reference_count > ENGINE_MAX_COMPOSITION_BRIDGE_REFERENCES:
+    die(
+        "Stage-3 Engine-backed composition bridges grew to "
+        f"{engine_bridge_reference_count} (ratchet: {ENGINE_MAX_COMPOSITION_BRIDGE_REFERENCES}); "
+        "Runtime direct-reference zero is not permission to add new Port-to-Engine forwarding"
+    )
+
+stage3_feature_method_count = sum(
+    1
+    for method in ENGINE_STAGE3_FEATURE_METHOD_ROOTS
+    if re.search(rf"\bprivate\s+(?:suspend\s+)?fun\s+{re.escape(method)}\s*\(", engine)
+)
+if stage3_feature_method_count > ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS:
+    die(
+        "LocalHarnessEngine regained Stage-3 Feature business roots: "
+        f"{stage3_feature_method_count} (ratchet: {ENGINE_MAX_STAGE3_FEATURE_METHOD_ROOTS})"
+    )
+
+for transactional_chat_owner in (
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersonaCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalCharacterBehaviorTuningCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatMembershipCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalReplySuggestionCoordinator.kt",
+):
+    transactional_source = strip_comments(read(transactional_chat_owner))
+    if "appendChatDomainStateCommit" not in transactional_source:
+        die(f"{transactional_chat_owner} must commit the durable Chat domain event before projection")
+
+chat_branch_owner = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatBranchCoordinator.kt")
+)
+if "appendChatProjectionCommit" not in chat_branch_owner:
+    die("Chat branch selection must atomically commit transcript/model-history/domain projection")
 
 unexpected_consumers = sorted(engine_consumers - ENGINE_CONSUMER_ALLOWLIST)
 if unexpected_consumers:
