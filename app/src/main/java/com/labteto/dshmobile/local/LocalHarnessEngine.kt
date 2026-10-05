@@ -85,6 +85,7 @@ import com.labteto.dshmobile.local.chat.restoreChatStateBefore
 import com.labteto.dshmobile.local.chat.restoreGroupStateBefore
 import com.labteto.dshmobile.local.chat.restoreMaterializedChatBranchState
 import com.labteto.dshmobile.local.chat.rewriteChatTranscriptFromUserEdit
+import com.labteto.dshmobile.local.chat.runOwnedGroupChatTurn
 import com.labteto.dshmobile.local.chat.saveGroupChatAnnouncement
 import com.labteto.dshmobile.local.chat.selectChatBranchVariant
 import com.labteto.dshmobile.local.chat.sourceEventSequenceForMessage
@@ -647,12 +648,6 @@ class LocalHarnessEngine @Inject internal constructor(
             },
         )
     }
-
-    private suspend fun runGroupChatTurn(input: String, sourceMessageId: String? = null) =
-        LocalSessionRuntimeRegistry.withOwner(currentSessionId, LocalSessionRuntimeKind.FOREGROUND) { ownedSessionId ->
-            if (currentSessionId != ownedSessionId) throw CancellationException("会话已切换")
-            LocalExecutionService.withTurn(context, ownedSessionId, { _state.value.error }) { groupChatTurnExecutor.run(input, sourceMessageId) }
-        }
 
     // SupervisorJob keeps one failed child from cancelling unrelated engine work. The handler is the
     // final visibility boundary; operation-specific busy/loading state is still owned by each launch.
@@ -1366,7 +1361,14 @@ class LocalHarnessEngine @Inject internal constructor(
         scope.launch(start = CoroutineStart.LAZY) {
             if (state.chat.groupChat.enabled) {
                 captureGroupPersonaCorrections(requestedText)
-                runGroupChatTurn(content)
+                runOwnedGroupChatTurn(
+                    context = context,
+                    sessionId = currentSessionId,
+                    currentSessionId = { currentSessionId },
+                    currentError = { _state.value.error },
+                    executor = groupChatTurnExecutor,
+                    input = content,
+                )
             } else {
                 captureChatPersonaCorrection(requestedText)
                 hydrateNewChatStateFromRelationshipMemory()
@@ -1989,7 +1991,15 @@ class LocalHarnessEngine @Inject internal constructor(
         val snapshot = _state.value
         if (snapshot.usageMode == LocalUsageMode.CHAT && snapshot.chat.groupChat.enabled) {
             captureGroupPersonaCorrections(memoryInput)
-            runGroupChatTurn(input, sourceMessageId)
+            runOwnedGroupChatTurn(
+                context = context,
+                sessionId = currentSessionId,
+                currentSessionId = { currentSessionId },
+                currentError = { _state.value.error },
+                executor = groupChatTurnExecutor,
+                input = input,
+                sourceMessageId = sourceMessageId,
+            )
             return
         }
         check(snapshot.usageMode == LocalUsageMode.CHAT) {
