@@ -12,6 +12,28 @@ class LocalToolOutputStoreTest {
     val temporary = TemporaryFolder()
 
     @Test
+    fun recoveryPagePlusHeaderFitsTheWorkInlineAllowance() {
+        val store = LocalToolOutputStore(File(temporary.root, "tool-output"))
+        val content = "prefix-" + "😀汉字".repeat(4_000) + "-suffix"
+
+        assertTrue(store.store("session-page", "call-page", content) != null)
+        val page = store.read(
+            "session-page",
+            "call-page",
+            startByte = 0,
+            maxBytes = LocalToolOutputStore.MAX_READ_BYTES,
+        )
+        val pageBytes = page.toByteArray(Charsets.UTF_8).size
+
+        // 修复前：正文按 4 KiB 交付，连同 header 超出 Work 内联额度，下游再次截断时
+        // next_byte 已前移到模型看不到的位置，被裁掉的字节会被静默跳过。
+        assertTrue(
+            "整段响应 $pageBytes 字节必须落在 Work 内联额度 $WORK_TOOL_INLINE_BYTES 字节内",
+            pageBytes <= WORK_TOOL_INLINE_BYTES,
+        )
+    }
+
+    @Test
     fun storesAndPagesSingleLineOutputByUtf8ByteRange() {
         val store = LocalToolOutputStore(File(temporary.root, "tool-output"))
         val content = "prefix-" + "😀汉字".repeat(8_000) + "-suffix"

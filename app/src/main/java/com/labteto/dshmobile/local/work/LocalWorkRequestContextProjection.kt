@@ -91,12 +91,14 @@ internal fun projectWorkRequestContext(
     )
     val budget = workRequestBudget(limit, cachePolicy)
 
-    // Large command/file outputs are the fastest-growing part of Work history. No oversized result
-    // stays verbatim in the hot request; full payloads remain recoverable from LocalToolOutputStore.
+    // Large command/file outputs are the fastest-growing part of Work history. Only the newest
+    // bounded results (the active working set) stay at write-time size; older payloads shrink to the
+    // stale preview and full payloads stay recoverable from LocalToolOutputStore.
     val staleToolProjection = projectStaleToolResults(
         history = messages,
         budget = budget,
-        keepRecentToolResults = 0,
+        keepRecentToolResults = WORK_FRESH_TOOL_RESULTS,
+        protectedRecentMaxBytes = WORK_TOOL_INLINE_BYTES,
     )
     val toolProjectedMessages = staleToolProjection?.messages ?: messages
     val toolProjectedPressure = if (staleToolProjection != null) {
@@ -272,6 +274,13 @@ private const val WORK_REQUEST_TAIL_CHARS = 40_000
 private const val WORK_REQUEST_SUMMARY_CHARS = 8_000
 private const val WORK_REQUEST_TOOL_RESULT_CHARS = 4_096
 private const val WORK_REQUEST_TOOL_RESULT_TOKENS = 1_600
+
+/**
+ * Newest tool results kept at write-time retention size in the hot request; older ones shrink to the
+ * stale preview so a fresh recovery page is never trimmed by the request projection.
+ */
+private const val WORK_FRESH_TOOL_RESULTS = 2
+
 private const val CACHE_AWARE_TAIL_RATIO = 0.16
 private const val CACHE_AWARE_MAX_TAIL_TOKENS = 64_000
 private const val CACHE_AWARE_TAIL_CHARS = 160_000

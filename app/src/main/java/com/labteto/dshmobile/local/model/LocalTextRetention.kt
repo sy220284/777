@@ -101,8 +101,13 @@ internal fun retainTextForModel(
 
 /**
  * Work keeps small tool results inline, but a large result must never become the next request's hot
- * payload. The full durable result is spilled by the caller; this returns only a sub-1 KiB-ish
- * recoverable preview so cache-friendly history can keep growing by append instead of compaction.
+ * payload. The full durable result is spilled by the caller; this returns a bounded recoverable
+ * preview so cache-friendly history can keep growing by append instead of compaction.
+ *
+ * The Work visible allowance below is shared by three consumers and must not drift: write-time
+ * retention here, request-time projection (LocalWorkRequestContextProjection) and the recovery
+ * page ceiling in LocalToolOutputStore. A page ceiling above this allowance would be re-truncated
+ * downstream while next_byte still advanced by the full page, silently skipping bytes.
  */
 internal fun retainToolResultForModel(
     value: String,
@@ -125,9 +130,24 @@ internal fun retainWorkToolResultForModel(value: String): LocalRetainedText {
     )
 }
 
-private const val WORK_TOOL_INLINE_BYTES = 2 * 1024
-private const val WORK_TOOL_PREVIEW_CHARS = 1_024
-private const val WORK_TOOL_PREVIEW_TOKENS = 300
+/**
+ * Fresh Work tool results stay verbatim up to this size. It equals
+ * LocalToolOutputStore.DEFAULT_READ_BYTES, so one default recovery page stays fully visible.
+ */
+internal const val WORK_TOOL_INLINE_BYTES = 4 * 1024
+
+/**
+ * Preview allowance for oversized fresh results. The char cap adds the omission marker length (18)
+ * so the resulting byte window still equals WORK_TOOL_INLINE_BYTES and no size range is lost.
+ */
+internal const val WORK_TOOL_PREVIEW_CHARS = WORK_TOOL_INLINE_BYTES + 18
+internal const val WORK_TOOL_PREVIEW_TOKENS = 1_600
+
+/**
+ * Recovery page ceiling in Work mode. One page plus its header must stay inside
+ * WORK_TOOL_INLINE_BYTES, otherwise a delivered page would be trimmed after next_byte advanced.
+ */
+internal const val WORK_TOOL_RECOVERY_PAGE_BYTES = WORK_TOOL_INLINE_BYTES - 256
 
 private fun safeUtf8PrefixEnd(bytes: ByteArray, requested: Int): Int {
     var end = requested.coerceIn(0, bytes.size)
