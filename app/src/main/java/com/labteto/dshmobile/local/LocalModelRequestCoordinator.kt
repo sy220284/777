@@ -6,6 +6,8 @@ import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecovery
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecoveryPolicy
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
 import com.labteto.dshmobile.local.chat.ChatStreamFilter
+import com.labteto.dshmobile.local.context.LocalRequestContextAssessment
+import com.labteto.dshmobile.local.context.LocalRequestContextProjection
 import com.labteto.dshmobile.local.context.historySummaryMode
 import com.labteto.dshmobile.local.context.projectLocalRequestContext
 import com.labteto.dshmobile.local.model.LocalAgentModelRequestRuntime
@@ -32,6 +34,7 @@ import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.work.assessWorkStepContext
 import com.labteto.dshmobile.local.work.executeWithModelAdmission
+import com.labteto.dshmobile.local.work.projectWorkRequestContext
 import com.labteto.dshmobile.local.work.toModelSnapshot
 import com.labteto.dshmobile.local.work.workRequestProjectionTargetTokens
 import com.labteto.dshmobile.local.work.workRequestProjectionTriggerTokens
@@ -135,20 +138,37 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             usageMode = snapshot.usageMode,
             workProjectionEnabled = executionControl != null,
             messages = messages,
-            tools = tools,
-            compactor = historyCompactor,
-            operationalLimitTokens = operationalLimit,
             measuredPressure = baselinePressure,
-            previousSourcePressure = previousSourcePressure,
-            structuredWorkState = if (
-                executionControl != null && snapshot.usageMode == LocalUsageMode.WORK
-            ) {
-                structuredWorkState(snapshot, log)
-            } else {
-                null
+            workProjection = {
+                val projected = projectWorkRequestContext(
+                    messages = messages,
+                    tools = tools,
+                    compactor = historyCompactor,
+                    operationalLimitTokens = operationalLimit,
+                    measuredPressure = baselinePressure,
+                    previousPressure = previousSourcePressure,
+                    structuredWorkState = structuredWorkState(snapshot, log),
+                    cachePolicy = cachePolicy,
+                    allowSemanticProjection = step <= 1,
+                )
+                LocalRequestContextProjection(
+                    messages = projected.messages,
+                    projected = projected.projected,
+                    estimatedTokensBefore = projected.estimatedTokensBefore,
+                    estimatedTokensAfter = projected.estimatedTokensAfter,
+                    omittedMessages = projected.omittedMessages,
+                    preProjectionAssessment = projected.preProjectionAssessment?.let { assessment ->
+                        LocalRequestContextAssessment(
+                            status = assessment.status.name.lowercase(),
+                            effectiveProjectionTriggerTokens =
+                                assessment.effectiveProjectionTriggerTokens,
+                            historyRatioPermille = assessment.historyRatioPermille,
+                            historyGrowthTokens = assessment.historyGrowthTokens,
+                            reasons = assessment.reasons,
+                        )
+                    },
+                )
             },
-            cachePolicy = cachePolicy,
-            allowSemanticProjection = step <= 1,
         )
         val requestMessages = contextProjection.messages
         val prefixAssessment = if (cachePolicy.mode != LocalPromptCacheMode.NONE) {
@@ -212,7 +232,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 put("omitted_messages", contextProjection.omittedMessages)
                 put("strategy", "active_work_checkpoint_plus_recent_causal_tail")
                 contextProjection.preProjectionAssessment?.let { assessment ->
-                    put("context_status_before", assessment.status.name.lowercase())
+                    put("context_status_before", assessment.status)
                     put("effective_projection_trigger_tokens", assessment.effectiveProjectionTriggerTokens)
                     put("history_ratio_permille_before", assessment.historyRatioPermille)
                     put("history_growth_tokens_before", assessment.historyGrowthTokens)
