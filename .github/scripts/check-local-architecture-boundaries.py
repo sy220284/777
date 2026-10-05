@@ -1066,6 +1066,21 @@ if "private val resourceScheduler = HarnessResourceScheduler(" in engine:
     die("LocalHarnessEngine must not own HarnessResourceScheduler after Kernel boundary freeze")
 if "LocalWorkRunRegistry" in runtime_state_store or "com.labteto.dshmobile.local.work" in runtime_state_store:
     die("Shared Runtime capability must not depend on WorkFeature internals")
+
+for runtime_source_path in (LOCAL_SOURCE_ROOT / "runtime").rglob("*.kt"):
+    runtime_source = strip_comments(runtime_source_path.read_text(encoding="utf-8"))
+    if "import com.labteto.dshmobile.local.work." in runtime_source:
+        relative = runtime_source_path.relative_to(ROOT).as_posix()
+        die(f"{relative} makes Shared Runtime depend on WorkFeature internals")
+
+conversation_files_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/session/LocalConversationFilesCoordinator.kt")
+)
+if (
+    "import com.labteto.dshmobile.local.work.LocalWorkspace" in conversation_files_source
+    or "private val workspace: LocalWorkspace" in conversation_files_source
+):
+    die("Session conversation-files capability must depend on workspace file ports, not WorkFeature LocalWorkspace")
 if "observeResourceSnapshots" not in runtime_state_store:
     die("Shared Runtime resource ownership must expose snapshots without importing Feature state")
 if "runtimeStateStore.observeResourceSnapshots(::projectResourceSnapshot)" not in work_run_registry:

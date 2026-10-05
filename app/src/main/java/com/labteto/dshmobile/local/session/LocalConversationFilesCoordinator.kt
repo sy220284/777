@@ -2,10 +2,10 @@ package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
-import com.labteto.dshmobile.local.work.LocalWorkspace
 
 internal class LocalConversationFilesCoordinator(
-    private val workspace: LocalWorkspace,
+    private val workspaceFilesProvider: () -> List<LocalWorkspaceFile>,
+    private val previewWorkspaceFile: (String) -> LocalWorkspaceFilePreview,
     private val eventLogFor: (String) -> LocalSessionEventLog,
     private val currentSessionId: () -> String,
     private val currentEventLog: () -> LocalSessionEventLog,
@@ -20,9 +20,9 @@ internal class LocalConversationFilesCoordinator(
     private val lock = Any()
     private val cache = LinkedHashMap<String, CacheEntry>(16, 0.75f, true)
 
-    fun workspaceFiles(): List<LocalWorkspaceFile> = workspace.files()
+    fun workspaceFiles(): List<LocalWorkspaceFile> = workspaceFilesProvider()
 
-    fun preview(path: String): LocalWorkspaceFilePreview = workspace.preview(path)
+    fun preview(path: String): LocalWorkspaceFilePreview = previewWorkspaceFile(path)
 
     fun invalidate(sessionIds: Collection<String>) {
         if (sessionIds.isEmpty()) return
@@ -32,7 +32,7 @@ internal class LocalConversationFilesCoordinator(
     }
 
     fun conversationFiles(sessionId: String): LocalConversationFiles {
-        val files = workspace.files()
+        val files = workspaceFilesProvider()
         val log = if (sessionId == currentSessionId()) currentEventLog() else eventLogFor(sessionId)
         val eventStamp = log.latestOf(CONVERSATION_FILE_EVENT_TYPES)?.sequence ?: -1L
         val workspaceStamp = workspaceFilesStamp(files)

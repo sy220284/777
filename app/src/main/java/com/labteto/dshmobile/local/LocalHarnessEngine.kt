@@ -272,6 +272,9 @@ import com.labteto.dshmobile.local.work.LocalWorkspace
 import com.labteto.dshmobile.local.work.guardWorkCompletionDelivery
 import com.labteto.dshmobile.local.work.localAggregateWorkStatePort
 import com.labteto.dshmobile.local.work.toLocalWorkRunState
+import com.labteto.dshmobile.local.work.toEnvironmentRunSnapshot
+import com.labteto.dshmobile.local.work.toEnvironmentWorkBudget
+import com.labteto.dshmobile.local.work.toEnvironmentWorkContextAssessment
 import com.labteto.dshmobile.local.work.queueAutomaticWorkContinuation
 import com.labteto.dshmobile.local.work.recordWorkCompletionQuality
 import com.labteto.dshmobile.local.work.shouldAutoContinueWorkFailure
@@ -444,7 +447,7 @@ class LocalHarnessEngine @Inject internal constructor(
         LocalEnvironmentInfoCoordinator(
             workspacePath = { workspace.path },
             resourceSnapshot = resourceScheduler::snapshot,
-            historyBudget = ::currentHistoryBudget,
+            foregroundHistoryBudgetChars = { currentHistoryBudget().maxHistoryChars },
             requestPressureStore = requestPressureStore,
             usageTracker = usageTracker,
             toolExecutionCoordinator = toolExecutionCoordinator,
@@ -457,8 +460,11 @@ class LocalHarnessEngine @Inject internal constructor(
             foregroundHistory = { modelHistory },
             foregroundPendingInputs = { pendingInputs.size() },
             pendingInputLimit = MAX_PENDING_INPUTS,
+            workContextAssessment = { sessionId ->
+                requestPressureStore.workAssessment(sessionId)?.toEnvironmentWorkContextAssessment()
+            },
             foregroundWorkBudget = { sessionId ->
-                workRunRegistry[sessionId]?.executionControl?.budget?.snapshot()
+                workRunRegistry[sessionId]?.executionControl?.budget?.snapshot()?.toEnvironmentWorkBudget()
             },
         )
     }
@@ -507,7 +513,8 @@ class LocalHarnessEngine @Inject internal constructor(
     @Volatile private lateinit var eventLog: LocalSessionEventLog
     private val conversationFilesCoordinator by lazy {
         LocalConversationFilesCoordinator(
-            workspace = workspace,
+            workspaceFilesProvider = workspace::files,
+            previewWorkspaceFile = workspace::preview,
             eventLogFor = ::eventLogFor,
             currentSessionId = { currentSessionId },
             currentEventLog = { eventLog },
@@ -3616,7 +3623,9 @@ class LocalHarnessEngine @Inject internal constructor(
                 allowArtifactWrite = allowMutation && !executionState.value.work.planMode,
             )
             "network_diagnose" -> webTools.diagnose(args.string("url"))
-            "environment_info" -> environmentInfoCoordinator.build(binding)
+            "environment_info" -> environmentInfoCoordinator.build(
+                binding?.toEnvironmentRunSnapshot(currentHistoryBudget(binding).maxHistoryChars),
+            )
             "capability_search" -> if (binding == null) {
                 searchCapabilities(args.string("query"))
             } else {
