@@ -1,25 +1,27 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Owns direct-chat persona selection and gallery binding for ChatFeature. */
 @Singleton
 internal class LocalChatPersonaCoordinator internal constructor(
     private val state: LocalChatStatePort,
+    private val loadPersona: suspend (String) -> PersonaProfile?,
     private val savePersona: suspend (PersonaProfile) -> PersonaProfile,
-    private val persistNow: suspend (String) -> Boolean,
+    private val restorePersona: suspend (String, PersonaProfile?) -> Unit,
+    private val commitDomainState: (LocalChatProjectionState, String) -> Unit,
     private val enqueueSnapshot: (String) -> Boolean,
 ) {
     @Inject
@@ -29,8 +31,18 @@ internal class LocalChatPersonaCoordinator internal constructor(
         sessionStorage: LocalSessionStorageRuntime,
     ) : this(
         state = chatState,
+        loadPersona = { id -> withContext(Dispatchers.IO) { personaStore.find(id) } },
         savePersona = { profile -> withContext(Dispatchers.IO) { personaStore.upsert(profile) } },
-        persistNow = sessionStorage::writeCurrentSnapshotNow,
+        restorePersona = { id, previous ->
+            withContext(Dispatchers.IO) { personaStore.restore(id, previous) }
+        },
+        commitDomainState = { committed, reason ->
+            appendChatDomainStateCommit(
+                sessionStorage.eventLogs.get(committed.sessionId),
+                committed,
+                reason,
+            )
+        },
         enqueueSnapshot = sessionStorage::enqueueCurrentSnapshot,
     )
 
@@ -45,11 +57,7 @@ internal class LocalChatPersonaCoordinator internal constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                state.update { current ->
-                    if (current.sessionId == snapshot.sessionId) {
-                        current.copy(error = error.message ?: "角色切换失败")
-                    } else current
-                }
+                publishError(snapshot.sessionId, error.message ?: "角色切换失败")
             }
         }
     }
@@ -60,17 +68,23 @@ internal class LocalChatPersonaCoordinator internal constructor(
         galleryId: String? = null,
     ): Boolean {
         val lease = LocalSessionRuntimeRegistry.tryAcquire(
-            snapshot.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
+            snapshot.sessionId,
+            LocalSessionRuntimeKind.MAINTENANCE,
         ) ?: return false
         return try {
             if (!state.value.matchesPersonaEdit(snapshot, requireEmptyDialogue = true)) return false
             val personaId = profile.id.takeUnless { it == PersonaProfile.DEFAULT_PERSONA_ID }
                 ?: "persona-${UUID.randomUUID()}"
-            val saved = savePersona(profile.copy(id = personaId))
-            var applied = false
-            state.update { current ->
-                applied = current.matchesPersonaEdit(snapshot, requireEmptyDialogue = true)
-                if (!applied) current else current.copy(
+            val previous = loadPersona(personaId)
+            var committed = false
+            try {
+                val saved = savePersona(profile.copy(id = personaId))
+                val current = state.value
+                if (!current.matchesPersonaEdit(snapshot, requireEmptyDialogue = true)) {
+                    rollbackPersona(personaId, previous, null)
+                    return false
+                }
+                val target = current.copy(
                     chat = current.chat.copy(
                         personaId = saved.id,
                         galleryId = galleryId,
@@ -82,11 +96,17 @@ internal class LocalChatPersonaCoordinator internal constructor(
                         chatBranches = LocalChatBranchState(),
                     ),
                     handoffSummary = null,
+                    error = null,
                 )
+                commitDomainState(target, "persona-selected")
+                committed = true
+                publishCommitted(target)
+                enqueueSnapshot(snapshot.sessionId)
+                true
+            } catch (error: Throwable) {
+                if (!committed) rollbackPersona(personaId, previous, error)
+                throw error
             }
-            if (!applied) return false
-            check(persistNow(snapshot.sessionId)) { "会话已切换，请重新选择角色" }
-            true
         } finally {
             lease.close()
         }
@@ -94,31 +114,37 @@ internal class LocalChatPersonaCoordinator internal constructor(
 
     internal fun bindGallery(galleryId: String, galleryStoryId: String?) {
         val snapshot = state.value
-        if (
-            snapshot.loading ||
-            snapshot.kernel.running ||
-            snapshot.usageMode != LocalUsageMode.CHAT
-        ) return
-        state.update { state ->
+        if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) return
+        val lease = LocalSessionRuntimeRegistry.tryAcquire(
+            snapshot.sessionId,
+            LocalSessionRuntimeKind.MAINTENANCE,
+        ) ?: return
+        try {
+            val current = state.value
             if (
-                state.sessionId != snapshot.sessionId ||
-                state.usageMode != LocalUsageMode.CHAT ||
-                state.loading || state.kernel.running ||
-                state.chat.personaId != snapshot.chat.personaId
-            ) {
-                state
-            } else {
-                state.copy(
-                    chat = state.chat.copy(
-                        galleryId = galleryId,
-                        galleryStoryId = galleryStoryId,
-                        gallerySaveSuppressedThrough = 0L,
-                    ),
-                )
-            }
-        }
-        if (state.value.sessionId == snapshot.sessionId) {
+                current.sessionId != snapshot.sessionId ||
+                current.usageMode != LocalUsageMode.CHAT ||
+                current.loading ||
+                current.kernel.running ||
+                current.chat.personaId != snapshot.chat.personaId ||
+                current.chat.galleryId != snapshot.chat.galleryId ||
+                current.chat.galleryStoryId != snapshot.chat.galleryStoryId
+            ) return
+            val target = current.copy(
+                chat = current.chat.copy(
+                    galleryId = galleryId,
+                    galleryStoryId = galleryStoryId,
+                    gallerySaveSuppressedThrough = 0L,
+                ),
+                error = null,
+            )
+            commitDomainState(target, "gallery-bound")
+            publishCommitted(target)
             enqueueSnapshot(snapshot.sessionId)
+        } catch (error: Throwable) {
+            publishError(snapshot.sessionId, error.message ?: "人物图集绑定失败")
+        } finally {
+            lease.close()
         }
     }
 
@@ -134,45 +160,58 @@ internal class LocalChatPersonaCoordinator internal constructor(
         ) return
         if (expectedStoryId != null && snapshot.chat.galleryStoryId != expectedStoryId) return
 
-        state.update { state ->
+        val lease = LocalSessionRuntimeRegistry.tryAcquire(
+            snapshot.sessionId,
+            LocalSessionRuntimeKind.MAINTENANCE,
+        ) ?: return
+        try {
+            val current = state.value
             if (
-                state.sessionId != snapshot.sessionId ||
-                state.usageMode != LocalUsageMode.CHAT ||
-                state.chat.galleryId != expectedGalleryId ||
-                (expectedStoryId != null && state.chat.galleryStoryId != expectedStoryId)
-            ) {
-                state
-            } else {
-                state.copy(
-                    chat = state.chat.copy(
-                        galleryId = if (keepCharacter) state.chat.galleryId else null,
-                        galleryStoryId = null,
-                        gallerySaveSuppressedThrough =
-                            state.transcriptIndex.latestCreatedAt.takeIf { it > 0L }
-                                ?: System.currentTimeMillis(),
-                    ),
-                )
-            }
-        }
-        if (state.value.sessionId == snapshot.sessionId) {
+                current.sessionId != snapshot.sessionId ||
+                current.usageMode != LocalUsageMode.CHAT ||
+                current.loading ||
+                current.kernel.running ||
+                current.chat.galleryId != expectedGalleryId ||
+                (expectedStoryId != null && current.chat.galleryStoryId != expectedStoryId)
+            ) return
+            val target = current.copy(
+                chat = current.chat.copy(
+                    galleryId = if (keepCharacter) current.chat.galleryId else null,
+                    galleryStoryId = null,
+                    gallerySaveSuppressedThrough =
+                        current.transcriptIndex.latestCreatedAt.takeIf { it > 0L }
+                            ?: System.currentTimeMillis(),
+                ),
+                error = null,
+            )
+            commitDomainState(target, "gallery-unbound")
+            publishCommitted(target)
             enqueueSnapshot(snapshot.sessionId)
+        } catch (error: Throwable) {
+            publishError(snapshot.sessionId, error.message ?: "人物图集解绑失败")
+        } finally {
+            lease.close()
         }
     }
 
     internal suspend fun syncDefault(profile: PersonaProfile): PersonaProfile {
         val snapshot = state.value
         val lease = LocalSessionRuntimeRegistry.tryAcquire(
-            snapshot.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
+            snapshot.sessionId,
+            LocalSessionRuntimeKind.MAINTENANCE,
         ) ?: error("当前会话正在运行，请稍后再同步默认角色")
         return try {
             check(state.value.matchesPersonaEdit(snapshot)) { "当前状态暂时不能同步默认角色" }
-            val saved = savePersona(profile.copy(id = PersonaProfile.DEFAULT_PERSONA_ID))
-            var applied = false
-            state.update { current ->
-                applied = current.matchesPersonaEdit(snapshot)
-                if (!applied) current else current.copy(
+            val personaId = PersonaProfile.DEFAULT_PERSONA_ID
+            val previous = loadPersona(personaId)
+            var committed = false
+            try {
+                val saved = savePersona(profile.copy(id = personaId))
+                val current = state.value
+                check(current.matchesPersonaEdit(snapshot)) { "会话已变化，请重新同步默认角色" }
+                val target = current.copy(
                     chat = current.chat.copy(
-                        personaId = PersonaProfile.DEFAULT_PERSONA_ID,
+                        personaId = personaId,
                         galleryId = null,
                         galleryStoryId = null,
                         gallerySaveSuppressedThrough =
@@ -180,12 +219,47 @@ internal class LocalChatPersonaCoordinator internal constructor(
                                 ?: System.currentTimeMillis(),
                         chatPersona = saved,
                     ),
+                    error = null,
                 )
+                commitDomainState(target, "default-persona-synced")
+                committed = true
+                publishCommitted(target)
+                enqueueSnapshot(snapshot.sessionId)
+                saved
+            } catch (error: Throwable) {
+                if (!committed) rollbackPersona(personaId, previous, error)
+                throw error
             }
-            check(applied && persistNow(snapshot.sessionId)) { "会话已变化，请重新同步默认角色" }
-            saved
         } finally {
             lease.close()
+        }
+    }
+
+    private fun publishCommitted(target: LocalChatProjectionState) {
+        state.update { current ->
+            if (current.sessionId != target.sessionId) current else current.copy(
+                chat = target.chat,
+                handoffSummary = target.handoffSummary,
+                error = target.error,
+            )
+        }
+    }
+
+    private fun publishError(sessionId: String, message: String) {
+        state.update { current ->
+            if (current.sessionId == sessionId) current.copy(error = message) else current
+        }
+    }
+
+    private suspend fun rollbackPersona(
+        personaId: String,
+        previous: PersonaProfile?,
+        primary: Throwable?,
+    ) {
+        withContext(NonCancellable) {
+            runCatching { restorePersona(personaId, previous) }
+                .exceptionOrNull()
+                ?.let { rollbackError -> primary?.addSuppressed(rollbackError) }
         }
     }
 }

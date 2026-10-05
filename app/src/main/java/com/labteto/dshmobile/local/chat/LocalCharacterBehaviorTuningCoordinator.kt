@@ -9,22 +9,17 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
-/**
- * Owns durable character/persona tuning edits inside ChatFeature.
- *
- * The edit takes the current Session MAINTENANCE lease before touching persona/gallery files and
- * commits the matching Session snapshot through the shared Session storage capability. No Engine
- * callback or second transition lock participates in the transaction.
- */
 @Singleton
 internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
     private val state: LocalChatStatePort,
     private val personaStore: ChatPersonaStore,
     private val galleryStore: ChatPersonaGalleryStore,
     private val acquireLease: (String) -> AutoCloseable?,
-    private val persistNow: suspend (String) -> Boolean,
+    private val commitDomainState: (LocalChatProjectionState, String) -> Unit,
+    private val enqueueSnapshot: (String) -> Boolean,
 ) {
     @Inject
     internal constructor(
@@ -37,12 +32,16 @@ internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
         personaStore = personaStore,
         galleryStore = galleryStore,
         acquireLease = { sessionId ->
-            LocalSessionRuntimeRegistry.tryAcquire(
-                sessionId,
-                LocalSessionRuntimeKind.MAINTENANCE,
+            LocalSessionRuntimeRegistry.tryAcquire(sessionId, LocalSessionRuntimeKind.MAINTENANCE)
+        },
+        commitDomainState = { committed, reason ->
+            appendChatDomainStateCommit(
+                sessionStorage.eventLogs.get(committed.sessionId),
+                committed,
+                reason,
             )
         },
-        persistNow = sessionStorage::writeCurrentSnapshotNow,
+        enqueueSnapshot = sessionStorage::enqueueCurrentSnapshot,
     )
 
     suspend fun configure(profile: PersonaProfile): Result<Unit> = try {
@@ -62,26 +61,40 @@ internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
             val personaId = snapshot.chat.personaId.takeUnless {
                 it == PersonaProfile.DEFAULT_PERSONA_ID
             } ?: "persona-${UUID.randomUUID()}"
-
-            val persisted = withContext(Dispatchers.IO) {
-                persistCharacterBehaviorTuning(
-                    personaStore,
-                    galleryStore,
-                    snapshot.chat.chatPersona,
-                    personaId,
-                    snapshot.chat.galleryId,
-                    profile,
-                )
+            val previousPersona = withContext(Dispatchers.IO) { personaStore.find(personaId) }
+            val previousGallery = withContext(Dispatchers.IO) {
+                snapshot.chat.galleryId?.let(galleryStore::findEntry)
             }
-            val durablePersona = persisted.persona
-            val sameBoundCharacter = persisted.sameBoundCharacter
-            state.update { current ->
+            var committed = false
+            try {
+                val persisted = withContext(Dispatchers.IO) {
+                    persistCharacterBehaviorTuning(
+                        personaStore,
+                        galleryStore,
+                        snapshot.chat.chatPersona,
+                        personaId,
+                        snapshot.chat.galleryId,
+                        profile,
+                    )
+                }
+                val current = state.value
                 check(
                     current.sessionId == snapshot.sessionId &&
+                        current.usageMode == LocalUsageMode.CHAT &&
+                        !current.loading &&
+                        !current.kernel.running &&
+                        !current.chat.groupChat.enabled &&
                         current.chat.personaId == snapshot.chat.personaId &&
-                        current.chat.galleryId == snapshot.chat.galleryId
+                        current.chat.galleryId == snapshot.chat.galleryId &&
+                        current.chat.galleryStoryId == snapshot.chat.galleryStoryId &&
+                        current.chat.chatContext.generation == snapshot.chat.chatContext.generation &&
+                        current.transcriptIndex.latestDialogueMessageId ==
+                            snapshot.transcriptIndex.latestDialogueMessageId
                 ) { "会话已切换，请重新保存角色设置" }
-                current.copy(
+
+                val durablePersona = persisted.persona
+                val sameBoundCharacter = persisted.sameBoundCharacter
+                val target = current.copy(
                     chat = current.chat.copy(
                         personaId = durablePersona.id,
                         galleryId = current.chat.galleryId.takeIf { sameBoundCharacter },
@@ -94,23 +107,41 @@ internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
                                     ?: System.currentTimeMillis()
                             },
                         chatPersona = durablePersona,
-                        chatState =
-                            if (sameBoundCharacter) {
-                                current.chat.chatState.copy(
-                                    behaviorTuning = durablePersona.behaviorTuning,
-                                )
-                            } else {
-                                ChatCharacterState(
-                                    behaviorTuning = durablePersona.behaviorTuning,
-                                )
-                            },
+                        chatState = if (sameBoundCharacter) {
+                            current.chat.chatState.copy(
+                                behaviorTuning = durablePersona.behaviorTuning,
+                            )
+                        } else {
+                            ChatCharacterState(behaviorTuning = durablePersona.behaviorTuning)
+                        },
                         replySuggestions =
                             if (sameBoundCharacter) current.chat.replySuggestions else emptyList(),
                     ),
                     handoffSummary = if (sameBoundCharacter) current.handoffSummary else null,
+                    error = null,
                 )
+                commitDomainState(target, "behavior-tuning-updated")
+                committed = true
+                state.update { latest ->
+                    if (latest.sessionId != target.sessionId) latest else latest.copy(
+                        chat = target.chat,
+                        handoffSummary = target.handoffSummary,
+                        error = null,
+                    )
+                }
+                enqueueSnapshot(snapshot.sessionId)
+            } catch (error: Throwable) {
+                if (!committed) {
+                    rollbackStores(
+                        personaId,
+                        previousPersona,
+                        snapshot.chat.galleryId,
+                        previousGallery,
+                        error,
+                    )
+                }
+                throw error
             }
-            check(persistNow(snapshot.sessionId)) { "会话已切换，请重新保存角色设置" }
         } finally {
             lease.close()
         }
@@ -119,5 +150,24 @@ internal class LocalCharacterBehaviorTuningCoordinator internal constructor(
         throw cancelled
     } catch (error: Exception) {
         Result.failure(error)
+    }
+
+    private suspend fun rollbackStores(
+        personaId: String,
+        previousPersona: PersonaProfile?,
+        galleryId: String?,
+        previousGallery: PersonaGalleryEntry?,
+        primary: Throwable,
+    ) {
+        withContext(NonCancellable + Dispatchers.IO) {
+            runCatching { personaStore.restore(personaId, previousPersona) }
+                .exceptionOrNull()
+                ?.let { primary.addSuppressed(it) }
+            galleryId?.let { id ->
+                runCatching { galleryStore.restoreEntry(id, previousGallery) }
+                    .exceptionOrNull()
+                    ?.let { primary.addSuppressed(it) }
+            }
+        }
     }
 }

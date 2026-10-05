@@ -12,10 +12,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
-/** Owns materialized direct-chat branch selection and its durable projection. */
 @Singleton
 internal class LocalChatBranchCoordinator @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
@@ -24,26 +21,32 @@ internal class LocalChatBranchCoordinator @Inject constructor(
     private val modelHistoryRuntime: LocalForegroundModelHistoryRuntime,
 ) {
     internal fun persistCurrentProjection(expectedSessionId: String, reason: String): Boolean {
+        val aggregate = runtimeStateStore.state.value
         val state = chatState.value
-        if (state.sessionId != expectedSessionId) return false
+        if (state.sessionId != expectedSessionId || aggregate.sessionId != expectedSessionId) return false
         val eventLog = sessionStorage.eventLogs.get(expectedSessionId)
-        eventLog.append(
-            "chat/branch-state",
-            JsonObject(
-                encodeChatBranchStateEvent(state.chat.chatBranches) +
-                    ("reason" to JsonPrimitive(reason)),
-            ),
-        )
         val activeTranscript = activeChatBranchMessages(state.chat.chatBranches)
             .ifEmpty { state.messages }
-        val transcriptSequence = com.labteto.dshmobile.local.persistActiveChatTranscript(
+        val event = appendChatProjectionCommit(
             eventLog = eventLog,
             reason = reason,
             activeTranscript = activeTranscript,
+            modelHistory = modelHistoryRuntime.history.snapshot(),
+            state = LocalTimelineRewriteState(
+                plan = aggregate.work.plan,
+                todos = aggregate.work.todos,
+                goal = aggregate.work.goal,
+                planMode = aggregate.work.planMode,
+                chatState = state.chat.chatState,
+                chatContext = state.chat.chatContext,
+                chatBranches = state.chat.chatBranches,
+                groupChat = state.chat.groupChat,
+                replySuggestions = state.chat.replySuggestions,
+            ),
         )
         runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor = maxOf(
             runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor ?: -1L,
-            transcriptSequence,
+            event.sequence,
         )
         return true
     }
@@ -77,11 +80,8 @@ internal class LocalChatBranchCoordinator @Inject constructor(
                 !state.transcriptIndex.branchingEligible
             ) return false
 
-            val selected = selectChatBranchVariant(
-                state.chat.chatBranches,
-                messageId,
-                targetIndex,
-            ) ?: return false
+            val selected = selectChatBranchVariant(state.chat.chatBranches, messageId, targetIndex)
+                ?: return false
             val activeMessages = activeChatBranchMessages(selected)
             if (activeMessages.isEmpty() || !chatBranchingEligible(activeMessages)) return false
 
@@ -92,49 +92,61 @@ internal class LocalChatBranchCoordinator @Inject constructor(
                 legacyState = snapshot?.first,
                 previousGeneration = state.chat.chatContext.generation,
             ).boundDurablePending(eventLog, "direct")
+            val selectedChatState = (snapshot?.first ?: state.chat.chatState)
+                .withoutLegacyConversationContext()
+            val selectedSuggestions = snapshot?.second.orEmpty()
+            val selectedHistory = buildDurableChatModelHistory(
+                eventLog = eventLog,
+                messages = activeMessages,
+                systemPrompt = chatSystemPrompt(),
+            )
+            val event = appendChatProjectionCommit(
+                eventLog = eventLog,
+                reason = "variant-selected",
+                activeTranscript = activeMessages,
+                modelHistory = selectedHistory,
+                state = LocalTimelineRewriteState(
+                    plan = state.work.plan,
+                    todos = state.work.todos,
+                    goal = state.work.goal,
+                    planMode = state.work.planMode,
+                    chatState = selectedChatState,
+                    chatContext = selectedContext,
+                    chatBranches = selected,
+                    groupChat = state.chat.groupChat,
+                    replySuggestions = selectedSuggestions,
+                ),
+            )
 
-            if (!modelHistoryRuntime.reset(
-                    state.sessionId,
-                    buildDurableChatModelHistory(
-                        eventLog = eventLog,
-                        messages = activeMessages,
-                        systemPrompt = chatSystemPrompt(),
-                    ),
-                )
-            ) return false
-
+            if (!modelHistoryRuntime.reset(state.sessionId, selectedHistory)) return true
             chatState.update { current ->
                 if (current.sessionId != state.sessionId) current else current.copy(
                     messages = activeMessages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                     transcriptIndex = buildLocalTranscriptRuntimeIndex(activeMessages),
                     chat = current.chat.copy(
-                        chatState = (snapshot?.first ?: current.chat.chatState)
-                            .withoutLegacyConversationContext(),
+                        chatState = selectedChatState,
                         chatContext = selectedContext,
-                        replySuggestions = snapshot?.second.orEmpty(),
+                        replySuggestions = selectedSuggestions,
                         chatBranches = selected,
                     ),
                     error = null,
                 )
             }
-
-            eventLog.append(
-                "chat/branch-state",
-                JsonObject(
-                    encodeChatBranchStateEvent(selected) +
-                        ("reason" to JsonPrimitive("variant-selected")),
-                ),
-            )
-            val transcriptSequence = com.labteto.dshmobile.local.persistActiveChatTranscript(
-                eventLog = eventLog,
-                reason = "variant-selected",
-                activeTranscript = activeMessages,
-            )
             runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor = maxOf(
                 runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor ?: -1L,
-                transcriptSequence,
+                event.sequence,
             )
-            modelHistoryRuntime.checkpoint(state.sessionId, "chat/variant-selected")
+            runCatching {
+                modelHistoryRuntime.checkpoint(state.sessionId, "chat/variant-selected")
+            }.onFailure { error ->
+                chatState.update { current ->
+                    if (current.sessionId == state.sessionId) {
+                        current.copy(
+                            error = "分支已切换，模型历史检查点写入失败：${error.message ?: error::class.java.simpleName}",
+                        )
+                    } else current
+                }
+            }
             sessionStorage.enqueueCurrentSnapshot(state.sessionId)
             return true
         } finally {

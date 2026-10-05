@@ -18,12 +18,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/**
- * Owns reply-suggestion generation and commit inside ChatFeature.
- *
- * Model work runs outside the Session lease on a frozen route. The final state/durable commit takes
- * the shared MAINTENANCE lease and revalidates the exact assistant/character generation target.
- */
 @Singleton
 internal class LocalReplySuggestionCoordinator @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
@@ -33,7 +27,6 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
     private val requestRuntime: LocalAuxiliaryModelRequestRuntime,
     private val usageTracker: DeepSeekUsageTracker,
     private val sessionStorage: LocalSessionStorageRuntime,
-    private val branchCoordinator: LocalChatBranchCoordinator,
 ) {
     suspend fun generate(): Boolean {
         val aggregateSnapshot = runtimeStateStore.state.value
@@ -87,10 +80,12 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
-            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-                put("status", "failed")
-                put("detail", error.message.orEmpty().take(1_000))
-            })
+            runCatching {
+                boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                    put("status", "failed")
+                    put("detail", error.message.orEmpty().take(1_000))
+                })
+            }
             updateError(
                 snapshot,
                 expectedAssistantMessageId,
@@ -108,10 +103,12 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
 
         val suggestions = chatTurnCoordinator.parseReplySuggestions(reply.content.orEmpty())
         if (suggestions.isNullOrEmpty()) {
-            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-                put("status", "parse-failed")
-                put("content", reply.content.orEmpty().take(2_000))
-            })
+            runCatching {
+                boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                    put("status", "parse-failed")
+                    put("content", reply.content.orEmpty().take(2_000))
+                })
+            }
             updateError(snapshot, expectedAssistantMessageId, "回复建议返回格式异常，请重试")
             return false
         }
@@ -121,40 +118,55 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
             LocalSessionRuntimeKind.MAINTENANCE,
         )
         if (lease == null) {
-            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-                put("status", "stale-discarded")
-                put("assistant_message_id", expectedAssistantMessageId)
-                put("reason", "session-busy")
-            })
+            runCatching {
+                boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                    put("status", "stale-discarded")
+                    put("assistant_message_id", expectedAssistantMessageId)
+                    put("reason", "session-busy")
+                })
+            }
             return false
         }
         try {
-            val applied = commitReplySuggestions(
-                chatState,
+            val prepared = prepareReplySuggestionCommit(
+                chatState.value,
                 snapshot,
                 expectedAssistantMessageId,
                 suggestions,
             )
-            if (!applied) {
-                boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-                    put("status", "stale-discarded")
-                    put("assistant_message_id", expectedAssistantMessageId)
-                })
+            if (prepared == null) {
+                runCatching {
+                    boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                        put("status", "stale-discarded")
+                        put("assistant_message_id", expectedAssistantMessageId)
+                    })
+                }
                 return false
             }
 
-            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-                put("status", "updated")
-                put("assistant_message_id", expectedAssistantMessageId)
-                put("suggestion_count", suggestions.size)
-            })
-            if (hasChatBranchAlternatives(chatState.value.chat.chatBranches)) {
-                branchCoordinator.persistCurrentProjection(
-                    expectedSessionId,
-                    "chat/reply-suggestions-updated",
+            appendChatDomainStateCommit(boundEventLog, prepared, "reply-suggestions-updated")
+            chatState.update { current ->
+                if (current.sessionId != expectedSessionId) current else current.copy(
+                    chat = prepared.chat,
+                    error = null,
                 )
             }
             sessionStorage.enqueueCurrentSnapshot(expectedSessionId)
+            runCatching {
+                boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                    put("status", "updated")
+                    put("assistant_message_id", expectedAssistantMessageId)
+                    put("suggestion_count", suggestions.size)
+                })
+            }.onFailure { error ->
+                chatState.update { current ->
+                    if (current.sessionId == expectedSessionId) {
+                        current.copy(
+                            error = "回复建议已保存，诊断日志写入失败：${error.message ?: error::class.java.simpleName}",
+                        )
+                    } else current
+                }
+            }
             return true
         } finally {
             lease.close()

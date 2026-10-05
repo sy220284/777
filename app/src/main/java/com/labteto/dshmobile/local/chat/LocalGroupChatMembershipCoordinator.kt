@@ -11,19 +11,16 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/**
- * ChatFeature owner for group-member edits.
- *
- * Membership changes use the shared Session MAINTENANCE lease instead of Engine-private locks.
- * Model history and durable snapshot writes stay on the shared runtime/session authorities.
- */
 @Singleton
 internal class LocalGroupChatMembershipCoordinator @Inject constructor(
     private val chatState: LocalChatStatePort,
@@ -35,73 +32,69 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
 
     internal fun configure(entries: List<PersonaGalleryEntry>): Boolean {
         val snapshot = chatState.value
-        if (
-            snapshot.loading ||
-            snapshot.kernel.running ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            !snapshot.chat.groupChat.enabled
-        ) return false
-
-        val selected = entries
-            .distinctBy(PersonaGalleryEntry::id)
-            .take(MAX_GROUP_CHAT_MEMBERS)
+        if (!snapshot.canEditGroupMembers()) return false
+        val selected = entries.distinctBy(PersonaGalleryEntry::id).take(MAX_GROUP_CHAT_MEMBERS)
         if (selected.size !in MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS) return false
 
         scope.launch {
-            try {
-                val members = resolveLocalGroupChatMembers(
-                entries = selected,
-                previousMembers = snapshot.chat.groupChat.members,
-                chatPersonaStore = personaStore,
-            )
             val lease = LocalSessionRuntimeRegistry.tryAcquire(
                 snapshot.sessionId,
                 LocalSessionRuntimeKind.MAINTENANCE,
             ) ?: return@launch
+            var committed = false
+            var previousPersonas: Map<String, PersonaProfile?> = emptyMap()
             try {
-                var applied = false
-                chatState.update { current ->
-                    applied =
-                        current.sessionId == snapshot.sessionId &&
-                            current.usageMode == LocalUsageMode.CHAT &&
-                            !current.loading &&
-                            !current.kernel.running &&
-                            current.chat.groupChat == snapshot.chat.groupChat &&
-                            current.transcriptIndex.latestDialogueMessageId ==
-                                snapshot.transcriptIndex.latestDialogueMessageId
-                    if (!applied) current else current.copy(
-                        chat = current.chat.copy(
-                            groupChat = current.chat.groupChat.copy(members = members),
-                            replySuggestions = emptyList(),
-                            chatBranches = LocalChatBranchState(),
-                        ),
-                        error = null,
-                    )
-                }
-                if (!applied) return@launch
+                val current = chatState.value
+                if (!current.matchesGroupMemberEdit(snapshot)) return@launch
 
+                previousPersonas = selected.associate { entry ->
+                    entry.id to personaStore.find(entry.id)
+                }
+                val members = resolveLocalGroupChatMembers(
+                    entries = selected,
+                    previousMembers = snapshot.chat.groupChat.members,
+                    chatPersonaStore = personaStore,
+                )
+                val afterResolve = chatState.value
+                if (!afterResolve.matchesGroupMemberEdit(snapshot)) {
+                    rollbackPersonas(previousPersonas, null)
+                    return@launch
+                }
+
+                val target = afterResolve.copy(
+                    chat = afterResolve.chat.copy(
+                        groupChat = afterResolve.chat.groupChat.copy(members = members),
+                        replySuggestions = emptyList(),
+                        chatBranches = LocalChatBranchState(),
+                    ),
+                    error = null,
+                )
                 val eventLog = sessionStorage.eventLogs.get(snapshot.sessionId)
-                modelHistoryRuntime.replaceSystemPrompt(snapshot.sessionId, groupChatSystemPrompt())
-                modelHistoryRuntime.checkpoint(snapshot.sessionId, "group/members-updated")
-                eventLog.append("group/members", buildJsonObject {
-                    put("count", members.size)
-                    put("gallery_ids", JsonArray(members.map { JsonPrimitive(it.galleryId) }))
-                })
+                appendChatDomainStateCommit(eventLog, target, "group-members-updated")
+                committed = true
+                publishCommitted(target)
                 sessionStorage.enqueueCurrentSnapshot(snapshot.sessionId)
-            } finally {
-                lease.close()
-            }
+                recordDerivedGroupState(
+                    snapshot.sessionId,
+                    eventLog,
+                    "group/members-updated",
+                    buildJsonObject {
+                        put("count", members.size)
+                        put("gallery_ids", JsonArray(members.map { JsonPrimitive(it.galleryId) }))
+                    },
+                )
             } catch (cancelled: CancellationException) {
+                if (!committed) rollbackPersonas(previousPersonas, cancelled)
                 throw cancelled
             } catch (error: Throwable) {
-                chatState.update { current ->
-                    if (current.sessionId == snapshot.sessionId && current.usageMode == snapshot.usageMode) {
-                        current.copy(
-                            error = error.message?.takeIf(String::isNotBlank)
-                                ?: "群聊成员更新失败：${error::class.java.simpleName}",
-                        )
-                    } else current
-                }
+                if (!committed) rollbackPersonas(previousPersonas, error)
+                publishError(
+                    snapshot.sessionId,
+                    error.message?.takeIf(String::isNotBlank)
+                        ?: "群聊成员更新失败：${error::class.java.simpleName}",
+                )
+            } finally {
+                lease.close()
             }
         }
         return true
@@ -110,10 +103,7 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
     internal fun remove(galleryId: String) {
         val snapshot = chatState.value
         if (
-            snapshot.loading ||
-            snapshot.kernel.running ||
-            snapshot.usageMode != LocalUsageMode.CHAT ||
-            !snapshot.chat.groupChat.enabled ||
+            !snapshot.canEditGroupMembers() ||
             snapshot.chat.groupChat.members.none { it.galleryId == galleryId }
         ) return
 
@@ -122,49 +112,97 @@ internal class LocalGroupChatMembershipCoordinator @Inject constructor(
             LocalSessionRuntimeKind.MAINTENANCE,
         ) ?: return
         try {
-            var applied = false
-            var memberCount = 0
-            chatState.update { current ->
-                applied =
-                    current.sessionId == snapshot.sessionId &&
-                        current.usageMode == LocalUsageMode.CHAT &&
-                        !current.loading &&
-                        !current.kernel.running &&
-                        current.chat.groupChat == snapshot.chat.groupChat &&
-                        current.transcriptIndex.latestDialogueMessageId ==
-                            snapshot.transcriptIndex.latestDialogueMessageId
-                if (!applied) current else {
-                    val members = current.chat.groupChat.members.filterNot {
-                        it.galleryId == galleryId
-                    }
-                    memberCount = members.size
-                    current.copy(
-                        chat = current.chat.copy(
-                            groupChat = current.chat.groupChat.copy(
-                                members = members,
-                                turnCursor = 0,
-                            ),
-                            groupActiveSpeakerName = null,
-                        ),
-                        error = null,
-                    )
-                }
-            }
-            if (!applied) return
-
+            val current = chatState.value
+            if (!current.matchesGroupMemberEdit(snapshot)) return
+            val members = current.chat.groupChat.members.filterNot { it.galleryId == galleryId }
+            val target = current.copy(
+                chat = current.chat.copy(
+                    groupChat = current.chat.groupChat.copy(members = members, turnCursor = 0),
+                    groupActiveSpeakerName = null,
+                ),
+                error = null,
+            )
             val eventLog = sessionStorage.eventLogs.get(snapshot.sessionId)
-            modelHistoryRuntime.replaceSystemPrompt(snapshot.sessionId, groupChatSystemPrompt())
-            modelHistoryRuntime.checkpoint(snapshot.sessionId, "group/member-deleted")
-            eventLog.append("group/members", buildJsonObject {
-                put("action", "member-deleted")
-                put("gallery_id", galleryId)
-                put("count", memberCount)
-            })
+            appendChatDomainStateCommit(eventLog, target, "group-member-deleted")
+            publishCommitted(target)
             sessionStorage.enqueueCurrentSnapshot(snapshot.sessionId)
+            recordDerivedGroupState(
+                snapshot.sessionId,
+                eventLog,
+                "group/member-deleted",
+                buildJsonObject {
+                    put("action", "member-deleted")
+                    put("gallery_id", galleryId)
+                    put("count", members.size)
+                },
+            )
+        } catch (error: Throwable) {
+            publishError(
+                snapshot.sessionId,
+                error.message?.takeIf(String::isNotBlank)
+                    ?: "群聊成员删除失败：${error::class.java.simpleName}",
+            )
         } finally {
             lease.close()
         }
     }
 
+    private fun publishCommitted(target: LocalChatProjectionState) {
+        chatState.update { current ->
+            if (current.sessionId != target.sessionId) current else current.copy(
+                chat = target.chat,
+                error = target.error,
+            )
+        }
+    }
 
+    private fun recordDerivedGroupState(
+        sessionId: String,
+        eventLog: com.labteto.dshmobile.local.session.LocalSessionEventLog,
+        reason: String,
+        audit: JsonObject,
+    ) {
+        runCatching {
+            check(modelHistoryRuntime.replaceSystemPrompt(sessionId, groupChatSystemPrompt())) {
+                "群聊模型历史会话已变化"
+            }
+            modelHistoryRuntime.checkpoint(sessionId, reason)
+            eventLog.append("group/members", audit)
+        }.onFailure { error ->
+            publishError(
+                sessionId,
+                "群聊成员已保存，恢复投影写入失败：${error.message ?: error::class.java.simpleName}",
+            )
+        }
+    }
+
+    private suspend fun rollbackPersonas(
+        previous: Map<String, PersonaProfile?>,
+        primary: Throwable?,
+    ) {
+        withContext(NonCancellable + Dispatchers.IO) {
+            previous.forEach { (id, profile) ->
+                runCatching { personaStore.restore(id, profile) }
+                    .exceptionOrNull()
+                    ?.let { primary?.addSuppressed(it) }
+            }
+        }
+    }
+
+    private fun publishError(sessionId: String, message: String) {
+        chatState.update { current ->
+            if (current.sessionId == sessionId) current.copy(error = message) else current
+        }
+    }
 }
+
+private fun LocalChatProjectionState.canEditGroupMembers(): Boolean =
+    !loading && !kernel.running && usageMode == LocalUsageMode.CHAT && chat.groupChat.enabled
+
+private fun LocalChatProjectionState.matchesGroupMemberEdit(
+    before: LocalChatProjectionState,
+): Boolean =
+    canEditGroupMembers() &&
+        sessionId == before.sessionId &&
+        chat.groupChat == before.chat.groupChat &&
+        transcriptIndex.latestDialogueMessageId == before.transcriptIndex.latestDialogueMessageId
