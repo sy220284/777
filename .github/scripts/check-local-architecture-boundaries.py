@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 LOCAL_SOURCE_ROOT = ROOT / "app/src/main/java/com/labteto/dshmobile/local"
 
 ENGINE_MAX_PUBLIC_METHODS = 0
-ENGINE_MAX_INTERNAL_METHODS = 59
+ENGINE_MAX_INTERNAL_METHODS = 1
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
 
@@ -27,7 +27,7 @@ RUNTIME_ENGINE_REFERENCE_BUDGETS = {
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt": 0,
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 3,
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt": 0,
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt": 0,
 }
 PROJECTION_FIELD_BUDGETS = {
@@ -38,7 +38,6 @@ PROJECTION_FIELD_BUDGETS = {
 
 ENGINE_CONSUMER_ALLOWLIST = {
     "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt",
 }
 
@@ -380,6 +379,23 @@ for relative, (class_name, maximum) in HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS.it
         f"{dependencies}/{maximum} constructor dependencies"
     )
 
+
+automation_runtime_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt")
+)
+for removed_automation_engine_proxy in (
+    "internal suspend fun prepareAutomationWorkSession",
+    "internal suspend fun runAutomationWork",
+    "internal suspend fun runAutomationChat",
+):
+    if removed_automation_engine_proxy in engine:
+        die("LocalHarnessEngine must not reintroduce Automation execution proxy API: " + removed_automation_engine_proxy)
+for required_automation_owner in (
+    "chatCoordinator: LocalAutomationChatCoordinator",
+    "workCoordinator: LocalAutomationWorkCoordinator",
+):
+    if required_automation_owner not in automation_runtime_source:
+        die("AutomationRuntime must depend on Automation-owned coordinators: " + required_automation_owner)
 
 for relative, maximum in RUNTIME_ENGINE_REFERENCE_BUDGETS.items():
     runtime_source = strip_comments(read(relative))
