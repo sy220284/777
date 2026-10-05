@@ -1,14 +1,22 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
+import com.labteto.dshmobile.local.interaction.LocalQuestion
+import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.model.recordRuntimeSystemPromptUpdate
 import com.labteto.dshmobile.local.model.workSystemPrompt
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -77,4 +85,66 @@ internal class LocalWorkPlanModeCoordinator @Inject constructor(
             lease.close()
         }
     }
+}
+
+
+/**
+ * Work-owned transition from planning into execution during an active run.
+ *
+ * The caller supplies only narrow Work/shared capabilities. The rule itself no longer lives in
+ * LocalHarnessEngine, so Work remains the owner of plan approval semantics while Runtime keeps
+ * interaction, model-history and Session persistence mechanics.
+ */
+internal suspend fun exitWorkPlanMode(
+    call: LocalToolCall,
+    plan: String,
+    state: LocalWorkStatePort,
+    interactions: LocalInteractionCoordinator,
+    aggregateSnapshot: () -> LocalHarnessState,
+    history: LocalModelHistoryBuffer,
+    eventLog: LocalSessionEventLog,
+    persist: () -> Unit,
+    updateContextMetrics: () -> Unit,
+): String {
+    if (!state.snapshot().planMode) return "当前未启用规划模式"
+
+    val answer = interactions.awaitQuestion(
+        LocalQuestion(
+            callId = call.id,
+            question = "Harness 已完成计划，是否批准并进入执行模式？\n\n${plan.take(8_000)}",
+            options = listOf("批准并进入执行模式", "继续规划"),
+        ),
+    )
+    if (answer != "批准并进入执行模式") {
+        return "用户要求继续规划。反馈：$answer"
+    }
+
+    val approvedPlan = plan.lines()
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .take(20)
+
+    state.update { current ->
+        current.copy(
+            planMode = false,
+            plan = approvedPlan,
+        )
+    }
+    eventLog.append("plan/state", buildJsonObject {
+        put("items", JsonArray(approvedPlan.map(::JsonPrimitive)))
+    })
+    eventLog.append("plan/mode", buildJsonObject { put("active", false) })
+
+    val snapshot = aggregateSnapshot()
+    if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
+        recordRuntimeSystemPromptUpdate(
+            history = history,
+            prompt = workSystemPrompt(snapshot.workspacePath, planMode = false),
+            state = snapshot,
+            log = eventLog,
+        )
+        updateContextMetrics()
+    }
+    persist()
+    return "计划已获批准，已进入执行模式"
 }
