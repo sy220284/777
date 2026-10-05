@@ -51,6 +51,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     private val repository: LocalSessionRepository
     private val storageManager = LocalSessionStorageManager(sessionsRoot, json)
     internal val coordinator: LocalSessionCoordinator
+    internal val agentRunCoordinator = LocalAgentRunCoordinator(eventLogFor = eventLogs::get)
 
     init {
         val orderedDomainCodecs = domainCodecs.sortedBy(LocalSessionDomainCodec::id)
