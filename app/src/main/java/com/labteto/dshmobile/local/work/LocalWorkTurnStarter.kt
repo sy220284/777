@@ -34,7 +34,6 @@ internal class LocalWorkTurnStarter(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val workRunRegistry: LocalWorkRunRegistry,
-    private val pruneToolResult: (String) -> String,
     private val runTurn: suspend (
         input: String,
         memoryInput: String,
@@ -178,7 +177,6 @@ internal class LocalWorkTurnStarter(
                 maxPendingInputs = MAX_PENDING_INPUTS,
             ),
             eventLog = sessionStorage.eventLogs.get(sessionId),
-            pruneToolResult = pruneToolResult,
         )
         workRunRegistry.attach(binding)
         binding.runHandle.projectionJob = scope.launch {
