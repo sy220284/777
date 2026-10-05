@@ -20,6 +20,7 @@ class LocalChatRuntime @Inject internal constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val personaCoordinator: LocalChatPersonaCoordinator,
+    private val groupMembership: LocalGroupChatMembershipCoordinator,
 ) {
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = behaviorTuning.configure(profile)
     internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) =
@@ -37,7 +38,7 @@ class LocalChatRuntime @Inject internal constructor(
     internal fun createSingleChatSession() = sessionRuntime.createSingleChatSession()
     internal fun switchChatMode(mode: LocalChatMode) = sessionRuntime.switchChatMode(mode)
     internal fun configureGroupChatMembers(entries: List<PersonaGalleryEntry>): Boolean =
-        engine.configureGroupChatMembers(entries)
+        groupMembership.configure(entries)
     internal suspend fun setGroupChatAnnouncement(text: String): Result<Unit> {
         val sessionId = runtimeStateStore.currentSessionId
         return saveGroupChatAnnouncement(
@@ -51,7 +52,7 @@ class LocalChatRuntime @Inject internal constructor(
         )
     }
     internal fun removeGroupChatMemberByGalleryId(galleryId: String) =
-        engine.removeGroupChatMemberByGalleryId(galleryId)
+        groupMembership.remove(galleryId)
     internal suspend fun generateReplySuggestions(): Boolean = engine.generateReplySuggestions()
     internal fun diaryEntries(subjectKey: String, limit: Int = MAX_CHAT_DIARY_ENTRIES) = persistence.diaryStore.listActive(subjectKey, limit)
     internal fun diaryEntriesForTransfer(subjectKey: String) = persistence.diaryStore.listForTransfer(subjectKey)
