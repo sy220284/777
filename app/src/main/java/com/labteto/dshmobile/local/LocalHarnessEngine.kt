@@ -1148,8 +1148,26 @@ class LocalHarnessEngine @Inject internal constructor(
             sessionLease = sessionLease,
         )
 
-        override fun regenerateReply(messageId: String): Boolean =
-            regenerateReplyForMode(LocalUsageMode.WORK, messageId)
+        override fun startRegeneration(messageId: String): Job {
+            val sessionId = currentSessionId
+            return scope.launch(start = CoroutineStart.LAZY) {
+                LocalSessionRuntimeRegistry.withOwner(
+                    sessionId,
+                    LocalSessionRuntimeKind.FOREGROUND,
+                ) { ownedSessionId ->
+                    if (currentSessionId != ownedSessionId) {
+                        throw CancellationException("会话已切换")
+                    }
+                    LocalExecutionService.withTurn(
+                        context,
+                        ownedSessionId,
+                        { _state.value.error },
+                    ) {
+                        workReplyRegenerator.regenerate(messageId)
+                    }
+                }
+            }
+        }
     }
 
     internal val chatTurnPort: LocalChatTurnPort = object : LocalChatTurnPort {
@@ -1161,319 +1179,24 @@ class LocalHarnessEngine @Inject internal constructor(
             chatTurnDispatcher.run(content, memoryInput, sourceMessageId)
         }
 
-        override fun editAndResendUserMessage(
-            messageId: String,
-            replacement: String,
-        ): LocalChatUserEditResult =
-            this@LocalHarnessEngine.editAndResendUserMessage(messageId, replacement)
-
-        override fun regenerateReply(messageId: String): Boolean =
-            regenerateReplyForMode(LocalUsageMode.CHAT, messageId)
-    }
-
-    /**
-     * Edit any historical user turn and continue from that point.
-     *
-     * The active transcript is rewritten destructively: the original user turn and every later
-     * message are removed from the active conversation. Hard scene state is replayed from the
-     * retained prefix so deleted future locations cannot leak into the new continuation.
-     */
-    private fun editAndResendUserMessage(messageId: String, replacement: String): LocalChatUserEditResult = synchronized(runStateLock) {
-        val requestedText = replacement.trim()
-        val state = _state.value
-        if (!state.modelState.configured) return@synchronized LocalChatUserEditResult.UNAVAILABLE
-        if (
-            state.loading ||
-            state.kernel.running ||
-            sessionTransitioning ||
-            activeJob?.isCompleted == false ||
-            workRunRegistry.live(state.sessionId) != null ||
-            pendingInputs.size() != 0
-        ) return@synchronized LocalChatUserEditResult.BUSY
-        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
-        if (state.usageMode == LocalUsageMode.WORK) {
-            val lease = LocalSessionRuntimeRegistry.tryAcquire(
-                state.sessionId,
-                LocalSessionRuntimeKind.FOREGROUND,
-            ) ?: return@synchronized LocalChatUserEditResult.BUSY
-            var leaseTransferred = false
-            try {
-                val result = editAndResendWorkUserMessage(
-                    messageId,
-                    requestedText,
-                    eventLog,
-                    memoryStore,
-                    chatPersonaGalleryStore,
-                    modelHistory,
-                    modelHistoryCheckpointCodec,
-                    _state,
-                    { updateContextMetrics() },
-                    { sequence -> transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, sequence) },
-                    { reason -> checkpointModelHistory(reason) },
-                    { persist() },
-                    { content -> transcriptRuntime.newMessage("user", content) },
-                ) { content, memoryInput, sourceMessageId ->
-                    val job = workTurnStarter.startExisting(
-                        content = content,
-                        memoryInput = memoryInput,
-                        sourceMessageId = sourceMessageId,
-                        sessionLease = lease,
+        override fun startRegeneration(
+            prompt: String,
+            replacingMessageId: String,
+        ): Job {
+            val sessionId = currentSessionId
+            return scope.launch(start = CoroutineStart.LAZY) {
+                LocalExecutionService.withTurn(
+                    context,
+                    sessionId,
+                    { _state.value.error },
+                ) {
+                    runChatTurn(
+                        input = prompt,
+                        replacingMessageId = replacingMessageId,
                     )
-                    leaseTransferred = true
-                    job.start()
                 }
-                if (!leaseTransferred) lease.close()
-                return@synchronized result
-            } catch (error: Throwable) {
-                if (!leaseTransferred) lease.close()
-                throw error
             }
         }
-        if (state.usageMode != LocalUsageMode.CHAT) {
-            return@synchronized LocalChatUserEditResult.UNAVAILABLE
-        }
-
-        val activeTranscript = activeTranscriptForUserEdit(
-            messageId = messageId,
-            activeBranch = activeChatBranchMessages(state.chat.chatBranches),
-            hotMessages = state.messages,
-            loadDurableTranscript = { LocalSessionTranscriptPager(eventLog).all() },
-        )
-        val originalIndex = activeTranscript.indexOfFirst { message -> message.id == messageId }
-        if (originalIndex < 0) return@synchronized LocalChatUserEditResult.MESSAGE_MISSING
-        val original = activeTranscript[originalIndex]
-        if (original.role != "user") return@synchronized LocalChatUserEditResult.MESSAGE_MISSING
-
-        val content = withEditedChatUserText(original, requestedText)
-        if (content.isBlank()) return@synchronized LocalChatUserEditResult.EMPTY
-        if (editableChatUserText(original).trim() == requestedText) return@synchronized LocalChatUserEditResult.UNCHANGED
-        cancelChatPostTurn()
-
-        val sourceSequence = sourceEventSequenceForMessage(eventLog, messageId)
-        val branchParentNode = state.chat.chatBranches.nodes
-            .firstOrNull { node -> node.message.id == messageId }
-            ?.parentId
-            ?.let { parentId ->
-                state.chat.chatBranches.nodes.firstOrNull { node -> node.message.id == parentId }
-            }
-        val branchParentState = branchParentNode?.chatStateAfter
-        val branchParentContext = branchParentNode?.chatContextAfter
-        val baseState = branchParentState
-            ?: restoreChatStateBefore(eventLog, json, sourceSequence, original.createdAt)
-            ?: ChatCharacterState()
-        val baseGroupState = if (state.chat.groupChat.enabled) {
-            restoreGroupStateBefore(eventLog, json, sourceSequence, original.createdAt)
-                ?: state.chat.groupChat.copy(
-                    members = state.chat.groupChat.members.map { member ->
-                        member.copy(chatState = ChatCharacterState())
-                    },
-                    turnCursor = 0,
-                )
-        } else {
-            state.chat.groupChat
-        }
-
-        val discarded = activeTranscript.drop(originalIndex)
-        val edited = transcriptRuntime.newMessage("user", content)
-        val rewritten = rewriteChatTranscriptFromUserEdit(
-            activeMessages = activeTranscript,
-            originalMessageId = messageId,
-            editedMessage = edited,
-        ) ?: return@synchronized LocalChatUserEditResult.MESSAGE_MISSING
-        val retainedPrefix = rewritten.dropLast(1)
-
-        val previousGeneration = if (state.chat.groupChat.enabled) {
-            state.chat.groupChat.context.generation
-        } else {
-            state.chat.chatContext.generation
-        }
-        val replayedContext = replayHardChatContextFromTranscript(
-            messages = retainedPrefix,
-            generation = previousGeneration + 1L,
-        )
-        val recoveredBaseContext = restoreBranchContext(
-            snapshot = branchParentContext,
-            legacyState = baseState,
-            previousGeneration = previousGeneration,
-        ).boundDurablePending(eventLog, if (state.chat.groupChat.enabled) "group" else "direct")
-        val baseContext = replayedContext.copy(continuity = recoveredBaseContext.continuity)
-        val editedModelMessage = editedChatUserModelMessage(
-            eventLog = eventLog,
-            originalMessageId = messageId,
-            content = content,
-        )
-        val rewrittenHistory = buildEditedChatModelHistory(
-            eventLog = eventLog,
-            messages = rewritten,
-            groupMode = state.chat.groupChat.enabled,
-            editedMessageId = edited.id,
-            editedModelMessage = editedModelMessage,
-            systemPrompt = if (state.chat.groupChat.enabled) groupChatSystemPrompt() else chatSystemPrompt(),
-        )
-
-        val restoredGroupState = if (state.chat.groupChat.enabled) {
-            baseGroupState.copy(context = baseContext)
-        } else {
-            baseGroupState
-        }
-        val committedChatState = baseState.withoutLegacyConversationContext()
-        val committedChatContext = if (state.chat.groupChat.enabled) state.chat.chatContext else baseContext
-        persistChatTimelineBaseline(
-            eventLog,
-            json,
-            state.copy(
-                chat = state.chat.copy(
-                    chatState = committedChatState,
-                    chatContext = committedChatContext,
-                    groupChat = restoredGroupState,
-                ),
-            ),
-        )
-        val rewrite = appendTimelineRewriteCommit(
-            eventLog = eventLog,
-            reason = "user-edited",
-            activeTranscript = rewritten,
-            modelHistory = rewrittenHistory,
-            state = LocalTimelineRewriteState(
-                plan = state.work.plan,
-                todos = state.work.todos,
-                goal = state.work.goal,
-                planMode = state.work.planMode,
-                chatState = committedChatState,
-                chatContext = committedChatContext,
-                chatBranches = LocalChatBranchState(),
-                groupChat = restoredGroupState,
-            ),
-            projection = LocalTimelineRewriteProjectionInput(
-                sourceSessionId = state.sessionId,
-                createdAtInclusive = original.createdAt,
-                discardedMessageIds = discarded.map(LocalHarnessMessage::id),
-                directGalleryId = state.chat.galleryId.takeIf {
-                    !state.chat.groupChat.enabled && state.chat.galleryStoryId != null
-                },
-                directStoryId = state.chat.galleryStoryId.takeIf {
-                    !state.chat.groupChat.enabled && state.chat.galleryId != null
-                },
-                directMessageKeys = if (state.chat.groupChat.enabled) emptyList() else discarded.map {
-                    com.labteto.dshmobile.local.chat.galleryMessageArchiveKey(it)
-                },
-                directReplacementChatState = committedChatState.takeIf {
-                    !state.chat.groupChat.enabled && state.chat.galleryId != null && state.chat.galleryStoryId != null
-                },
-                groupGalleryStates = if (state.chat.groupChat.enabled) {
-                    baseGroupState.members.map { it.galleryId to it.chatState }
-                } else {
-                    emptyList()
-                },
-            ),
-            editedMessageId = edited.id,
-            editedModelMessage = editedModelMessage,
-        )
-        transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, rewrite.sequence)
-        modelHistory.reset(rewrittenHistory)
-        updateContextMetrics()
-        _state.update { current ->
-            current.copy(
-                messages = rewritten.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
-                transcriptIndex = buildLocalTranscriptRuntimeIndex(rewritten),
-                chat = current.chat.copy(
-                    chatState = committedChatState,
-                    chatContext = committedChatContext,
-                    groupChat = restoredGroupState,
-                    replySuggestions = emptyList(),
-                    chatBranches = LocalChatBranchState(),
-                    groupActiveSpeakerName = null,
-                    personaCorrectionNotice = null,
-                ),
-                error = null,
-            )
-        }
-        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
-        checkpointModelHistory(if (state.chat.groupChat.enabled) "group/user-edited" else "chat/user-edited")
-        persist()
-        automationScheduler.onChatUserActivity(
-            sessionId = state.sessionId,
-            userMessageAt = edited.createdAt,
-        )
-
-        scope.launch(start = CoroutineStart.LAZY) {
-            chatTurnDispatcher.run(
-                input = content,
-                memoryInput = requestedText,
-                sourceMessageId = edited.id,
-            )
-        }.also { activeJob = it; it.start() }
-        LocalChatUserEditResult.SENT
-    }
-
-    /** Re-run the latest answer against the same turn; never re-execute work tools. */
-    private fun regenerateReplyForMode(expectedMode: LocalUsageMode, messageId: String): Boolean = synchronized(runStateLock) {
-        val state = _state.value
-        if (state.usageMode != expectedMode) return@synchronized false
-        if (!state.modelState.configured || state.loading ||
-            state.chat.groupChat.enabled ||
-            sessionTransitioning || activeJob?.isCompleted == false || pendingInputs.size() != 0
-        ) return@synchronized false
-        val last = state.messages.lastOrNull() ?: return@synchronized false
-        if (last.id != messageId || last.role != "assistant") return@synchronized false
-        val promptMessage = state.messages.dropLast(1).lastOrNull { it.role == "user" }
-            ?: return@synchronized false
-        val prompt = promptMessage.content
-        if (modelHistory.lastOrNull()?.get("role")?.jsonPrimitive?.contentOrNull != "assistant") {
-            return@synchronized false
-        }
-        cancelChatPostTurn()
-
-        if (state.usageMode == LocalUsageMode.CHAT && state.transcriptIndex.branchingEligible) {
-            val branches = if (state.chat.chatBranches.nodes.isNotEmpty()) {
-                state.chat.chatBranches
-            } else {
-                syncChatBranchState(
-                    current = LocalChatBranchState(),
-                    activeMessages = transcriptForBranchMaterialization(state),
-                    chatState = state.chat.chatState,
-                    chatContext = state.chat.chatContext,
-                    replySuggestions = state.chat.replySuggestions,
-                )
-            }
-            val branchParentState = chatBranchParentState(branches, messageId)
-            val sourceSequence = sourceEventSequenceForMessage(eventLog, promptMessage.id)
-            val baseState = branchParentState
-                ?: restoreChatStateBefore(eventLog, json, sourceSequence, promptMessage.createdAt)
-                ?: ChatCharacterState()
-            val baseContext = restoreBranchContext(
-                snapshot = chatBranchParentContext(branches, messageId),
-                legacyState = baseState,
-                previousGeneration = state.chat.chatContext.generation,
-            ).boundDurablePending(eventLog, if (state.chat.groupChat.enabled) "group" else "direct")
-            _state.update {
-                it.copy(
-                    chat = it.chat.copy(
-                        chatState = baseState.withoutLegacyConversationContext(),
-                        chatContext = baseContext,
-                        replySuggestions = emptyList(),
-                        chatBranches = branches,
-                    ),
-                )
-            }
-        }
-        scope.launch(start = CoroutineStart.LAZY) {
-            LocalExecutionService.withTurn(context, state.sessionId, { _state.value.error }) {
-                if (state.usageMode == LocalUsageMode.CHAT) runChatTurn(prompt, replacingMessageId = messageId)
-                else workReplyRegenerator.regenerate(messageId)
-            }
-        }
-            .also { activeJob = it; it.start() }
-        true
-    }
-
-    private fun transcriptForBranchMaterialization(
-        state: LocalHarnessState,
-    ): List<LocalHarnessMessage> {
-        val activeBranch = activeChatBranchMessages(state.chat.chatBranches)
-        if (activeBranch.isNotEmpty()) return activeBranch
-        if (state.transcriptIndex.totalMessageCount <= state.messages.size.toLong()) return state.messages
-        return LocalSessionTranscriptPager(eventLog).all()
     }
 
     private fun persistChatBranchState(reason: String) {
