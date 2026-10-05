@@ -16,19 +16,15 @@ AGGREGATE_STATE_MAX_FIELDS = 28
 ENGINE_COMPOSITION_BRIDGE_ALLOWLIST = {
     "automationChatCoordinator",
     "automationWorkCoordinator",
-    "chatExecutionPort",
+    "chatTurnPort",
     "diagnosticsPort",
     "sessionLifecyclePort",
     "toolsManagementPort",
     "workTurnPort",
 }
 ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
-    "sendChat",
-    "queueHumanTurn",
     "queueWorkTurnLocked",
     "queueExistingWorkTurnLocked",
-    "queueTurn",
-    "queueTurnLocked",
     "runTurn",
     "runAgentTurn",
     "runWorkAgentTurn",
@@ -691,6 +687,15 @@ work_execution_coordinator_source = strip_comments(
 work_turn_port_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnPort.kt")
 )
+chat_send_coordinator_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatSendCoordinator.kt")
+)
+chat_execution_coordinator_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatExecutionCoordinator.kt")
+)
+chat_turn_port_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnPort.kt")
+)
 if "LocalHarnessEngine" in work_execution_coordinator_source:
     die("WorkExecutionPort implementation must stay inside WorkFeature without Engine")
 if "prepareLocalSend(text, attachments)" not in work_execution_coordinator_source:
@@ -718,6 +723,40 @@ if "coordinator: LocalWorkExecutionCoordinator" not in feature_execution_port_mo
     die("WorkExecutionPort must be implemented by LocalWorkExecutionCoordinator")
 if "engine.workExecutionPort" in feature_execution_port_module_source or "internal val workExecutionPort" in engine:
     die("LocalHarnessEngine must not own the Work product execution port")
+if "LocalHarnessEngine" in chat_execution_coordinator_source:
+    die("ChatExecutionPort implementation must stay inside ChatFeature without Engine")
+for required_chat_send_owner in (
+    "prepareLocalSend(text, attachments)",
+    "coordinateOwnedLocalSend(",
+    "persistChatTimelineBaseline(",
+    "appendMaterializedChatBranchMessage(",
+    "sessionStorage.enqueueCurrentSnapshot(sessionId)",
+    "turn.start(",
+):
+    if required_chat_send_owner not in chat_send_coordinator_source:
+        die("ChatFeature send ownership is incomplete: " + required_chat_send_owner)
+if "interface LocalChatTurnPort" not in chat_turn_port_source:
+    die("Chat turn migration port contract is missing")
+if "LocalHarnessEngine" in chat_turn_port_source or "LocalHarnessState" in chat_turn_port_source:
+    die("Chat turn migration port must not expose Engine or aggregate state")
+if "provideLocalChatExecutionPort" not in feature_execution_port_module_source:
+    die("app composition root must bind the Chat-owned execution implementation")
+if "coordinator: LocalChatExecutionCoordinator" not in feature_execution_port_module_source:
+    die("ChatExecutionPort must be implemented by LocalChatExecutionCoordinator")
+if "engine.chatExecutionPort" in feature_execution_port_module_source or "internal val chatExecutionPort" in engine:
+    die("LocalHarnessEngine must not own the Chat product execution port")
+if "provideLocalChatTurnPort" not in feature_execution_port_module_source or "engine.chatTurnPort" not in feature_execution_port_module_source:
+    die("Chat turn composition must use the explicit migration bridge")
+for removed_chat_send_root in (
+    "private fun sendChat(",
+    "private fun queueHumanTurn(",
+    "private fun queueTurn(",
+    "private fun queueTurnLocked(",
+    "private fun recordUserTranscript(",
+):
+    if removed_chat_send_root in engine:
+        die("Chat send business must not return to LocalHarnessEngine: " + removed_chat_send_root)
+
 if "provideLocalWorkTurnPort" not in feature_execution_port_module_source:
     die("app composition root must expose the temporary Work turn bridge")
 if "engine.workTurnPort" not in feature_execution_port_module_source:
