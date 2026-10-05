@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalSessionCoordinator
 import com.labteto.dshmobile.local.LocalSessionRepository
 import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
+import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionFilesRuntime
 import com.labteto.dshmobile.local.session.LocalSessionStorageManager
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
@@ -69,6 +70,10 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
             domainCodecs = orderedDomainCodecs,
         )
+    }
+
+    internal fun enqueueSnapshot(snapshot: LocalHarnessSession) {
+        coordinator.enqueue(snapshot)
     }
 
     internal fun enqueueCurrentSnapshot(expectedSessionId: String): Boolean {
