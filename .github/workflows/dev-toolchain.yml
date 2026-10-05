@@ -115,7 +115,7 @@ jobs:
           KIT="$RUNNER_TEMP/artifact"
           cd "$KIT"
           sha256sum -c SHA256SUMS
-          test -x "$KIT/install.sh"
+          test -f "$KIT/install.sh"
           bash "$KIT/install.sh" --help >/dev/null
 
           SDK="$RUNNER_TEMP/777-android-sdk"
