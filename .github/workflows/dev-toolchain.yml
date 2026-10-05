@@ -230,11 +230,30 @@ jobs:
             sha256sum -c SHA256SUMS
           )
 
+          # GitHub 连接器单个 Artifact 实际下载上限为 512 MiB。
+          # 这里按 500 MiB 做硬门槛，给 ZIP 容器和元数据留出余量。
+          MAX_COMPONENT_BYTES=$((500 * 1024 * 1024))
+          oversize=0
           for component in $ALL_COMPONENTS; do
-            test -s "$OUT/777-toolchain-$component-latest/payload.tar.gz"
-            du -sh "$OUT/777-toolchain-$component-latest"
+            dir="$OUT/777-toolchain-$component-latest"
+            test -s "$dir/payload.tar.gz"
+            bytes="$(du -sb "$dir" | awk '{print $1}')"
+            mib="$(( (bytes + 1024 * 1024 - 1) / (1024 * 1024) ))"
+            printf '%-28s %10s bytes  %4s MiB\n' "$component" "$bytes" "$mib"
+            if [ "$bytes" -gt "$MAX_COMPONENT_BYTES" ]; then
+              echo "::error title=工具链组件过大::$component 为 $bytes bytes（约 $mib MiB），超过 500 MiB 安全门槛，必须继续拆分。" >&2
+              oversize=1
+            fi
           done
-          du -sh "$BOOT"
+
+          boot_bytes="$(du -sb "$BOOT" | awk '{print $1}')"
+          boot_mib="$(( (boot_bytes + 1024 * 1024 - 1) / (1024 * 1024) ))"
+          printf '%-28s %10s bytes  %4s MiB\n' "bootstrap" "$boot_bytes" "$boot_mib"
+
+          if [ "$oversize" -ne 0 ]; then
+            echo "存在超过连接器安全下载门槛的组件，停止上传。" >&2
+            exit 1
+          fi
 
       - name: 上传 bootstrap Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
