@@ -726,7 +726,7 @@ class LocalHarnessEngine @Inject internal constructor(
         )
     }
 
-    private val automationWorkCoordinator by lazy {
+    internal val automationWorkCoordinator by lazy {
         LocalAutomationWorkCoordinator(
             state = runtimeStateStore.state,
             sessionCoordinator = sessionCoordinator,
@@ -745,7 +745,7 @@ class LocalHarnessEngine @Inject internal constructor(
         )
     }
 
-    private val automationChatCoordinator by lazy {
+    internal val automationChatCoordinator by lazy {
         LocalAutomationChatCoordinator(
             state = runtimeStateStore.state,
             sessionCoordinator = sessionCoordinator,
@@ -1709,64 +1709,6 @@ class LocalHarnessEngine @Inject internal constructor(
         (binding?.runHandle?.modelHistory ?: modelHistory).append(message)
         updateContextMetrics(binding)
     }
-
-    internal suspend fun prepareAutomationWorkSession(
-        text: String,
-        preferredSessionId: String? = null,
-    ): String = automationWorkCoordinator.prepareWorkSession(text, preferredSessionId)
-
-    internal suspend fun runAutomationWork(
-        text: String,
-        preferredSessionId: String? = null,
-        timeoutMillis: Long = 5 * 60_000L,
-        recoverInterrupted: Boolean = false,
-    ): LocalAutomationRunResult = automationWorkCoordinator.runWork(
-        text = text,
-        preferredSessionId = preferredSessionId,
-        timeoutMillis = timeoutMillis,
-        recoverInterrupted = recoverInterrupted,
-    )
-
-    /**
-     * Generate one role-authored message for an existing single-character chat session.
-     *
-     * The scheduled instruction is context, never a fabricated user turn. When the target chat is
-     * visible we temporarily own the normal turn slot so user input queues behind the proactive
-     * message instead of racing it; detached chats are generated without changing the visible UI.
-     */
-    internal suspend fun runAutomationChat(
-        instruction: String,
-        targetSessionId: String,
-        timeoutMillis: Long = 3 * 60_000L,
-        recoverInterrupted: Boolean = false,
-        recoveryStartedAt: Long? = null,
-        quietHoursEnabled: Boolean = false,
-        quietStartHour: Int = 23,
-        quietStartMinute: Int = 0,
-        quietEndHour: Int = 7,
-        quietEndMinute: Int = 0,
-        proactiveMinGapMinutes: Long = 6L * 60L,
-        proactiveMaxUnanswered: Int = 2,
-        minimumSilenceMinutes: Long? = null,
-        silenceReferenceAt: Long? = null,
-        bypassProactivePolicy: Boolean = false,
-    ): LocalAutomationRunResult = automationChatCoordinator.run(
-        instruction = instruction,
-        targetSessionId = targetSessionId,
-        timeoutMillis = timeoutMillis,
-        recoverInterrupted = recoverInterrupted,
-        recoveryStartedAt = recoveryStartedAt,
-        quietHoursEnabled = quietHoursEnabled,
-        quietStartHour = quietStartHour,
-        quietStartMinute = quietStartMinute,
-        quietEndHour = quietEndHour,
-        quietEndMinute = quietEndMinute,
-        proactiveMinGapMinutes = proactiveMinGapMinutes,
-        proactiveMaxUnanswered = proactiveMaxUnanswered,
-        minimumSilenceMinutes = minimumSilenceMinutes,
-        silenceReferenceAt = silenceReferenceAt,
-        bypassProactivePolicy = bypassProactivePolicy,
-    )
 
     private suspend fun acquireAutomationChatVisibleTurn(
         targetSessionId: String,
