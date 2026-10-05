@@ -157,13 +157,14 @@ safe_root "$GRADLE_USER_HOME" GRADLE_USER_HOME
 if [ -n "$REPO_ROOT" ]; then safe_root "$REPO_ROOT" REPO_ROOT; fi
 
 find_component_dir() {
-  local component="$1" artifact direct
+  local component="$1" artifact direct declared_component
   artifact="$(artifact_name_for_component "$component")"
   for direct in "$ARTIFACTS_DIR/$artifact" "$ARTIFACTS_DIR/$component" "$ARTIFACTS_DIR"; do
     if [ -f "$direct/component.env" ]; then
-      # shellcheck disable=SC1090
-      source "$direct/component.env"
-      if [ "${ARTIFACT_COMPONENT:-}" = "$component" ]; then
+      # 校验前绝不 source 下载内容；只把 ARTIFACT_COMPONENT 当纯文本读取，
+      # 等 SHA-256 通过后再加载完整元数据。
+      declared_component="$(sed -n 's/^ARTIFACT_COMPONENT=//p' "$direct/component.env" | head -n 1)"
+      if [ "$declared_component" = "$component" ]; then
         printf '%s\n' "$direct"
         return 0
       fi
