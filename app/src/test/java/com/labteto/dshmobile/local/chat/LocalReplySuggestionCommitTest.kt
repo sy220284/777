@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.chat
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalHarnessResourceState
+import com.labteto.dshmobile.local.runtime.localAggregateProjectionPort
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
@@ -31,7 +32,7 @@ class LocalReplySuggestionCommitTest {
         val state = InterceptedFlow(MutableStateFlow(before))
         state.beforeCompare = { state.delegate.value = before.copy(sessionId = "other") }
 
-        assertFalse(commitReplySuggestions(state, before, "reply", suggestions))
+        assertFalse(commitReplySuggestions(localAggregateProjectionPort(state), before, "reply", suggestions))
         assertEquals("other", state.value.sessionId)
         assertTrue(state.value.chat.replySuggestions.isEmpty())
     }
@@ -46,8 +47,8 @@ class LocalReplySuggestionCommitTest {
         )
         changedTargets.forEach { changed ->
             val state = MutableStateFlow(changed)
-            assertFalse(commitReplySuggestions(state, before, "reply", suggestions))
-            commitReplySuggestionError(state, before, "reply", "旧请求失败")
+            assertFalse(commitReplySuggestions(localAggregateProjectionPort(state), before, "reply", suggestions))
+            commitReplySuggestionError(localAggregateProjectionPort(state), before, "reply", "旧请求失败")
             assertEquals(changed, state.value)
         }
     }
@@ -61,7 +62,7 @@ class LocalReplySuggestionCommitTest {
             )
         }
 
-        assertTrue(commitReplySuggestions(state, before, "reply", suggestions))
+        assertTrue(commitReplySuggestions(localAggregateProjectionPort(state), before, "reply", suggestions))
         assertEquals(suggestions, state.value.chat.replySuggestions)
         assertEquals(1, state.value.kernel.resources.activeModelRequests)
     }
