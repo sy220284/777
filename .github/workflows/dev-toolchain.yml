@@ -114,7 +114,7 @@ jobs:
           NODE_VERSION=$NODE_VERSION
           ACTIONLINT_VERSION=$ACTIONLINT_VERSION
           EOF
-            tar -C "$payload" -cf - . | gzip -1 > "$root/payload.tar.gz"
+            tar -h -C "$payload" -cf - . | gzip -1 > "$root/payload.tar.gz"
             (
               cd "$root"
               sha256sum component.env payload.tar.gz > SHA256SUMS
@@ -122,66 +122,82 @@ jobs:
             )
           }
 
+          new_stage() {
+            local component="$1" dir="$STAGE/$component"
+            rm -rf "$dir"
+            mkdir -p "$dir"
+            printf '%s\n' "$dir"
+          }
+
+          JDK_STAGE="$(new_stage jdk)"
+          ln -s "$JAVA_HOME" "$JDK_STAGE/jdk"
+          make_component jdk "$JDK_STAGE"
+
           SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
           test -n "$SDK_ROOT"
-
-          mkdir -p "$STAGE/jdk/jdk"
-          cp -a "$JAVA_HOME"/. "$STAGE/jdk/jdk/"
-          make_component jdk "$STAGE/jdk"
-
-          mkdir -p "$STAGE/android-core/android-sdk"
-          cp -a "$SDK_ROOT/cmdline-tools" "$STAGE/android-core/android-sdk/"
-          cp -a "$SDK_ROOT/platform-tools" "$STAGE/android-core/android-sdk/"
-          mkdir -p "$STAGE/android-core/android-sdk/build-tools" "$STAGE/android-core/android-sdk/platforms"
-          cp -a "$SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS" "$STAGE/android-core/android-sdk/build-tools/"
-          if [ -d "$SDK_ROOT/platforms/android-$ANDROID_COMPILE_API" ]; then
-            cp -a "$SDK_ROOT/platforms/android-$ANDROID_COMPILE_API" "$STAGE/android-core/android-sdk/platforms/"
-          else
-            cp -a "$SDK_ROOT/platforms/android-${ANDROID_COMPILE_API}.0" "$STAGE/android-core/android-sdk/platforms/"
+          PLATFORM_DIR="$SDK_ROOT/platforms/android-$ANDROID_COMPILE_API"
+          if [ ! -d "$PLATFORM_DIR" ]; then
+            PLATFORM_DIR="$SDK_ROOT/platforms/android-${ANDROID_COMPILE_API}.0"
           fi
+          test -d "$PLATFORM_DIR"
+
+          ANDROID_STAGE="$(new_stage android-core)"
+          mkdir -p "$ANDROID_STAGE/android-sdk/build-tools" "$ANDROID_STAGE/android-sdk/platforms"
+          ln -s "$SDK_ROOT/cmdline-tools" "$ANDROID_STAGE/android-sdk/cmdline-tools"
+          ln -s "$SDK_ROOT/platform-tools" "$ANDROID_STAGE/android-sdk/platform-tools"
+          ln -s "$SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS" "$ANDROID_STAGE/android-sdk/build-tools/$ANDROID_BUILD_TOOLS"
+          ln -s "$PLATFORM_DIR" "$ANDROID_STAGE/android-sdk/platforms/$(basename "$PLATFORM_DIR")"
           if [ -d "$SDK_ROOT/licenses" ]; then
-            cp -a "$SDK_ROOT/licenses" "$STAGE/android-core/android-sdk/"
+            ln -s "$SDK_ROOT/licenses" "$ANDROID_STAGE/android-sdk/licenses"
           fi
-          make_component android-core "$STAGE/android-core"
+          make_component android-core "$ANDROID_STAGE"
 
           GRADLE_BIN="$(find "$GRADLE_USER_HOME/wrapper/dists" -type f -path "*/gradle-$GRADLE_VERSION/bin/gradle" -print -quit)"
           test -n "$GRADLE_BIN"
           GRADLE_DIST_HOME="$(cd "$(dirname "$GRADLE_BIN")/.." && pwd)"
-          mkdir -p "$STAGE/gradle-runtime"
-          cp -a "$GRADLE_DIST_HOME" "$STAGE/gradle-runtime/gradle"
-          make_component gradle-runtime "$STAGE/gradle-runtime"
+          GRADLE_STAGE="$(new_stage gradle-runtime)"
+          ln -s "$GRADLE_DIST_HOME" "$GRADLE_STAGE/gradle"
+          make_component gradle-runtime "$GRADLE_STAGE"
 
           rm -rf "$GRADLE_USER_HOME/daemon"
-          mkdir -p "$STAGE/gradle-deps"
-          cp -a "$GRADLE_USER_HOME" "$STAGE/gradle-deps/gradle-user-home"
-          make_component gradle-deps "$STAGE/gradle-deps"
+          find "$GRADLE_USER_HOME" -type f -name '*.lock' -delete || true
+          GRADLE_DEPS_STAGE="$(new_stage gradle-deps)"
+          ln -s "$GRADLE_USER_HOME" "$GRADLE_DEPS_STAGE/gradle-user-home"
+          make_component gradle-deps "$GRADLE_DEPS_STAGE"
 
           test -d .gradle/runtime-cache
-          mkdir -p "$STAGE/runtime-cache"
-          cp -a .gradle/runtime-cache "$STAGE/runtime-cache/runtime-cache"
-          make_component runtime-cache "$STAGE/runtime-cache"
+          RUNTIME_STAGE="$(new_stage runtime-cache)"
+          ln -s "$GITHUB_WORKSPACE/.gradle/runtime-cache" "$RUNTIME_STAGE/runtime-cache"
+          make_component runtime-cache "$RUNTIME_STAGE"
 
           NODE_BIN="$(readlink -f "$(command -v node)")"
           NODE_HOME="$(cd "$(dirname "$NODE_BIN")/.." && pwd)"
-          mkdir -p "$STAGE/node"
-          cp -a "$NODE_HOME" "$STAGE/node/node-current"
-          make_component node "$STAGE/node"
+          NODE_STAGE="$(new_stage node)"
+          ln -s "$NODE_HOME" "$NODE_STAGE/node-current"
+          make_component node "$NODE_STAGE"
 
-          mkdir -p "$STAGE/actionlint/bin"
-          cp -a "$RUNNER_TEMP/actionlint-bin/actionlint" "$STAGE/actionlint/bin/actionlint"
-          make_component actionlint "$STAGE/actionlint"
+          ACTIONLINT_STAGE="$(new_stage actionlint)"
+          mkdir -p "$ACTIONLINT_STAGE/bin"
+          ln -s "$RUNNER_TEMP/actionlint-bin/actionlint" "$ACTIONLINT_STAGE/bin/actionlint"
+          make_component actionlint "$ACTIONLINT_STAGE"
 
-          mkdir -p "$STAGE/emulator/android-sdk"
-          cp -a "$SDK_ROOT/emulator" "$STAGE/emulator/android-sdk/emulator"
-          make_component emulator "$STAGE/emulator"
+          test -d "$SDK_ROOT/emulator"
+          EMULATOR_STAGE="$(new_stage emulator)"
+          mkdir -p "$EMULATOR_STAGE/android-sdk"
+          ln -s "$SDK_ROOT/emulator" "$EMULATOR_STAGE/android-sdk/emulator"
+          make_component emulator "$EMULATOR_STAGE"
 
-          mkdir -p "$STAGE/android-image-16/android-sdk/system-images"
-          cp -a "$SDK_ROOT/system-images/android-36" "$STAGE/android-image-16/android-sdk/system-images/android-36"
-          make_component android-image-16 "$STAGE/android-image-16"
+          test -d "$SDK_ROOT/system-images/android-36"
+          IMAGE16_STAGE="$(new_stage android-image-16)"
+          mkdir -p "$IMAGE16_STAGE/android-sdk/system-images"
+          ln -s "$SDK_ROOT/system-images/android-36" "$IMAGE16_STAGE/android-sdk/system-images/android-36"
+          make_component android-image-16 "$IMAGE16_STAGE"
 
-          mkdir -p "$STAGE/android-image-17/android-sdk/system-images"
-          cp -a "$SDK_ROOT/system-images/android-37.0" "$STAGE/android-image-17/android-sdk/system-images/android-37.0"
-          make_component android-image-17 "$STAGE/android-image-17"
+          test -d "$SDK_ROOT/system-images/android-37.0"
+          IMAGE17_STAGE="$(new_stage android-image-17)"
+          mkdir -p "$IMAGE17_STAGE/android-sdk/system-images"
+          ln -s "$SDK_ROOT/system-images/android-37.0" "$IMAGE17_STAGE/android-sdk/system-images/android-37.0"
+          make_component android-image-17 "$IMAGE17_STAGE"
 
           BOOT="$OUT/777-toolchain-bootstrap-latest"
           mkdir -p "$BOOT/tools" "$BOOT/docs"
