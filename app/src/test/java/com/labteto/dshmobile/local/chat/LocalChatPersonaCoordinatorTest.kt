@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.runtime.localAggregateProjectionPort
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import kotlinx.coroutines.CompletableDeferred
@@ -25,7 +26,7 @@ class LocalChatPersonaCoordinatorTest {
         val reached = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val coordinator = LocalChatPersonaCoordinator(
-            state = state, savePersona = { it },
+            state = localAggregateProjectionPort(state), savePersona = { it },
             persistNow = {
                 reached.complete(Unit)
                 release.await()
@@ -63,7 +64,7 @@ class LocalChatPersonaCoordinatorTest {
             val state = initialState()
             var writes = 0
             val coordinator = LocalChatPersonaCoordinator(
-                state = state,
+                state = localAggregateProjectionPort(state),
                 savePersona = { profile -> state.value = mutation(state.value); profile },
                 persistNow = { writes++; true }, enqueueSnapshot = { true },
             )
@@ -78,7 +79,7 @@ class LocalChatPersonaCoordinatorTest {
     fun existingOwnerRejectsBothEditsBeforePersonaWrite() = runBlocking {
         val state = initialState()
         val coordinator = LocalChatPersonaCoordinator(
-            state = state, savePersona = { error("must not write while owned") },
+            state = localAggregateProjectionPort(state), savePersona = { error("must not write while owned") },
             persistNow = { error("must not persist while owned") }, enqueueSnapshot = { true },
         )
         val owner = requireNotNull(LocalSessionRuntimeRegistry.tryAcquire(
@@ -96,7 +97,7 @@ class LocalChatPersonaCoordinatorTest {
     fun defaultSyncRejectsLateResultAndPersistenceFailureCannotReportSuccess() = runBlocking {
         val state = initialState()
         val stale = LocalChatPersonaCoordinator(
-            state = state,
+            state = localAggregateProjectionPort(state),
             savePersona = { profile -> state.value = state.value.copy(usageMode = LocalUsageMode.WORK); profile },
             persistNow = { error("stale snapshot must not persist") }, enqueueSnapshot = { true },
         )
