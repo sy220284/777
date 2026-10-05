@@ -5,6 +5,8 @@ import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
+import com.labteto.dshmobile.local.model.compact
+import com.labteto.dshmobile.local.model.compactOverflow
 import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
 import com.labteto.dshmobile.local.runtime.MODEL_HISTORY_CHECKPOINT_TURN_INTERVAL
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -150,6 +152,34 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
             },
         )
         checkpoint(binding, "session/compaction")
+        updateContextMetrics(binding)
+        persist(binding)
+    }
+
+    internal fun persistOverflowCompaction(
+        snapshot: com.labteto.dshmobile.local.LocalHarnessState,
+        summaryMode: LocalHistorySummaryMode,
+        binding: LocalWorkRunBinding,
+    ) {
+        if (snapshot.sessionId != binding.sessionId) return
+        val history = binding.runHandle.modelHistory
+        val compaction = history.compactOverflow(
+            compactor = compactor,
+            summaryMode = summaryMode,
+        ) ?: return
+
+        runtimeStateStore.requestPressureStore.advanceGeneration(
+            binding.sessionId,
+            compaction.estimatedTokensAfter,
+        )
+        binding.eventLog.append("session/compaction", buildJsonObject {
+            put("trigger", "context-overflow")
+            put("omitted_messages", compaction.omittedMessages)
+            put("summary", compaction.summary)
+            put("estimated_tokens_before", compaction.estimatedTokensBefore)
+            put("estimated_tokens_after", compaction.estimatedTokensAfter)
+        })
+        checkpoint(binding, "session/context-overflow")
         updateContextMetrics(binding)
         persist(binding)
     }
