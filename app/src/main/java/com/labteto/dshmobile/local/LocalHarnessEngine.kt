@@ -2027,13 +2027,6 @@ class LocalHarnessEngine @Inject internal constructor(
 
     internal fun installedPluginIdsForUi(): List<String> = pluginComposition.installedPluginIds()
 
-    /** Stop the visible Chat foreground slot through the shared Runtime owner. */
-    internal fun stopForegroundRun() {
-        cancelChatPostTurn()
-        runtimeStateStore.cancelForegroundRun(eventLog)
-        _state.update { it.copy(work = it.work.copy(pendingApproval = null, pendingQuestion = null)) }
-    }
-
     /** Start a clean, project-scoped, or continuation session without copying full old history. */
     internal fun createSession(mode: LocalConversationMode) =
         sessionLifecycle.createSession(mode)
