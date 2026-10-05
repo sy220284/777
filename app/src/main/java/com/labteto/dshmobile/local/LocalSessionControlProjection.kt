@@ -70,10 +70,6 @@ internal fun projectSessionControlTail(
             when (event.type) {
                 "chat/active-transcript" -> {
                     decodeTimelineRewriteState(event.data)?.let { rewrite ->
-                        plan = rewrite.plan
-                        todos = rewrite.todos
-                        goal = rewrite.goal
-                        planMode = rewrite.planMode
                         chatBranches = rewrite.chatBranches
                         chatState = rewrite.chatState
                         chatContext = rewrite.chatContext
