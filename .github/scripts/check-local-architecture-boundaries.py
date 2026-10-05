@@ -690,12 +690,19 @@ if "LocalHarnessEngine" in work_execution_coordinator_source:
     die("WorkExecutionPort implementation must stay inside WorkFeature without Engine")
 if "prepareLocalSend(text, attachments)" not in work_execution_coordinator_source:
     die("WorkFeature must own Work input preparation")
-if "workRunRegistry.enqueueIntoLiveRun(prepared)" not in work_execution_coordinator_source:
-    die("WorkFeature must route additional input into the Work-owned live run before the bridge")
-if "turn.sendPrepared(prepared)" not in work_execution_coordinator_source:
-    die("WorkFeature may use the migration bridge only when no live Work binding exists")
-if work_execution_coordinator_source.find("workRunRegistry.enqueueIntoLiveRun(prepared)") > work_execution_coordinator_source.find("turn.sendPrepared(prepared)"):
-    die("Work-owned live-run queue must be checked before the first-turn migration bridge")
+for required_work_send_owner in (
+    "workRunRegistry.enqueueIntoLiveRun(prepared)",
+    "coordinateOwnedLocalSend(",
+    "runtimeStateStore.foregroundRunHandle.pendingInputs",
+    "sessionStorage.enqueueCurrentSnapshot(sessionId)",
+    "turn.startPrepared(",
+):
+    if required_work_send_owner not in work_execution_coordinator_source:
+        die("WorkFeature first-send ownership is incomplete: " + required_work_send_owner)
+if work_execution_coordinator_source.find("workRunRegistry.enqueueIntoLiveRun(prepared)") > work_execution_coordinator_source.find("coordinateOwnedLocalSend("):
+    die("Work-owned live-run queue must be checked before first-turn admission")
+if "queueHumanTurn(" in work_execution_coordinator_source:
+    die("Work send must not route through the Engine Chat queue")
 if "interface LocalWorkTurnPort" not in work_turn_port_source:
     die("Work turn migration port contract is missing")
 if "LocalHarnessEngine" in work_turn_port_source or "LocalHarnessState" in work_turn_port_source:
