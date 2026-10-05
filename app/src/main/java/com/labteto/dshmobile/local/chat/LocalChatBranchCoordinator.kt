@@ -103,7 +103,7 @@ internal class LocalChatBranchCoordinator @Inject constructor(
                 )
             ) return false
 
-            runtimeStateStore.mutableState.update { current ->
+            runtimeStateStore.projection.update { current ->
                 if (current.sessionId != state.sessionId) current else current.copy(
                     messages = activeMessages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                     transcriptIndex = buildLocalTranscriptRuntimeIndex(activeMessages),
