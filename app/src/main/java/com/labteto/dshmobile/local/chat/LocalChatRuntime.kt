@@ -14,9 +14,10 @@ class LocalChatRuntime @Inject constructor(
     private val persistence: LocalChatPersistence,
     private val sessionRuntime: LocalSessionRuntime,
     private val personaCorrections: LocalChatPersonaCorrectionCoordinator,
+    private val behaviorTuning: LocalCharacterBehaviorTuningCoordinator,
     private val personaCoordinator: LocalChatPersonaCoordinator,
 ) {
-    internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = engine.configureChatPersona(profile)
+    internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = behaviorTuning.configure(profile)
     internal fun selectChatPersona(profile: PersonaProfile, galleryId: String? = null) =
         personaCoordinator.select(profile, galleryId)
     internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) =
