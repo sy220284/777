@@ -1,11 +1,5 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.LocalModelPresets
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.LocalModelProtocol
-import com.labteto.dshmobile.local.apiKeyProfileForRoute
-import com.labteto.dshmobile.local.migrateOfficialClaudeModel
-import com.labteto.dshmobile.local.normalizeModelBaseUrl
 import java.util.UUID
 
 internal data class LocalModelApiKeyDraft(val profile: LocalModelProfile, val key: String)

@@ -1,11 +1,10 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.interaction
 
 import android.content.Context
+import android.content.SharedPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-
-import android.content.SharedPreferences
 
 /**
  * Single durable source of truth for global automatic approval.

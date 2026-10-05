@@ -6,11 +6,16 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
+import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
+import com.labteto.dshmobile.local.model.LocalModelRunContext
+import com.labteto.dshmobile.local.model.LocalToolCall
+import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
+import com.labteto.dshmobile.local.tools.LocalToolPolicy
+import com.labteto.dshmobile.local.tools.LocalToolRouter
 import com.labteto.dshmobile.observability.AppLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
-import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

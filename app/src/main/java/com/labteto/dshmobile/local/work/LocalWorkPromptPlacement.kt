@@ -1,5 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
+import com.labteto.dshmobile.local.runtime.MAX_EPHEMERAL_CONTEXT_CHARS
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull

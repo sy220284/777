@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import android.content.Context
-import com.labteto.dshmobile.local.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID

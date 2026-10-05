@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
+
+
 
 /**
  * Incremental reverse pager for the user-visible transcript stored in Session Event.

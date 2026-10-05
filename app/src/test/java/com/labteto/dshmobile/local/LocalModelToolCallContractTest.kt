@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
+import com.labteto.dshmobile.local.model.LocalModelReply
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import okhttp3.*

@@ -10,20 +10,20 @@ import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
-import com.labteto.dshmobile.local.DeepSeekPricingRepository
-import com.labteto.dshmobile.local.DeepSeekPricingState
-import com.labteto.dshmobile.local.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.TokenUsageRecord
-import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
-import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
-import com.labteto.dshmobile.local.LocalSessionStorageStatus
-import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.local.model.DeepSeekPricingRepository
+import com.labteto.dshmobile.local.model.DeepSeekPricingState
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
+import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
+import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
+import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_DIR
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_FILE
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -197,7 +197,7 @@ class SettingsViewModel @Inject constructor(
     fun discoverModels(provider: LlmConfigurableProvider) =
         remoteSettingsController.discoverModels(provider)
 
-    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) =
+    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) =
         withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride) }
 
     fun selectLocalModel(id: String) = localHarness.selectModel(id)
@@ -277,7 +277,7 @@ class SettingsViewModel @Inject constructor(
     }
     fun removeLocalModel(id: String) = localHarness.removeModel(id)
 
-    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null): String =
+    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null): String =
         localHarness.testModel(apiKey, model, baseUrl, protocol, profileId)
 
     fun configureLocalMemory(userRules: String, autoRecall: Boolean, autoMemory: Boolean) {

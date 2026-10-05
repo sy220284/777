@@ -1,5 +1,8 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.LocalHistoryBudget
+import com.labteto.dshmobile.local.runtime.structuredWorkState
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject

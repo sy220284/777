@@ -1,12 +1,12 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.activity.BackEventCompat
-import com.labteto.dshmobile.local.LocalChatMode
-import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
 import com.labteto.dshmobile.local.feature.LocalFeatureModuleId
 import com.labteto.dshmobile.local.feature.LocalFeatureRoute
+import com.labteto.dshmobile.local.session.LocalSessionSummary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

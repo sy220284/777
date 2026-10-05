@@ -1,8 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
+import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
 import com.labteto.dshmobile.local.chat.ChatPostTurnPlan
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
@@ -10,6 +10,8 @@ import com.labteto.dshmobile.local.chat.ChatTurnContext
 import com.labteto.dshmobile.local.chat.ChatTurnRunner
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.isUnboundChatPersona
+import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import javax.inject.Inject
 import javax.inject.Singleton
 

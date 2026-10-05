@@ -1,9 +1,9 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalChatMode
-import com.labteto.dshmobile.local.LocalChatUserEditResult
+import com.labteto.dshmobile.local.chat.LocalChatMode
+import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.LocalHarnessEngine
-import com.labteto.dshmobile.local.LocalImportedAttachment
+import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.session.LocalSessionRuntime
 import javax.inject.Inject
 import javax.inject.Singleton

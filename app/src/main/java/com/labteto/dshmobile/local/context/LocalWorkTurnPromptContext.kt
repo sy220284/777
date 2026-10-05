@@ -1,7 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.context
 
-import com.labteto.dshmobile.local.context.ContextComposer
-import com.labteto.dshmobile.local.context.ContextRequest
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.model.withWorkRuntimeContext
 
 internal data class LocalWorkTurnPromptContext(
     val stable: String = "",

@@ -1,16 +1,16 @@
 package com.labteto.dshmobile.automation
 
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import android.content.Context
 import androidx.work.WorkManager
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.HostsStore
-import com.labteto.dshmobile.local.LocalAutomationRunResult
-import com.labteto.dshmobile.local.truncateWithoutSplittingSurrogatePair
+import com.labteto.dshmobile.local.automation.LocalAutomationRunResult
+import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.notify.DshNotifications
 import com.labteto.dshmobile.notify.stableNotificationId
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Owns Automation Worker terminal settlement after the runtime execution has finished.

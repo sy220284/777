@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
+
+
 
 /**
  * Incremental literal phrase filter for chat streaming.

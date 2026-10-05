@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalModelPromptUpdateMode
+import com.labteto.dshmobile.local.model.applyRuntimeSystemPromptUpdate
+import com.labteto.dshmobile.local.model.workSystemPrompt
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put

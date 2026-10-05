@@ -1,9 +1,7 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalGoal
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalSessionEventLog
-import com.labteto.dshmobile.local.LocalTodoItem
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json

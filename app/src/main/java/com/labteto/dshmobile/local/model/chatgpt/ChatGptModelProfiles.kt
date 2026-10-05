@@ -1,9 +1,9 @@
 package com.labteto.dshmobile.local.model.chatgpt
 
-import com.labteto.dshmobile.local.LocalModelAuthKind
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.LocalModelProtocol
-import com.labteto.dshmobile.local.modelProfileId
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelProtocol
+import com.labteto.dshmobile.local.model.modelProfileId
 
 /**
  * The authenticated ChatGPT plan catalog is the model allow-list.

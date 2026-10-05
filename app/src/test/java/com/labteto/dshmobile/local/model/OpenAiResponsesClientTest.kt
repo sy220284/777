@@ -1,9 +1,9 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalToolCatalog
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.chat.chatPostTurnModelMessages
+import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import java.io.IOException
 import java.net.SocketException
 import kotlinx.coroutines.runBlocking

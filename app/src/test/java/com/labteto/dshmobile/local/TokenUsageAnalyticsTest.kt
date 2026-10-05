@@ -1,7 +1,9 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelProtocol
+import com.labteto.dshmobile.local.model.LocalModelRouteIdentity
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
-
 import java.time.Instant
 import java.time.ZoneId
 import kotlinx.serialization.json.JsonArray

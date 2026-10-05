@@ -3,6 +3,11 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.tools.ToolResultRetention
 import com.labteto.dshmobile.local.agent.LocalAgentContinuationPolicy
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelPromptUpdateMode
+import com.labteto.dshmobile.local.model.projectRecoverableToolResult
+import com.labteto.dshmobile.local.model.routeFingerprint
+import com.labteto.dshmobile.local.model.toRunModelSurface
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull

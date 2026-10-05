@@ -1,4 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
+
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
 
 /**
  * Resolves the default route for delegated read-only work.

@@ -3,12 +3,10 @@ package com.labteto.dshmobile.local.work
 import android.content.Context
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalJobInfo
-import com.labteto.dshmobile.local.LocalWorkRunBinding
-import com.labteto.dshmobile.local.projectJobSnapshotToSessionStates
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
+import com.labteto.dshmobile.local.jobs.syncForegroundJobs
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
-import com.labteto.dshmobile.local.syncForegroundJobs
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton

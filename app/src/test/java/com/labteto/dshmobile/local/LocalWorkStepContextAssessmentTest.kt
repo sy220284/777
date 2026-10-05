@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalPromptPressure
+import com.labteto.dshmobile.local.work.LocalWorkStepContextStatus
+import com.labteto.dshmobile.local.work.assessWorkStepContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

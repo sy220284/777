@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlinx.serialization.json.Json

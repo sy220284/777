@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.labteto.dshmobile.local.model.DeepSeekPricingRepository
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.CountDownLatch

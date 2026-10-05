@@ -1,9 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.labteto.dshmobile.local.LocalHarnessMessage
-import com.labteto.dshmobile.local.LocalTranscriptPage
-import com.labteto.dshmobile.local.LocalTranscriptPageCursor
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalSessionRuntime
+import com.labteto.dshmobile.local.session.LocalTranscriptPage
+import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

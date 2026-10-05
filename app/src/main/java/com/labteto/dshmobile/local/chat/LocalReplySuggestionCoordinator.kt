@@ -2,12 +2,11 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalChatTurnCoordinator
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.LocalModelReply
-import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.hasChatBranchAlternatives
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.JsonArray

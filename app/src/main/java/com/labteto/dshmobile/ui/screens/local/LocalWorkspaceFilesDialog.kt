@@ -36,12 +36,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.LocalConversationFiles
-import com.labteto.dshmobile.local.LocalWorkspaceFile
-import com.labteto.dshmobile.local.LocalWorkspaceFilePreview
-import com.labteto.dshmobile.ui.components.DsSegmentedTabs
+import com.labteto.dshmobile.local.session.LocalConversationFiles
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import com.labteto.dshmobile.ui.components.DsPageEmptyState
 import com.labteto.dshmobile.ui.components.DsPageLoadingState
+import com.labteto.dshmobile.ui.components.DsSegmentedTabs
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing

@@ -26,17 +26,16 @@ import com.labteto.dshmobile.interop.github.GitHubConnectorStatus
 import com.labteto.dshmobile.interop.lsp.LspPlugin
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.interop.mcp.McpToolBridgePlugin
-import com.labteto.dshmobile.local.LocalApiKeyStore
-import com.labteto.dshmobile.local.LocalBuiltinPlugin
-import com.labteto.dshmobile.local.LocalToolCall
 import com.labteto.dshmobile.local.LocalWebProvider
-import com.labteto.dshmobile.local.LocalWebTools
-import com.labteto.dshmobile.local.LocalWorkspace
-import com.labteto.dshmobile.local.LocalVisionPlugin
-import com.labteto.dshmobile.local.LocalVisionRoute
 import com.labteto.dshmobile.local.TokenUsageContext
-import com.labteto.dshmobile.local.VisionClient
+import com.labteto.dshmobile.local.model.LocalApiKeyStore
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalToolCall
+import com.labteto.dshmobile.local.vision.LocalVisionPlugin
+import com.labteto.dshmobile.local.vision.LocalVisionRoute
+import com.labteto.dshmobile.local.vision.VisionClient
+import com.labteto.dshmobile.local.web.LocalWebTools
+import com.labteto.dshmobile.local.work.LocalWorkspace
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import com.labteto.dshmobile.runtime.AndroidRuntimePlugin
 import com.labteto.dshmobile.runtime.PersistentPipeTerminalProvider
@@ -170,7 +169,7 @@ internal class LocalPluginComposition(
             val profile = route.profile
             when {
                 profile == null || !modelGateway.hasCredential(profile) -> null
-                profile.authKind == com.labteto.dshmobile.local.LocalModelAuthKind.API_KEY -> apiKeys.getFor(profile.id)
+                profile.authKind == com.labteto.dshmobile.local.model.LocalModelAuthKind.API_KEY -> apiKeys.getFor(profile.id)
                 else -> "chatgpt-plan"
             }
         },

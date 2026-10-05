@@ -1,6 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive

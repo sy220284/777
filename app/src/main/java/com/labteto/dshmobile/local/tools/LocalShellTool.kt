@@ -1,5 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.tools
 
+import com.labteto.dshmobile.local.jobs.LocalJobManager
+import com.labteto.dshmobile.local.work.LocalWorkspace
 import kotlinx.serialization.json.JsonObject
 
 /**

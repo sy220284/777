@@ -1,5 +1,13 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.context
 
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.model.LocalHistoryCompactor
+import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
+import com.labteto.dshmobile.local.model.LocalPromptPressure
+import com.labteto.dshmobile.local.model.LocalStructuredWorkState
+import com.labteto.dshmobile.local.runtime.structuredWorkState
+import com.labteto.dshmobile.local.work.LocalWorkStepContextAssessment
+import com.labteto.dshmobile.local.work.projectWorkRequestContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 

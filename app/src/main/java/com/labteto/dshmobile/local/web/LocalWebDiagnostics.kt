@@ -1,8 +1,6 @@
 package com.labteto.dshmobile.local.web
 
 import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
-import com.labteto.dshmobile.local.classifyProbeStatus
-import com.labteto.dshmobile.local.shouldRetryProbeStatus
 import java.net.SocketTimeoutException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay

@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.interaction.LOCAL_QUESTION_CANCELLED_RESPONSE
+import com.labteto.dshmobile.local.interaction.LocalApproval
+import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
+import com.labteto.dshmobile.local.interaction.LocalQuestion
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent

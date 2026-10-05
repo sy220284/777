@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.serialization.json.Json

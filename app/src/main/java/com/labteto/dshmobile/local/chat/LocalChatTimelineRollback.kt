@@ -1,7 +1,10 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject

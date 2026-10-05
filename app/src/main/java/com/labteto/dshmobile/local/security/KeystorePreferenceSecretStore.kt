@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.security
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties

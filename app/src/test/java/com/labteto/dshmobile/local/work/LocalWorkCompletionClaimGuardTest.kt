@@ -1,15 +1,13 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalGoal
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalModelReply
-import com.labteto.dshmobile.local.LocalSessionEventLog
-import com.labteto.dshmobile.local.LocalTodoItem
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalCanonicalContent
 import com.labteto.dshmobile.local.model.LocalCanonicalMessage
 import com.labteto.dshmobile.local.model.LocalCanonicalRole
+import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.quality.LocalOutputQualityContext
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject

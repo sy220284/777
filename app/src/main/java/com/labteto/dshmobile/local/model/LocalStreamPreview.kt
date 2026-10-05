@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
+
+
 
 /** Keeps the visible tail of a model reply and publishes it at a screen-friendly rate. */
 internal class LocalStreamPreview(

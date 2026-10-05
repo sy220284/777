@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.labteto.dshmobile.local.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.session.LocalSessionRuntime
+import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 internal class LocalTranscriptHistoryController(
     session: LocalSessionRuntime,
     private val currentSessionId: () -> String,
-    liveMessages: () -> List<com.labteto.dshmobile.local.LocalHarnessMessage>,
+    liveMessages: () -> List<com.labteto.dshmobile.local.session.LocalHarnessMessage>,
     private val scope: CoroutineScope,
 ) {
     private val loader = LocalTranscriptHistoryLoader(session, currentSessionId, liveMessages)

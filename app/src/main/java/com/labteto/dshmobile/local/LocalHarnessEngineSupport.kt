@@ -2,6 +2,10 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.harness.session.SessionRepairResult
+import com.labteto.dshmobile.local.attachment.cleanupLocalImageAttachments
+import com.labteto.dshmobile.local.attachment.collectLocalImageAttachmentReferences
+import com.labteto.dshmobile.local.attachment.mergeLocalImageAttachmentReferences
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject

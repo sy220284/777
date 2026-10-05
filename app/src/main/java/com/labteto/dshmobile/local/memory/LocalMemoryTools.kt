@@ -1,7 +1,16 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.memory
 
-import com.labteto.dshmobile.local.memory.*
-import kotlinx.serialization.json.*
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.record
+import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.tools.optionalString
+import com.labteto.dshmobile.local.tools.string
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 internal class LocalMemoryTools(
     private val store: MemoryStore,

@@ -1,10 +1,16 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
+import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.model.LOCAL_IMAGE_REF
+import com.labteto.dshmobile.local.model.buildLocalUserModelMessage
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

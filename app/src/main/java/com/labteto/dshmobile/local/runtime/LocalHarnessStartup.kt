@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

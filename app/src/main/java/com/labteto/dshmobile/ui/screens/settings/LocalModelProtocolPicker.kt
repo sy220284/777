@@ -4,7 +4,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.LocalModelProtocol
+import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.MenuItem
 

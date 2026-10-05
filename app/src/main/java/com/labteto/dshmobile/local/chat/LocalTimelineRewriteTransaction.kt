@@ -1,10 +1,11 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatContextState
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
-import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.encodeTranscriptMessages
+import com.labteto.dshmobile.local.work.LocalGoal
+import com.labteto.dshmobile.local.work.LocalTodoItem
 import java.util.UUID
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

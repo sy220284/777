@@ -1,8 +1,6 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalModelReply
-import com.labteto.dshmobile.local.LocalToolCall
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

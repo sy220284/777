@@ -1,11 +1,11 @@
 package com.labteto.dshmobile.ui.screens.settings
 
-import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
+import com.labteto.dshmobile.local.session.LocalConversationMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

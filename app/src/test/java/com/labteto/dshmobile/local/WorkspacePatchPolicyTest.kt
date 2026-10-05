@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.work.validateWorkspacePatchPaths
 import org.junit.Assert.assertThrows
 import org.junit.Test
 

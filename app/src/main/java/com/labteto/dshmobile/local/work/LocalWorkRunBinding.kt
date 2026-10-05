@@ -1,8 +1,16 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
+import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
+import com.labteto.dshmobile.local.runtime.projectExecutionJobs
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalTranscriptRuntime
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.updateChatBranchNodeSnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 

@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.runtime
 
-import com.labteto.dshmobile.local.LocalHarnessResourceState
+
 
 /** Cross-feature runtime kernel state. Product-owned execution details stay in their Feature state. */
 data class LocalKernelState(

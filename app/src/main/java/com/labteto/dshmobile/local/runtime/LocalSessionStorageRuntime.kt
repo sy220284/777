@@ -1,10 +1,9 @@
 package com.labteto.dshmobile.local.runtime
 
 import android.content.Context
-import com.labteto.dshmobile.local.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
 import com.labteto.dshmobile.local.LocalSessionCoordinator
-import com.labteto.dshmobile.local.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.LocalSessionRepository
+import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject

@@ -3,15 +3,11 @@ package com.labteto.dshmobile.local.model
 import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.labteto.dshmobile.local.LocalModelAuthKind
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.LocalModelProtocol
-import com.labteto.dshmobile.local.modelProfileId
 import java.util.UUID
 import kotlinx.serialization.json.Json
 import org.junit.After
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith

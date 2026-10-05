@@ -1,12 +1,12 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.recordRuntimeSystemPromptUpdate
+import com.labteto.dshmobile.local.model.recordRuntimeSystemPromptUpdate
+import com.labteto.dshmobile.local.model.workSystemPrompt
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
-import com.labteto.dshmobile.local.workSystemPrompt
+import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.update

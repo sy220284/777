@@ -1,4 +1,8 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
+
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
+import com.labteto.dshmobile.local.work.LocalWorkspace
 
 internal class LocalConversationFilesCoordinator(
     private val workspace: LocalWorkspace,

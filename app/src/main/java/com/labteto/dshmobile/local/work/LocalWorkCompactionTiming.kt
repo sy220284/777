@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
+
+import com.labteto.dshmobile.local.LocalUsageMode
 
 /**
  * Work keeps its provider-visible prefix stable while a user turn is executing.

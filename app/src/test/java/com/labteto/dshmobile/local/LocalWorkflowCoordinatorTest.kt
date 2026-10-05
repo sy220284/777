@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.agent.LocalSubagentExecutionException
+import com.labteto.dshmobile.local.work.LocalWorkflowCoordinator
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

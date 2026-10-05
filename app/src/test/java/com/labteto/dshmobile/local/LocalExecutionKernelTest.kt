@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
+import com.labteto.dshmobile.local.runtime.localResourceBudgetForMemoryClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

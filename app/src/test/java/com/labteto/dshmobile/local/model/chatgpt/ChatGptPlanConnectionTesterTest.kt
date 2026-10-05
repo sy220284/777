@@ -1,8 +1,8 @@
 package com.labteto.dshmobile.local.model.chatgpt
 
-import com.labteto.dshmobile.local.LocalModelAuthKind
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.LocalModelProtocol
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelProtocol
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

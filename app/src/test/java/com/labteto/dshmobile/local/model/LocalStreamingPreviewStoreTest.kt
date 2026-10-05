@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.LocalUsageMode
 import org.junit.Assert.assertEquals
 import org.junit.Test

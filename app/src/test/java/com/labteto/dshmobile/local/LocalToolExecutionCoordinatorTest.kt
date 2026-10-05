@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.work.LocalWorkState
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
@@ -11,9 +10,15 @@ import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
+import com.labteto.dshmobile.local.agent.localAgentRunPolicy
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelRunContext
+import com.labteto.dshmobile.local.model.LocalToolCall
+import com.labteto.dshmobile.local.tools.LocalToolCatalog
+import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
+import com.labteto.dshmobile.local.work.LocalWorkState
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject

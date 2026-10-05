@@ -1,5 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonArray

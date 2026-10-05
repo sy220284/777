@@ -5,7 +5,6 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
@@ -24,6 +23,7 @@ import com.labteto.dshmobile.local.chat.isMeaningfulGalleryPersona
 import com.labteto.dshmobile.local.chat.samePersonaIdentity
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
+import com.labteto.dshmobile.local.session.LocalConversationMode
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

@@ -1,13 +1,8 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.DeepSeekTokenUsage
-import com.labteto.dshmobile.local.LocalModelDelta
 import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalModelReply
-import com.labteto.dshmobile.local.LocalToolCall
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.estimatePromptBreakdown
-import com.labteto.dshmobile.local.normalizeModelBaseUrl
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.time.ZonedDateTime
@@ -34,8 +29,8 @@ import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.ResponseBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.ResponseBody
 
 @Singleton
 internal class AnthropicMessagesClient @Inject constructor(

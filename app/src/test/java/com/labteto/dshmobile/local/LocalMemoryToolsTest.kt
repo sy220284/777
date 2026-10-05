@@ -1,6 +1,13 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.memory.*
+import com.labteto.dshmobile.local.memory.LocalMemoryTools
+import com.labteto.dshmobile.local.memory.MemoryConflictResolver
+import com.labteto.dshmobile.local.memory.MemoryKind
+import com.labteto.dshmobile.local.memory.MemoryManager
+import com.labteto.dshmobile.local.memory.MemoryPolicy
+import com.labteto.dshmobile.local.memory.MemoryScope
+import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.local.session.LocalConversationMode
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Rule

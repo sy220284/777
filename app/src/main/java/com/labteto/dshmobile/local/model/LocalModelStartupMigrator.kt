@@ -1,10 +1,6 @@
 package com.labteto.dshmobile.local.model
 
 import android.content.SharedPreferences
-import com.labteto.dshmobile.local.LocalApiKeyStore
-import com.labteto.dshmobile.local.LocalModelAuthKind
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.modelProfileId
 
 /** One-time compatibility migration and active credential restoration for local model profiles. */
 internal class LocalModelStartupMigrator(

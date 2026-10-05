@@ -371,7 +371,7 @@ internal data class LegacyPersonaGalleryEntryV1To3(
     val id: String,
     val persona: LegacyPersonaProfileV1,
     val storyNotes: String = "",
-    val history: List<com.labteto.dshmobile.local.LocalHarnessMessage> = emptyList(),
+    val history: List<com.labteto.dshmobile.local.session.LocalHarnessMessage> = emptyList(),
     val chatState: ChatCharacterState = ChatCharacterState(),
     val sourceSessionId: String = "",
     val updatedAt: Long = 0L,

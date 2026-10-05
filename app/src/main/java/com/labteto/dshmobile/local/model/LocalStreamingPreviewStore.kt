@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.LocalUsageMode
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow

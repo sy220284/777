@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.estimateModelTokens
+import com.labteto.dshmobile.local.model.estimateModelTokens
 
 /**
  * Single request-time projection for the V3 character-life runtime.

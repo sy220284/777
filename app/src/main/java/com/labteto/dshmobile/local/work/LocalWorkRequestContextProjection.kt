@@ -1,5 +1,19 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalHistoryBudget
+import com.labteto.dshmobile.local.model.LocalHistoryCompactor
+import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
+import com.labteto.dshmobile.local.model.LocalPromptPressure
+import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
+import com.labteto.dshmobile.local.model.LocalStructuredWorkState
+import com.labteto.dshmobile.local.model.compactHistoryWithStaleToolProjection
+import com.labteto.dshmobile.local.model.estimateModelTokens
+import com.labteto.dshmobile.local.model.projectStaleToolResults
+import com.labteto.dshmobile.local.runtime.structuredWorkState
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull

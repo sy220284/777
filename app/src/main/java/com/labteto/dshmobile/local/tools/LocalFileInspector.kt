@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.tools
 
 import android.graphics.BitmapFactory
 import android.media.ExifInterface

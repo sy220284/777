@@ -1,5 +1,8 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.runtime.CHAT_DYNAMIC_CONTEXT_RESERVE_CHARS
+import com.labteto.dshmobile.local.runtime.MAX_EPHEMERAL_CONTEXT_CHARS
+import com.labteto.dshmobile.local.runtime.PLAN_MODE_PROMPT
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull

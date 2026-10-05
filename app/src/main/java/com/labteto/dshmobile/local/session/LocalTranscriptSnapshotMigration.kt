@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
 
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject

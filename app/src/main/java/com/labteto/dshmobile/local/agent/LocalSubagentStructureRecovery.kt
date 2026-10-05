@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.agent
 
 import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject

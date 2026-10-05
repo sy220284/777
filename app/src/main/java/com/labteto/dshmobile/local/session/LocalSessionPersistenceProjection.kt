@@ -1,6 +1,9 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalSessionCoordinator
+import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 
 /**
  * Session-owned durable projections used by the local runtime composition root.

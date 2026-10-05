@@ -2,8 +2,8 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalSessionCoordinator
-import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update

@@ -1,9 +1,13 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.attachment
 
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.labteto.dshmobile.local.model.LocalImageMetadata
+import com.labteto.dshmobile.local.model.SUPPORTED_LOCAL_IMAGE_TYPES
+import com.labteto.dshmobile.local.model.validateLocalImageMetadata
+import com.labteto.dshmobile.local.work.LocalWorkspace
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream

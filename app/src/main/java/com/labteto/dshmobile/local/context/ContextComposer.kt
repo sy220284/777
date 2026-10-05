@@ -2,11 +2,11 @@ package com.labteto.dshmobile.local.context
 
 import com.labteto.dshmobile.harness.context.AgentContextAssembler
 import com.labteto.dshmobile.harness.context.AgentContextMemory
-import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.profile.UserProfileStore
+import com.labteto.dshmobile.local.session.LocalConversationMode
 import javax.inject.Inject
 import javax.inject.Singleton
 

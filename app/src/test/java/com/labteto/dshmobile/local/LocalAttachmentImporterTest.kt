@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.attachment.copyAttachmentCancellably
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.security.MessageDigest

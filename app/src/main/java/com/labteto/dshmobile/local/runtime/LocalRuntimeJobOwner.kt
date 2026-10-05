@@ -1,9 +1,9 @@
 package com.labteto.dshmobile.local.runtime
 
 import android.content.Context
-import com.labteto.dshmobile.local.LocalJobInfo
-import com.labteto.dshmobile.local.LocalJobManager
-import com.labteto.dshmobile.local.LocalPersistentJobStore
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
+import com.labteto.dshmobile.local.jobs.LocalJobManager
+import com.labteto.dshmobile.local.jobs.LocalPersistentJobStore
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList

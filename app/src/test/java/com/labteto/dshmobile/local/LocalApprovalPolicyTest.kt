@@ -8,6 +8,13 @@ import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
+import com.labteto.dshmobile.local.interaction.LocalApproval
+import com.labteto.dshmobile.local.interaction.LocalApprovalImpact
+import com.labteto.dshmobile.local.runtime.approvalImpact
+import com.labteto.dshmobile.local.runtime.canAutoApproveSafely
+import com.labteto.dshmobile.local.runtime.canResolvePendingByEnablingAutoApproval
+import com.labteto.dshmobile.local.runtime.canUseDeviceApprovalLease
+import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

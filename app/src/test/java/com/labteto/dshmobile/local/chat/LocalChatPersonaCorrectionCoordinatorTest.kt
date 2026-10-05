@@ -1,10 +1,9 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.ChatPersonaCorrectionNotice
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json

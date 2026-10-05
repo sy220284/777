@@ -1,5 +1,10 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.tools
 
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.model.LocalModelPromptUpdateMode
+import com.labteto.dshmobile.local.model.LocalModelRuntimeCapabilities
+import com.labteto.dshmobile.local.model.LocalRunModelSurface
+import com.labteto.dshmobile.local.model.currentModelRuntimeCapabilities
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull

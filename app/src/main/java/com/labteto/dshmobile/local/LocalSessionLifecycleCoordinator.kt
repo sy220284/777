@@ -1,11 +1,5 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
-import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
-import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
-
-import com.labteto.dshmobile.local.runtime.LocalKernelState
-import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.harness.session.HandoffGoal
@@ -15,19 +9,39 @@ import com.labteto.dshmobile.harness.session.HandoffTodo
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatDiaryStore
-import com.labteto.dshmobile.local.chat.LocalChatState
-import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
-import com.labteto.dshmobile.local.chat.continuePendingInSession
-import com.labteto.dshmobile.local.chat.withLegacyFallback
-import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
+import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.chat.LocalChatMode
+import com.labteto.dshmobile.local.chat.LocalChatState
+import com.labteto.dshmobile.local.chat.LocalGroupChatState
+import com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_MEMBERS
+import com.labteto.dshmobile.local.chat.MIN_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.resolveCharacterBehaviorTuning
+import com.labteto.dshmobile.local.chat.activeChatBranchMessages
+import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
+import com.labteto.dshmobile.local.chat.continuePendingInSession
 import com.labteto.dshmobile.local.chat.findEstablishedGroupChatSession
-import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
+import com.labteto.dshmobile.local.chat.groupTranscriptLine
+import com.labteto.dshmobile.local.chat.hasChatBranchAlternatives
 import com.labteto.dshmobile.local.chat.isUnboundChatPersona
+import com.labteto.dshmobile.local.chat.resolveCharacterBehaviorTuning
+import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
+import com.labteto.dshmobile.local.chat.withLegacyFallback
+import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
+import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
+import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.local.runtime.LocalKernelState
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.projectExecutionJobs
+import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
+import com.labteto.dshmobile.local.session.LocalConversationFilesCoordinator
+import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.work.LocalWorkState
 import java.io.File
 import java.util.UUID
@@ -35,12 +49,12 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 
 internal fun shouldContinueSingleChatBinding(
     mode: LocalConversationMode,

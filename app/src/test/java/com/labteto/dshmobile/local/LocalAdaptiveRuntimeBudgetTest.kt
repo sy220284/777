@@ -1,8 +1,10 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
-
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
+import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+import com.labteto.dshmobile.local.runtime.adaptiveAgentStepLimit
+import com.labteto.dshmobile.local.runtime.adaptiveToolResultBudget
+import com.labteto.dshmobile.local.runtime.nextAdaptiveAgentStepLimit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

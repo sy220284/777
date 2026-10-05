@@ -1,9 +1,15 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.tools
 
-import com.labteto.dshmobile.harness.plugin.*
-import com.labteto.dshmobile.harness.tools.*
+import com.labteto.dshmobile.harness.plugin.HarnessContext
+import com.labteto.dshmobile.harness.plugin.HarnessPlugin
+import com.labteto.dshmobile.harness.tools.HarnessTool
+import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
+import com.labteto.dshmobile.harness.tools.ToolResult
+import com.labteto.dshmobile.local.model.LocalToolCall
 import java.util.UUID
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 internal class LocalBuiltinPlugin(
     private val execute: suspend (LocalToolCall, Boolean, String?) -> String,

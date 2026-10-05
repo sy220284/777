@@ -2,20 +2,27 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatDiarySourceMode
 import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.chat.ChatDiaryWriteRequest
-import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
-import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.activeChatBranchMessages
 import com.labteto.dshmobile.local.chat.applySceneTurn
+import com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey
 import com.labteto.dshmobile.local.chat.commitProcessed
 import com.labteto.dshmobile.local.chat.enqueuePendingDurably
-import com.labteto.dshmobile.local.chat.loadPendingBatch
 import com.labteto.dshmobile.local.chat.groundContinuityEvidence
+import com.labteto.dshmobile.local.chat.hasChatBranchAlternatives
+import com.labteto.dshmobile.local.chat.loadPendingBatch
+import com.labteto.dshmobile.local.chat.updateChatBranchNodeSnapshot
 import com.labteto.dshmobile.local.chat.withContextForPlanner
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -23,8 +30,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 

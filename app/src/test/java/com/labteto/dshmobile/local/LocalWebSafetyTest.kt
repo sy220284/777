@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.web.classifyProbeStatus
+import com.labteto.dshmobile.local.web.isTextualWebMediaType
+import com.labteto.dshmobile.local.web.pinUriToAddress
+import com.labteto.dshmobile.local.web.shouldRetryProbeStatus
 import java.net.InetAddress
 import java.net.URI
 import org.junit.Assert.assertEquals

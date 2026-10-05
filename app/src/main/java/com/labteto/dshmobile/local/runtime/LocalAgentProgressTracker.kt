@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import java.security.MessageDigest

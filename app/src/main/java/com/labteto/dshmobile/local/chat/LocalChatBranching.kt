@@ -1,15 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatContextState
-import com.labteto.dshmobile.local.chat.ChatContinuityState
-import com.labteto.dshmobile.local.chat.ChatReplySuggestion
-import com.labteto.dshmobile.local.chat.applySceneTurn
-import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
-import com.labteto.dshmobile.local.chat.hasUsefulFacts
-import com.labteto.dshmobile.local.chat.normalized
-import com.labteto.dshmobile.local.chat.withLegacyFallback
-import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

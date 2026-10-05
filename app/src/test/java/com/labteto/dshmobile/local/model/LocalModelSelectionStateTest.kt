@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.*
 import org.junit.Assert.*
 import org.junit.Test
 

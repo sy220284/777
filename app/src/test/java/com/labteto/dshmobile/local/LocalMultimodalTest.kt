@@ -1,5 +1,19 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.model.LOCAL_IMAGE_REF
+import com.labteto.dshmobile.local.model.LocalImageCapabilityRegistry
+import com.labteto.dshmobile.local.model.LocalImageInputMode
+import com.labteto.dshmobile.local.model.LocalImageMetadata
+import com.labteto.dshmobile.local.model.LocalImageRequestBudget
+import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.buildLocalUserModelMessage
+import com.labteto.dshmobile.local.model.imageInputUnsupported
+import com.labteto.dshmobile.local.model.prepareLocalMultimodalMessages
+import com.labteto.dshmobile.local.model.readLocalImageBytesBounded
+import com.labteto.dshmobile.local.model.replaceLocalUserModelMessageText
+import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
+import com.labteto.dshmobile.local.model.validateLocalImageMetadata
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray

@@ -1,7 +1,10 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.LocalHistoryBudget
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryPolicy
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
 
 internal fun LocalSubagentHistoryPolicy.compactBeforeModelStep(
     history: LocalModelHistoryBuffer,

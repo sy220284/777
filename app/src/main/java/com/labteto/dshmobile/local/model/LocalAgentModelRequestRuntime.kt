@@ -1,8 +1,9 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
-import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
+import com.labteto.dshmobile.local.work.executeWithModelAdmission
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 

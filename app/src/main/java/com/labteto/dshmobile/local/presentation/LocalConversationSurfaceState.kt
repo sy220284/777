@@ -1,20 +1,20 @@
 package com.labteto.dshmobile.local.presentation
 
-import com.labteto.dshmobile.local.ChatPersonaCorrectionNotice
-import com.labteto.dshmobile.local.LocalApproval
-import com.labteto.dshmobile.local.LocalChatBranchState
-import com.labteto.dshmobile.local.LocalConversationMode
-import com.labteto.dshmobile.local.LocalGroupChatState
-import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalImageInputMode
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.LocalQuestion
-import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatPersonaCorrectionNotice
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
+import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.chat.LocalGroupChatState
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.interaction.LocalApproval
+import com.labteto.dshmobile.local.interaction.LocalQuestion
+import com.labteto.dshmobile.local.model.LocalImageInputMode
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalSessionSummary
 
 /**
  * Shared conversation substrate rendered by Chat and Work.

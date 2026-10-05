@@ -7,6 +7,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 
+LOCAL_SOURCE_ROOT = ROOT / "app/src/main/java/com/labteto/dshmobile/local"
+
 ENGINE_MAX_PUBLIC_METHODS = 0
 ENGINE_MAX_INTERNAL_METHODS = 59
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
@@ -62,6 +64,30 @@ def read(relative: str) -> str:
 def strip_comments(source: str) -> str:
     source = re.sub(r"/\*[\s\S]*?\*/", "", source)
     return re.sub(r"//.*$", "", source, flags=re.MULTILINE)
+
+
+# Physical boundaries must also be Kotlin boundaries; root-package leakage defeats import guards.
+for source_path in LOCAL_SOURCE_ROOT.rglob("*.kt"):
+    relative = source_path.relative_to(LOCAL_SOURCE_ROOT)
+    expected_package = "com.labteto.dshmobile.local"
+    if relative.parent.parts:
+        expected_package += "." + ".".join(relative.parent.parts)
+    source = source_path.read_text(encoding="utf-8")
+    declared = re.search(r"^package\s+([A-Za-z0-9_.]+)\s*$", source, re.MULTILINE)
+    if declared is None or declared.group(1) != expected_package:
+        die(f"directory/package mismatch: {relative}; expected {expected_package}")
+    if re.search(r"^import\s+[^\n]+\.\*\s*$", source, re.MULTILINE):
+        die(f"architecture-sensitive source must use explicit imports: {relative}")
+
+domain_models = read("app/src/main/java/com/labteto/dshmobile/local/LocalHarnessModels.kt")
+for domain_type in (
+    "LocalApproval", "LocalApprovalImpact", "LocalQuestion", "LocalJobInfo", "LocalTodoItem",
+    "LocalGoal", "LocalWorkflowProgress", "LocalChatBranchState", "LocalGroupChatState",
+    "ChatPersonaCorrectionNotice", "LocalImageInputMode", "LocalModelReply", "LocalToolCall",
+    "LocalHarnessSession", "LocalSessionSummary", "LocalHarnessMessage",
+):
+    if re.search(rf"\b(?:class|interface|object)\s+{domain_type}\b", domain_models):
+        die(f"domain model must not return to the root aggregate file: {domain_type}")
 
 
 def constructor_dependency_count(relative: str, class_name: str) -> int:
@@ -646,11 +672,12 @@ for required_mutation in (
     if required_mutation not in work_progress:
         die("Work mutations must write through LocalWorkState: " + required_mutation)
 
-stream_state_start = models.find("data class LocalHarnessStreamingState(")
-stream_state_end = models.find("\n)", stream_state_start)
+model_contracts = read("app/src/main/java/com/labteto/dshmobile/local/model/LocalModelModels.kt")
+stream_state_start = model_contracts.find("data class LocalHarnessStreamingState(")
+stream_state_end = model_contracts.find("\n)", stream_state_start)
 if stream_state_start < 0 or stream_state_end < 0:
     die("unable to locate LocalHarnessStreamingState")
-stream_state = models[stream_state_start:stream_state_end]
+stream_state = model_contracts[stream_state_start:stream_state_end]
 for identity_field in ("sessionId", "requestId", "usageMode"):
     if not re.search(rf"\bval\s+{identity_field}\s*:", stream_state):
         die(f"streaming preview must carry explicit {identity_field} ownership")
@@ -897,10 +924,7 @@ if "runtimeStateStore.jobManager.output" not in work_runtime_source or "runtimeS
     die("WorkRuntime must access background jobs through the shared Runtime capability")
 if "LocalWorkPlanModeCoordinator" not in work_runtime_source or "engine.setPlanMode" in work_runtime_source:
     die("Work plan-mode ownership must stay inside WorkFeature")
-if (
-    "val sessionId = runtimeStateStore.currentSessionId" not in work_runtime_source
-    or "workRunRegistry.requestCancel(sessionId)" not in work_runtime_source
-):
+if "workRunRegistry.requestCancel(sessionId)" not in work_runtime_source or "val sessionId = runtimeStateStore.currentSessionId" not in work_runtime_source:
     die("Work session-bound cancellation must stay inside WorkFeature")
 if "foregroundModelHistory = LocalModelHistoryBuffer()" not in runtime_state_store:
     die("Shared Runtime must own the visible foreground model-history state")

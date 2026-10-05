@@ -1,5 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.automation
 
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive

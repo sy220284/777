@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.web
 
 import java.net.InetAddress
 import java.net.URI

@@ -1,8 +1,9 @@
 package com.labteto.dshmobile.local
 
 import android.content.Context
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import java.util.UUID
 import org.junit.After
 import org.junit.Assert.assertFalse

@@ -1,9 +1,19 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
-import java.time.LocalDate
+import com.labteto.dshmobile.local.LocalHistoryBudget
+import com.labteto.dshmobile.local.LocalToolExecutionCoordinator
+import com.labteto.dshmobile.local.TokenUsageAggregate
+import com.labteto.dshmobile.local.TokenUsageGroupKind
+import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalRequestPressureStore
+import com.labteto.dshmobile.local.record
+import com.labteto.dshmobile.local.work.LocalWorkExecutionBudget
+import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.observability.AppLogEntry
+import java.time.LocalDate
 
 /** Owns environment diagnostic snapshot selection and report assembly. */
 internal class LocalEnvironmentInfoCoordinator(

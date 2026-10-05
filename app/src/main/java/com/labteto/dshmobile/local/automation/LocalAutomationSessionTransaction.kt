@@ -1,9 +1,12 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.automation
 
-import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
-
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject

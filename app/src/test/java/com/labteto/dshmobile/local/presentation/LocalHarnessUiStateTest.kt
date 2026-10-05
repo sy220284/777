@@ -1,13 +1,13 @@
 package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.LocalChatState
+import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.work.LocalWorkState
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalHarnessUiStateTest {
@@ -103,8 +103,8 @@ class LocalHarnessUiStateTest {
         val aggregate = LocalHarnessState(
             work = LocalWorkState(
                 plan = listOf("第一步"),
-                todos = listOf(com.labteto.dshmobile.local.LocalTodoItem("继续", "in_progress")),
-                goal = com.labteto.dshmobile.local.LocalGoal("完成迁移"),
+                todos = listOf(com.labteto.dshmobile.local.work.LocalTodoItem("继续", "in_progress")),
+                goal = com.labteto.dshmobile.local.work.LocalGoal("完成迁移"),
                 planMode = true,
             ),
         )
@@ -172,7 +172,7 @@ class LocalHarnessUiStateTest {
     }
     @Test
     fun sameRouteAccountSwitchUpdatesSettingsWithoutWakingUnrelatedShellState() {
-        val first = com.labteto.dshmobile.local.LocalModelProfile("account-a", "same-model", "https://example.com")
+        val first = com.labteto.dshmobile.local.model.LocalModelProfile("account-a", "same-model", "https://example.com")
         val second = first.copy(id = "account-b")
         val before = LocalHarnessState(modelState = com.labteto.dshmobile.local.model.LocalModelState(model = first.model, baseUrl = first.baseUrl,
             modelSelection = com.labteto.dshmobile.local.model.LocalModelSelectionState(listOf(first, second), first.id)))

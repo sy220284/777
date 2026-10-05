@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
+
+
 
 /**
  * Resolves only credentials that belong to the official DeepSeek API route.

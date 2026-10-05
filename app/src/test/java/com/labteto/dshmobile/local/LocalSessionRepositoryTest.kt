@@ -1,9 +1,14 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
+import com.labteto.dshmobile.local.chat.LocalChatMode
+import com.labteto.dshmobile.local.chat.LocalGroupChatMember
+import com.labteto.dshmobile.local.chat.LocalGroupChatState
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalHarnessSession
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject

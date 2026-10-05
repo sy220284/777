@@ -1,8 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.ChatPersonaCorrectionNotice
-import com.labteto.dshmobile.local.LocalChatBranchState
-import com.labteto.dshmobile.local.LocalGroupChatState
+
 
 /** Chat-owned runtime state. Durable Session storage remains a separate projection boundary. */
 data class LocalChatState(

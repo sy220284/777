@@ -1,8 +1,13 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolRegistry
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalToolExecutionCoordinator
+import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
+import com.labteto.dshmobile.local.runtime.SUBAGENT_EXCLUDED_TOOLS
+import com.labteto.dshmobile.local.runtime.SUBAGENT_VIRTUAL_SCREEN_TOOLS
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

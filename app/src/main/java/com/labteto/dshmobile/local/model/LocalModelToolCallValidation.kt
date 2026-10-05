@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalToolCall
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject

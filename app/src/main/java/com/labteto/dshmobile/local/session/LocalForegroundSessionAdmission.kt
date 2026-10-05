@@ -1,9 +1,9 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
 
-import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
-
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.send.coordinateLocalSend
 

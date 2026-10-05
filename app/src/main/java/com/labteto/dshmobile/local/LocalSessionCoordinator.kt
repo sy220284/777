@@ -1,9 +1,20 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
-import com.labteto.dshmobile.local.canonicalizeLegacyChatBranchState
+import com.labteto.dshmobile.local.chat.canonicalizeLegacyChatBranchState
+import com.labteto.dshmobile.local.chat.migrateLegacyConversationContext
 import com.labteto.dshmobile.local.chat.withLegacyFallback
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
+import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
+import com.labteto.dshmobile.local.session.migrateLegacyTranscriptSnapshot
+import com.labteto.dshmobile.local.session.projectLocalTranscriptRuntimeIndexTail
+import com.labteto.dshmobile.local.session.projectSessionTranscriptTail
+import com.labteto.dshmobile.local.session.transcriptProjectionReplayCursor
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 

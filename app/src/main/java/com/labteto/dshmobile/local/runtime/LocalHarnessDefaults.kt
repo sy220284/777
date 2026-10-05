@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
+
+
 
 internal const val KEY_MODEL = "model"
 internal const val KEY_CONFIGURED_MODELS = "configured_models"

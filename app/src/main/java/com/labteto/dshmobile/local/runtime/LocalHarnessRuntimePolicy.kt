@@ -1,9 +1,15 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.harness.resource.HarnessResourceBudget
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.interaction.LocalApproval
+import com.labteto.dshmobile.local.interaction.LocalApprovalImpact
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
+import com.labteto.dshmobile.local.tools.LocalAutoApprovalScope
+import com.labteto.dshmobile.local.tools.LocalToolPolicy
 
 class LocalHarnessBlockedException(
     message: String,

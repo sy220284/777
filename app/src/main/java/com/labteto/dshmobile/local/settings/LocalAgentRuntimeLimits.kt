@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.settings
+
+
 
 /**
  * 智能体运行步数设置的统一边界。

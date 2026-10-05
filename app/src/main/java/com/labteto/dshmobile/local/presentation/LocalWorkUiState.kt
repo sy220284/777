@@ -1,13 +1,13 @@
 package com.labteto.dshmobile.local.presentation
 
-import com.labteto.dshmobile.local.LocalApproval
-import com.labteto.dshmobile.local.LocalConversationMode
-import com.labteto.dshmobile.local.LocalGoal
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalJobInfo
-import com.labteto.dshmobile.local.LocalQuestion
-import com.labteto.dshmobile.local.LocalTodoItem
-import com.labteto.dshmobile.local.LocalWorkflowProgress
+import com.labteto.dshmobile.local.interaction.LocalApproval
+import com.labteto.dshmobile.local.interaction.LocalQuestion
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
+import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.work.LocalGoal
+import com.labteto.dshmobile.local.work.LocalTodoItem
+import com.labteto.dshmobile.local.work.LocalWorkflowProgress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.web
 
 import java.net.Inet4Address
 import java.net.Inet6Address

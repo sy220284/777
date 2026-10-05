@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.estimateModelTokens
+import com.labteto.dshmobile.local.model.estimateModelTokens
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals

@@ -1,6 +1,11 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
+import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.model.LocalContextWindowSnapshot
+import com.labteto.dshmobile.local.model.LocalPromptPressure
+import com.labteto.dshmobile.local.work.LocalWorkExecutionBudget
+import com.labteto.dshmobile.local.work.LocalWorkStepContextAssessment
 import com.labteto.dshmobile.observability.AppLogEntry
 
 /** Formats the user-visible environment summary without owning engine resources. */

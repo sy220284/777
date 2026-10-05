@@ -1,19 +1,45 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.automation
 
-import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.work.LocalWorkState
+import com.labteto.dshmobile.local.LocalChatReplyCoordinator
+import com.labteto.dshmobile.local.LocalChatTurnCoordinator
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalModelRequestCoordinator
+import com.labteto.dshmobile.local.LocalSessionCoordinator
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatPersonaStore
 import com.labteto.dshmobile.local.chat.LocalChatState
+import com.labteto.dshmobile.local.chat.appendMaterializedChatBranchMessage
 import com.labteto.dshmobile.local.chat.applySceneTurn
+import com.labteto.dshmobile.local.chat.characterProactiveDirective
 import com.labteto.dshmobile.local.chat.enqueuePending
 import com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy
 import com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger
 import com.labteto.dshmobile.local.chat.isNearDuplicateProactive
 import com.labteto.dshmobile.local.chat.proactiveConversationFocus
-import com.labteto.dshmobile.local.chat.characterProactiveDirective
 import com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.model.chatSystemPrompt
+import com.labteto.dshmobile.local.model.withChatTurnContext
+import com.labteto.dshmobile.local.model.withEphemeralContext
+import com.labteto.dshmobile.local.recordAutomation
+import com.labteto.dshmobile.local.runtime.AUTOMATION_CHAT_HISTORY_MESSAGES
+import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
+import com.labteto.dshmobile.local.runtime.CHAT_ROLEPLAY_TEMPERATURE
+import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
+import com.labteto.dshmobile.local.session.appendLocalTranscriptRuntimeIndex
+import com.labteto.dshmobile.local.session.encodeTranscriptMessages
+import com.labteto.dshmobile.local.session.localTranscriptIndexForSession
+import com.labteto.dshmobile.local.work.LocalWorkState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -24,6 +50,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+
 /**
  * Owns proactive scheduled Chat generation and detached-session persistence.
  *

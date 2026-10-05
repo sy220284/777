@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
+import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalModelRuntimeCapabilities
 
 /**
  * Two independent guards share one policy object:

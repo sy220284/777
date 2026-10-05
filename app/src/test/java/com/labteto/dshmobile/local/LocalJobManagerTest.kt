@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
+import com.labteto.dshmobile.local.jobs.LocalJobManager
+import com.labteto.dshmobile.local.jobs.LocalPersistentJobStore
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi

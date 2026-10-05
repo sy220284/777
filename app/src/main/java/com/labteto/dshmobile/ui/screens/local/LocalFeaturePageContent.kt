@@ -8,9 +8,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.automation.AutomationMode
-import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
+import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.presentation.LocalHarnessShellState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState

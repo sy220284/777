@@ -4,7 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.labteto.dshmobile.local.KeystorePreferenceSecretStore
+import com.labteto.dshmobile.local.security.KeystorePreferenceSecretStore
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton

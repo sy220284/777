@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
+
+import com.labteto.dshmobile.local.model.LocalPromptPressure
 
 /**
  * Evaluates whether one Work request carries a reasonable amount of model-visible context.

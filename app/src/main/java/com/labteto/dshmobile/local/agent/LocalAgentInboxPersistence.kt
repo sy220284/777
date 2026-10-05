@@ -1,7 +1,9 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.agent
 
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

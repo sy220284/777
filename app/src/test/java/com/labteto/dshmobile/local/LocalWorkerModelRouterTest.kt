@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
+import com.labteto.dshmobile.local.work.LocalWorkerModelRouter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

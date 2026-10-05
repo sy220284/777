@@ -1,5 +1,11 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
 
+import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.chat.LocalGroupChatState
+import com.labteto.dshmobile.local.chat.decodeChatBranchStateEvent
+import com.labteto.dshmobile.local.chat.decodeTimelineRewriteState
+import com.labteto.dshmobile.local.work.LocalGoal
+import com.labteto.dshmobile.local.work.LocalTodoItem
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

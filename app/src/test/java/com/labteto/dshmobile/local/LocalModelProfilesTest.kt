@@ -1,8 +1,19 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelCapability
+import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelProtocol
+import com.labteto.dshmobile.local.model.LocalModelToolCallingMode
+import com.labteto.dshmobile.local.model.LocalPromptCacheMode
+import com.labteto.dshmobile.local.model.apiKeyProfileForRoute
+import com.labteto.dshmobile.local.model.canBackDeepSeekSearch
+import com.labteto.dshmobile.local.model.modelProfileId
+import com.labteto.dshmobile.local.model.usesResponsesTransport
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 

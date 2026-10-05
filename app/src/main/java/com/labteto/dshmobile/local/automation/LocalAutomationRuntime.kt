@@ -1,12 +1,11 @@
 package com.labteto.dshmobile.local.automation
 
-import com.labteto.dshmobile.local.LocalAutomationRunResult
 import com.labteto.dshmobile.local.LocalHarnessEngine
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.distinctUntilChanged
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 /** Automation execution plus the bounded chat snapshot used by the event planner. */
 @Singleton

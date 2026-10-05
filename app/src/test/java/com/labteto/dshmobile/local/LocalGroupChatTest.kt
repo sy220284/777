@@ -3,10 +3,20 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatSceneState
+import com.labteto.dshmobile.local.chat.LocalChatMode
+import com.labteto.dshmobile.local.chat.LocalGroupChatMember
+import com.labteto.dshmobile.local.chat.LocalGroupChatState
+import com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_RESPONDERS_PER_TURN
+import com.labteto.dshmobile.local.chat.groupChatResponders
+import com.labteto.dshmobile.local.chat.groupMessageVisibleContent
+import com.labteto.dshmobile.local.chat.groupTranscriptLine
+import com.labteto.dshmobile.local.chat.migrateLegacyConversationContext
+import com.labteto.dshmobile.local.chat.stripGroupSpeakerPrefix
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlinx.serialization.json.Json
 
 class LocalGroupChatTest {
     private val ayaka = LocalGroupChatMember(

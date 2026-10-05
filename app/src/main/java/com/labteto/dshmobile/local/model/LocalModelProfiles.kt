@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
 
 import java.net.URI
 import java.security.MessageDigest

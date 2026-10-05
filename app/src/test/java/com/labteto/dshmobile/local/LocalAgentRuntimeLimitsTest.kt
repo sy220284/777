@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.settings.LocalAgentRuntimeLimits
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

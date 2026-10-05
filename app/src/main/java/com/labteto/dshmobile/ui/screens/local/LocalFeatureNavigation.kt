@@ -1,10 +1,10 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.activity.BackEventCompat
-import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.chat.findEstablishedGroupChatSession
 import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
 import com.labteto.dshmobile.local.feature.LocalFeatureRoute
+import com.labteto.dshmobile.local.session.LocalSessionSummary
 
 internal typealias LocalFeaturePage = LocalFeatureRoute
 

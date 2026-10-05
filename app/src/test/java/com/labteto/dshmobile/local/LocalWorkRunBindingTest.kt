@@ -1,11 +1,16 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.presentation.toWorkSurfaceUiState
-import com.labteto.dshmobile.local.runtime.LocalKernelState
-import com.labteto.dshmobile.local.work.LocalWorkState
-import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
-import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
+import com.labteto.dshmobile.local.interaction.LocalQuestion
+import com.labteto.dshmobile.local.presentation.toWorkSurfaceUiState
+import com.labteto.dshmobile.local.runtime.LocalHarnessResourceState
+import com.labteto.dshmobile.local.runtime.LocalKernelState
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.work.LocalWorkRunBinding
+import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
+import com.labteto.dshmobile.local.work.LocalWorkState
+import com.labteto.dshmobile.local.work.mirrorLocalWorkRunState
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest

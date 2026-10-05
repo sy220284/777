@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers

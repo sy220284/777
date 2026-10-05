@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

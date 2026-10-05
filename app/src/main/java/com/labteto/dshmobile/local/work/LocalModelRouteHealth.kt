@@ -1,5 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.model.modelFailureKind
 import java.util.LinkedHashMap
 import java.util.concurrent.atomic.AtomicBoolean

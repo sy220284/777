@@ -1,9 +1,9 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalHarnessResourceState
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.runtime.LocalHarnessResourceState
+import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

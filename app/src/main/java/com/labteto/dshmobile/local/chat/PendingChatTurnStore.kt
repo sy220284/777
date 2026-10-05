@@ -1,11 +1,11 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import java.util.WeakHashMap
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import java.util.WeakHashMap
 
 private val pendingTurnJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 private const val PENDING_EVENT = "chat/pending-turn"

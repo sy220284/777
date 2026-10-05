@@ -1,12 +1,12 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.model.workSystemPrompt
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
-import com.labteto.dshmobile.local.workSystemPrompt
+import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull

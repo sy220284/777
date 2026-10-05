@@ -1,10 +1,8 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalGoal
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalSessionEventLog
-import com.labteto.dshmobile.local.LocalTodoItem
-import com.labteto.dshmobile.local.optionalString
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.tools.optionalString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonArray

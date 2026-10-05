@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.LocalImageInputMode
+
 
 /** Model-owned runtime configuration and selected route identity. */
 data class LocalModelState(

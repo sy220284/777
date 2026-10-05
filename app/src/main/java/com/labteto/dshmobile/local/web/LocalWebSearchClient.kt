@@ -1,6 +1,15 @@
 package com.labteto.dshmobile.local.web
 
 import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.LocalWebException
+import com.labteto.dshmobile.local.TokenUsageAction
+import com.labteto.dshmobile.local.TokenUsageContext
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelProtocol
+import com.labteto.dshmobile.local.model.LocalModelRouteIdentity
+import com.labteto.dshmobile.local.model.parseDeepSeekAnthropicUsage
 import java.net.SocketTimeoutException
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -19,16 +28,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-
-import com.labteto.dshmobile.local.DeepSeekUsageTracker
-import com.labteto.dshmobile.local.TokenUsageContext
-import com.labteto.dshmobile.local.TokenUsageAction
-import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.LocalWebException
-import com.labteto.dshmobile.local.LocalModelRouteIdentity
-import com.labteto.dshmobile.local.LocalModelAuthKind
-import com.labteto.dshmobile.local.LocalModelProtocol
-import com.labteto.dshmobile.local.parseDeepSeekAnthropicUsage
 
 /** DeepSeek auxiliary search wire format, result projection and actual API usage attribution. */
 internal class LocalWebSearchClient(

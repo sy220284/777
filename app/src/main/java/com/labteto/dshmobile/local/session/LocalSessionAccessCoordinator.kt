@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
+
+import com.labteto.dshmobile.local.LocalHarnessState
 
 internal class LocalSessionAccessCoordinator(
     private val summaries: () -> List<LocalSessionSummary>,

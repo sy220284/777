@@ -1,8 +1,9 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
+import com.labteto.dshmobile.local.record
 
 /** Available in environment_info after recent app process exits. */
 internal object LocalProcessExitStatus {

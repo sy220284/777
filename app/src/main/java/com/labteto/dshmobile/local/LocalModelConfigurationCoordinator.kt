@@ -1,12 +1,21 @@
 package com.labteto.dshmobile.local
 
 import android.content.Context
-import com.labteto.dshmobile.local.model.resolveLocalModelApiKeyDraft
+import com.labteto.dshmobile.local.model.LocalApiKeyStore
+import com.labteto.dshmobile.local.model.LocalDeepSeekSearchCredentialResolver
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelConnectionTester
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelMutationGate
+import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelProfileStore
+import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.model.LocalModelStartupMigrator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
+import com.labteto.dshmobile.local.model.modelProfileId
+import com.labteto.dshmobile.local.model.resolveLocalModelApiKeyDraft
+import com.labteto.dshmobile.local.runtime.DEFAULT_BASE_URL
+import com.labteto.dshmobile.local.runtime.DEFAULT_MODEL
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton

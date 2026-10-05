@@ -1,8 +1,22 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.jobs
 
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
-import com.labteto.dshmobile.local.model.LocalModelRunContext
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalSubagentRunner
+import com.labteto.dshmobile.local.agent.requireCompletedOutput
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelProtocol
+import com.labteto.dshmobile.local.model.LocalModelRunContext
+import com.labteto.dshmobile.local.model.routeFingerprint
+import com.labteto.dshmobile.local.runtime.BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS
+import com.labteto.dshmobile.local.runtime.DEFAULT_WEB_FETCH_BYTES
+import com.labteto.dshmobile.local.runtime.MAX_WEB_FETCH_BYTES
+import com.labteto.dshmobile.local.runtime.PERSISTENT_RECOVERY_RETRY_MILLIS
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.settings.LocalAgentRuntimeLimits
+import com.labteto.dshmobile.local.web.LocalWebTools
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

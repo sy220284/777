@@ -1,12 +1,11 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
-
 import java.io.File
 import java.util.LinkedHashMap
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 
 /**

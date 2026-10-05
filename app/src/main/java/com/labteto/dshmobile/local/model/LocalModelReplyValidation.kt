@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalModelReply
 
 /** A terminal response without text or executable calls cannot satisfy a user request. */
 internal fun validateUsableModelReply(reply: LocalModelReply) {

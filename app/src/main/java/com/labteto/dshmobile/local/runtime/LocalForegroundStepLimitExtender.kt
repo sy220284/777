@@ -1,9 +1,8 @@
-package com.labteto.dshmobile.local
-
-import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.harness.agent.AgentStepLimitExtender
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
+import com.labteto.dshmobile.local.LocalHarnessState
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put

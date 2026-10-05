@@ -1,25 +1,35 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
-
+import com.labteto.dshmobile.local.LocalChatReplyCoordinator
+import com.labteto.dshmobile.local.LocalChatTurnCoordinator
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.TokenUsageAction
+import com.labteto.dshmobile.local.boundedGroupChatRequestHistory
+import com.labteto.dshmobile.local.buildTokenUsageContext
+import com.labteto.dshmobile.local.finalizeGroupContextAfterRefresh
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.LocalImageCapabilityRegistry
+import com.labteto.dshmobile.local.model.LocalImageInputMode
+import com.labteto.dshmobile.local.model.LocalImageRequestBudget
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatContinuityState
-import com.labteto.dshmobile.local.chat.ChatDiaryDelta
-import com.labteto.dshmobile.local.chat.ChatDiarySourceMode
-import com.labteto.dshmobile.local.chat.ChatDiaryStore
-import com.labteto.dshmobile.local.chat.ChatDiaryWriteRequest
-import com.labteto.dshmobile.local.chat.ChatPendingTurn
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
-import com.labteto.dshmobile.local.chat.ChatPersonaStore
-import com.labteto.dshmobile.local.chat.ChatSceneState
-import com.labteto.dshmobile.local.chat.chatPostTurnModelMessages
-import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.applySceneTurn
-import com.labteto.dshmobile.local.chat.enqueuePendingDurably
-import com.labteto.dshmobile.local.chat.loadPendingBatch
-import com.labteto.dshmobile.local.chat.withContextForPlanner
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.model.estimateModelTokens
+import com.labteto.dshmobile.local.model.hasLocalImageRefs
+import com.labteto.dshmobile.local.model.imageInputUnsupported
+import com.labteto.dshmobile.local.model.prepareLocalMultimodalMessages
+import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
+import com.labteto.dshmobile.local.model.withChatTurnContext
+import com.labteto.dshmobile.local.model.withTailEphemeralContext
+import com.labteto.dshmobile.local.record
+import com.labteto.dshmobile.local.renderPendingTurnsForPlanner
+import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
+import com.labteto.dshmobile.local.runtime.CHAT_ROLEPLAY_TEMPERATURE
+import com.labteto.dshmobile.local.runtime.GROUP_POST_TURN_PENDING_BATCH
+import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalTranscriptRuntime
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -774,7 +784,7 @@ internal class LocalGroupChatTurnExecutor(
             val sharedPendingForRefresh = currentGroup.context.loadPendingBatch(
                 eventLog, GROUP_POST_TURN_PENDING_BATCH, scope = "group",
                 activeBranchMessageIds = if (hasChatBranchAlternatives(_state.value.chat.chatBranches)) {
-                    com.labteto.dshmobile.local.activeChatBranchMessages(_state.value.chat.chatBranches).mapTo(hashSetOf()) { it.id }
+                    com.labteto.dshmobile.local.chat.activeChatBranchMessages(_state.value.chat.chatBranches).mapTo(hashSetOf()) { it.id }
                 } else null,
             )
             val refreshBatch = refreshGroupMemberStates(

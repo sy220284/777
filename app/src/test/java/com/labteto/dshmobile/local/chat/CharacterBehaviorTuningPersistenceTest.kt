@@ -1,8 +1,5 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalChatMode
-import com.labteto.dshmobile.local.LocalGroupChatMember
-import com.labteto.dshmobile.local.LocalGroupChatState
 import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals

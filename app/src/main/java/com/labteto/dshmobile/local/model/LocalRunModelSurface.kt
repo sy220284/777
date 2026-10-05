@@ -1,6 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.model.resolveLocalModelProtocol
+import com.labteto.dshmobile.local.LocalHarnessState
 
 /**
  * Immutable model-facing facts for one admitted Agent run.

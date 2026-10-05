@@ -1,11 +1,11 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalApprovalPreferences
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalInteractionCoordinator
-import com.labteto.dshmobile.local.LocalSessionEventLog
-import com.labteto.dshmobile.local.LocalSessionEventLogRegistry
+import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
+import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow

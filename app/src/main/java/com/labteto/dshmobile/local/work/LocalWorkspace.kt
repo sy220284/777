@@ -1,5 +1,8 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.tools.LocalSandboxBoundary
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 import java.io.File
 import java.io.FileOutputStream
 import java.io.Reader
@@ -10,9 +13,9 @@ import java.security.MessageDigest
 import java.util.ArrayDeque
 import java.util.LinkedHashMap
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 

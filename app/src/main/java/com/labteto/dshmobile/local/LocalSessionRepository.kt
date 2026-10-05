@@ -2,6 +2,11 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
+import com.labteto.dshmobile.local.chat.LocalChatMode
+import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.session.LocalSessionSummaryIndex
+import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap

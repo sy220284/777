@@ -1,5 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.interaction
 
+import com.labteto.dshmobile.local.LocalHarnessState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow

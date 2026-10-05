@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.tools.boolean
+import com.labteto.dshmobile.local.tools.int
+import com.labteto.dshmobile.local.tools.long
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals

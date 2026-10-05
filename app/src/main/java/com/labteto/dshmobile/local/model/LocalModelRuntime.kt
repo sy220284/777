@@ -1,9 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalHarnessEngine
-import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.LocalModelConfigurationCoordinator
-import com.labteto.dshmobile.local.LocalModelProtocol
 import javax.inject.Inject
 import javax.inject.Singleton
 

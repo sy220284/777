@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.model
 
 import android.content.Context
-import com.labteto.dshmobile.local.LocalImageInputMode
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject

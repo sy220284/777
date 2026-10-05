@@ -1,9 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalModelAuthKind
 import com.labteto.dshmobile.local.LocalModelConfigurationCoordinator
-import com.labteto.dshmobile.local.LocalModelProfile
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow

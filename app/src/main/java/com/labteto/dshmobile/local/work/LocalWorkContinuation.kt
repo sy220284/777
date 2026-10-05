@@ -1,6 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.local.LocalModelException
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put

@@ -4,35 +4,36 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.labteto.dshmobile.local.LocalImportedAttachment
-import com.labteto.dshmobile.local.LocalConversationMode
-import com.labteto.dshmobile.local.LocalChatUserEditResult
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.send.LocalSendResult
+import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.chat.ChatDiaryEntry
+import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
+import com.labteto.dshmobile.local.chat.GroupAnnouncementService
+import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
+import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
+import com.labteto.dshmobile.local.chat.PersonaAutoFillService
+import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
+import com.labteto.dshmobile.local.chat.PersonaInspectionResult
+import com.labteto.dshmobile.local.chat.PersonaInspectionService
+import com.labteto.dshmobile.local.chat.PersonaPreset
+import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
+import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.PersonaTransferDocument
+import com.labteto.dshmobile.local.chat.PersonaTransferFormat
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import com.labteto.dshmobile.local.presentation.projectChatSurfaceState
 import com.labteto.dshmobile.local.presentation.projectShellState
-import com.labteto.dshmobile.local.presentation.projectWorkSurfaceState
 import com.labteto.dshmobile.local.presentation.projectWorkState
-import com.labteto.dshmobile.local.chat.PersonaAutoFillService
-import com.labteto.dshmobile.local.chat.GroupAnnouncementService
-import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.PersonaPreset
-import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
-import com.labteto.dshmobile.local.chat.ChatDiaryEntry
-import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
-import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
-import com.labteto.dshmobile.local.chat.PersonaInspectionResult
-import com.labteto.dshmobile.local.chat.PersonaInspectionService
-import com.labteto.dshmobile.local.chat.PersonaTransferDocument
-import com.labteto.dshmobile.local.chat.PersonaTransferFormat
+import com.labteto.dshmobile.local.presentation.projectWorkSurfaceState
+import com.labteto.dshmobile.local.send.LocalSendResult
+import com.labteto.dshmobile.local.session.LocalConversationMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
     private val runtime: LocalUiRuntime,
@@ -150,8 +151,8 @@ class LocalHarnessViewModel @Inject constructor(
         return runtime.chat.createGroupChatSession(entries)
     }
     fun createSingleChatSession() = runtime.chat.createSingleChatSession()
-    fun openGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.GROUP)
-    fun leaveGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.SINGLE)
+    fun openGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.chat.LocalChatMode.GROUP)
+    fun leaveGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.chat.LocalChatMode.SINGLE)
     fun configureGroupChatMembers(ids: List<String>): Boolean {
         val entriesById = gallery.value.associateBy(PersonaGalleryEntry::id)
         val entries = ids.distinct().mapNotNull(entriesById::get)

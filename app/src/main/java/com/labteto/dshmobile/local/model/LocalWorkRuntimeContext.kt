@@ -1,6 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.model.resolveLocalModelProtocol
+
 
 /**
  * Adds per-turn facts that the remote model cannot reliably infer from its own execution context.

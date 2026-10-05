@@ -1,12 +1,32 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.automation
 
-import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
-import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
-
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalSessionCoordinator
+import com.labteto.dshmobile.local.LocalSubagentRunner
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.agent.LocalSubagentResult
+import com.labteto.dshmobile.local.agent.requireCompletedOutput
 import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.work.LocalWorkState
 import com.labteto.dshmobile.local.chat.LocalChatState
+import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.model.LocalModelRunContext
+import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
+import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
+import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
+import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
+import com.labteto.dshmobile.local.runtime.LocalAutomationWorkException
+import com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+import com.labteto.dshmobile.local.runtime.MAX_EVENT_CHARS
+import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
+import com.labteto.dshmobile.local.session.appendLocalTranscriptRuntimeIndex
+import com.labteto.dshmobile.local.session.encodeTranscriptMessages
+import com.labteto.dshmobile.local.session.localTranscriptIndexForSession
+import com.labteto.dshmobile.local.work.LocalWorkState
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
@@ -14,7 +34,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull

@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.vision.LocalVisionAnalysisCache
+import com.labteto.dshmobile.local.vision.LocalVisionRoute
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

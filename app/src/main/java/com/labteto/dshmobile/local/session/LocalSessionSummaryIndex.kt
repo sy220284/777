@@ -1,5 +1,8 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
 
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.LocalChatMode
+import com.labteto.dshmobile.local.record
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption

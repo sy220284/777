@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.agent
 
 import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
-import com.labteto.dshmobile.local.truncateWithoutSplittingSurrogatePair
+import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive

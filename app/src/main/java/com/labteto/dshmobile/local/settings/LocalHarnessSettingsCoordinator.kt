@@ -1,7 +1,10 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.ChatStyleGuard
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.model.LOCAL_WORKER_PROFILE_ID_PREFERENCE
 import com.labteto.dshmobile.local.profile.UserProfile

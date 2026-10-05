@@ -1,18 +1,17 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalJobInfo
-import com.labteto.dshmobile.local.LocalPersistentJobStore
-import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.LocalSessionEventLog
-import com.labteto.dshmobile.local.LocalWorkRunBinding
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
+import com.labteto.dshmobile.local.jobs.LocalPersistentJobStore
 import com.labteto.dshmobile.local.runtime.LocalRuntimeJobOwner
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest

@@ -154,7 +154,7 @@ class PersonaSchemaMigrationTest {
                             id = "story-1",
                             title = "桥边旧事",
                             history = listOf(
-                                com.labteto.dshmobile.local.LocalHarnessMessage(
+                                com.labteto.dshmobile.local.session.LocalHarnessMessage(
                                     id = "m1",
                                     role = "user",
                                     content = "还记得这里吗？",

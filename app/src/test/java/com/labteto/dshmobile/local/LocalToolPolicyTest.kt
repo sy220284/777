@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.tools.*
+import com.labteto.dshmobile.local.runtime.canAutoApproveSafely
+import com.labteto.dshmobile.local.tools.LocalAutoApprovalScope
+import com.labteto.dshmobile.local.tools.LocalToolCatalog
+import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
