@@ -65,6 +65,42 @@ class LocalSessionStorageRuntime @Inject internal constructor(
         )
     }
 
+    internal fun enqueueCurrentSnapshot(expectedSessionId: String): Boolean {
+        val eventLog = eventLogs.get(expectedSessionId)
+        val controlProjectedThroughSequence = eventLog.latestSequence()
+        val transcriptProjectedThroughSequence =
+            runtimeStateStore.foregroundTranscriptProjectionCursor
+        val state = runtimeStateStore.state.value
+        if (state.sessionId != expectedSessionId) return false
+        coordinator.enqueue(
+            coordinator.snapshot(
+                sessionId = expectedSessionId,
+                state = state,
+                controlProjectedThroughSequence = controlProjectedThroughSequence,
+                transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
+            ),
+        )
+        return true
+    }
+
+    internal suspend fun writeCurrentSnapshotNow(expectedSessionId: String): Boolean {
+        val eventLog = eventLogs.get(expectedSessionId)
+        val controlProjectedThroughSequence = eventLog.latestSequence()
+        val transcriptProjectedThroughSequence =
+            runtimeStateStore.foregroundTranscriptProjectionCursor
+        val state = runtimeStateStore.state.value
+        if (state.sessionId != expectedSessionId) return false
+        coordinator.writeNow(
+            coordinator.snapshot(
+                sessionId = expectedSessionId,
+                state = state,
+                controlProjectedThroughSequence = controlProjectedThroughSequence,
+                transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
+            ),
+        )
+        return true
+    }
+
     private fun publishSummaries() {
         runCatching { coordinator.summaries() }
             .onSuccess { summaries ->
