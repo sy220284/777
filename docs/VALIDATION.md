@@ -93,8 +93,8 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
    - 已完成 Shared 边界禁止反向依赖 Feature；
    - 领域状态单写与 UI projection 边界；
    - Feature Catalog 与 Runtime Plugin 生命周期分离；
-   - 旧 Engine、composition bridge、历史迁移 allowlist 已退出当前合法结构，只作为永久禁止回归目标；
-   - 已迁 Engine 业务根 / 旧包路径 / 已清零跨层边不得通过改名、代理或历史白名单回归。
+   - Feature / Shared Capability / Runtime Kernel 的 Owner、公开边界与依赖方向必须与 `ARCHITECTURE.md` 一致；
+   - FeatureCatalog 路由唯一、UI projection 边界、应用组合根装配、领域状态单写与 Session / Run ownership 必须由当前门禁持续验证。
 
 2. `check-local-performance-invariants.py`
    - transcript / Session Event 历史访问有界；
@@ -199,17 +199,24 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 
 `architecture-3-gates` 分成两类可独立诊断的检查：
 
-- **所有权与依赖门禁**：Feature / Shared Capability / Runtime Kernel 单向依赖、跨 Feature Port、Feature Catalog 唯一路由归属、领域状态单写、UI 不直接消费聚合状态、UI 不新增 Store / Coordinator / Service / Runtime 等实现穿透、已迁旧路径永久禁止回归。
+- **所有权与依赖门禁**：Feature / Shared Capability / Runtime Kernel 单向依赖、跨 Feature Port、FeatureCatalog 唯一路由归属、领域状态单写、应用组合根唯一装配、UI 只消费 presentation / Feature API / projection、Shared 保持中立、Kernel 保持极薄。
 - **执行不变量门禁**：有界历史访问与 streaming、模型历史缓存、Session / Agent run ownership 与迟到提交、进程唯一资源调度器、MODEL_REQUEST 租约、工具执行唯一策略入口、模型 route/profile 冻结、Session 持久化与恢复顺序等运行时行为。
 
-历史迁移债务和 Engine bridge 已完成清零的部分，不再作为当前可用白名单或合法中间状态。当前架构门禁只允许：
-- 当前权威文档明确记录且尚未退出的精确债务；
-- 对应具体消费文件、依赖边、出口条件和删除条件；
-- 新增边默认失败，已经删除的历史边、旧 Engine bridge、旧跨 Feature / UI 穿透不得借用历史迁移白名单重新引入。
+当前架构门禁以真实结构和运行不变量为准：
 
-当前不把 Engine 方法数、构造依赖数、聚合状态字段数、UI projection 字段数或文件行数当作架构完成条件。已迁 Feature 业务根、旧包路径、Runtime→Engine 依赖、Engine 私有业务实现、已清零的 Shared→Feature / Settings→Feature / UI→internal 旧边均按永久禁止回归处理。
+- 每个 Feature 的领域 Owner、状态 writer、配置 writer 和公开 Port 必须唯一；
+- Shared Capability 只承载跨 Feature 的中立能力，并通过稳定契约被消费；
+- Runtime Kernel 只承担进程 start-once、生命周期 scope、bootstrap / recovery 触发与初始化错误投影；
+- Feature / Provider 构造集中在应用组合根，生产装配不得出现同一能力的多个实现；
+- UI 只通过 presentation / Feature API / projection 消费，不能直接穿透领域 Store / Coordinator / Runtime；
+- FeatureCatalog 的 route owner、页面 contribution、Back / Drawer / restore policy 必须唯一；
+- `LocalHarnessState` 只作为 Runtime-owned 兼容聚合 / 只读投影，不作为领域权威写入口；
+- Session ownership、Agent run identity、迟到提交栅栏与 recovery coordination 保持单一共享运行事实源；
+- 当前若存在架构债务，必须精确记录消费文件、依赖边、退出条件和验证方式。
 
-门禁失败应修复真实所有权、依赖方向或运行不变量，禁止通过提高数字预算、改名、等量代理替换或移动文件规避。
+架构完成条件不使用方法数、构造依赖数、聚合状态字段数、UI projection 字段数或文件行数等代码形状指标。
+
+门禁失败必须修复真实所有权、依赖方向、装配关系、状态归属或运行不变量，不能通过提高数字预算、改名、等量代理替换或移动文件规避。
 
 ## 性能门禁
 
@@ -331,7 +338,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - ChatGPT“测试连接”必须走该授权记录自己的套餐 profile，并以真实 Responses 完成作为成功条件；不得只用 /models 可达代替推理连通。
 - 多条授权记录可由用户显式移除；移除一条记录不得误删其他 client_id 的模型档案或凭据。
 - refresh token 被确认失效并清空后，设置页必须读取最新持久化状态并回到“需重新授权”，不得继续用旧快照显示已连接。
-- ChatGPT 套餐连通测试属于账户/模型边界职责，放在独立 tester 中；已退役的 `LocalHarnessEngine` 不得回归，也不得把同类职责重新集中进 `LocalRuntimeKernel`。
+- ChatGPT 套餐连通测试属于账户 / 模型边界职责，放在独立 tester 中；`LocalRuntimeKernel` 只维持生命周期与 bootstrap / recovery 边界，不承载账户、模型发现或连通测试业务。
 - `response.completed`、`response.failed`、`response.incomplete` 与流中断分别处理；收到 `response.completed` 后立即按成功终态结算，不再继续等待连接 EOF，避免终态后的 TCP/HTTP2 收尾抖动触发重复请求。
 - 统一 `withCancellableModelResponse` 只让读取/协议阶段错误决定请求成败；成功结果产生后的 `Response.close()` 清理异常必须降级为 best-effort，不能反转成功并触发重复发送。
 - `response.completed` 前发生可恢复网络中断、超时或临时服务错误时继续使用有限次数退避重试；用户主动取消、参数/权限错误、套餐限制等不可恢复状态不得盲目重放。
