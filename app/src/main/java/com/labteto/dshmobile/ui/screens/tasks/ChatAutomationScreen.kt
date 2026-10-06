@@ -33,6 +33,7 @@ import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.LocalChatAutomationPolicy
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -449,7 +450,8 @@ private fun ChatAutomationVisualStatus.dsStatus(): DsStatus = when (this) {
 private fun chatScheduleDescription(task: AutomationTask): String = when (task.scheduleType) {
     AutomationScheduleType.SILENCE -> stringResource(
         R.string.tasks_chat_schedule_silence,
-        ((task.silenceMinutes ?: 60L) / 60L).coerceAtLeast(1L),
+        ((task.silenceMinutes ?: LocalChatAutomationPolicy.MIN_SILENCE_MINUTES) / 60L)
+            .coerceAtLeast(LocalChatAutomationPolicy.MIN_SILENCE_MINUTES / 60L),
     )
     AutomationScheduleType.WINDOW -> stringResource(
         R.string.tasks_chat_schedule_window,
