@@ -5,13 +5,13 @@ import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecovery
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecoveryPolicy
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
-import com.labteto.dshmobile.local.chat.ChatStreamFilter
 import com.labteto.dshmobile.local.context.LocalRequestContextAssessmentInput
 import com.labteto.dshmobile.local.context.LocalRequestContextPolicy
 import com.labteto.dshmobile.local.context.LocalRequestContextPolicyInput
 import com.labteto.dshmobile.local.context.LocalRequestContextProjection
 import com.labteto.dshmobile.local.context.historySummaryMode
 import com.labteto.dshmobile.local.context.projectLocalRequestContext
+import com.labteto.dshmobile.local.model.LocalStreamPhraseFilter
 import com.labteto.dshmobile.local.model.LocalAgentModelRequestRuntime
 import com.labteto.dshmobile.local.model.LocalModelAdmissionPort
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
@@ -498,7 +498,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     )
                     val streamFilter = streamFilterPhrases
                         .takeIf { it.isNotEmpty() }
-                        ?.let(::ChatStreamFilter)
+                        ?.let(::LocalStreamPhraseFilter)
                     val activePressure = LocalPromptPressureMeter.measure(
                         messages = activeMessages,
                         tools = tools,
