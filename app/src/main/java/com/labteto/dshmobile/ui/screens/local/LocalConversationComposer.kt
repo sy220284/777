@@ -75,6 +75,7 @@ internal fun LocalConversationComposer(
     onPlanModeChange: (Boolean) -> Unit,
     onAutoApprove: () -> Unit,
     onDisableAutoApprove: () -> Unit,
+    onFocusChanged: (Boolean) -> Unit = {},
 ) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
@@ -234,7 +235,10 @@ internal fun LocalConversationComposer(
                 },
                 modifier = Modifier.weight(1f),
                 maxLines = 5,
-                onFocusedChange = { focused = it },
+                onFocusedChange = {
+                    focused = it
+                    onFocusChanged(it)
+                },
             )
             AnimatedVisibility(
                 visible = !expanded,
