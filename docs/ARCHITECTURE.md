@@ -2,11 +2,11 @@
 
 > 本文是 777 当前唯一系统架构权威文档。
 >
-> 架构 3.0 的当前边界是：**模块化单体 + 层级化 Feature 组合 + 共享能力契约 + 极薄进程运行内核**。本文前半部分定义现行架构，后半部分保留迁移阶段记录用于解释演进。
+> 架构 3.0 的当前边界是：**模块化单体 + 层级化 Feature 组合 + 共享能力契约 + 极薄进程运行内核**。本文只描述现行架构、系统不变量和持续约束。
 
 ## 1. 核心结论
 
-777 不再把“拆更多 Coordinator / Runtime”本身视为架构优化。
+架构优化以所有权、依赖方向、状态事实源和执行边界为准，不以拆更多 Coordinator / Runtime 作为目标。
 
 架构 3.0 固定以下所有权模型：
 
@@ -350,9 +350,9 @@ Feature route contribution
 Feature UI
 ```
 
-路由归属和页面状态枚举已切到 `LocalFeatureCatalog`，并由最终架构门禁永久约束。
+路由归属和页面状态枚举由 `LocalFeatureCatalog` 统一提供，架构门禁持续验证唯一归属。
 
-中央 `LocalFeaturePageContent` 的产品页面 `when` 已删除；各 Feature 自己贡献页面渲染、Back ownership、Drawer 入口和恢复策略，Shell 只按 `LocalFeatureCatalog` 与 contribution 契约执行导航。
+各 Feature 自己贡献页面渲染、Back ownership、Drawer 入口和恢复策略，Shell 只按 `LocalFeatureCatalog` 与 contribution 契约执行导航。
 
 ## 10. Product Feature 与 Runtime Plugin 的区别
 
@@ -494,7 +494,7 @@ Kernel 不承担具体产品 Feature、Model Provider、Tool 领域、Settings �
 
 ## 14. 当前必须保留的系统不变量
 
-架构迁移不得破坏已经验证的核心行为：
+当前实现必须持续保持以下核心行为：
 
 - `LocalSessionRuntimeRegistry` 的 Session owner 单一所有权；
 - Automation `scheduleGeneration` 的提交权；
@@ -521,32 +521,27 @@ Feature Catalog 与路由门禁现包括：
 - 导航必须通过 Catalog 解析；
 - Shell 页面状态枚举必须来自 Catalog。
 
-包名与领域契约收口已增加：
+架构门禁持续验证以下当前边界：
 
 - Local 生产源码的 Kotlin package 必须与物理目录一致；
 - Local 架构敏感源码禁止 wildcard import；
 - 根层 `LocalHarnessModels.kt` 仅声明 `LocalHarnessState` 与跨 Feature 的 `LocalUsageMode`；
-- Work 的计划、目标和任务清单归属 Work；审批/问答与后台任务类型分别归属共享 Interaction / Jobs 契约，避免 Runtime 反向依赖 Work internal；
-- 模型响应、会话/消息、附件、工具文件、Automation 结果与资源状态归位到对应契约目录，既有序列化字段与枚举值保持兼容。
-
-包名、领域契约与运行状态边界当前均按架构 3.0 最终门禁维护：
-
-- Feature 禁止互相导入 internal package；
-- UI 禁止引用领域 Store / Coordinator 等内部实现，只通过 presentation / Feature API / projection 消费；
-- Chat / Work 不持有完整 `LocalHarnessState` 可写聚合状态；领域事实由所属 Feature / Shared Capability 单一拥有，聚合适配仅存在于应用组合根 / Runtime-owned 兼容投影边界；
-- Session ownership、Agent run identity、迟到提交栅栏与 recovery coordination 归共享 Runtime 所有，Feature 不建立第二套 run owner；
-- 全局审批配置以 `LocalApprovalPreferences` 为共享权威事实，Work 通过流式投影消费，不再从 Session 快照复制第二事实源；
+- Work 的计划、目标和任务清单归 WorkFeature；审批/问答与后台任务类型分别归共享 Interaction / Jobs 契约；
+- 模型响应、会话/消息、附件、工具文件、Automation 结果与资源状态位于对应契约目录，序列化字段与枚举值保持兼容；
+- Feature 不互相导入 internal package；
+- UI 不引用领域 Store / Coordinator 等内部实现，只通过 presentation / Feature API / projection 消费；
+- Chat / Work 不持有完整 `LocalHarnessState` 可写聚合状态；领域事实由所属 Feature / Shared Capability 单一拥有，聚合适配只存在于应用组合根 / Runtime-owned 兼容投影边界；
+- Session ownership、Agent run identity、迟到提交栅栏与 recovery coordination 归共享 Runtime 单一持有；
+- 全局审批配置由 `LocalApprovalPreferences` 单一持有，Work 通过流式投影消费；
 - Chat / Work / Automation / Tools / Settings 的领域状态、规则和公开 API 均由所属 Feature 单一拥有；
 - Session / Model / Agent / Tool / Memory / Resource / Usage / Event / Persistence 等共享能力保持中立单一事实源；
-- 应用组合根负责 Feature / Provider 构造装配，`LocalRuntimeKernel` 不承载产品组合；
+- 应用组合根负责 Feature / Provider 构造装配，`LocalRuntimeKernel` 只承担进程生命周期边界；
 - `LocalHarnessState` 只保留 Runtime-owned 兼容聚合与只读投影用途，领域写入通过所属 Owner 完成；
 - CI 以所有权、依赖方向、唯一事实源、生产装配、运行不变量和投影边界作为架构放行条件。
 
-## 16. 验证与完成标准
+## 16. 验证与持续完成标准
 
-架构阶段完成不以“文件移动完成”为准。
-
-每一阶段必须完成：
+任何架构变更都必须完成以下闭环：
 
 ```text
 实现
@@ -557,7 +552,7 @@ Feature Catalog 与路由门禁现包括：
 → 最新 main + 当前 PR head 完整 CI
 ```
 
-整个架构 3.0 只有在以下条件同时成立时才完成：
+架构 3.0 长期成立必须同时满足：
 
 - 每个 Feature 拥有自己的领域状态、规则、写入与公开 API；
 - Feature 之间只通过稳定能力契约 / Port 协作；

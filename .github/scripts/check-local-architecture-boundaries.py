@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Validate Architecture 3.0 structural boundaries and one-way migration exits.
+"""Validate the current Architecture 3.0 ownership and runtime boundaries.
 
-This guard intentionally checks ownership, dependency direction, writable-state boundaries,
-composition roots, and retired paths. It does not freeze implementation spelling, method-body
+This guard checks ownership, dependency direction, writable-state boundaries, composition roots,
+and current execution contracts directly. It does not freeze implementation spelling, method-body
 shape, constructor size, file size, or business behavior; those belong to tests and execution
 invariant guards.
 """
@@ -16,8 +16,6 @@ APP_SOURCE_ROOT = ROOT / "app/src/main/java/com/labteto/dshmobile"
 LOCAL_SOURCE_ROOT = APP_SOURCE_ROOT / "local"
 UI_SOURCE_ROOT = APP_SOURCE_ROOT / "ui"
 
-RETIRED_ENGINE_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
-RETIRED_ENGINE_SUPPORT_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngineSupport.kt"
 RUNTIME_KERNEL_PATH = "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernel.kt"
 APPLICATION_PATH = "app/src/main/java/com/labteto/dshmobile/DshApplication.kt"
 COMPOSITION_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt"
@@ -37,8 +35,8 @@ FEATURE_FORBIDDEN_IMPORT_PREFIXES = {
     ),
 }
 
-# These Shared packages have completed the reverse-dependency cleanup. Keep them Feature-agnostic.
-FROZEN_SHARED_PACKAGES = (
+# Shared Capability packages stay Feature-agnostic under the current ownership graph.
+SHARED_CAPABILITY_PACKAGES = (
     "agent",
     "attachment",
     "context",
@@ -78,8 +76,8 @@ AUTOMATION_ALLOWED_CROSS_FEATURE_API_SYMBOLS = {
 }
 
 
-# Stage 5 is closed. UI may consume DTOs and presentation facades/projections, but direct Feature
-# implementation objects or top-level Feature behavior/values are final architecture violations.
+# UI may consume DTOs and presentation facades/projections; Feature implementation objects and
+# top-level Feature behavior/values stay behind the Feature UI/API boundary.
 UI_ALLOWED_PRESENTATION_IMPORT_PREFIXES = (
     "com.labteto.dshmobile.local.presentation.",
 )
@@ -98,8 +96,8 @@ UI_INTERNAL_IMPLEMENTATION_SUFFIXES = (
 )
 
 
-# Closed Shared slices must remain independent from product Feature internals.
-FROZEN_SHARED_FILES = (
+# These Shared boundary files must remain independent from product Feature internals.
+SHARED_BOUNDARY_FILES = (
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalCurrentSessionSnapshotProvider.kt",
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionControlProjection.kt",
     "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
@@ -118,29 +116,25 @@ NARROW_PORT_PATHS = (
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalDiagnosticsPort.kt",
 )
 
-LEGACY_MOVED_IMPORTS = {
-    "com.labteto.dshmobile.local.runtime.structuredWorkState":
-        "com.labteto.dshmobile.local.work.structuredWorkState",
-    "com.labteto.dshmobile.local.runtime.LocalWorkCueKind":
-        "com.labteto.dshmobile.local.work.LocalWorkCueKind",
-    "com.labteto.dshmobile.local.runtime.extractLocalWorkCueSnippet":
-        "com.labteto.dshmobile.local.work.extractLocalWorkCueSnippet",
-    "com.labteto.dshmobile.local.LocalChatContextRefreshCoordinator":
-        "com.labteto.dshmobile.local.chat.LocalChatContextRefreshCoordinator",
-    "com.labteto.dshmobile.local.settings.LocalAgentRuntimeLimits":
-        "com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits",
-    "com.labteto.dshmobile.local.chat.ChatStreamFilter":
-        "com.labteto.dshmobile.local.model.LocalStreamPhraseFilter",
+CURRENT_OWNER_SYMBOLS = {
+    "LocalAgentRuntimeLimits": "app/src/main/java/com/labteto/dshmobile/local/agent/",
+    "structuredWorkState": "app/src/main/java/com/labteto/dshmobile/local/work/",
+    "LocalWorkCueKind": "app/src/main/java/com/labteto/dshmobile/local/work/",
+    "extractLocalWorkCueSnippet": "app/src/main/java/com/labteto/dshmobile/local/work/",
+    "LocalChatContextRefreshCoordinator": "app/src/main/java/com/labteto/dshmobile/local/chat/",
+    "LocalStreamPhraseFilter": "app/src/main/java/com/labteto/dshmobile/local/model/",
+    "LocalSubagentRunner": "app/src/main/java/com/labteto/dshmobile/local/work/",
+    "LocalSubagentRunnerFactory": "app/src/main/java/com/labteto/dshmobile/local/work/",
+    "LocalPersistentJobRecoveryCoordinator": "app/src/main/java/com/labteto/dshmobile/local/work/",
+    "LocalWorkTurnPromptContext": "app/src/main/java/com/labteto/dshmobile/local/work/",
+    "LocalChatTurnCoordinator": "app/src/main/java/com/labteto/dshmobile/local/chat/",
+    "LocalChatReplyCoordinator": "app/src/main/java/com/labteto/dshmobile/local/chat/",
+    "boundedChatRequestHistory": "app/src/main/java/com/labteto/dshmobile/local/chat/",
+    "editedChatUserModelMessage": "app/src/main/java/com/labteto/dshmobile/local/chat/",
+    "LocalSessionCoordinator": "app/src/main/java/com/labteto/dshmobile/local/session/",
+    "LocalSessionRepository": "app/src/main/java/com/labteto/dshmobile/local/session/",
 }
 
-RETIRED_SETTINGS_RUNTIME_PATHS = (
-    "app/src/main/java/com/labteto/dshmobile/local/settings/LocalAgentRuntimeLimits.kt",
-)
-
-RETIRED_SHARED_WORK_SEMANTIC_PATHS = (
-    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalStructuredWorkStateProjection.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalWorkStateCueExtractor.kt",
-)
 
 
 def die(message: str) -> None:
@@ -195,6 +189,15 @@ def references_type(source: str, type_name: str) -> bool:
     return re.search(rf"\b{re.escape(type_name)}\b", strip_comments(source)) is not None
 
 
+def declares_symbol(source: str, symbol: str) -> bool:
+    return re.search(
+        rf"^\s*(?:(?:public|internal|private|protected|data|enum|sealed|annotation|value|open|abstract)\s+)*"
+        rf"(?:class|interface|object|typealias|fun|val|const\s+val)\s+{re.escape(symbol)}\b",
+        strip_comments(source),
+        re.MULTILINE,
+    ) is not None
+
+
 # ---- Authority -------------------------------------------------------------
 
 architecture_doc = read("docs/ARCHITECTURE.md")
@@ -208,12 +211,6 @@ for contract in (
     if contract not in architecture_doc:
         die("docs/ARCHITECTURE.md lost Architecture 3.0 authority: " + contract)
 
-for retired_claim in (
-    "LocalHarnessEngine\n  cross-capability turn/session orchestration",
-    "`LocalHarnessEngine` owns consistency across a local turn/session",
-):
-    if retired_claim in architecture_doc:
-        die("architecture authority regressed to retired Engine-centered ownership: " + retired_claim)
 
 
 # ---- Physical Kotlin boundaries -------------------------------------------
@@ -229,61 +226,23 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
     if re.search(r"^import\s+[^\n]+\.\*\s*$", source, re.MULTILINE):
         die(f"architecture-sensitive source must use explicit imports: {path.relative_to(ROOT)}")
 
-# Removed package paths are permanent exits.
-for kotlin_root in (
-    ROOT / "app/src/main",
-    ROOT / "app/src/test",
-    ROOT / "app/src/androidTest",
-):
-    if not kotlin_root.exists():
-        continue
-    for path, source in kotlin_sources_under(kotlin_root):
-        for legacy_import, replacement in LEGACY_MOVED_IMPORTS.items():
-            if re.search(rf"^import\s+{re.escape(legacy_import)}\s*$", source, re.MULTILINE):
-                die(
-                    f"{path.relative_to(ROOT)} imports retired path {legacy_import}; "
-                    f"use {replacement}"
-                )
-
-for retired in RETIRED_SETTINGS_RUNTIME_PATHS:
-    if (ROOT / retired).exists():
-        die("shared Agent runtime limit contract returned to SettingsFeature: " + retired)
-
-for retired in RETIRED_SHARED_WORK_SEMANTIC_PATHS:
-    if (ROOT / retired).exists():
-        die("Work semantic interpretation returned to Shared Runtime: " + retired)
-
-
-for retired in (
-    "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRunnerFactory.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/jobs/LocalPersistentJobRecoveryCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/context/LocalWorkTurnPromptContext.kt",
-):
-    if (ROOT / retired).exists():
-        die("Work-owned execution/recovery implementation returned to a legacy Shared/root path: " + retired)
-
-
-for retired in (
-    "app/src/main/java/com/labteto/dshmobile/local/LocalChatTurnCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/LocalChatReplyCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/LocalChatHistoryWindow.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/LocalChatEditSupport.kt",
-):
-    if (ROOT / retired).exists():
-        die("retired Chat business owner returned outside ChatFeature: " + retired)
-
-for retired in (
-    "app/src/main/java/com/labteto/dshmobile/local/LocalSessionCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionPersistenceProjection.kt",
-):
-    if (ROOT / retired).exists():
-        die("retired Session boundary returned outside neutral Shared Session ownership: " + retired)
-
-# Retired shared implementations must stay deleted after their Feature owner takes over.
-if (ROOT / "app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt").exists():
-    die("legacy shared Memory coordinator returned; use Chat/Work owned memory runtimes")
+# Current domain symbols must have one declaration under their architectural owner.
+production_sources = list(kotlin_sources_under(APP_SOURCE_ROOT))
+for symbol, owner_prefix in CURRENT_OWNER_SYMBOLS.items():
+    declarations = [
+        path.relative_to(ROOT).as_posix()
+        for path, source in production_sources
+        if declares_symbol(source, symbol)
+    ]
+    if len(declarations) != 1:
+        die(
+            f"{symbol} must have exactly one production declaration under {owner_prefix}; "
+            f"found {declarations}"
+        )
+    if not declarations[0].startswith(owner_prefix):
+        die(
+            f"{symbol} belongs to {owner_prefix}, found declaration at {declarations[0]}"
+        )
 
 foreground_loader = strip_comments(read(
     "app/src/main/java/com/labteto/dshmobile/local/LocalForegroundSessionLoader.kt"
@@ -296,7 +255,9 @@ for forbidden in (
     "projectGroupGalleryState(",
 ):
     if forbidden in foreground_loader:
-        die("foreground composition reclaimed Chat domain restore semantics: " + forbidden)
+        die("foreground composition contains Chat domain restore semantics: " + forbidden)
+
+
 
 # App shell lifecycle hooks must enter local product behavior through presentation boundaries.
 main_activity_imports = imports(read("app/src/main/java/com/labteto/dshmobile/MainActivity.kt"))
@@ -305,7 +266,6 @@ if "com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator" in main_ac
         "MainActivity bypasses presentation ownership for ChatGPT refresh; "
         "use the presentation account workflow so remote catalog refresh and local profile reconciliation stay atomic"
     )
-
 
 # ---- Dependency direction --------------------------------------------------
 
@@ -319,7 +279,7 @@ for feature_name, forbidden_prefixes in FEATURE_FORBIDDEN_IMPORT_PREFIXES.items(
                     "use provider-owned API/Port or a Shared Capability"
                 )
 
-for package_name in FROZEN_SHARED_PACKAGES:
+for package_name in SHARED_CAPABILITY_PACKAGES:
     for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / package_name):
         source_imports = imports(source)
         for prefix in FEATURE_INTERNAL_IMPORT_PREFIXES:
@@ -328,8 +288,6 @@ for package_name in FROZEN_SHARED_PACKAGES:
                     f"{path.relative_to(ROOT)} makes Shared Capability depend on Feature internal {prefix}; "
                     "invert the dependency through a neutral Shared contract"
                 )
-        if references_type(source, "LocalHarnessEngine"):
-            die(f"{path.relative_to(ROOT)} makes Shared Capability depend on legacy LocalHarnessEngine")
         relative = path.relative_to(ROOT).as_posix()
         aggregate_state_owner_paths = {
             "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt",
@@ -341,15 +299,15 @@ for package_name in FROZEN_SHARED_PACKAGES:
                 "pass a neutral Shared DTO/Port instead"
             )
 
-for relative in FROZEN_SHARED_FILES:
+for relative in SHARED_BOUNDARY_FILES:
     source_imports = imports(read(relative))
     for prefix in FEATURE_INTERNAL_IMPORT_PREFIXES:
         if any(item.startswith(prefix) for item in source_imports):
             die(
-                f"{relative} is a closed Shared boundary but imports Feature internal {prefix}"
+                f"{relative} is a Shared Capability boundary but imports Feature internal {prefix}"
             )
 
-# Shared Session/Memory are final one-way boundaries; reverse Feature imports fail directly.
+# Shared Session/Memory remain one-way boundaries; reverse Feature dependencies fail directly.
 def format_edges(edges: set[tuple[str, str]]) -> str:
     return ", ".join(f"{path} -> {imported}" for path, imported in sorted(edges))
 
@@ -399,7 +357,7 @@ if automation_internal_edges:
         + "; consume provider-owned execution Ports instead"
     )
 
-# Settings is a product Feature; cross-Feature internals are forbidden in the final graph.
+# Settings is a product Feature; cross-Feature internals are forbidden in the current graph.
 settings_internal_edges: set[tuple[str, str]] = set()
 for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "settings"):
     relative = path.relative_to(ROOT).as_posix()
@@ -483,19 +441,7 @@ for work_semantic in ("LocalWorkCheckpoint", "<work-checkpoint>", "最近持久�
         die("Shared Agent recovery interprets WorkFeature semantics: " + work_semantic)
 
 
-# ---- Final Runtime Kernel and retired Engine ------------------------------
-
-if (ROOT / RETIRED_ENGINE_PATH).exists():
-    die("retired LocalHarnessEngine source returned; Architecture 3.0 uses LocalRuntimeKernel")
-if (ROOT / RETIRED_ENGINE_SUPPORT_PATH).exists():
-    die("retired LocalHarnessEngineSupport source returned; helpers must live with their real owner")
-
-for path, source in kotlin_sources_under(APP_SOURCE_ROOT):
-    if references_type(source, "LocalHarnessEngine"):
-        die(
-            f"{path.relative_to(ROOT)} reintroduced retired LocalHarnessEngine; "
-            "use a Feature/Shared owner or LocalRuntimeKernel lifecycle API"
-        )
+# ---- Runtime Kernel current contract ----------------------------------------
 
 runtime_kernel = strip_comments(read(RUNTIME_KERNEL_PATH))
 for required in (
@@ -516,7 +462,7 @@ for forbidden in (
     "LocalFeaturePage",
 ):
     if forbidden in runtime_kernel:
-        die("LocalRuntimeKernel regained product/Feature semantics: " + forbidden)
+        die("LocalRuntimeKernel contains product/Feature semantics: " + forbidden)
 
 bootstrap_composition = strip_comments(read(
     "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt"
@@ -630,7 +576,7 @@ for aggregate_container, relative, class_name in domain_sources:
     flattened = aggregate_fields & data_class_fields(read(relative), class_name)
     if flattened:
         die(
-            f"LocalHarnessState re-flattened {class_name} field(s): "
+            f"LocalHarnessState duplicates {class_name} field(s): "
             + ", ".join(sorted(flattened))
         )
 
@@ -648,7 +594,7 @@ for chat_owned_setting in (
     "recordStyleGuardHits(",
 ):
     if chat_owned_setting in settings_coordinator:
-        die("SettingsFeature reclaimed Chat-owned style guard semantics: " + chat_owned_setting)
+        die("SettingsFeature contains Chat-owned style guard semantics: " + chat_owned_setting)
 
 for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
     relative = path.relative_to(ROOT).as_posix()
@@ -692,8 +638,6 @@ for relative in NARROW_PORT_PATHS:
         source,
     ) is None:
         die(relative + " must remain a narrow interface contract: " + expected_name)
-    if references_type(source, "LocalHarnessEngine"):
-        die(relative + " exposes the legacy Engine through a 3.0 Port")
     if "MutableStateFlow<LocalHarnessState>" in source:
         die(relative + " exposes writable aggregate state through a 3.0 Port")
 
@@ -712,7 +656,7 @@ for relative in NARROW_PORT_PATHS:
 
 
 
-# Stage-3 Chat/Work Execution Ports must remain complete lifecycle contracts.
+# Chat/Work Execution Ports must expose the complete current lifecycle contract.
 for relative, request_type, result_type in (
     (
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionPort.kt",
@@ -741,7 +685,7 @@ for relative, request_type, result_type in (
         "cancelAndJoin(",
     ):
         if required not in contract:
-            die(relative + " lost stage-3 execution lifecycle capability: " + required)
+            die(relative + " lost required execution lifecycle capability: " + required)
 
 feature_execution_composition = strip_comments(read(COMPOSITION_PATH))
 for adapter in (
@@ -892,4 +836,4 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
             "platform provider construction belongs to the plugin composition root"
         )
 
-print("[architecture-3] OK: ownership, dependency direction, state boundaries, and migration exits hold")
+print("[architecture-3] OK: current ownership, dependency direction, state boundaries, and runtime contracts hold")
