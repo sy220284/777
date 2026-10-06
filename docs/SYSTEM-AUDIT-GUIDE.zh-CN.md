@@ -142,7 +142,7 @@ Chat / Work / Automation / Subagent / Group Chat
 - Observability；
 - Security Policy。
 
-纵向沿完整链路检查。链路按真实 Owner 展开，禁止套用旧的固定“UI → Coordinator → Runtime → Store”层级模板：
+纵向沿完整链路检查。链路必须按当前真实 Owner、公开 Port、生产装配和事实源展开：
 
 ```text
 用户操作 / 自动触发
@@ -335,7 +335,7 @@ Runtime Kernel 只按架构 3.0 承担 start-once、生命周期 scope、bootstr
 - 单向依赖；
 - 每项业务事实只有一个权威 Owner；
 - 每项能力有明确且唯一的公开进入边界；
-- Registry / Coordinator / Policy / Store 按所属 Feature 或 Shared Capability 分域归属，不建立跨域“全局总管”；
+- Registry / Coordinator / Policy / Store 按所属 Feature 或 Shared Capability 分域归属，跨域协作通过稳定契约组合；
 - Shared Capability 只承载真正中立、可跨 Feature 复用的能力；
 - Runtime Kernel 不承载 Feature 领域业务；
 - 可热插拔；
@@ -453,7 +453,7 @@ UI 文案
    - 同类入口是否通过同一公开 API / Port / Coordinator；
    - UI 是否直接导入领域 Store / Service / Repository / Gateway；
    - Feature 是否导入 sibling Feature internal；
-   - 是否绕过统一 Registry / Policy / Gateway；
+   - 是否绕过该能力所属 Owner 的 Registry / Policy / Gateway；
    - Gradle/module 依赖方向是否与架构一致；
    - DI provider / binding / composition root 是否只装配一个权威实现；
    - Feature catalog、页面 contribution、导航、Back / Drawer / restore 是否全部注册；
@@ -731,7 +731,7 @@ UI 文案
 
 检查：
 
-- Tool / MCP 是否经过统一 Registry、Approval、Resource 和 Security Policy；
+- Tool / MCP 是否经过 Tool Capability 所属 Registry、Approval、Resource 和 Security Policy；
 - 只读 / 计划作用域是否真的不能执行状态修改工具；
 - 网络工具是否按真实方法和参数判断副作用；
 - 外部进程、MCP stdio、LSP 的启动 / 停止 / 超时 / 取消是否闭环；
