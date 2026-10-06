@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,11 +26,11 @@ class LocalWorkProgressCoordinatorTest {
 
     @Test
     fun backgroundProgressStaysInCapturedSessionAndPersistsAfterItsEvent() {
-        val visible = MutableStateFlow(LocalHarnessState(sessionId = "visible"))
-        val run = MutableStateFlow(LocalHarnessState(sessionId = "background"))
+        val visible = MutableStateFlow(LocalWorkRunState(sessionId = "visible"))
+        val run = MutableStateFlow(LocalWorkRunState(sessionId = "background"))
         val log = eventLog(File(temporary.root, "background.jsonl"))
         var writes = 0
-        val coordinator = LocalWorkProgressCoordinator(localAggregateWorkStatePort(run), log) {
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(run), log) {
             assertEquals("background", run.value.sessionId)
             assertEquals("goal/state", log.snapshot().last().type)
             writes++
@@ -50,9 +49,9 @@ class LocalWorkProgressCoordinatorTest {
 
     @Test
     fun oversizedPlanAndTodosRetainExistingBoundsAndWholeListReplacement() {
-        val state = MutableStateFlow(LocalHarnessState())
+        val state = MutableStateFlow(LocalWorkRunState(sessionId = "test"))
         val log = eventLog(File(temporary.root, "progress.jsonl"))
-        val coordinator = LocalWorkProgressCoordinator(localAggregateWorkStatePort(state), log) {}
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) {}
         coordinator.updatePlan(buildJsonObject {
             put("items", JsonArray(List(1000) { JsonPrimitive("步骤 $it") }))
         })
@@ -77,10 +76,10 @@ class LocalWorkProgressCoordinatorTest {
 
     @Test
     fun invalidOrMissingGoalDoesNotWriteAnEventOrPersist() {
-        val state = MutableStateFlow(LocalHarnessState())
+        val state = MutableStateFlow(LocalWorkRunState(sessionId = "test"))
         val log = eventLog(File(temporary.root, "goal.jsonl"))
         var writes = 0
-        val coordinator = LocalWorkProgressCoordinator(localAggregateWorkStatePort(state), log) { writes++ }
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { writes++ }
         assertTrue(runCatching { coordinator.updateGoal("active", null) }.isFailure)
         assertTrue(runCatching { coordinator.updateGoal("invalid", null) }.isFailure)
         assertNull(state.value.work.goal)
@@ -98,7 +97,8 @@ class LocalWorkProgressCoordinatorTest {
     @Test
     fun goalCompletionRequiresRuntimeTodosToBeClosed() {
         val state = MutableStateFlow(
-            LocalHarnessState(
+            LocalWorkRunState(
+                sessionId = "goal-transition",
                 work = LocalWorkState(
                     goal = LocalGoal("收口共享底座"),
                     todos = listOf(
@@ -110,7 +110,7 @@ class LocalWorkProgressCoordinatorTest {
         )
         val log = eventLog(File(temporary.root, "goal-transition.jsonl"))
         var writes = 0
-        val coordinator = LocalWorkProgressCoordinator(localAggregateWorkStatePort(state), log) { writes++ }
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { writes++ }
 
         val rejected = runCatching { coordinator.updateGoal("completed", null) }
 
@@ -133,18 +133,21 @@ class LocalWorkProgressCoordinatorTest {
 
     @Test
     fun eventWriteFailureLeavesAllWorkProgressAndPersistenceUnchanged() {
-        val initial = LocalHarnessState(work = LocalWorkState(
-            plan = listOf("原计划"),
-            todos = listOf(LocalTodoItem("原任务", "completed")),
-            goal = LocalGoal("原目标"),
-        ))
+        val initial = LocalWorkRunState(
+            sessionId = "failure",
+            work = LocalWorkState(
+                plan = listOf("原计划"),
+                todos = listOf(LocalTodoItem("原任务", "completed")),
+                goal = LocalGoal("原目标"),
+            ),
+        )
         val state = MutableStateFlow(initial)
         val parent = temporary.newFolder("not-a-directory")
         val log = eventLog(File(parent, "goal.jsonl"))
         assertTrue(parent.delete())
         assertTrue(parent.createNewFile())
         var persisted = false
-        val coordinator = LocalWorkProgressCoordinator(localAggregateWorkStatePort(state), log) { persisted = true }
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { persisted = true }
         val mutations = listOf<() -> Unit>(
             { coordinator.updatePlan(buildJsonObject { put("plan", "新计划") }) },
             { coordinator.updateTodos(buildJsonObject {}) },

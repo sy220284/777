@@ -162,11 +162,12 @@ internal class LocalWorkRunBinding(
             transcriptWindow = current.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
             transcriptIndex = current.transcriptIndex,
             plan = current.work.plan,
-            todos = current.work.todos,
-            goal = current.work.goal,
             planMode = current.work.planMode,
             controlProjectedThroughSequence = eventLog.latestSequence(),
             transcriptProjectedThroughSequence = runHandle.transcriptProjectionCursor,
+        ).withWorkSessionDomain(
+            todos = current.work.todos,
+            goal = current.work.goal,
         )
     }
 

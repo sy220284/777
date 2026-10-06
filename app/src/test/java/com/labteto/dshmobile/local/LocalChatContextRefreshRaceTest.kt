@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.LocalChatTurnCoordinator
+
 import com.labteto.dshmobile.local.chat.CharacterLoreEngine
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatDiaryStore
@@ -70,7 +72,7 @@ class LocalChatContextRefreshRaceTest {
         val observedProfiles = mutableListOf<String>()
         val coordinator = LocalChatContextRefreshCoordinator(
             readState = { state.value },
-            chatState = LocalChatStatePort(state),
+            chatState = localAggregateChatStatePort(state),
             chatTurnCoordinator = turns,
             diaryStore = ChatDiaryStore(File(temporary.root, "diary"), json),
             requestPlanner = { _, _, _, selectedProfile ->

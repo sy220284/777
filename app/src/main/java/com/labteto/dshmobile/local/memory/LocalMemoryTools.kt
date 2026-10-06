@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.memory
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.record
 import com.labteto.dshmobile.local.session.LocalConversationMode
@@ -12,15 +11,22 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
+internal data class LocalMemoryToolContext(
+    val usageMode: LocalUsageMode,
+    val conversationMode: LocalConversationMode,
+    val projectId: String?,
+    val lineageId: String,
+)
+
 internal class LocalMemoryTools(
     private val store: MemoryStore,
     private val manager: MemoryManager,
-    private val state: () -> LocalHarnessState,
+    private val context: () -> LocalMemoryToolContext,
     private val sessionId: () -> String,
 ) {
     fun execute(name: String, args: JsonObject, allowMutation: Boolean): String { return when (name) {
             "memory_search" -> {
-                val state = state()
+                val state = context()
                 val records = store.search(
                     query = args.string("query"),
                     allowedScopes = allowedMemoryScopes(state.conversationMode),
@@ -39,7 +45,7 @@ internal class LocalMemoryTools(
                 }
             }
             "memory_list" -> {
-                val state = state()
+                val state = context()
                 val records = store.listActive(
                     allowedScopes = allowedMemoryScopes(state.conversationMode),
                     projectId = state.projectId,
@@ -56,7 +62,7 @@ internal class LocalMemoryTools(
             }
             "memory_remember" -> {
                 if (!allowMutation) return "该子任务无权写入长期记忆"
-                val state = state()
+                val state = context()
                 val scope = when (args.string("scope").lowercase()) {
                     "global" -> MemoryScope.GLOBAL
                     "project" -> MemoryScope.PROJECT
@@ -137,7 +143,7 @@ internal class LocalMemoryTools(
         }
     }
     private fun visibleRecord(rawId: String): MemoryRecord? {
-        val current = state()
+        val current = context()
         val visible = store.listActive(
             allowedScopes = allowedMemoryScopes(current.conversationMode),
             projectId = current.projectId,

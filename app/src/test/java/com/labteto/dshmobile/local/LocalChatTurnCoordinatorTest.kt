@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.LocalChatTurnCoordinator
+import com.labteto.dshmobile.local.chat.recentReplySuggestionDialogue
+import com.labteto.dshmobile.local.chat.recentRoleReplies
+
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import org.junit.Assert.assertEquals

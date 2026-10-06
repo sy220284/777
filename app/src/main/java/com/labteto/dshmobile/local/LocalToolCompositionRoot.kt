@@ -13,6 +13,7 @@ import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import com.labteto.dshmobile.local.tools.LocalToolsManagementPort
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.local.usage.LocalTokenUsageContextBridge
+import com.labteto.dshmobile.local.usage.LocalTokenUsageSessionFacts
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
@@ -74,10 +75,15 @@ internal class LocalToolCompositionRoot @Inject constructor(
         workspace = workspace,
     )
     private val usageBridge = LocalTokenUsageContextBridge(
-        runtimeStateStore.state,
-        workRunRegistry::state,
-        sessionStorage.eventLogs::get,
-        runtimeStateStore::currentSessionId,
+        sessionFacts = { sessionId ->
+            val summary = sessionStorage.coordinator.summaries().firstOrNull { it.id == sessionId }
+            LocalTokenUsageSessionFacts(
+                mode = summary?.usageMode,
+                title = summary?.title,
+            )
+        },
+        eventLogFor = sessionStorage.eventLogs::get,
+        currentSessionId = runtimeStateStore::currentSessionId,
     )
 
     internal val plugins: LocalPluginComposition by lazy {

@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
+
+import com.labteto.dshmobile.local.LocalHarnessState
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
@@ -92,8 +94,8 @@ class LocalChatTurnCoordinator @Inject constructor(
         persona = persona,
         reply = reply,
         recordUsage = recordUsage,
-        guardEnabled = snapshot.chatStyleGuardEnabled,
-        additionalBannedPhrases = snapshot.chatStyleGuardCustomPhrases,
+        guardEnabled = snapshot.chat.chatStyleGuardEnabled,
+        additionalBannedPhrases = snapshot.chat.chatStyleGuardCustomPhrases,
         recentAssistantReplies = recentRoleReplies(
             messages = snapshot.messages,
             groupEnabled = snapshot.chat.groupChat.enabled,

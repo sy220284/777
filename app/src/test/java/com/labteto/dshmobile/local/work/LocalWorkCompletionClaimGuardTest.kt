@@ -6,7 +6,6 @@ import com.labteto.dshmobile.local.model.LocalCanonicalContent
 import com.labteto.dshmobile.local.model.LocalCanonicalMessage
 import com.labteto.dshmobile.local.model.LocalCanonicalRole
 import com.labteto.dshmobile.local.model.LocalModelReply
-import com.labteto.dshmobile.local.quality.LocalOutputQualityContext
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.serialization.json.Json
@@ -34,7 +33,7 @@ class LocalWorkCompletionClaimGuardTest {
         )
         val result = LocalWorkCompletionClaimGuard.inspect(
             "全部完成，可以交付。",
-            LocalOutputQualityContext(usageMode = LocalUsageMode.WORK, state = state),
+            state.work,
         )
         assertTrue(result.changed)
         assertTrue(result.text.startsWith("当前尚未完成："))
@@ -55,7 +54,7 @@ class LocalWorkCompletionClaimGuardTest {
         )
         val result = LocalWorkCompletionClaimGuard.inspect(
             "代码修改已完成，测试仍在运行。",
-            LocalOutputQualityContext(usageMode = LocalUsageMode.WORK, state = state),
+            state.work,
         )
 
         assertFalse(result.changed)
@@ -118,7 +117,7 @@ class LocalWorkCompletionClaimGuardTest {
         )
         val result = LocalWorkCompletionClaimGuard.inspect(
             "尚未完成，还要继续处理。",
-            LocalOutputQualityContext(usageMode = LocalUsageMode.WORK, state = state),
+            state.work,
         )
         assertTrue(result.findings.isEmpty())
     }

@@ -1,17 +1,5 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
 
-import com.labteto.dshmobile.local.session.LocalHarnessMessage
-import com.labteto.dshmobile.local.session.LocalHarnessSession
-import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
-import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.local.session.LocalSessionSummary
-import com.labteto.dshmobile.local.session.normalizeLocalSessionDomains
-import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
-import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
-import com.labteto.dshmobile.local.session.migrateLegacyTranscriptSnapshot
-import com.labteto.dshmobile.local.session.projectLocalTranscriptRuntimeIndexTail
-import com.labteto.dshmobile.local.session.projectSessionTranscriptTail
-import com.labteto.dshmobile.local.session.transcriptProjectionReplayCursor
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -126,41 +114,6 @@ internal class LocalSessionCoordinator(
                 projected.projectedThroughSequence != stored.transcriptProjectedThroughSequence,
         )
     }
-
-    fun snapshot(
-        sessionId: String,
-        state: LocalHarnessState,
-        controlProjectedThroughSequence: Long,
-        transcriptProjectedThroughSequence: Long?,
-    ): LocalHarnessSession = LocalHarnessSession(
-        id = sessionId,
-        title = state.transcriptIndex.firstUserTitle ?: "新会话",
-        updatedAt = state.transcriptIndex.latestCreatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
-        usageMode = state.usageMode,
-        personaId = state.chat.personaId,
-        chatState = state.chat.chatState,
-        chatContext = state.chat.chatContext,
-        replySuggestions = state.chat.replySuggestions,
-        chatBranches = state.chat.chatBranches,
-        groupChat = state.chat.groupChat,
-        galleryId = state.chat.galleryId,
-        galleryStoryId = state.chat.galleryStoryId,
-        gallerySaveSuppressedThrough = state.chat.gallerySaveSuppressedThrough,
-        conversationMode = state.conversationMode,
-        parentSessionId = state.parentSessionId,
-        lineageId = state.lineageId,
-        projectId = state.projectId,
-        handoffSummary = state.handoffSummary,
-        messages = emptyList(),
-        transcriptWindow = state.messages.takeLast(runtimeWindowMessages),
-        transcriptIndex = state.transcriptIndex,
-        plan = state.work.plan,
-        todos = state.work.todos,
-        goal = state.work.goal,
-        planMode = state.work.planMode,
-        controlProjectedThroughSequence = controlProjectedThroughSequence,
-        transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
-    )
 
     private fun normalizeLoaded(session: LocalHarnessSession): LocalHarnessSession =
         normalizeLocalSessionDomains(session, domainCodecs)

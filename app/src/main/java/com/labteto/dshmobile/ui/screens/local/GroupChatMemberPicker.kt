@@ -28,8 +28,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_MEMBERS
-import com.labteto.dshmobile.local.chat.MIN_GROUP_CHAT_MEMBERS
+import com.labteto.dshmobile.local.presentation.MAX_GROUP_CHAT_MEMBERS
+import com.labteto.dshmobile.local.presentation.MIN_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton

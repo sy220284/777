@@ -1,11 +1,13 @@
 package com.labteto.dshmobile.local.runtime
 
 import android.content.Context
-import com.labteto.dshmobile.local.LocalSessionCoordinator
-import com.labteto.dshmobile.local.LocalSessionRepository
+import com.labteto.dshmobile.local.session.LocalSessionCoordinator
+import com.labteto.dshmobile.local.session.LocalSessionRepository
 import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
+import com.labteto.dshmobile.local.session.LocalCurrentSessionSnapshotProvider
 import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.localSessionSnapshotBoundary
 import com.labteto.dshmobile.local.session.LocalSessionFilesRuntime
 import com.labteto.dshmobile.local.session.LocalSessionStorageManager
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
@@ -36,6 +38,7 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     internal val eventLogs: LocalSessionEventLogRegistry,
     internal val files: LocalSessionFilesRuntime,
     domainCodecs: Set<@JvmSuppressWildcards LocalSessionDomainCodec>,
+    private val currentSnapshotProvider: LocalCurrentSessionSnapshotProvider,
 ) {
     private val sessionsRoot = File(context.filesDir, "local-harness/sessions").apply { mkdirs() }
     private val scope = CoroutineScope(
@@ -78,17 +81,14 @@ class LocalSessionStorageRuntime @Inject internal constructor(
     }
 
     internal fun currentSnapshot(expectedSessionId: String): LocalHarnessSession? {
-        val eventLog = eventLogs.get(expectedSessionId)
-        val controlProjectedThroughSequence = eventLog.latestSequence()
-        val transcriptProjectedThroughSequence =
-            runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor
-        val state = runtimeStateStore.state.value
-        if (state.sessionId != expectedSessionId) return null
-        return coordinator.snapshot(
-            sessionId = expectedSessionId,
-            state = state,
-            controlProjectedThroughSequence = controlProjectedThroughSequence,
-            transcriptProjectedThroughSequence = transcriptProjectedThroughSequence,
+        val boundary = localSessionSnapshotBoundary(
+            eventLog = eventLogs.get(expectedSessionId),
+            transcriptProjectionCursor = runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor,
+        )
+        return currentSnapshotProvider.snapshot(
+            expectedSessionId = expectedSessionId,
+            boundary = boundary,
+            runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
         )
     }
 

@@ -1,10 +1,7 @@
 package com.labteto.dshmobile.local.interaction
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 
 internal const val LOCAL_QUESTION_CANCELLED_RESPONSE = "用户取消了问题"
@@ -28,63 +25,6 @@ internal interface LocalInteractionStatePort {
     fun setDeviceApprovalLease(enabled: Boolean)
 }
 
-internal fun localInteractionStatePort(
-    state: MutableStateFlow<LocalHarnessState>,
-): LocalInteractionStatePort = object : LocalInteractionStatePort {
-    override fun pendingApproval(): LocalApproval? = state.value.work.pendingApproval
-
-    override fun setPendingApproval(approval: LocalApproval?) {
-        state.update { current ->
-            current.copy(work = current.work.copy(pendingApproval = approval))
-        }
-    }
-
-    override fun clearPendingApproval(callId: String) {
-        state.update { current ->
-            if (current.work.pendingApproval?.callId == callId) {
-                current.copy(work = current.work.copy(pendingApproval = null))
-            } else {
-                current
-            }
-        }
-    }
-
-    override fun setPendingQuestion(question: LocalQuestion?) {
-        state.update { current ->
-            current.copy(work = current.work.copy(pendingQuestion = question))
-        }
-    }
-
-    override fun clearPendingQuestion(callId: String) {
-        state.update { current ->
-            if (current.work.pendingQuestion?.callId == callId) {
-                current.copy(work = current.work.copy(pendingQuestion = null))
-            } else {
-                current
-            }
-        }
-    }
-
-    override fun clearPendingInteractions() {
-        state.update { current ->
-            current.copy(
-                work = current.work.copy(
-                    pendingApproval = null,
-                    pendingQuestion = null,
-                ),
-            )
-        }
-    }
-
-    override fun deviceApprovalLeaseEnabled(): Boolean = state.value.work.deviceApprovalLease
-
-    override fun setDeviceApprovalLease(enabled: Boolean) {
-        state.update { current ->
-            current.copy(work = current.work.copy(deviceApprovalLease = enabled))
-        }
-    }
-}
-
 /**
  * Owns all user-mediated wait/response state for one local Harness run.
  *
@@ -94,8 +34,6 @@ internal fun localInteractionStatePort(
 internal class LocalInteractionCoordinator(
     private val state: LocalInteractionStatePort,
 ) {
-    constructor(state: MutableStateFlow<LocalHarnessState>) : this(localInteractionStatePort(state))
-
     private data class ApprovalWaiter(
         val callId: String,
         val response: CompletableDeferred<Boolean>,

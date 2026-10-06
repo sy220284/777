@@ -63,11 +63,11 @@ import com.labteto.dshmobile.local.chat.PersonaGalleryStory
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.MAX_PERSONA_TRANSFER_BYTES
-import com.labteto.dshmobile.local.chat.PERSONA_WORD_MIME
+import com.labteto.dshmobile.local.presentation.MAX_PERSONA_TRANSFER_BYTES
+import com.labteto.dshmobile.local.presentation.PERSONA_WORD_MIME
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
-import com.labteto.dshmobile.local.chat.galleryMessageArchiveKey
+import com.labteto.dshmobile.local.presentation.galleryMessageArchiveKey
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard

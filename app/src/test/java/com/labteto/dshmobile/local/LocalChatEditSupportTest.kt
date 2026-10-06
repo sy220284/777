@@ -1,5 +1,11 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.editedChatUserModelMessage
+import com.labteto.dshmobile.local.chat.buildEditedChatModelHistory
+import com.labteto.dshmobile.local.chat.buildDurableChatModelHistory
+import com.labteto.dshmobile.local.chat.persistActiveChatTranscript
+import com.labteto.dshmobile.local.chat.persistRewrittenChatTranscript
+
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent

@@ -1,27 +1,26 @@
-package com.labteto.dshmobile.local.chat
+package com.labteto.dshmobile.local.persistence
 
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
-/**
- * Small durable-file wrapper for chat persona documents.
- *
- * A malformed primary is quarantined instead of being silently treated as an empty document.
- * Writes keep a last-known-good backup and replace the primary atomically when the platform allows.
- */
 internal enum class RecoveringDocumentFailurePolicy {
     FAIL_CLOSED,
     RECREATE_DEFAULT,
 }
 
-internal class RecoveringChatDocumentFile(
+/**
+ * Durable text document with a last-known-good backup and corrupt-file quarantine.
+ *
+ * This is persistence infrastructure only. Callers own decoding, validation and domain semantics.
+ */
+internal class RecoveringDocumentFile(
     private val file: File,
     private val clock: () -> Long = System::currentTimeMillis,
     private val failurePolicy: RecoveringDocumentFailurePolicy = RecoveringDocumentFailurePolicy.FAIL_CLOSED,
 ) {
     private val root: File = requireNotNull(file.parentFile) {
-        "聊天数据文件必须位于目录中：${file.path}"
+        "持久数据文件必须位于目录中：${file.path}"
     }
     private val backup = File(root, "${file.name}.bak")
 
@@ -64,7 +63,7 @@ internal class RecoveringChatDocumentFile(
 
     fun write(serialized: String, validate: (String) -> Boolean) {
         root.mkdirs()
-        require(validate(serialized)) { "拒绝写入无法解析的聊天数据" }
+        require(validate(serialized)) { "拒绝写入无法解析的持久数据" }
 
         val currentText = if (file.isFile) runCatching { file.readText() }.getOrNull() else null
         if (currentText != null && validate(currentText)) {

@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.toLocalChatProjectionState
+
+import com.labteto.dshmobile.local.localAggregateChatStatePort
+
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalHarnessResourceState
@@ -31,7 +35,7 @@ class LocalReplySuggestionCommitTest {
         val state = InterceptedFlow(MutableStateFlow(before))
         state.beforeCompare = { state.delegate.value = before.copy(sessionId = "other") }
 
-        assertFalse(commitReplySuggestions(LocalChatStatePort(state), before.toLocalChatProjectionState(), "reply", suggestions))
+        assertFalse(commitReplySuggestions(localAggregateChatStatePort(state), before.toLocalChatProjectionState(), "reply", suggestions))
         assertEquals("other", state.value.sessionId)
         assertTrue(state.value.chat.replySuggestions.isEmpty())
     }
@@ -46,8 +50,8 @@ class LocalReplySuggestionCommitTest {
         )
         changedTargets.forEach { changed ->
             val state = MutableStateFlow(changed)
-            assertFalse(commitReplySuggestions(LocalChatStatePort(state), before.toLocalChatProjectionState(), "reply", suggestions))
-            commitReplySuggestionError(LocalChatStatePort(state), before.toLocalChatProjectionState(), "reply", "旧请求失败")
+            assertFalse(commitReplySuggestions(localAggregateChatStatePort(state), before.toLocalChatProjectionState(), "reply", suggestions))
+            commitReplySuggestionError(localAggregateChatStatePort(state), before.toLocalChatProjectionState(), "reply", "旧请求失败")
             assertEquals(changed, state.value)
         }
     }
@@ -61,7 +65,7 @@ class LocalReplySuggestionCommitTest {
             )
         }
 
-        assertTrue(commitReplySuggestions(LocalChatStatePort(state), before.toLocalChatProjectionState(), "reply", suggestions))
+        assertTrue(commitReplySuggestions(localAggregateChatStatePort(state), before.toLocalChatProjectionState(), "reply", suggestions))
         assertEquals(suggestions, state.value.chat.replySuggestions)
         assertEquals(1, state.value.kernel.resources.activeModelRequests)
     }

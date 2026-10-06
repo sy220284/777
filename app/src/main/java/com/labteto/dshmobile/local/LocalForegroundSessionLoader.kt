@@ -22,7 +22,9 @@ import com.labteto.dshmobile.local.runtime.DEFAULT_BASE_URL
 import com.labteto.dshmobile.local.runtime.DEFAULT_MODEL
 import com.labteto.dshmobile.local.runtime.DEFAULT_MODEL_ATTEMPTS
 import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
+import com.labteto.dshmobile.local.chat.projectChatSessionControls
 import com.labteto.dshmobile.local.work.LocalForegroundRecoveryCoordinator
+import com.labteto.dshmobile.local.work.projectWorkSessionControls
 import com.labteto.dshmobile.local.runtime.LocalKernelState
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
@@ -123,11 +125,9 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             persistedSnapshotExists = loaded != null,
             legacyBaselineSequence = legacyProjectionBaseline,
         )
-        val projectedControls = projectSessionControlTail(
-            snapshot = stored,
-            events = log.snapshotAfter(projectionCursor),
-            sequenceExclusive = projectionCursor,
-        )
+        val controlTail = log.snapshotAfter(projectionCursor)
+        val projectedChatControls = projectChatSessionControls(stored, controlTail)
+        val projectedWorkControls = projectWorkSessionControls(stored, controlTail)
         val restoredTranscript = coordinator.restoreTranscript(
             stored = stored,
             persistedSnapshotExists = loaded != null,
@@ -168,7 +168,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
         val profile = contextComposer.userProfile()
         val restoredChat = chatRestore.restore(
             usageMode = stored.usageMode,
-            controls = projectedControls,
+            controls = projectedChatControls,
             messages = restoredTranscript.messages,
             log = log,
         )
@@ -222,7 +222,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             parentSessionId = stored.parentSessionId,
             lineageId = restoredLineageId,
             projectId = restoredProjectId,
-            handoffSummary = projectedControls.handoffSummary,
+            handoffSummary = projectedChatControls.handoffSummary,
             userRules = profile.customRules,
             autoRecall = profile.autoRecall,
             autoMemory = profile.autoMemory,
@@ -231,7 +231,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             messages = restoredTranscript.messages,
             transcriptIndex = restoredTranscript.index,
             work = com.labteto.dshmobile.local.work.LocalWorkSessionLifecyclePlanner.restoreState(
-                projectedControls, stored.usageMode, stored.id, runtimeStateStore.jobManager.snapshotInfos(),
+                projectedWorkControls, stored.usageMode, stored.id, runtimeStateStore.jobManager.snapshotInfos(),
             ),
             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
                 loaded?.legacySafeAutoApproval == true,

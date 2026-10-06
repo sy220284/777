@@ -16,7 +16,7 @@ import com.labteto.dshmobile.local.runtime.projectExecutionJobs
  */
 internal object LocalWorkSessionLifecyclePlanner {
     internal fun restoreState(
-        controls: com.labteto.dshmobile.local.LocalSessionControlProjection,
+        controls: LocalWorkState,
         usageMode: com.labteto.dshmobile.local.LocalUsageMode,
         sessionId: String,
         jobs: List<com.labteto.dshmobile.local.jobs.LocalJobInfo>,

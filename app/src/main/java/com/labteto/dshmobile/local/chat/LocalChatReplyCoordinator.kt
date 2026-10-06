@@ -1,4 +1,13 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
+
+import com.labteto.dshmobile.local.ForegroundTokenUsageSeed
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.TokenUsageAction
+import com.labteto.dshmobile.local.TokenUsageContext
+import com.labteto.dshmobile.local.buildForegroundTokenUsageContext
+import com.labteto.dshmobile.local.buildTokenUsageContext
+import com.labteto.dshmobile.local.record
 
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatContinuityGuardMode
@@ -12,8 +21,7 @@ import com.labteto.dshmobile.local.chat.stripGroupSpeakerPrefix
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
-import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
-import com.labteto.dshmobile.local.settings.LocalHarnessSettingsCoordinator
+import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.JsonArray
@@ -25,14 +33,14 @@ import kotlinx.serialization.json.put
 /**
  * Final response boundary for chat-mode model output.
  *
- * The engine owns scheduling and persistence. This coordinator owns style finalization plus the
+ * Scheduling and durable persistence stay with their Session/Feature owners. This coordinator owns style finalization plus the
  * deterministic continuity guard that must pass before a reply becomes durable/visible.
  */
 @Singleton
 internal class LocalChatReplyCoordinator @Inject constructor(
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
     private val usageTracker: DeepSeekUsageTracker,
-    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val styleGuardSettings: LocalChatStyleGuardSettingsPort,
 ) {
     suspend fun finalizeDirect(
         snapshot: LocalHarnessState,
@@ -346,12 +354,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
         )
     }
 
-    private fun recordStyleGuardHits(violations: List<String>) {
-        runtimeStateStore.projection.recordStyleGuardHits(
-            violations,
-            LocalHarnessSettingsCoordinator.MAX_STYLE_GUARD_HITS,
-        )
-    }
+    private fun recordStyleGuardHits(violations: List<String>) = styleGuardSettings.recordHits(violations)
 
     private suspend fun finalizeStyled(
         snapshot: LocalHarnessState,

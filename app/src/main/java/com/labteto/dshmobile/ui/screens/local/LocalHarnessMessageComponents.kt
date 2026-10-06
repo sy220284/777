@@ -62,8 +62,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.LocalChatBranchInfo
-import com.labteto.dshmobile.local.chat.editableChatUserText
-import com.labteto.dshmobile.local.chat.groupMessageVisibleContent
+import com.labteto.dshmobile.local.presentation.editableChatUserText
+import com.labteto.dshmobile.local.presentation.groupMessageVisibleContent
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.AgentOperationKind

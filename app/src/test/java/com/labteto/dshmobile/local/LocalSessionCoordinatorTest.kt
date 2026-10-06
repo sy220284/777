@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.session.LocalSessionCoordinator
+import com.labteto.dshmobile.local.session.LocalSessionRepository
+
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
@@ -11,14 +14,22 @@ import com.labteto.dshmobile.local.chat.LocalChatSessionDomainCodec
 import com.labteto.dshmobile.local.chat.LocalChatState
 import com.labteto.dshmobile.local.chat.LocalGroupChatMember
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
+import com.labteto.dshmobile.local.chat.chatBranches
+import com.labteto.dshmobile.local.chat.chatContext
+import com.labteto.dshmobile.local.chat.chatState
+import com.labteto.dshmobile.local.chat.groupChat
+import com.labteto.dshmobile.local.chat.withChatSessionDomain
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
-import com.labteto.dshmobile.local.session.localSessionPersistenceSnapshot
+import com.labteto.dshmobile.local.session.LocalSessionSnapshotBoundary
 import com.labteto.dshmobile.local.work.LocalGoal
 import com.labteto.dshmobile.local.work.LocalTodoItem
 import com.labteto.dshmobile.local.work.LocalWorkState
+import com.labteto.dshmobile.local.work.LocalWorkSessionDomainCodec
+import com.labteto.dshmobile.local.work.goal
+import com.labteto.dshmobile.local.work.todos
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -72,8 +83,7 @@ class LocalSessionCoordinatorTest {
             domainCodecs = listOf(LocalChatSessionDomainCodec),
         )
         repository.writeNow(
-            LocalHarnessSession(
-                id = "legacy-chat",
+            LocalHarnessSession(id = "legacy-chat").withChatSessionDomain(
                 chatState = ChatCharacterState(scene = ChatSceneState(location = "庭院")),
             ),
         )
@@ -120,11 +130,17 @@ class LocalSessionCoordinatorTest {
             ),
         )
 
-        val snapshot = coordinator.snapshot(
-            sessionId = "s1",
-            state = state,
-            controlProjectedThroughSequence = 8L,
-            transcriptProjectedThroughSequence = 7L,
+        val runtime = com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore()
+        runtime.initialize(state)
+        val snapshot = requireNotNull(
+            LocalCurrentSessionSnapshotComposition(runtime).snapshot(
+                expectedSessionId = "s1",
+                boundary = LocalSessionSnapshotBoundary(
+                    controlProjectedThroughSequence = 8L,
+                    transcriptProjectedThroughSequence = 7L,
+                ),
+                runtimeWindowMessages = 2,
+            ),
         )
 
         assertTrue(snapshot.messages.isEmpty())
@@ -175,8 +191,17 @@ class LocalSessionCoordinatorTest {
             plan = listOf("检查"), todos = listOf(LocalTodoItem("恢复", "in_progress")),
             goal = LocalGoal("完整恢复"), planMode = true,
         )
-        val snapshot = coordinator.snapshot(
-            "round-trip", LocalHarnessState(chat = chat, work = work), 11L, 10L,
+        val runtime = com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(sessionId = "round-trip", chat = chat, work = work))
+        val snapshot = requireNotNull(
+            LocalCurrentSessionSnapshotComposition(runtime).snapshot(
+                expectedSessionId = "round-trip",
+                boundary = LocalSessionSnapshotBoundary(
+                    controlProjectedThroughSequence = 11L,
+                    transcriptProjectedThroughSequence = 10L,
+                ),
+                runtimeWindowMessages = 2,
+            ),
         )
         coordinator.writeNow(snapshot)
 
@@ -186,7 +211,7 @@ class LocalSessionCoordinatorTest {
             coldRepository,
             { id -> LocalSessionEventLog(File(sessions, "$id.events.jsonl"), json) },
             2,
-            listOf(LocalChatSessionDomainCodec),
+            listOf(LocalChatSessionDomainCodec, LocalWorkSessionDomainCodec),
         )
         val restored = requireNotNull(coldCoordinator.read("round-trip"))
         assertEquals(snapshot, restored)
@@ -199,45 +224,12 @@ class LocalSessionCoordinatorTest {
         assertTrue(!encoded.contains("\"chat\":") && !encoded.contains("\"work\":"))
     }
 
-    @Test
-    fun persistenceProjectionCapturesCursorBeforeReadingForegroundState() = runTest {
-        val json = Json { ignoreUnknownKeys = true }
-        val sessions = temporary.newFolder("cursor-order")
-        val log = LocalSessionEventLog(File(sessions, "s1.events.jsonl"), json)
-        val repository = LocalSessionRepository(sessions, json, backgroundScope, {}, {})
-        val coordinator = LocalSessionCoordinator(
-            repository,
-            { log },
-            2,
-            listOf(LocalChatSessionDomainCodec),
-        )
-        val capturedSequence = log.latestSequence()
-        var stateReads = 0
-
-        val snapshot = localSessionPersistenceSnapshot(
-            sessionCoordinator = coordinator,
-            currentSessionId = "s1",
-            currentState = {
-                stateReads++
-                // Simulate a control update landing at the state-read boundary. Its event must
-                // remain replayable, rather than being skipped by a cursor newer than the state.
-                log.append("plan/state", kotlinx.serialization.json.buildJsonObject {})
-                LocalHarnessState(work = LocalWorkState(plan = listOf("新计划")))
-            },
-            eventLog = log,
-            transcriptProjectionCursor = 0L,
-        )
-
-        assertEquals(1, stateReads)
-        assertEquals(capturedSequence, snapshot.controlProjectedThroughSequence)
-        assertTrue(log.latestSequence() > snapshot.controlProjectedThroughSequence!!)
-        assertEquals(listOf("新计划"), snapshot.plan)
-    }
 
     private fun message(id: String, role: String, content: String) = LocalHarnessMessage(
         id = id,
         role = role,
         content = content,
-        createdAt = id.hashCode().toLong(),
+        createdAt = id.removePrefix("m").toLongOrNull() ?: 1L,
     )
+
 }

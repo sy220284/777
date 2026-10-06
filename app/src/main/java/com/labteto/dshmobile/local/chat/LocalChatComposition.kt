@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalChatReplyCoordinator
-import com.labteto.dshmobile.local.LocalChatTurnCoordinator
 import com.labteto.dshmobile.local.LocalModelRequestCoordinator
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
@@ -22,6 +20,7 @@ internal class LocalChatComposition @Inject constructor(
     usageTracker: DeepSeekUsageTracker,
     sessionStorage: LocalSessionStorageRuntime,
     private val chatState: LocalChatStatePort,
+    private val styleGuardSettings: LocalChatStyleGuardSettingsPort,
 ) {
     private val modelHistory = LocalForegroundModelHistoryRuntime(
         runtimeStateStore = runtimeStateStore,
@@ -46,7 +45,7 @@ internal class LocalChatComposition @Inject constructor(
     internal val replyCoordinator = LocalChatReplyCoordinator(
         chatTurnCoordinator = turnCoordinator,
         usageTracker = usageTracker,
-        runtimeStateStore = runtimeStateStore,
+        styleGuardSettings = styleGuardSettings,
     )
 
     internal fun cancelPostTurn() = contextRefresh.cancelScheduledRefresh()

@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.harness.agent.AgentStepLimitExtender
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
-import com.labteto.dshmobile.local.LocalHarnessState
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -17,7 +16,7 @@ internal fun localForegroundStepLimitExtender(
     enabled: Boolean,
     configuredBase: Int,
     task: String,
-    state: () -> LocalHarnessState,
+    kernelState: () -> LocalKernelState,
     pressure: () -> HarnessResourcePressure,
     onExtended: (JsonObject) -> Unit,
     canExtend: () -> Boolean = { true },
@@ -27,14 +26,14 @@ internal fun localForegroundStepLimitExtender(
     return AgentStepLimitExtender { currentLimit, stepsUsed ->
         if (currentLimit >= maxTotalSteps) return@AgentStepLimitExtender null
         if (!canExtend()) return@AgentStepLimitExtender null
-        val current = state()
+        val current = kernelState()
         val livePressure = pressure()
         val next = nextAdaptiveAgentStepLimit(
             currentLimit = currentLimit,
             configuredBase = configuredBase,
             task = task,
-            contextChars = current.kernel.contextChars,
-            contextBudgetChars = current.kernel.contextBudgetChars,
+            contextChars = current.contextChars,
+            contextBudgetChars = current.contextBudgetChars,
             pressure = livePressure,
             kind = LocalAgentRunKind.FOREGROUND,
         )
@@ -45,8 +44,8 @@ internal fun localForegroundStepLimitExtender(
                     put("steps_used", stepsUsed)
                     put("previous_limit", currentLimit)
                     put("next_limit", boundedNext)
-                    put("context_chars", current.kernel.contextChars)
-                    put("context_budget_chars", current.kernel.contextBudgetChars)
+                    put("context_chars", current.contextChars)
+                    put("context_budget_chars", current.contextBudgetChars)
                     put("resource_pressure", livePressure.name.lowercase())
                 },
             )

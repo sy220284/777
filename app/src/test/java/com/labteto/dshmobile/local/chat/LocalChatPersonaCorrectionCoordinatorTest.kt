@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.localAggregateChatStatePort
+
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -58,7 +60,7 @@ class LocalChatPersonaCorrectionCoordinatorTest {
             json = json,
         )
         val coordinator = LocalChatPersonaCorrectionCoordinator(
-            LocalChatStatePort(runtime),
+            localAggregateChatStatePort(runtime.projection),
             personaStore,
             logs,
             enqueueSnapshot = { true },
@@ -111,7 +113,7 @@ class LocalChatPersonaCorrectionCoordinatorTest {
             json = json,
         )
         val coordinator = LocalChatPersonaCorrectionCoordinator(
-            LocalChatStatePort(runtime),
+            localAggregateChatStatePort(runtime.projection),
             personaStore,
             logs,
             enqueueSnapshot = { true },

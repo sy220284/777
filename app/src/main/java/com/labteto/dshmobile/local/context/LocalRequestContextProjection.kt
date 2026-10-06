@@ -1,10 +1,8 @@
 package com.labteto.dshmobile.local.context
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
 import com.labteto.dshmobile.local.model.LocalPromptPressure
-import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -33,8 +31,6 @@ internal data class LocalRequestContextProjection(
 )
 
 internal data class LocalRequestContextPolicyInput(
-    val snapshot: LocalHarnessState,
-    val eventLog: LocalSessionEventLog,
     val messages: List<JsonObject>,
     val tools: JsonArray,
     val operationalLimitTokens: Int,

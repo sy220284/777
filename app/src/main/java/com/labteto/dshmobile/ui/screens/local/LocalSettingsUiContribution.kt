@@ -10,7 +10,20 @@ internal fun localSettingsFeatureUiContribution(
     onCheckUpdate: () -> Unit,
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
     onPopFeature: () -> Unit,
-): LocalFeatureUiContribution = LocalFeatureUiContribution(LocalFeatureModuleId.SETTINGS) { page ->
+    onOpenFromDrawer: (LocalFeaturePage) -> Unit,
+    onCloseDrawer: () -> Unit,
+): LocalFeatureUiContribution = LocalFeatureUiContribution(
+    moduleId = LocalFeatureModuleId.SETTINGS,
+    drawerActions = mapOf(
+        LocalFeatureDrawerEntry.SETTINGS to {
+            onSettingsDestinationChange(SettingsDestination.ROOT)
+            onOpenFromDrawer(LocalFeaturePage.SETTINGS)
+            onCloseDrawer()
+        },
+    ),
+    backAction = { _, edge -> localFeatureProductBackAction(edge) },
+    restorePage = ::localFeatureRestoreOwnedPage,
+) { page ->
     check(page == LocalFeaturePage.SETTINGS) { "Settings received non-SETTINGS route: $page" }
     SettingsScreen(
         onClose = {

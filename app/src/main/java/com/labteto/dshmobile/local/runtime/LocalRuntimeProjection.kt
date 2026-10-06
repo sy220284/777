@@ -234,31 +234,6 @@ internal class LocalRuntimeProjection(
         }
     }
 
-    internal fun setChatStyleGuardEnabled(enabled: Boolean) {
-        state.update { current -> current.copy(chatStyleGuardEnabled = enabled) }
-    }
-
-    internal fun setChatStyleGuardPhrases(phrases: List<String>) {
-        state.update { current -> current.copy(chatStyleGuardCustomPhrases = phrases) }
-    }
-
-    internal fun clearStyleGuardHits() {
-        state.update { current -> current.copy(styleGuardHits = emptyList()) }
-    }
-
-    internal fun recordStyleGuardHits(violations: List<String>, maxHits: Int) {
-        if (violations.isEmpty()) return
-        state.update { current ->
-            current.copy(
-                styleGuardHits = (current.styleGuardHits + violations)
-                    .map(String::trim)
-                    .filter(String::isNotBlank)
-                    .distinct()
-                    .takeLast(maxHits),
-            )
-        }
-    }
-
     internal fun publishSessions(summaries: List<LocalSessionSummary>) {
         state.update { current -> current.copy(sessions = summaries) }
     }

@@ -59,7 +59,8 @@ internal class LocalWorkTurnToolRuntime(
         }
         return schemas.modelSchemas(
             policy = policy,
-            state = binding.aggregateSnapshot(),
+            modelState = binding.state.value.modelState,
+            planModeEnabled = binding.state.value.work.planMode,
             history = binding.runHandle.modelHistory.snapshot(),
             enabledOptional = enabled,
         )

@@ -139,8 +139,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 {
                     policy.project(
                         LocalRequestContextPolicyInput(
-                            snapshot = snapshot,
-                            eventLog = log,
                             messages = messages,
                             tools = tools,
                             operationalLimitTokens = operationalLimit,
@@ -451,23 +449,28 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     val madeProgress = compacted != null &&
                         compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
                         compacted.messages != activeMessages
-                    if (!madeProgress || compacted == null) {
+                    if (!madeProgress) {
                         null
                     } else {
+                        val recovered = checkNotNull(compacted)
                         overflowRound += 1
                         if (persistOverflowHistory) {
-                            (overflowPersister ?: foregroundCompaction::persistOverflowCompaction)(snapshot, summaryMode)
+                            if (overflowPersister != null) {
+                                overflowPersister(snapshot, summaryMode)
+                            } else if (!snapshot.chat.groupChat.enabled) {
+                                foregroundCompaction.persistOverflowCompaction(snapshot.sessionId, summaryMode)
+                            }
                         }
                         log.append("request/context-overflow-recovery", buildJsonObject {
                             put("step", step)
                             put("round", overflowRound)
                             put("model", snapshot.modelState.model)
-                            put("estimated_tokens_before", compacted.estimatedTokensBefore)
-                            put("estimated_tokens_after", compacted.estimatedTokensAfter)
-                            put("omitted_messages", compacted.omittedMessages)
+                            put("estimated_tokens_before", recovered.estimatedTokensBefore)
+                            put("estimated_tokens_after", recovered.estimatedTokensAfter)
+                            put("omitted_messages", recovered.omittedMessages)
                         })
                         LocalAgentModelStepRecovery(
-                            messages = compacted.messages,
+                            messages = recovered.messages,
                             reason = "context_overflow",
                         )
                     }

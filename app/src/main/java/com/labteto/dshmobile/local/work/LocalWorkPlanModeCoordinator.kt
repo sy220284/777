@@ -70,7 +70,7 @@ internal class LocalWorkPlanModeCoordinator @Inject constructor(
                 recordRuntimeSystemPromptUpdate(
                     history = history,
                     prompt = workSystemPrompt(after.workspacePath, enabled),
-                    state = after,
+                    modelState = after.modelState,
                     log = log,
                 )
                 val resources = runtimeStateStore.resourceSnapshot()
@@ -136,7 +136,7 @@ internal suspend fun exitWorkPlanMode(
         recordRuntimeSystemPromptUpdate(
             history = history,
             prompt = workSystemPrompt(snapshot.workspacePath, planMode = false),
-            state = snapshot,
+            modelState = snapshot.modelState,
             log = eventLog,
         )
         updateContextMetrics()

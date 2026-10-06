@@ -16,4 +16,7 @@ data class LocalChatState(
     val groupChat: LocalGroupChatState = LocalGroupChatState(),
     val groupActiveSpeakerName: String? = null,
     val personaCorrectionNotice: ChatPersonaCorrectionNotice? = null,
+    val chatStyleGuardEnabled: Boolean = true,
+    val chatStyleGuardCustomPhrases: List<String> = emptyList(),
+    val styleGuardHits: List<String> = emptyList(),
 )

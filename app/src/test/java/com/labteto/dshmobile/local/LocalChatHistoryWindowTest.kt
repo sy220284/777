@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.boundedChatRequestHistory
+import com.labteto.dshmobile.local.chat.boundedGroupChatRequestHistory
+
 import com.labteto.dshmobile.local.model.estimateModelTokens
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject

@@ -13,7 +13,7 @@ internal class LocalChatModelAssistController(
     private val runtime: LocalUiRuntime,
     private val chatUi: LocalChatUiFacade,
 ) {
-    private val state = runtime.session.state
+    private val state = runtime.state
 
     suspend fun generateGroupAnnouncement(direction: String): Result<String> =
         try {

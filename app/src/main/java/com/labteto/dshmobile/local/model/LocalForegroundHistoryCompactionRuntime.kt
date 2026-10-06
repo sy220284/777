@@ -23,14 +23,11 @@ internal class LocalForegroundHistoryCompactionRuntime @Inject constructor(
     private val checkpointCodec = ModelHistoryCheckpointCodec()
 
     internal fun persistOverflowCompaction(
-        snapshot: com.labteto.dshmobile.local.LocalHarnessState,
+        sessionId: String,
         summaryMode: LocalHistorySummaryMode,
     ) {
         val current = runtimeStateStore.state.value
-        if (
-            current.sessionId != snapshot.sessionId ||
-            current.chat.groupChat.enabled
-        ) return
+        if (current.sessionId != sessionId) return
 
         val history = runtimeStateStore.foregroundRunHandle.modelHistory
         val compaction = history.compactOverflow(
@@ -39,10 +36,10 @@ internal class LocalForegroundHistoryCompactionRuntime @Inject constructor(
         ) ?: return
 
         runtimeStateStore.requestPressureStore.advanceGeneration(
-            snapshot.sessionId,
+            sessionId,
             compaction.estimatedTokensAfter,
         )
-        val eventLog = sessionStorage.eventLogs.get(snapshot.sessionId)
+        val eventLog = sessionStorage.eventLogs.get(sessionId)
         eventLog.append("session/compaction", buildJsonObject {
             put("trigger", "context-overflow")
             put("omitted_messages", compaction.omittedMessages)
@@ -61,14 +58,14 @@ internal class LocalForegroundHistoryCompactionRuntime @Inject constructor(
 
         val resources = runtimeStateStore.resourceSnapshot()
         runtimeStateStore.projection.updateContextMetrics(
-            sessionId = snapshot.sessionId,
+            sessionId = sessionId,
             contextChars = history.encodedChars,
             contextBudgetChars = runtimeStateStore.contextBudgetCharsFor(
                 runtimeStateStore.state.value,
                 resources,
             ),
         )
-        check(sessionStorage.enqueueCurrentSnapshot(snapshot.sessionId)) {
+        check(sessionStorage.enqueueCurrentSnapshot(sessionId)) {
             "前台模型历史压缩完成后会话已切换"
         }
     }

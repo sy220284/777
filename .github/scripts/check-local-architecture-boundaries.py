@@ -21,7 +21,6 @@ RUNTIME_KERNEL_PATH = "app/src/main/java/com/labteto/dshmobile/local/runtime/Loc
 APPLICATION_PATH = "app/src/main/java/com/labteto/dshmobile/DshApplication.kt"
 COMPOSITION_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt"
 
-UI_AGGREGATE_STATE_ALLOWLIST: set[str] = set()
 
 # Chat/Work are provider Features. Their internals may depend on Shared capabilities, never siblings.
 FEATURE_FORBIDDEN_IMPORT_PREFIXES = {
@@ -46,7 +45,11 @@ FROZEN_SHARED_PACKAGES = (
     "interaction",
     "jobs",
     "lsp",
+    "memory",
     "model",
+    "persistence",
+    "profile",
+    "quality",
     "runtime",
     "security",
     "send",
@@ -61,21 +64,7 @@ FEATURE_INTERNAL_IMPORT_PREFIXES = (
     "com.labteto.dshmobile.local.settings.",
 )
 
-# Remaining reverse/cross-Feature edges are explicit migration debt.
-# Every allowance is an exact (consumer file, imported symbol) edge so debt cannot be replaced
-# with a different internal dependency inside the same file.
-SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST = {
-    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.ChatCharacterState"),
-    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.ChatContextState"),
-    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.ChatReplySuggestion"),
-    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.LocalChatBranchState"),
-    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.LocalGroupChatState"),
-    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.PersonaProfile"),
-    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.work.LocalGoal"),
-    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.work.LocalTodoItem"),
-}
 
-AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST = set()
 AUTOMATION_ALLOWED_CROSS_FEATURE_API_SYMBOLS = {
     "LocalChatExecutionPort",
     "LocalChatTurnPort",
@@ -87,14 +76,9 @@ AUTOMATION_ALLOWED_CROSS_FEATURE_API_SYMBOLS = {
     "LocalWorkAutomationExecutionPort",
 }
 
-SETTINGS_INTERNAL_IMPORT_MIGRATION_ALLOWLIST = {
-    ("app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatStyleGuard"),
-    ("app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt", "com.labteto.dshmobile.local.chat.PersonaProfile"),
-}
 
-# Stage 5 is still migrating. UI may consume presentation facades/projections, but direct Store /
-# Coordinator / Service / Runtime / Manager / Repository / Tracker / Executor / Registry / Gateway /
-# Port imports are exact migration debt and may only shrink.
+# Stage 5 is closed. UI may consume DTOs and presentation facades/projections, but direct Feature
+# implementation objects or top-level Feature behavior/values are final architecture violations.
 UI_ALLOWED_PRESENTATION_IMPORT_PREFIXES = (
     "com.labteto.dshmobile.local.presentation.",
 )
@@ -111,26 +95,17 @@ UI_INTERNAL_IMPLEMENTATION_SUFFIXES = (
     "Gateway",
     "Port",
 )
-UI_INTERNAL_IMPORT_MIGRATION_ALLOWLIST: set[tuple[str, str]] = set()
 
 
-# Session is still being horizontally migrated; these neutral slices are already closed.
+# Closed Shared slices must remain independent from product Feature internals.
 FROZEN_SHARED_FILES = (
-    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionPersistenceProjection.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/session/LocalCurrentSessionSnapshotProvider.kt",
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionControlProjection.kt",
     "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt",
     "app/src/main/java/com/labteto/dshmobile/local/context/LocalRequestContextProjection.kt",
 )
 
-# Writable aggregate state is temporary composition debt, not a general Feature API.
-FEATURE_AGGREGATE_WRITE_ALLOWLIST = {
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatStatePort.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkStatePort.kt",
-}
-RUNTIME_PROJECTION_UPDATE_ALLOWLIST = {
-    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatStatePort.kt",
-}
+RUNTIME_PROJECTION_UPDATE_OWNER = "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt"
 
 NARROW_PORT_PATHS = (
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatExecutionPort.kt",
@@ -277,6 +252,33 @@ for retired in RETIRED_SHARED_WORK_SEMANTIC_PATHS:
         die("Work semantic interpretation returned to Shared Runtime: " + retired)
 
 
+for retired in (
+    "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalSubagentRunnerFactory.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/jobs/LocalPersistentJobRecoveryCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/context/LocalWorkTurnPromptContext.kt",
+):
+    if (ROOT / retired).exists():
+        die("Work-owned execution/recovery implementation returned to a legacy Shared/root path: " + retired)
+
+
+for retired in (
+    "app/src/main/java/com/labteto/dshmobile/local/LocalChatTurnCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/LocalChatReplyCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/LocalChatHistoryWindow.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/LocalChatEditSupport.kt",
+):
+    if (ROOT / retired).exists():
+        die("retired Chat business owner returned outside ChatFeature: " + retired)
+
+for retired in (
+    "app/src/main/java/com/labteto/dshmobile/local/LocalSessionCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionPersistenceProjection.kt",
+):
+    if (ROOT / retired).exists():
+        die("retired Session boundary returned outside neutral Shared Session ownership: " + retired)
+
 # Retired shared implementations must stay deleted after their Feature owner takes over.
 if (ROOT / "app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt").exists():
     die("legacy shared Memory coordinator returned; use Chat/Work owned memory runtimes")
@@ -317,6 +319,16 @@ for package_name in FROZEN_SHARED_PACKAGES:
                 )
         if references_type(source, "LocalHarnessEngine"):
             die(f"{path.relative_to(ROOT)} makes Shared Capability depend on legacy LocalHarnessEngine")
+        relative = path.relative_to(ROOT).as_posix()
+        aggregate_state_owner_paths = {
+            "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeProjection.kt",
+            "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt",
+        }
+        if relative not in aggregate_state_owner_paths and references_type(source, "LocalHarnessState"):
+            die(
+                f"{relative} makes a Shared Capability depend on aggregate Feature state; "
+                "pass a neutral Shared DTO/Port instead"
+            )
 
 for relative in FROZEN_SHARED_FILES:
     source_imports = imports(read(relative))
@@ -326,8 +338,7 @@ for relative in FROZEN_SHARED_FILES:
                 f"{relative} is a closed Shared boundary but imports Feature internal {prefix}"
             )
 
-# Session/Memory still contain known reverse Feature dependencies. Track exact import edges so
-# the remaining migration debt cannot spread or be substituted inside an already-allowed file.
+# Shared Session/Memory are final one-way boundaries; reverse Feature imports fail directly.
 def format_edges(edges: set[tuple[str, str]]) -> str:
     return ", ".join(f"{path} -> {imported}" for path, imported in sorted(edges))
 
@@ -340,27 +351,22 @@ for package_name in ("session", "memory"):
             if imported.startswith(FEATURE_INTERNAL_IMPORT_PREFIXES):
                 shared_reverse_dependency_edges.add((relative, imported))
 
-unexpected_shared_reverse = (
-    shared_reverse_dependency_edges - SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST
-)
-if unexpected_shared_reverse:
+if shared_reverse_dependency_edges:
     die(
-        "new Shared→Feature migration edge(s): "
-        + format_edges(unexpected_shared_reverse)
+        "Shared→Feature reverse dependency edge(s): "
+        + format_edges(shared_reverse_dependency_edges)
         + "; invert them through neutral Shared contracts"
     )
-stale_shared_reverse = (
-    SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST - shared_reverse_dependency_edges
-)
-if stale_shared_reverse:
-    die(
-        "stale Shared→Feature migration edge(s): "
-        + format_edges(stale_shared_reverse)
-        + "; shrink the exact ratchet with the migration"
-    )
 
-# Automation may consume provider-owned execution Ports, but all remaining internal imports are
-# Stage-4 debt tracked by exact edge.
+for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "session"):
+    relative = path.relative_to(ROOT).as_posix()
+    if references_type(source, "LocalHarnessState"):
+        die(
+            f"{relative} makes Shared Session transitively depend on the aggregate Feature state; "
+            "use a neutral Session snapshot/provider contract"
+        )
+
+# Automation may consume provider-owned execution Ports; all other Chat/Work internals are forbidden.
 automation_internal_edges: set[tuple[str, str]] = set()
 for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "automation"):
     relative = path.relative_to(ROOT).as_posix()
@@ -375,26 +381,14 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "automation"):
             continue
         automation_internal_edges.add((relative, imported))
 
-unexpected_automation_internal = (
-    automation_internal_edges - AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST
-)
-if unexpected_automation_internal:
+if automation_internal_edges:
     die(
-        "new Automation→Feature-internal migration edge(s): "
-        + format_edges(unexpected_automation_internal)
+        "Automation→Feature-internal edge(s): "
+        + format_edges(automation_internal_edges)
         + "; consume provider-owned execution Ports instead"
     )
-stale_automation_internal = (
-    AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST - automation_internal_edges
-)
-if stale_automation_internal:
-    die(
-        "stale Automation internal-import migration edge(s): "
-        + format_edges(stale_automation_internal)
-        + "; shrink Stage 4 debt with the Port migration"
-    )
 
-# Settings is a product Feature. Its remaining Chat coupling is explicit Stage-5 migration debt.
+# Settings is a product Feature; cross-Feature internals are forbidden in the final graph.
 settings_internal_edges: set[tuple[str, str]] = set()
 for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "settings"):
     relative = path.relative_to(ROOT).as_posix()
@@ -406,27 +400,41 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "settings"):
         )):
             settings_internal_edges.add((relative, imported))
 
-unexpected_settings_internal = (
-    settings_internal_edges - SETTINGS_INTERNAL_IMPORT_MIGRATION_ALLOWLIST
-)
-if unexpected_settings_internal:
+if settings_internal_edges:
     die(
-        "new Settings→Feature-internal migration edge(s): "
-        + format_edges(unexpected_settings_internal)
+        "Settings→Feature-internal edge(s): "
+        + format_edges(settings_internal_edges)
         + "; expose a Settings-facing provider API/Port instead"
     )
-stale_settings_internal = (
-    SETTINGS_INTERNAL_IMPORT_MIGRATION_ALLOWLIST - settings_internal_edges
-)
-if stale_settings_internal:
-    die(
-        "stale Settings internal-import migration edge(s): "
-        + format_edges(stale_settings_internal)
-        + "; shrink Stage 5 debt with the migration"
-    )
 
-# UI may consume DTOs and presentation facades/projections. Direct implementation imports are
-# migration debt until Feature UI contribution is complete.
+# UI may consume DTOs and presentation facades/projections. Direct implementation or Feature behavior imports are forbidden.
+feature_ui_behavior_symbols: set[str] = set()
+for feature_name in ("chat", "work", "automation", "settings", "tools"):
+    for _path, feature_source in kotlin_sources_under(LOCAL_SOURCE_ROOT / feature_name):
+        package_match = re.search(r"^package\s+([\w.]+)", feature_source, re.MULTILINE)
+        if package_match is None:
+            continue
+        package_name = package_match.group(1)
+        for symbol in re.findall(
+            r"^(?:internal\s+|public\s+)?(?:suspend\s+)?fun\s+(?:<[^>]+>\s*)?(?:[\w<>?,.]+\.)?([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+            feature_source,
+            re.MULTILINE,
+        ):
+            feature_ui_behavior_symbols.add(f"{package_name}.{symbol}")
+        for symbol in re.findall(
+            r"^(?:internal\s+|public\s+)?object\s+([A-Za-z_][A-Za-z0-9_]*)\b",
+            feature_source,
+            re.MULTILINE,
+        ):
+            feature_ui_behavior_symbols.add(f"{package_name}.{symbol}")
+        for symbol in re.findall(
+            r"^(?:internal\s+|public\s+)?(?:const\s+)?val\s+([A-Za-z_][A-Za-z0-9_]*)\b",
+            feature_source,
+            re.MULTILINE,
+        ):
+            feature_ui_behavior_symbols.add(f"{package_name}.{symbol}")
+
+ui_feature_behavior_edges: set[tuple[str, str]] = set()
 ui_internal_edges: set[tuple[str, str]] = set()
 for path, source in kotlin_sources_under(UI_SOURCE_ROOT):
     relative = path.relative_to(ROOT).as_posix()
@@ -438,20 +446,21 @@ for path, source in kotlin_sources_under(UI_SOURCE_ROOT):
         symbol = imported.rsplit(".", 1)[-1]
         if symbol.endswith(UI_INTERNAL_IMPLEMENTATION_SUFFIXES):
             ui_internal_edges.add((relative, imported))
+        if imported in feature_ui_behavior_symbols:
+            ui_feature_behavior_edges.add((relative, imported))
 
-unexpected_ui_internal = ui_internal_edges - UI_INTERNAL_IMPORT_MIGRATION_ALLOWLIST
-if unexpected_ui_internal:
+if ui_internal_edges:
     die(
-        "new UI→internal implementation migration edge(s): "
-        + format_edges(unexpected_ui_internal)
+        "UI→internal implementation edge(s): "
+        + format_edges(ui_internal_edges)
         + "; UI must consume a Feature API/projection"
     )
-stale_ui_internal = UI_INTERNAL_IMPORT_MIGRATION_ALLOWLIST - ui_internal_edges
-if stale_ui_internal:
+
+if ui_feature_behavior_edges:
     die(
-        "stale UI internal-import migration edge(s): "
-        + format_edges(stale_ui_internal)
-        + "; shrink Stage 5 debt with the UI migration"
+        "UI imports Feature top-level behavior/value directly: "
+        + format_edges(ui_feature_behavior_edges)
+        + "; expose the policy through local.presentation / Feature UI API"
     )
 
 # Shared recovery must remain semantically neutral even when types are not imported.
@@ -616,7 +625,7 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
     relative = path.relative_to(ROOT).as_posix()
     if "runtimeStateStore.mutableState" in source or "runtime.mutableState" in source:
         die(f"{relative} bypasses the Runtime projection with writable aggregate state")
-    if "runtimeStateStore.projection.update(" in source and relative not in RUNTIME_PROJECTION_UPDATE_ALLOWLIST:
+    if "runtimeStateStore.projection.update(" in source and relative != RUNTIME_PROJECTION_UPDATE_OWNER:
         die(
             f"{relative} introduces a new aggregate write seam; "
             "use a domain StatePort or explicit Runtime projection command"
@@ -625,25 +634,26 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
 for feature_name in ("chat", "work"):
     for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / feature_name):
         relative = path.relative_to(ROOT).as_posix()
-        if (
-            "MutableStateFlow<LocalHarnessState>" in source
-            and relative not in FEATURE_AGGREGATE_WRITE_ALLOWLIST
-        ):
+        if "MutableStateFlow<LocalHarnessState>" in source:
             die(
                 f"{relative} introduces writable aggregate state inside {feature_name} Feature; "
                 "use domain-owned state or a narrow StatePort"
+            )
+        if re.search(r"\(\s*LocalHarnessState\s*\)\s*->\s*LocalHarnessState", source):
+            die(
+                f"{relative} exposes a full aggregate write transform inside {feature_name} Feature; "
+                "keep aggregate snapshots read-only and write through domain-owned state"
             )
 
 aggregate_ui_consumers: set[str] = set()
 for path, source in kotlin_sources_under(UI_SOURCE_ROOT):
     if references_type(source, "LocalHarnessState"):
         aggregate_ui_consumers.add(path.relative_to(ROOT).as_posix())
-unexpected_ui = sorted(aggregate_ui_consumers - UI_AGGREGATE_STATE_ALLOWLIST)
-if unexpected_ui:
-    die("UI must consume Feature/Shell projections instead of LocalHarnessState: " + ", ".join(unexpected_ui))
-stale_ui = sorted(UI_AGGREGATE_STATE_ALLOWLIST - aggregate_ui_consumers)
-if stale_ui:
-    die("stale UI aggregate-state allowlist entries: " + ", ".join(stale_ui))
+if aggregate_ui_consumers:
+    die(
+        "UI must consume Feature/Shell projections instead of LocalHarnessState: "
+        + ", ".join(sorted(aggregate_ui_consumers))
+    )
 
 for relative in NARROW_PORT_PATHS:
     source = strip_comments(read(relative))
@@ -772,6 +782,12 @@ if re.search(r"\bwhen\s*\(\s*page\s*\)", feature_page_host):
     die("central Feature page host must not dispatch product pages with when(page)")
 if "LocalFeatureUiContribution" not in feature_page_host:
     die("Feature page host lost the Feature UI contribution contract")
+if "LocalConversationSurfaceState" in feature_page_host:
+    die("central Feature page host must not broadcast Chat surface state to every Feature contribution")
+
+for required in ("drawerActions", "backAction", "restorePage"):
+    if required not in feature_page_host:
+        die("Feature UI contribution lost navigation ownership contract: " + required)
 
 feature_contribution_paths = {
     "SHELL": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalShellUiContribution.kt",
@@ -800,6 +816,35 @@ for module_id, relative in feature_contribution_paths.items():
             f"Feature UI contribution {module_id} must not compose sibling owners: "
             + ", ".join(sorted(foreign_markers))
         )
+    if "LocalHarnessViewModel" in contribution:
+        die(
+            f"Feature UI contribution {module_id} must consume narrow state/actions instead of LocalHarnessViewModel"
+        )
+
+    if module_id != "SHELL":
+        for required in ("drawerActions =", "backAction =", "restorePage ="):
+            if required not in contribution:
+                die(f"Feature UI contribution {module_id} lost {required.strip(' =')} ownership")
+
+feature_shell = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
+))
+for required in (
+    "localFeatureOwnedBackAction(",
+    "localFeatureRestoreStack(",
+    "openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE)",
+    "openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER)",
+    "openDrawerEntry(LocalFeatureDrawerEntry.GROUP_CHAT)",
+    "openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY)",
+    "openDrawerEntry(LocalFeatureDrawerEntry.DIARY)",
+    "openDrawerEntry(LocalFeatureDrawerEntry.TASKS)",
+    "openDrawerEntry(LocalFeatureDrawerEntry.TOOLS)",
+    "openDrawerEntry(LocalFeatureDrawerEntry.SETTINGS)",
+):
+    if required not in feature_shell:
+        die("Shell lost Feature-owned navigation dispatch: " + required)
+if re.search(r"openFeatureFromDrawer\(\s*LocalFeaturePage\.", feature_shell):
+    die("Shell must not hard-code product Drawer route ownership")
 
 plugin_composition = strip_comments(read(
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"

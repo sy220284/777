@@ -2,11 +2,7 @@ package com.labteto.dshmobile.local.settings
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
-import com.labteto.dshmobile.local.chat.ChatStyleGuard
-import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.model.LOCAL_WORKER_PROFILE_ID_PREFERENCE
 import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
@@ -124,78 +120,10 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
         personalizationWrites.trySend(generation to profile).getOrThrow()
     }
 
-    fun configureChatStyleGuard(enabled: Boolean) {
-        preferences.edit().putBoolean(KEY_CHAT_STYLE_GUARD, enabled).apply()
-        statePort.setChatStyleGuardEnabled(enabled)
-    }
-
-    fun addChatStyleGuardPhrase(value: String): Boolean {
-        val phrase = normalizeChatStyleGuardPhrase(value) ?: return false
-        val current = state.chatStyleGuardCustomPhrases
-        if (phrase in current || current.size >= MAX_CUSTOM_CHAT_FILTERS) return false
-        val updated = current + phrase
-        persistChatStyleGuardPhrases(updated)
-        statePort.setChatStyleGuardPhrases(updated)
-        return true
-    }
-
-    fun removeChatStyleGuardPhrase(value: String) {
-        val phrase = value.trim()
-        if (phrase.isEmpty()) return
-        val current = state.chatStyleGuardCustomPhrases
-        val updated = current.filterNot { it == phrase }
-        if (updated == current) return
-        persistChatStyleGuardPhrases(updated)
-        statePort.setChatStyleGuardPhrases(updated)
-    }
-
-    fun clearChatStyleGuardHits() {
-        statePort.clearStyleGuardHits()
-    }
-
-    fun chatStreamFilterPhrases(
-        snapshot: LocalHarnessState,
-        persona: PersonaProfile = snapshot.chat.chatPersona,
-    ): List<String> = ChatStyleGuard.activePhrases(
-        customPhrases = snapshot.chatStyleGuardCustomPhrases,
-        personaPhrases = persona.bannedPhrases,
-        enabled = snapshot.usageMode == LocalUsageMode.CHAT && snapshot.chatStyleGuardEnabled,
-    )
-
-    fun recordStyleGuardHits(violations: List<String>) {
-        statePort.recordStyleGuardHits(violations, MAX_STYLE_GUARD_HITS)
-    }
-
-    private fun persistChatStyleGuardPhrases(phrases: List<String>) {
-        preferences.edit()
-            .putString(KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES, phrases.joinToString("\n"))
-            .apply()
-    }
-
     companion object {
         const val KEY_MAIN_MAX_STEPS = "main_max_steps"
         const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
         const val KEY_MODEL_ATTEMPTS = "model_attempts"
         const val KEY_WORKER_PROFILE_ID = LOCAL_WORKER_PROFILE_ID_PREFERENCE
-        const val KEY_CHAT_STYLE_GUARD = "chat_style_guard_enabled"
-        const val KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES = "chat_style_guard_custom_phrases"
-        const val MAX_STYLE_GUARD_HITS = 20
-        const val MAX_CUSTOM_CHAT_FILTERS = 50
-        const val MAX_CUSTOM_CHAT_FILTER_CHARS = 32
-
-        fun loadChatStyleGuardCustomPhrases(preferences: SharedPreferences): List<String> =
-            preferences.getString(KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES, "")
-                .orEmpty()
-                .lineSequence()
-                .mapNotNull(::normalizeChatStyleGuardPhrase)
-                .distinct()
-                .take(MAX_CUSTOM_CHAT_FILTERS)
-                .toList()
-
-        private fun normalizeChatStyleGuardPhrase(value: String): String? =
-            value.replace('\n', ' ')
-                .trim()
-                .takeIf(String::isNotBlank)
-                ?.take(MAX_CUSTOM_CHAT_FILTER_CHARS)
     }
 }

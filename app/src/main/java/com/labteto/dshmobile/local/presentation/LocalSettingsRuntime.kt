@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.LocalWebProvider
+import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelRuntime
 import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
@@ -35,6 +36,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val modelRuntime: LocalModelRuntime,
     private val modelSettings: LocalModelSettingsCoordinator,
     private val settingsCoordinator: LocalHarnessSettingsCoordinator,
+    private val chatStyleGuardSettings: LocalChatStyleGuardSettingsPort,
     private val web: LocalWebProvider,
     private val sessionStorage: LocalSessionStorageRuntime,
     runtimeStateStore: LocalRuntimeStateStore,
@@ -51,6 +53,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     val state: Flow<LocalHarnessSettingsState> = runtimeState.map { it.toSettingsUiState() }.distinctUntilChanged()
     val initialState get() = runtimeState.value.toSettingsUiState()
     val chatGptState: StateFlow<ChatGptUiState> = chatGpt.state
+    val chatStyleGuardBuiltInPhrases: List<String> get() = chatStyleGuardSettings.builtInPhrases
 
     fun memoryContext(): LocalSettingsMemoryContext = runtimeState.value.let {
         LocalSettingsMemoryContext(it.conversationMode, it.projectId, it.lineageId)
@@ -76,10 +79,10 @@ class LocalSettingsRuntime @Inject internal constructor(
         }
     fun configurePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean) =
         settingsCoordinator.configurePersonalization(rules, autoRecall, autoMemory)
-    fun configureChatStyleGuard(enabled: Boolean) = settingsCoordinator.configureChatStyleGuard(enabled)
-    fun addChatStyleGuardPhrase(value: String) = settingsCoordinator.addChatStyleGuardPhrase(value)
-    fun removeChatStyleGuardPhrase(value: String) = settingsCoordinator.removeChatStyleGuardPhrase(value)
-    fun clearChatStyleGuardHits() = settingsCoordinator.clearChatStyleGuardHits()
+    fun configureChatStyleGuard(enabled: Boolean) = chatStyleGuardSettings.configureEnabled(enabled)
+    fun addChatStyleGuardPhrase(value: String) = chatStyleGuardSettings.addPhrase(value)
+    fun removeChatStyleGuardPhrase(value: String) = chatStyleGuardSettings.removePhrase(value)
+    fun clearChatStyleGuardHits() = chatStyleGuardSettings.clearHits()
     suspend fun diagnoseNetwork(target: String) = web.diagnose(target)
     suspend fun sessionStorageStatus(): LocalSessionStorageStatus = sessionStorage.storageStatus()
     suspend fun compactSessionStorage(): LocalSessionStorageStatus = sessionStorage.compactStorage()

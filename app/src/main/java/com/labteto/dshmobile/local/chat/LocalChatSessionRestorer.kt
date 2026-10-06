@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalSessionControlProjection
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.chatSystemPrompt
@@ -27,7 +26,7 @@ internal class LocalChatSessionRestorer @Inject constructor(
 
     internal suspend fun restore(
         usageMode: LocalUsageMode,
-        controls: LocalSessionControlProjection,
+        controls: LocalChatDurableState,
         messages: List<LocalHarnessMessage>,
         log: LocalSessionEventLog,
     ): LocalChatSessionRestore = withContext(Dispatchers.IO) {

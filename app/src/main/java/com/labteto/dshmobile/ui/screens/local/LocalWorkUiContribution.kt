@@ -6,26 +6,43 @@ import com.labteto.dshmobile.local.presentation.LocalHarnessShellState
 internal fun localWorkFeatureUiContribution(
     filesMode: LocalFilesMode,
     shell: LocalHarnessShellState,
-    viewModel: LocalHarnessViewModel,
+    actions: LocalWorkFeatureUiActions,
     onFilesModeChange: (LocalFilesMode) -> Unit,
     onPushFeature: (LocalFeaturePage) -> Unit,
     onPopFeature: () -> Unit,
-): LocalFeatureUiContribution = LocalFeatureUiContribution(LocalFeatureModuleId.WORK) { page ->
+    onOpenFromDrawer: (LocalFeaturePage) -> Unit,
+    onCloseDrawer: () -> Unit,
+): LocalFeatureUiContribution = LocalFeatureUiContribution(
+    moduleId = LocalFeatureModuleId.WORK,
+    drawerActions = mapOf(
+        LocalFeatureDrawerEntry.WORKSPACE to {
+            onFilesModeChange(LocalFilesMode.WORKSPACE)
+            onOpenFromDrawer(LocalFeaturePage.WORKSPACE)
+            onCloseDrawer()
+        },
+        LocalFeatureDrawerEntry.RUN_CENTER to {
+            onOpenFromDrawer(LocalFeaturePage.RUN_CENTER)
+            onCloseDrawer()
+        },
+    ),
+    backAction = { _, edge -> localFeatureProductBackAction(edge) },
+    restorePage = ::localFeatureRestoreOwnedPage,
+) { page ->
     when (page) {
         LocalFeaturePage.WORKSPACE -> LocalWorkspaceFilesDialog(
             mode = filesMode,
             sessionId = shell.sessionId,
             workspacePath = shell.workspacePath,
-            loadWorkspace = viewModel::workspaceFiles,
-            loadConversation = viewModel::conversationFiles,
-            loadPreview = viewModel::previewWorkspaceFile,
+            loadWorkspace = actions.workspaceFiles,
+            loadConversation = actions.conversationFiles,
+            loadPreview = actions.previewWorkspaceFile,
             onDismiss = onPopFeature,
         )
-        LocalFeaturePage.RUN_CENTER -> LocalWorkStateContent(viewModel) { workState ->
+        LocalFeaturePage.RUN_CENTER -> LocalWorkStateContent(actions.workState) { workState ->
             LocalRunCenterScreen(
                 state = workState,
-                onJobOutput = viewModel::backgroundJobOutput,
-                onStopJob = viewModel::stopBackgroundJob,
+                onJobOutput = actions.backgroundJobOutput,
+                onStopJob = actions.stopBackgroundJob,
                 onOpenResults = {
                     onFilesModeChange(LocalFilesMode.CONVERSATION)
                     onPushFeature(LocalFeaturePage.WORKSPACE)

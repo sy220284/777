@@ -1,10 +1,8 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalChatReplyCoordinator
-import com.labteto.dshmobile.local.LocalChatTurnCoordinator
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalModelRequestCoordinator
-import com.labteto.dshmobile.local.LocalSessionCoordinator
+import com.labteto.dshmobile.local.session.LocalSessionCoordinator
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
@@ -62,6 +60,7 @@ import kotlinx.serialization.json.put
 @javax.inject.Singleton
 internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject constructor(
     private val runtimeStateStore: com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore,
+    private val styleGuardSettings: LocalChatStyleGuardSettingsPort,
     private val sessionStorage: com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime,
     private val persistence: LocalChatPersistence,
     private val chatComposition: LocalChatComposition,
@@ -422,7 +421,7 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                     reply = rawReply,
                     recordUsage = { candidate -> usageTracker.recordAutomation(boundState, candidate, TokenUsageAction.AUTOMATION_CHAT, proactiveDirective) },
                     onGuardEvent = { action, violations ->
-                        runtimeStateStore.projection.recordStyleGuardHits(violations, 20)
+                        styleGuardSettings.recordHits(violations)
                         boundEventLog.append("chat/style-guard", buildJsonObject {
                             put("action", action)
                             put("automation", true)
@@ -453,7 +452,7 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                         reply = retryRawReply,
                         recordUsage = { candidate -> usageTracker.recordAutomation(boundState, candidate, TokenUsageAction.CHAT_REPAIR, proactiveDirective) },
                         onGuardEvent = { action, violations ->
-                            runtimeStateStore.projection.recordStyleGuardHits(violations, 20)
+                            styleGuardSettings.recordHits(violations)
                             boundEventLog.append("chat/style-guard", buildJsonObject {
                                 put("action", action)
                                 put("automation", true)
@@ -570,10 +569,11 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                             transcriptWindow = (latestWindow + proactiveMessage)
                                 .takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
                             transcriptIndex = nextTranscriptIndex,
+                            transcriptProjectedThroughSequence = assistantEvent.sequence,
+                        ).withChatSessionDomain(
                             chatState = nextChatState,
                             chatContext = nextContext,
                             chatBranches = nextBranches,
-                            transcriptProjectedThroughSequence = assistantEvent.sequence,
                         ),
                     )
                 }

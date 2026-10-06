@@ -2,11 +2,8 @@ package com.labteto.dshmobile.local.chat
 
 import android.content.Context
 import com.labteto.dshmobile.local.ForegroundTokenUsageSeed
-import com.labteto.dshmobile.local.LocalChatReplyCoordinator
-import com.labteto.dshmobile.local.LocalChatTurnCoordinator
 import com.labteto.dshmobile.local.LocalModelRequestCoordinator
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.boundedChatRequestHistory
 import com.labteto.dshmobile.local.model.LocalImageCapability
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
@@ -237,9 +234,9 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     toolsOverride = JsonArray(emptyList()),
                     publishPreviewEnabled = false,
                     streamFilterPhrases = ChatStyleGuard.activePhrases(
-                        customPhrases = snapshot.chatStyleGuardCustomPhrases,
+                        customPhrases = snapshot.chat.chatStyleGuardCustomPhrases,
                         personaPhrases = turnContext.persona.bannedPhrases,
-                        enabled = snapshot.chatStyleGuardEnabled,
+                        enabled = snapshot.chat.chatStyleGuardEnabled,
                     ),
                     persistOverflowHistory = true,
                     requestLog = eventLog,

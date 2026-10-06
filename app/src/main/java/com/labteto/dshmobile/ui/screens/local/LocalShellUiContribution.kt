@@ -1,7 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -12,12 +14,13 @@ import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.presentation.LocalHarnessShellState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 @Composable
 internal fun localShellFeatureUiContribution(
     shell: LocalHarnessShellState,
-    state: LocalConversationSurfaceState,
+    state: StateFlow<LocalConversationSurfaceState>,
     activeModelProfile: LocalModelProfile?,
     sendFeedback: LocalSendFeedbackState,
     gallery: List<PersonaGalleryEntry>,
@@ -25,19 +28,23 @@ internal fun localShellFeatureUiContribution(
     modeIntro: LocalUsageMode?,
     pinnedSessionIds: Set<String>,
     sessionTitleOverrides: Map<String, String>,
-    viewModel: LocalHarnessViewModel,
+    actions: LocalShellFeatureUiActions,
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
     onPushFeature: (LocalFeaturePage) -> Unit,
     onNewSession: () -> Unit,
 ): LocalFeatureUiContribution {
     val scope = rememberCoroutineScope()
-    return LocalFeatureUiContribution(LocalFeatureModuleId.SHELL) { page ->
+    val surface by state.collectAsStateWithLifecycle()
+    return LocalFeatureUiContribution(
+        moduleId = LocalFeatureModuleId.SHELL,
+        restorePage = ::localFeatureRestoreOwnedPage,
+    ) { page ->
         check(page == LocalFeaturePage.HOME) { "Shell received non-HOME route: $page" }
         LocalConversationSurface(
-            state = state,
+            state = surface,
             activeModelProfile = activeModelProfile,
             sendFeedback = sendFeedback,
-            streamingState = viewModel.streamingState,
+            streamingState = actions.streamingState,
             gallery = gallery,
             transcriptHistory = transcriptHistory,
             modeIntro = modeIntro,
@@ -45,42 +52,42 @@ internal fun localShellFeatureUiContribution(
                 onSettingsDestinationChange(SettingsDestination.ROOT)
                 onPushFeature(LocalFeaturePage.SETTINGS)
             },
-            onSelectModel = viewModel::selectModel,
-            onSend = viewModel::send,
-            onEditAndResend = viewModel::editAndResendUserMessage,
-            onSelectMessageVariant = viewModel::selectChatMessageVariant,
-            onRegenerate = viewModel::regenerateReply,
-            onGenerateReplySuggestions = viewModel::generateReplySuggestions,
-            onLoadOlderTranscript = viewModel::loadOlderTranscript,
-            onImportAttachment = viewModel::importAttachment,
-            onStop = viewModel::stop,
+            onSelectModel = actions.selectModel,
+            onSend = actions.send,
+            onEditAndResend = actions.editAndResend,
+            onSelectMessageVariant = actions.selectMessageVariant,
+            onRegenerate = actions.regenerate,
+            onGenerateReplySuggestions = actions.generateReplySuggestions,
+            onLoadOlderTranscript = actions.loadOlderTranscript,
+            onImportAttachment = actions.importAttachment,
+            onStop = actions.stop,
             onNewSession = onNewSession,
-            onExitGroupChat = viewModel::leaveGroupChatMode,
+            onExitGroupChat = actions.exitGroupChat,
             onOpenRunCenter = { onPushFeature(LocalFeaturePage.RUN_CENTER) },
-            sessionTitle = sessionTitleOverrides[state.sessionId]
-                ?: shell.sessions.firstOrNull { it.id == state.sessionId }?.title
+            sessionTitle = sessionTitleOverrides[surface.sessionId]
+                ?: shell.sessions.firstOrNull { it.id == surface.sessionId }?.title
                 ?: stringResource(R.string.chatlist_new_session),
-            sessionPinned = state.sessionId in pinnedSessionIds,
-            onTogglePinSession = { viewModel.toggleSessionPinned(state.sessionId) },
-            onRenameSession = { title -> viewModel.renameSession(state.sessionId, title) },
-            onDeleteSession = { scope.launch { viewModel.deleteSessions(setOf(state.sessionId)) } },
-            onConfigureChatPersona = viewModel::configureChatPersona,
-            onConfigureGroupMembers = viewModel::configureGroupChatMembers,
-            onSelectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
-            onAutoFillChatPersona = viewModel::autoFillChatPersona,
-            onSaveGroupAnnouncement = viewModel::setGroupChatAnnouncement,
-            onGenerateGroupAnnouncement = viewModel::generateGroupChatAnnouncement,
-            onUndoPersonaCorrection = viewModel::undoChatPersonaCorrection,
-            onPlanModeChange = viewModel::setPlanMode,
-            onApprove = viewModel::approve,
-            onDeny = viewModel::deny,
-            onAutoApprove = viewModel::enableAutoApproval,
-            onAutoApprovePending = viewModel::enableAutoApprovalForPending,
-            onApproveDeviceTurn = viewModel::enableDeviceApprovalLease,
-            onDisableDeviceTurn = viewModel::disableDeviceApprovalLease,
-            onDisableAutoApprove = viewModel::disableAutoApproval,
-            onAnswerQuestion = viewModel::answerQuestion,
-            onCancelQuestion = viewModel::cancelQuestion,
+            sessionPinned = surface.sessionId in pinnedSessionIds,
+            onTogglePinSession = { actions.toggleSessionPinned(surface.sessionId) },
+            onRenameSession = { title -> actions.renameSession(surface.sessionId, title) },
+            onDeleteSession = { scope.launch { actions.deleteSessions(setOf(surface.sessionId)) } },
+            onConfigureChatPersona = actions.configureChatPersona,
+            onConfigureGroupMembers = actions.configureGroupMembers,
+            onSelectGalleryPersona = actions.selectGalleryPersona,
+            onAutoFillChatPersona = actions.autoFillChatPersona,
+            onSaveGroupAnnouncement = actions.saveGroupAnnouncement,
+            onGenerateGroupAnnouncement = actions.generateGroupAnnouncement,
+            onUndoPersonaCorrection = actions.undoPersonaCorrection,
+            onPlanModeChange = actions.setPlanMode,
+            onApprove = actions.approve,
+            onDeny = actions.deny,
+            onAutoApprove = actions.enableAutoApproval,
+            onAutoApprovePending = actions.enableAutoApprovalForPending,
+            onApproveDeviceTurn = actions.enableDeviceApprovalLease,
+            onDisableDeviceTurn = actions.disableDeviceApprovalLease,
+            onDisableAutoApprove = actions.disableAutoApproval,
+            onAnswerQuestion = actions.answerQuestion,
+            onCancelQuestion = actions.cancelQuestion,
         )
     }
 }

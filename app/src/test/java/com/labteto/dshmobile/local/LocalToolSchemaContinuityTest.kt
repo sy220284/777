@@ -41,11 +41,25 @@ class LocalToolSchemaContinuityTest {
         val previous = JsonArray(listOf(tool("a"), tool("b")))
         val reordered = JsonArray(listOf(tool("b"), tool("a"), tool("c")))
 
-        val deepSeek = stableRunToolSchemas(previous, reordered, LocalHarnessState())
+        val deepSeek = stableRunToolSchemas(
+            previous,
+            reordered,
+            LocalModelProfile(
+                id = "deepseek",
+                model = "deepseek-flash",
+                baseUrl = "https://api.deepseek.com",
+                provider = "DeepSeek",
+            ).toRunModelSurface(),
+        )
         val unknown = stableRunToolSchemas(
             previous,
             reordered,
-            LocalHarnessState(modelState = com.labteto.dshmobile.local.model.LocalModelState(model = "custom", baseUrl = "https://proxy.example/v1")),
+            LocalModelProfile(
+                id = "custom",
+                model = "custom",
+                baseUrl = "https://proxy.example/v1",
+                provider = "Custom",
+            ).toRunModelSurface(),
         )
 
         assertEquals(listOf("a", "b", "c"), names(deepSeek))

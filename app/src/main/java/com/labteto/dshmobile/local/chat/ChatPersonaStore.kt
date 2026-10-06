@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.persistence.RecoveringDocumentFile
+
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -130,7 +132,7 @@ class ChatPersonaStore internal constructor(
             migrationMarker = File(context.filesDir, "local-harness/chat/personas-v1-to-v2.done"),
         )
 
-    private val durableFile = RecoveringChatDocumentFile(file)
+    private val durableFile = RecoveringDocumentFile(file)
 
     private val backupFile = File(file.parentFile, "${file.name}.bak")
     private var cachedDocument: PersonaDocument? = null

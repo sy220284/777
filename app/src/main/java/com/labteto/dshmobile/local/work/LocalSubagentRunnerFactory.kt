@@ -1,16 +1,18 @@
-package com.labteto.dshmobile.local.agent
+package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.capability.HarnessVirtualDisplayProvider
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalSubagentRunner
 import com.labteto.dshmobile.local.LocalToolOutputStore
+import com.labteto.dshmobile.local.agent.LocalSubagentCompactionPolicy
+import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.context.ContextRequest
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.localHistoryBudgetFor
 import com.labteto.dshmobile.local.memory.LocalMemoryTools
+import com.labteto.dshmobile.local.memory.LocalMemoryToolContext
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
@@ -54,6 +56,7 @@ internal class LocalSubagentRunnerFactory(
     private val eventLogFor: (String) -> LocalSessionEventLog,
     private val defaultState: StateFlow<LocalHarnessState>,
     private val defaultSessionId: () -> String,
+    private val compactionPolicy: LocalSubagentCompactionPolicy,
 ) {
     fun createBound(
         sessionId: String,
@@ -73,7 +76,14 @@ internal class LocalSubagentRunnerFactory(
         val boundMemoryTools = LocalMemoryTools(
             memoryStore,
             memoryManager,
-            state = { boundState },
+            context = {
+                LocalMemoryToolContext(
+                    usageMode = boundState.usageMode,
+                    conversationMode = boundState.conversationMode,
+                    projectId = boundState.projectId,
+                    lineageId = boundState.lineageId,
+                )
+            },
             sessionId = { sessionId },
         )
         return create(
@@ -148,5 +158,6 @@ internal class LocalSubagentRunnerFactory(
         runSessionId = runSessionId,
         runKind = runKind,
         modelAdmission = modelAdmission,
+        compactionPolicy = compactionPolicy,
     )
 }

@@ -19,8 +19,6 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.agent.localAgentRunPolicy
 import com.labteto.dshmobile.local.context.ContextComposer
-import com.labteto.dshmobile.local.context.LocalWorkTurnPromptContext
-import com.labteto.dshmobile.local.context.composeWorkTurnContext
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalImageCapability
 import com.labteto.dshmobile.local.model.LocalModelGateway
@@ -68,6 +66,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -108,12 +107,9 @@ internal class LocalWorkAgentTurnExecutor(
     private class BoundRunState(
         private val binding: LocalWorkRunBinding,
     ) {
+        /** Read-only compatibility snapshot for Shared request APIs; Work writes stay domain-owned. */
         val value: LocalHarnessState
             get() = binding.aggregateSnapshot()
-
-        fun update(transform: (LocalHarnessState) -> LocalHarnessState) {
-            binding.state.value = transform(binding.aggregateSnapshot()).toLocalWorkRunState()
-        }
     }
 
     internal suspend fun run(
@@ -147,7 +143,7 @@ internal class LocalWorkAgentTurnExecutor(
             var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
             heldSession = foregroundSessionId
             LocalExecutionService.holdTurn(context, foregroundSessionId)
-            runState.update {
+            binding.state.update {
                 it.copy(
                     work = it.work.copy(
                         workflowProgress = null,
@@ -266,7 +262,7 @@ internal class LocalWorkAgentTurnExecutor(
                     workModelHistoryRuntime.drainPendingInputs(binding)
                     val snapshot = runState.value
                     val tools = modelToolStepSurface.capture(
-                        runToolSurface.next(workTurnToolRuntime.schemas(runPolicy, binding), snapshot),
+                        runToolSurface.next(workTurnToolRuntime.schemas(runPolicy, binding)),
                     )
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
@@ -321,7 +317,7 @@ internal class LocalWorkAgentTurnExecutor(
                                     binding,
                                 )
                             },
-                            contextPolicy = LocalWorkRequestContextPolicy,
+                            contextPolicy = LocalWorkRequestContextPolicy(structuredWorkState(snapshot, runEventLog)),
                             admission = binding.executionControl.asModelAdmissionPort(),
                         ).also {
                             if (nativeImagesSent) {
@@ -584,7 +580,7 @@ internal class LocalWorkAgentTurnExecutor(
                     enabled = runPolicy.allowToolExecution,
                     configuredBase = mainMaxSteps,
                     task = input,
-                    state = { runState.value },
+                    kernelState = { runState.value.kernel },
                     pressure = { resourceScheduler.snapshot().pressure },
                     onExtended = { runEventLog.append("turn/budget-extended", it) },
                     canExtend = progressTracker::claimExtensionProgress,
@@ -610,7 +606,7 @@ internal class LocalWorkAgentTurnExecutor(
                 )
                 val queued = queueAutomaticWorkContinuation(binding, runContext.runId, timeoutError)
                 if (!queued) {
-                    runState.update { it.copy(error = "本轮执行超过 15 分钟，已暂停并保留已有进度") }
+                    binding.state.update { it.copy(error = "本轮执行超过 15 分钟，已暂停并保留已有进度") }
                 }
             } catch (_: CancellationException) {
                 binding.runHandle.cancellationRequested = true
@@ -625,12 +621,12 @@ internal class LocalWorkAgentTurnExecutor(
                     false
                 }
                 if (!queued) {
-                    runState.update { it.copy(error = error.message ?: "本机执行失败") }
+                    binding.state.update { it.copy(error = error.message ?: "本机执行失败") }
                 }
                 // TurnFailed has already settled tool side effects and checkpointed model-visible state.
             } finally {
                 binding.interactions.cancelAll()
-                runState.update {
+                binding.state.update {
                     it.copy(
                         work = it.work.copy(
                             pendingApproval = null,
@@ -645,7 +641,7 @@ internal class LocalWorkAgentTurnExecutor(
                     workModelHistoryRuntime.persist(binding)
                 } catch (error: Exception) {
                     if (error is CancellationException) throw error
-                    runState.update { current -> current.copy(error = "Work 回合已结束，快照保存失败：${error.message}") }
+                    binding.state.update { current -> current.copy(error = "Work 回合已结束，快照保存失败：${error.message}") }
                 } finally {
                     try {
                         try { LocalExecutionService.releaseTurn(context, foregroundSessionId, foregroundOutcome) }

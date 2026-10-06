@@ -76,7 +76,6 @@ import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageRecord
-import com.labteto.dshmobile.local.chat.ChatStyleGuard
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -514,7 +513,7 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.CHAT -> {
-                        val builtInFilters = ChatStyleGuard.bannedPhrases
+                        val builtInFilters = viewModel.chatStyleGuardBuiltInPhrases
                         val customFilters = localHarness.chatStyleGuardCustomPhrases
                         val personaFilters = localHarness.chatPersona.bannedPhrases
                             .map(String::trim)

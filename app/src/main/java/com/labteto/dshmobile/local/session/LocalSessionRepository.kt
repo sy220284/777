@@ -1,11 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
-import com.labteto.dshmobile.local.session.LocalHarnessSession
-import com.labteto.dshmobile.local.session.LocalSessionDomainCodec
-import com.labteto.dshmobile.local.session.LocalSessionSummary
-import com.labteto.dshmobile.local.session.LocalSessionSummaryIndex
 import com.labteto.dshmobile.observability.AppLog
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap

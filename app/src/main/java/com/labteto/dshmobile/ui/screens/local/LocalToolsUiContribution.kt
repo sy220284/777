@@ -10,7 +10,19 @@ internal fun localToolsFeatureUiContribution(
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
     onPushFeature: (LocalFeaturePage) -> Unit,
     onPopFeature: () -> Unit,
-): LocalFeatureUiContribution = LocalFeatureUiContribution(LocalFeatureModuleId.TOOLS) { page ->
+    onOpenFromDrawer: (LocalFeaturePage) -> Unit,
+    onCloseDrawer: () -> Unit,
+): LocalFeatureUiContribution = LocalFeatureUiContribution(
+    moduleId = LocalFeatureModuleId.TOOLS,
+    drawerActions = mapOf(
+        LocalFeatureDrawerEntry.TOOLS to {
+            onOpenFromDrawer(LocalFeaturePage.TOOLS)
+            onCloseDrawer()
+        },
+    ),
+    backAction = { _, edge -> localFeatureProductBackAction(edge) },
+    restorePage = ::localFeatureRestoreOwnedPage,
+) { page ->
     check(page == LocalFeaturePage.TOOLS) { "Tools received non-TOOLS route: $page" }
     ToolsScreen(
         onClose = onPopFeature,

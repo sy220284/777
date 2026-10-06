@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.editedChatUserModelMessage
+
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
@@ -10,6 +12,7 @@ import com.labteto.dshmobile.local.chat.ChatDiaryWriteRequest
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
+import com.labteto.dshmobile.local.chat.projectChatSessionControls
 import com.labteto.dshmobile.local.chat.LocalTimelineRewriteProjectionInput
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.LocalTimelineRewriteState
@@ -76,10 +79,9 @@ class LocalTimelineRewriteTransactionTest {
                     codec = ModelHistoryCheckpointCodec(),
                 ).messages,
             )
-            val projected = projectSessionControlTail(
+            val projected = projectChatSessionControls(
                 snapshot = LocalHarnessSession(id = "session"),
                 events = listOf(event),
-                sequenceExclusive = -1L,
             )
             assertEquals("稳定", projected.chatState.mood)
             assertEquals(7L, projected.chatContext.generation)
@@ -120,10 +122,9 @@ class LocalTimelineRewriteTransactionTest {
                     codec = ModelHistoryCheckpointCodec(),
                 ).messages,
             )
-            val projected = projectSessionControlTail(
+            val projected = projectChatSessionControls(
                 LocalHarnessSession(id = "session"),
                 listOf(event),
-                -1L,
             )
             assertEquals("安心", projected.chatState.mood)
             assertEquals(9L, projected.chatContext.generation)

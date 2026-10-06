@@ -1,9 +1,8 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.decodeLocalAgentInboxPending
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.LocalTimelineRewriteProjectionInput
@@ -16,7 +15,6 @@ import com.labteto.dshmobile.local.chat.recoverPendingTimelineRewriteProjection
 import com.labteto.dshmobile.local.chat.sourceEventSequenceForMessage
 import com.labteto.dshmobile.local.chat.timelineRewriteEditedModelMessage
 import com.labteto.dshmobile.local.chat.withEditedChatUserText
-import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.replaceLocalUserModelMessageText
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
@@ -27,97 +25,10 @@ import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-
-internal fun editAndResendWorkUserMessage(
-    messageId: String,
-    requestedText: String,
-    eventLog: LocalSessionEventLog,
-    memoryStore: MemoryStore,
-    galleryStore: ChatPersonaGalleryStore,
-    modelHistory: LocalModelHistoryBuffer,
-    modelHistoryCheckpointCodec: ModelHistoryCheckpointCodec,
-    stateFlow: MutableStateFlow<LocalHarnessState>,
-    updateContextMetrics: () -> Unit,
-    updateTranscriptProjectionCursor: (Long) -> Unit,
-    checkpointModelHistory: (String) -> Unit,
-    persist: () -> Unit,
-    newUserMessage: (String) -> LocalHarnessMessage,
-    startTurn: (String, String, String) -> Unit,
-): LocalChatUserEditResult {
-    val state = stateFlow.value
-    val activeTranscript = LocalSessionTranscriptPager(eventLog).all()
-    val originalIndex = activeTranscript.indexOfFirst { message -> message.id == messageId }
-    if (originalIndex < 0) return LocalChatUserEditResult.MESSAGE_MISSING
-    val original = activeTranscript[originalIndex]
-    if (original.role != "user") return LocalChatUserEditResult.MESSAGE_MISSING
-
-    val content = withEditedChatUserText(original, requestedText)
-    if (content.isBlank()) return LocalChatUserEditResult.EMPTY
-    if (editableChatUserText(original).trim() == requestedText) return LocalChatUserEditResult.UNCHANGED
-
-    val sourceSequence = sourceEventSequenceForMessage(eventLog, messageId)
-        ?: return LocalChatUserEditResult.MESSAGE_MISSING
-    val eventsBeforeEdit = eventLog.snapshot().filter { event -> event.sequence < sourceSequence }
-    val restoredHistory = restoreLocalModelHistory(
-        events = eventsBeforeEdit,
-        legacyFallback = emptyList(),
-        codec = modelHistoryCheckpointCodec,
-    ).messages
-    val restoredControls = projectSessionControlTail(
-        snapshot = LocalHarnessSession(id = state.sessionId),
-        events = eventsBeforeEdit,
-        sequenceExclusive = -1L,
-    )
-    val retainedPrefix = activeTranscript.take(originalIndex)
-    val discarded = activeTranscript.drop(originalIndex)
-    val editedModelMessage = editedChatUserModelMessage(eventLog, messageId, content)
-    val edited = newUserMessage(content)
-    val rewritten = retainedPrefix + edited
-    val rewrittenHistory = restoredHistory + editedModelMessage
-    val rewrite = appendTimelineRewriteCommit(
-        eventLog = eventLog,
-        reason = "work-user-edited",
-        activeTranscript = rewritten,
-        modelHistory = rewrittenHistory,
-        state = LocalTimelineRewriteState(
-            chatState = state.chat.chatState,
-            chatContext = state.chat.chatContext,
-            chatBranches = LocalChatBranchState(),
-            groupChat = state.chat.groupChat,
-        ),
-        projection = LocalTimelineRewriteProjectionInput(
-            sourceSessionId = state.sessionId,
-            createdAtInclusive = original.createdAt,
-            discardedMessageIds = discarded.map(LocalHarnessMessage::id),
-        ),
-        editedMessageId = edited.id,
-        editedModelMessage = editedModelMessage,
-    )
-    updateTranscriptProjectionCursor(rewrite.sequence)
-
-    modelHistory.reset(rewrittenHistory)
-    updateContextMetrics()
-    stateFlow.update { current ->
-        current.copy(
-            messages = rewritten.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES),
-            transcriptIndex = buildLocalTranscriptRuntimeIndex(rewritten),
-            work = current.work.copy(
-            ),
-            error = null,
-        )
-    }
-    recoverPendingTimelineRewriteProjection(eventLog, memoryStore, galleryStore)
-    checkpointModelHistory("work/user-edit-commit")
-    persist()
-    startTurn(content, requestedText, edited.id)
-    return LocalChatUserEditResult.SENT
-}
 
 internal fun editedChatUserModelMessage(
     eventLog: LocalSessionEventLog,

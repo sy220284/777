@@ -10,7 +10,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.session.LocalSessionArchiveMaintenance
-import com.labteto.dshmobile.local.settings.LocalHarnessSettingsCoordinator
+import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import com.labteto.dshmobile.local.work.LocalWorkComposition
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -34,6 +34,7 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
     private val work: LocalWorkComposition,
     private val foregroundWake: LocalForegroundTurnWakeCoordinator,
     private val foregroundSessionLoader: LocalForegroundSessionLoader,
+    private val chatStyleGuardSettings: LocalChatStyleGuardSettingsPort,
 ) : LocalRuntimeBootstrapPort {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
@@ -41,13 +42,16 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
     private val workspace get() = sessionStorage.files.workspace
 
     override fun initialize(scope: CoroutineScope, initialSessionId: String) {
+        val chatGuard = chatStyleGuardSettings.initialSettings()
         runtimeStateStore.initialize(
             LocalHarnessState(
                 workspacePath = workspace.path,
                 sessionId = initialSessionId,
                 usage = usageTracker.state.value,
-                chatStyleGuardEnabled = preferences.getBoolean(LocalHarnessSettingsCoordinator.KEY_CHAT_STYLE_GUARD, true),
-                chatStyleGuardCustomPhrases = LocalHarnessSettingsCoordinator.loadChatStyleGuardCustomPhrases(preferences),
+                chat = com.labteto.dshmobile.local.chat.LocalChatState(
+                    chatStyleGuardEnabled = chatGuard.enabled,
+                    chatStyleGuardCustomPhrases = chatGuard.customPhrases,
+                ),
             ),
         )
         scope.launch {

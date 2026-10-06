@@ -1,9 +1,6 @@
 package com.labteto.dshmobile.local.session
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import java.util.UUID
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -16,36 +13,12 @@ internal interface LocalTranscriptStatePort {
     fun appendMessages(messages: List<LocalHarnessMessage>, runtimeWindowMessages: Int)
 }
 
-internal fun localAggregateTranscriptStatePort(
-    state: MutableStateFlow<LocalHarnessState>,
-): LocalTranscriptStatePort = object : LocalTranscriptStatePort {
-    override fun appendMessages(messages: List<LocalHarnessMessage>, runtimeWindowMessages: Int) {
-        state.update { current ->
-            current.copy(
-                messages = (current.messages + messages).takeLast(runtimeWindowMessages),
-                transcriptIndex = appendLocalTranscriptRuntimeIndex(current.transcriptIndex, messages),
-            )
-        }
-    }
-}
-
 internal class LocalTranscriptRuntime(
     private val state: LocalTranscriptStatePort,
     private val pruneToolResult: (String) -> String,
     private val runtimeWindowMessages: Int,
     private val onProjected: (Long) -> Unit,
 ) {
-    constructor(
-        state: MutableStateFlow<LocalHarnessState>,
-        pruneToolResult: (String) -> String,
-        runtimeWindowMessages: Int,
-        onProjected: (Long) -> Unit,
-    ) : this(
-        state = localAggregateTranscriptStatePort(state),
-        pruneToolResult = pruneToolResult,
-        runtimeWindowMessages = runtimeWindowMessages,
-        onProjected = onProjected,
-    )
 
     fun newMessage(
         role: String,

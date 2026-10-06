@@ -13,6 +13,7 @@ import com.labteto.dshmobile.local.runtime.LocalDiagnosticsRuntime
 import com.labteto.dshmobile.local.runtime.LocalRuntimeBootstrapPort
 import com.labteto.dshmobile.local.runtime.LocalWorkDiagnosticsProvider
 import com.labteto.dshmobile.local.session.LocalActiveSessionScopeProvider
+import com.labteto.dshmobile.local.session.LocalCurrentSessionSnapshotProvider
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.session.LocalSessionLifecyclePort
 import com.labteto.dshmobile.local.tools.LocalToolsManagementPort
@@ -89,6 +90,12 @@ internal object LocalFeatureExecutionPortModule {
     fun provideLocalSessionLifecyclePort(
         composition: LocalSessionComposition,
     ): LocalSessionLifecyclePort = composition
+
+    @Provides
+    @Singleton
+    fun provideLocalCurrentSessionSnapshotProvider(
+        composition: LocalCurrentSessionSnapshotComposition,
+    ): LocalCurrentSessionSnapshotProvider = composition
 
     @Provides
     @Singleton

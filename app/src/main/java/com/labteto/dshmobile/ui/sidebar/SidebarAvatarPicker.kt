@@ -49,7 +49,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaPreset
-import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
+import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize

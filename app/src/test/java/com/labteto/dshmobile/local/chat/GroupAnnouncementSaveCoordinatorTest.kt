@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.localAggregateChatStatePort
+
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
@@ -21,7 +23,7 @@ class GroupAnnouncementSaveCoordinatorTest {
     fun authorityFailureLeavesAnnouncementUnchangedAndReleasesLease(): Unit = runBlocking {
         val flow = state("announcement-authority-failure")
         val result = saveGroupChatAnnouncement(
-            LocalChatStatePort(flow), "新公告", flow.value.sessionId,
+            localAggregateChatStatePort(flow), "新公告", flow.value.sessionId,
             commitDomainState = { error("disk failure") },
             persistNow = { error("不得写派生快照") },
         )
@@ -38,7 +40,7 @@ class GroupAnnouncementSaveCoordinatorTest {
         val flow = state("announcement-cache-failure")
         var committed: LocalChatProjectionState? = null
         val result = saveGroupChatAnnouncement(
-            LocalChatStatePort(flow), "新公告", flow.value.sessionId,
+            localAggregateChatStatePort(flow), "新公告", flow.value.sessionId,
             commitDomainState = {
                 assertEquals("", flow.value.chat.groupChat.announcement)
                 committed = it

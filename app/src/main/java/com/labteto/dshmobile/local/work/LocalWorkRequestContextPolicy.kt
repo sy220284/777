@@ -8,7 +8,9 @@ import com.labteto.dshmobile.local.context.LocalRequestContextProjection
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 
 /** WorkFeature implementation of the Shared request-context policy contract. */
-internal object LocalWorkRequestContextPolicy : LocalRequestContextPolicy {
+internal class LocalWorkRequestContextPolicy(
+    private val structuredState: com.labteto.dshmobile.local.model.LocalStructuredWorkState,
+) : LocalRequestContextPolicy {
     private val compactor = LocalHistoryCompactor()
 
     override fun project(input: LocalRequestContextPolicyInput): LocalRequestContextProjection {
@@ -19,7 +21,7 @@ internal object LocalWorkRequestContextPolicy : LocalRequestContextPolicy {
             operationalLimitTokens = input.operationalLimitTokens,
             measuredPressure = input.measuredPressure,
             previousPressure = input.previousPressure,
-            structuredWorkState = structuredWorkState(input.snapshot, input.eventLog),
+            structuredWorkState = structuredState,
             cachePolicy = input.cachePolicy,
             allowSemanticProjection = input.allowSemanticProjection,
         )

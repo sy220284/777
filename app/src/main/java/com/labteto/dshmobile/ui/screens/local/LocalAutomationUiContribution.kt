@@ -6,11 +6,24 @@ import com.labteto.dshmobile.ui.screens.tasks.TasksScreen
 
 internal fun localAutomationFeatureUiContribution(
     taskMode: AutomationMode?,
-    viewModel: LocalHarnessViewModel,
+    actions: LocalAutomationFeatureUiActions,
     onTaskModeChange: (AutomationMode?) -> Unit,
     onResetNavigation: () -> Unit,
     onPopFeature: () -> Unit,
-): LocalFeatureUiContribution = LocalFeatureUiContribution(LocalFeatureModuleId.AUTOMATION) { page ->
+    onOpenFromDrawer: (LocalFeaturePage) -> Unit,
+    onCloseDrawer: () -> Unit,
+): LocalFeatureUiContribution = LocalFeatureUiContribution(
+    moduleId = LocalFeatureModuleId.AUTOMATION,
+    drawerActions = mapOf(
+        LocalFeatureDrawerEntry.TASKS to {
+            onTaskModeChange(null)
+            onOpenFromDrawer(LocalFeaturePage.TASKS)
+            onCloseDrawer()
+        },
+    ),
+    backAction = { _, edge -> localFeatureProductBackAction(edge) },
+    restorePage = ::localFeatureRestoreOwnedPage,
+) { page ->
     check(page == LocalFeaturePage.TASKS) { "Automation received non-TASKS route: $page" }
     TasksScreen(
         onClose = {
@@ -18,7 +31,7 @@ internal fun localAutomationFeatureUiContribution(
             onPopFeature()
         },
         onOpenSession = { sessionId ->
-            if (viewModel.switchSession(sessionId)) {
+            if (actions.switchSession(sessionId)) {
                 onTaskModeChange(null)
                 onResetNavigation()
             }

@@ -1,5 +1,23 @@
 package com.labteto.dshmobile.local.session
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
+
+internal val LocalSessionDomainJson: Json = Json {
+    ignoreUnknownKeys = true
+    coerceInputValues = true
+    encodeDefaults = true
+    explicitNulls = false
+}
+
+internal inline fun <reified T> decodeLocalSessionDomain(payload: JsonElement): T =
+    LocalSessionDomainJson.decodeFromJsonElement(payload)
+
+internal inline fun <reified T> encodeLocalSessionDomain(value: T): JsonElement =
+    LocalSessionDomainJson.encodeToJsonElement(value)
+
 /**
  * Narrow Feature hook for interpreting domain fields after a durable Session document is decoded.
  *

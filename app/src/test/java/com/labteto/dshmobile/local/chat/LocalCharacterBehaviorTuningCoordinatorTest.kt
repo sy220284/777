@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.localAggregateChatStatePort
+
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalKernelState
@@ -40,7 +42,7 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
         var leaseHeld = false
         var commits = 0
         val coordinator = LocalCharacterBehaviorTuningCoordinator(
-            state = LocalChatStatePort(state),
+            state = localAggregateChatStatePort(state),
             personaStore = personas,
             galleryStore = gallery,
             acquireLease = {
@@ -91,7 +93,7 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
             ),
         ))
         val coordinator = LocalCharacterBehaviorTuningCoordinator(
-            state = LocalChatStatePort(state),
+            state = localAggregateChatStatePort(state),
             personaStore = personas,
             galleryStore = gallery,
             acquireLease = { object : AutoCloseable { override fun close() = Unit } },
@@ -123,7 +125,7 @@ class LocalCharacterBehaviorTuningCoordinatorTest {
         ))
         var commits = 0
         val coordinator = LocalCharacterBehaviorTuningCoordinator(
-            state = LocalChatStatePort(state),
+            state = localAggregateChatStatePort(state),
             personaStore = personas,
             galleryStore = gallery,
             acquireLease = { object : AutoCloseable { override fun close() = Unit } },

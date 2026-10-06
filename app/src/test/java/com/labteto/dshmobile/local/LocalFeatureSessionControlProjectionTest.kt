@@ -9,12 +9,20 @@ import com.labteto.dshmobile.local.chat.LocalChatDurableState
 import com.labteto.dshmobile.local.chat.encodeChatBranchStateEvent
 import com.labteto.dshmobile.local.chat.encodeChatDomainStateEvent
 import com.labteto.dshmobile.local.chat.upsertChatBranchNode
+import com.labteto.dshmobile.local.chat.projectChatSessionControls
+import com.labteto.dshmobile.local.chat.chatBranches
+import com.labteto.dshmobile.local.chat.replySuggestions
+import com.labteto.dshmobile.local.chat.withChatSessionDomain
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.projectionReplayCursor
 import com.labteto.dshmobile.local.work.LocalGoal
 import com.labteto.dshmobile.local.work.LocalTodoItem
+import com.labteto.dshmobile.local.work.projectWorkSessionControls
+import com.labteto.dshmobile.local.work.goal
+import com.labteto.dshmobile.local.work.todos
+import com.labteto.dshmobile.local.work.withWorkSessionDomain
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -23,16 +31,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
-class LocalSessionControlProjectionTest {
+class LocalFeatureSessionControlProjectionTest {
     @Test
     fun approvedPlanReplaysPlanAndModeAsOneFact() {
         val snapshot = LocalHarnessSession(id = "s1", plan = listOf("旧计划"), planMode = true)
-        val projected = projectSessionControlTail(snapshot, listOf(
+        val projected = projectWorkSessionControls(snapshot, listOf(
             event(1L, "plan/approved", buildJsonObject {
                 put("items", buildJsonArray { add(JsonPrimitive("批准计划")) })
                 put("active", false)
             }),
-        ), -1L)
+        ))
         assertEquals(listOf("批准计划"), projected.plan)
         assertFalse(projected.planMode)
     }
@@ -42,10 +50,11 @@ class LocalSessionControlProjectionTest {
         val snapshot = LocalHarnessSession(
             id = "s1",
             plan = listOf("快照计划"),
-            todos = listOf(LocalTodoItem("快照任务", "pending")),
-            goal = LocalGoal("快照目标"),
             planMode = true,
             controlProjectedThroughSequence = 5L,
+        ).withWorkSessionDomain(
+            todos = listOf(LocalTodoItem("快照任务", "pending")),
+            goal = LocalGoal("快照目标"),
         )
         val events = listOf(
             event(4L, "plan/state", buildJsonObject {
@@ -73,7 +82,7 @@ class LocalSessionControlProjectionTest {
             event(9L, "plan/mode", buildJsonObject { put("active", false) }),
         )
 
-        val projected = projectSessionControlTail(snapshot, events, sequenceExclusive = 5L)
+        val projected = projectWorkSessionControls(snapshot, events.filter { it.sequence > 5L })
 
         assertEquals(listOf("检查事实源", "回放增量"), projected.plan)
         assertEquals(listOf(LocalTodoItem("补回归测试", "in_progress")), projected.todos)
@@ -92,19 +101,17 @@ class LocalSessionControlProjectionTest {
         )
         val snapshot = LocalHarnessSession(
             id = "branch",
-            chatBranches = oldState,
             controlProjectedThroughSequence = 3L,
-        )
+        ).withChatSessionDomain(chatBranches = oldState)
         val branchEvent = event(
             4L,
             "chat/branch-state",
             encodeChatBranchStateEvent(newState),
         )
 
-        val projected = projectSessionControlTail(
+        val projected = projectChatSessionControls(
             snapshot = snapshot,
-            events = listOf(branchEvent),
-            sequenceExclusive = 3L,
+            events = listOf(branchEvent).filter { it.sequence > 3L },
         )
 
         assertEquals(newState, projected.chatBranches)
@@ -116,9 +123,10 @@ class LocalSessionControlProjectionTest {
             id = "chat-domain",
             personaId = "old-persona",
             galleryId = "old-gallery",
-            replySuggestions = listOf(ChatReplySuggestion("旧", "旧建议")),
             handoffSummary = "旧摘要",
             controlProjectedThroughSequence = 8L,
+        ).withChatSessionDomain(
+            replySuggestions = listOf(ChatReplySuggestion("旧", "旧建议")),
         )
         val durable = LocalChatDurableState(
             personaId = "new-persona",
@@ -129,14 +137,13 @@ class LocalSessionControlProjectionTest {
             replySuggestions = listOf(ChatReplySuggestion("新", "新建议")),
             handoffSummary = null,
         )
-        val projected = projectSessionControlTail(
+        val projected = projectChatSessionControls(
             snapshot = snapshot,
             events = listOf(event(
                 9L,
                 LOCAL_CHAT_DOMAIN_STATE_EVENT_TYPE,
                 encodeChatDomainStateEvent(durable, "test"),
-            )),
-            sequenceExclusive = 8L,
+            )).filter { it.sequence > 8L },
         )
 
         assertEquals("new-persona", projected.personaId)
@@ -175,17 +182,15 @@ class LocalSessionControlProjectionTest {
         val snapshot = LocalHarnessSession(
             id = "safe",
             plan = listOf("现有计划"),
-            goal = LocalGoal("现有目标"),
             controlProjectedThroughSequence = 3L,
-        )
+        ).withWorkSessionDomain(goal = LocalGoal("现有目标"))
         val malformed = event(4L, "plan/state", buildJsonObject {
             put("items", "错误类型")
         })
 
-        val projected = projectSessionControlTail(
+        val projected = projectWorkSessionControls(
             snapshot = snapshot,
-            events = listOf(malformed),
-            sequenceExclusive = 3L,
+            events = listOf(malformed).filter { it.sequence > 3L },
         )
 
         assertEquals(snapshot.plan, projected.plan)
@@ -197,9 +202,8 @@ class LocalSessionControlProjectionTest {
         val snapshot = LocalHarnessSession(
             id = "strict",
             plan = listOf("可信计划"),
-            todos = listOf(LocalTodoItem("可信任务", "pending")),
             controlProjectedThroughSequence = 10L,
-        )
+        ).withWorkSessionDomain(todos = listOf(LocalTodoItem("可信任务", "pending")))
         val events = listOf(
             event(11L, "plan/state", buildJsonObject {
                 put("items", buildJsonArray {
@@ -221,7 +225,7 @@ class LocalSessionControlProjectionTest {
             }),
         )
 
-        val projected = projectSessionControlTail(snapshot, events, sequenceExclusive = 10L)
+        val projected = projectWorkSessionControls(snapshot, events.filter { it.sequence > 10L })
 
         assertEquals(snapshot.plan, projected.plan)
         assertEquals(snapshot.todos, projected.todos)
@@ -232,15 +236,14 @@ class LocalSessionControlProjectionTest {
         val snapshot = LocalHarnessSession(
             id = "clear",
             plan = listOf("旧计划"),
-            todos = listOf(LocalTodoItem("旧任务", "completed")),
             controlProjectedThroughSequence = 20L,
-        )
+        ).withWorkSessionDomain(todos = listOf(LocalTodoItem("旧任务", "completed")))
         val events = listOf(
             event(21L, "plan/state", buildJsonObject { put("items", buildJsonArray { }) }),
             event(22L, "todo/state", buildJsonObject { put("items", buildJsonArray { }) }),
         )
 
-        val projected = projectSessionControlTail(snapshot, events, sequenceExclusive = 20L)
+        val projected = projectWorkSessionControls(snapshot, events.filter { it.sequence > 20L })
 
         assertEquals(emptyList<String>(), projected.plan)
         assertEquals(emptyList<LocalTodoItem>(), projected.todos)
@@ -251,13 +254,14 @@ class LocalSessionControlProjectionTest {
         val snapshot = LocalHarnessSession(
             id = "s2",
             plan = listOf("保留计划"),
-            todos = listOf(LocalTodoItem("保留任务", "completed")),
-            goal = LocalGoal("保留目标", "completed"),
             planMode = false,
             controlProjectedThroughSequence = 12L,
+        ).withWorkSessionDomain(
+            todos = listOf(LocalTodoItem("保留任务", "completed")),
+            goal = LocalGoal("保留目标", "completed"),
         )
 
-        val projected = projectSessionControlTail(snapshot, emptyList(), sequenceExclusive = 12L)
+        val projected = projectWorkSessionControls(snapshot, emptyList())
 
         assertEquals(snapshot.plan, projected.plan)
         assertEquals(snapshot.todos, projected.todos)

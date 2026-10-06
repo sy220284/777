@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.buildDurableChatModelHistory
 import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
 import com.labteto.dshmobile.local.model.chatSystemPrompt
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES

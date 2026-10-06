@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.jobs.LocalJobManager
-import com.labteto.dshmobile.local.jobs.LocalPersistentJobRecoveryCoordinator
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits

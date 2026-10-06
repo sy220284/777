@@ -598,7 +598,8 @@ class LocalToolExecutionCoordinatorTest {
         ).single().jsonObject
         val planning = projection.modelSchemas(
             policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            state = LocalHarnessState(work = LocalWorkState(planMode = true)),
+            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
+            planModeEnabled = true,
             history = emptyList(),
         ).single().jsonObject
         val writable = projection.subagentSchemas(
@@ -635,7 +636,8 @@ class LocalToolExecutionCoordinatorTest {
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
         val schemas = projection.modelSchemas(
             policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            state = LocalHarnessState(work = LocalWorkState(planMode = true)),
+            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
+            planModeEnabled = true,
             history = emptyList(),
             enabledOptional = setOf("remote_lookup"),
         )

@@ -7,7 +7,7 @@ import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.HostsStore
-import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
+import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID

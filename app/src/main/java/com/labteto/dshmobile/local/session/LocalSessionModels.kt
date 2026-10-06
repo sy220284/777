@@ -1,17 +1,10 @@
 package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatContextState
-import com.labteto.dshmobile.local.chat.ChatReplySuggestion
-import com.labteto.dshmobile.local.chat.LocalChatBranchState
-import com.labteto.dshmobile.local.chat.LocalGroupChatState
-import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
-import com.labteto.dshmobile.local.work.LocalGoal
-import com.labteto.dshmobile.local.work.LocalTodoItem
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
 /** One durable row shown in the on-device Harness transcript. */
@@ -45,12 +38,17 @@ data class LocalHarnessSession(
     val title: String = "新会话",
     val updatedAt: Long = 0L,
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
-    val personaId: String = PersonaProfile.DEFAULT_PERSONA_ID,
-    val chatState: ChatCharacterState = ChatCharacterState(),
-    val chatContext: ChatContextState = ChatContextState(),
-    val replySuggestions: List<ChatReplySuggestion> = emptyList(),
-    val chatBranches: LocalChatBranchState = LocalChatBranchState(),
-    val groupChat: LocalGroupChatState = LocalGroupChatState(),
+    val personaId: String = "default",
+    @SerialName("chatState")
+    val chatStatePayload: JsonObject = JsonObject(emptyMap()),
+    @SerialName("chatContext")
+    val chatContextPayload: JsonObject = JsonObject(emptyMap()),
+    @SerialName("replySuggestions")
+    val replySuggestionsPayload: JsonArray = JsonArray(emptyList()),
+    @SerialName("chatBranches")
+    val chatBranchesPayload: JsonObject = JsonObject(emptyMap()),
+    @SerialName("groupChat")
+    val groupChatPayload: JsonObject = JsonObject(emptyMap()),
     val galleryId: String? = null,
     val galleryStoryId: String? = null,
     val gallerySaveSuppressedThrough: Long = 0L,
@@ -74,8 +72,10 @@ data class LocalHarnessSession(
     @SerialName("modelHistory")
     val legacyModelHistory: List<JsonObject> = emptyList(),
     val plan: List<String> = emptyList(),
-    val todos: List<LocalTodoItem> = emptyList(),
-    val goal: LocalGoal? = null,
+    @SerialName("todos")
+    val todosPayload: JsonArray = JsonArray(emptyList()),
+    @SerialName("goal")
+    val goalPayload: JsonObject? = null,
     val planMode: Boolean = false,
     /** Highest SessionEvent sequence already reflected in the materialized control-state snapshot. */
     val controlProjectedThroughSequence: Long? = null,

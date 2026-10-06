@@ -1,9 +1,9 @@
-package com.labteto.dshmobile.local.jobs
+package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalSubagentRunner
 import com.labteto.dshmobile.local.agent.requireCompletedOutput
+import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelProfile

@@ -16,7 +16,7 @@ class GroupReplyDeliveryLedgerTest {
             "session",
             listOf("previous", "retried"),
             listOf("retried"),
-            LocalChatStatePort(state),
+            localAggregateChatStatePort(state),
         ) { writes++ }
         ledger.fail("retried", LocalGroupChatState())
         assertEquals(listOf("previous", "retried"), state.value.chat.groupChat.failedReplyMemberIds)
@@ -29,7 +29,7 @@ class GroupReplyDeliveryLedgerTest {
             "old-session",
             emptyList(),
             listOf("member"),
-            LocalChatStatePort(state),
+            localAggregateChatStatePort(state),
         ) { writes++ }
         ledger.fail("member", LocalGroupChatState())
         assertEquals(emptyList<String>(), state.value.chat.groupChat.failedReplyMemberIds)

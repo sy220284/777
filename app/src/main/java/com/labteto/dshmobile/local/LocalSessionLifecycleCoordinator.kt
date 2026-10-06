@@ -17,6 +17,7 @@ import com.labteto.dshmobile.local.session.LocalConversationFilesCoordinator
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalSessionDomainCreateSpec
 import com.labteto.dshmobile.local.session.LocalSessionDomainModeCommand
+import com.labteto.dshmobile.local.session.LocalSessionCoordinator
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.work.LocalWorkSessionLifecyclePlanner
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex

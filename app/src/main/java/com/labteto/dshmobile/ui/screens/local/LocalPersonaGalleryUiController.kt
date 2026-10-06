@@ -11,14 +11,14 @@ import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaPreset
-import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
+import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
-import com.labteto.dshmobile.local.chat.galleryEntryHasUnsavedChanges
-import com.labteto.dshmobile.local.chat.isMeaningfulGalleryPersona
-import com.labteto.dshmobile.local.chat.samePersonaIdentity
-import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
+import com.labteto.dshmobile.local.presentation.galleryEntryHasUnsavedChanges
+import com.labteto.dshmobile.local.presentation.isMeaningfulGalleryPersona
+import com.labteto.dshmobile.local.presentation.samePersonaIdentity
+import com.labteto.dshmobile.local.presentation.withoutLegacyConversationContext
 import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import java.io.File
@@ -37,7 +37,7 @@ internal class LocalPersonaGalleryUiController(
     private val appContext: Context,
     private val scope: CoroutineScope,
 ) {
-    private val state = runtime.session.state
+    private val state = runtime.state
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     private val transfer = LocalPersonaTransferCoordinator(runtime, chatUi)
     val gallery: StateFlow<List<PersonaGalleryEntry>> = _gallery.asStateFlow()

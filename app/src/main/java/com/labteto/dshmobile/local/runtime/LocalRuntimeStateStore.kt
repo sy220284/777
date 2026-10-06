@@ -10,7 +10,10 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalHistoryBudget
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
+import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
+import com.labteto.dshmobile.local.interaction.LocalInteractionStatePort
+import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.localHistoryBudgetFor
@@ -80,7 +83,58 @@ class LocalRuntimeStateStore internal constructor(
         onChanged = ::publishResourceSnapshot,
     )
 
-    internal val foregroundInteractions = LocalInteractionCoordinator(mutable)
+    private val foregroundInteractionState = object : LocalInteractionStatePort {
+        override fun pendingApproval(): LocalApproval? = mutable.value.work.pendingApproval
+
+        override fun setPendingApproval(approval: LocalApproval?) {
+            mutable.update { current ->
+                current.copy(work = current.work.copy(pendingApproval = approval))
+            }
+        }
+
+        override fun clearPendingApproval(callId: String) {
+            mutable.update { current ->
+                if (current.work.pendingApproval?.callId == callId) {
+                    current.copy(work = current.work.copy(pendingApproval = null))
+                } else current
+            }
+        }
+
+        override fun setPendingQuestion(question: LocalQuestion?) {
+            mutable.update { current ->
+                current.copy(work = current.work.copy(pendingQuestion = question))
+            }
+        }
+
+        override fun clearPendingQuestion(callId: String) {
+            mutable.update { current ->
+                if (current.work.pendingQuestion?.callId == callId) {
+                    current.copy(work = current.work.copy(pendingQuestion = null))
+                } else current
+            }
+        }
+
+        override fun clearPendingInteractions() {
+            mutable.update { current ->
+                current.copy(
+                    work = current.work.copy(
+                        pendingApproval = null,
+                        pendingQuestion = null,
+                    ),
+                )
+            }
+        }
+
+        override fun deviceApprovalLeaseEnabled(): Boolean = mutable.value.work.deviceApprovalLease
+
+        override fun setDeviceApprovalLease(enabled: Boolean) {
+            mutable.update { current ->
+                current.copy(work = current.work.copy(deviceApprovalLease = enabled))
+            }
+        }
+    }
+
+    internal val foregroundInteractions = LocalInteractionCoordinator(foregroundInteractionState)
     internal val streamingPreviewStore = LocalStreamingPreviewStore()
     internal val requestPressureStore = LocalRequestPressureStore()
     internal val foregroundRunHandle = LocalAgentRunHandle(maxPendingInputs = MAX_PENDING_INPUTS)

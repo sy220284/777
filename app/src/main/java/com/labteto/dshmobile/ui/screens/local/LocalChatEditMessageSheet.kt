@@ -16,8 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
-import com.labteto.dshmobile.local.chat.chatMessageHasAttachmentContext
-import com.labteto.dshmobile.local.chat.editableChatUserText
+import com.labteto.dshmobile.local.presentation.chatMessageHasAttachmentContext
+import com.labteto.dshmobile.local.presentation.editableChatUserText
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton

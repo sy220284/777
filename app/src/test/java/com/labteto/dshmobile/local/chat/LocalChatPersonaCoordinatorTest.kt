@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.toLocalChatProjectionState
+
+import com.labteto.dshmobile.local.localAggregateChatStatePort
+
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
@@ -24,7 +28,7 @@ class LocalChatPersonaCoordinatorTest {
         val state = initialState()
         var commits = 0
         val coordinator = LocalChatPersonaCoordinator(
-            state = LocalChatStatePort(state),
+            state = localAggregateChatStatePort(state),
             loadPersona = { null },
             savePersona = { it },
             restorePersona = { _, _ -> error("成功提交不得回滚") },
@@ -59,7 +63,7 @@ class LocalChatPersonaCoordinatorTest {
             var restores = 0
             var commits = 0
             val coordinator = LocalChatPersonaCoordinator(
-                state = LocalChatStatePort(state),
+                state = localAggregateChatStatePort(state),
                 loadPersona = { PersonaProfile(id = "old", name = "旧值") },
                 savePersona = { profile -> state.value = mutation(state.value); profile },
                 restorePersona = { _, _ -> restores++ },
@@ -80,7 +84,7 @@ class LocalChatPersonaCoordinatorTest {
     fun existingOwnerRejectsBothEditsBeforePersonaWrite() = runBlocking {
         val state = initialState()
         val coordinator = LocalChatPersonaCoordinator(
-            state = LocalChatStatePort(state),
+            state = localAggregateChatStatePort(state),
             loadPersona = { error("占用期间不得读取") },
             savePersona = { error("占用期间不得写入") },
             restorePersona = { _, _ -> error("占用期间不得回滚") },
@@ -108,7 +112,7 @@ class LocalChatPersonaCoordinatorTest {
         var restored: PersonaProfile? = null
         val previous = PersonaProfile(id = "new", name = "旧人物")
         val coordinator = LocalChatPersonaCoordinator(
-            state = LocalChatStatePort(state),
+            state = localAggregateChatStatePort(state),
             loadPersona = { previous },
             savePersona = { it },
             restorePersona = { _, value -> restored = value },
@@ -133,7 +137,7 @@ class LocalChatPersonaCoordinatorTest {
         val state = initialState()
         var restores = 0
         val coordinator = LocalChatPersonaCoordinator(
-            state = LocalChatStatePort(state),
+            state = localAggregateChatStatePort(state),
             loadPersona = { PersonaProfile() },
             savePersona = { profile ->
                 state.value = state.value.copy(usageMode = LocalUsageMode.WORK)

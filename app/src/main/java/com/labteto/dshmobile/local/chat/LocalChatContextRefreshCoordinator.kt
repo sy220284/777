@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalChatTurnCoordinator
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.LocalModelRequestCoordinator

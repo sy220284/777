@@ -2,7 +2,6 @@ package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -31,7 +30,7 @@ internal class LocalAuxiliaryModelRequestRuntime @Inject constructor(
     private val stepRuntime = LocalAgentModelStepRuntime()
 
     internal suspend fun complete(
-        snapshot: LocalHarnessState,
+        modelAttempts: Int,
         profile: LocalModelProfile,
         messages: List<JsonObject>,
         eventLog: LocalSessionEventLog,
@@ -41,7 +40,7 @@ internal class LocalAuxiliaryModelRequestRuntime @Inject constructor(
         val surface = profile.toRunModelSurface()
         return stepRuntime.execute(
             initialMessages = messages,
-            maxAttempts = snapshot.modelState.modelAttempts.coerceIn(1, 5),
+            maxAttempts = modelAttempts.coerceIn(1, 5),
             retryable = { error ->
                 (error as? LocalModelException)?.retryable == true || error is IOException
             },

@@ -1,10 +1,8 @@
 package com.labteto.dshmobile.local.tools
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.model.LocalModelPromptUpdateMode
 import com.labteto.dshmobile.local.model.LocalModelRuntimeCapabilities
 import com.labteto.dshmobile.local.model.LocalRunModelSurface
-import com.labteto.dshmobile.local.model.currentModelRuntimeCapabilities
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -21,13 +19,6 @@ internal class LocalRunToolSurface(
 ) {
     private var visible: JsonArray? = null
 
-    fun next(current: JsonArray, state: LocalHarnessState): JsonArray =
-        stableRunToolSchemas(
-            previous = visible,
-            current = current,
-            capabilities = surface?.capabilities ?: state.currentModelRuntimeCapabilities(),
-        ).also { visible = it }
-
     fun next(current: JsonArray): JsonArray {
         val frozen = requireNotNull(surface) { "Frozen model surface is required" }
         return stableRunToolSchemas(
@@ -37,16 +28,6 @@ internal class LocalRunToolSurface(
         ).also { visible = it }
     }
 }
-
-internal fun stableRunToolSchemas(
-    previous: JsonArray?,
-    current: JsonArray,
-    state: LocalHarnessState,
-): JsonArray = stableRunToolSchemas(
-    previous = previous,
-    current = current,
-    capabilities = state.currentModelRuntimeCapabilities(),
-)
 
 internal fun stableRunToolSchemas(
     previous: JsonArray?,

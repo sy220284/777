@@ -5,10 +5,8 @@ import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.local.LocalModelRequestCoordinator
 import com.labteto.dshmobile.local.LocalToolApprovalRuntime
 import com.labteto.dshmobile.local.LocalToolCompositionRoot
-import com.labteto.dshmobile.local.agent.LocalSubagentRunnerFactory
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
-import com.labteto.dshmobile.local.jobs.LocalPersistentJobRecoveryCoordinator
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
@@ -90,6 +88,7 @@ internal class LocalWorkComposition @Inject constructor(
             eventLogFor = sessionStorage.eventLogs::get,
             defaultState = runtimeStateStore.state,
             defaultSessionId = runtimeStateStore::currentSessionId,
+            compactionPolicy = LocalWorkSubagentCompactionPolicy,
         )
     }
     private val subagents by lazy {
@@ -195,7 +194,7 @@ internal class LocalWorkComposition @Inject constructor(
         sessionId: String,
         boundState: com.labteto.dshmobile.local.LocalHarnessState,
         onApprovalBlocked: (String) -> Unit,
-    ): com.labteto.dshmobile.local.LocalSubagentRunner = subagentFactory.createBound(
+    ): com.labteto.dshmobile.local.work.LocalSubagentRunner = subagentFactory.createBound(
         sessionId = sessionId,
         boundState = boundState,
         runKind = LocalAgentRunKind.AUTOMATION,

@@ -4,9 +4,6 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalCanonicalContent
 import com.labteto.dshmobile.local.model.LocalModelReply
-import com.labteto.dshmobile.local.quality.LocalOutputQualityContext
-import com.labteto.dshmobile.local.quality.LocalOutputQualityGuard
-import com.labteto.dshmobile.local.quality.LocalOutputQualityPipeline
 import com.labteto.dshmobile.local.quality.LocalOutputQualityResult
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.JsonArray
@@ -15,22 +12,21 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal object LocalWorkCompletionClaimGuard : LocalOutputQualityGuard {
-    override fun inspect(
+internal object LocalWorkCompletionClaimGuard {
+    fun inspect(
         text: String,
-        context: LocalOutputQualityContext,
+        workState: LocalWorkState,
     ): LocalOutputQualityResult {
         if (text.isBlank()) return LocalOutputQualityResult(text)
         val corrected = correctGlobalCompletionClaims(text)
         if (corrected == text) return LocalOutputQualityResult(text)
-        val state = context.state ?: return LocalOutputQualityResult(text)
         val findings = mutableListOf<String>()
-        val openTodos = state.work.todos.count { it.status == "pending" || it.status == "in_progress" }
+        val openTodos = workState.todos.count { it.status == "pending" || it.status == "in_progress" }
         if (openTodos > 0) findings += "完成声明与未完成任务清单冲突"
-        if (state.work.goal?.status == "blocked") findings += "完成声明与阻塞目标状态冲突"
+        if (workState.goal?.status == "blocked") findings += "完成声明与阻塞目标状态冲突"
         if (findings.isEmpty()) return LocalOutputQualityResult(text)
         return LocalOutputQualityResult(
-            text = truthfulIncompleteDeliveryText(openTodos, state.work.goal?.status == "blocked") + "\n\n" + corrected,
+            text = truthfulIncompleteDeliveryText(openTodos, workState.goal?.status == "blocked") + "\n\n" + corrected,
             findings = findings,
             changed = true,
         )
@@ -66,7 +62,6 @@ internal object LocalWorkCompletionClaimGuard : LocalOutputQualityGuard {
 
 }
 
-private val WORK_OUTPUT_QUALITY_PIPELINE = LocalOutputQualityPipeline(listOf(LocalWorkCompletionClaimGuard))
 
 internal fun guardWorkCompletionDelivery(
     reply: LocalModelReply,
@@ -75,10 +70,7 @@ internal fun guardWorkCompletionDelivery(
 ): LocalModelReply {
     if (state.usageMode != LocalUsageMode.WORK || reply.toolCalls.isNotEmpty()) return reply
     val original = reply.content?.takeIf(String::isNotBlank) ?: return reply
-    val result = WORK_OUTPUT_QUALITY_PIPELINE.inspect(
-        original,
-        LocalOutputQualityContext(usageMode = state.usageMode, state = state),
-    )
+    val result = LocalWorkCompletionClaimGuard.inspect(original, state.work)
     if (!result.changed) return reply
     eventLog.append("work/output-quality", buildJsonObject {
         put("findings", JsonArray(result.findings.map(::JsonPrimitive)))
@@ -118,10 +110,7 @@ internal fun recordWorkCompletionQuality(
     eventLog: LocalSessionEventLog,
 ) {
     if (state.usageMode != LocalUsageMode.WORK) return
-    val result = WORK_OUTPUT_QUALITY_PIPELINE.inspect(
-        text,
-        LocalOutputQualityContext(usageMode = state.usageMode, state = state),
-    )
+    val result = LocalWorkCompletionClaimGuard.inspect(text, state.work)
     if (result.findings.isEmpty()) return
     eventLog.append("work/output-quality", buildJsonObject {
         put("findings", JsonArray(result.findings.map(::JsonPrimitive)))

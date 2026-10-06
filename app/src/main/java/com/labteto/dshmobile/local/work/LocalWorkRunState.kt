@@ -12,8 +12,8 @@ import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
  * Mutable state owned by one detached/foreground Work run.
  *
  * This deliberately excludes Chat, Settings, Session lists, usage accounting and other product
- * domains. Aggregate LocalHarnessState is only reconstructed at the composition boundary when a
- * legacy execution API still needs a read-only snapshot during Architecture 3.0 migration.
+ * domains. Aggregate LocalHarnessState is reconstructed only as a read-only compatibility snapshot
+ * for Shared request APIs; Work never receives an aggregate write boundary.
  */
 internal data class LocalWorkRunState(
     val modelState: LocalModelState = LocalModelState(),
@@ -62,7 +62,7 @@ internal fun LocalHarnessState.toLocalWorkRunState(): LocalWorkRunState {
     )
 }
 
-/** Read-only migration snapshot for shared/legacy execution APIs; never retained as Work state. */
+/** Read-only compatibility snapshot for Shared request APIs; never retained or used as a write owner. */
 internal fun LocalWorkRunState.toAggregateSnapshot(): LocalHarnessState = LocalHarnessState(
     loading = false,
     modelState = modelState,

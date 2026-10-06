@@ -1,10 +1,16 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.session.LocalSessionRepository
+
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
 import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.LocalChatSessionDomainCodec
 import com.labteto.dshmobile.local.chat.LocalGroupChatMember
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
+import com.labteto.dshmobile.local.chat.chatState
+import com.labteto.dshmobile.local.chat.groupChat
+import com.labteto.dshmobile.local.chat.replySuggestions
+import com.labteto.dshmobile.local.chat.withChatSessionDomain
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import kotlinx.coroutines.test.advanceTimeBy
@@ -41,6 +47,7 @@ class LocalSessionRepositoryTest {
             LocalHarnessSession(
                 id = "group",
                 usageMode = LocalUsageMode.CHAT,
+            ).withChatSessionDomain(
                 groupChat = LocalGroupChatState(
                     mode = LocalChatMode.GROUP,
                     announcement = "雨夜客栈，众人刚刚收到同一封匿名信。",
@@ -61,6 +68,7 @@ class LocalSessionRepositoryTest {
             LocalHarnessSession(
                 id = "group",
                 usageMode = LocalUsageMode.CHAT,
+            ).withChatSessionDomain(
                 groupChat = LocalGroupChatState(
                     mode = LocalChatMode.GROUP,
                     announcement = "旧公告",
@@ -71,6 +79,7 @@ class LocalSessionRepositoryTest {
             LocalHarnessSession(
                 id = "group",
                 usageMode = LocalUsageMode.CHAT,
+            ).withChatSessionDomain(
                 groupChat = LocalGroupChatState(
                     mode = LocalChatMode.GROUP,
                     announcement = "新公告",
@@ -151,6 +160,7 @@ class LocalSessionRepositoryTest {
                 title = "旧群聊",
                 updatedAt = 10L,
                 usageMode = LocalUsageMode.CHAT,
+            ).withChatSessionDomain(
                 groupChat = LocalGroupChatState(
                     mode = LocalChatMode.GROUP,
                     members = listOf(

@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.LocalHarnessState
 
 /**
  * Immutable model-facing facts for one admitted Agent run.
@@ -40,14 +39,14 @@ internal fun LocalModelProfile.toRunModelSurface(): LocalRunModelSurface {
     )
 }
 
-internal fun LocalHarnessState.currentModelRuntimeCapabilities(): LocalModelRuntimeCapabilities {
-    val profile = modelState.modelSelection.activeProfile
+internal fun LocalModelState.currentModelRuntimeCapabilities(): LocalModelRuntimeCapabilities {
+    val profile = modelSelection.activeProfile
     val protocol = profile?.let {
-        resolveLocalModelProtocol(it.authKind, it, modelState.model, modelState.baseUrl)
-    } ?: LocalModelPresets.protocolFor(modelState.model, modelState.baseUrl)
+        resolveLocalModelProtocol(it.authKind, it, model, baseUrl)
+    } ?: LocalModelPresets.protocolFor(model, baseUrl)
     return LocalModelPresets.runtimeCapabilitiesFor(
-        model = modelState.model,
-        baseUrl = modelState.baseUrl,
+        model = model,
+        baseUrl = baseUrl,
         protocol = protocol,
         authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
     )

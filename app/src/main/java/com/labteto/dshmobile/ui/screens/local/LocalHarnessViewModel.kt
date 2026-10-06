@@ -12,7 +12,7 @@ import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
 import com.labteto.dshmobile.local.chat.PersonaPreset
-import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
+import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
@@ -39,8 +39,8 @@ class LocalHarnessViewModel @Inject constructor(
     private val sessionUi: LocalSessionUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
-    val state = runtime.session.state
-    val streamingState = runtime.session.streamingState; internal val sendFeedbackState = runtime.session.sendFeedbackState
+    val state = runtime.state
+    val streamingState = runtime.streamingState; internal val sendFeedbackState = runtime.sendFeedbackState
     val shellState = state.projectShellState(viewModelScope)
     val chatSurfaceState = state.projectChatSurfaceState(viewModelScope)
     val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)
@@ -210,8 +210,8 @@ class LocalHarnessViewModel @Inject constructor(
             LocalUsageMode.WORK -> runtime.work.stop()
         }
     }
-    fun newSession() = runtime.session.createSession(LocalConversationMode.INDEPENDENT)
-    fun createSession(mode: LocalConversationMode) = runtime.session.createSession(mode)
+    fun newSession() = runtime.session.createSession(LocalConversationMode.INDEPENDENT, state.value.usageMode)
+    fun createSession(mode: LocalConversationMode) = runtime.session.createSession(mode, state.value.usageMode)
     fun setPlanMode(enabled: Boolean) = runtime.work.setPlanMode(enabled)
     fun switchUsageMode(mode: LocalUsageMode) = runtime.session.switchUsageMode(mode)
     suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = personaGalleryController.configureChatPersona(profile)

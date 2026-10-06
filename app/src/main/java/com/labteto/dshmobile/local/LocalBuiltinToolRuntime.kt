@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.capability.ProcessRequest
 import com.labteto.dshmobile.local.memory.LocalMemoryTools
+import com.labteto.dshmobile.local.memory.LocalMemoryToolContext
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.LocalToolCall
@@ -26,6 +27,7 @@ import com.labteto.dshmobile.local.tools.long
 import com.labteto.dshmobile.local.tools.optionalString
 import com.labteto.dshmobile.local.tools.string
 import com.labteto.dshmobile.local.usage.LocalTokenUsageContextBridge
+import com.labteto.dshmobile.local.usage.LocalTokenUsageSessionFacts
 import com.labteto.dshmobile.local.work.LocalWorkComposition
 import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
@@ -65,10 +67,15 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
     private val fileInspector by lazy { LocalFileInspector(File(workspace.path)) }
     private val usageBridge by lazy {
         LocalTokenUsageContextBridge(
-            runtimeStateStore.state,
-            workRuns::state,
-            sessionStorage.eventLogs::get,
-            runtimeStateStore::currentSessionId,
+            sessionFacts = { sessionId ->
+                val summary = sessionStorage.coordinator.summaries().firstOrNull { it.id == sessionId }
+                LocalTokenUsageSessionFacts(
+                    mode = summary?.usageMode,
+                    title = summary?.title,
+                )
+            },
+            eventLogFor = sessionStorage.eventLogs::get,
+            currentSessionId = runtimeStateStore::currentSessionId,
         )
     }
     private val sessionAccess by lazy {
@@ -313,7 +320,15 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         LocalMemoryTools(
             memoryStore,
             memoryManager,
-            state = { binding?.aggregateSnapshot() ?: runtimeStateStore.state.value },
+            context = {
+                val current = binding?.aggregateSnapshot() ?: runtimeStateStore.state.value
+                LocalMemoryToolContext(
+                    usageMode = current.usageMode,
+                    conversationMode = current.conversationMode,
+                    projectId = current.projectId,
+                    lineageId = current.lineageId,
+                )
+            },
             sessionId = { binding?.sessionId ?: runtimeStateStore.currentSessionId },
         )
 

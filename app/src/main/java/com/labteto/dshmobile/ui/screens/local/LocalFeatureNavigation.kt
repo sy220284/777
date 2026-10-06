@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.activity.BackEventCompat
-import com.labteto.dshmobile.local.chat.findEstablishedGroupChatSession
 import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
 import com.labteto.dshmobile.local.feature.LocalFeatureRoute
 import com.labteto.dshmobile.local.session.LocalSessionSummary
@@ -29,12 +28,11 @@ internal enum class LocalFeatureBackAction {
     POP_FEATURE,
 }
 
-internal fun localFeatureBackAction(swipeEdge: Int?): LocalFeatureBackAction =
-    if (swipeEdge == BackEventCompat.EDGE_LEFT) {
-        LocalFeatureBackAction.OPEN_DRAWER
-    } else {
-        LocalFeatureBackAction.POP_FEATURE
-    }
+internal fun localFeatureProductBackAction(swipeEdge: Int?): LocalFeatureBackAction =
+    if (swipeEdge == BackEventCompat.EDGE_LEFT) LocalFeatureBackAction.OPEN_DRAWER
+    else LocalFeatureBackAction.POP_FEATURE
+
+internal fun localFeatureRestoreOwnedPage(page: LocalFeaturePage): LocalFeaturePage = page
 
 internal fun localFeatureOpenFromDrawer(
     stack: List<String>,
@@ -52,12 +50,6 @@ internal fun localFeaturePop(stack: List<String>): List<String> =
     if (stack.size <= 1) listOf(LocalFeaturePage.HOME.name) else stack.dropLast(1)
 
 internal fun localFeatureHome(): List<String> = listOf(LocalFeaturePage.HOME.name)
-
-internal fun establishedGroupChatSessionId(sessions: List<LocalSessionSummary>): String? =
-    findEstablishedGroupChatSession(sessions)?.id
-
-internal fun hasEstablishedGroupChat(sessions: List<LocalSessionSummary>): Boolean =
-    establishedGroupChatSessionId(sessions) != null
 
 internal fun acceptLocalSessionNavigation(
     currentSessionId: String,

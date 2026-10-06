@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.AgentEvent
 import com.labteto.dshmobile.harness.agent.AgentEventSink
@@ -13,6 +13,14 @@ import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalHistoryBudget
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.TokenUsageAction
+import com.labteto.dshmobile.local.TokenUsageContext
+import com.labteto.dshmobile.local.buildTokenUsageContext
+import com.labteto.dshmobile.local.agent.LocalSubagentCompactionPolicy
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
 import com.labteto.dshmobile.local.agent.LocalSubagentStatus
@@ -48,8 +56,6 @@ import com.labteto.dshmobile.local.runtime.nextAdaptiveAgentStepLimit
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
 import com.labteto.dshmobile.local.tools.LocalRunToolSurface
-import com.labteto.dshmobile.local.work.compactAtTurnBoundary
-import com.labteto.dshmobile.local.work.compactBeforeModelStep
 import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -90,6 +96,7 @@ internal class LocalSubagentRunner(
     private val runSessionId: () -> String = { state.value.sessionId },
     private val runKind: LocalAgentRunKind = LocalAgentRunKind.SUBAGENT,
     private val modelAdmission: LocalModelAdmissionPort? = null,
+    private val compactionPolicy: LocalSubagentCompactionPolicy,
 ) {
     private val historyPolicy = com.labteto.dshmobile.local.agent.LocalSubagentHistoryPolicy(
         spillToolOutput = spillToolOutput,
@@ -312,7 +319,7 @@ internal class LocalSubagentRunner(
                             put("content", message)
                         })
                     }
-                    historyPolicy.compactBeforeModelStep(history, subagentId, modelStep, runHistoryBudget, runCachePolicy)
+                    compactionPolicy.beforeModelStep(historyPolicy, history, subagentId, modelStep, runHistoryBudget, runCachePolicy)
                     modelStep += 1
                     val durableHistory = history.snapshot()
                     val selectedMode = resolveImageMode(snapshot.modelState.imageInputMode, snapshot.modelState.baseUrl, routeModel)
@@ -577,7 +584,7 @@ internal class LocalSubagentRunner(
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
             }
             return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "SUBAGENT_ERROR")
-        } finally { historyPolicy.compactAtTurnBoundary(history, subagentId, runHistoryBudget, runCachePolicy) }
+        } finally { compactionPolicy.atTurnBoundary(historyPolicy, history, subagentId, runHistoryBudget, runCachePolicy) }
     }
 
     private fun AgentToolCall.toLocalToolCall() = LocalToolCall(id, name, arguments, rawArguments)

@@ -1,8 +1,6 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.AgentToolResult
-import com.labteto.dshmobile.local.LocalSubagentRunner
-import com.labteto.dshmobile.local.agent.LocalSubagentRunnerFactory
 import com.labteto.dshmobile.local.agent.requireCompletedOutput
 import com.labteto.dshmobile.local.memory.LocalMemoryTools
 import com.labteto.dshmobile.local.model.LocalToolCall

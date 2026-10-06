@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalChatTurnCoordinator
+import com.labteto.dshmobile.local.toLocalChatProjectionState
+
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
@@ -71,7 +72,7 @@ internal class LocalReplySuggestionCoordinator @Inject constructor(
         )
         val reply = try {
             requestRuntime.complete(
-                snapshot = aggregateSnapshot,
+                modelAttempts = aggregateSnapshot.modelState.modelAttempts,
                 profile = profile,
                 messages = chatReplySuggestionModelMessages(prompt),
                 eventLog = boundEventLog,

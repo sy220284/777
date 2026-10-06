@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.persistence.RecoveringDocumentFile
+
 import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -38,7 +40,7 @@ internal object PersonaSchemaMigration {
 
     fun readLegacyPersonaDocument(file: File, json: Json): LegacyPersonaDocumentV1 {
         val migrationJson = tolerant(json)
-        return RecoveringChatDocumentFile(file).read(
+        return RecoveringDocumentFile(file).read(
             defaultValue = ::LegacyPersonaDocumentV1,
             decode = { encoded ->
                 migrationJson.decodeFromString(LegacyPersonaDocumentV1.serializer(), encoded).also { document ->
@@ -50,7 +52,7 @@ internal object PersonaSchemaMigration {
 
     fun readLegacyGalleryDocument(file: File, json: Json): LegacyGalleryDocumentV4 {
         val migrationJson = tolerant(json)
-        return RecoveringChatDocumentFile(file).read(
+        return RecoveringDocumentFile(file).read(
             defaultValue = ::LegacyGalleryDocumentV4,
             decode = { encoded ->
                 val root = migrationJson.parseToJsonElement(encoded).jsonObject

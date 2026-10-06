@@ -83,8 +83,8 @@ import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.chatBranchInfo
-import com.labteto.dshmobile.local.chat.isUnboundChatPersona
+import com.labteto.dshmobile.local.presentation.chatBranchInfo
+import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
@@ -216,6 +216,162 @@ fun LocalHarnessScreen(
         featureStack = localFeatureHome()
     }
 
+    val shellActions = LocalShellFeatureUiActions(
+        streamingState = viewModel.streamingState,
+        selectModel = viewModel::selectModel,
+        send = viewModel::send,
+        editAndResend = viewModel::editAndResendUserMessage,
+        selectMessageVariant = viewModel::selectChatMessageVariant,
+        regenerate = viewModel::regenerateReply,
+        generateReplySuggestions = viewModel::generateReplySuggestions,
+        loadOlderTranscript = viewModel::loadOlderTranscript,
+        importAttachment = viewModel::importAttachment,
+        stop = viewModel::stop,
+        exitGroupChat = viewModel::leaveGroupChatMode,
+        toggleSessionPinned = viewModel::toggleSessionPinned,
+        renameSession = viewModel::renameSession,
+        deleteSessions = viewModel::deleteSessions,
+        configureChatPersona = viewModel::configureChatPersona,
+        configureGroupMembers = viewModel::configureGroupChatMembers,
+        selectGalleryPersona = viewModel::selectGalleryPersonaForCurrentChat,
+        autoFillChatPersona = viewModel::autoFillChatPersona,
+        saveGroupAnnouncement = viewModel::setGroupChatAnnouncement,
+        generateGroupAnnouncement = viewModel::generateGroupChatAnnouncement,
+        undoPersonaCorrection = viewModel::undoChatPersonaCorrection,
+        setPlanMode = viewModel::setPlanMode,
+        approve = viewModel::approve,
+        deny = viewModel::deny,
+        enableAutoApproval = viewModel::enableAutoApproval,
+        enableAutoApprovalForPending = viewModel::enableAutoApprovalForPending,
+        enableDeviceApprovalLease = viewModel::enableDeviceApprovalLease,
+        disableDeviceApprovalLease = viewModel::disableDeviceApprovalLease,
+        disableAutoApproval = viewModel::disableAutoApproval,
+        answerQuestion = viewModel::answerQuestion,
+        cancelQuestion = viewModel::cancelQuestion,
+    )
+    val chatActions = LocalChatFeatureUiActions(
+        personaPresets = viewModel.personaPresets,
+        diaryEntries = viewModel::diaryEntries,
+        hasUnsavedCurrentPersona = viewModel::hasUnsavedCurrentPersona,
+        currentGalleryHasUnsavedChanges = viewModel::currentGalleryHasUnsavedChanges,
+        saveCurrentToGallery = viewModel::saveCurrentToGallery,
+        editGalleryNotes = viewModel::editGalleryNotes,
+        renameGalleryStory = viewModel::renameGalleryStory,
+        inspectGalleryPersona = viewModel::inspectGalleryPersona,
+        applyGallerySuggestions = viewModel::applyGallerySuggestions,
+        deleteGalleryEntry = viewModel::deleteGalleryEntry,
+        deleteGalleryStory = viewModel::deleteGalleryStory,
+        deleteGalleryHistoryMessage = viewModel::deleteGalleryHistoryMessage,
+        exportGalleryPersona = viewModel::exportGalleryPersona,
+        importGalleryPersona = viewModel::importGalleryPersona,
+        installPersonaPreset = viewModel::installPersonaPreset,
+        setGalleryPortrait = viewModel::setGalleryPortrait,
+        removeGalleryPortrait = viewModel::removeGalleryPortrait,
+        startFromGallery = viewModel::startFromGallery,
+    )
+    val workActions = LocalWorkFeatureUiActions(
+        workState = viewModel.workState,
+        workspaceFiles = viewModel::workspaceFiles,
+        conversationFiles = viewModel::conversationFiles,
+        previewWorkspaceFile = viewModel::previewWorkspaceFile,
+        backgroundJobOutput = viewModel::backgroundJobOutput,
+        stopBackgroundJob = viewModel::stopBackgroundJob,
+    )
+    val automationActions = LocalAutomationFeatureUiActions(
+        switchSession = viewModel::switchSession,
+    )
+    val activeConversationState = when (shell.usageMode) {
+        LocalUsageMode.CHAT -> viewModel.chatSurfaceState
+        LocalUsageMode.WORK -> viewModel.workSurfaceState
+    }
+
+    val featureContributions = listOf(
+        localShellFeatureUiContribution(
+            shell = shell,
+            state = activeConversationState,
+            activeModelProfile = activeModelProfile,
+            sendFeedback = sendFeedback,
+            gallery = gallery,
+            transcriptHistory = transcriptHistory,
+            modeIntro = modeIntro,
+            pinnedSessionIds = pinnedSessionIds,
+            sessionTitleOverrides = sessionTitleOverrides,
+            actions = shellActions,
+            onSettingsDestinationChange = { settingsDestination = it },
+            onPushFeature = ::pushFeature,
+            onNewSession = { showNewSessionMode = true },
+        ),
+        localChatFeatureUiContribution(
+            gallery = gallery,
+            state = viewModel.chatSurfaceState,
+            actions = chatActions,
+            onResetNavigation = ::resetFeatureNavigation,
+            onNewPersona = { showNewPersona = true },
+            onPopFeature = ::popFeature,
+            sessions = shell.sessions,
+            onSwitchSession = viewModel::switchSession,
+            onOpenGroupSetup = { showGroupSetup = true },
+            onPromptPersonaSave = { showPersonaGallerySavePrompt = true },
+            onOpenFromDrawer = ::openFeatureFromDrawer,
+            onCloseDrawer = { scope.launch { drawerState.close() } },
+        ),
+        localWorkFeatureUiContribution(
+            filesMode = filesMode,
+            shell = shell,
+            actions = workActions,
+            onFilesModeChange = { filesMode = it },
+            onPushFeature = ::pushFeature,
+            onPopFeature = ::popFeature,
+            onOpenFromDrawer = ::openFeatureFromDrawer,
+            onCloseDrawer = { scope.launch { drawerState.close() } },
+        ),
+        localAutomationFeatureUiContribution(
+            taskMode = taskMode,
+            actions = automationActions,
+            onTaskModeChange = { taskMode = it },
+            onResetNavigation = ::resetFeatureNavigation,
+            onPopFeature = ::popFeature,
+            onOpenFromDrawer = ::openFeatureFromDrawer,
+            onCloseDrawer = { scope.launch { drawerState.close() } },
+        ),
+        localToolsFeatureUiContribution(
+            onTaskModeChange = { taskMode = it },
+            onSettingsDestinationChange = { settingsDestination = it },
+            onPushFeature = ::pushFeature,
+            onPopFeature = ::popFeature,
+            onOpenFromDrawer = ::openFeatureFromDrawer,
+            onCloseDrawer = { scope.launch { drawerState.close() } },
+        ),
+        localSettingsFeatureUiContribution(
+            settingsDestination = settingsDestination,
+            updateStatus = updateStatus,
+            onCheckUpdate = onCheckUpdate,
+            onSettingsDestinationChange = { settingsDestination = it },
+            onPopFeature = ::popFeature,
+            onOpenFromDrawer = ::openFeatureFromDrawer,
+            onCloseDrawer = { scope.launch { drawerState.close() } },
+        ),
+    )
+
+    fun openDrawerEntry(entry: LocalFeatureDrawerEntry) {
+        val action = localFeatureDrawerAction(entry, featureContributions)
+            ?: error("Missing Feature drawer contribution: $entry")
+        action()
+    }
+
+    LaunchedEffect(
+        featureStack,
+        drawerFeatureOriginStack,
+        featureContributions.map(LocalFeatureUiContribution::moduleId),
+    ) {
+        val restoredStack = localFeatureRestoreStack(featureStack, featureContributions)
+        val restoredOrigin = drawerFeatureOriginStack?.let {
+            localFeatureRestoreStack(it, featureContributions)
+        }
+        if (restoredStack != featureStack) featureStack = restoredStack
+        if (restoredOrigin != drawerFeatureOriginStack) drawerFeatureOriginStack = restoredOrigin
+    }
+
     LaunchedEffect(modeIntro) { if (modeIntro != null) { delay(6_000); modeIntro = null } }
 
     LaunchedEffect(pendingUsageMode, shell.loading, shell.usageMode) {
@@ -285,9 +441,10 @@ fun LocalHarnessScreen(
         progress.collect { event ->
             if (swipeEdge == null) swipeEdge = event.swipeEdge
         }
-        when (localFeatureBackAction(swipeEdge)) {
+        when (localFeatureOwnedBackAction(featurePage, swipeEdge, featureContributions)) {
             LocalFeatureBackAction.OPEN_DRAWER -> drawerState.open()
             LocalFeatureBackAction.POP_FEATURE -> popFeature()
+            null -> Unit
         }
     }
 
@@ -332,118 +489,24 @@ fun LocalHarnessScreen(
                     }
                 },
                 onDeleteSessions = viewModel::deleteSessions,
-                onWorkspaceFiles = {
-                    filesMode = LocalFilesMode.WORKSPACE
-                    openFeatureFromDrawer(LocalFeaturePage.WORKSPACE)
-                    scope.launch { drawerState.close() }
-                },
-                onOpenRunCenter = {
-                    openFeatureFromDrawer(LocalFeaturePage.RUN_CENTER)
-                    scope.launch { drawerState.close() }
-                },
+                onWorkspaceFiles = { openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE) },
+                onOpenRunCenter = { openDrawerEntry(LocalFeatureDrawerEntry.RUN_CENTER) },
                 groupMemberCount = shell.groupChat.members.size,
-                onOpenGroupChat = {
-                    val establishedSessionId = establishedGroupChatSessionId(shell.sessions)
-                    if (establishedSessionId != null) {
-                        if (viewModel.switchSession(establishedSessionId)) {
-                            resetFeatureNavigation()
-                            scope.launch { drawerState.close() }
-                        }
-                    } else {
-                        showGroupSetup = true
-                        scope.launch { drawerState.close() }
-                    }
-                },
-                onOpenPersonaGallery = {
-                    scope.launch { drawerState.close() }
-                    if (viewModel.hasUnsavedCurrentPersona()) {
-                        showPersonaGallerySavePrompt = true
-                    } else {
-                        openFeatureFromDrawer(LocalFeaturePage.PERSONA_GALLERY)
-                    }
-                },
-                onOpenDiary = {
-                    openFeatureFromDrawer(LocalFeaturePage.DIARY)
-                    scope.launch { drawerState.close() }
-                },
-                onTasks = {
-                    taskMode = null
-                    openFeatureFromDrawer(LocalFeaturePage.TASKS)
-                    scope.launch { drawerState.close() }
-                },
-                onTools = {
-                    openFeatureFromDrawer(LocalFeaturePage.TOOLS)
-                    scope.launch { drawerState.close() }
-                },
-                onSettings = {
-                    settingsDestination = SettingsDestination.ROOT
-                    openFeatureFromDrawer(LocalFeaturePage.SETTINGS)
-                    scope.launch { drawerState.close() }
-                },
+                onOpenGroupChat = { openDrawerEntry(LocalFeatureDrawerEntry.GROUP_CHAT) },
+                onOpenPersonaGallery = { openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY) },
+                onOpenDiary = { openDrawerEntry(LocalFeatureDrawerEntry.DIARY) },
+                onTasks = { openDrawerEntry(LocalFeatureDrawerEntry.TASKS) },
+                onTools = { openDrawerEntry(LocalFeatureDrawerEntry.TOOLS) },
+                onSettings = { openDrawerEntry(LocalFeatureDrawerEntry.SETTINGS) },
             )
         },
     ) {
-        LocalConversationStateContent(viewModel, shell.usageMode) { state ->
-            LocalFeatureAnimatedHost(
-                stack = featureStack,
-                modifier = Modifier.fillMaxSize(),
-            ) { renderedPage ->
-                featureStateHolder.SaveableStateProvider(renderedPage.name) {
-                    val featureContributions = listOf(
-                        localShellFeatureUiContribution(
-                            shell = shell,
-                            state = state,
-                            activeModelProfile = activeModelProfile,
-                            sendFeedback = sendFeedback,
-                            gallery = gallery,
-                            transcriptHistory = transcriptHistory,
-                            modeIntro = modeIntro,
-                            pinnedSessionIds = pinnedSessionIds,
-                            sessionTitleOverrides = sessionTitleOverrides,
-                            viewModel = viewModel,
-                            onSettingsDestinationChange = { settingsDestination = it },
-                            onPushFeature = ::pushFeature,
-                            onNewSession = { showNewSessionMode = true },
-                        ),
-                        localChatFeatureUiContribution(
-                            gallery = gallery,
-                            state = state,
-                            viewModel = viewModel,
-                            onResetNavigation = ::resetFeatureNavigation,
-                            onNewPersona = { showNewPersona = true },
-                            onPopFeature = ::popFeature,
-                        ),
-                        localWorkFeatureUiContribution(
-                            filesMode = filesMode,
-                            shell = shell,
-                            viewModel = viewModel,
-                            onFilesModeChange = { filesMode = it },
-                            onPushFeature = ::pushFeature,
-                            onPopFeature = ::popFeature,
-                        ),
-                        localAutomationFeatureUiContribution(
-                            taskMode = taskMode,
-                            viewModel = viewModel,
-                            onTaskModeChange = { taskMode = it },
-                            onResetNavigation = ::resetFeatureNavigation,
-                            onPopFeature = ::popFeature,
-                        ),
-                        localToolsFeatureUiContribution(
-                            onTaskModeChange = { taskMode = it },
-                            onSettingsDestinationChange = { settingsDestination = it },
-                            onPushFeature = ::pushFeature,
-                            onPopFeature = ::popFeature,
-                        ),
-                        localSettingsFeatureUiContribution(
-                            settingsDestination = settingsDestination,
-                            updateStatus = updateStatus,
-                            onCheckUpdate = onCheckUpdate,
-                            onSettingsDestinationChange = { settingsDestination = it },
-                            onPopFeature = ::popFeature,
-                        ),
-                    )
-                    LocalFeaturePageContent(renderedPage, featureContributions)
-                }
+        LocalFeatureAnimatedHost(
+            stack = featureStack,
+            modifier = Modifier.fillMaxSize(),
+        ) { renderedPage ->
+            featureStateHolder.SaveableStateProvider(renderedPage.name) {
+                LocalFeaturePageContent(renderedPage, featureContributions)
             }
         }
     }
@@ -518,7 +581,7 @@ fun LocalHarnessScreen(
             },
             onContinue = {
                 showPersonaGallerySavePrompt = false
-                openFeatureFromDrawer(LocalFeaturePage.PERSONA_GALLERY)
+                openDrawerEntry(LocalFeatureDrawerEntry.PERSONA_GALLERY_CONTINUE)
             },
             onDismiss = { showPersonaGallerySavePrompt = false },
         )

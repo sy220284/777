@@ -14,12 +14,15 @@ ROOT = Path(__file__).resolve().parents[2]
 LOCAL_ROOT = ROOT / "app/src/main/java/com/labteto/dshmobile/local"
 
 EVENT_LOG = ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionEventLog.kt"
-REPOSITORY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt"
+REPOSITORY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
 DEEPSEEK = ROOT / "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"
 CONTEXT_BUDGET = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalContextBudget.kt"
-SESSION_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionCoordinator.kt"
+SESSION_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionCoordinator.kt"
 SESSION_STORAGE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt"
+SESSION_SNAPSHOT_PROVIDER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalCurrentSessionSnapshotComposition.kt"
+SESSION_SNAPSHOT_BOUNDARY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalCurrentSessionSnapshotProvider.kt"
 TRANSCRIPT_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt"
+WORK_RUN_BINDING = ROOT / "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt"
 MODEL_HISTORY_BUFFER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryBuffer.kt"
 ENGINE_DEFAULTS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt"
 TRANSCRIPT_HISTORY_LOADER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryLoader.kt"
@@ -84,7 +87,10 @@ deepseek = strip_comments(read(DEEPSEEK))
 context_budget = strip_comments(read(CONTEXT_BUDGET))
 session_coordinator = strip_comments(read(SESSION_COORDINATOR))
 session_storage = strip_comments(read(SESSION_STORAGE))
+session_snapshot_provider = strip_comments(read(SESSION_SNAPSHOT_PROVIDER))
+session_snapshot_boundary = strip_comments(read(SESSION_SNAPSHOT_BOUNDARY))
 transcript_runtime = strip_comments(read(TRANSCRIPT_RUNTIME))
+work_run_binding = strip_comments(read(WORK_RUN_BINDING))
 model_history_buffer = strip_comments(read(MODEL_HISTORY_BUFFER))
 engine_defaults = strip_comments(read(ENGINE_DEFAULTS))
 transcript_history_loader = strip_comments(read(TRANSCRIPT_HISTORY_LOADER))
@@ -107,12 +113,7 @@ all_local_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobil
 
 root_execution_sources = {}
 for relative in (
-    "app/src/main/java/com/labteto/dshmobile/local/LocalChatTurnCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/LocalChatReplyCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/LocalChatHistoryWindow.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/LocalChatEditSupport.kt",
     "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/LocalSessionCoordinator.kt",
     "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt",
     "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
 ):
@@ -236,8 +237,14 @@ for relative, token in (
     if token in source:
         violations.append(f"{relative} uses full-history events() for recent attribution")
 
-if "(current.messages + messages).takeLast(runtimeWindowMessages)" not in transcript_runtime:
-    violations.append("LocalTranscriptRuntime lost its bounded visible transcript window")
+if (
+    "fun appendMessages(messages: List<LocalHarnessMessage>, runtimeWindowMessages: Int)" not in transcript_runtime
+    or "state.appendMessages(messages, runtimeWindowMessages)" not in transcript_runtime
+    or "(current.messages + messages).takeLast(runtimeWindowMessages)" not in work_run_binding
+):
+    violations.append(
+        "Transcript projection must preserve a bounded visible window through its narrow state port"
+    )
 
 if (
     "summaryCache" not in repository
@@ -249,19 +256,20 @@ if (
 # ---- Session persistence and recovery ordering ----------------------------
 
 if (
-    "messages = emptyList()" not in session_coordinator
-    or "transcriptWindow = state.messages.takeLast(runtimeWindowMessages)" not in session_coordinator
+    "messages = emptyList()" not in session_snapshot_provider
+    or "transcriptWindow = state.messages.takeLast(runtimeWindowMessages)" not in session_snapshot_provider
 ):
     violations.append("Session snapshots must keep full transcript out of the snapshot payload")
 
+if "controlProjectedThroughSequence = eventLog.latestSequence()" not in session_snapshot_boundary:
+    violations.append("Session snapshot boundary lost durable control cursor capture")
 if not ordered_in_source(
     session_storage,
-    "val controlProjectedThroughSequence = eventLog.latestSequence()",
-    "val transcriptProjectedThroughSequence",
-    "val state = runtimeStateStore.state.value",
+    "val boundary = localSessionSnapshotBoundary(",
+    "return currentSnapshotProvider.snapshot(",
 ):
     violations.append(
-        "Session persistence must capture durable projection cursors before reading mutable runtime state"
+        "Session persistence must capture durable projection cursors before materializing mutable Feature state"
     )
 
 if contains_any(foreground_sources, 'eventLog.append("user/queue"'):

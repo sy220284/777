@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
 import kotlinx.serialization.json.JsonObject

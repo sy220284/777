@@ -63,6 +63,7 @@ class SettingsViewModel @Inject constructor(
             initialValue = localHarness.initialState,
         )
     val chatGptState: StateFlow<ChatGptUiState> = localHarness.chatGptState
+    val chatStyleGuardBuiltInPhrases: List<String> get() = localHarness.chatStyleGuardBuiltInPhrases
     val deepSeekPricing: StateFlow<DeepSeekPricingState> = settingsData.deepSeekPricing
     val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = settingsData.usageRevision
         .mapLatest {
