@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.persistence.LOCAL_HARNESS_PREFERENCES_NAME
+import com.labteto.dshmobile.local.persistence.LocalHarnessPreferences
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
@@ -62,7 +62,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
     private val chatRestore: com.labteto.dshmobile.local.chat.LocalChatSessionRestorer,
     private val approvalPreferences: LocalApprovalPreferences,
 ) {
-    private val preferences = context.getSharedPreferences(LOCAL_HARNESS_PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val preferences = LocalHarnessPreferences.from(context)
     private val workspace get() = sessionStorage.files.workspace
     private val coordinator get() = sessionStorage.coordinator
     private val agentRunCoordinator get() = sessionStorage.agentRunCoordinator
