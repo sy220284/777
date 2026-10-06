@@ -76,11 +76,6 @@ def paths_containing(sources: dict[str, str], token: str) -> list[str]:
     return sorted(path for path, source in sources.items() if token in source)
 
 
-def paths_matching(sources: dict[str, str], pattern: str) -> list[str]:
-    regex = re.compile(pattern)
-    return sorted(path for path, source in sources.items() if regex.search(source))
-
-
 def ordered_in_source(source: str, *tokens: str) -> bool:
     positions = [source.find(token) for token in tokens]
     return min(positions) >= 0 and positions == sorted(positions)
@@ -277,15 +272,21 @@ if not ordered_in_source(
         "Session persistence must capture durable projection cursors before materializing mutable Feature state"
     )
 
-direct_queue_event_writers = paths_matching(
-    foreground_sources,
-    r'eventLog\.append\(\s*"[^"]*queue[^"]*"',
-)
-if direct_queue_event_writers:
-    violations.append(
-        "queued Agent input must persist through LocalAgentInboxPersistence; "
-        "direct queue event writes found in: " + ", ".join(direct_queue_event_writers)
-    )
+agent_inbox_persistence_path =
+    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentInboxPersistence.kt"
+agent_inbox_persistence = all_local_sources.get(agent_inbox_persistence_path, "")
+if 'LOCAL_AGENT_INBOX_EVENT_TYPE = "agent/inbox/spliced"' not in agent_inbox_persistence:
+    violations.append("LocalAgentInboxPersistence must own the canonical durable inbox event type")
+
+for path, source in all_local_sources.items():
+    if path != agent_inbox_persistence_path and '"agent/inbox/spliced"' in source:
+        violations.append(
+            f"{path} hard-codes the durable Agent inbox event type; use LOCAL_AGENT_INBOX_EVENT_TYPE"
+        )
+    if "eventLog.append(LOCAL_AGENT_INBOX_EVENT_TYPE" in source and "encodeLocalAgentInboxEvent(" not in source:
+        violations.append(
+            f"{path} writes Agent inbox state without encodeLocalAgentInboxEvent"
+        )
 
 # Recovery must reject stale ownership before late foreground Work commits.
 if not contains_any(work_sources, "agentRunCoordinator.ensureCurrentOwner("):
