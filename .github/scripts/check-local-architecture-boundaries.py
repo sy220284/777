@@ -131,6 +131,7 @@ FROZEN_SHARED_PACKAGES = (
     "send",
     "usage",
     "web",
+    "tools",
 )
 FEATURE_INTERNAL_IMPORT_PREFIXES = (
     "com.labteto.dshmobile.local.chat.",
@@ -139,14 +140,51 @@ FEATURE_INTERNAL_IMPORT_PREFIXES = (
     "com.labteto.dshmobile.local.settings.",
 )
 
-# Remaining reverse/cross-Feature edges are explicit migration debt. They may only shrink.
+# Remaining reverse/cross-Feature edges are explicit migration debt.
+# Every allowance is an exact (consumer file, imported symbol) edge so debt cannot be replaced
+# with a different internal dependency inside the same file.
 SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST = {
-    "app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt",
+    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatDiaryStore"),
+    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatMemorySelector"),
+    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.PersonaProfile"),
+    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.chatLongTermMemoryBudget"),
+    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey"),
+    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.diaryRecallItemLimit"),
+    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.diaryRecallUsageInstruction"),
+    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.isUnboundChatPersona"),
+    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.relationshipMemoryMatchesSubject"),
+    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.shouldSearchDiary"),
+    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.takeWithinModelTokenBudget"),
+    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.ChatCharacterState"),
+    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.ChatContextState"),
+    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.ChatReplySuggestion"),
+    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.LocalChatBranchState"),
+    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.LocalGroupChatState"),
+    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.PersonaProfile"),
+    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.work.LocalGoal"),
+    ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.work.LocalTodoItem"),
 }
+
 AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST = {
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt",
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatPendingTurn"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatPersonaStore"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.LocalChatState"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.appendMaterializedChatBranchMessage"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.applySceneTurn"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.characterProactiveDirective"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.enqueuePending"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.isNearDuplicateProactive"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.proactiveConversationFocus"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.withoutLegacyConversationContext"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.work.LocalWorkState"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatCharacterState"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt", "com.labteto.dshmobile.local.chat.LocalChatState"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt", "com.labteto.dshmobile.local.chat.PersonaProfile"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt", "com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy"),
+    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt", "com.labteto.dshmobile.local.work.LocalWorkState"),
 }
 AUTOMATION_ALLOWED_CROSS_FEATURE_API_SYMBOLS = {
     "LocalChatExecutionPort",
@@ -154,6 +192,54 @@ AUTOMATION_ALLOWED_CROSS_FEATURE_API_SYMBOLS = {
     "LocalChatUserActivityPort",
     "LocalWorkExecutionPort",
     "LocalWorkTurnPort",
+}
+
+SETTINGS_INTERNAL_IMPORT_MIGRATION_ALLOWLIST = {
+    ("app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatStyleGuard"),
+    ("app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt", "com.labteto.dshmobile.local.chat.PersonaProfile"),
+}
+
+# Stage 5 is still migrating. UI may consume presentation facades/projections, but direct Store /
+# Coordinator / Service / Runtime / Manager / Repository / Tracker / Executor / Registry / Gateway /
+# Port imports are exact migration debt and may only shrink.
+UI_ALLOWED_PRESENTATION_IMPORT_PREFIXES = (
+    "com.labteto.dshmobile.local.presentation.",
+)
+UI_INTERNAL_IMPLEMENTATION_SUFFIXES = (
+    "Coordinator",
+    "Store",
+    "Service",
+    "Runtime",
+    "Manager",
+    "Repository",
+    "Tracker",
+    "Executor",
+    "Registry",
+    "Gateway",
+    "Port",
+)
+UI_INTERNAL_IMPORT_MIGRATION_ALLOWLIST = {
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatModelAssistController.kt", "com.labteto.dshmobile.local.chat.GroupAnnouncementService"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatModelAssistController.kt", "com.labteto.dshmobile.local.chat.PersonaAutoFillService"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt", "com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt", "com.labteto.dshmobile.local.chat.GroupAnnouncementService"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt", "com.labteto.dshmobile.local.chat.PersonaAutoFillService"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt", "com.labteto.dshmobile.local.chat.PersonaInspectionService"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt", "com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt", "com.labteto.dshmobile.local.chat.PersonaAutoFillService"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt", "com.labteto.dshmobile.local.chat.PersonaInspectionService"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaTransferCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaPresetArtworkInstaller.kt", "com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryController.kt", "com.labteto.dshmobile.local.session.LocalSessionRuntime"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryLoader.kt", "com.labteto.dshmobile.local.session.LocalSessionRuntime"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/AutomationPlannerUiController.kt", "com.labteto.dshmobile.local.automation.AutomationPlanningService"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksViewModel.kt", "com.labteto.dshmobile.local.automation.AutomationPlanningService"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt", "com.labteto.dshmobile.local.memory.MemoryManager"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt", "com.labteto.dshmobile.local.memory.MemoryStore"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt", "com.labteto.dshmobile.local.memory.MemoryManager"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt", "com.labteto.dshmobile.local.memory.MemoryStore"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt", "com.labteto.dshmobile.local.model.DeepSeekPricingRepository"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt", "com.labteto.dshmobile.local.model.DeepSeekUsageTracker"),
 }
 
 # Session is still being horizontally migrated; these neutral slices are already closed.
@@ -351,41 +437,42 @@ for relative in FROZEN_SHARED_FILES:
                 f"{relative} is a closed Shared boundary but imports Feature internal {prefix}"
             )
 
-# Session/Memory still contain known reverse Feature dependencies. Track exact files so the
-# remaining migration debt cannot spread while domain codecs and memory ownership are extracted.
-shared_reverse_dependency_consumers: set[str] = set()
+# Session/Memory still contain known reverse Feature dependencies. Track exact import edges so
+# the remaining migration debt cannot spread or be substituted inside an already-allowed file.
+def format_edges(edges: set[tuple[str, str]]) -> str:
+    return ", ".join(f"{path} -> {imported}" for path, imported in sorted(edges))
+
+
+shared_reverse_dependency_edges: set[tuple[str, str]] = set()
 for package_name in ("session", "memory"):
     for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / package_name):
-        source_imports = imports(source)
-        if any(
-            item.startswith(prefix)
-            for item in source_imports
-            for prefix in FEATURE_INTERNAL_IMPORT_PREFIXES
-        ):
-            shared_reverse_dependency_consumers.add(path.relative_to(ROOT).as_posix())
+        relative = path.relative_to(ROOT).as_posix()
+        for imported in imports(source):
+            if imported.startswith(FEATURE_INTERNAL_IMPORT_PREFIXES):
+                shared_reverse_dependency_edges.add((relative, imported))
 
-unexpected_shared_reverse = sorted(
-    shared_reverse_dependency_consumers - SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST
+unexpected_shared_reverse = (
+    shared_reverse_dependency_edges - SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST
 )
 if unexpected_shared_reverse:
     die(
-        "new Shared→Feature migration debt: "
-        + ", ".join(unexpected_shared_reverse)
-        + "; invert it through a neutral Shared contract instead"
+        "new Shared→Feature migration edge(s): "
+        + format_edges(unexpected_shared_reverse)
+        + "; invert them through neutral Shared contracts"
     )
-stale_shared_reverse = sorted(
-    SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST - shared_reverse_dependency_consumers
+stale_shared_reverse = (
+    SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST - shared_reverse_dependency_edges
 )
 if stale_shared_reverse:
     die(
-        "stale Shared→Feature migration allowlist entries: "
-        + ", ".join(stale_shared_reverse)
-        + "; shrink the ratchet with the migration"
+        "stale Shared→Feature migration edge(s): "
+        + format_edges(stale_shared_reverse)
+        + "; shrink the exact ratchet with the migration"
     )
 
-# Automation may consume provider-owned execution Ports, but remaining direct internal imports are
-# Stage-4 debt restricted to the two legacy coordinators.
-automation_internal_consumers: set[str] = set()
+# Automation may consume provider-owned execution Ports, but all remaining internal imports are
+# Stage-4 debt tracked by exact edge.
+automation_internal_edges: set[tuple[str, str]] = set()
 for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "automation"):
     relative = path.relative_to(ROOT).as_posix()
     for imported in imports(source):
@@ -397,25 +484,85 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "automation"):
         symbol = imported.rsplit(".", 1)[-1]
         if symbol in AUTOMATION_ALLOWED_CROSS_FEATURE_API_SYMBOLS:
             continue
-        automation_internal_consumers.add(relative)
+        automation_internal_edges.add((relative, imported))
 
-unexpected_automation_internal = sorted(
-    automation_internal_consumers - AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST
+unexpected_automation_internal = (
+    automation_internal_edges - AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST
 )
 if unexpected_automation_internal:
     die(
-        "new Automation→Feature-internal migration debt: "
-        + ", ".join(unexpected_automation_internal)
-        + "; consume Chat/Work execution Ports instead"
+        "new Automation→Feature-internal migration edge(s): "
+        + format_edges(unexpected_automation_internal)
+        + "; consume provider-owned execution Ports instead"
     )
-stale_automation_internal = sorted(
-    AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST - automation_internal_consumers
+stale_automation_internal = (
+    AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST - automation_internal_edges
 )
 if stale_automation_internal:
     die(
-        "stale Automation internal-import migration allowlist entries: "
-        + ", ".join(stale_automation_internal)
+        "stale Automation internal-import migration edge(s): "
+        + format_edges(stale_automation_internal)
         + "; shrink Stage 4 debt with the Port migration"
+    )
+
+# Settings is a product Feature. Its remaining Chat coupling is explicit Stage-5 migration debt.
+settings_internal_edges: set[tuple[str, str]] = set()
+for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "settings"):
+    relative = path.relative_to(ROOT).as_posix()
+    for imported in imports(source):
+        if imported.startswith((
+            "com.labteto.dshmobile.local.chat.",
+            "com.labteto.dshmobile.local.work.",
+            "com.labteto.dshmobile.local.automation.",
+        )):
+            settings_internal_edges.add((relative, imported))
+
+unexpected_settings_internal = (
+    settings_internal_edges - SETTINGS_INTERNAL_IMPORT_MIGRATION_ALLOWLIST
+)
+if unexpected_settings_internal:
+    die(
+        "new Settings→Feature-internal migration edge(s): "
+        + format_edges(unexpected_settings_internal)
+        + "; expose a Settings-facing provider API/Port instead"
+    )
+stale_settings_internal = (
+    SETTINGS_INTERNAL_IMPORT_MIGRATION_ALLOWLIST - settings_internal_edges
+)
+if stale_settings_internal:
+    die(
+        "stale Settings internal-import migration edge(s): "
+        + format_edges(stale_settings_internal)
+        + "; shrink Stage 5 debt with the migration"
+    )
+
+# UI may consume DTOs and presentation facades/projections. Direct implementation imports are
+# migration debt until Feature UI contribution is complete.
+ui_internal_edges: set[tuple[str, str]] = set()
+for path, source in kotlin_sources_under(UI_SOURCE_ROOT):
+    relative = path.relative_to(ROOT).as_posix()
+    for imported in imports(source):
+        if not imported.startswith("com.labteto.dshmobile.local."):
+            continue
+        if imported.startswith(UI_ALLOWED_PRESENTATION_IMPORT_PREFIXES):
+            continue
+        symbol = imported.rsplit(".", 1)[-1]
+        if symbol.endswith(UI_INTERNAL_IMPLEMENTATION_SUFFIXES):
+            ui_internal_edges.add((relative, imported))
+
+unexpected_ui_internal = ui_internal_edges - UI_INTERNAL_IMPORT_MIGRATION_ALLOWLIST
+if unexpected_ui_internal:
+    die(
+        "new UI→internal implementation migration edge(s): "
+        + format_edges(unexpected_ui_internal)
+        + "; UI must consume a Feature API/projection"
+    )
+stale_ui_internal = UI_INTERNAL_IMPORT_MIGRATION_ALLOWLIST - ui_internal_edges
+if stale_ui_internal:
+    die(
+        "stale UI internal-import migration edge(s): "
+        + format_edges(stale_ui_internal)
+        + "; shrink Stage 5 debt with the UI migration"
     )
 
 # Shared recovery must remain semantically neutral even when types are not imported.
@@ -619,10 +766,29 @@ if stale_ui:
 
 for relative in NARROW_PORT_PATHS:
     source = strip_comments(read(relative))
+    expected_name = Path(relative).stem
+    if re.search(
+        rf"\binternal\s+(?:fun\s+)?interface\s+{re.escape(expected_name)}\b",
+        source,
+    ) is None:
+        die(relative + " must remain a narrow interface contract: " + expected_name)
     if references_type(source, "LocalHarnessEngine"):
         die(relative + " exposes the legacy Engine through a 3.0 Port")
     if "MutableStateFlow<LocalHarnessState>" in source:
         die(relative + " exposes writable aggregate state through a 3.0 Port")
+
+    source_imports = imports(source)
+    if "/chat/" in relative:
+        forbidden_prefixes = FEATURE_FORBIDDEN_IMPORT_PREFIXES["chat"]
+    elif "/work/" in relative:
+        forbidden_prefixes = FEATURE_FORBIDDEN_IMPORT_PREFIXES["work"]
+    else:
+        forbidden_prefixes = FEATURE_INTERNAL_IMPORT_PREFIXES
+    for prefix in forbidden_prefixes:
+        if any(item.startswith(prefix) for item in source_imports):
+            die(
+                relative + " leaks Feature internal dependencies through a 3.0 Port: " + prefix
+            )
 
 
 # ---- Product Feature composition vs Runtime plugins -----------------------
