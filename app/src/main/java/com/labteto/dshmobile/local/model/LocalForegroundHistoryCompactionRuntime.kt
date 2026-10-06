@@ -50,8 +50,9 @@ internal class LocalForegroundHistoryCompactionRuntime @Inject constructor(
         eventLog.append(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
             checkpointCodec.encode(
-                durableModelHistorySnapshot(history.snapshot()),
-                "session/context-overflow",
+                messages = durableModelHistorySnapshot(history.snapshot()),
+                reason = "session/context-overflow",
+                asOfSequence = eventLog.latestSequence(),
             ),
         )
         runtimeStateStore.foregroundRunHandle.turnsSinceModelHistoryCheckpoint = 0
