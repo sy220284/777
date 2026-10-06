@@ -95,7 +95,9 @@ internal fun TaskCard(
     val backgroundTaskLabel = stringResource(R.string.tasks_background_task)
     val scheduleLabel = when (task.scheduleType) {
         AutomationScheduleType.SILENCE -> {
-            val minutes = task.silenceMinutes ?: requireNotNull(task.recurringMinutes) {\n                "Normalized silence task requires a duration"\n            }
+            val minutes = task.silenceMinutes ?: requireNotNull(task.recurringMinutes) {
+                "Normalized silence task requires a duration"
+            }
             stringResource(R.string.tasks_schedule_silence_value, minutes / 60L)
         }
         AutomationScheduleType.DAILY -> stringResource(R.string.tasks_schedule_daily)
