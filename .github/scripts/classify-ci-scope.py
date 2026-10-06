@@ -64,7 +64,6 @@ CI_CONTROL_FILES = {
 ARCHITECTURE_3_CONTROL_FILES = {
     "AGENTS.md",
     "docs/ARCHITECTURE.md",
-    "docs/ARCHITECTURE-3-EXECUTION-PLAN.zh-CN.md",
     "docs/SYSTEM-AUDIT-GUIDE.zh-CN.md",
     "docs/VALIDATION.md",
     ".github/workflows/ci.yml",

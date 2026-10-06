@@ -35,9 +35,9 @@ mock-harness/             测试 Harness
 reference-validation/     官方 Harness 差分验证
 ```
 
-app 内采用 capability runtime + projection + coordinator 的模块化单体结构。
+app 内采用架构 3.0 的模块化单体：产品业务归所属 Feature，跨 Feature 中立能力归 Shared Capability，Feature / Provider 构造集中在应用组合根，UI 只通过 presentation / Feature API / projection 消费。
 
-新增功能优先放到正确能力边界；已退役的 `LocalHarnessEngine` 不得恢复，`LocalRuntimeKernel` 也不得承接产品 Feature 业务，UI 与 Session 能力继续通过明确的 Feature / Shared owner 扩展。
+新增功能先确定领域 Owner、共享能力边界、公开 Port、生产装配和状态事实源；`LocalRuntimeKernel` 只负责进程 start-once、生命周期 scope、bootstrap / recovery 触发和初始化失败投影。
 
 ## 开发规则
 
