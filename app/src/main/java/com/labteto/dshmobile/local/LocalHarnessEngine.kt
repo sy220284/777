@@ -107,7 +107,6 @@ import com.labteto.dshmobile.local.context.LocalWorkTurnPromptContext
 import com.labteto.dshmobile.local.context.composeWorkTurnContext
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
-import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.jobs.LocalPersistentJobRecoveryCoordinator
 import com.labteto.dshmobile.local.lsp.parseLanguageServerCommand
@@ -268,6 +267,7 @@ import com.labteto.dshmobile.local.vision.LocalVisionRoute
 import com.labteto.dshmobile.local.work.LocalForegroundRecoveryCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkTurnPort
 import com.labteto.dshmobile.local.work.LocalWorkAgentTurnExecutor
+import com.labteto.dshmobile.local.work.LocalWorkBuiltinToolRuntime
 import com.labteto.dshmobile.local.work.LocalWorkMemoryRuntime
 import com.labteto.dshmobile.local.work.LocalWorkModelHistoryRuntime
 import com.labteto.dshmobile.local.work.LocalWorkToolResultRuntime
@@ -277,7 +277,6 @@ import com.labteto.dshmobile.local.work.LocalRuntimeOwnershipPolicy
 import com.labteto.dshmobile.local.work.LocalWorkExecutionControl
 import com.labteto.dshmobile.local.work.LocalWorkRequestContextPolicy
 import com.labteto.dshmobile.local.work.asModelAdmissionPort
-import com.labteto.dshmobile.local.work.LocalWorkProgressCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.local.work.LocalWorkSubagentRuntime
@@ -298,7 +297,6 @@ import com.labteto.dshmobile.local.work.shouldProactivelyCompactBeforeModelStep
 import com.labteto.dshmobile.local.work.validateWorkspacePatchPaths
 import com.labteto.dshmobile.local.work.withWorkTurnContext
 import com.labteto.dshmobile.local.work.workSteadyStateHistoryBudget
-import com.labteto.dshmobile.local.work.exitWorkPlanMode
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.observability.DiagnosticReport
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
@@ -776,6 +774,15 @@ class LocalHarnessEngine @Inject internal constructor(
             runtimeStateStore = runtimeStateStore,
             sessionStorage = sessionStorageRuntime,
             workMemory = workMemoryRuntime,
+        )
+    }
+
+    private val workBuiltinToolRuntime by lazy {
+        LocalWorkBuiltinToolRuntime(
+            persist = { binding ->
+                sessionCoordinator.enqueue(binding.persistenceSnapshot())
+            },
+            updateContextMetrics = workModelHistoryRuntime::updateContextMetrics,
         )
     }
 
@@ -1770,6 +1777,7 @@ class LocalHarnessEngine @Inject internal constructor(
         if (executionState.value.work.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
             return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
         }
+        workBuiltinToolRuntime.execute(call, binding)?.let { return it }
         return when (call.name) {
             "read", "read_file" -> workspace.read(
                 relativePath = args.string("path"),
@@ -1918,28 +1926,6 @@ class LocalHarnessEngine @Inject internal constructor(
             } else {
                 searchCapabilities(args.string("query"), binding.enabledOptionalTools)
             }
-            "update_plan" -> workProgress(binding).updatePlan(args)
-            "exit_plan_mode" -> exitWorkPlanMode(
-                call = call,
-                plan = args.string("plan"),
-                state = binding?.workState ?: localAggregateWorkStatePort(_state),
-                interactions = binding?.interactions ?: runtimeStateStore.foregroundInteractions,
-                aggregateSnapshot = { binding?.aggregateSnapshot() ?: _state.value },
-                history = binding?.runHandle?.modelHistory ?: modelHistory,
-                eventLog = binding?.eventLog ?: eventLog,
-                persist = { persist(binding) },
-                updateContextMetrics = { updateContextMetrics(binding) },
-            )
-            "todo_write" -> workProgress(binding).updateTodos(args)
-            "create_goal" -> workProgress(binding).createGoal(args.string("description"))
-            "get_goal" -> workProgress(binding).getGoal()
-            "update_goal" -> workProgress(binding).updateGoal(args.string("status"), args.optionalString("note"))
-            "ask_user_question" -> askUser(
-                call,
-                args.string("question"),
-                args["options"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
-                binding,
-            )
             "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(workspace::readSkill)
                 ?: workspace.skills().takeIf { it.isNotEmpty() }?.joinToString("\n") ?: "未安装技能"
             "list_skills" -> workspace.skills().takeIf { it.isNotEmpty() }?.joinToString("\n") ?: "未安装技能"
@@ -2116,21 +2102,6 @@ class LocalHarnessEngine @Inject internal constructor(
             ),
         )
     }
-
-    private fun workProgress(binding: LocalWorkRunBinding?) = LocalWorkProgressCoordinator(
-        state = binding?.workState ?: localAggregateWorkStatePort(_state),
-        eventLog = binding?.eventLog ?: eventLog,
-        persist = { persist(binding) },
-    )
-
-    private suspend fun askUser(
-        call: LocalToolCall,
-        question: String,
-        options: List<String>,
-        binding: LocalWorkRunBinding? = null,
-    ): String = (binding?.interactions ?: runtimeStateStore.foregroundInteractions).awaitQuestion(
-        LocalQuestion(call.id, question.take(2_000), options.take(6)),
-    )
 
     private fun cancelChatPostTurn() {
         chatContextRefreshCoordinator.cancelScheduledRefresh()
