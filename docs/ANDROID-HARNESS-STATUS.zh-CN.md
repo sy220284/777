@@ -23,20 +23,31 @@ Node / Python / Git 是 Agent 可调用的工具运行环境。
 
 ## 总体结构
 
+业务调用：
+
 ```text
 Compose UI
-→ presentation projection
-→ Chat / Work / Session / Model / Tools / Automation runtimes
-→ Feature API / Shared Capability
-→ LocalRuntimeKernel（仅进程启动、恢复与维护）
-→ coordinators / stores / repositories
+→ presentation / Feature API / projection
+→ Chat / Work / Automation / Tools Feature
+→ Shared Capability / Shared Runtime（按需）
+→ stores / registries / policies / gateways
 → harness-core
 → Android runtime / MCP / LSP / device providers
 ```
 
+进程启动：
+
+```text
+DshApplication
+→ LocalRuntimeKernel
+→ LocalRuntimeBootstrapPort
+→ 应用组合根
+→ Shared Runtime / Feature 初始化与恢复
+```
+
 `harness-core` 负责平台无关 Agent 语义。
 
-Android 模块负责生命周期、进程、设备、UI 和平台能力。
+Android 模块负责生命周期、进程、设备、UI 和平台能力；`LocalRuntimeKernel` 只负责进程 start-once、生命周期 scope、bootstrap / recovery 触发和初始化失败投影。
 
 ## Agent
 
@@ -149,7 +160,7 @@ Tool / Plugin / Capability Registry 已进入主运行链。
 
 平台能力由 `LocalPluginCompositionFactory` 组合。
 
-Engine 不直接持有 PluginRegistry。
+PluginRegistry / PluginManager 由运行时插件体系持有，产品 Feature 通过 Tool / Plugin 共享契约消费，不由 `LocalRuntimeKernel` 或 UI 持有。
 
 ## MCP 与 LSP
 
