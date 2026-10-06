@@ -57,7 +57,7 @@
    - `docs/SHARED-AUDIT-CONCLUSIONS.zh-CN.md`
    - 其他直接相关的当前文档。
 
-   当前架构事实以 `ARCHITECTURE.md` 的最终所有权、阶段完成状态和永久门禁为准。阶段执行计划、历史迁移说明、旧 Engine / bridge / allowlist 只能用于追溯和防回归，不能作为当前允许依赖、当前组件或当前完成条件。
+   当前架构事实以 `ARCHITECTURE.md`、当前代码、`architecture-3-gates` 和真实生产装配共同确认。审计必须把每项能力映射到当前 Feature / Shared Capability / Runtime Kernel / 应用组合根 / UI projection 边界，并以当前真实 Owner、公开 Port、状态与配置事实源作为判断依据。
 3. 锁定：
    - 当前最新 `main` SHA；
    - 当前活动 PR；
@@ -339,7 +339,7 @@ Runtime Kernel 只按架构 3.0 承担 start-once、生命周期 scope、bootstr
 - Shared Capability 只承载真正中立、可跨 Feature 复用的能力；
 - Runtime Kernel 不承载 Feature 领域业务；
 - 可热插拔；
-- 新功能替代旧功能后旧路径退出。
+- 同一能力的生产调用、状态写入、配置写入和装配入口是否收敛到一个明确 Owner。
 
 重点找：
 
@@ -352,16 +352,19 @@ Runtime Kernel 只按架构 3.0 承担 start-once、生命周期 scope、bootstr
 - 业务规则复制；
 - 多个平行 Manager / Registry；
 - 参数堆积掩盖职责混乱；
-- 只移动代码位置，没有移动所有权；
-- 新 Owner 接管后旧路径仍参与运行；
-- composition root / DI 同时装配新旧 Owner；
-- Feature / Page / Tool / Worker / Registry 有重复注册；
-- Shared 层开始解释 Feature 专属领域语义；
-- Feature 重新持有完整聚合可写状态；
-- Kernel / Shell / Settings 因“方便调用”重新吸收领域逻辑；
-- 已删除的旧 Engine / composition bridge / 跨层直接消费者通过改名或新代理回归。
-
-> 旧 Engine、历史 bridge、迁移 allowlist 只作为“永久禁止回归”的历史墓碑检查，不属于当前架构的合法运行组件，也不得作为当前调用链模板。
+- 代码位置与业务 Owner 不一致；
+- 同一业务事实存在两个及以上可写 Owner；
+- composition root / DI 对同一能力装配多个生产实现；
+- Feature / Page / Tool / Worker / Registry 出现重复注册或路由归属不唯一；
+- Shared Capability 开始解释 Feature 专属领域语义；
+- Feature 持有完整聚合可写状态，绕过领域状态边界；
+- Runtime Kernel 承载具体 Feature 业务、领域状态或 Provider 装配；
+- Shell 超出导航宿主职责，持有 Feature 业务状态或执行领域规则；
+- SettingsFeature 超出设置入口职责，持有其他 Feature 的真实配置事实；
+- UI 绕过 presentation / Feature API / projection 直接消费内部实现；
+- `LocalHarnessState` 兼容聚合被重新作为领域权威状态或双写入口；
+- Session owner、Agent run identity、迟到提交栅栏、recovery coordination 出现第二套所有权；
+- FeatureCatalog 路由、页面 contribution、Back / Drawer / restore policy 的 Owner 不唯一。
 
 #### 功能设计与实现度
 
@@ -456,7 +459,7 @@ UI 文案
    - Feature catalog、页面 contribution、导航、Back / Drawer / restore 是否全部注册；
    - Worker / Job / Tool / MCP / serializer / codec / registry 是否注册到真实生产入口；
    - Manifest、权限、intent/filter、deep link、foreground service 等声明是否与代码入口一致；
-   - 新实现接管后旧依赖、旧注册、旧 provider、旧 worker、旧 serializer 是否完全退出；
+   - 同一能力是否只保留一套生产依赖、注册、provider、worker、serializer / codec 和真实执行入口；
    - debug/test 注册不得误进入 production，production 注册也不得只在测试中存在。
 
 6. **关联功能协同**
