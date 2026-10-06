@@ -56,6 +56,8 @@
    - `docs/UI-UX.zh-CN.md`
    - `docs/SHARED-AUDIT-CONCLUSIONS.zh-CN.md`
    - 其他直接相关的当前文档。
+
+   当前架构事实以 `ARCHITECTURE.md` 的最终所有权、阶段完成状态和永久门禁为准。阶段执行计划、历史迁移说明、旧 Engine / bridge / allowlist 只能用于追溯和防回归，不能作为当前允许依赖、当前组件或当前完成条件。
 3. 锁定：
    - 当前最新 `main` SHA；
    - 当前活动 PR；
@@ -140,22 +142,22 @@ Chat / Work / Automation / Subagent / Group Chat
 - Observability；
 - Security Policy。
 
-纵向沿完整链路检查：
+纵向沿完整链路检查。链路按真实 Owner 展开，禁止套用旧的固定“UI → Coordinator → Runtime → Store”层级模板：
 
 ```text
 用户操作 / 自动触发
 → UI
-→ ViewModel / Projection / State
-→ Coordinator / Feature API
-→ Runtime / Shared Capability
-→ Model / Tool / External API
-→ Domain / Data Processing
-→ EventLog / Store
-→ 后处理
-→ 持久化
-→ 恢复
+→ Feature API / presentation / projection
+→ 领域 Feature Owner
+→ Shared Capability（仅在需要跨 Feature 中立能力时）
+→ 外部 Model / Tool / Platform（如适用）
+→ 领域事件 / 状态提交
+→ Shared persistence / runtime owner（如适用）
+→ 恢复 / 投影
 → UI 最终反馈
 ```
+
+Runtime Kernel 只按架构 3.0 承担 start-once、生命周期 scope、bootstrap / recovery 触发和初始化错误投影；不得因为链路图方便，把领域业务默认画进 Kernel。
 
 重点发现：
 
@@ -331,9 +333,11 @@ Chat / Work / Automation / Subagent / Group Chat
 - 高内聚、低耦合；
 - 单一职责；
 - 单向依赖；
-- 唯一事实源；
-- 唯一入口；
-- 统一 Registry / Coordinator / Policy / Store；
+- 每项业务事实只有一个权威 Owner；
+- 每项能力有明确且唯一的公开进入边界；
+- Registry / Coordinator / Policy / Store 按所属 Feature 或 Shared Capability 分域归属，不建立跨域“全局总管”；
+- Shared Capability 只承载真正中立、可跨 Feature 复用的能力；
+- Runtime Kernel 不承载 Feature 领域业务；
 - 可热插拔；
 - 新功能替代旧功能后旧路径退出。
 
@@ -355,7 +359,9 @@ Chat / Work / Automation / Subagent / Group Chat
 - Shared 层开始解释 Feature 专属领域语义；
 - Feature 重新持有完整聚合可写状态；
 - Kernel / Shell / Settings 因“方便调用”重新吸收领域逻辑；
-- 已清零的 Engine / bridge / 直接消费者通过改名或新代理回归。
+- 已删除的旧 Engine / composition bridge / 跨层直接消费者通过改名或新代理回归。
+
+> 旧 Engine、历史 bridge、迁移 allowlist 只作为“永久禁止回归”的历史墓碑检查，不属于当前架构的合法运行组件，也不得作为当前调用链模板。
 
 #### 功能设计与实现度
 
