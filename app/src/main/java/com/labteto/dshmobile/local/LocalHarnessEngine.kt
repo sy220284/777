@@ -247,7 +247,7 @@ import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import com.labteto.dshmobile.local.session.localSessionPersistenceSnapshot
 import com.labteto.dshmobile.local.session.localSessionSummariesOrEmpty
 import com.labteto.dshmobile.local.session.projectionReplayCursor
-import com.labteto.dshmobile.local.settings.LocalAgentRuntimeLimits
+import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.settings.LocalHarnessSettingsCoordinator
 import com.labteto.dshmobile.local.tools.LocalFileInspector
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
