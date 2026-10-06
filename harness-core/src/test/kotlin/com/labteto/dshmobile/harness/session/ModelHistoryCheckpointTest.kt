@@ -17,20 +17,52 @@ class ModelHistoryCheckpointTest {
             buildJsonObject { put("role", "user"); put("content", "你好") },
         )
 
-        val encoded = codec.encode(history, "user/message")
-        val restored = requireNotNull(codec.decode(encoded))
+        val encoded = codec.encode(
+            messages = history,
+            reason = "user/message",
+            asOfSequence = 42L,
+        )
+        val restored = requireNotNull(codec.decodeCheckpoint(encoded))
 
-        assertEquals(history, restored)
-        assertEquals("user/message", encoded["reason"]?.toString()?.trim('"'))
+        assertEquals(history, restored.messages)
+        assertEquals("user/message", restored.reason)
+        assertEquals(42L, restored.asOfSequence)
+        assertEquals(ModelHistoryCheckpointCodec.CURRENT_VERSION, restored.version)
     }
 
     @Test
     fun rejectsFutureVersion() {
         val encoded = buildJsonObject {
-            put("version", 2)
+            put("version", 3)
             put("messages", JsonArray(emptyList()))
         }
         assertNull(codec.decode(encoded))
+    }
+
+    @Test
+    fun restoresVersionOneCheckpointWithoutWatermark() {
+        val encoded = buildJsonObject {
+            put("version", 1)
+            put("reason", "legacy")
+            put(
+                "messages",
+                JsonArray(
+                    listOf(
+                        buildJsonObject {
+                            put("role", "user")
+                            put("content", "旧检查点")
+                        },
+                    ),
+                ),
+            )
+        }
+
+        val restored = requireNotNull(codec.decodeCheckpoint(encoded))
+
+        assertEquals(1, restored.version)
+        assertEquals("legacy", restored.reason)
+        assertEquals(null, restored.asOfSequence)
+        assertEquals("旧检查点", restored.messages.single()["content"]?.toString()?.trim('"'))
     }
 
     @Test
