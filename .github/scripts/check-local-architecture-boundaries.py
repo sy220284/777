@@ -682,19 +682,25 @@ if "workAgentTurnExecutor.run(" not in engine:
 work_subagent_runtime_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSubagentRuntime.kt")
 )
+work_agent_control_builtin_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentControlBuiltinRuntime.kt")
+)
+work_builtin_tool_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBuiltinToolRuntime.kt")
+)
 if "internal fun runner(binding: LocalWorkRunBinding)" not in work_subagent_runtime_source:
     die("WorkFeature must own bound subagent runner composition")
 if "internal suspend fun runWorkflow(" not in work_subagent_runtime_source:
     die("WorkFeature must own workflow execution and progress projection")
 if "private fun workSubagents(" in engine or "private suspend fun runWorkflow(" in engine:
     die("Work subagent/workflow business must not return to LocalHarnessEngine")
-if "workSubagentRuntime.runWorkflow(" not in engine:
-    die("Work workflow tool must stay routed to the Work-owned runtime")
+if "subagents.runWorkflow(" not in work_agent_control_builtin_source:
+    die("Work workflow tool must stay routed inside Work-owned agent-control execution")
 
 if "private suspend fun exitPlanMode(" in engine:
     die("Work plan-exit business must not return to LocalHarnessEngine")
-if "exitWorkPlanMode(" not in engine:
-    die("Work plan-exit tool must stay routed to the Work-owned transaction")
+if "exitWorkPlanMode(" not in work_builtin_tool_source:
+    die("Work plan-exit tool must stay routed inside Work-owned builtin execution")
 
 work_registry_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunRegistry.kt")
@@ -2389,9 +2395,6 @@ for removed_private_business_method in ENGINE_REMOVED_PRIVATE_BUSINESS_METHODS:
             + removed_private_business_method
         )
 
-work_agent_control_builtin_source = strip_comments(
-    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentControlBuiltinRuntime.kt")
-)
 for required_work_agent_control_boundary in (
     "class LocalWorkAgentControlBuiltinRuntime",
     "persistentJobs.startReadonlySubagent(",
@@ -2405,9 +2408,6 @@ for required_work_agent_control_boundary in (
             + required_work_agent_control_boundary
         )
 
-work_builtin_tool_source = strip_comments(
-    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBuiltinToolRuntime.kt")
-)
 removed_engine_work_builtin_tools = (
     "update_plan",
     "exit_plan_mode",
