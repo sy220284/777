@@ -122,6 +122,21 @@ for lane in required_ci_lanes:
     if lane not in VALIDATION:
         violations.append(f"docs/VALIDATION.md lost current CI lane: {lane}")
 
+validation_merge_section = ""
+if "### merge-gate" in VALIDATION:
+    validation_merge_section = VALIDATION.split("### merge-gate", 1)[1].split("\n## ", 1)[0]
+for lane in (
+    "static-gates",
+    "architecture-3-gates",
+    "unit-tests",
+    "build-arm64",
+    "device-artifacts-x86",
+    "android-16-instrumented",
+    "android-17-instrumented",
+):
+    if lane not in validation_merge_section:
+        violations.append(f"docs/VALIDATION.md complete-product merge-gate list lost required lane: {lane}")
+
 bootstrap_index = CI.find("- name: Bootstrap CI control plane")
 classify_index = CI.find("- name: Classify CI scope")
 if bootstrap_index < 0 or classify_index < 0 or bootstrap_index > classify_index:
@@ -174,22 +189,36 @@ for lane, tokens in merge_gate_contracts.items():
         if token not in merge_gate:
             violations.append(f"merge-gate lost {lane} selection/result contract: {token}")
 
-# Every check-*.py file is a gate by convention; an orphaned gate is dead policy.
-automation_sources: list[tuple[Path, str]] = []
-for candidate in [*sorted(WORKFLOWS.glob("*.yml")), *sorted(SCRIPTS.glob("*"))]:
+# Every check-*.py file is a gate by convention; it must be reachable from a workflow,
+# directly or through another reachable automation script. Mutual references between orphaned
+# scripts do not count as execution coverage.
+script_sources: dict[Path, str] = {}
+for candidate in sorted(SCRIPTS.glob("*")):
     if not candidate.is_file():
         continue
     try:
-        automation_sources.append((candidate, candidate.read_text(encoding="utf-8")))
+        script_sources[candidate] = candidate.read_text(encoding="utf-8")
     except UnicodeDecodeError:
         continue
+
+reachable_scripts: set[Path] = set()
+frontier_sources = [
+    workflow.read_text(encoding="utf-8")
+    for workflow in sorted(WORKFLOWS.glob("*.yml"))
+]
+while frontier_sources:
+    source = frontier_sources.pop()
+    for candidate, candidate_source in script_sources.items():
+        if candidate in reachable_scripts:
+            continue
+        relative = candidate.relative_to(ROOT).as_posix()
+        if candidate.name in source or relative in source:
+            reachable_scripts.add(candidate)
+            frontier_sources.append(candidate_source)
+
 for guard in sorted(SCRIPTS.glob("check-*.py")):
-    if not any(
-        guard.name in source
-        for candidate, source in automation_sources
-        if candidate != guard
-    ):
-        violations.append(f"{guard.name}: gate script is not reachable from workflow/automation")
+    if guard not in reachable_scripts:
+        violations.append(f"{guard.name}: gate script is not reachable from any workflow execution chain")
 
 # Gradle wrapper and dependency verification are supply-chain boundaries.
 if "distributionSha256Sum=" not in WRAPPER:
