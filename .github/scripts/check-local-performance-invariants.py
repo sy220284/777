@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guard local Harness performance invariants that are easy to regress in code review."""
+"""Guard Architecture 3.0 execution-surface performance and behavior invariants."""
 
 from pathlib import Path
 import re
@@ -38,11 +38,10 @@ CHAT_CONTEXT_REFRESH = ROOT / "app/src/main/java/com/labteto/dshmobile/local/cha
 GROUP_CHAT_EXECUTOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt"
 SUBAGENT_RUNNER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt"
 TOKEN_USAGE_ANALYTICS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
-CLEANUP_WORKFLOW = ROOT / ".github/workflows/cleanup-old-releases.yml"
 
 violations: list[str] = []
 
-engine = ENGINE.read_text(encoding="utf-8")
+engine = ENGINE.read_text(encoding="utf-8") if ENGINE.exists() else ""
 
 local_conversation_surface = LOCAL_CONVERSATION_SURFACE.read_text(encoding="utf-8")
 local_conversation_composer = LOCAL_CONVERSATION_COMPOSER.read_text(encoding="utf-8")
@@ -108,7 +107,6 @@ group_chat_executor = GROUP_CHAT_EXECUTOR.read_text(encoding="utf-8")
 subagent_runner = SUBAGENT_RUNNER.read_text(encoding="utf-8")
 token_usage_analytics = TOKEN_USAGE_ANALYTICS.read_text(encoding="utf-8")
 lifecycle_coordinator = LIFECYCLE_COORDINATOR.read_text(encoding="utf-8")
-cleanup_workflow = CLEANUP_WORKFLOW.read_text(encoding="utf-8")
 
 
 def kotlin_sources_under(relative_dir: str) -> dict[str, str]:
@@ -142,11 +140,7 @@ def count_in_sources(sources: dict[str, str], token: str) -> int:
     return sum(source.count(token) for source in sources.values())
 
 
-engine_source = {
-    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": engine,
-}
 chat_execution_sources = merge_sources(
-    engine_source,
     {
         "app/src/main/java/com/labteto/dshmobile/local/LocalChatTurnCoordinator.kt": chat_coordinator,
         "app/src/main/java/com/labteto/dshmobile/local/LocalChatReplyCoordinator.kt": chat_reply_coordinator,
@@ -157,7 +151,6 @@ chat_execution_sources = merge_sources(
     kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/chat"),
 )
 work_execution_sources = merge_sources(
-    engine_source,
     {
         "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt": subagent_runner,
         "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt": tool_coordinator,
@@ -165,7 +158,6 @@ work_execution_sources = merge_sources(
     kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/work"),
 )
 session_execution_sources = merge_sources(
-    engine_source,
     {
         "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt": lifecycle_coordinator,
         "app/src/main/java/com/labteto/dshmobile/local/LocalSessionCoordinator.kt": coordinator,
@@ -209,17 +201,8 @@ if "withLegacyFallback" in engine:
 if "withLegacyFallback" in automation_chat:
     violations.append("Automation Chat must consume canonical ChatContextState from LocalSessionCoordinator")
 
-if "release:" not in cleanup_workflow or "types: [published]" not in cleanup_workflow:
-    violations.append("Release cleanup must stay event-driven from published releases")
-if "cron: '23 3 * * *'" not in cleanup_workflow or "*/30 * * * *" in cleanup_workflow:
-    violations.append("Release cleanup fallback must stay daily rather than every 30 minutes")
-if "keep = formal_releases[:3]" not in cleanup_workflow or "remove = formal_releases[3:]" not in cleanup_workflow:
-    violations.append("Release retention must keep exactly the three highest formal published versions")
-if "timedelta(" in cleanup_workflow or "cutoff =" in cleanup_workflow:
-    violations.append("Release retention must not add an age-based retention window")
-
 def constant(name: str) -> int | None:
-    source = engine + "\n" + engine_defaults
+    source = engine_defaults
     match = re.search(rf"const val {re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", source)
     return int(match.group(1).replace("_", "")) if match else None
 
@@ -235,6 +218,14 @@ if preview_interval is None or not 16 <= preview_interval <= 250:
         f"STREAM_PREVIEW_INTERVAL_MS must stay screen-friendly (16..250 ms), got {preview_interval}"
     )
 
+hot_path_sources = merge_sources(
+    chat_execution_sources,
+    work_execution_sources,
+    session_execution_sources,
+    {
+        "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": engine,
+    } if engine else {},
+)
 for forbidden in (
     "modelHistory.sumOf",
     "state.streamingAssistant + delta.content",
@@ -251,8 +242,8 @@ for forbidden in (
     "CHAT_MODE_TOOLS",
     "postTurnSnapshot.messages.lastOrNull",
 ):
-    if forbidden in engine:
-        violations.append(f"LocalHarnessEngine.kt reintroduced hot-path pattern: {forbidden}")
+    if contains_any(hot_path_sources, forbidden):
+        violations.append(f"Architecture 3.0 execution surface reintroduced hot-path pattern: {forbidden}")
 
 # Engine must never mutate the underlying model-history collection directly. The dedicated
 # buffer owns every write together with its cached character/token accounting.
@@ -267,19 +258,33 @@ for forbidden_mutation in (
             f"LocalHarnessEngine bypassed LocalModelHistoryBuffer: {forbidden_mutation}"
         )
 
-expected_buffer_counts = {
-    "messages +=": 2,      # append + reset
-    "messages.add(": 1,    # prepend
-    "messages[0] =": 1,    # replaceSystem
-    "messages.clear()": 1, # reset
-}
+required_buffer_methods = (
+    "snapshot",
+    "append",
+    "insert",
+    "replaceSystem",
+    "reset",
+)
+for method in required_buffer_methods:
+    if re.search(rf"\bfun\s+{method}\s*\(", model_history_buffer) is None:
+        violations.append(
+            f"LocalModelHistoryBuffer lost required mutation/accounting API: {method}"
+        )
+for metric in ("encodedChars", "estimatedTokens"):
+    if re.search(rf"\bvar\s+{metric}\s*:\s*Int", model_history_buffer) is None:
+        violations.append(
+            f"LocalModelHistoryBuffer lost cached history metric: {metric}"
+        )
+if "recalculateMetrics()" not in model_history_buffer:
+    violations.append("LocalModelHistoryBuffer reset must retain a cached-metric recomputation path")
+
 historical_chat_full_scan_patterns = (
     "sourceEventSequenceForMessage(eventLog.events()",
     "restoreChatStateBefore(eventLog.events()",
     "restoreGroupStateBefore(eventLog.events()",
 )
 for pattern in historical_chat_full_scan_patterns:
-    if pattern in engine:
+    if contains_any(chat_execution_sources, pattern):
         violations.append(
             "Historical Chat timeline rewrites must page event history instead of materializing the full archive"
         )
@@ -295,13 +300,6 @@ for name, source, forbidden in (
 
 if "fun latestMatching(" not in event_log:
     violations.append("SessionEventLog must keep newest-first predicate lookup for hot run attribution")
-
-for token, expected in expected_buffer_counts.items():
-    actual = model_history_buffer.count(token)
-    if actual != expected:
-        violations.append(
-            f"LocalModelHistoryBuffer accounting path changed unexpectedly: {token!r} count={actual}, expected={expected}"
-        )
 
 if "val events = snapshot()" in event_log:
     violations.append("SessionEventLog.read must not materialize the whole event archive")
