@@ -11,7 +11,7 @@
 | 文档 | 内容 |
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 架构 3.0：Feature 分层组合、共享能力契约、运行内核、迁移阶段与架构门禁 |
-| [SYSTEM-AUDIT-GUIDE.zh-CN.md](SYSTEM-AUDIT-GUIDE.zh-CN.md) | 全量系统联审权威规范：顶层审计视角、具体维度、多轮执行方法、问题分级与输出标准 |
+| [SYSTEM-AUDIT-GUIDE.zh-CN.md](SYSTEM-AUDIT-GUIDE.zh-CN.md) | 全量系统联审权威规范：按功能架构、数据状态、生命周期、外部能力、性能、体验与工程质量分组执行审计 |\n| [SHARED-AUDIT-CONCLUSIONS.zh-CN.md](SHARED-AUDIT-CONCLUSIONS.zh-CN.md) | 可共享审计结论库：按链路闭环、数据字段、配置依赖与所有权归组的可复用审计规则 |
 | [PROTOCOL.md](PROTOCOL.md) | 当前远程 Web 协议与本机 Session / Agent 协议边界 |
 | [COMPATIBILITY.md](COMPATIBILITY.md) | 当前 Android、ABI、本机语义参考和远程 Harness / relay 支持矩阵 |
 | [SECURITY.md](SECURITY.md) | 凭据、工作区、工具、恢复、Web、设备、数据和更新安全边界 |
