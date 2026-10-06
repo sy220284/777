@@ -11,7 +11,7 @@
 - 规则依据：[AGENTS.md](../AGENTS.md)、[系统联审](SYSTEM-AUDIT-GUIDE.zh-CN.md)、[架构 3.0](ARCHITECTURE.md)、[验证](VALIDATION.md)、[安全](SECURITY.md)、[UI / UX](UI-UX.zh-CN.md)、[协议](PROTOCOL.md)、[兼容性](COMPATIBILITY.md)。
 - 实现事实由当前代码、构建配置、锁定文件和 CI 确认；文档中的旧版本号及旧 Engine 链路描述不能覆盖新架构和当前代码。
 
-当前最近一次有远端执行结果的产品 Head 为 `d3b115b`：CI #4792 的 scope / static-gates 已通过，Architecture 3.0 所有权门禁也通过，失败来自性能门禁仍匹配旧 Engine 工具调用字面串；该门禁已改为验证 `LocalWorkTurnToolRuntime` 的真实 session binding。开发工具链 #282 的真实构建另暴露 `LocalWorkToolResultRuntime` 仍引用迁移前的 `adaptiveToolResultBudget` 包路径，该编译错误也已修复。当前 Head 已继续前进，因此以上失败 run 只能作为已修问题证据，不能替代当前 Head 的完整验收；当前接口未能为后续 API 推送触发新的 pull_request Actions run，仍须取得最新 Head 的完整 CI 结果后才能关闭阶段。
+当前最新 Head 已进入新的完整 CI。此前 CI #4805 已证明 scope / static-gates / architecture-3-gates 在 Work AgentLoop、上下文策略和工具运行迁移后可通过；随后继续迁出 Engine 内 16 个 Work task / agent-control builtin 分支时，CI #4816 正确抓到一条仍要求 workflow / plan-exit 保留 Engine 路由的旧架构断言，该断言已改为验证新的 Work-owned builtin runtime。最新 Head 仍须重新通过 architecture-3-gates、单测、arm64、x86_64、Android 16 / 17 与 merge-gate 后才能计为当前验收结果。
 
 ## 2. 当前进度与真实剩余量
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | 1：共享能力 / Kernel 边界 | Session owner、run identity/recovery、资源调度和 Session 存储已有统一所有者 | 保留已建立边界；继续删除残留跨层适配 |
 | 2：领域状态 | Chat / Work / Kernel / Model 已拆分；Chat timeline rewrite 已停止承载 Work plan/todo/goal/planMode | 继续收缩聚合状态迁移适配层 |
-| 3：Chat / Work Feature | 7 类 Runtime→Engine 依赖永久归零；已知阶段三 Engine 业务根已清零；Work 主 AgentLoop、工具运行、发送/重生成与 Chat 发送、直聊回合、时间线/分支等真实实现已归 Feature | 清零 5 个阶段三 Engine 组合桥：`chatTurnPort`、`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort`；继续收口 Session / 可见 Work 投影等横向适配 |
+| 3：Chat / Work Feature | 7 类 Runtime→Engine 依赖永久归零；已知阶段三 Engine 业务根已清零；Engine 内 Work task / agent-control builtin 分发也已清零；Work 主 AgentLoop、工具运行、发送/重生成与 Chat 发送、直聊回合、时间线/分支等真实实现已归 Feature | 清零 5 个阶段三 Engine 组合桥：`chatTurnPort`、`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort`；继续迁出共享 Tools 组合与 Session 横向适配 |
 | 4：Automation Feature | Automation Runtime→Engine 已永久归零，但组合根仍由 Engine 提供 Automation Chat / Work coordinator | 迁出 `automationChatCoordinator`、`automationWorkCoordinator` 两个阶段四桥并切换后台入口 |
 | 5：UI contribution | Catalog 不可变，路由归属及页面枚举已接管 | 中央页面 `when`、页面依赖、Back、入口及恢复继续下沉 |
 | 6：Runtime Kernel | 共享运行状态已接管运行身份、资源、前台句柄等事实 | 删除剩余产品装配/迁移适配后再替换 Engine；仅更名不算完成 |
@@ -27,7 +27,7 @@
 当前守卫基线已经切换到架构 3.0：
 
 - Chat / Work / Session / Model / Tools / Automation / Settings Runtime → `LocalHarnessEngine` 已归零路径全部为永久禁止项。
-- `ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST` 已为空；已迁出的 `sendChat`、`runAgentTurn`、`runChatTurn`、`runWorkAgentTurn`、`regenerate*`、`workSubagents` 等旧业务根重新出现直接失败。
+- `ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST` 与 `ENGINE_STAGE3_WORK_BUILTIN_ALLOWLIST` 均已为空；已迁出的 Work task / agent-control 工具分发和 `sendChat`、`runAgentTurn`、`runChatTurn`、`runWorkAgentTurn`、`regenerate*`、`workSubagents` 等旧业务根重新出现直接失败。
 - 阶段三组合桥与阶段四 Automation 桥分开维护具体 allowlist，只能缩小，不能用等量新代理替换。
 - Chat / Work provider Feature 禁止导入 sibling Feature internal；Shared Context 已改为中立 `LocalRequestContextPolicy` / DTO，由 Work 提供语义投影策略。
 - Chat timeline durable state 只承载 Chat 领域状态，不再通过 Chat event 写回 Work 控制状态。
@@ -37,7 +37,7 @@
 
 当前需要补齐：
 
-1. 清零阶段三 5 个 Engine 组合桥；其中 Chat / Work turn 的真实业务实现已在 Feature，剩余主要是启动、Session owner 与 Hilt 装配壳。
+1. 清零阶段三 5 个 Engine 组合桥；Chat / Work turn 的领域执行和 Work task / agent-control builtin 已在 Feature，`workTurnPort` 当前主要受共享 Tools/plugin composition 仍在 Engine 装配所阻塞，禁止用新的 Engine 工具代理替换。
 2. 将 Session 生命周期、可见 Work 投影、诊断和 Tools 管理的剩余 Engine 横向适配迁入明确 capability / composition owner。
 3. 阶段四单独处理 Automation 两个 Engine coordinator bridge，以及 persistent / automation subagent 等后台装配，不再混入阶段三进度。
 4. 继续删除迁移后无调用旧实现，并同步收紧门禁。
@@ -99,7 +99,7 @@ P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修�
 | 上下文 / 输出 | history budget、Work request projection、compaction、quality | Shared Model / context 机制 + Work 策略 | prefix cache、工具结果 spill / read、完成声明门禁、typed checkpoint |
 | 重新生成 / 恢复 | `regenerateWorkReply`、中断恢复与 safe-job 入口 | WorkRecovery + Shared recovery adjudication | 未开始 / 结果未知副作用、历史重建、重复提交、进程死亡、任务恢复 |
 
-当前 Work send、主 AgentLoop、Work-owned Tool runtime、重生成和请求上下文策略已经迁出 Engine；后续集中清理 `workTurnPort` 装配桥、可见 Work 投影 / Session 横向适配，以及阶段四才处理的 persistent / automation subagent 装配。每次删除旧路径同步缩紧门禁。
+当前 Work send、主 AgentLoop、重生成、请求上下文策略以及 task / agent-control builtin 分发已经迁出 Engine；`ENGINE_STAGE3_WORK_BUILTIN_ALLOWLIST` 已清零。后续集中迁出共享 Tools/plugin composition 装配以解除 `workTurnPort`，再处理可见 Work 投影 / Session 横向适配；阶段四 persistent / automation subagent 装配继续单独处理。每次删除旧路径同步缩紧门禁。
 
 建立提供方拥有的 `WorkExecutionPort`：接收明确目标会话、输入、超时 / 恢复选项，返回结构化完成 / 阻塞 / 取消 / 失败结果。所有实际执行复用唯一 Session owner、run coordinator、冻结模型身份和 Tool execution；端口不提供 `MutableStateFlow<LocalHarnessState>`、binding 或内部 runner 给调用方。
 
