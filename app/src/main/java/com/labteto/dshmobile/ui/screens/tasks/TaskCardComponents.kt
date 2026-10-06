@@ -47,7 +47,6 @@ import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
-import com.labteto.dshmobile.local.chat.LocalChatAutomationPolicy
 import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -97,7 +96,7 @@ internal fun TaskCard(
     val backgroundTaskLabel = stringResource(R.string.tasks_background_task)
     val scheduleLabel = when (task.scheduleType) {
         AutomationScheduleType.SILENCE -> {
-            val minutes = task.silenceMinutes ?: task.recurringMinutes ?: LocalChatAutomationPolicy.MIN_SILENCE_MINUTES
+            val minutes = task.silenceMinutes ?: requireNotNull(task.recurringMinutes) {\n                "沉默触发任务缺少规范化时长"\n            }
             stringResource(R.string.tasks_schedule_silence_value, minutes / 60L)
         }
         AutomationScheduleType.DAILY -> stringResource(R.string.tasks_schedule_daily)

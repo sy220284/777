@@ -95,6 +95,7 @@ UI_INTERNAL_IMPLEMENTATION_SUFFIXES = (
     "Registry",
     "Gateway",
     "Port",
+    "Policy",
 )
 
 
