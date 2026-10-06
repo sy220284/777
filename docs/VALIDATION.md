@@ -27,55 +27,84 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 
 ## CI
 
-`.github/workflows/ci.yml` 先由 `scope` 根据改动文件分配最低且完整的验证集合，最终统一由 `merge-gate` 放行。混合改动取检查并集，未知路径保守回退到完整 CI。
+`.github/workflows/ci.yml` 先由 `scope` 按架构 3.0 风险范围分配验证集合，`architecture-3-gates` 独立验证所有权 / 依赖与执行不变量，最终统一由 `merge-gate` 放行。混合改动取检查并集，未知产品路径保守回退到完整 CI。
+
+主线 `push` 不使用 workflow 级 `paths-ignore` 绕过控制面。所有改动先进入 `scope`；纯文档可快速结束，CI / 门禁 / 架构控制文件本身必须真实执行相应验证。
 
 当前任务类型：
 
 ```text
-纯文档 / 仓库说明
+普通纯文档 / 仓库说明
 → scope → merge-gate
 
-普通 GitHub Actions / 自动化脚本 / CI 控制面
+架构 3.0 权威文档 / CI 主流程 / 架构门禁控制面
+→ static-gates → architecture-3-gates → merge-gate
+
+普通 GitHub Actions / 自动化脚本
 → static-gates → merge-gate
 
-纯 JVM / 单元测试 / Reference Validation / Mock Harness
+架构 3.0 范围内的 JVM / 单元测试
+→ static-gates → architecture-3-gates → unit-tests → merge-gate
+
+普通 JVM / Reference Validation / Mock Harness
 → static-gates → unit-tests → merge-gate
 
 官方 fixture / 上游锁定来源变化
 → static-gates + fixture-provenance + unit-tests → merge-gate
 
-纯 androidTest
-→ static-gates
+架构 3.0 范围内的 androidTest
+→ static-gates → architecture-3-gates
 → device-artifacts-x86
 → Android 16 + Android 17（并行，共用同一组 APK）
 → merge-gate
 
 产品源码 / 资源 / Gradle / Runtime / 未知路径
-→ static-gates
+→ static-gates → architecture-3-gates
 → unit-tests + build-arm64 + device-artifacts-x86（三路并行）
 → Android 16 + Android 17（并行，共用 device-artifacts-x86）
 → merge-gate
 ```
 
-`.github/release-version` 直接参与 `versionName/versionCode` 计算，因此按完整产品变更处理，main push 不得忽略。修改 APK 结构校验或 Android 启动 smoke 脚本仍归入完整 CI。手动 `workflow_dispatch` 始终强制完整 CI，并包含 fixture provenance。
-
-主线 `push` 对纯文档、普通自动化和测试-only 改动不重复启动产品 CI；产品、构建、Runtime 与版本身份变化仍执行完整组合验证。
+`.github/release-version` 直接参与 `versionName/versionCode` 计算，因此按完整产品变更处理。修改 APK 结构校验或 Android 启动 smoke 脚本仍归入完整 CI。手动 `workflow_dispatch` 始终强制完整 CI，并包含 fixture provenance。
 
 ### static-gates
 
-该阶段优先快速失败，避免明显错误继续消耗 Gradle / 模拟器 Runner：
+该阶段只保留快速、与产品架构实现位置无关的仓库级检查：
 
 - CI 范围分类器自测。
 - actionlint 工作流语义校验；下载版本和 SHA-256 固定。
-- 所有外部 GitHub Actions 必须固定到 40 位提交 SHA。
+- 所有外部 GitHub Actions 固定到 40 位提交 SHA。
 - Python / Shell 语法校验。
 - Gradle Wrapper distribution SHA、依赖 verification metadata、版本目录禁止动态版本。
 - 新增 Gradle 模块如存在单元测试，必须被 CI 显式覆盖。
 - Android Manifest / exported component / FileProvider / 模型 HTTPS-or-loopback 安全边界。
-- UI 硬编码、Design System、通知、Kotlin 风险、性能、架构门禁。
+- UI 硬编码、Design System、通知、Kotlin 风险与构建基线。
 - Runtime 压缩器自测。
 - 发布版本格式。
 - 防止重新引入 Android 16/17 各自 `connectedDebugAndroidTest` 重复构建。
+
+### architecture-3-gates
+
+该 lane 是架构 3.0 的权威结构与执行门禁，分成两个独立步骤：
+
+1. `check-local-architecture-boundaries.py`
+   - Feature / Shared Capability / Runtime Kernel 单向依赖；
+   - cross-Feature internal 禁止；
+   - 已完成 Shared 边界禁止反向依赖 Feature；
+   - 领域状态单写与 UI projection 边界；
+   - Feature Catalog 与 Runtime Plugin 生命周期分离；
+   - Engine 只允许组合根迁移桥，精确 allowlist 只能随迁移缩小；
+   - 已迁 Engine 业务根 / 旧包路径永久禁止回归。
+
+2. `check-local-performance-invariants.py`
+   - transcript / Session Event 历史访问有界；
+   - streaming preview 有界；
+   - model history 缓存与单一写入口；
+   - Session snapshot / recovery 顺序；
+   - 旧 durable queue、模型 / Tool 直连、Vision fallback 等执行旁路禁止回归。
+
+这两份脚本不再冻结 UI 样式、Prompt 文案、固定方法体、构造依赖数量、文件行数、字段数量或具体变量名。业务语义由单元 / conformance / 设备测试证明；架构门禁只证明 3.0 边界与关键运行不变量。
+
 
 ### fixture-provenance
 
