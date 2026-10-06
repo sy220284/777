@@ -93,8 +93,8 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
    - 已完成 Shared 边界禁止反向依赖 Feature；
    - 领域状态单写与 UI projection 边界；
    - Feature Catalog 与 Runtime Plugin 生命周期分离；
-   - Engine 只允许组合根迁移桥，精确 allowlist 只能随迁移缩小；
-   - 已迁 Engine 业务根 / 旧包路径永久禁止回归。
+   - 旧 Engine、composition bridge、历史迁移 allowlist 已退出当前合法结构，只作为永久禁止回归目标；
+   - 已迁 Engine 业务根 / 旧包路径 / 已清零跨层边不得通过改名、代理或历史白名单回归。
 
 2. `check-local-performance-invariants.py`
    - transcript / Session Event 历史访问有界；
