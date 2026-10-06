@@ -814,50 +814,67 @@ SettingsFeature 只负责设置体验和配置入口；真实配置所有权仍�
 
 ---
 
-### SC-018 历史迁移规则不得作为当前合法架构状态
+### SC-018 当前架构审计必须围绕真实 Owner、公开边界与生产装配
 
 #### 结论
 
-仓库中为了说明演进过程，可能继续出现旧 Engine、bridge、迁移 allowlist、阶段目标或旧调用链名称。
+架构审计必须直接验证当前架构 3.0 的真实边界，不能只检查文件位置、类名或表面分层。
 
-这些内容只有在当前权威文档明确声明为现行边界时，才能参与当前架构判定；已经完成退出的历史路径只用于追溯和永久防回归，不能继续作为合法中间状态、允许依赖或审计模板。
+每项能力都要回答：
+
+- 领域业务由哪个 Feature 拥有；
+- 哪些能力属于中立 Shared Capability；
+- Runtime Kernel 实际承担哪些生命周期职责；
+- 应用组合根实际装配了哪些 Feature / Provider；
+- UI 通过哪个 presentation / Feature API / projection 消费；
+- 哪个 Store / Registry / Policy / Runtime 持有权威事实；
+- 哪些 Port 是跨边界唯一合法入口；
+- 哪些状态只允许只读投影，哪些对象具备写权限。
 
 #### 固定核查路径
 
 ```text
-发现旧架构名词 / 阶段规则
-→ 查当前 ARCHITECTURE 最终所有权
-→ 查当前阶段状态
-→ 查 architecture-3-gates / 当前门禁
-→ 查真实代码是否仍存在
-→ 分类：
-   当前合法组件
-   / 兼容只读投影
-   / 当前精确债务
-   / 历史墓碑
-→ 只按当前分类执行审计
+产品能力 / 用户入口
+→ FeatureCatalog / route owner
+→ Feature API / presentation
+→ Feature Owner
+→ Shared Capability（如适用）
+→ 应用组合根 / provider 装配
+→ Runtime Kernel 生命周期边界
+→ 权威状态 / 配置 / Session / Run owner
+→ projection / UI
+→ 持久化 / 恢复 / 后台
 ```
 
 #### 必查项
 
-- 阶段执行计划是否仍属于当前文档索引；
-- “仍需 / 后续 / 完成时”等措辞是否只是历史阶段时序；
-- 旧 Engine / bridge / allowlist 是否已经在最终状态中清零；
-- 历史 0 预算、方法数、文件数、聚合字段数等旧完成指标是否已经废弃；
-- 当前 CI 是否改为所有权、依赖方向、唯一事实源和运行不变量门禁；
-- 兼容投影是否只读，是否被误判成允许恢复旧双写；
-- 当前精确债务是否有明确消费文件、依赖边、出口和删除条件；
-- 已清零旧边是否通过代理、改名或新白名单重新出现。
+- 每个 route 是否只归属一个 Feature；
+- 每个 Feature 是否只维护自己的领域规则与可写状态；
+- Shared Capability 是否保持中立，不解释 Feature 专属领域语义；
+- Runtime Kernel 是否保持极薄，只负责 start-once、生命周期 scope、bootstrap / recovery 触发和初始化错误投影；
+- Feature / Provider 的构造装配是否集中在应用组合根；
+- UI 是否只消费窄 projection / Feature API；
+- Shell 是否只承担导航栈、Drawer、系统 Back 等宿主职责；
+- SettingsFeature 是否只负责设置体验和配置入口，真实配置 Owner 仍归对应 Feature / Shared Capability；
+- `LocalHarnessState` 是否只承担 Runtime-owned 兼容聚合与只读投影，不成为领域双写入口；
+- Session ownership、Agent run identity、迟到提交栅栏和 recovery coordination 是否由共享 Runtime 单一持有；
+- FeatureCatalog、page contribution、Back policy、Drawer entry、restore policy 是否保持唯一 Owner；
+- Tool / Model / Session / Memory / Jobs 等共享能力是否通过稳定契约被 Feature 消费；
+- 同一能力是否存在多个生产装配、多个 writer 或多个路由 Owner。
 
 #### 完成标准
 
 ```text
-当前权威边界已确认
-+ 历史阶段与现行规则已区分
-+ 旧路径只作防回归墓碑
-+ 当前精确债务单独标识
-+ 无历史 allowlist 被当作放行依据
-+ 审计链路不再套用旧架构模板
+Feature Owner 明确
++ Shared Capability 保持中立
++ Runtime Kernel 边界清晰
++ 应用组合根装配唯一
++ FeatureCatalog 路由归属唯一
++ UI 只通过公开投影 / API
++ 权威状态与配置单写
++ Session / Run ownership 单一
++ 跨边界 Port 清晰
++ 持久化与恢复语义一致
 ```
 
 ---
