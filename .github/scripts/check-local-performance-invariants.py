@@ -272,8 +272,9 @@ if not ordered_in_source(
         "Session persistence must capture durable projection cursors before materializing mutable Feature state"
     )
 
-agent_inbox_persistence_path =
+agent_inbox_persistence_path = (
     "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentInboxPersistence.kt"
+)
 agent_inbox_persistence = all_local_sources.get(agent_inbox_persistence_path, "")
 if 'LOCAL_AGENT_INBOX_EVENT_TYPE = "agent/inbox/spliced"' not in agent_inbox_persistence:
     violations.append("LocalAgentInboxPersistence must own the canonical durable inbox event type")
