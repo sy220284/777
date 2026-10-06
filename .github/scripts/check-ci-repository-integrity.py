@@ -295,10 +295,12 @@ for required_architecture_ci in (
         violations.append(
             "Architecture 3.0 CI lane is incomplete: " + required_architecture_ci
         )
-if CI.count("check-local-architecture-boundaries.py") != 1:
-    violations.append("Architecture 3.0 ownership guard must run exactly once in its dedicated lane")
-if CI.count("check-local-performance-invariants.py") != 1:
-    violations.append("Architecture 3.0 performance invariant guard must run exactly once in its dedicated lane")
+architecture_guard_command = "python3 .github/scripts/check-local-architecture-boundaries.py"
+performance_guard_command = "python3 .github/scripts/check-local-performance-invariants.py"
+if len(re.findall(rf"^\\s*run:\\s*{re.escape(architecture_guard_command)}\\s*$", CI, re.MULTILINE)) != 1:
+    violations.append("Architecture 3.0 ownership guard must execute exactly once in its dedicated lane")
+if len(re.findall(rf"^\\s*run:\\s*{re.escape(performance_guard_command)}\\s*$", CI, re.MULTILINE)) != 1:
+    violations.append("Architecture 3.0 performance invariant guard must execute exactly once in its dedicated lane")
 if "classify-ci-scope.py --self-test" not in CI:
     violations.append("CI scope classifier must self-test before downstream validation")
 
