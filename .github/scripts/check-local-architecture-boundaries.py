@@ -393,6 +393,69 @@ for builtin in REMOVED_ENGINE_STAGE3_WORK_BUILTINS:
         die("Work-owned builtin dispatch returned to LocalHarnessEngine: " + builtin)
 
 
+# Session owns transaction ordering; provider Features own domain interpretation.
+session_lifecycle = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt"
+))
+chat_session_lifecycle = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatSessionLifecyclePlanner.kt"
+))
+work_session_lifecycle = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkSessionLifecyclePlanner.kt"
+))
+
+for required in (
+    "private val chatSessionLifecycle: LocalChatSessionLifecyclePlanner",
+    "chatSessionLifecycle.prepareCreate(",
+    "chatSessionLifecycle.resolveModeCommand(",
+    "LocalWorkSessionLifecyclePlanner.initialState(",
+    "LocalWorkSessionLifecyclePlanner.handoffState(",
+):
+    if required not in session_lifecycle:
+        die("Session lifecycle lost provider-owned domain planning: " + required)
+
+for forbidden in (
+    "ChatPersonaStore",
+    "ChatCharacterState",
+    "ChatContextState",
+    "LocalChatState(",
+    "LocalGroupChatState",
+    "PersonaGalleryEntry",
+    "PersonaProfile",
+    "resolveLocalGroupChatMembers",
+    "MIN_GROUP_CHAT_MEMBERS",
+    "MAX_GROUP_CHAT_MEMBERS",
+    "projectExecutionJobs(",
+    "LocalWorkState(",
+    "HandoffGoal",
+    "HandoffTodo",
+    "groupTranscriptLine(",
+):
+    if forbidden in session_lifecycle:
+        die(
+            "Shared Session lifecycle reinterprets provider Feature domain state: "
+            + forbidden
+        )
+
+for required in (
+    "class LocalChatSessionLifecyclePlanner",
+    "resolveLocalGroupChatMembers(",
+    "LocalChatState(",
+    "findEstablishedGroupChatSession(",
+    "continuePendingInSession(",
+):
+    if required not in chat_session_lifecycle:
+        die("ChatFeature Session lifecycle planning is incomplete: " + required)
+
+for required in (
+    "object LocalWorkSessionLifecyclePlanner",
+    "projectExecutionJobs(",
+    "HandoffState(",
+):
+    if required not in work_session_lifecycle:
+        die("WorkFeature Session lifecycle projection is incomplete: " + required)
+
+
 # ---- State ownership and single-writer seams ------------------------------
 
 aggregate_models = strip_comments(read(
