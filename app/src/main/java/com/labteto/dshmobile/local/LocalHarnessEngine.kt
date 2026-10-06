@@ -53,6 +53,7 @@ import com.labteto.dshmobile.local.chat.LocalChatState
 import com.labteto.dshmobile.local.chat.LocalChatStatePort
 import com.labteto.dshmobile.local.chat.LocalChatPersonaCorrectionCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatRelationshipHydrator
+import com.labteto.dshmobile.local.chat.LocalChatSessionLifecyclePlanner
 import com.labteto.dshmobile.local.chat.LocalChatTurnDispatcher
 import com.labteto.dshmobile.local.chat.LocalChatTranscriptRuntime
 import com.labteto.dshmobile.local.chat.LocalChatTurnPort
@@ -374,6 +375,7 @@ class LocalHarnessEngine @Inject internal constructor(
     private val chatPersonaGalleryStore get() = chatPersistence.galleryStore
     private val chatDiaryStore get() = chatPersistence.diaryStore
     private val chatTurnCoordinator get() = chatComposition.turnCoordinator
+    private val chatSessionLifecyclePlanner by lazy { LocalChatSessionLifecyclePlanner(chatPersonaStore) }
     private val memoryClassMb get() = runtimeStateStore.memoryClassMb
     private val workspace: LocalWorkspace
         get() = sessionStorageRuntime.files.workspace
@@ -817,7 +819,7 @@ class LocalHarnessEngine @Inject internal constructor(
             state = runtimeStateStore.state,
             sessionCoordinator = sessionCoordinator,
             eventLogFor = ::eventLogFor,
-            chatPersonaStore = chatPersonaStore,
+            chatSessionLifecycle = chatSessionLifecyclePlanner,
             chatTurnCoordinator = chatTurnCoordinator,
             chatReplyCoordinator = chatReplyCoordinator,
             usageTracker = usageTracker,
