@@ -1,11 +1,9 @@
 package com.labteto.dshmobile.local.quality
 
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 
 internal data class LocalOutputQualityContext(
     val usageMode: LocalUsageMode? = null,
-    val state: LocalHarnessState? = null,
 )
 
 internal data class LocalOutputQualityResult(

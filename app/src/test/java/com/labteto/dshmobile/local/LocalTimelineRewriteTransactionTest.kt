@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.editedChatUserModelMessage
+
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextState
@@ -8,8 +10,22 @@ import com.labteto.dshmobile.local.chat.ChatDiarySourceMode
 import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.chat.ChatDiaryWriteRequest
 import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
+import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.chat.LocalGroupChatState
+import com.labteto.dshmobile.local.chat.projectChatSessionControls
+import com.labteto.dshmobile.local.chat.LocalTimelineRewriteProjectionInput
+import com.labteto.dshmobile.local.chat.ChatReplySuggestion
+import com.labteto.dshmobile.local.chat.LocalTimelineRewriteState
+import com.labteto.dshmobile.local.chat.appendChatProjectionCommit
+import com.labteto.dshmobile.local.chat.appendTimelineRewriteCommit
+import com.labteto.dshmobile.local.chat.recoverPendingTimelineRewriteProjection
+import com.labteto.dshmobile.local.chat.sourceEventSequenceForMessage
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -21,7 +37,7 @@ import org.junit.Test
 
 class LocalTimelineRewriteTransactionTest {
     @Test
-    fun oneRewriteEventRestoresTranscriptModelHistoryAndControlState() {
+    fun oneRewriteEventRestoresTranscriptModelHistoryAndChatState() {
         withStores { log, _, _, _, _ ->
             val edited = LocalHarnessMessage(
                 id = "edited",
@@ -34,10 +50,6 @@ class LocalTimelineRewriteTransactionTest {
                 buildJsonObject { put("role", "user"); put("content", "新问题") },
             )
             val rewriteState = LocalTimelineRewriteState(
-                plan = listOf("新计划"),
-                todos = listOf(LocalTodoItem("继续修复", "in_progress")),
-                goal = LocalGoal("完成重写"),
-                planMode = true,
                 chatState = ChatCharacterState(mood = "稳定"),
                 chatContext = ChatContextState(generation = 7L),
                 chatBranches = LocalChatBranchState(),
@@ -67,15 +79,56 @@ class LocalTimelineRewriteTransactionTest {
                     codec = ModelHistoryCheckpointCodec(),
                 ).messages,
             )
-            val projected = projectSessionControlTail(
+            val projected = projectChatSessionControls(
                 snapshot = LocalHarnessSession(id = "session"),
                 events = listOf(event),
-                sequenceExclusive = -1L,
             )
-            assertEquals(listOf("新计划"), projected.plan)
-            assertEquals("完成重写", projected.goal?.description)
             assertEquals("稳定", projected.chatState.mood)
             assertEquals(7L, projected.chatContext.generation)
+        }
+    }
+
+    @Test
+    fun projectionCommitRestoresTranscriptModelHistoryAndReplySuggestionsFromOneEvent() {
+        withStores { log, _, _, _, _ ->
+            val user = LocalHarnessMessage("u1", "user", "问题", createdAt = 1L)
+            val assistant = LocalHarnessMessage("a1", "assistant", "回答", createdAt = 2L)
+            val history = listOf(
+                buildJsonObject { put("role", "system"); put("content", "system") },
+                buildJsonObject { put("role", "user"); put("content", "问题") },
+                buildJsonObject { put("role", "assistant"); put("content", "回答") },
+            )
+            val suggestions = listOf(ChatReplySuggestion("继续", "继续聊"))
+            val event = appendChatProjectionCommit(
+                eventLog = log,
+                reason = "variant-selected",
+                activeTranscript = listOf(user, assistant),
+                modelHistory = history,
+                state = LocalTimelineRewriteState(
+                    chatState = ChatCharacterState(mood = "安心"),
+                    chatContext = ChatContextState(generation = 9L),
+                    chatBranches = LocalChatBranchState(),
+                    groupChat = LocalGroupChatState(),
+                    replySuggestions = suggestions,
+                ),
+            )
+
+            assertEquals(listOf("u1", "a1"), LocalSessionTranscriptPager(log).all().map { it.id })
+            assertEquals(
+                history,
+                restoreLocalModelHistory(
+                    events = listOf(event),
+                    legacyFallback = emptyList(),
+                    codec = ModelHistoryCheckpointCodec(),
+                ).messages,
+            )
+            val projected = projectChatSessionControls(
+                LocalHarnessSession(id = "session"),
+                listOf(event),
+            )
+            assertEquals("安心", projected.chatState.mood)
+            assertEquals(9L, projected.chatContext.generation)
+            assertEquals(suggestions, projected.replySuggestions)
         }
     }
 
@@ -115,10 +168,6 @@ class LocalTimelineRewriteTransactionTest {
                 activeTranscript = listOf(edited),
                 modelHistory = listOf(modelMessage),
                 state = LocalTimelineRewriteState(
-                    plan = emptyList(),
-                    todos = emptyList(),
-                    goal = null,
-                    planMode = false,
                     chatState = ChatCharacterState(),
                     chatContext = ChatContextState(),
                     chatBranches = LocalChatBranchState(),
@@ -155,7 +204,6 @@ class LocalTimelineRewriteTransactionTest {
                 activeTranscript = listOf(edited),
                 modelHistory = listOf(modelMessage),
                 state = LocalTimelineRewriteState(
-                    emptyList(), emptyList(), null, false,
                     ChatCharacterState(), ChatContextState(), LocalChatBranchState(), LocalGroupChatState(),
                 ),
                 projection = LocalTimelineRewriteProjectionInput("session", 1L, listOf("old")),

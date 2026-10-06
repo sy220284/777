@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.labteto.dshmobile.local.LocalQuestion
+import com.labteto.dshmobile.local.interaction.LocalQuestion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

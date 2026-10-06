@@ -1,12 +1,6 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.DeepSeekClient
-import com.labteto.dshmobile.local.LocalModelAuthKind
-import com.labteto.dshmobile.local.LocalModelDelta
-import com.labteto.dshmobile.local.LocalModelProtocol
-import com.labteto.dshmobile.local.LocalModelReply
-import com.labteto.dshmobile.local.LocalModelRuntimeCapabilities
-import com.labteto.dshmobile.local.normalizeModelBaseUrl
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton

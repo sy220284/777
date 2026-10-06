@@ -7,15 +7,15 @@ import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.async
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -39,7 +39,7 @@ class ChatGptAuthRecoveryAndroidTest {
         val accounts = ChatGptAccountStore(preferences, Json)
         val events = ChatGptPlanAuthorizationEvents()
         val resolver = com.labteto.dshmobile.local.model.LocalModelCredentialResolver(
-            com.labteto.dshmobile.local.LocalApiKeyStore(preferences), accounts,
+            com.labteto.dshmobile.local.model.LocalApiKeyStore(preferences), accounts,
             ChatGptSessionManager(accounts, OkHttpClient(), Json), events,
         )
         val id = ChatGptAccountStore.accountId("oaiapp_replay", "subject")

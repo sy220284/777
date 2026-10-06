@@ -6,6 +6,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -67,6 +69,9 @@ class HarnessJobManager(
     )
 
     private val lock = Any()
+    // Capture and commit in one order. Otherwise an older callback/write can arrive after a
+    // terminal snapshot and restore a running UI or durable record.
+    private val publicationLock = Any()
     private val records = linkedMapOf<String, Record>()
     private val removingOwners = mutableSetOf<String>()
 
@@ -278,7 +283,9 @@ class HarnessJobManager(
                     notifyChanged()
                 }
                 val result = block(record.id, report).takeLast(MAX_OUTPUT)
+                currentCoroutineContext().ensureActive()
                 synchronized(lock) {
+                    if (record.status != "running") throw CancellationException("后台任务已停止")
                     record.output = result
                     record.status = "completed"
                     record.updatedAt = System.currentTimeMillis()
@@ -292,6 +299,7 @@ class HarnessJobManager(
                 throw cancelled
             } catch (error: Exception) {
                 synchronized(lock) {
+                    if (record.status != "running") return@synchronized
                     record.status = "failed"
                     record.output = "任务失败：${error.message ?: error::class.java.simpleName}"
                     record.updatedAt = System.currentTimeMillis()
@@ -515,7 +523,7 @@ class HarnessJobManager(
         throw IllegalStateException("后台任务终态持久化失败", lastFailure)
     }
 
-    private fun publish() {
+    private fun publish() = synchronized(publicationLock) {
         val infos: List<JobInfo>
         val snapshots: List<JobSnapshot>
         synchronized(lock) {
@@ -529,11 +537,11 @@ class HarnessJobManager(
         runCatching { onSnapshotsChanged(snapshots) }
     }
 
-    private fun notifyChanged() {
+    private fun notifyChanged() = synchronized(publicationLock) {
         onChanged(snapshotRecords())
     }
 
-    private fun persistCurrentSnapshots() {
+    private fun persistCurrentSnapshots() = synchronized(publicationLock) {
         onSnapshotsChanged(synchronized(lock) { records.values.map(::snapshot) })
     }
 

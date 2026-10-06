@@ -1,7 +1,9 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.agent
 
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -26,6 +28,7 @@ internal fun encodeLocalAgentInboxEvent(
     put("pending", JsonArray(pending.map(::encodeQueuedAgentInput)))
     if (affected.isNotEmpty()) {
         put("queue_ids", JsonArray(affected.map { JsonPrimitive(it.id) }))
+        put("affected", JsonArray(affected.map(::encodeQueuedAgentInput)))
     }
     if (modelMessages.isNotEmpty()) {
         put("model_messages", JsonArray(modelMessages))

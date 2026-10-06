@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.labteto.dshmobile.local.security.KeystorePreferenceSecretStore
 import java.io.IOException
 import java.security.KeyStore
 import java.util.UUID

@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.memory
 
-import com.labteto.dshmobile.local.LocalConversationMode
+import com.labteto.dshmobile.local.session.LocalConversationMode
 import javax.inject.Inject
 import javax.inject.Singleton
 

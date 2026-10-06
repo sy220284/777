@@ -1,8 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.chat.ChatContinuityState
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
-import com.labteto.dshmobile.local.chat.ChatSceneState
+
 
 internal data class LocalGroupGalleryProjectionFailure(
     val galleryId: String,

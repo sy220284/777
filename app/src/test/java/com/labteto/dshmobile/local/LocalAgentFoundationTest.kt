@@ -1,5 +1,17 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.context.LocalContextCheckpointKind
+import com.labteto.dshmobile.local.context.buildTrustedContextCheckpointModelMessage
+import com.labteto.dshmobile.local.context.historySummaryMode
+import com.labteto.dshmobile.local.context.isTrustedContextCheckpointModelMessage
+import com.labteto.dshmobile.local.context.projectLocalRequestContext
+import com.labteto.dshmobile.local.model.LocalHistoryCompactor
+import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
+import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
+import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
+import com.labteto.dshmobile.local.model.LocalRequestPressureStore
+import com.labteto.dshmobile.local.model.LocalWorkCheckpoint
+import com.labteto.dshmobile.local.work.structuredWorkState
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -71,14 +83,8 @@ class LocalAgentFoundationTest {
             usageMode = LocalUsageMode.CHAT,
             workProjectionEnabled = true,
             messages = messages,
-            tools = tools,
-            compactor = LocalHistoryCompactor(maxHistoryChars = 10, tailChars = 5),
-            operationalLimitTokens = 100,
             measuredPressure = pressure,
-            previousSourcePressure = null,
-            structuredWorkState = null,
-            cachePolicy = LocalPromptCachePolicy(),
-            allowSemanticProjection = true,
+            workProjection = { error("Chat must not invoke Work semantic projection") },
         )
 
         assertFalse(projected.projected)

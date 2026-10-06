@@ -1,22 +1,38 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.interaction
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 
 internal const val LOCAL_QUESTION_CANCELLED_RESPONSE = "用户取消了问题"
 private const val LOCAL_QUESTION_EMPTY_RESPONSE = "用户未提供文字回答"
 
 /**
- * Owns all user-mediated wait/response state for the local Harness.
+ * Narrow state surface owned by one interaction runtime.
+ *
+ * Approval/question coordination must not know the aggregate app state. Implementations expose only
+ * the interaction facts required by this lifecycle, so foreground and detached Work can share the
+ * same semantics without receiving a writable application aggregate.
+ */
+internal interface LocalInteractionStatePort {
+    fun pendingApproval(): LocalApproval?
+    fun setPendingApproval(approval: LocalApproval?)
+    fun clearPendingApproval(callId: String)
+    fun setPendingQuestion(question: LocalQuestion?)
+    fun clearPendingQuestion(callId: String)
+    fun clearPendingInteractions()
+    fun deviceApprovalLeaseEnabled(): Boolean
+    fun setDeviceApprovalLease(enabled: Boolean)
+}
+
+/**
+ * Owns all user-mediated wait/response state for one local Harness run.
  *
  * One interaction mutex preserves the current UI contract of showing a single decision at a time.
  * Call-id checks ensure a stale click can never resolve a later approval or question.
  */
 internal class LocalInteractionCoordinator(
-    private val state: MutableStateFlow<LocalHarnessState>,
+    private val state: LocalInteractionStatePort,
 ) {
     private data class ApprovalWaiter(
         val callId: String,
@@ -34,6 +50,14 @@ internal class LocalInteractionCoordinator(
     private var questionWaiter: QuestionWaiter? = null
     private var cancellationGeneration = 0L
 
+    internal fun pendingApproval(): LocalApproval? = state.pendingApproval()
+
+    internal fun deviceApprovalLeaseEnabled(): Boolean = state.deviceApprovalLeaseEnabled()
+
+    internal fun setDeviceApprovalLease(enabled: Boolean) {
+        state.setDeviceApprovalLease(enabled)
+    }
+
     suspend fun awaitApproval(approval: LocalApproval): Boolean {
         val generation = synchronized(waiterLock) { cancellationGeneration }
         interactionMutex.lock()
@@ -48,20 +72,14 @@ internal class LocalInteractionCoordinator(
                 }
                 approvalWaiter = ApprovalWaiter(approval.callId, response)
             }
-            state.update { it.copy(pendingApproval = approval) }
+            state.setPendingApproval(approval)
             return try {
                 response.await()
             } finally {
                 synchronized(waiterLock) {
                     if (approvalWaiter?.callId == approval.callId) approvalWaiter = null
                 }
-                state.update { current ->
-                    if (current.pendingApproval?.callId == approval.callId) {
-                        current.copy(pendingApproval = null)
-                    } else {
-                        current
-                    }
-                }
+                state.clearPendingApproval(approval.callId)
             }
         } finally {
             interactionMutex.unlock()
@@ -82,20 +100,14 @@ internal class LocalInteractionCoordinator(
                 }
                 questionWaiter = QuestionWaiter(question.callId, response)
             }
-            state.update { it.copy(pendingQuestion = question) }
+            state.setPendingQuestion(question)
             return try {
                 response.await().trim().ifBlank { LOCAL_QUESTION_EMPTY_RESPONSE }
             } finally {
                 synchronized(waiterLock) {
                     if (questionWaiter?.callId == question.callId) questionWaiter = null
                 }
-                state.update { current ->
-                    if (current.pendingQuestion?.callId == question.callId) {
-                        current.copy(pendingQuestion = null)
-                    } else {
-                        current
-                    }
-                }
+                state.clearPendingQuestion(question.callId)
             }
         } finally {
             interactionMutex.unlock()
@@ -107,6 +119,18 @@ internal class LocalInteractionCoordinator(
             val waiter = approvalWaiter
             if (waiter?.callId != callId) return@synchronized false
             waiter.response.complete(approved)
+        }
+
+    /** Commit an approval mode change only while this exact unresolved request still owns the wait. */
+    fun resolveApproval(callId: String, commit: (LocalApproval) -> Boolean): Boolean =
+        synchronized(waiterLock) {
+            val waiter = approvalWaiter
+            val pending = state.pendingApproval()
+            if (waiter?.callId != callId || waiter.response.isCompleted || pending?.callId != callId) {
+                return@synchronized false
+            }
+            if (!commit(pending)) return@synchronized false
+            waiter.response.complete(true)
         }
 
     fun answerQuestion(callId: String, answer: String): Boolean =
@@ -122,7 +146,7 @@ internal class LocalInteractionCoordinator(
     fun cancelAll() {
         synchronized(waiterLock) {
             cancellationGeneration += 1L
-            state.update { it.copy(pendingApproval = null, pendingQuestion = null) }
+            state.clearPendingInteractions()
             approvalWaiter?.response?.complete(false)
             questionWaiter?.response?.cancel()
         }

@@ -1,9 +1,6 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalGoal
-import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalSessionEventLog
-import com.labteto.dshmobile.local.LocalTodoItem
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
@@ -29,11 +26,11 @@ class LocalWorkProgressCoordinatorTest {
 
     @Test
     fun backgroundProgressStaysInCapturedSessionAndPersistsAfterItsEvent() {
-        val visible = MutableStateFlow(LocalHarnessState(sessionId = "visible"))
-        val run = MutableStateFlow(LocalHarnessState(sessionId = "background"))
+        val visible = MutableStateFlow(LocalWorkRunState(sessionId = "visible"))
+        val run = MutableStateFlow(LocalWorkRunState(sessionId = "background"))
         val log = eventLog(File(temporary.root, "background.jsonl"))
         var writes = 0
-        val coordinator = LocalWorkProgressCoordinator(run, log) {
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(run), log) {
             assertEquals("background", run.value.sessionId)
             assertEquals("goal/state", log.snapshot().last().type)
             writes++
@@ -43,18 +40,18 @@ class LocalWorkProgressCoordinatorTest {
         visible.value = visible.value.copy(sessionId = "another-visible")
         coordinator.updateGoal("blocked", "等待依赖")
 
-        assertNull(visible.value.goal)
-        assertEquals("完成任务", run.value.goal?.description)
-        assertEquals("blocked", run.value.goal?.status)
+        assertNull(visible.value.work.goal)
+        assertEquals("完成任务", run.value.work.goal?.description)
+        assertEquals("blocked", run.value.work.goal?.status)
         assertEquals(2, writes)
         assertEquals("blocked", log.snapshot().last().data["status"]?.toString()?.trim('"'))
     }
 
     @Test
     fun oversizedPlanAndTodosRetainExistingBoundsAndWholeListReplacement() {
-        val state = MutableStateFlow(LocalHarnessState())
+        val state = MutableStateFlow(LocalWorkRunState(sessionId = "test"))
         val log = eventLog(File(temporary.root, "progress.jsonl"))
-        val coordinator = LocalWorkProgressCoordinator(state, log) {}
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) {}
         coordinator.updatePlan(buildJsonObject {
             put("items", JsonArray(List(1000) { JsonPrimitive("步骤 $it") }))
         })
@@ -66,79 +63,101 @@ class LocalWorkProgressCoordinatorTest {
                 }
             }))
         })
-        assertEquals(20, state.value.plan.size)
-        assertEquals(50, state.value.todos.size)
-        assertTrue(state.value.todos.all { it.content.length == 500 && it.status == "pending" })
+        assertEquals(20, state.value.work.plan.size)
+        assertEquals(50, state.value.work.todos.size)
+        assertTrue(state.value.work.todos.all { it.content.length == 500 && it.status == "pending" })
 
         coordinator.updatePlan(buildJsonObject { put("plan", "一\n\n二") })
-        assertEquals(listOf("一", "二"), state.value.plan)
+        assertEquals(listOf("一", "二"), state.value.work.plan)
         coordinator.updateTodos(buildJsonObject {})
-        assertTrue(state.value.todos.isEmpty())
+        assertTrue(state.value.work.todos.isEmpty())
         assertEquals(listOf("plan/state", "todo/state", "plan/state", "todo/state"), log.snapshot().map { it.type })
     }
 
     @Test
     fun invalidOrMissingGoalDoesNotWriteAnEventOrPersist() {
-        val state = MutableStateFlow(LocalHarnessState())
+        val state = MutableStateFlow(LocalWorkRunState(sessionId = "test"))
         val log = eventLog(File(temporary.root, "goal.jsonl"))
         var writes = 0
-        val coordinator = LocalWorkProgressCoordinator(state, log) { writes++ }
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { writes++ }
         assertTrue(runCatching { coordinator.updateGoal("active", null) }.isFailure)
         assertTrue(runCatching { coordinator.updateGoal("invalid", null) }.isFailure)
-        assertNull(state.value.goal)
+        assertNull(state.value.work.goal)
         assertTrue(log.snapshot().isEmpty())
         assertEquals(0, writes)
 
         coordinator.createGoal("g".repeat(3000))
         coordinator.updateGoal("completed", "n".repeat(3000))
-        assertEquals(2000, state.value.goal?.description?.length)
-        assertEquals(2000, state.value.goal?.note?.length)
+        assertEquals(2000, state.value.work.goal?.description?.length)
+        assertEquals(2000, state.value.work.goal?.note?.length)
         coordinator.updateGoal("paused", null)
-        assertNull(state.value.goal?.note)
+        assertNull(state.value.work.goal?.note)
     }
 
     @Test
     fun goalCompletionRequiresRuntimeTodosToBeClosed() {
         val state = MutableStateFlow(
-            LocalHarnessState(
-                goal = LocalGoal("收口共享底座"),
-                todos = listOf(
-                    LocalTodoItem("补回归", "pending"),
-                    LocalTodoItem("已完成项", "completed"),
+            LocalWorkRunState(
+                sessionId = "goal-transition",
+                work = LocalWorkState(
+                    goal = LocalGoal("收口共享底座"),
+                    todos = listOf(
+                        LocalTodoItem("补回归", "pending"),
+                        LocalTodoItem("已完成项", "completed"),
+                    ),
                 ),
             ),
         )
         val log = eventLog(File(temporary.root, "goal-transition.jsonl"))
         var writes = 0
-        val coordinator = LocalWorkProgressCoordinator(state, log) { writes++ }
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { writes++ }
 
         val rejected = runCatching { coordinator.updateGoal("completed", null) }
 
         assertTrue(rejected.isFailure)
-        assertEquals("active", state.value.goal?.status)
+        assertEquals("active", state.value.work.goal?.status)
         assertEquals(0, writes)
         assertEquals("goal/transition-rejected", log.snapshot().last().type)
 
         state.value = state.value.copy(
-            todos = state.value.todos.map { it.copy(status = "completed") },
+            work = state.value.work.copy(
+                todos = state.value.work.todos.map { it.copy(status = "completed") },
+            ),
         )
         coordinator.updateGoal("completed", "验证通过")
 
-        assertEquals("completed", state.value.goal?.status)
+        assertEquals("completed", state.value.work.goal?.status)
         assertEquals(1, writes)
         assertEquals("goal/state", log.snapshot().last().type)
     }
 
     @Test
-    fun eventWriteFailureStopsPersistence() {
-        val state = MutableStateFlow(LocalHarnessState())
+    fun eventWriteFailureLeavesAllWorkProgressAndPersistenceUnchanged() {
+        val initial = LocalWorkRunState(
+            sessionId = "failure",
+            work = LocalWorkState(
+                plan = listOf("原计划"),
+                todos = listOf(LocalTodoItem("原任务", "completed")),
+                goal = LocalGoal("原目标"),
+            ),
+        )
+        val state = MutableStateFlow(initial)
         val parent = temporary.newFolder("not-a-directory")
         val log = eventLog(File(parent, "goal.jsonl"))
         assertTrue(parent.delete())
         assertTrue(parent.createNewFile())
         var persisted = false
-        val coordinator = LocalWorkProgressCoordinator(state, log) { persisted = true }
-        assertTrue(runCatching { coordinator.createGoal("失败场景") }.isFailure)
-        assertEquals(false, persisted)
+        val coordinator = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { persisted = true }
+        val mutations = listOf<() -> Unit>(
+            { coordinator.updatePlan(buildJsonObject { put("plan", "新计划") }) },
+            { coordinator.updateTodos(buildJsonObject {}) },
+            { coordinator.createGoal("新目标") },
+            { coordinator.updateGoal("blocked", "依赖失败") },
+        )
+        mutations.forEach { mutation ->
+            assertTrue(runCatching(mutation).isFailure)
+            assertEquals(initial, state.value)
+            assertEquals(false, persisted)
+        }
     }
 }

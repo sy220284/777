@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.agent
+
+
 
 internal enum class LocalSubagentStatus {
     COMPLETED,

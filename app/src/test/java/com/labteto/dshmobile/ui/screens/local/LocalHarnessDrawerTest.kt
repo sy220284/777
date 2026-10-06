@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.session.LocalSessionSummary
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

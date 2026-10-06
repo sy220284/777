@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.labteto.dshmobile.local.runtime.LocalExecutionService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals

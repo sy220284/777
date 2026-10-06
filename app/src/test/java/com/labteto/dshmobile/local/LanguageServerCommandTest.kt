@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.lsp.parseLanguageServerCommand
 import org.junit.Assert.*
 import org.junit.Test
 

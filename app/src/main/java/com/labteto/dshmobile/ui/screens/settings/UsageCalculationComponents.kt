@@ -37,7 +37,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.TokenUsageAction
@@ -49,6 +48,7 @@ import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.TokenUsageGroupSummary
 import com.labteto.dshmobile.local.TokenUsageModeAnalytics
 import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsSegment

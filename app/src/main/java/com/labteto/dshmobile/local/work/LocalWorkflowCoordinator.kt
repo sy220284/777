@@ -1,9 +1,10 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.workflow.HarnessWorkflowAcceptance
 import com.labteto.dshmobile.harness.workflow.HarnessWorkflowMode
 import com.labteto.dshmobile.harness.workflow.HarnessWorkflowProgress
 import com.labteto.dshmobile.harness.workflow.HarnessWorkflowRunner
+import com.labteto.dshmobile.local.agent.LocalSubagentExecutionException
 
 /** Runs read-only delegated work with bounded reassignment and explicit output checks. */
 internal class LocalWorkflowCoordinator(

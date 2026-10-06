@@ -44,10 +44,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.LocalChatMode
-import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
+import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -524,7 +524,7 @@ internal fun LocalSessionDrawerRow(
                         color = colors.labelCaption,
                         maxLines = 1,
                     )
-                    if (session.chatMode == LocalChatMode.GROUP) {
+                    if (session.chatMode == LocalChatMode.GROUP.name) {
                         DsPill(text = stringResource(R.string.local_group_chat_title))
                     }
                     if (running) {

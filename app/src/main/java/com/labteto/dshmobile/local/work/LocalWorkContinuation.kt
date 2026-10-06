@@ -1,6 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.local.LocalModelException
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -24,14 +25,14 @@ internal fun queueAutomaticWorkContinuation(
         !shouldAutoContinueWorkFailure(
             error = error,
             automaticContinuationCount = binding.automaticContinuationCount,
-            pendingInputs = binding.pendingInputs.size(),
+            pendingInputs = binding.runHandle.pendingInputs.size(),
         )
     ) {
         return false
     }
 
     val continuationId = "continuation-$sourceRunId-${binding.automaticContinuationCount + 1}"
-    val accepted = binding.pendingInputs.offer(
+    val accepted = binding.runHandle.pendingInputs.offer(
         QueuedAgentInput(
             content = INTERNAL_WORK_CONTINUATION_PROMPT,
             memoryInput = "",
@@ -48,8 +49,8 @@ internal fun queueAutomaticWorkContinuation(
     binding.continuationParentRunId = sourceRunId
     binding.state.update {
         it.copy(
+            kernel = it.kernel.copy(queuedInputCount = binding.runHandle.pendingInputs.size()),
             error = null,
-            queuedInputCount = binding.pendingInputs.size(),
         )
     }
     binding.eventLog.append("turn/continuation-queued", buildJsonObject {

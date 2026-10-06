@@ -5,8 +5,19 @@ import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.harness.session.RecoveredToolResult
-import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.harness.session.SessionRecovery
+import com.labteto.dshmobile.harness.session.SessionRepairResult
+import com.labteto.dshmobile.local.agent.localAgentRunPolicy
+import com.labteto.dshmobile.local.context.buildTrustedWorkCheckpointModelMessage
+import com.labteto.dshmobile.local.model.LocalWorkCheckpoint
+import com.labteto.dshmobile.local.runtime.LOCAL_AGENT_RUN_CHECKPOINT_EVENT
+import com.labteto.dshmobile.local.runtime.LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT
+import com.labteto.dshmobile.local.runtime.LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT
+import com.labteto.dshmobile.local.runtime.LocalAgentRunCheckpointStatus
+import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
+import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -87,7 +98,11 @@ class LocalAgentRunCoordinatorTest {
             )
 
             val decision = requireNotNull(
-                coordinator.recoveryDecision("s1", SessionRepairResult()),
+                coordinator.recoveryDecision(
+                    sessionId = "s1",
+                    repair = SessionRepairResult(),
+                    contextPolicy = LocalWorkRecoveryContextPolicy,
+                ),
             )
 
             val content = decision.queuedInput?.content.orEmpty()

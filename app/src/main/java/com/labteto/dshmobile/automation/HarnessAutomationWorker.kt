@@ -1,8 +1,6 @@
 package com.labteto.dshmobile.automation
 
 import android.content.Context
-import com.labteto.dshmobile.connection.HostsStore
-import com.labteto.dshmobile.notify.DshNotifications
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -10,6 +8,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
+import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.harness.capability.HarnessScheduler
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
@@ -18,25 +17,25 @@ import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
-import com.labteto.dshmobile.local.LocalAutomationWorkException
-import com.labteto.dshmobile.local.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.automation.LocalAutomationRuntime
+import com.labteto.dshmobile.local.automation.LocalAutomationRunStatus
+import com.labteto.dshmobile.notify.DshNotifications
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.io.File
-import java.nio.file.StandardCopyOption
-import java.nio.file.Files
-import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.charset.StandardCharsets
 import java.io.FileOutputStream
+import java.nio.charset.StandardCharsets
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
-import kotlin.random.Random
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -188,40 +187,50 @@ class HarnessAutomationWorker(
                     bypassProactivePolicy = manualRun,
                 )
             }
-            settlement.settleSuccess(
-                id = id,
-                requestedGeneration = requestedGeneration,
-                task = task,
-                manualRun = manualRun,
-                started = started,
-                run = run,
-            )
+            when (run.status) {
+                LocalAutomationRunStatus.DELIVERED,
+                LocalAutomationRunStatus.SKIPPED -> settlement.settleSuccess(
+                    id = id,
+                    requestedGeneration = requestedGeneration,
+                    task = task,
+                    manualRun = manualRun,
+                    started = started,
+                    run = run,
+                )
+                LocalAutomationRunStatus.BLOCKED -> settlement.settleBlocked(
+                    id = id,
+                    requestedGeneration = requestedGeneration,
+                    task = task,
+                    manualRun = manualRun,
+                    started = started,
+                    sessionId = run.sessionId,
+                    detail = run.detail ?: run.output,
+                )
+                LocalAutomationRunStatus.CANCELLED -> settlement.settleFailure(
+                    id = id,
+                    requestedGeneration = requestedGeneration,
+                    task = task,
+                    manualRun = manualRun,
+                    started = started,
+                    sessionId = run.sessionId,
+                    detail = run.detail ?: run.output,
+                    persistWorkSessionId = task.mode == AutomationMode.WORK,
+                    receiptStatus = "cancelled",
+                )
+                LocalAutomationRunStatus.FAILED -> settlement.settleFailure(
+                    id = id,
+                    requestedGeneration = requestedGeneration,
+                    task = task,
+                    manualRun = manualRun,
+                    started = started,
+                    sessionId = run.sessionId,
+                    detail = run.detail ?: run.output,
+                    persistWorkSessionId = task.mode == AutomationMode.WORK,
+                )
+            }
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (blocked: LocalHarnessBlockedException) {
-            settlement.settleBlocked(
-                id = id,
-                requestedGeneration = requestedGeneration,
-                task = task,
-                manualRun = manualRun,
-                started = started,
-                sessionId = blocked.sessionId ?: task.workSessionId,
-                detail = blocked.message ?: "需要人工处理",
-            )
-            Result.success()
-        } catch (error: LocalAutomationWorkException) {
-            settlement.settleFailure(
-                id = id,
-                requestedGeneration = requestedGeneration,
-                task = task,
-                manualRun = manualRun,
-                started = started,
-                sessionId = error.sessionId,
-                detail = error.message ?: "后台任务失败",
-                persistWorkSessionId = true,
-            )
-            Result.success()
         } catch (error: Throwable) {
             settlement.settleFailure(
                 id = id,

@@ -1,5 +1,11 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.tools
 
+import com.labteto.dshmobile.local.documentedContextWindowTokens
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelState
+import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
+import com.labteto.dshmobile.local.operationalInputLimitTokens
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -10,22 +16,22 @@ import kotlinx.serialization.json.JsonObject
  * the existing context-pressure budget so unknown/custom providers do not inherit assumptions.
  */
 internal fun optionalToolPromptBudgetForRoute(
-    state: LocalHarnessState,
+    modelState: LocalModelState,
     history: List<JsonObject>,
 ): Int {
-    val profile = state.modelSelection.activeProfile
+    val profile = modelState.modelSelection.activeProfile
     val cachePolicy = LocalModelPresets.promptCachePolicyFor(
-        model = state.model,
-        baseUrl = state.baseUrl,
-        protocol = profile?.protocol ?: LocalModelPresets.protocolFor(state.model, state.baseUrl),
+        model = modelState.model,
+        baseUrl = modelState.baseUrl,
+        protocol = profile?.protocol ?: LocalModelPresets.protocolFor(modelState.model, modelState.baseUrl),
         authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
     )
     if (cachePolicy.preserveToolSurface) {
         return LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS
     }
     val operationalLimit = operationalInputLimitTokens(
-        state.model,
-        state.baseUrl,
+        modelState.model,
+        modelState.baseUrl,
         profile?.contextWindowTokensOverride,
     )
     val pressure = LocalPromptPressureMeter.measure(
@@ -33,8 +39,8 @@ internal fun optionalToolPromptBudgetForRoute(
         tools = JsonArray(emptyList()),
         operationalLimitTokens = operationalLimit,
         modelContextWindowTokens = documentedContextWindowTokens(
-            state.model,
-            state.baseUrl,
+            modelState.model,
+            modelState.baseUrl,
             profile?.contextWindowTokensOverride,
         ),
     )

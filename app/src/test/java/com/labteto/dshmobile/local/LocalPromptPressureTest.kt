@@ -1,5 +1,12 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelAdmissionRequest
+import com.labteto.dshmobile.local.model.LocalPromptPressure
+import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
+import com.labteto.dshmobile.local.model.LocalRequestPressureStore
+import com.labteto.dshmobile.local.model.validateModelRequestAdmission
+import com.labteto.dshmobile.local.work.assessWorkStepContext
+import com.labteto.dshmobile.local.work.toRequestContextAssessment
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -30,6 +37,28 @@ class LocalPromptPressureTest {
     }
 
     @Test
+    fun genericModelAdmissionRejectsOversizedRequestWithoutWorkControl() {
+        val request = LocalModelAdmissionRequest(
+            routeFingerprint = "test-route",
+            model = "unknown-model",
+            baseUrl = "https://example.com/v1",
+            contextWindowTokensOverride = 4_096,
+            messages = listOf(
+                buildJsonObject {
+                    put("role", "user")
+                    put("content", "x".repeat(100_000))
+                },
+            ),
+            tools = JsonArray(emptyList()),
+        )
+
+        val failure = runCatching { validateModelRequestAdmission(request) }.exceptionOrNull()
+
+        assertTrue(failure is LocalModelException)
+        assertEquals("MODEL_CONTEXT_BUDGET_EXCEEDED", (failure as LocalModelException).code)
+    }
+
+    @Test
     fun unknownModelOperationalLimitIsARealGuard() {
         val limit = operationalInputLimitTokens("unknown-model", "https://example.com/v1")
         assertTrue(limit in 1..300_000)
@@ -53,12 +82,19 @@ class LocalPromptPressureTest {
             targetTokens = 28_000,
             baseTriggerTokens = 36_000,
         )
+        val assessmentSnapshot = assessment.toRequestContextAssessment()
 
         val sourcePressure = pressure.copy(
             estimatedInputTokens = 42_000,
             historyTokens = 34_000,
         )
-        store.record("work", pressure, assessment, workSourcePressure = sourcePressure)
+        store.record(
+            sessionId = "work",
+            pressure = pressure,
+            contextAssessment = assessmentSnapshot,
+            usageMode = LocalUsageMode.WORK,
+            sourcePressure = sourcePressure,
+        )
         val laterChatPressure = pressure.copy(
             estimatedInputTokens = 9_000,
             historyTokens = 3_000,
@@ -69,7 +105,7 @@ class LocalPromptPressureTest {
         assertEquals(laterChatPressure, store.latest("work"))
         assertEquals(pressure, store.latestWork("work"))
         assertEquals(sourcePressure, store.latestWorkSource("work"))
-        assertEquals(assessment, store.workAssessment("work"))
+        assertEquals(assessmentSnapshot, store.workAssessment("work"))
     }
 
     @Test

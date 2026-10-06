@@ -1,14 +1,14 @@
 package com.labteto.dshmobile.local.presentation
 
-import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
-import com.labteto.dshmobile.local.LocalGroupChatState
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalImageInputMode
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.model.LocalModelSelectionState
-import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.LocalGroupChatState
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
+import com.labteto.dshmobile.local.model.LocalImageInputMode
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelSelectionState
+import com.labteto.dshmobile.local.session.LocalSessionSummary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -72,20 +72,20 @@ data class LocalHarnessShellState(
 internal fun LocalHarnessState.toSettingsUiState(): LocalHarnessSettingsState =
     LocalHarnessSettingsState(
         loading = loading,
-        model = model,
-        baseUrl = baseUrl,
-        modelSelection = modelSelection,
+        model = modelState.model,
+        baseUrl = modelState.baseUrl,
+        modelSelection = modelState.modelSelection,
         mainMaxSteps = mainMaxSteps,
         subagentMaxSteps = subagentMaxSteps,
-        modelAttempts = modelAttempts,
-        imageInputMode = imageInputMode,
+        modelAttempts = modelState.modelAttempts,
+        imageInputMode = modelState.imageInputMode,
         userRules = userRules,
         autoRecall = autoRecall,
         autoMemory = autoMemory,
-        chatStyleGuardEnabled = chatStyleGuardEnabled,
-        chatStyleGuardCustomPhrases = chatStyleGuardCustomPhrases,
-        styleGuardHits = styleGuardHits,
-        chatPersona = chatPersona,
+        chatStyleGuardEnabled = chat.chatStyleGuardEnabled,
+        chatStyleGuardCustomPhrases = chat.chatStyleGuardCustomPhrases,
+        styleGuardHits = chat.styleGuardHits,
+        chatPersona = chat.chatPersona,
         usage = usage,
         error = error,
     )
@@ -96,11 +96,11 @@ internal fun LocalHarnessState.toShellUiState(): LocalHarnessShellState =
         sessionId = sessionId,
         sessions = sessions,
         usageMode = usageMode,
-        running = running,
-        groupChat = groupChat,
-        chatPersona = chatPersona,
-        galleryId = galleryId,
-        galleryStoryId = galleryStoryId,
+        running = kernel.running,
+        groupChat = chat.groupChat,
+        chatPersona = chat.chatPersona,
+        galleryId = chat.galleryId,
+        galleryStoryId = chat.galleryStoryId,
         workspacePath = workspacePath,
     )
 

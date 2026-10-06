@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.labteto.dshmobile.local.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 
 internal data class LocalTranscriptHistoryState(
     val sessionId: String = "",

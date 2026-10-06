@@ -1,5 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.context
 
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject

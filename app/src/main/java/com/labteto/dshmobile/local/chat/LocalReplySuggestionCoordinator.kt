@@ -1,49 +1,43 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalChatTurnCoordinator
-import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.LocalModelReply
-import com.labteto.dshmobile.local.LocalSessionEventLog
+import com.labteto.dshmobile.local.toLocalChatProjectionState
+
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.hasChatBranchAlternatives
-import com.labteto.dshmobile.local.updateChatBranchNodeSnapshot
+import com.labteto.dshmobile.local.TokenUsageAction
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.LocalAuxiliaryModelRequestRuntime
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.recordForeground
+import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/**
- * Owns the model-assisted reply-suggestion transaction end to end: frozen route resolution,
- * protocol-safe input construction, parsing, stale-result rejection, diagnostics and state commit.
- */
-internal class LocalReplySuggestionCoordinator(
-    private val state: MutableStateFlow<LocalHarnessState>,
+@Singleton
+internal class LocalReplySuggestionCoordinator @Inject constructor(
+    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val chatState: LocalChatStatePort,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
     private val modelGateway: LocalModelGateway,
-    private val requestModel: suspend (
-        snapshot: LocalHarnessState,
-        messages: List<JsonObject>,
-        eventLog: LocalSessionEventLog,
-        profile: LocalModelProfile,
-    ) -> LocalModelReply,
-    private val recordUsage: (LocalHarnessState, LocalModelReply) -> Unit,
-    private val eventLogFor: (String) -> LocalSessionEventLog,
-    private val persistBranchState: (String) -> Unit,
-    private val persist: () -> Unit,
+    private val requestRuntime: LocalAuxiliaryModelRequestRuntime,
+    private val usageTracker: DeepSeekUsageTracker,
+    private val sessionStorage: LocalSessionStorageRuntime,
 ) {
     suspend fun generate(): Boolean {
-        val snapshot = state.value
+        val aggregateSnapshot = runtimeStateStore.state.value
+        val snapshot = aggregateSnapshot.toLocalChatProjectionState()
         if (
             snapshot.loading ||
-            !snapshot.configured ||
-            snapshot.running ||
+            !snapshot.modelState.configured ||
+            snapshot.kernel.running ||
             snapshot.usageMode != LocalUsageMode.CHAT ||
-            snapshot.groupChat.enabled
+            snapshot.chat.groupChat.enabled
         ) return false
 
         val assistantMessage = snapshot.messages.lastOrNull { message ->
@@ -51,125 +45,138 @@ internal class LocalReplySuggestionCoordinator(
         } ?: return false
         val expectedSessionId = snapshot.sessionId
         val expectedAssistantMessageId = assistantMessage.id
-        val boundEventLog = eventLogFor(expectedSessionId)
+        val boundEventLog = sessionStorage.eventLogs.get(expectedSessionId)
         val profile = try {
             modelGateway.profileForRoute(
-                profileId = snapshot.modelSelection.activeProfileId,
-                model = snapshot.model,
-                baseUrl = snapshot.baseUrl,
+                profileId = snapshot.modelState.modelSelection.activeProfileId,
+                model = snapshot.modelState.model,
+                baseUrl = snapshot.modelState.baseUrl,
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
             updateError(
-                expectedSessionId,
+                snapshot,
                 expectedAssistantMessageId,
-                error.message?.takeIf(String::isNotBlank) ?: "回复建议需要可用的模型账户或 API Key",
+                error.message?.takeIf(String::isNotBlank)
+                    ?: "回复建议需要可用的模型账户或 API Key",
             )
             return false
         }
 
         val prompt = chatTurnCoordinator.replySuggestionsPrompt(
-            persona = snapshot.chatPersona,
-            state = snapshot.chatState,
+            persona = snapshot.chat.chatPersona,
+            state = snapshot.chat.chatState,
             messages = snapshot.messages,
             latestAssistantMessageId = expectedAssistantMessageId,
         )
         val reply = try {
-            requestModel(
-                snapshot,
-                chatReplySuggestionModelMessages(prompt),
-                boundEventLog,
-                profile,
+            requestRuntime.complete(
+                modelAttempts = aggregateSnapshot.modelState.modelAttempts,
+                profile = profile,
+                messages = chatReplySuggestionModelMessages(prompt),
+                eventLog = boundEventLog,
+                operation = "chat/reply-suggestions",
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
-            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-                put("status", "failed")
-                put("detail", error.message.orEmpty().take(1_000))
-            })
+            runCatching {
+                boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                    put("status", "failed")
+                    put("detail", error.message.orEmpty().take(1_000))
+                })
+            }
             updateError(
-                expectedSessionId,
+                snapshot,
                 expectedAssistantMessageId,
                 error.message?.takeIf(String::isNotBlank) ?: "回复建议生成失败，请重试",
             )
             return false
         }
-        recordUsage(snapshot, reply)
+        usageTracker.recordForeground(
+            snapshot = aggregateSnapshot,
+            reply = reply,
+            action = TokenUsageAction.REPLY_SUGGESTIONS,
+            turnId = snapshot.transcriptIndex.latestUserMessageId,
+            step = CHAT_POST_TURN_MODEL_STEP + 1,
+        )
 
         val suggestions = chatTurnCoordinator.parseReplySuggestions(reply.content.orEmpty())
         if (suggestions.isNullOrEmpty()) {
-            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-                put("status", "parse-failed")
-                put("content", reply.content.orEmpty().take(2_000))
-            })
-            updateError(expectedSessionId, expectedAssistantMessageId, "回复建议返回格式异常，请重试")
+            runCatching {
+                boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                    put("status", "parse-failed")
+                    put("content", reply.content.orEmpty().take(2_000))
+                })
+            }
+            updateError(snapshot, expectedAssistantMessageId, "回复建议返回格式异常，请重试")
             return false
         }
 
-        var applied = false
-        state.update { current ->
-            if (
-                current.sessionId != expectedSessionId ||
-                current.usageMode != LocalUsageMode.CHAT ||
-                current.groupChat.enabled ||
-                current.transcriptIndex.latestDialogueMessageId != expectedAssistantMessageId
-            ) {
-                current
-            } else {
-                applied = true
-                current.copy(
-                    replySuggestions = suggestions,
+        val lease = LocalSessionRuntimeRegistry.tryAcquire(
+            expectedSessionId,
+            LocalSessionRuntimeKind.MAINTENANCE,
+        )
+        if (lease == null) {
+            runCatching {
+                boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                    put("status", "stale-discarded")
+                    put("assistant_message_id", expectedAssistantMessageId)
+                    put("reason", "session-busy")
+                })
+            }
+            return false
+        }
+        try {
+            val prepared = prepareReplySuggestionCommit(
+                chatState.value,
+                snapshot,
+                expectedAssistantMessageId,
+                suggestions,
+            )
+            if (prepared == null) {
+                runCatching {
+                    boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                        put("status", "stale-discarded")
+                        put("assistant_message_id", expectedAssistantMessageId)
+                    })
+                }
+                return false
+            }
+
+            appendChatDomainStateCommit(boundEventLog, prepared, "reply-suggestions-updated")
+            chatState.update { current ->
+                if (current.sessionId != expectedSessionId) current else current.copy(
+                    chat = prepared.chat,
                     error = null,
-                    chatBranches = if (current.transcriptIndex.branchingEligible) {
-                        updateChatBranchNodeSnapshot(
-                            state = current.chatBranches,
-                            messageId = expectedAssistantMessageId,
-                            chatState = current.chatState,
-                            chatContext = current.chatContext,
-                            replySuggestions = suggestions,
-                        )
-                    } else {
-                        current.chatBranches
-                    },
                 )
             }
+            sessionStorage.enqueueCurrentSnapshot(expectedSessionId)
+            runCatching {
+                boundEventLog.append("chat/reply-suggestions", buildJsonObject {
+                    put("status", "updated")
+                    put("assistant_message_id", expectedAssistantMessageId)
+                    put("suggestion_count", suggestions.size)
+                })
+            }.onFailure { error ->
+                chatState.update { current ->
+                    if (current.sessionId == expectedSessionId) {
+                        current.copy(
+                            error = "回复建议已保存，诊断日志写入失败：${error.message ?: error::class.java.simpleName}",
+                        )
+                    } else current
+                }
+            }
+            return true
+        } finally {
+            lease.close()
         }
-        if (!applied) {
-            boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-                put("status", "stale-discarded")
-                put("assistant_message_id", expectedAssistantMessageId)
-            })
-            return false
-        }
-
-        boundEventLog.append("chat/reply-suggestions", buildJsonObject {
-            put("status", "updated")
-            put("assistant_message_id", expectedAssistantMessageId)
-            put("suggestion_count", suggestions.size)
-        })
-        if (hasChatBranchAlternatives(state.value.chatBranches)) {
-            persistBranchState("chat/reply-suggestions-updated")
-        }
-        persist()
-        return true
     }
 
     private fun updateError(
-        expectedSessionId: String,
+        snapshot: LocalChatProjectionState,
         expectedAssistantMessageId: String,
         message: String,
-    ) {
-        state.update { current ->
-            if (
-                current.sessionId == expectedSessionId &&
-                current.transcriptIndex.latestDialogueMessageId == expectedAssistantMessageId
-            ) {
-                current.copy(error = message)
-            } else {
-                current
-            }
-        }
-    }
+    ) = commitReplySuggestionError(chatState, snapshot, expectedAssistantMessageId, message)
 }

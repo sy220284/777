@@ -1,16 +1,16 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.DeepSeekUsageTracker
-import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageContext
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -233,7 +233,7 @@ private fun stripTrailingJsonCommas(raw: String): String {
 /**
  * Turns a short natural-language description (plus recent chat context) into the structured
  * default persona used by chat mode. The generated profile is returned to the UI and persisted
- * through LocalHarnessEngine.configureChatPersona so the normal persona/session path remains
+ * through the ChatFeature persona/session API so the normal path remains
  * the single source of truth.
  */
 @Singleton

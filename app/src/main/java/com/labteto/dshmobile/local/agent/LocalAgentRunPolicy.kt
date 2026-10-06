@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.agent
+
+import com.labteto.dshmobile.local.LocalUsageMode
 
 /**
  * Product-surface capability policy layered on top of the shared Harness runtime.

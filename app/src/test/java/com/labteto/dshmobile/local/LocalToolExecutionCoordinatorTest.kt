@@ -10,9 +10,15 @@ import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
+import com.labteto.dshmobile.local.agent.localAgentRunPolicy
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelRunContext
+import com.labteto.dshmobile.local.model.LocalToolCall
+import com.labteto.dshmobile.local.tools.LocalToolCatalog
+import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
+import com.labteto.dshmobile.local.work.LocalWorkState
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -592,7 +598,8 @@ class LocalToolExecutionCoordinatorTest {
         ).single().jsonObject
         val planning = projection.modelSchemas(
             policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            state = LocalHarnessState(planMode = true),
+            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
+            planModeEnabled = true,
             history = emptyList(),
         ).single().jsonObject
         val writable = projection.subagentSchemas(
@@ -629,7 +636,8 @@ class LocalToolExecutionCoordinatorTest {
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
         val schemas = projection.modelSchemas(
             policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            state = LocalHarnessState(planMode = true),
+            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
+            planModeEnabled = true,
             history = emptyList(),
             enabledOptional = setOf("remote_lookup"),
         )

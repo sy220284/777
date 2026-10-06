@@ -2,14 +2,14 @@ package com.labteto.dshmobile.local.agent
 
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
-import com.labteto.dshmobile.local.LocalHistoryCompactor
-import com.labteto.dshmobile.local.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalRunModelSurface
-import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.contextWindowExceeded
+import com.labteto.dshmobile.local.model.LocalHistoryCompactor
+import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalRunModelSurface
 import com.labteto.dshmobile.local.model.compactOverflow
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 

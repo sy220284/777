@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.tools.ToolResultRetention
+import com.labteto.dshmobile.local.model.EPHEMERAL_TOOL_RESULT_PLACEHOLDER
+import com.labteto.dshmobile.local.model.LOCAL_TOOL_RESULT_RETENTION_KEY
+import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
+import com.labteto.dshmobile.local.model.localToolHistoryMessage
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

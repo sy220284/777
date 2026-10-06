@@ -2,17 +2,42 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.AgentRequestEvent
 import com.labteto.dshmobile.harness.agent.AgentRequestEventSink
-import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
-import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecovery
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecoveryPolicy
-import com.labteto.dshmobile.observability.AppLog
+import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
+import com.labteto.dshmobile.local.context.LocalRequestContextAssessmentInput
+import com.labteto.dshmobile.local.context.LocalRequestContextPolicy
+import com.labteto.dshmobile.local.context.LocalRequestContextPolicyInput
+import com.labteto.dshmobile.local.context.LocalRequestContextProjection
+import com.labteto.dshmobile.local.context.historySummaryMode
+import com.labteto.dshmobile.local.context.projectLocalRequestContext
+import com.labteto.dshmobile.local.model.LocalStreamPhraseFilter
+import com.labteto.dshmobile.local.model.LocalAgentModelRequestRuntime
+import com.labteto.dshmobile.local.model.LocalModelAdmissionPort
+import com.labteto.dshmobile.local.model.LocalHistoryCompactor
+import com.labteto.dshmobile.local.model.LocalForegroundHistoryCompactionRuntime
+import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
 import com.labteto.dshmobile.local.model.LocalModelCancellationException
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.model.LocalPromptCacheBaselineStore
+import com.labteto.dshmobile.local.model.LocalPromptCacheContinuityStore
+import com.labteto.dshmobile.local.model.LocalPromptCacheMode
+import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
+import com.labteto.dshmobile.local.model.LocalStreamPreview
 import com.labteto.dshmobile.local.model.modelFailureKind
-import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
+import com.labteto.dshmobile.local.model.redactModelImages
+import com.labteto.dshmobile.local.model.routeFingerprint
+import com.labteto.dshmobile.local.model.toRunModelSurface
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.observability.AppLog
 import java.security.MessageDigest
 import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -27,20 +52,24 @@ import kotlinx.serialization.json.put
  * Owns foreground model transport semantics: request logging, retry, streaming preview and overflow
  * recovery. The engine supplies only current product state and the durable compaction callback.
  */
-internal class LocalModelRequestCoordinator(
+@Singleton
+internal class LocalModelRequestCoordinator @Inject constructor(
     private val modelGateway: LocalModelGateway,
-    private val resourceScheduler: HarnessResourceScheduler,
-    private val historyCompactor: LocalHistoryCompactor,
-    private val toolSchemas: (LocalAgentRunPolicy) -> JsonArray,
-    private val defaultEventLog: () -> LocalSessionEventLog,
-    private val streamingPreviewStore: LocalStreamingPreviewStore,
-    private val persistOverflowCompaction: (LocalHarnessState, LocalHistorySummaryMode) -> Unit,
-    private val pressureStore: LocalRequestPressureStore = LocalRequestPressureStore(),
-    private val promptCacheBaselines: LocalPromptCacheBaselineStore = LocalPromptCacheBaselineStore(),
-    private val promptCacheContinuity: LocalPromptCacheContinuityStore = LocalPromptCacheContinuityStore(),
-    private val maxStreamPreviewChars: Int = 4_096,
-    private val streamPreviewIntervalMs: Long = 50L,
+    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val sessionStorage: LocalSessionStorageRuntime,
+    private val foregroundCompaction: LocalForegroundHistoryCompactionRuntime,
 ) {
+    private val resourceScheduler
+        get() = runtimeStateStore.resourceScheduler
+    private val streamingPreviewStore
+        get() = runtimeStateStore.streamingPreviewStore
+    private val pressureStore
+        get() = runtimeStateStore.requestPressureStore
+    private val historyCompactor = LocalHistoryCompactor()
+    private val promptCacheBaselines = LocalPromptCacheBaselineStore()
+    private val promptCacheContinuity = LocalPromptCacheContinuityStore()
+    private val maxStreamPreviewChars: Int = 4_096
+    private val streamPreviewIntervalMs: Long = 50L
     private val requestRuntime = LocalAgentModelRequestRuntime(modelGateway, resourceScheduler)
     private val modelStepRuntime = LocalAgentModelStepRuntime()
 
@@ -59,14 +88,15 @@ internal class LocalModelRequestCoordinator(
         profile: LocalModelProfile? = null,
         previewGuard: () -> Boolean = { true },
         overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
-        executionControl: LocalWorkExecutionControl? = null,
+        contextPolicy: LocalRequestContextPolicy? = null,
+        admission: LocalModelAdmissionPort? = null,
     ): LocalModelReply {
-        val tools = toolsOverride ?: toolSchemas(localAgentRunPolicy(snapshot.usageMode))
-        val log = requestLog ?: defaultEventLog()
+        val tools = toolsOverride ?: JsonArray(emptyList())
+        val log = requestLog ?: sessionStorage.eventLogs.get(snapshot.sessionId)
         val frozenProfile = profile ?: modelGateway.profileForRoute(
-            snapshot.modelSelection.activeProfileId,
-            snapshot.model,
-            snapshot.baseUrl,
+            snapshot.modelState.modelSelection.activeProfileId,
+            snapshot.modelState.model,
+            snapshot.modelState.baseUrl,
         )
         val runSurface = frozenProfile.toRunModelSurface()
         val credentialDiagnostic = modelGateway.credentialDiagnostic(frozenProfile)
@@ -102,22 +132,24 @@ internal class LocalModelRequestCoordinator(
         )
         val contextProjection = projectLocalRequestContext(
             usageMode = snapshot.usageMode,
-            workProjectionEnabled = executionControl != null,
+            workProjectionEnabled = contextPolicy != null,
             messages = messages,
-            tools = tools,
-            compactor = historyCompactor,
-            operationalLimitTokens = operationalLimit,
             measuredPressure = baselinePressure,
-            previousSourcePressure = previousSourcePressure,
-            structuredWorkState = if (
-                executionControl != null && snapshot.usageMode == LocalUsageMode.WORK
-            ) {
-                structuredWorkState(snapshot, log)
-            } else {
-                null
+            workProjection = contextPolicy?.let { policy ->
+                {
+                    policy.project(
+                        LocalRequestContextPolicyInput(
+                            messages = messages,
+                            tools = tools,
+                            operationalLimitTokens = operationalLimit,
+                            measuredPressure = baselinePressure,
+                            previousPressure = previousSourcePressure,
+                            cachePolicy = cachePolicy,
+                            allowSemanticProjection = step <= 1,
+                        ),
+                    )
+                }
             },
-            cachePolicy = cachePolicy,
-            allowSemanticProjection = step <= 1,
         )
         val requestMessages = contextProjection.messages
         val prefixAssessment = if (cachePolicy.mode != LocalPromptCacheMode.NONE) {
@@ -138,16 +170,17 @@ internal class LocalModelRequestCoordinator(
                 modelContextWindowTokens = modelContextWindow,
             )
         } else baselinePressure
-        val workContextAssessment = if (
-            executionControl != null && snapshot.usageMode == LocalUsageMode.WORK
+        val contextAssessment = if (
+            contextPolicy != null && snapshot.usageMode == LocalUsageMode.WORK
         ) {
-            assessWorkStepContext(
-                current = pressure,
-                previous = previousSourcePressure,
-                targetTokens = workRequestProjectionTargetTokens(operationalLimit, cachePolicy),
-                baseTriggerTokens = workRequestProjectionTriggerTokens(operationalLimit, cachePolicy),
-                growthCurrent = baselinePressure,
-                allowAdaptiveEarlyCompaction = cachePolicy.allowAdaptiveEarlyCompaction,
+            contextPolicy.assess(
+                LocalRequestContextAssessmentInput(
+                    current = pressure,
+                    previous = previousSourcePressure,
+                    operationalLimitTokens = operationalLimit,
+                    cachePolicy = cachePolicy,
+                    growthCurrent = baselinePressure,
+                ),
             )
         } else {
             null
@@ -155,9 +188,8 @@ internal class LocalModelRequestCoordinator(
         pressureStore.record(
             sessionId = snapshot.sessionId,
             pressure = pressure,
-            workAssessment = workContextAssessment,
-            workSourcePressure = if (workContextAssessment != null) baselinePressure else null,
-            usageMode = snapshot.usageMode,
+            contextAssessment = contextAssessment,
+                        usageMode = snapshot.usageMode,
             sourcePressure = baselinePressure,
         )
         val contextWindow = pressureStore.window(snapshot.sessionId)
@@ -181,7 +213,7 @@ internal class LocalModelRequestCoordinator(
                 put("omitted_messages", contextProjection.omittedMessages)
                 put("strategy", "active_work_checkpoint_plus_recent_causal_tail")
                 contextProjection.preProjectionAssessment?.let { assessment ->
-                    put("context_status_before", assessment.status.name.lowercase())
+                    put("context_status_before", assessment.status)
                     put("effective_projection_trigger_tokens", assessment.effectiveProjectionTriggerTokens)
                     put("history_ratio_permille_before", assessment.historyRatioPermille)
                     put("history_growth_tokens_before", assessment.historyGrowthTokens)
@@ -202,8 +234,8 @@ internal class LocalModelRequestCoordinator(
             }
         }
         log.append("request/header", buildJsonObject {
-            put("model", snapshot.model)
-            put("base_url", snapshot.baseUrl)
+            put("model", snapshot.modelState.model)
+            put("base_url", snapshot.modelState.baseUrl)
             put("profile_id", frozenProfile.id)
             put("provider", frozenProfile.provider)
             put("auth_kind", frozenProfile.authKind.name)
@@ -240,8 +272,8 @@ internal class LocalModelRequestCoordinator(
             put("history_tokens_estimate", pressure.historyTokens)
             put("current_user_tokens_estimate", pressure.currentUserTokens)
             put("tool_definition_tokens_estimate", pressure.toolDefinitionTokens)
-            workContextAssessment?.let { assessment ->
-                put("context_efficiency_status", assessment.status.name.lowercase())
+            contextAssessment?.let { assessment ->
+                put("context_efficiency_status", assessment.status)
                 put("history_ratio_permille", assessment.historyRatioPermille)
                 put("tool_ratio_permille", assessment.toolRatioPermille)
                 put("input_growth_tokens", assessment.inputGrowthTokens)
@@ -258,12 +290,12 @@ internal class LocalModelRequestCoordinator(
             }
             put("tool_count", tools.size)
             put("tool_names", toolNames)
-            put("plan_mode", snapshot.planMode)
+            put("plan_mode", snapshot.work.planMode)
             temperature?.let { put("temperature", it) }
         })
         log.append("request/context", buildJsonObject {
             put("step", step)
-            put("model", snapshot.model)
+            put("model", snapshot.modelState.model)
             put("message_count", logMessages.size)
             put("context_chars", contextChars)
             put("estimated_input_tokens", pressure.estimatedInputTokens)
@@ -276,7 +308,7 @@ internal class LocalModelRequestCoordinator(
         var lastProviderError: LocalModelException? = null
         var attemptStartedNanos = System.nanoTime()
         val executor = modelStepRuntime.requestExecutor(
-            maxAttempts = (maxAttemptsOverride ?: snapshot.modelAttempts).coerceIn(1, 5),
+            maxAttempts = (maxAttemptsOverride ?: snapshot.modelState.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
                 (error as? LocalModelException)?.let { lastProviderError = it }
                 (error as? LocalModelException)?.retryable == true || error is java.io.IOException
@@ -311,7 +343,7 @@ internal class LocalModelRequestCoordinator(
                             "LocalModelRequest",
                             buildString {
                                 append(if (localPreflight) "模型请求本地拒绝 " else "模型请求失败 ")
-                                append("model=${snapshot.model} step=$step attempt=${event.attempt} ")
+                                append("model=${snapshot.modelState.model} step=$step attempt=${event.attempt} ")
                                 append("duration_ms=$durationMs session_id=${snapshot.sessionId} ")
                                 providerError?.code?.let { append("code=$it ") }
                                 providerError?.let {
@@ -413,32 +445,32 @@ internal class LocalModelRequestCoordinator(
                     val compacted = historyCompactor.compactForOverflow(
                         history = activeMessages,
                         summaryMode = summaryMode,
-                        structuredWorkState = if (summaryMode == LocalHistorySummaryMode.WORK) {
-                            structuredWorkState(snapshot, log)
-                        } else {
-                            null
-                        },
                     )
                     val madeProgress = compacted != null &&
                         compacted.estimatedTokensAfter < compacted.estimatedTokensBefore &&
                         compacted.messages != activeMessages
-                    if (!madeProgress || compacted == null) {
+                    if (!madeProgress) {
                         null
                     } else {
+                        val recovered = checkNotNull(compacted)
                         overflowRound += 1
                         if (persistOverflowHistory) {
-                            (overflowPersister ?: persistOverflowCompaction)(snapshot, summaryMode)
+                            if (overflowPersister != null) {
+                                overflowPersister(snapshot, summaryMode)
+                            } else if (!snapshot.chat.groupChat.enabled) {
+                                foregroundCompaction.persistOverflowCompaction(snapshot.sessionId, summaryMode)
+                            }
                         }
                         log.append("request/context-overflow-recovery", buildJsonObject {
                             put("step", step)
                             put("round", overflowRound)
-                            put("model", snapshot.model)
-                            put("estimated_tokens_before", compacted.estimatedTokensBefore)
-                            put("estimated_tokens_after", compacted.estimatedTokensAfter)
-                            put("omitted_messages", compacted.omittedMessages)
+                            put("model", snapshot.modelState.model)
+                            put("estimated_tokens_before", recovered.estimatedTokensBefore)
+                            put("estimated_tokens_after", recovered.estimatedTokensAfter)
+                            put("omitted_messages", recovered.omittedMessages)
                         })
                         LocalAgentModelStepRecovery(
-                            messages = compacted.messages,
+                            messages = recovered.messages,
                             reason = "context_overflow",
                         )
                     }
@@ -469,7 +501,7 @@ internal class LocalModelRequestCoordinator(
                     )
                     val streamFilter = streamFilterPhrases
                         .takeIf { it.isNotEmpty() }
-                        ?.let(::ChatStreamFilter)
+                        ?.let(::LocalStreamPhraseFilter)
                     val activePressure = LocalPromptPressureMeter.measure(
                         messages = activeMessages,
                         tools = tools,
@@ -481,17 +513,8 @@ internal class LocalModelRequestCoordinator(
                         activePressure,
                         usageMode = snapshot.usageMode,
                     )
-                    executeWithModelAdmission(
-                        control = executionControl,
-                        routeFingerprint = routeFingerprint,
-                        model = frozenProfile.model,
-                        baseUrl = frozenProfile.baseUrl,
-                        contextWindowTokensOverride = frozenProfile.contextWindowTokensOverride,
-                        messages = activeMessages,
-                        tools = tools,
-                    ) {
-                        try {
-                            requestRuntime.complete(
+                    val reply = try {
+                        requestRuntime.complete(
                                 surface = runSurface,
                                 messages = activeMessages,
                                 tools = tools,
@@ -499,19 +522,19 @@ internal class LocalModelRequestCoordinator(
                                 temperature = temperature,
                                 promptCacheComparisonResponseId = cacheComparisonResponseId,
                                 promptCacheKey = promptCacheKey,
-                                promptCacheTtl = promptCacheTtl,
-                                admissionHandledExternally = true,
-                                onDelta = { delta ->
+                            promptCacheTtl = promptCacheTtl,
+                            admission = admission,
+                            onDelta = { delta ->
                                     val visible = streamFilter?.append(delta.content)?.text ?: delta.content
                                     streamPreview.append(visible)
                                 },
                             )
                         } catch (cancelled: CancellationException) {
-                            val admission =
+                            val admissionState =
                                 (cancelled as? LocalModelCancellationException)?.admissionState
                             log.append("request/cancelled", buildJsonObject {
                                 put("step", step)
-                                admission?.let {
+                                admissionState?.let {
                                     put("admission_state", it.name.lowercase())
                                     put(
                                         "budget_settlement",
@@ -542,7 +565,7 @@ internal class LocalModelRequestCoordinator(
                                 }
                             })
                             throw error
-                        }.also { reply ->
+                        }
                             streamFilter?.flush()?.text?.takeIf(String::isNotEmpty)?.let(streamPreview::append)
                             streamPreview.flush()
                             activePrefixAssessment?.let { cache ->
@@ -600,8 +623,7 @@ internal class LocalModelRequestCoordinator(
                                     })
                                 }
                             }
-                        }
-                    }
+                            reply
                 }
             } finally {
                 previewOwner?.let(streamingPreviewStore::clear)

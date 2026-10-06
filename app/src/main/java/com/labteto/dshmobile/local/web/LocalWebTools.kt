@@ -1,5 +1,12 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.web
 
+import com.labteto.dshmobile.local.LocalWebException
+import com.labteto.dshmobile.local.LocalWebFetchResult
+import com.labteto.dshmobile.local.LocalWebProvider
+import com.labteto.dshmobile.local.TokenUsageContext
+import com.labteto.dshmobile.local.runtime.MAX_TOOL_RESULT_CHARS
+import com.labteto.dshmobile.local.tools.resolveJsonPath
+import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
@@ -10,6 +17,8 @@ internal class LocalWebTools(
     private val workspace: LocalWorkspace,
     private val json: Json,
 ) {
+    suspend fun diagnose(target: String): String = web.diagnose(target)
+
     suspend fun search(
         queries: List<String>,
         usageContext: TokenUsageContext? = null,

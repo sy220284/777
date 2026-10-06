@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
+import com.labteto.dshmobile.local.work.LocalWorkerModelRouter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -48,23 +52,23 @@ class LocalWorkerModelRouterTest {
 
     @Test
     fun apiKeyParentWithoutWorkerInheritsParentRoute() {
-        val state = LocalHarnessState(
+        val state = LocalHarnessState(modelState = com.labteto.dshmobile.local.model.LocalModelState(
             modelSelection = LocalModelSelectionState(
                 profiles = listOf(worker),
                 activeProfileId = worker.id,
             ),
-        )
+        ))
         assertNull(LocalWorkerModelRouter.resolve(null, state))
     }
 
     private fun state(
         profiles: List<LocalModelProfile>,
         workerProfileId: String?,
-    ): LocalHarnessState = LocalHarnessState(
+    ): LocalHarnessState = LocalHarnessState(modelState = com.labteto.dshmobile.local.model.LocalModelState(
         modelSelection = LocalModelSelectionState(
             profiles = profiles,
             activeProfileId = primaryPlan.id,
             workerProfileId = workerProfileId,
         ),
-    )
+    ))
 }

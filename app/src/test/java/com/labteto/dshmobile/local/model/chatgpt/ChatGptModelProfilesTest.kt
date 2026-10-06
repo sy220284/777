@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.model.chatgpt
 
-import com.labteto.dshmobile.local.LocalModelAuthKind
-import com.labteto.dshmobile.local.LocalModelProtocol
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelProtocol
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -50,7 +50,7 @@ class ChatGptModelProfilesTest {
             "account-b",
             listOf(ChatGptModelOption("shared-model", "Shared")),
         )
-        val apiProfile = com.labteto.dshmobile.local.LocalModelProfile(
+        val apiProfile = com.labteto.dshmobile.local.model.LocalModelProfile(
             id = "api",
             model = "shared-model",
             baseUrl = "https://example.test/v1",
@@ -80,7 +80,7 @@ class ChatGptModelProfilesTest {
             "account-b",
             listOf(ChatGptModelOption("other-account-model", "Other")),
         )
-        val apiProfile = com.labteto.dshmobile.local.LocalModelProfile(
+        val apiProfile = com.labteto.dshmobile.local.model.LocalModelProfile(
             id = "api",
             model = "api-model",
             baseUrl = "https://example.test/v1",

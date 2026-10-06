@@ -1,5 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.model.LocalModelReply
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 

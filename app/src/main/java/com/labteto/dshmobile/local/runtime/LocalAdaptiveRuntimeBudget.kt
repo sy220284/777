@@ -1,6 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
+import com.labteto.dshmobile.local.LocalHistoryBudget
 import kotlin.math.ceil
 
 /**

@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.LocalWorkflowProgress
+import com.labteto.dshmobile.local.work.LocalWorkflowProgress
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType

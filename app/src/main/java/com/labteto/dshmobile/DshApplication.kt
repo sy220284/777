@@ -8,6 +8,7 @@ import android.os.LocaleList
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.connection.KeepAliveWorker
 import com.labteto.dshmobile.notify.NotificationObserver
+import com.labteto.dshmobile.local.runtime.LocalRuntimeKernel
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.update.UpdateCache
 import dagger.hilt.android.HiltAndroidApp
@@ -26,6 +27,7 @@ class DshApplication : Application() {
     // their frame collectors; start() then begins notification classification.
     @Inject lateinit var notificationObserver: NotificationObserver
     @Inject lateinit var hostsStore: HostsStore
+    @Inject lateinit var localRuntimeKernel: LocalRuntimeKernel
 
     private val maintenanceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -39,6 +41,7 @@ class DshApplication : Application() {
         )
         KeepAliveWorker.schedule(this)
         notificationObserver.start()
+        localRuntimeKernel.start()
 
         // Legacy update files are removed immediately. A verified APK that has already been handed
         // to Android's installer is kept only until either this installed build reaches the target

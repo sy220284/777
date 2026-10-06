@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.LocalModelException
 import kotlinx.serialization.json.Json
-import com.labteto.dshmobile.local.LocalModelReply
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -15,9 +15,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
-import com.labteto.dshmobile.local.LocalModelException
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalCanonicalModelCodecTest {

@@ -1,5 +1,8 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.attachment
 
+import com.labteto.dshmobile.local.model.LOCAL_IMAGE_REF
+import com.labteto.dshmobile.local.model.sniffLocalImageMediaType
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement

@@ -1,6 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.local.model.LOCAL_MODEL_TOOL_CALLS_EVENT_KEY
+import com.labteto.dshmobile.local.tools.optionalString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

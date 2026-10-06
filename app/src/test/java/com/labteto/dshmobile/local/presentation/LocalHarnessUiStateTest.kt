@@ -1,10 +1,13 @@
 package com.labteto.dshmobile.local.presentation
 
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.LocalChatState
+import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
+import com.labteto.dshmobile.local.work.LocalWorkState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalHarnessUiStateTest {
@@ -22,12 +25,14 @@ class LocalHarnessUiStateTest {
     fun settingsProjectionIgnoresUnrelatedHotRuntimeChanges() {
         val base = LocalHarnessState()
         val hotPathUpdate = base.copy(
-            running = true,
-            resources = base.resources.copy(
-                activeModelRequests = 1,
-                activeAgents = 1,
+            kernel = base.kernel.copy(
+                running = true,
+                resources = base.kernel.resources.copy(
+                    activeModelRequests = 1,
+                    activeAgents = 1,
+                ),
+                contextChars = 42_000,
             ),
-            contextChars = 42_000,
         )
 
         assertEquals(base.toSettingsUiState(), hotPathUpdate.toSettingsUiState())
@@ -37,11 +42,13 @@ class LocalHarnessUiStateTest {
     fun taskProjectionIgnoresUnrelatedHotRuntimeChanges() {
         val base = LocalHarnessState()
         val hotPathUpdate = base.copy(
-            running = true,
-            resources = base.resources.copy(
-                activeModelRequests = 1,
-                activeTerminals = 1,
-                resourcePressure = "medium",
+            kernel = base.kernel.copy(
+                running = true,
+                resources = base.kernel.resources.copy(
+                    activeModelRequests = 1,
+                    activeTerminals = 1,
+                    resourcePressure = "medium",
+                ),
             ),
         )
 
@@ -52,14 +59,16 @@ class LocalHarnessUiStateTest {
     fun shellProjectionIgnoresStreamingAndResourceChurn() {
         val base = LocalHarnessState()
         val hotPathUpdate = base.copy(
-            resources = base.resources.copy(
-                activeModelRequests = 1,
-                activeAgents = 1,
-                activeTerminals = 1,
-                resourcePressure = "high",
+            kernel = base.kernel.copy(
+                resources = base.kernel.resources.copy(
+                    activeModelRequests = 1,
+                    activeAgents = 1,
+                    activeTerminals = 1,
+                    resourcePressure = "high",
+                ),
+                contextChars = 42_000,
+                queuedInputCount = 3,
             ),
-            contextChars = 42_000,
-            queuedInputCount = 3,
         )
 
         assertEquals(base.toShellUiState(), hotPathUpdate.toShellUiState())
@@ -69,9 +78,11 @@ class LocalHarnessUiStateTest {
     fun workProjectionIgnoresChatChurn() {
         val base = LocalHarnessState()
         val unrelatedUpdate = base.copy(
-            chatPersona = base.chatPersona.copy(name = "另一人物"),
-            galleryId = "gallery-2",
-            model = "another-model",
+            chat = base.chat.copy(
+                chatPersona = base.chat.chatPersona.copy(name = "另一人物"),
+                galleryId = "gallery-2",
+            ),
+            modelState = base.modelState.copy(model = "another-model"),
         )
 
         assertEquals(base.toWorkUiState(), unrelatedUpdate.toWorkUiState())
@@ -83,29 +94,59 @@ class LocalHarnessUiStateTest {
 
         assertNotEquals(
             base.toWorkUiState(),
-            base.copy(running = true, contextChars = 12_000, queuedInputCount = 2).toWorkUiState(),
+            base.copy(kernel = base.kernel.copy(running = true, contextChars = 12_000, queuedInputCount = 2)).toWorkUiState(),
         )
+    }
+
+    @Test
+    fun workProjectionReadsWorkDomainState() {
+        val aggregate = LocalHarnessState(
+            work = LocalWorkState(
+                plan = listOf("第一步"),
+                todos = listOf(com.labteto.dshmobile.local.work.LocalTodoItem("继续", "in_progress")),
+                goal = com.labteto.dshmobile.local.work.LocalGoal("完成迁移"),
+                planMode = true,
+            ),
+        )
+
+        val work = aggregate.toWorkUiState()
+        val surface = aggregate.toWorkSurfaceUiState()
+
+        assertEquals(listOf("第一步"), work.plan)
+        assertEquals("完成迁移", work.goal?.description)
+        assertEquals(1, work.todos.size)
+        assertTrue(surface.planMode)
     }
 
     @Test
     fun chatSurfaceProjectionIgnoresWorkOnlyChurn() {
         val base = LocalHarnessState(usageMode = LocalUsageMode.CHAT)
-        val workOnlyUpdate = base.copy(model = "another-model", planMode = true, safeAutoApprovalEnabled = true, contextChars = 48_000, queuedInputCount = 4)
+        val workOnlyUpdate = base.copy(
+            modelState = base.modelState.copy(model = "another-model"),
+            work = LocalWorkState(planMode = true),
+            safeAutoApprovalEnabled = true,
+            kernel = base.kernel.copy(contextChars = 48_000, queuedInputCount = 4),
+        )
         assertEquals(base.toChatSurfaceUiState(), workOnlyUpdate.toChatSurfaceUiState())
     }
 
     @Test
     fun workSurfaceProjectionIgnoresChatOnlyChurn() {
         val base = LocalHarnessState(usageMode = LocalUsageMode.WORK)
-        val chatOnlyUpdate = base.copy(chatPersona = base.chatPersona.copy(name = "另一人物"), galleryId = "gallery-2")
+        val chatOnlyUpdate = base.copy(
+            chat = base.chat.copy(
+                chatPersona = base.chat.chatPersona.copy(name = "另一人物"),
+                galleryId = "gallery-2",
+            ),
+        )
         assertEquals(base.toWorkSurfaceUiState(), chatOnlyUpdate.toWorkSurfaceUiState())
     }
 
     @Test
     fun conversationSurfaceProjectionsStillTrackSharedHotFields() {
         val base = LocalHarnessState()
-        assertNotEquals(base.toChatSurfaceUiState(), base.copy(running = true).toChatSurfaceUiState())
-        assertNotEquals(base.toWorkSurfaceUiState(), base.copy(running = true).toWorkSurfaceUiState())
+        assertNotEquals(base.toChatSurfaceUiState(), base.copy(kernel = base.kernel.copy(running = true)).toChatSurfaceUiState())
+        assertNotEquals(base.toWorkSurfaceUiState(), base.copy(kernel = base.kernel.copy(running = true)).toWorkSurfaceUiState())
     }
 
     @Test
@@ -114,7 +155,7 @@ class LocalHarnessUiStateTest {
 
         assertNotEquals(
             base.toSettingsUiState(),
-            base.copy(model = "another-model").toSettingsUiState(),
+            base.copy(modelState = base.modelState.copy(model = "another-model")).toSettingsUiState(),
         )
         assertNotEquals(
             base.toTaskUiState(),
@@ -131,11 +172,11 @@ class LocalHarnessUiStateTest {
     }
     @Test
     fun sameRouteAccountSwitchUpdatesSettingsWithoutWakingUnrelatedShellState() {
-        val first = com.labteto.dshmobile.local.LocalModelProfile("account-a", "same-model", "https://example.com")
+        val first = com.labteto.dshmobile.local.model.LocalModelProfile("account-a", "same-model", "https://example.com")
         val second = first.copy(id = "account-b")
-        val before = LocalHarnessState(model = first.model, baseUrl = first.baseUrl,
-            modelSelection = com.labteto.dshmobile.local.model.LocalModelSelectionState(listOf(first, second), first.id))
-        val after = before.copy(modelSelection = before.modelSelection.copy(activeProfileId = second.id))
+        val before = LocalHarnessState(modelState = com.labteto.dshmobile.local.model.LocalModelState(model = first.model, baseUrl = first.baseUrl,
+            modelSelection = com.labteto.dshmobile.local.model.LocalModelSelectionState(listOf(first, second), first.id)))
+        val after = before.copy(modelState = before.modelState.copy(modelSelection = before.modelState.modelSelection.copy(activeProfileId = second.id)))
         assertNotEquals(before.toSettingsUiState(), after.toSettingsUiState())
         assertEquals(before.toShellUiState(), after.toShellUiState())
         assertEquals(second.id, after.toSettingsUiState().modelSelection.activeProfileId)

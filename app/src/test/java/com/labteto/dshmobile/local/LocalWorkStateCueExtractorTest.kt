@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.work.LocalWorkCueKind
+import com.labteto.dshmobile.local.work.extractLocalWorkCueSnippet
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.WORK_TOOL_INLINE_BYTES
 import java.io.File
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

@@ -1,13 +1,13 @@
 package com.labteto.dshmobile.local.presentation
 
-import com.labteto.dshmobile.local.LocalApproval
-import com.labteto.dshmobile.local.LocalConversationMode
-import com.labteto.dshmobile.local.LocalGoal
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalJobInfo
-import com.labteto.dshmobile.local.LocalQuestion
-import com.labteto.dshmobile.local.LocalTodoItem
-import com.labteto.dshmobile.local.LocalWorkflowProgress
+import com.labteto.dshmobile.local.interaction.LocalApproval
+import com.labteto.dshmobile.local.interaction.LocalQuestion
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
+import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.work.LocalGoal
+import com.labteto.dshmobile.local.work.LocalTodoItem
+import com.labteto.dshmobile.local.work.LocalWorkflowProgress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -51,26 +51,26 @@ data class LocalWorkUiState(
 internal fun LocalHarnessState.toWorkUiState(): LocalWorkUiState =
     LocalWorkUiState(
         sessionId = sessionId,
-        running = running,
-        workflowProgress = workflowProgress,
-        goal = goal,
-        todos = todos,
-        activeAgents = resources.activeAgents,
-        jobs = jobs,
-        pendingApproval = pendingApproval,
-        pendingQuestion = pendingQuestion,
-        plan = plan,
-        queuedInputCount = queuedInputCount,
-        maxAgents = resources.maxAgents,
-        activeTerminals = resources.activeTerminals,
-        maxTerminals = resources.maxTerminals,
-        activeVirtualDisplays = resources.activeVirtualDisplays,
-        maxVirtualDisplays = resources.maxVirtualDisplays,
-        activeLanguageServers = resources.activeLanguageServers,
-        maxLanguageServers = resources.maxLanguageServers,
-        resourcePressure = resources.resourcePressure,
-        contextChars = contextChars,
-        contextBudgetChars = contextBudgetChars,
+        running = kernel.running,
+        workflowProgress = work.workflowProgress,
+        goal = work.goal,
+        todos = work.todos,
+        activeAgents = kernel.resources.activeAgents,
+        jobs = work.jobs,
+        pendingApproval = work.pendingApproval,
+        pendingQuestion = work.pendingQuestion,
+        plan = work.plan,
+        queuedInputCount = kernel.queuedInputCount,
+        maxAgents = kernel.resources.maxAgents,
+        activeTerminals = kernel.resources.activeTerminals,
+        maxTerminals = kernel.resources.maxTerminals,
+        activeVirtualDisplays = kernel.resources.activeVirtualDisplays,
+        maxVirtualDisplays = kernel.resources.maxVirtualDisplays,
+        activeLanguageServers = kernel.resources.activeLanguageServers,
+        maxLanguageServers = kernel.resources.maxLanguageServers,
+        resourcePressure = kernel.resources.resourcePressure,
+        contextChars = kernel.contextChars,
+        contextBudgetChars = kernel.contextBudgetChars,
         conversationMode = conversationMode,
         handoffSummary = handoffSummary,
     )

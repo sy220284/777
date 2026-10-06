@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.labteto.dshmobile.local.LocalGoal
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
+import com.labteto.dshmobile.local.work.LocalGoal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

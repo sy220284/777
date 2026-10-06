@@ -1,15 +1,6 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.LocalModelAuthKind
-import com.labteto.dshmobile.local.LocalModelDelta
 import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.LocalModelPresets
-import com.labteto.dshmobile.local.LocalModelProtocol
-import com.labteto.dshmobile.local.LocalModelRouteIdentity
-import com.labteto.dshmobile.local.LocalModelReply
-import com.labteto.dshmobile.local.LocalModelToolCallingMode
-import com.labteto.dshmobile.local.normalizeModelBaseUrl
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.currentCoroutineContext

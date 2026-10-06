@@ -1,7 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.PersonaProfile
+
 
 internal data class GroupReplyForStateUpdate(
     val member: LocalGroupChatMember,

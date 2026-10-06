@@ -22,6 +22,10 @@ internal class ChatDiaryStore(
         val delta = ChatDiaryEntryPolicy.sanitizeDelta(request) ?: return null
         val now = System.currentTimeMillis()
         val document = documents.read()
+        request.projectionId?.let { id ->
+            document.entries.firstOrNull { entry -> entry.revisions.any { it.projectionId == id } }
+                ?.let { return it }
+        }
         val entries = document.entries.toMutableList()
         val disclosure = ChatDiaryEntryPolicy.disclosureFor(request, delta)
         val candidateSources = ChatDiaryEntryPolicy.sourcesFor(request)
@@ -35,6 +39,7 @@ internal class ChatDiaryStore(
             disclosure = disclosure,
             sources = candidateSources,
             updatedAt = now,
+            projectionId = request.projectionId,
         )
         val candidate = ChatDiaryEntry(
             id = UUID.randomUUID().toString(),

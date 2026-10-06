@@ -1,5 +1,17 @@
 package com.labteto.dshmobile.harness.jobs
 
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -15,6 +27,102 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HarnessJobPersistenceTest {
+    @Test
+    fun cancelledJobKeepsCancellationWhenBlockingWorkThrowsLate() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val manager = HarnessJobManager(scope, {})
+        try {
+            val id = manager.start("blocking", ownerId = "session-a") { _, _ ->
+                entered.countDown()
+                check(release.await(5, TimeUnit.SECONDS))
+                error("late failure")
+            }.substringAfterLast('：')
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            manager.kill(id, "session-a")
+            release.countDown()
+            runBlocking { manager.stopAllAndJoin() }
+            assertTrue(manager.snapshots().single().status == "cancelled")
+            assertFalse(manager.output(id).contains("late failure"))
+        } finally {
+            release.countDown()
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun cancelledJobCannotCommitSuccessWhenBlockingWorkReturnsLate() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val manager = HarnessJobManager(scope, {})
+        try {
+            val id = manager.start("blocking", ownerId = "session-a") { _, _ ->
+                entered.countDown()
+                check(release.await(5, TimeUnit.SECONDS))
+                "late success"
+            }.substringAfterLast('：')
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            manager.kill(id, "session-a")
+            release.countDown()
+            runBlocking { manager.stopAllAndJoin() }
+            assertTrue(manager.snapshots().single().status == "cancelled")
+            assertFalse(manager.output(id).contains("late success"))
+        } finally {
+            release.countDown()
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun delayedRunningPublicationCannotOverwriteConcurrentCancellation() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val workers = Executors.newFixedThreadPool(2)
+        val runningCallback = CountDownLatch(1)
+        val releaseCallback = CountDownLatch(1)
+        val cancelledCallback = CountDownLatch(1)
+        val held = AtomicBoolean(false)
+        val durable = AtomicReference<List<JobSnapshot>>(emptyList())
+        val manager = HarnessJobManager(
+            scope = scope,
+            idFactory = { "job-race" },
+            onChanged = { jobs ->
+                if (jobs.any { it.status == "running" } && held.compareAndSet(false, true)) {
+                    runningCallback.countDown()
+                    check(releaseCallback.await(5, TimeUnit.SECONDS))
+                }
+                if (jobs.any { it.status == "cancelled" }) cancelledCallback.countDown()
+            },
+            onSnapshotsChanged = durable::set,
+        )
+        try {
+            val start = workers.submit<String> {
+                manager.start("race", ownerId = "session-a") { _, _ -> awaitCancellation() }
+            }
+            assertTrue(runningCallback.await(5, TimeUnit.SECONDS))
+            val cancel = workers.submit<String> { manager.kill("job-race", "session-a") }
+            runBlocking {
+                withTimeout(5_000) {
+                    while (manager.snapshots().single().status != "cancelled") delay(1)
+                }
+            }
+            // The record lock remains available, but a later publication cannot overtake the
+            // callback which is still committing the earlier generation.
+            assertFalse(cancelledCallback.await(200, TimeUnit.MILLISECONDS))
+            releaseCallback.countDown()
+            start.get(5, TimeUnit.SECONDS)
+            cancel.get(5, TimeUnit.SECONDS)
+            runBlocking { manager.stopAllAndJoin() }
+            assertTrue(cancelledCallback.await(5, TimeUnit.SECONDS))
+            assertTrue(durable.get().single().status == "cancelled")
+        } finally {
+            releaseCallback.countDown()
+            scope.cancel()
+            workers.shutdownNow()
+        }
+    }
+
     @Test
     fun cancelledJobKeepsItsSlotAndRemainsOwnedUntilCleanupCompletes() = runTest {
         val cleaning = CompletableDeferred<Unit>()

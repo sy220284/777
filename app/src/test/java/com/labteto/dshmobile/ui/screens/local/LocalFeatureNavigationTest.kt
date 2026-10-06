@@ -1,9 +1,13 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.activity.BackEventCompat
-import com.labteto.dshmobile.local.LocalChatMode
-import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.chat.LocalChatMode
+import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
+import com.labteto.dshmobile.local.feature.LocalFeatureModuleId
+import com.labteto.dshmobile.local.feature.LocalFeatureRoute
+import com.labteto.dshmobile.local.presentation.findEstablishedGroupChatSession
+import com.labteto.dshmobile.local.session.LocalSessionSummary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,15 +18,15 @@ class LocalFeatureNavigationTest {
     fun leftEdgeBackGestureOpensDrawerWhileOtherBackInputsPopFeature() {
         assertEquals(
             LocalFeatureBackAction.OPEN_DRAWER,
-            localFeatureBackAction(BackEventCompat.EDGE_LEFT),
+            localFeatureProductBackAction(BackEventCompat.EDGE_LEFT),
         )
         assertEquals(
             LocalFeatureBackAction.POP_FEATURE,
-            localFeatureBackAction(BackEventCompat.EDGE_RIGHT),
+            localFeatureProductBackAction(BackEventCompat.EDGE_RIGHT),
         )
         assertEquals(
             LocalFeatureBackAction.POP_FEATURE,
-            localFeatureBackAction(null),
+            localFeatureProductBackAction(null),
         )
     }
 
@@ -162,7 +166,7 @@ class LocalFeatureNavigationTest {
 
     @Test
     fun everySidebarFeatureKeepsDrawerAndBackFlowConsistent() {
-        val pages = LocalFeaturePage.entries.filter { it != LocalFeaturePage.HOME }
+        val pages = LocalFeatureCatalog.routes.filter { it != LocalFeaturePage.HOME }
 
         pages.forEach { page ->
             val opened = localFeatureOpenFromDrawer(
@@ -177,7 +181,7 @@ class LocalFeatureNavigationTest {
             )
             assertEquals(
                 LocalFeatureBackAction.OPEN_DRAWER,
-                localFeatureBackAction(BackEventCompat.EDGE_LEFT),
+                localFeatureProductBackAction(BackEventCompat.EDGE_LEFT),
             )
             assertEquals(page, localFeatureCurrent(opened.stack))
             assertEquals(
@@ -188,13 +192,32 @@ class LocalFeatureNavigationTest {
     }
 
     @Test
+    fun featureCatalogAssignsEveryRouteToExactlyOneModule() {
+        val registered = LocalFeatureCatalog.modules.flatMap { it.routes }
+
+        assertEquals(LocalFeatureRoute.entries.toSet(), registered.toSet())
+        assertEquals(registered.size, registered.toSet().size)
+        assertEquals(
+            LocalFeatureModuleId.CHAT,
+            LocalFeatureCatalog.ownerOf(LocalFeaturePage.PERSONA_GALLERY),
+        )
+        assertEquals(
+            listOf(LocalFeaturePage.WORKSPACE, LocalFeaturePage.RUN_CENTER),
+            LocalFeatureCatalog.routesFor(LocalFeatureModuleId.WORK),
+        )
+        assertEquals(
+            LocalFeatureModuleId.AUTOMATION,
+            LocalFeatureCatalog.ownerOf(LocalFeaturePage.TASKS),
+        )
+    }
+    @Test
     fun onlyGroupWithConfiguredMembersCountsAsEstablished() {
         val emptyGroup = LocalSessionSummary(
             id = "group-empty",
             title = "群聊",
             updatedAt = 1L,
             usageMode = LocalUsageMode.CHAT,
-            chatMode = LocalChatMode.GROUP,
+            chatMode = LocalChatMode.GROUP.name,
             groupMemberCount = 0,
             blank = true,
         )
@@ -207,17 +230,51 @@ class LocalFeatureNavigationTest {
             title = "单聊",
             updatedAt = 2L,
             usageMode = LocalUsageMode.CHAT,
-            chatMode = LocalChatMode.SINGLE,
+            chatMode = LocalChatMode.SINGLE.name,
             blank = false,
         )
 
-        assertFalse(hasEstablishedGroupChat(listOf(emptyGroup, direct)))
-        assertTrue(hasEstablishedGroupChat(listOf(configuredGroup, direct)))
-        assertFalse(hasEstablishedGroupChat(listOf(direct)))
+        assertEquals(null, findEstablishedGroupChatSession(listOf(emptyGroup, direct)))
+        assertEquals(configuredGroup, findEstablishedGroupChatSession(listOf(configuredGroup, direct)))
+        assertEquals(null, findEstablishedGroupChatSession(listOf(direct)))
         assertEquals(
             "group-configured",
-            establishedGroupChatSessionId(listOf(emptyGroup, configuredGroup, direct)),
+            findEstablishedGroupChatSession(listOf(emptyGroup, configuredGroup, direct))?.id,
         )
-        assertEquals(null, establishedGroupChatSessionId(listOf(emptyGroup, direct)))
+        assertEquals(null, findEstablishedGroupChatSession(listOf(emptyGroup, direct))?.id)
     }
+    @Test
+    fun featureContributionOwnsBackRestoreAndDrawerPolicy() {
+        var drawerOpened = false
+        val contribution = LocalFeatureUiContribution(
+            moduleId = LocalFeatureModuleId.WORK,
+            drawerActions = mapOf(LocalFeatureDrawerEntry.WORKSPACE to { drawerOpened = true }),
+            backAction = { _, edge -> localFeatureProductBackAction(edge) },
+            restorePage = ::localFeatureRestoreOwnedPage,
+            content = { },
+        )
+        val contributions = listOf(
+            LocalFeatureUiContribution(
+                moduleId = LocalFeatureModuleId.SHELL,
+                restorePage = ::localFeatureRestoreOwnedPage,
+                content = { },
+            ),
+            contribution,
+        )
+
+        localFeatureDrawerAction(LocalFeatureDrawerEntry.WORKSPACE, contributions)?.invoke()
+        assertTrue(drawerOpened)
+        assertEquals(
+            LocalFeatureBackAction.OPEN_DRAWER,
+            localFeatureOwnedBackAction(LocalFeaturePage.WORKSPACE, BackEventCompat.EDGE_LEFT, contributions),
+        )
+        assertEquals(
+            listOf(LocalFeaturePage.HOME.name, LocalFeaturePage.WORKSPACE.name),
+            localFeatureRestoreStack(
+                listOf(LocalFeaturePage.HOME.name, LocalFeaturePage.WORKSPACE.name),
+                contributions,
+            ),
+        )
+    }
+
 }

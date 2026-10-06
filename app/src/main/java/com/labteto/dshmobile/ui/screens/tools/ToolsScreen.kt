@@ -40,7 +40,7 @@ import com.labteto.dshmobile.core.wire.dto.PluginFiberPhase
 import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.data.SessionStore
-import com.labteto.dshmobile.local.tools.LocalToolsRuntime
+import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -90,7 +90,7 @@ data class ToolsUiState(
 
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
-    private val localTools: LocalToolsRuntime,
+    private val localTools: LocalToolsUiFacade,
     private val sessionStore: SessionStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ToolsUiState())

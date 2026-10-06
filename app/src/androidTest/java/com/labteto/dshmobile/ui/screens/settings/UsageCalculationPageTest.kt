@@ -11,7 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.DeepSeekUsageSnapshot
+import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule

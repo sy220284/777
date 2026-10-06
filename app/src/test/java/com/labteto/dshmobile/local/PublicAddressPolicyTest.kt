@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.web.PublicAddressPolicy
 import java.net.InetAddress
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

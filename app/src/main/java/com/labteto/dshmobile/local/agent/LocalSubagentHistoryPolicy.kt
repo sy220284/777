@@ -1,6 +1,13 @@
 package com.labteto.dshmobile.local.agent
-import com.labteto.dshmobile.local.*
-import com.labteto.dshmobile.local.model.*
+
+import com.labteto.dshmobile.local.LocalHistoryBudget
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.model.LocalHistoryCompactor
+import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
+import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.compact
+import com.labteto.dshmobile.local.model.projectRecoverableToolResult
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.JsonObject
 
 /** Owns subagent history retention, compaction and bounded progress memory. */

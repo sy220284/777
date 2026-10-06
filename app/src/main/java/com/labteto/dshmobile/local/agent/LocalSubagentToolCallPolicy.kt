@@ -1,7 +1,9 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.agent
 
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.harness.agent.AgentToolResult
+import com.labteto.dshmobile.local.runtime.SUBAGENT_VIRTUAL_SCREEN_TOOLS
+import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 

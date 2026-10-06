@@ -1,8 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
 
 import java.util.UUID
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -11,12 +9,17 @@ import kotlinx.serialization.json.JsonObject
  * Durable transcript facts still live in Session Event; this runtime only maintains the hot window
  * shown by LocalHarnessState and advances the caller-owned durable projection cursor.
  */
+internal interface LocalTranscriptStatePort {
+    fun appendMessages(messages: List<LocalHarnessMessage>, runtimeWindowMessages: Int)
+}
+
 internal class LocalTranscriptRuntime(
-    private val state: MutableStateFlow<LocalHarnessState>,
+    private val state: LocalTranscriptStatePort,
     private val pruneToolResult: (String) -> String,
     private val runtimeWindowMessages: Int,
     private val onProjected: (Long) -> Unit,
 ) {
+
     fun newMessage(
         role: String,
         content: String,
@@ -50,12 +53,7 @@ internal class LocalTranscriptRuntime(
         eventSequence: Long,
     ) {
         if (messages.isNotEmpty()) {
-            state.update { current ->
-                current.copy(
-                    messages = (current.messages + messages).takeLast(runtimeWindowMessages),
-                    transcriptIndex = appendLocalTranscriptRuntimeIndex(current.transcriptIndex, messages),
-                )
-            }
+            state.appendMessages(messages, runtimeWindowMessages)
         }
         onProjected(eventSequence)
     }

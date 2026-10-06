@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.harness.tools.ToolResultRetention
 import kotlinx.serialization.json.JsonObject

@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
+
+
 
 /**
  * Keeps persisted recovery separate from an in-memory Work runtime that still owns the session.

@@ -1,7 +1,11 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.interaction.LOCAL_QUESTION_CANCELLED_RESPONSE
+import com.labteto.dshmobile.local.interaction.LocalApproval
+import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
+import com.labteto.dshmobile.local.interaction.LocalInteractionStatePort
+import com.labteto.dshmobile.local.interaction.LocalQuestion
 import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -11,9 +15,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalInteractionCoordinatorTest {
+    private class TestState : LocalInteractionStatePort {
+        var approval: LocalApproval? = null
+        var question: LocalQuestion? = null
+        var deviceLease: Boolean = false
+
+        override fun pendingApproval(): LocalApproval? = approval
+        override fun setPendingApproval(approval: LocalApproval?) { this.approval = approval }
+        override fun clearPendingApproval(callId: String) { if (approval?.callId == callId) approval = null }
+        override fun setPendingQuestion(question: LocalQuestion?) { this.question = question }
+        override fun clearPendingQuestion(callId: String) { if (question?.callId == callId) question = null }
+        override fun clearPendingInteractions() { approval = null; question = null }
+        override fun deviceApprovalLeaseEnabled(): Boolean = deviceLease
+        override fun setDeviceApprovalLease(enabled: Boolean) { deviceLease = enabled }
+    }
+
     @Test
     fun staleApprovalIdCannotResolveCurrentInteraction() = runTest {
-        val state = MutableStateFlow(LocalHarnessState())
+        val state = TestState()
         val coordinator = LocalInteractionCoordinator(state)
         val approval = LocalApproval(
             callId = "approval-1",
@@ -26,16 +45,16 @@ class LocalInteractionCoordinatorTest {
         val result = async { coordinator.awaitApproval(approval) }
         runCurrent()
 
-        assertEquals("approval-1", state.value.pendingApproval?.callId)
+        assertEquals("approval-1", state.approval?.callId)
         assertFalse(coordinator.answerApproval("stale-id", true))
         assertTrue(coordinator.answerApproval("approval-1", true))
         assertTrue(result.await())
-        assertNull(state.value.pendingApproval)
+        assertNull(state.approval)
     }
 
     @Test
     fun concurrentInteractionsAreSerializedInsteadOfOverwritingState() = runTest {
-        val state = MutableStateFlow(LocalHarnessState())
+        val state = TestState()
         val coordinator = LocalInteractionCoordinator(state)
         val first = LocalApproval(
             callId = "first",
@@ -51,22 +70,22 @@ class LocalInteractionCoordinatorTest {
         val question = async { coordinator.awaitQuestion(second) }
         runCurrent()
 
-        assertEquals("first", state.value.pendingApproval?.callId)
-        assertNull(state.value.pendingQuestion)
+        assertEquals("first", state.approval?.callId)
+        assertNull(state.question)
 
         assertTrue(coordinator.answerApproval("first", true))
         assertTrue(approval.await())
         runCurrent()
 
-        assertEquals("second", state.value.pendingQuestion?.callId)
+        assertEquals("second", state.question?.callId)
         assertTrue(coordinator.answerQuestion("second", "继续"))
         assertEquals("继续", question.await())
-        assertNull(state.value.pendingQuestion)
+        assertNull(state.question)
     }
 
     @Test
     fun cancelAllInvalidatesInteractionsAlreadyQueuedBehindCurrentOne() = runTest {
-        val state = MutableStateFlow(LocalHarnessState())
+        val state = TestState()
         val coordinator = LocalInteractionCoordinator(state)
         val approval = async {
             coordinator.awaitApproval(
@@ -92,13 +111,13 @@ class LocalInteractionCoordinatorTest {
         runCurrent()
 
         assertTrue(queuedQuestion.await().isFailure)
-        assertNull(state.value.pendingApproval)
-        assertNull(state.value.pendingQuestion)
+        assertNull(state.approval)
+        assertNull(state.question)
     }
 
     @Test
     fun cancellingQuestionUsesStableModelVisibleSemantic() = runTest {
-        val state = MutableStateFlow(LocalHarnessState())
+        val state = TestState()
         val coordinator = LocalInteractionCoordinator(state)
         val question = async {
             coordinator.awaitQuestion(LocalQuestion("question-1", "请选择"))
@@ -107,12 +126,12 @@ class LocalInteractionCoordinatorTest {
 
         assertTrue(coordinator.cancelQuestion("question-1"))
         assertEquals(LOCAL_QUESTION_CANCELLED_RESPONSE, question.await())
-        assertNull(state.value.pendingQuestion)
+        assertNull(state.question)
     }
 
     @Test
     fun staleApprovalFromCancelledGenerationCannotResolveReplacementApproval() = runTest {
-        val state = MutableStateFlow(LocalHarnessState())
+        val state = TestState()
         val coordinator = LocalInteractionCoordinator(state)
         val old = async {
             coordinator.awaitApproval(
@@ -142,11 +161,11 @@ class LocalInteractionCoordinatorTest {
         }
         runCurrent()
 
-        assertEquals("replacement", state.value.pendingApproval?.callId)
+        assertEquals("replacement", state.approval?.callId)
         assertFalse(coordinator.answerApproval("old", true))
         assertTrue(coordinator.answerApproval("replacement", true))
         assertTrue(replacement.await())
-        assertNull(state.value.pendingApproval)
+        assertNull(state.approval)
     }
 
 }

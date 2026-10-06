@@ -1,9 +1,9 @@
 package com.labteto.dshmobile.local.model.chatgpt
 
-import com.labteto.dshmobile.local.LocalModelAuthKind
-import com.labteto.dshmobile.local.LocalModelConnectionTester
-import com.labteto.dshmobile.local.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelConnectionTester
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalModelProfile
 import javax.inject.Inject
 import javax.inject.Singleton
 

@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalGroupChatState
+
 
 internal data class CharacterBehaviorTuningRestore(
     val persona: PersonaProfile,

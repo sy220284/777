@@ -1,6 +1,9 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
+import com.labteto.dshmobile.local.LocalHistoryBudget
+import com.labteto.dshmobile.local.context.LocalContextCheckpointKind
+import com.labteto.dshmobile.local.context.buildTrustedContextCheckpointModelMessage
+import com.labteto.dshmobile.local.context.isTrustedContextCheckpointModelMessage
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject

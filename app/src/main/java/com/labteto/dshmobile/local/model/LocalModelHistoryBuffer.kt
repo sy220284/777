@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.estimateModelTokens
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -8,7 +7,7 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Owns the mutable model-visible history and its cached size metrics.
  *
- * Keeping the collection and counters together prevents LocalHarnessEngine from having to update
+ * Keeping the collection and counters together prevents the Runtime Kernel from having to update
  * three pieces of state for every append/reset/compaction operation.
  */
 internal class LocalModelHistoryBuffer {

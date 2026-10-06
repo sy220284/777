@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.vision
 
 import java.io.File
 import java.io.FileOutputStream

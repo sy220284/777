@@ -1,10 +1,12 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.files.LocalFileObservationCache
+import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test

@@ -1,6 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.jobs
 
 import android.content.Context
+import com.labteto.dshmobile.local.runtime.LocalExecutionService
 
 /** Keep the notification for running jobs active and report when Android rejects the service. */
 internal fun syncForegroundJobs(

@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.send
 
-import com.labteto.dshmobile.local.LocalImportedAttachment
-import com.labteto.dshmobile.local.buildLocalUserModelMessage
+import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.model.buildLocalUserModelMessage
 import kotlinx.serialization.json.JsonObject
 
 internal enum class LocalSendDisposition {

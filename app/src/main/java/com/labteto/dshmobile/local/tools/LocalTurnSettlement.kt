@@ -1,6 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.harness.agent.AgentToolCall
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 

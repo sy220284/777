@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.session
 
 import com.labteto.dshmobile.harness.session.SessionEventFileSnapshot
 import com.labteto.dshmobile.harness.session.SessionEventLog

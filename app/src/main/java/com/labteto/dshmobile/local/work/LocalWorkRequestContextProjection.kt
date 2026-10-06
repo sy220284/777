@@ -1,5 +1,19 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalHistoryBudget
+import com.labteto.dshmobile.local.model.LocalHistoryCompactor
+import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
+import com.labteto.dshmobile.local.model.LocalPromptPressure
+import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
+import com.labteto.dshmobile.local.model.LocalStructuredWorkState
+import com.labteto.dshmobile.local.model.compactHistoryWithStaleToolProjection
+import com.labteto.dshmobile.local.model.estimateModelTokens
+import com.labteto.dshmobile.local.model.projectStaleToolResults
+import com.labteto.dshmobile.local.model.WORK_TOOL_INLINE_BYTES
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -27,15 +41,15 @@ internal fun workSteadyStateHistoryBudget(
     extraTokens: Int,
     state: LocalHarnessState,
 ): LocalHistoryBudget {
-    val profile = state.modelSelection.activeProfile
+    val profile = state.modelState.modelSelection.activeProfile
     return workSteadyStateHistoryBudget(
         base = base,
         currentHistoryTokens = currentHistoryTokens,
         extraTokens = extraTokens,
         cachePolicy = LocalModelPresets.promptCachePolicyFor(
-            model = state.model,
-            baseUrl = state.baseUrl,
-            protocol = profile?.protocol ?: LocalModelPresets.protocolFor(state.model, state.baseUrl),
+            model = state.modelState.model,
+            baseUrl = state.modelState.baseUrl,
+            protocol = profile?.protocol ?: LocalModelPresets.protocolFor(state.modelState.model, state.modelState.baseUrl),
             authKind = profile?.authKind ?: LocalModelAuthKind.API_KEY,
         ),
     )

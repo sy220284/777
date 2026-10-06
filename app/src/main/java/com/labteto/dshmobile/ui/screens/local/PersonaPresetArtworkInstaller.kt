@@ -4,21 +4,21 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPreset
+import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
 import java.io.File
 
 internal class PersonaPresetArtworkInstaller(
     private val appContext: Context,
-    private val galleryStore: ChatPersonaGalleryStore,
+    private val chatUi: LocalChatUiFacade,
 ) {
     fun install(preset: PersonaPreset): PersonaGalleryEntry {
-        val existingIds = galleryStore.list().mapTo(hashSetOf(), PersonaGalleryEntry::id)
+        val existingIds = chatUi.galleryEntries().mapTo(hashSetOf(), PersonaGalleryEntry::id)
         val stagedPortrait = stageArtwork(preset)
         var savedId: String? = null
         try {
-            val saved = galleryStore.save(
+            val saved = chatUi.saveGallery(
                 persona = preset.persona,
                 sourceSessionId = "",
                 history = emptyList(),
@@ -32,14 +32,14 @@ internal class PersonaPresetArtworkInstaller(
                     stagedPortrait.delete()
                     saved
                 }
-                else -> galleryStore.updatePortraitPath(saved.id, stagedPortrait.absolutePath)
+                else -> chatUi.updateGalleryPortrait(saved.id, stagedPortrait.absolutePath)
                     ?: error(appContext.getString(R.string.persona_gallery_entry_missing))
             }
         } catch (error: Throwable) {
             stagedPortrait?.delete()
             savedId
                 ?.takeIf { it !in existingIds }
-                ?.let(galleryStore::delete)
+                ?.let(chatUi::deleteGallery)
             throw error
         }
     }

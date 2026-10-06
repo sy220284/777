@@ -8,9 +8,9 @@ import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 /** Keeps hot Work status updates inside the smallest UI restart scope that renders them. */
 @Composable
 internal fun LocalWorkStateContent(
-    viewModel: LocalHarnessViewModel,
+    stateFlow: kotlinx.coroutines.flow.StateFlow<LocalWorkUiState>,
     content: @Composable (LocalWorkUiState) -> Unit,
 ) {
-    val state by viewModel.workState.collectAsStateWithLifecycle()
+    val state by stateFlow.collectAsStateWithLifecycle()
     content(state)
 }

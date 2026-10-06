@@ -1,10 +1,12 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.tools
 
+import com.labteto.dshmobile.local.jobs.LocalJobManager
+import com.labteto.dshmobile.local.files.LocalWorkspace
 import kotlinx.serialization.json.JsonObject
 
 /**
  * Owns local shell timeout policy and foreground/background execution semantics.
- * Keeping this outside LocalHarnessEngine prevents process-lifecycle policy from leaking back into
+ * Keeping this outside the Runtime Kernel prevents process-lifecycle policy from leaking into
  * the main agent state machine.
  */
 internal object LocalShellTool {

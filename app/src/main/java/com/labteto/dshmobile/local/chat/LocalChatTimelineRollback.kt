@@ -1,7 +1,10 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -22,9 +25,9 @@ internal fun persistChatTimelineBaseline(
 ) {
     if (state.usageMode != LocalUsageMode.CHAT) return
     eventLog.append("chat/state-baseline", buildJsonObject {
-        put("state", json.encodeToJsonElement(ChatCharacterState.serializer(), state.chatState))
-        if (state.groupChat.enabled) {
-            put("group_state", json.encodeToJsonElement(LocalGroupChatState.serializer(), state.groupChat))
+        put("state", json.encodeToJsonElement(ChatCharacterState.serializer(), state.chat.chatState))
+        if (state.chat.groupChat.enabled) {
+            put("group_state", json.encodeToJsonElement(LocalGroupChatState.serializer(), state.chat.groupChat))
         }
     })
 }

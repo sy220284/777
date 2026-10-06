@@ -2,10 +2,10 @@ package com.labteto.dshmobile.local.usage
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import java.util.UUID
 import kotlinx.serialization.json.Json

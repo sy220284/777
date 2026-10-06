@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
+
+import com.labteto.dshmobile.local.runtime.LocalAgentRunRouteIdentity
 
 /**
  * Resolve the exact saved profile for an executable recovery.

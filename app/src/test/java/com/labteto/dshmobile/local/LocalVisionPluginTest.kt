@@ -3,6 +3,12 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolContext
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelProtocol
+import com.labteto.dshmobile.local.vision.LocalVisionAnalyzer
+import com.labteto.dshmobile.local.vision.LocalVisionPlugin
+import com.labteto.dshmobile.local.vision.LocalVisionRoute
+import java.nio.file.Files
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -10,7 +16,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.file.Files
 
 class LocalVisionPluginTest {
     @Test

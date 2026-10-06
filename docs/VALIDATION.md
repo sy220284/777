@@ -27,55 +27,84 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 
 ## CI
 
-`.github/workflows/ci.yml` 先由 `scope` 根据改动文件分配最低且完整的验证集合，最终统一由 `merge-gate` 放行。混合改动取检查并集，未知路径保守回退到完整 CI。
+`.github/workflows/ci.yml` 先由 `scope` 按架构 3.0 风险范围分配验证集合，`architecture-3-gates` 独立验证所有权 / 依赖与执行不变量，最终统一由 `merge-gate` 放行。混合改动取检查并集，未知产品路径保守回退到完整 CI。
+
+主线 `push` 不使用 workflow 级 `paths-ignore` 绕过控制面。所有改动先进入 `scope`；纯文档可快速结束，CI / 门禁 / 架构控制文件本身必须真实执行相应验证。
 
 当前任务类型：
 
 ```text
-纯文档 / 仓库说明
+普通纯文档 / 仓库说明
 → scope → merge-gate
 
-普通 GitHub Actions / 自动化脚本 / CI 控制面
+架构 3.0 权威文档 / CI 主流程 / 架构门禁控制面
+→ static-gates → architecture-3-gates → merge-gate
+
+普通 GitHub Actions / 自动化脚本
 → static-gates → merge-gate
 
-纯 JVM / 单元测试 / Reference Validation / Mock Harness
+架构 3.0 范围内的 JVM / 单元测试
+→ static-gates → architecture-3-gates → unit-tests → merge-gate
+
+普通 JVM / Reference Validation / Mock Harness
 → static-gates → unit-tests → merge-gate
 
 官方 fixture / 上游锁定来源变化
 → static-gates + fixture-provenance + unit-tests → merge-gate
 
-纯 androidTest
-→ static-gates
+架构 3.0 范围内的 androidTest
+→ static-gates → architecture-3-gates
 → device-artifacts-x86
 → Android 16 + Android 17（并行，共用同一组 APK）
 → merge-gate
 
 产品源码 / 资源 / Gradle / Runtime / 未知路径
-→ static-gates
+→ static-gates → architecture-3-gates
 → unit-tests + build-arm64 + device-artifacts-x86（三路并行）
 → Android 16 + Android 17（并行，共用 device-artifacts-x86）
 → merge-gate
 ```
 
-`.github/release-version` 直接参与 `versionName/versionCode` 计算，因此按完整产品变更处理，main push 不得忽略。修改 APK 结构校验或 Android 启动 smoke 脚本仍归入完整 CI。手动 `workflow_dispatch` 始终强制完整 CI，并包含 fixture provenance。
-
-主线 `push` 对纯文档、普通自动化和测试-only 改动不重复启动产品 CI；产品、构建、Runtime 与版本身份变化仍执行完整组合验证。
+`.github/release-version` 直接参与 `versionName/versionCode` 计算，因此按完整产品变更处理。修改 APK 结构校验或 Android 启动 smoke 脚本仍归入完整 CI。手动 `workflow_dispatch` 始终强制完整 CI，并包含 fixture provenance。
 
 ### static-gates
 
-该阶段优先快速失败，避免明显错误继续消耗 Gradle / 模拟器 Runner：
+该阶段只保留快速、与产品架构实现位置无关的仓库级检查：
 
 - CI 范围分类器自测。
 - actionlint 工作流语义校验；下载版本和 SHA-256 固定。
-- 所有外部 GitHub Actions 必须固定到 40 位提交 SHA。
+- 所有外部 GitHub Actions 固定到 40 位提交 SHA。
 - Python / Shell 语法校验。
 - Gradle Wrapper distribution SHA、依赖 verification metadata、版本目录禁止动态版本。
 - 新增 Gradle 模块如存在单元测试，必须被 CI 显式覆盖。
 - Android Manifest / exported component / FileProvider / 模型 HTTPS-or-loopback 安全边界。
-- UI 硬编码、Design System、通知、Kotlin 风险、性能、架构门禁。
+- UI 硬编码、Design System、通知、Kotlin 风险与构建基线。
 - Runtime 压缩器自测。
 - 发布版本格式。
 - 防止重新引入 Android 16/17 各自 `connectedDebugAndroidTest` 重复构建。
+
+### architecture-3-gates
+
+该 lane 是架构 3.0 的权威结构与执行门禁，分成两个独立步骤：
+
+1. `check-local-architecture-boundaries.py`
+   - Feature / Shared Capability / Runtime Kernel 单向依赖；
+   - cross-Feature internal 禁止；
+   - 已完成 Shared 边界禁止反向依赖 Feature；
+   - 领域状态单写与 UI projection 边界；
+   - Feature Catalog 与 Runtime Plugin 生命周期分离；
+   - Engine 只允许组合根迁移桥，精确 allowlist 只能随迁移缩小；
+   - 已迁 Engine 业务根 / 旧包路径永久禁止回归。
+
+2. `check-local-performance-invariants.py`
+   - transcript / Session Event 历史访问有界；
+   - streaming preview 有界；
+   - model history 缓存与单一写入口；
+   - Session snapshot / recovery 顺序；
+   - 旧 durable queue、模型 / Tool 直连、Vision fallback 等执行旁路禁止回归。
+
+这两份脚本不再冻结 UI 样式、Prompt 文案、固定方法体、构造依赖数量、文件行数、字段数量或具体变量名。业务语义由单元 / conformance / 设备测试证明；架构门禁只证明 3.0 边界与关键运行不变量。
+
 
 ### fixture-provenance
 
@@ -168,16 +197,16 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 
 ## 架构门禁
 
-架构门禁至少保护：
+`architecture-3-gates` 分成两类可独立诊断的检查：
 
-- `LocalHarnessEngine` public surface。
-- Engine 构造依赖。
-- 已知热点文件行数。
-- UI / Worker 直接依赖 Engine 的 allowlist。
-- capability package 边界。
-- 聚合状态规模。
+- **所有权与依赖门禁**：Feature / Shared Capability / Runtime Kernel 单向依赖、跨 Feature Port、Feature Catalog 唯一路由归属、领域状态单写、UI 不直接消费聚合状态、UI 不新增 Store / Coordinator / Service / Runtime 等实现穿透、已迁旧路径永久禁止回归。
+- **执行不变量门禁**：有界历史访问与 streaming、模型历史缓存、Session / Agent run ownership 与迟到提交、进程唯一资源调度器、MODEL_REQUEST 租约、工具执行唯一策略入口、模型 route/profile 冻结、Session 持久化与恢复顺序等运行时行为。
 
-门禁失败应下沉职责，不应提高预算。
+迁移期债务必须按真实边精确记录。Shared→Feature、Automation→Chat/Work、Settings→其他 Feature、UI→内部实现均使用“消费文件 + 具体 import”白名单；新增边直接失败，已删除边未同步缩白名单也直接失败。Engine bridge 同样按具体桥名称分阶段维护，阶段三与阶段四分开收缩。允许文件本身存在，不代表允许在同一文件里替换成另一条依赖。
+
+当前不再把 Engine 方法数、构造依赖数、聚合状态字段数、UI projection 字段数或文件行数当作架构完成条件。已迁 Feature 业务根、旧包路径、Runtime→Engine 依赖与 Engine 私有业务实现使用永久禁止回归规则。
+
+门禁失败应修复真实所有权、依赖方向或运行不变量，禁止通过提高数字预算、改名、等量代理替换或移动文件规避。
 
 ## 性能门禁
 
@@ -299,7 +328,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - ChatGPT“测试连接”必须走该授权记录自己的套餐 profile，并以真实 Responses 完成作为成功条件；不得只用 /models 可达代替推理连通。
 - 多条授权记录可由用户显式移除；移除一条记录不得误删其他 client_id 的模型档案或凭据。
 - refresh token 被确认失效并清空后，设置页必须读取最新持久化状态并回到“需重新授权”，不得继续用旧快照显示已连接。
-- ChatGPT 套餐连通测试属于账户/模型边界职责，放在独立 tester 中；不得继续扩大 `LocalHarnessEngine` 热点文件。
+- ChatGPT 套餐连通测试属于账户/模型边界职责，放在独立 tester 中；已退役的 `LocalHarnessEngine` 不得回归，也不得把同类职责重新集中进 `LocalRuntimeKernel`。
 - `response.completed`、`response.failed`、`response.incomplete` 与流中断分别处理；收到 `response.completed` 后立即按成功终态结算，不再继续等待连接 EOF，避免终态后的 TCP/HTTP2 收尾抖动触发重复请求。
 - 统一 `withCancellableModelResponse` 只让读取/协议阶段错误决定请求成败；成功结果产生后的 `Response.close()` 清理异常必须降级为 best-effort，不能反转成功并触发重复发送。
 - `response.completed` 前发生可恢复网络中断、超时或临时服务错误时继续使用有限次数退避重试；用户主动取消、参数/权限错误、套餐限制等不可恢复状态不得盲目重放。

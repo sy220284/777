@@ -1,11 +1,11 @@
 package com.labteto.dshmobile.local.agent
 
-import com.labteto.dshmobile.local.LocalAgentModelRequestRuntime
 import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalModelReply
-import com.labteto.dshmobile.local.LocalRunModelSurface
-import com.labteto.dshmobile.local.LocalSessionEventLog
-import com.labteto.dshmobile.local.LocalWorkExecutionControl
+import com.labteto.dshmobile.local.model.LocalAgentModelRequestRuntime
+import com.labteto.dshmobile.local.model.LocalModelAdmissionPort
+import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.model.LocalRunModelSurface
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonObject
 internal class LocalSubagentModelRequestBoundary(
     private val requestRuntime: LocalAgentModelRequestRuntime,
     private val eventLog: () -> LocalSessionEventLog,
-    private val executionControl: LocalWorkExecutionControl?,
+    private val admission: LocalModelAdmissionPort?,
 ) {
     suspend fun complete(
         surface: LocalRunModelSurface,
@@ -27,7 +27,7 @@ internal class LocalSubagentModelRequestBoundary(
                 surface = surface,
                 messages = messages,
                 tools = tools,
-                executionControl = executionControl,
+                admission = admission,
             )
         } catch (error: LocalModelException) {
             logSubagentProviderError(eventLog(), subagentId, step, error)

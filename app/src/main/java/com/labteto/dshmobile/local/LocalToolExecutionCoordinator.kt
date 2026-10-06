@@ -6,11 +6,16 @@ import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
+import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
+import com.labteto.dshmobile.local.model.LocalModelRunContext
+import com.labteto.dshmobile.local.model.LocalToolCall
+import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
+import com.labteto.dshmobile.local.tools.LocalToolPolicy
+import com.labteto.dshmobile.local.tools.LocalToolRouter
 import com.labteto.dshmobile.observability.AppLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
-import com.labteto.dshmobile.local.model.LocalModelRunContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -19,7 +24,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * Owns the model-visible tool surface and the common permission/error boundary for foreground runs.
  *
  * Built-in implementations stay registered in [ToolRegistry]; this coordinator decides visibility,
- * capability activation, approval and structured error projection so LocalHarnessEngine no longer
+ * capability activation, approval and structured error projection so the Runtime Kernel never
  * duplicates those rules around the Agent loop.
  */
 internal class LocalToolExecutionCoordinator(

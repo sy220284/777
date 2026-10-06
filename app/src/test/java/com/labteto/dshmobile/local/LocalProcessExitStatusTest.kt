@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.runtime.formatProcessExitStatus
+import com.labteto.dshmobile.local.runtime.isExpectedProcessExit
+import com.labteto.dshmobile.local.runtime.processExitReasonLabel
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

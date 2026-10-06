@@ -1,15 +1,22 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
-import java.time.LocalDate
+import com.labteto.dshmobile.local.LocalToolExecutionCoordinator
+import com.labteto.dshmobile.local.TokenUsageAggregate
+import com.labteto.dshmobile.local.TokenUsageGroupKind
+import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalRequestPressureStore
+import com.labteto.dshmobile.local.record
 import com.labteto.dshmobile.observability.AppLogEntry
+import java.time.LocalDate
 
 /** Owns environment diagnostic snapshot selection and report assembly. */
 internal class LocalEnvironmentInfoCoordinator(
     private val workspacePath: () -> String,
     private val resourceSnapshot: () -> HarnessResourceSnapshot,
-    private val historyBudget: (LocalWorkRunBinding?) -> LocalHistoryBudget,
+    private val foregroundHistoryBudgetChars: () -> Int,
     private val requestPressureStore: LocalRequestPressureStore,
     private val usageTracker: DeepSeekUsageTracker,
     private val toolExecutionCoordinator: LocalToolExecutionCoordinator,
@@ -22,28 +29,29 @@ internal class LocalEnvironmentInfoCoordinator(
     private val foregroundHistory: () -> LocalModelHistoryBuffer,
     private val foregroundPendingInputs: () -> Int,
     private val pendingInputLimit: Int,
-    private val foregroundWorkBudget: (String) -> LocalWorkExecutionBudget.Snapshot?,
+    private val workContextAssessment: (String) -> LocalEnvironmentWorkContextAssessment?,
+    private val foregroundWorkBudget: (String) -> LocalEnvironmentWorkBudget?,
 ) {
-    fun build(binding: LocalWorkRunBinding?): String {
-        val sessionId = binding?.sessionId ?: foregroundSessionId()
-        val history = binding?.modelHistory ?: foregroundHistory()
-        val pendingInputCount = binding?.pendingInputs?.size() ?: foregroundPendingInputs()
+    fun build(run: LocalEnvironmentRunSnapshot? = null): String {
+        val sessionId = run?.sessionId ?: foregroundSessionId()
+        val contextChars = run?.contextChars ?: foregroundHistory().encodedChars
+        val contextBudgetChars = run?.contextBudgetChars ?: foregroundHistoryBudgetChars()
+        val pendingInputCount = run?.pendingInputs ?: foregroundPendingInputs()
         val latestRequest = usageTracker.analyticsSnapshot().recentRecords.firstOrNull { record ->
             record.reported && record.inputTokens > 0L && record.context.sessionId == sessionId
         }
-        val enabledOptional = binding?.enabledOptionalTools?.let { tools ->
-            synchronized(tools) { tools.toSet() }
-        } ?: toolExecutionCoordinator.enabledOptionalSnapshot()
+        val enabledOptional = run?.enabledOptionalTools
+            ?: toolExecutionCoordinator.enabledOptionalSnapshot()
         val commands = COMMANDS.filter(commandAvailable)
         return LocalEnvironmentReport.build(
             workspacePath = workspacePath(),
             resources = resourceSnapshot(),
-            contextChars = history.encodedChars,
-            contextBudgetChars = historyBudget(binding).maxHistoryChars,
+            contextChars = contextChars,
+            contextBudgetChars = contextBudgetChars,
             requestPressure = requestPressureStore.latest(sessionId),
-            workContextAssessment = requestPressureStore.workAssessment(sessionId),
+            workContextAssessment = workContextAssessment(sessionId),
             contextWindow = requestPressureStore.window(sessionId),
-            workBudget = binding?.executionControl?.budget?.snapshot() ?: foregroundWorkBudget(sessionId),
+            workBudget = run?.workBudget ?: foregroundWorkBudget(sessionId),
             latestRequest = latestRequest,
             capabilitySummary = toolExecutionCoordinator.capabilitySummary(enabledOptional),
             pendingInputs = pendingInputCount,

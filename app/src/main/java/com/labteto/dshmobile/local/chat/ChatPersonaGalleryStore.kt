@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import android.content.Context
-import com.labteto.dshmobile.local.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.UUID
@@ -27,6 +27,19 @@ class ChatPersonaGalleryStore internal constructor(
 
     @Synchronized
     fun list(): List<PersonaGalleryEntry> = readNormalized().entries.sortedByDescending { it.updatedAt }
+
+    @Synchronized
+    internal fun findEntry(id: String): PersonaGalleryEntry? =
+        readNormalized().entries.firstOrNull { it.id == id }
+
+    @Synchronized
+    internal fun restoreEntry(id: String, previous: PersonaGalleryEntry?) {
+        require(previous == null || previous.id == id) { "人物图集回滚编号不一致" }
+        val document = readNormalized()
+        val restored = document.entries.filterNot { it.id == id }.toMutableList()
+        previous?.let(restored::add)
+        documentStore.write(document.copy(version = 5, entries = restored))
+    }
 
     @Synchronized
     internal fun loadStoryHistory(

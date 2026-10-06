@@ -1,12 +1,19 @@
 package com.labteto.dshmobile.local.presentation
 
-import com.labteto.dshmobile.local.LocalConversationMode
-import com.labteto.dshmobile.local.LocalHarnessEngine
-import com.labteto.dshmobile.local.LocalImageInputMode
-import com.labteto.dshmobile.local.LocalSessionStorageStatus
+import com.labteto.dshmobile.local.LocalWebProvider
+import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
+import com.labteto.dshmobile.local.model.LocalImageInputMode
+import com.labteto.dshmobile.local.model.LocalModelRuntime
+import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanConnectionTester
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
+import com.labteto.dshmobile.local.runtime.LocalDiagnosticsPort
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
+import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
+import com.labteto.dshmobile.local.settings.LocalHarnessSettingsCoordinator
 import java.io.OutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -22,24 +29,33 @@ data class LocalSettingsMemoryContext(
 )
 
 @Singleton
-class LocalSettingsRuntime @Inject constructor(
-    private val engine: LocalHarnessEngine,
+class LocalSettingsRuntime @Inject internal constructor(
+    private val diagnostics: LocalDiagnosticsPort,
     chatGptAuth: ChatGptAuthCoordinator,
     chatGptPlanTester: ChatGptPlanConnectionTester,
+    private val modelRuntime: LocalModelRuntime,
+    private val modelSettings: LocalModelSettingsCoordinator,
+    private val settingsCoordinator: LocalHarnessSettingsCoordinator,
+    private val chatStyleGuardSettings: LocalChatStyleGuardSettingsPort,
+    private val web: LocalWebProvider,
+    private val sessionStorage: LocalSessionStorageRuntime,
+    runtimeStateStore: LocalRuntimeStateStore,
 ) {
     private val chatGpt = ChatGptSettingsController(
         auth = chatGptAuth,
-        requireAccountSelectionAllowed = engine::requireChatGptAccountSelectionAllowed,
-        syncModels = engine::syncChatGptModels,
-        retireProfiles = engine::retireChatGptAccountProfiles,
-        removeProfiles = engine::removeChatGptAccountProfiles,
+        requireAccountSelectionAllowed = modelRuntime::requireChatGptAccountSelectionAllowed,
+        syncModels = modelRuntime::syncChatGptModels,
+        retireProfiles = modelRuntime::retireChatGptAccountProfiles,
+        removeProfiles = modelRuntime::removeChatGptAccountProfiles,
         testAccount = chatGptPlanTester::test,
     )
-    val state: Flow<LocalHarnessSettingsState> = engine.state.map { it.toSettingsUiState() }.distinctUntilChanged()
-    val initialState get() = engine.state.value.toSettingsUiState()
+    private val runtimeState = runtimeStateStore.state
+    val state: Flow<LocalHarnessSettingsState> = runtimeState.map { it.toSettingsUiState() }.distinctUntilChanged()
+    val initialState get() = runtimeState.value.toSettingsUiState()
     val chatGptState: StateFlow<ChatGptUiState> = chatGpt.state
+    val chatStyleGuardBuiltInPhrases: List<String> get() = chatStyleGuardSettings.builtInPhrases
 
-    fun memoryContext(): LocalSettingsMemoryContext = engine.state.value.let {
+    fun memoryContext(): LocalSettingsMemoryContext = runtimeState.value.let {
         LocalSettingsMemoryContext(it.conversationMode, it.projectId, it.lineageId)
     }
     suspend fun refreshChatGpt() = chatGpt.refresh()
@@ -51,24 +67,27 @@ class LocalSettingsRuntime @Inject constructor(
     suspend fun selectChatGptAccount(id: String) = chatGpt.select(id)
     suspend fun disconnectChatGptAccount(id: String): String? = chatGpt.disconnect(id)
     suspend fun removeChatGptAccount(id: String): String? = chatGpt.remove(id)
-    fun configureModel(apiKey: String, model: String, baseUrl: String) = engine.configure(apiKey, model, baseUrl)
-    suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) = engine.saveModelConfiguration(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
-    fun selectModel(id: String) = engine.selectModel(id)
-    fun removeModel(id: String) = engine.removeModelProfile(id)
-    suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null) = engine.testModelConfiguration(apiKey, model, baseUrl, protocol, profileId)
-    fun configureImageInputMode(mode: LocalImageInputMode) = engine.configureImageInputMode(mode)
-    fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int, workerProfileId: String?) = engine.configureRuntimeLimits(main, subagent, attempts).also { engine.configureWorkerProfile(workerProfileId) }
+    fun configureModel(apiKey: String, model: String, baseUrl: String) = modelRuntime.configure(apiKey, model, baseUrl)
+    suspend fun saveModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) = modelRuntime.saveConfiguration(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride)
+    fun selectModel(id: String) = modelRuntime.selectModel(id)
+    fun removeModel(id: String) = modelRuntime.removeModel(id)
+    suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null) = modelRuntime.testConfiguration(apiKey, model, baseUrl, protocol, profileId)
+    fun configureImageInputMode(mode: LocalImageInputMode) = modelSettings.configureImageInputMode(mode)
+    fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int, workerProfileId: String?) =
+        settingsCoordinator.configureRuntimeLimits(main, subagent, attempts).also {
+            settingsCoordinator.configureWorkerProfile(workerProfileId)
+        }
     fun configurePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean) =
-        engine.configurePersonalization(rules, autoRecall, autoMemory)
-    fun configureChatStyleGuard(enabled: Boolean) = engine.configureChatStyleGuard(enabled)
-    fun addChatStyleGuardPhrase(value: String) = engine.addChatStyleGuardPhrase(value)
-    fun removeChatStyleGuardPhrase(value: String) = engine.removeChatStyleGuardPhrase(value)
-    fun clearChatStyleGuardHits() = engine.clearChatStyleGuardHits()
-    suspend fun diagnoseNetwork(target: String) = engine.diagnoseNetwork(target)
-    suspend fun sessionStorageStatus(): LocalSessionStorageStatus = engine.sessionStorageStatusForUi()
-    suspend fun compactSessionStorage(): LocalSessionStorageStatus = engine.compactSessionStorageForUi()
-    suspend fun exportSessionStorage(output: OutputStream) = engine.exportSessionStorageForUi(output)
-    suspend fun environmentInfo() = engine.environmentInfoForUi()
-    suspend fun diagnosticReport() = engine.diagnosticReportForUi()
-    fun clearCredential() = engine.clearCredential()
+        settingsCoordinator.configurePersonalization(rules, autoRecall, autoMemory)
+    fun configureChatStyleGuard(enabled: Boolean) = chatStyleGuardSettings.configureEnabled(enabled)
+    fun addChatStyleGuardPhrase(value: String) = chatStyleGuardSettings.addPhrase(value)
+    fun removeChatStyleGuardPhrase(value: String) = chatStyleGuardSettings.removePhrase(value)
+    fun clearChatStyleGuardHits() = chatStyleGuardSettings.clearHits()
+    suspend fun diagnoseNetwork(target: String) = web.diagnose(target)
+    suspend fun sessionStorageStatus(): LocalSessionStorageStatus = sessionStorage.storageStatus()
+    suspend fun compactSessionStorage(): LocalSessionStorageStatus = sessionStorage.compactStorage()
+    suspend fun exportSessionStorage(output: OutputStream) = sessionStorage.exportStorage(output)
+    suspend fun environmentInfo() = diagnostics.environmentInfo()
+    suspend fun diagnosticReport() = diagnostics.diagnosticReport()
+    fun clearCredential() = modelRuntime.clearCredential()
 }

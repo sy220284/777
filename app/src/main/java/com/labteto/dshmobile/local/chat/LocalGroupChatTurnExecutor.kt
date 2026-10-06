@@ -1,31 +1,40 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.LocalModelRequestCoordinator
+import com.labteto.dshmobile.local.TokenUsageAction
+import com.labteto.dshmobile.local.buildTokenUsageContext
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
+import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelGateway
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatContinuityState
-import com.labteto.dshmobile.local.chat.ChatDiaryDelta
-import com.labteto.dshmobile.local.chat.ChatDiarySourceMode
-import com.labteto.dshmobile.local.chat.ChatDiaryStore
-import com.labteto.dshmobile.local.chat.ChatDiaryWriteRequest
-import com.labteto.dshmobile.local.chat.ChatPendingTurn
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
-import com.labteto.dshmobile.local.chat.ChatPersonaStore
-import com.labteto.dshmobile.local.chat.ChatSceneState
-import com.labteto.dshmobile.local.chat.chatPostTurnModelMessages
-import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.applySceneTurn
-import com.labteto.dshmobile.local.chat.enqueuePendingDurably
-import com.labteto.dshmobile.local.chat.loadPendingBatch
-import com.labteto.dshmobile.local.chat.withContextForPlanner
-import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
+import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.model.estimateModelTokens
+import com.labteto.dshmobile.local.model.groupChatSystemPrompt
+import com.labteto.dshmobile.local.model.hasLocalImageRefs
+import com.labteto.dshmobile.local.model.imageInputUnsupported
+import com.labteto.dshmobile.local.model.localImageRequestBudgetForModelConcurrency
+import com.labteto.dshmobile.local.model.prepareLocalMultimodalMessages
+import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
+import com.labteto.dshmobile.local.model.withChatTurnContext
+import com.labteto.dshmobile.local.model.withTailEphemeralContext
+import com.labteto.dshmobile.local.record
+import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
+import com.labteto.dshmobile.local.runtime.CHAT_ROLEPLAY_TEMPERATURE
+import com.labteto.dshmobile.local.runtime.GROUP_POST_TURN_PENDING_BATCH
+import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -41,65 +50,86 @@ import kotlinx.serialization.json.put
  *
  * The engine supplies only its live session boundaries and persistence/model callbacks. Group reply
  * fan-out, per-character state refresh, shared-scene consolidation and transcript projection stay
- * together here instead of expanding LocalHarnessEngine.
+ * together here under ChatFeature ownership.
  */
-internal class LocalGroupChatTurnExecutor(
-    private val _state: MutableStateFlow<LocalHarnessState>,
+@Singleton
+internal class LocalGroupChatTurnExecutor @Inject constructor(
+    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val chatState: LocalChatStatePort,
     private val modelGateway: LocalModelGateway,
-    private val chatPersonaStore: ChatPersonaStore,
-    private val chatPersonaGalleryStore: ChatPersonaGalleryStore,
+    private val modelRequests: LocalModelRequestCoordinator,
+    private val modelHistoryRuntime: LocalForegroundModelHistoryRuntime,
+    private val sessionStorage: LocalSessionStorageRuntime,
+    private val chatMemory: LocalChatMemoryRuntime,
+    private val branchCoordinator: LocalChatBranchCoordinator,
+    private val transcriptRuntime: LocalChatTranscriptRuntime,
+    private val chatPersistence: LocalChatPersistence,
     private val chatReplyCoordinator: LocalChatReplyCoordinator,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
-    private val diaryStore: ChatDiaryStore,
     private val usageTracker: DeepSeekUsageTracker,
     private val json: Json,
-    private val modelHistory: LocalModelHistoryBuffer,
-    private val transcriptRuntime: LocalTranscriptRuntime,
-    private val imageCapabilities: LocalImageCapabilityRegistry,
-    private val imageRequestBudget: LocalImageRequestBudget,
-    private val workspacePath: String,
-    private val eventLogProvider: () -> LocalSessionEventLog,
-    private val completeModel: suspend (
-        String,
-        LocalHarnessState,
-        List<JsonObject>,
-        Int,
-        JsonArray?,
-        Boolean,
-        Int?,
-        Boolean,
-        Double?,
-    ) -> LocalModelReply,
-    private val ensureSystemMessageAction: () -> Unit,
-    private val captureAutoMemoryAction: suspend (String, String?) -> Unit,
-    private val chatMemoryContextAction: (String, LocalHarnessState, String, String) -> String,
-    private val compactHistoryAction: (Int) -> Unit,
-    private val updateContextMetricsAction: () -> Unit,
-    private val persistBranchStateAction: (String) -> Unit,
-    private val checkpointHistoryAction: (String) -> Unit,
-    private val persistAction: () -> Unit,
-    private val persistNowAction: suspend () -> Unit,
-    private val finishTurn: (Job?) -> Unit,
 ) {
+    private val sessionId: String
+        get() = runtimeStateStore.currentSessionId
     private val eventLog: LocalSessionEventLog
-        get() = eventLogProvider()
+        get() = sessionStorage.eventLogs.get(sessionId)
+    private val modelHistory
+        get() = modelHistoryRuntime.history
+    private val chatPersonaStore
+        get() = chatPersistence.personaStore
+    private val chatPersonaGalleryStore
+        get() = chatPersistence.galleryStore
+    private val diaryStore
+        get() = chatPersistence.diaryStore
+    private val imageCapabilities
+        get() = runtimeStateStore.imageCapabilities
+    private val imageRequestBudget by lazy {
+        localImageRequestBudgetForModelConcurrency(runtimeStateStore.resourceBudget.maxModelRequests)
+    }
+    private val workspacePath: String
+        get() = sessionStorage.files.workspace.path
 
-    private fun ensureSystemMessage() = ensureSystemMessageAction()
+    private fun ensureSystemMessage() {
+        check(modelHistoryRuntime.ensureSystemPrompt(sessionId, groupChatSystemPrompt())) {
+            "群聊 system prompt 写入时前台会话已切换"
+        }
+    }
 
     private suspend fun captureAutoMemoryDirective(text: String, sourceMessageId: String? = null) =
-        captureAutoMemoryAction(text, sourceMessageId)
+        chatMemory.captureAutoMemoryDirective(text, sourceMessageId)
 
-    private fun compactHistoryIfNeeded(extraTokens: Int = 0) = compactHistoryAction(extraTokens)
+    private fun compactHistoryIfNeeded(extraTokens: Int = 0) {
+        check(modelHistoryRuntime.compactChatIfNeeded(sessionId, extraTokens)) {
+            "群聊历史压缩时前台会话已切换"
+        }
+    }
 
-    private fun updateContextMetrics() = updateContextMetricsAction()
+    private fun updateContextMetrics() {
+        check(modelHistoryRuntime.refreshMetrics(sessionId)) {
+            "群聊历史指标更新时前台会话已切换"
+        }
+    }
 
-    private fun persistChatBranchState(reason: String) = persistBranchStateAction(reason)
+    private fun persistChatBranchState(reason: String) =
+        branchCoordinator.persistCurrentProjection(sessionId, reason)
 
-    private fun checkpointModelHistory(reason: String) = checkpointHistoryAction(reason)
+    private fun checkpointModelHistory(reason: String) {
+        check(modelHistoryRuntime.checkpoint(sessionId, reason)) {
+            "群聊模型历史检查点写入时前台会话已切换"
+        }
+    }
 
-    private fun persist() = persistAction()
+    private fun persist() {
+        check(sessionStorage.enqueueCurrentSnapshot(sessionId)) {
+            "群聊快照排队时前台会话已切换"
+        }
+    }
 
-    private suspend fun persistNow() = persistNowAction()
+    private suspend fun persistNow() {
+        check(sessionStorage.writeCurrentSnapshotNow(sessionId)) {
+            "群聊快照写入时前台会话已切换"
+        }
+    }
 
     private fun projectGalleryState(groupChat: LocalGroupChatState, phase: String) {
         projectGroupGalleryState(groupChat, chatPersonaGalleryStore).failures.forEach { failure ->
@@ -121,16 +151,20 @@ internal class LocalGroupChatTurnExecutor(
         maxAttemptsOverride: Int? = null,
         allowContextOverflowRecovery: Boolean = true,
         temperature: Double? = null,
-    ): LocalModelReply = completeModel(
-        key,
-        snapshot,
-        messages,
-        step,
-        toolsOverride,
-        publishPreview,
-        maxAttemptsOverride,
-        allowContextOverflowRecovery,
-        temperature,
+    ): LocalModelReply = modelRequests.complete(
+        snapshot = snapshot,
+        messages = messages,
+        step = step,
+        toolsOverride = toolsOverride,
+        publishPreviewEnabled = publishPreview,
+        maxAttemptsOverride = maxAttemptsOverride,
+        allowContextOverflowRecovery = allowContextOverflowRecovery,
+        requestLog = eventLog,
+        temperature = temperature,
+        previewGuard = {
+            runtimeStateStore.currentSessionId == snapshot.sessionId &&
+                runtimeStateStore.state.value.sessionId == snapshot.sessionId
+        },
     )
 
     private suspend fun generateGroupReply(
@@ -146,7 +180,7 @@ internal class LocalGroupChatTurnExecutor(
     ): GroupGeneratedReply {
         val persona = chatPersonaStore.get(member.personaId)
         val startedAtNanos = System.nanoTime()
-        val interactiveAttempts = snapshot.modelAttempts.coerceIn(1, 2)
+        val interactiveAttempts = snapshot.modelState.modelAttempts.coerceIn(1, 2)
 
         return try {
             val turnContext = chatReplyCoordinator.buildGroupTurnContext(
@@ -155,9 +189,9 @@ internal class LocalGroupChatTurnExecutor(
                 input = input,
                 allMembers = allMembers,
                 handoffSummary = snapshot.handoffSummary,
-                sharedContext = snapshot.groupChat.context,
+                sharedContext = snapshot.chat.groupChat.context,
                 memoryContext = memoryContext,
-                announcement = snapshot.groupChat.announcement,
+                announcement = snapshot.chat.groupChat.announcement,
                 mayStaySilent = false,
                 silentToken = GROUP_CHAT_SILENT_TOKEN,
             )
@@ -167,10 +201,10 @@ internal class LocalGroupChatTurnExecutor(
                 dynamicContext = turnContext.dynamicPrompt,
             )
             val groupImageMode = resolveLocalImageInputMode(
-                snapshot.imageInputMode,
+                snapshot.modelState.imageInputMode,
                 imageCapabilities,
-                snapshot.baseUrl,
-                snapshot.model,
+                snapshot.modelState.baseUrl,
+                snapshot.modelState.model,
             )
             if (hasLocalImageRefs(groupRequestHistory) && groupImageMode == LocalImageInputMode.TOOL) {
                 throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
@@ -180,7 +214,7 @@ internal class LocalGroupChatTurnExecutor(
                 workspaceRoot = File(workspacePath),
                 mode = groupImageMode,
                 budget = imageRequestBudget,
-                maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.model, snapshot.baseUrl),
+                maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(snapshot.modelState.model, snapshot.modelState.baseUrl),
             )
             val rawReply = completeWithRetry(
                 key = key,
@@ -199,7 +233,7 @@ internal class LocalGroupChatTurnExecutor(
                 input = input,
                 index = index,
                 rawReply = rawReply,
-                sharedContext = snapshot.groupChat.context,
+                sharedContext = snapshot.chat.groupChat.context,
                 usageContext = buildTokenUsageContext(
                     snapshot = snapshot,
                     action = TokenUsageAction.GROUP_REPLY,
@@ -248,7 +282,7 @@ internal class LocalGroupChatTurnExecutor(
                 put("elapsed_ms", (System.nanoTime() - startedAtNanos) / 1_000_000L)
             })
             val failure = if (hasLocalImageRefs(baseHistory) && imageInputUnsupported(error)) {
-                imageCapabilities.markUnsupported(snapshot.baseUrl, snapshot.model)
+                imageCapabilities.markUnsupported(snapshot.modelState.baseUrl, snapshot.modelState.model)
                 IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。", error)
             } else {
                 error
@@ -305,7 +339,7 @@ internal class LocalGroupChatTurnExecutor(
                             .filter(String::isNotBlank)
                             .joinToString(" ")
                     },
-                    generation = snapshot.groupChat.context.generation,
+                    generation = snapshot.chat.groupChat.context.generation,
                 ),
             )
         }.onSuccess { diary ->
@@ -334,9 +368,9 @@ internal class LocalGroupChatTurnExecutor(
         sharedPending: List<ChatPendingTurn>,
         step: Int,
     ): ChatCharacterState? {
-        val snapshot = _state.value
+        val snapshot = runtimeStateStore.state.value
         val key = modelRequestMarkerOrNull(snapshot) ?: return null
-        val sharedContext = _state.value.groupChat.context
+        val sharedContext = runtimeStateStore.state.value.chat.groupChat.context
         val plannerState = member.chatState.withContextForPlanner(sharedContext)
         val prompt = buildString {
             appendLine(
@@ -399,9 +433,9 @@ internal class LocalGroupChatTurnExecutor(
         sharedPending: List<ChatPendingTurn>,
     ): GroupStateRefreshBatch {
         if (replies.isEmpty()) return GroupStateRefreshBatch(emptyMap(), complete = true)
-        val initialSnapshot = _state.value
+        val initialSnapshot = runtimeStateStore.state.value
         val responderIds = replies.mapTo(hashSetOf()) { it.member.galleryId }
-        val observers = initialSnapshot.groupChat.members
+        val observers = initialSnapshot.chat.groupChat.members
             .filter { it.galleryId !in responderIds }
             .map { member ->
                 member to (
@@ -424,7 +458,7 @@ internal class LocalGroupChatTurnExecutor(
             )
         }
 
-        val snapshot = _state.value
+        val snapshot = runtimeStateStore.state.value
         val key = modelRequestMarkerOrNull(snapshot) ?: return GroupStateRefreshBatch(
             states = replies.associate { it.member.galleryId to it.member.chatState },
             complete = false,
@@ -442,7 +476,7 @@ internal class LocalGroupChatTurnExecutor(
                 val memberPrompt = chatTurnCoordinator.postTurnPrompt(
                     persona = reply.persona,
                     state = reply.member.chatState.withContextForPlanner(
-                        snapshot.groupChat.context,
+                        snapshot.chat.groupChat.context,
                     ),
                     userMessage = userMessage,
                     assistantMessage = reply.content,
@@ -499,7 +533,7 @@ internal class LocalGroupChatTurnExecutor(
                 val parsed = chatTurnCoordinator.parsePostTurn(
                     text = plan.toString(),
                     previous = source.member.chatState.withContextForPlanner(
-                        snapshot.groupChat.context,
+                        snapshot.chat.groupChat.context,
                     ),
                     userMessage = userMessage,
                     assistantMessage = source.content,
@@ -558,28 +592,36 @@ internal class LocalGroupChatTurnExecutor(
         input: String,
         sourceMessageId: String? = null,
     ) {
-        _state.update {
-            it.copy(
-                running = true,
-                error = null,
-                replySuggestions = emptyList(),
-                groupActiveSpeakerName = null,
-                deviceApprovalLease = false,
-                pendingApproval = null,
-                pendingQuestion = null,
-            )
+        val ownedSessionId = sessionId
+        runtimeStateStore.projection.setForegroundRunning(
+            sessionId = ownedSessionId,
+            running = true,
+            error = null,
+        )
+        chatState.update { current ->
+            if (current.sessionId != ownedSessionId) {
+                current
+            } else {
+                current.copy(
+                    error = null,
+                    chat = current.chat.copy(
+                        replySuggestions = emptyList(),
+                        groupActiveSpeakerName = null,
+                    ),
+                )
+            }
         }
         try {
-            val snapshot = _state.value
-            require(snapshot.groupChat.members.size >= MIN_GROUP_CHAT_MEMBERS) {
+            val snapshot = runtimeStateStore.state.value
+            require(snapshot.chat.groupChat.members.size >= MIN_GROUP_CHAT_MEMBERS) {
                 "群聊至少需要添加 $MIN_GROUP_CHAT_MEMBERS 个角色"
             }
             ensureSystemMessage()
             captureAutoMemoryDirective(input, sourceMessageId)
 
             val key = modelRequestMarkerOrNull(snapshot) ?: error("请先配置模型账户或 API Key")
-            val members = snapshot.groupChat.members
-            val cursor = snapshot.groupChat.turnCursor % members.size
+            val members = snapshot.chat.groupChat.members
+            val cursor = snapshot.chat.groupChat.turnCursor % members.size
             val rotated = members.drop(cursor) + members.take(cursor)
             val responders = groupChatResponders(input, rotated)
             require(responders.isNotEmpty()) { "群聊里还没有可发言的角色" }
@@ -590,7 +632,12 @@ internal class LocalGroupChatTurnExecutor(
                     member.personaId,
                 )
                 member.galleryId to subjectKey?.let {
-                    chatMemoryContextAction(input, snapshot, it, persona.name)
+                    chatMemory.relationshipContext(
+                        query = input,
+                        viewerSubjectKey = it,
+                        viewerName = persona.name,
+                        groupAudience = true,
+                    )
                 }.orEmpty()
             }
             val groupPromptTokens = responders.maxOfOrNull { member ->
@@ -601,9 +648,9 @@ internal class LocalGroupChatTurnExecutor(
                     input = input,
                     allMembers = members,
                     handoffSummary = snapshot.handoffSummary,
-                    sharedContext = snapshot.groupChat.context,
+                    sharedContext = snapshot.chat.groupChat.context,
                     memoryContext = groupMemoryContexts[member.galleryId].orEmpty(),
-                    announcement = snapshot.groupChat.announcement,
+                    announcement = snapshot.chat.groupChat.announcement,
                     mayStaySilent = false,
                     silentToken = GROUP_CHAT_SILENT_TOKEN,
                 )
@@ -612,16 +659,26 @@ internal class LocalGroupChatTurnExecutor(
             compactHistoryIfNeeded(extraTokens = groupPromptTokens)
 
             eventLog.append("turn/start", buildJsonObject {
-                put("model", snapshot.model)
+                put("model", snapshot.modelState.model)
                 put("mode", "group-chat")
                 put("member_count", members.size)
                 put("responder_count", responders.size)
             })
 
             val turnId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId
-            var currentGroup = snapshot.groupChat
+            var currentGroup = snapshot.chat.groupChat
             var deliveredReplies = 0
-            val delivery = GroupReplyDeliveryLedger(snapshot.sessionId, currentGroup.failedReplyMemberIds, responders.map { it.galleryId }, _state, ::persistNow)
+            val delivery = GroupReplyDeliveryLedger(
+                sessionId = snapshot.sessionId,
+                previousFailedMemberIds = currentGroup.failedReplyMemberIds,
+                responderIds = responders.map { it.galleryId },
+                state = chatState,
+                persist = { persistedSessionId ->
+                    check(sessionStorage.writeCurrentSnapshotNow(persistedSessionId)) {
+                        "群聊交付状态写入时前台会话已切换"
+                    }
+                },
+            )
             val repliesForStateUpdate = mutableListOf<GroupReplyForStateUpdate>()
             val baseHistory = boundedGroupChatRequestHistory(modelHistory.snapshot())
 
@@ -647,8 +704,10 @@ internal class LocalGroupChatTurnExecutor(
 
                 generatedReplies.forEachIndexed { index, deferred ->
                     val initialMember = responders[index]
-                    _state.update { current ->
-                        current.copy(groupActiveSpeakerName = initialMember.displayName)
+                    chatState.update { current ->
+                        current.copy(
+                            chat = current.chat.copy(groupActiveSpeakerName = initialMember.displayName),
+                        )
                     }
 
                     val generated = deferred.await()
@@ -699,10 +758,11 @@ internal class LocalGroupChatTurnExecutor(
                         },
                     )
                     updateContextMetrics()
-                    val beforeAssistant = _state.value
+                    val beforeAssistant = runtimeStateStore.state.value
                     transcriptRuntime.applyMessages(
-                        listOf(transcript),
-                        assistantEvent.sequence,
+                        sessionId = snapshot.sessionId,
+                        messages = listOf(transcript),
+                        eventSequence = assistantEvent.sequence,
                     )
                     val pendingContext = currentGroup.context
                         .applySceneTurn(
@@ -724,27 +784,29 @@ internal class LocalGroupChatTurnExecutor(
                         scope = "group",
                     )
                     currentGroup = currentGroup.copy(context = pendingContext)
-                    _state.update { current ->
+                    chatState.update { current ->
                         if (current.sessionId == snapshot.sessionId) {
-                            current.copy(groupChat = currentGroup)
+                            current.copy(chat = current.chat.copy(groupChat = currentGroup))
                         } else {
                             current
                         }
                     }
                     if (
-                        beforeAssistant.chatBranches.nodes.isNotEmpty() &&
+                        beforeAssistant.chat.chatBranches.nodes.isNotEmpty() &&
                         beforeAssistant.transcriptIndex.branchingEligible
                     ) {
-                        _state.update { current ->
+                        chatState.update { current ->
                             current.copy(
-                                chatBranches = appendMaterializedChatBranchMessage(
-                                    current = current.chatBranches,
-                                    activeMessages = beforeAssistant.messages,
-                                    message = transcript,
-                                    parentId = beforeAssistant.transcriptIndex.latestDialogueMessageId,
-                                    chatState = current.chatState,
-                                    chatContext = current.groupChat.context,
-                                    replySuggestions = emptyList(),
+                                chat = current.chat.copy(
+                                    chatBranches = appendMaterializedChatBranchMessage(
+                                        current = current.chat.chatBranches,
+                                        activeMessages = beforeAssistant.messages,
+                                        message = transcript,
+                                        parentId = beforeAssistant.transcriptIndex.latestDialogueMessageId,
+                                        chatState = current.chat.chatState,
+                                        chatContext = current.chat.groupChat.context,
+                                        replySuggestions = emptyList(),
+                                    ),
                                 ),
                             )
                         }
@@ -763,8 +825,8 @@ internal class LocalGroupChatTurnExecutor(
 
             val sharedPendingForRefresh = currentGroup.context.loadPendingBatch(
                 eventLog, GROUP_POST_TURN_PENDING_BATCH, scope = "group",
-                activeBranchMessageIds = if (hasChatBranchAlternatives(_state.value.chatBranches)) {
-                    com.labteto.dshmobile.local.activeChatBranchMessages(_state.value.chatBranches).mapTo(hashSetOf()) { it.id }
+                activeBranchMessageIds = if (hasChatBranchAlternatives(runtimeStateStore.state.value.chat.chatBranches)) {
+                    com.labteto.dshmobile.local.chat.activeChatBranchMessages(runtimeStateStore.state.value.chat.chatBranches).mapTo(hashSetOf()) { it.id }
                 } else null,
             )
             val refreshBatch = refreshGroupMemberStates(
@@ -801,15 +863,16 @@ internal class LocalGroupChatTurnExecutor(
                     )
                 },
             )
-            val nextCursor = (snapshot.groupChat.turnCursor + 1) % members.size
+            val nextCursor = (snapshot.chat.groupChat.turnCursor + 1) % members.size
             currentGroup = currentGroup.copy(turnCursor = nextCursor)
-            _state.update { current ->
+            chatState.update { current ->
                 if (current.sessionId == snapshot.sessionId) {
                     current.copy(
-                        groupChat = currentGroup,
-                        groupActiveSpeakerName = null,
-                        replySuggestions = emptyList(),
-
+                        chat = current.chat.copy(
+                            groupChat = currentGroup,
+                            groupActiveSpeakerName = null,
+                            replySuggestions = emptyList(),
+                        ),
                     )
                 } else {
                     current
@@ -817,12 +880,12 @@ internal class LocalGroupChatTurnExecutor(
             }
 
             delivery.recordCompletedOutcome(eventLog, deliveredReplies)
-            if (hasChatBranchAlternatives(_state.value.chatBranches)) {
+            if (hasChatBranchAlternatives(runtimeStateStore.state.value.chat.chatBranches)) {
                 persistChatBranchState("group/branch-completed")
             }
             checkpointModelHistory("group/completed")
             persistNow()
-            projectGalleryState(_state.value.groupChat, "turn-complete")
+            projectGalleryState(runtimeStateStore.state.value.chat.groupChat, "turn-complete")
         } catch (cancelled: CancellationException) {
             eventLog.append("turn/end", buildJsonObject {
                 put("reason", "aborted")
@@ -833,7 +896,12 @@ internal class LocalGroupChatTurnExecutor(
             throw cancelled
         } catch (error: Exception) {
             val detail = error.message ?: "群聊请求失败"
-            _state.update { it.copy(error = detail, groupActiveSpeakerName = null) }
+            chatState.update {
+                it.copy(
+                    error = detail,
+                    chat = it.chat.copy(groupActiveSpeakerName = null),
+                )
+            }
             eventLog.append("turn/end", buildJsonObject {
                 put("reason", "error")
                 put("mode", "group-chat")
@@ -842,25 +910,29 @@ internal class LocalGroupChatTurnExecutor(
             checkpointModelHistory("group/failed")
             persist()
         } finally {
-            _state.update {
-                it.copy(
-                    running = false,
-                    groupActiveSpeakerName = null,
-                    pendingApproval = null,
-                    pendingQuestion = null,
-                    deviceApprovalLease = false,
-                )
+            runtimeStateStore.projection.setForegroundRunning(
+                sessionId = ownedSessionId,
+                running = false,
+                error = runtimeStateStore.state.value.error,
+            )
+            chatState.update { current ->
+                if (current.sessionId != ownedSessionId) {
+                    current
+                } else {
+                    current.copy(
+                        chat = current.chat.copy(groupActiveSpeakerName = null),
+                    )
+                }
             }
             persist()
-            finishTurn(currentCoroutineContext()[Job])
         }
     }
     private suspend fun modelRequestMarkerOrNull(snapshot: LocalHarnessState): String? =
         try {
             modelGateway.profileForRoute(
-                profileId = snapshot.modelSelection.activeProfileId,
-                model = snapshot.model,
-                baseUrl = snapshot.baseUrl,
+                profileId = snapshot.modelState.modelSelection.activeProfileId,
+                model = snapshot.modelState.model,
+                baseUrl = snapshot.modelState.baseUrl,
             ).id
         } catch (cancelled: CancellationException) {
             throw cancelled

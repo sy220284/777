@@ -1,6 +1,8 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.lsp
 
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 
 internal fun parseLanguageServerCommand(text: String): List<String> {
     if (text.isBlank()) return emptyList()

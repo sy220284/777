@@ -15,10 +15,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.LocalChatUserEditResult
-import com.labteto.dshmobile.local.LocalHarnessMessage
-import com.labteto.dshmobile.local.chatMessageHasAttachmentContext
-import com.labteto.dshmobile.local.editableChatUserText
+import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
+import com.labteto.dshmobile.local.presentation.chatMessageHasAttachmentContext
+import com.labteto.dshmobile.local.presentation.editableChatUserText
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize

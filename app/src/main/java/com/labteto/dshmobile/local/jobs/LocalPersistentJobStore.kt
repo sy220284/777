@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.jobs
 
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import java.io.File

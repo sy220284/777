@@ -1,20 +1,15 @@
 package com.labteto.dshmobile.local.model
 
 import android.content.SharedPreferences
-import com.labteto.dshmobile.local.LocalModelAuthKind
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.LocalModelProtocol
-import com.labteto.dshmobile.local.LocalModelPresets
-import com.labteto.dshmobile.local.modelProfileId
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.model.chatgpt.refreshChatGptPlanProfiles
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 
 /** Durable model-profile metadata. Secrets remain in provider-specific credential stores. */
@@ -31,7 +26,7 @@ internal class LocalModelProfileStore(
             val storedModel = obj["model"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
                 ?: return@mapNotNull null
             val baseUrl = obj["baseUrl"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-            val model = com.labteto.dshmobile.local.migrateOfficialClaudeModel(storedModel, baseUrl)
+            val model = com.labteto.dshmobile.local.model.migrateOfficialClaudeModel(storedModel, baseUrl)
             val auth = obj["authKind"]?.jsonPrimitive?.contentOrNull
                 ?.let { runCatching { LocalModelAuthKind.valueOf(it) }.getOrNull() }
                 ?: LocalModelAuthKind.API_KEY

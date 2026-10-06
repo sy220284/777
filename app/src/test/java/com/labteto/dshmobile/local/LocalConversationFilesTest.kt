@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.encodeTranscriptMessages
+import com.labteto.dshmobile.local.session.localConversationFiles
+import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals

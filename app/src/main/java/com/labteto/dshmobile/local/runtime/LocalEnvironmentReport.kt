@@ -1,7 +1,40 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
+import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.model.LocalContextWindowSnapshot
+import com.labteto.dshmobile.local.model.LocalPromptPressure
 import com.labteto.dshmobile.observability.AppLogEntry
+
+internal data class LocalEnvironmentWorkContextAssessment(
+    val status: String,
+    val historyRatioPermille: Int,
+    val toolRatioPermille: Int,
+    val inputGrowthTokens: Int,
+    val historyGrowthTokens: Int,
+    val effectiveProjectionTriggerTokens: Int,
+    val reasons: List<String>,
+)
+
+internal data class LocalEnvironmentWorkBudget(
+    val reportedExposureTokens: Long,
+    val uncertainExposureTokens: Long,
+    val pendingExposureTokens: Long,
+    val admittedRequests: Int,
+    val maxRequests: Int,
+    val estimateCalibrationPermille: Int,
+    val calibrationSamples: Int,
+    val calibrationRoutes: Int,
+)
+
+internal data class LocalEnvironmentRunSnapshot(
+    val sessionId: String,
+    val contextChars: Int,
+    val contextBudgetChars: Int,
+    val pendingInputs: Int,
+    val enabledOptionalTools: Set<String>,
+    val workBudget: LocalEnvironmentWorkBudget? = null,
+)
 
 /** Formats the user-visible environment summary without owning engine resources. */
 internal object LocalEnvironmentReport {
@@ -11,9 +44,9 @@ internal object LocalEnvironmentReport {
         contextChars: Int,
         contextBudgetChars: Int,
         requestPressure: LocalPromptPressure? = null,
-        workContextAssessment: LocalWorkStepContextAssessment? = null,
+        workContextAssessment: LocalEnvironmentWorkContextAssessment? = null,
         contextWindow: LocalContextWindowSnapshot? = null,
-        workBudget: LocalWorkExecutionBudget.Snapshot? = null,
+        workBudget: LocalEnvironmentWorkBudget? = null,
         latestRequest: TokenUsageRecord?,
         capabilitySummary: String,
         pendingInputs: Int,
@@ -53,7 +86,7 @@ internal object LocalEnvironmentReport {
         }
         workContextAssessment?.let { assessment ->
             appendLine(
-                "Work 单步上下文：${assessment.status.name.lowercase()}；" +
+                "Work 单步上下文：${assessment.status}；" +
                     "history=${assessment.historyRatioPermille / 10.0}%；" +
                     "tools=${assessment.toolRatioPermille / 10.0}%；" +
                     "input_delta=${assessment.inputGrowthTokens}；" +

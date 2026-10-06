@@ -1,6 +1,20 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.vision
 
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.TokenUsageAction
+import com.labteto.dshmobile.local.TokenUsageContext
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelProtocol
+import com.labteto.dshmobile.local.model.LocalModelRouteIdentity
+import com.labteto.dshmobile.local.model.normalizeModelBaseUrl
+import com.labteto.dshmobile.local.model.parseDeepSeekOpenAiUsage
+import com.labteto.dshmobile.local.model.withCancellableModelResponse
+import com.labteto.dshmobile.local.record
 import java.io.ByteArrayOutputStream
 import java.net.SocketTimeoutException
 import java.util.UUID
@@ -8,7 +22,6 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
-import com.labteto.dshmobile.local.model.withCancellableModelResponse
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -24,8 +37,8 @@ import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 
 /**
  * OpenAI-compatible multimodal transport for explicit image-analysis tools.

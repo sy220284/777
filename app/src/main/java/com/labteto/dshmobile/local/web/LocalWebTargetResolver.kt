@@ -1,11 +1,9 @@
 package com.labteto.dshmobile.local.web
 
-import com.labteto.dshmobile.local.LocalWebException
-import com.labteto.dshmobile.local.PublicAddressPolicy
-import com.labteto.dshmobile.local.pinUriToAddress
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import com.labteto.dshmobile.local.LocalWebException
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress

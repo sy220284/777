@@ -10,20 +10,17 @@ import com.labteto.dshmobile.connection.ConnectionUiState
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
-import com.labteto.dshmobile.local.DeepSeekPricingRepository
-import com.labteto.dshmobile.local.DeepSeekPricingState
-import com.labteto.dshmobile.local.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
 import com.labteto.dshmobile.local.TokenUsageGroupDetail
 import com.labteto.dshmobile.local.TokenUsageGroupKind
 import com.labteto.dshmobile.local.TokenUsageRecord
-import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
-import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
-import com.labteto.dshmobile.local.LocalSessionStorageStatus
-import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
-import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
-import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.local.model.DeepSeekPricingState
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
+import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
+import com.labteto.dshmobile.local.presentation.LocalSettingsDataFacade
+import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
+import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_DIR
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_FILE
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -47,17 +44,14 @@ class SettingsViewModel @Inject constructor(
     private val hostsStore: HostsStore,
     private val connectionManager: ConnectionManager,
     private val localHarness: LocalSettingsRuntime,
-    private val deepSeekPricingRepository: DeepSeekPricingRepository,
-    private val usageTracker: DeepSeekUsageTracker,
-    private val memoryStore: MemoryStore,
-    private val memoryManager: MemoryManager,
+    private val settingsData: LocalSettingsDataFacade,
     @ApplicationContext context: Context,
 ) : ViewModel() {
 
     private val appContext = context.applicationContext
     private val remoteSettingsController = RemoteSettingsController(connectionManager, viewModelScope)
     private val deviceCapabilitiesController = DeviceCapabilitiesController(appContext)
-    private val memorySettingsController = MemorySettingsController(localHarness, memoryStore, memoryManager)
+    private val memorySettingsController = MemorySettingsController(localHarness, settingsData)
 
     private val _state = MutableStateFlow(AppSettings())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
@@ -69,10 +63,11 @@ class SettingsViewModel @Inject constructor(
             initialValue = localHarness.initialState,
         )
     val chatGptState: StateFlow<ChatGptUiState> = localHarness.chatGptState
-    val deepSeekPricing: StateFlow<DeepSeekPricingState> = deepSeekPricingRepository.state
-    val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = usageTracker.analyticsRevision
+    val chatStyleGuardBuiltInPhrases: List<String> get() = localHarness.chatStyleGuardBuiltInPhrases
+    val deepSeekPricing: StateFlow<DeepSeekPricingState> = settingsData.deepSeekPricing
+    val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = settingsData.usageRevision
         .mapLatest {
-            withContext(Dispatchers.IO) { usageTracker.analyticsSnapshot() }
+            withContext(Dispatchers.IO) { settingsData.usageSnapshot() }
         }
         .stateIn(
             scope = viewModelScope,
@@ -176,7 +171,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun refreshDeepSeekPricing() {
-        viewModelScope.launch { deepSeekPricingRepository.refreshFromOfficial() }
+        viewModelScope.launch { settingsData.refreshDeepSeekPricing() }
     }
 
     fun refreshRemoteSettings() = remoteSettingsController.refresh()
@@ -197,7 +192,7 @@ class SettingsViewModel @Inject constructor(
     fun discoverModels(provider: LlmConfigurableProvider) =
         remoteSettingsController.discoverModels(provider)
 
-    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) =
+    suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null) =
         withContext(Dispatchers.IO) { localHarness.saveModel(apiKey, model, baseUrl, protocol, profileId, contextWindowTokensOverride) }
 
     fun selectLocalModel(id: String) = localHarness.selectModel(id)
@@ -277,7 +272,7 @@ class SettingsViewModel @Inject constructor(
     }
     fun removeLocalModel(id: String) = localHarness.removeModel(id)
 
-    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.LocalModelProtocol? = null, profileId: String? = null): String =
+    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null): String =
         localHarness.testModel(apiKey, model, baseUrl, protocol, profileId)
 
     fun configureLocalMemory(userRules: String, autoRecall: Boolean, autoMemory: Boolean) {
@@ -322,11 +317,11 @@ class SettingsViewModel @Inject constructor(
         kind: TokenUsageGroupKind,
         key: String,
     ): TokenUsageGroupDetail? = withContext(Dispatchers.IO) {
-        usageTracker.analyticsGroupDetail(kind, key)
+        settingsData.usageGroupDetail(kind, key)
     }
 
     suspend fun usageRecord(requestId: String): TokenUsageRecord? = withContext(Dispatchers.IO) {
-        usageTracker.analyticsRecord(requestId)
+        settingsData.usageRecord(requestId)
     }
 
     fun refreshDeviceCapabilities() = deviceCapabilitiesController.refresh()

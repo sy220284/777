@@ -2,8 +2,6 @@ package com.labteto.dshmobile.local.model
 
 import android.content.Context
 import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.normalizeModelBaseUrl
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton

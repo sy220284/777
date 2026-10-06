@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.persistence.RecoveringDocumentFile
+
 import java.io.File
 import kotlinx.serialization.json.Json
 
@@ -13,7 +15,7 @@ internal class PersonaGalleryDocumentStore(
     private val file: File,
     private val json: Json,
 ) {
-    private val durableFile = RecoveringChatDocumentFile(file)
+    private val durableFile = RecoveringDocumentFile(file)
     private val backupFile = File(file.parentFile, "${file.name}.bak")
     private var cachedDocument: GalleryDocument? = null
     private var cachedStamp: DocumentStamp? = null

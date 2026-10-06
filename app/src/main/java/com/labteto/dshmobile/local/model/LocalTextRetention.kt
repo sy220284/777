@@ -1,4 +1,7 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
+
+import com.labteto.dshmobile.local.LocalHistoryBudget
+import com.labteto.dshmobile.local.LocalUsageMode
 
 /**
  * Conservative request estimator used only for pressure decisions. DeepSeek's exact tokenizer is

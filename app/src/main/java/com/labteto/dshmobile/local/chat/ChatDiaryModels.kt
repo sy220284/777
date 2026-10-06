@@ -46,6 +46,7 @@ data class ChatDiaryRevision(
     val disclosure: ChatDiaryDisclosure = ChatDiaryDisclosure.SHAREABLE,
     val sources: List<ChatDiarySourceRef> = emptyList(),
     val updatedAt: Long,
+    val projectionId: String? = null,
 )
 
 @Serializable
@@ -77,6 +78,7 @@ internal data class ChatDiaryDocument(
     val entries: List<ChatDiaryEntry> = emptyList(),
 )
 
+@Serializable
 internal data class ChatDiaryWriteRequest(
     val subjectKey: String,
     val personaName: String,
@@ -88,4 +90,5 @@ internal data class ChatDiaryWriteRequest(
     val sourceAssistantMessageIds: List<String>,
     val evidenceText: String,
     val generation: Long,
+    val projectionId: String? = null,
 )

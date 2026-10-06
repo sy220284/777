@@ -1,12 +1,24 @@
 package com.labteto.dshmobile.local
 
-import android.content.SharedPreferences
-import com.labteto.dshmobile.local.model.resolveLocalModelApiKeyDraft
+import android.content.Context
+import com.labteto.dshmobile.local.model.LocalApiKeyStore
+import com.labteto.dshmobile.local.model.LocalDeepSeekSearchCredentialResolver
+import com.labteto.dshmobile.local.model.LocalModelAuthKind
+import com.labteto.dshmobile.local.model.LocalModelConnectionTester
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelMutationGate
+import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelProfileStore
+import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.model.LocalModelStartupMigrator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
+import com.labteto.dshmobile.local.model.modelProfileId
+import com.labteto.dshmobile.local.model.resolveLocalModelApiKeyDraft
+import com.labteto.dshmobile.local.runtime.DEFAULT_BASE_URL
+import com.labteto.dshmobile.local.runtime.DEFAULT_MODEL
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 
 internal data class LocalModelConfigurationResult(
@@ -16,16 +28,18 @@ internal data class LocalModelConfigurationResult(
 )
 
 /** Coordinates model-route mutations; storage, migration and credential resolution stay extracted. */
-internal class LocalModelConfigurationCoordinator(
-    preferences: SharedPreferences,
+@Singleton
+class LocalModelConfigurationCoordinator @Inject internal constructor(
+    @ApplicationContext context: Context,
     private val apiKeys: LocalApiKeyStore,
     private val gateway: LocalModelGateway,
     private val tester: LocalModelConnectionTester,
     json: Json,
 ) {
+    private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
     private val profiles = LocalModelProfileStore(preferences, json)
     private val startup = LocalModelStartupMigrator(preferences, profiles, apiKeys, gateway)
-    suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null): LocalModelConfigurationResult =
+    internal suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null): LocalModelConfigurationResult =
         LocalModelMutationGate.run {
             require(model.isNotBlank()) { "模型名称不能为空" }
             val existingProfiles = profiles.read()
@@ -39,14 +53,14 @@ internal class LocalModelConfigurationCoordinator(
             LocalModelConfigurationResult(true, profile.model, profile.baseUrl, all, profile.id)
         }
 
-    suspend fun saveChatGptModels(
+    internal suspend fun saveChatGptModels(
         accountId: String,
         models: List<ChatGptModelOption>,
     ): List<LocalModelProfile> = LocalModelMutationGate.run {
         profiles.replaceChatGpt(accountId, models)
     }
 
-    suspend fun select(
+    internal suspend fun select(
         id: String,
         all: List<LocalModelProfile> = profiles.read(),
     ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
@@ -56,7 +70,7 @@ internal class LocalModelConfigurationCoordinator(
         LocalModelConfigurationResult(true, selected.model, selected.baseUrl, all, selected.id)
     }
 
-    suspend fun remove(
+    internal suspend fun remove(
         id: String,
         currentModel: String,
         currentBaseUrl: String,
@@ -68,7 +82,7 @@ internal class LocalModelConfigurationCoordinator(
         finishRemoval(all.filterNot { it.id == id }, activeRemoved, currentModel, currentBaseUrl)
     }
 
-    suspend fun removeChatGptAccount(
+    internal suspend fun removeChatGptAccount(
         accountId: String,
         currentModel: String,
         currentBaseUrl: String,
@@ -88,7 +102,7 @@ internal class LocalModelConfigurationCoordinator(
         )
     }
 
-    suspend fun clearActive(
+    internal suspend fun clearActive(
         currentModel: String,
         currentBaseUrl: String,
     ): LocalModelConfigurationResult = LocalModelMutationGate.run {
@@ -98,19 +112,22 @@ internal class LocalModelConfigurationCoordinator(
         finishRemoval(all.filterNot { it.id == active?.id }, true, currentModel, currentBaseUrl)
     }
 
-    suspend fun prepareStartup(model: String, baseUrl: String) = startup.prepare(model, baseUrl)
+    internal suspend fun prepareStartup(model: String, baseUrl: String) = startup.prepare(model, baseUrl)
 
-    suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): String {
+    internal suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): String {
         if (model.isBlank()) return "请选择模型"
         return tester.testStoredRoute(apiKey, normalizeModel(model), baseUrl, protocol, profiles.read(), apiKeys::getFor, profileId)
     }
 
-    fun readProfiles(): List<LocalModelProfile> = profiles.read()
+    internal fun readProfiles(): List<LocalModelProfile> = profiles.read()
 
-    fun activeProfile(model: String, baseUrl: String, all: List<LocalModelProfile> = profiles.read()) =
+    internal suspend fun resolveDeepSeekSearchCredential(): String? =
+        LocalDeepSeekSearchCredentialResolver(::readProfiles, apiKeys).resolve()
+
+    internal fun activeProfile(model: String, baseUrl: String, all: List<LocalModelProfile> = profiles.read()) =
         profiles.active(model, baseUrl, all)
 
-    fun normalizeModel(model: String): String =
+    internal fun normalizeModel(model: String): String =
         model.trim().ifBlank { DEFAULT_MODEL }.let {
             if (it.equals("deepseek-chat", true) || it.equals("deepseek-reasoner", true)) DEFAULT_MODEL else it
         }

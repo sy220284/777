@@ -1,7 +1,5 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.model.resolveLocalModelApiKeyDraft
-import com.labteto.dshmobile.local.model.LocalModelGateway
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException

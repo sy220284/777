@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import com.labteto.dshmobile.harness.agent.AgentStepLimitExtender
 import com.labteto.dshmobile.harness.resource.HarnessResourcePressure
@@ -10,13 +10,13 @@ internal const val MAX_FOREGROUND_DYNAMIC_STEPS = 512
 internal const val FOREGROUND_TURN_TIMEOUT_MILLIS = 15 * 60_000L
 
 /**
- * Builds the foreground soft-step extender without making LocalHarnessEngine own budget policy.
+ * Builds the foreground soft-step extender without making the Runtime Kernel own budget policy.
  */
 internal fun localForegroundStepLimitExtender(
     enabled: Boolean,
     configuredBase: Int,
     task: String,
-    state: () -> LocalHarnessState,
+    kernelState: () -> LocalKernelState,
     pressure: () -> HarnessResourcePressure,
     onExtended: (JsonObject) -> Unit,
     canExtend: () -> Boolean = { true },
@@ -26,7 +26,7 @@ internal fun localForegroundStepLimitExtender(
     return AgentStepLimitExtender { currentLimit, stepsUsed ->
         if (currentLimit >= maxTotalSteps) return@AgentStepLimitExtender null
         if (!canExtend()) return@AgentStepLimitExtender null
-        val current = state()
+        val current = kernelState()
         val livePressure = pressure()
         val next = nextAdaptiveAgentStepLimit(
             currentLimit = currentLimit,

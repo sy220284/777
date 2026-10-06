@@ -1,10 +1,53 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
-import com.labteto.dshmobile.local.model.LocalModelGateway
+import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.documentedContextWindowTokens
+import com.labteto.dshmobile.local.operationalInputLimitTokens
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+
+internal data class LocalModelAdmissionRequest(
+    val routeFingerprint: String,
+    val model: String,
+    val baseUrl: String,
+    val contextWindowTokensOverride: Int?,
+    val messages: List<JsonObject>,
+    val tools: JsonArray,
+)
+
+internal fun interface LocalModelAdmissionPort {
+    suspend fun execute(
+        request: LocalModelAdmissionRequest,
+        block: suspend () -> LocalModelReply,
+    ): LocalModelReply
+}
+
+/** Model-owned safety preflight that applies to every provider request, with or without Work. */
+internal fun validateModelRequestAdmission(request: LocalModelAdmissionRequest) {
+    val pressure = LocalPromptPressureMeter.measure(
+        messages = request.messages,
+        tools = request.tools,
+        operationalLimitTokens = operationalInputLimitTokens(
+            request.model,
+            request.baseUrl,
+            request.contextWindowTokensOverride,
+        ),
+        modelContextWindowTokens = documentedContextWindowTokens(
+            request.model,
+            request.baseUrl,
+            request.contextWindowTokensOverride,
+        ),
+    )
+    if (pressure.estimatedInputTokens > pressure.operationalLimitTokens) {
+        throw LocalModelException(
+            code = "MODEL_CONTEXT_BUDGET_EXCEEDED",
+            message = "预计输入 ${pressure.estimatedInputTokens} token，超过当前路由安全上限 ${pressure.operationalLimitTokens}",
+            retryable = false,
+        )
+    }
+}
 
 /**
  * Shared admitted provider-call boundary for foreground agents, subagents and bounded auxiliary work.
@@ -26,8 +69,7 @@ internal class LocalAgentModelRequestRuntime(
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
-        executionControl: LocalWorkExecutionControl? = null,
-        admissionHandledExternally: Boolean = false,
+        admission: LocalModelAdmissionPort? = null,
         onDelta: (LocalModelDelta) -> Unit = {},
     ): LocalModelReply {
         val completeProvider: suspend () -> LocalModelReply = {
@@ -66,17 +108,15 @@ internal class LocalAgentModelRequestRuntime(
                 completeProvider()
             }
         }
-        if (admissionHandledExternally) return invokeProvider()
-        return executeWithModelAdmission(
-            control = executionControl,
+        val admissionRequest = LocalModelAdmissionRequest(
             routeFingerprint = surface.routeFingerprint,
             model = surface.model,
             baseUrl = surface.baseUrl,
             contextWindowTokensOverride = surface.contextWindowTokensOverride,
             messages = messages,
             tools = tools,
-        ) {
-            invokeProvider()
-        }
+        )
+        validateModelRequestAdmission(admissionRequest)
+        return admission?.execute(admissionRequest, invokeProvider) ?: invokeProvider()
     }
 }

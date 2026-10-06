@@ -1,10 +1,10 @@
 package com.labteto.dshmobile.local.agent
 
-import com.labteto.dshmobile.local.LocalHistoryCompaction
 import com.labteto.dshmobile.local.LocalModelException
-import com.labteto.dshmobile.local.LocalSessionEventLog
+import com.labteto.dshmobile.local.model.LocalHistoryCompaction
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import com.labteto.dshmobile.local.model.modelFailureKind
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put

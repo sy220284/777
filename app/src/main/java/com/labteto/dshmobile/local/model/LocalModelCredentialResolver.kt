@@ -1,14 +1,11 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.LocalApiKeyStore
-import com.labteto.dshmobile.local.LocalModelAuthKind
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountRecord
-import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountStore
-import com.labteto.dshmobile.local.model.chatgpt.ChatGptSessionManager
-import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanAuthorizationEvents
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_PLAN_SCOPE
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_RESOURCE_INVOKE_SCOPE
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountRecord
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountStore
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanAuthorizationEvents
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptSessionManager
 import com.labteto.dshmobile.local.model.chatgpt.isUsableChatGptPlanBinding
 import javax.inject.Inject
 import javax.inject.Singleton

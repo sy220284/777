@@ -2,6 +2,9 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.SessionEvent
 import com.labteto.dshmobile.harness.session.SessionEventFileSnapshot
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.LocalSessionStorageManager
+import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File

@@ -1,15 +1,12 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.local.LocalGoal
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalModelReply
-import com.labteto.dshmobile.local.LocalSessionEventLog
-import com.labteto.dshmobile.local.LocalTodoItem
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalCanonicalContent
 import com.labteto.dshmobile.local.model.LocalCanonicalMessage
 import com.labteto.dshmobile.local.model.LocalCanonicalRole
-import com.labteto.dshmobile.local.quality.LocalOutputQualityContext
+import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -26,15 +23,17 @@ class LocalWorkCompletionClaimGuardTest {
     fun completionClaimIsDiagnosedWhenRuntimeStateStillHasOpenWork() {
         val state = LocalHarnessState(
             usageMode = LocalUsageMode.WORK,
-            goal = LocalGoal("完成重构", status = "blocked"),
-            todos = listOf(
-                LocalTodoItem("补测试", "pending"),
-                LocalTodoItem("已处理", "completed"),
+            work = LocalWorkState(
+                goal = LocalGoal("完成重构", status = "blocked"),
+                todos = listOf(
+                    LocalTodoItem("补测试", "pending"),
+                    LocalTodoItem("已处理", "completed"),
+                ),
             ),
         )
         val result = LocalWorkCompletionClaimGuard.inspect(
             "全部完成，可以交付。",
-            LocalOutputQualityContext(usageMode = LocalUsageMode.WORK, state = state),
+            state.work,
         )
         assertTrue(result.changed)
         assertTrue(result.text.startsWith("当前尚未完成："))
@@ -49,11 +48,13 @@ class LocalWorkCompletionClaimGuardTest {
     fun localProgressClaimIsNotMistakenForWholeTaskCompletion() {
         val state = LocalHarnessState(
             usageMode = LocalUsageMode.WORK,
-            todos = listOf(LocalTodoItem("继续测试", "pending")),
+            work = LocalWorkState(
+                todos = listOf(LocalTodoItem("继续测试", "pending")),
+            ),
         )
         val result = LocalWorkCompletionClaimGuard.inspect(
             "代码修改已完成，测试仍在运行。",
-            LocalOutputQualityContext(usageMode = LocalUsageMode.WORK, state = state),
+            state.work,
         )
 
         assertFalse(result.changed)
@@ -68,8 +69,10 @@ class LocalWorkCompletionClaimGuardTest {
             val log = LocalSessionEventLog(File(root, "events.jsonl"), Json)
             val state = LocalHarnessState(
                 usageMode = LocalUsageMode.WORK,
-                goal = LocalGoal("完成发布", status = "active"),
-                todos = listOf(LocalTodoItem("跑完整 CI", "in_progress")),
+                work = LocalWorkState(
+                    goal = LocalGoal("完成发布", status = "active"),
+                    todos = listOf(LocalTodoItem("跑完整 CI", "in_progress")),
+                ),
             )
             val reply = LocalModelReply(
                 message = buildJsonObject {
@@ -108,11 +111,13 @@ class LocalWorkCompletionClaimGuardTest {
     fun negativeCompletionStatementDoesNotProduceFalseFinding() {
         val state = LocalHarnessState(
             usageMode = LocalUsageMode.WORK,
-            todos = listOf(LocalTodoItem("继续处理", "pending")),
+            work = LocalWorkState(
+                todos = listOf(LocalTodoItem("继续处理", "pending")),
+            ),
         )
         val result = LocalWorkCompletionClaimGuard.inspect(
             "尚未完成，还要继续处理。",
-            LocalOutputQualityContext(usageMode = LocalUsageMode.WORK, state = state),
+            state.work,
         )
         assertTrue(result.findings.isEmpty())
     }

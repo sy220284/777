@@ -4,6 +4,8 @@ import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import com.labteto.dshmobile.harness.resource.HarnessResourceBudget
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
+import com.labteto.dshmobile.local.jobs.LocalJobManager
+import com.labteto.dshmobile.local.jobs.LocalPersistentJobStore
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle

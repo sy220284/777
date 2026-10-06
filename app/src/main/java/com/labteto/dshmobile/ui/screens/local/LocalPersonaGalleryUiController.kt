@@ -5,24 +5,21 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.LocalConversationMode
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
-import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
-import com.labteto.dshmobile.local.chat.PersonaInspectionService
 import com.labteto.dshmobile.local.chat.PersonaPreset
-import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
+import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
-import com.labteto.dshmobile.local.chat.galleryEntryHasUnsavedChanges
-import com.labteto.dshmobile.local.chat.isMeaningfulGalleryPersona
-import com.labteto.dshmobile.local.chat.samePersonaIdentity
-import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
+import com.labteto.dshmobile.local.presentation.galleryEntryHasUnsavedChanges
+import com.labteto.dshmobile.local.presentation.isMeaningfulGalleryPersona
+import com.labteto.dshmobile.local.presentation.samePersonaIdentity
+import com.labteto.dshmobile.local.presentation.withoutLegacyConversationContext
+import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -36,24 +33,22 @@ import kotlinx.coroutines.withContext
 /** Owns persona-gallery UI state, persistence, portraits and model-assisted maintenance. */
 internal class LocalPersonaGalleryUiController(
     private val runtime: LocalUiRuntime,
-    private val personaAutoFillService: PersonaAutoFillService,
-    private val personaInspectionService: PersonaInspectionService,
-    private val galleryStore: ChatPersonaGalleryStore,
+    private val chatUi: LocalChatUiFacade,
     private val appContext: Context,
     private val scope: CoroutineScope,
 ) {
-    private val state = runtime.session.state
+    private val state = runtime.state
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
-    private val transfer = LocalPersonaTransferCoordinator(runtime, galleryStore)
+    private val transfer = LocalPersonaTransferCoordinator(runtime, chatUi)
     val gallery: StateFlow<List<PersonaGalleryEntry>> = _gallery.asStateFlow()
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
     suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = runSuspendResult {
         runtime.chat.configureChatPersona(profile).getOrThrow()
-        _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
+        _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
     }
     init {
         scope.launch(Dispatchers.IO) {
-            runCatching { galleryStore.list() }.onSuccess { _gallery.value = it }
+            runCatching { chatUi.galleryEntries() }.onSuccess { _gallery.value = it }
         }
     }
 
@@ -66,9 +61,9 @@ suspend fun saveCurrentToGallery(
     val snapshot = state.value
     check(
         !snapshot.loading &&
-            !snapshot.running &&
+            !snapshot.kernel.running &&
             snapshot.usageMode == LocalUsageMode.CHAT &&
-            !snapshot.groupChat.enabled
+            !snapshot.chat.groupChat.enabled
     ) {
         "请在单人聊天空闲时保存人设与故事"
     }
@@ -76,27 +71,27 @@ suspend fun saveCurrentToGallery(
         runtime.session.completeTranscriptForUi(snapshot.sessionId)
     }
     val archiveHistory = if (
-        snapshot.galleryStoryId == null &&
-        snapshot.gallerySaveSuppressedThrough > 0L
+        snapshot.chat.galleryStoryId == null &&
+        snapshot.chat.gallerySaveSuppressedThrough > 0L
     ) {
         completeHistory.filter { message ->
-            message.createdAt > snapshot.gallerySaveSuppressedThrough
+            message.createdAt > snapshot.chat.gallerySaveSuppressedThrough
         }
     } else {
         completeHistory
     }
     val outcome = withContext(Dispatchers.IO) {
-        galleryStore.save(
-            persona = snapshot.chatPersona,
+        chatUi.saveGallery(
+            persona = snapshot.chat.chatPersona,
             sourceSessionId = snapshot.sessionId,
             history = archiveHistory,
-            chatState = snapshot.chatState.withoutLegacyConversationContext(),
+            chatState = snapshot.chat.chatState.withoutLegacyConversationContext(),
             notes = notes,
-            chatContext = snapshot.chatContext,
-            existingId = existingId ?: snapshot.galleryId,
-            existingStoryId = existingStoryId ?: snapshot.galleryStoryId,
+            chatContext = snapshot.chat.chatContext,
+            existingId = existingId ?: snapshot.chat.galleryId,
+            existingStoryId = existingStoryId ?: snapshot.chat.galleryStoryId,
             forceNewStory = forceNewStory,
-        ).also { _gallery.value = galleryStore.list() }
+        ).also { _gallery.value = chatUi.galleryEntries() }
     }
     runtime.chat.bindChatGallery(outcome.entry.id, outcome.storyId)
     outcome.entry
@@ -106,24 +101,24 @@ fun hasUnsavedCurrentPersona(): Boolean {
     val snapshot = state.value
     if (
         snapshot.loading ||
-        snapshot.running ||
+        snapshot.kernel.running ||
         snapshot.usageMode != LocalUsageMode.CHAT ||
-        snapshot.groupChat.enabled
+        snapshot.chat.groupChat.enabled
     ) return false
-    val persona = snapshot.chatPersona
+    val persona = snapshot.chat.chatPersona
     if (!isMeaningfulGalleryPersona(persona)) return false
 
     val latestDialogueAt = snapshot.transcriptIndex.latestDialogueCreatedAt
-    val suppressedThrough = snapshot.gallerySaveSuppressedThrough
+    val suppressedThrough = snapshot.chat.gallerySaveSuppressedThrough
     val hasDialogueAfterSuppression =
         snapshot.transcriptIndex.hasDialogue && latestDialogueAt > suppressedThrough
 
     if (suppressedThrough > 0L && !hasDialogueAfterSuppression) return false
 
-    val bound = snapshot.galleryId?.let { id -> gallery.value.firstOrNull { it.id == id } }
-    if (snapshot.galleryId != null) {
+    val bound = snapshot.chat.galleryId?.let { id -> gallery.value.firstOrNull { it.id == id } }
+    if (snapshot.chat.galleryId != null) {
         if (bound == null) return true
-        val story = bound.story(snapshot.galleryStoryId)
+        val story = bound.story(snapshot.chat.galleryStoryId)
         val archivedThrough = story?.history
             ?.asReversed()
             ?.firstOrNull { message -> message.role == "user" || message.role == "assistant" }
@@ -132,10 +127,10 @@ fun hasUnsavedCurrentPersona(): Boolean {
         val hasNewDialogue = hasDialogueAfterSuppression && latestDialogueAt > archivedThrough
         return hasNewDialogue || galleryEntryHasUnsavedChanges(
             entry = bound,
-            storyId = snapshot.galleryStoryId,
+            storyId = snapshot.chat.galleryStoryId,
             persona = persona,
             history = emptyList(),
-            chatState = snapshot.chatState,
+            chatState = snapshot.chat.chatState,
         )
     }
 
@@ -144,7 +139,7 @@ fun hasUnsavedCurrentPersona(): Boolean {
 }
 
 fun currentGalleryNeedsUpdate(): Boolean =
-    !state.value.groupChat.enabled && state.value.galleryId != null
+    !state.value.chat.groupChat.enabled && state.value.chat.galleryId != null
 
 fun currentGalleryHasUnsavedChanges(): Boolean = hasUnsavedCurrentPersona()
 
@@ -152,7 +147,7 @@ fun selectGalleryPersonaForCurrentChat(id: String): Boolean {
     val snapshot = state.value
     if (
         snapshot.loading ||
-        snapshot.running ||
+        snapshot.kernel.running ||
         snapshot.usageMode != LocalUsageMode.CHAT ||
         snapshot.transcriptIndex.hasDialogue
     ) return false
@@ -162,28 +157,28 @@ fun selectGalleryPersonaForCurrentChat(id: String): Boolean {
 }
 
 suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGalleryEntry> = runCatching {
-    check(!state.value.loading && !state.value.running) { "请在聊天空闲时新建人物" }
+    check(!state.value.loading && !state.value.kernel.running) { "请在聊天空闲时新建人物" }
     require(isMeaningfulGalleryPersona(profile)) { "请填写人物名称和至少一项人物设定" }
     val entry = withContext(Dispatchers.IO) {
-        galleryStore.save(
+        chatUi.saveGallery(
             persona = profile,
             sourceSessionId = "",
             history = emptyList(),
             chatState = ChatCharacterState(),
             notes = "",
-        ).entry.also { _gallery.value = galleryStore.list() }
+        ).entry.also { _gallery.value = chatUi.galleryEntries() }
     }
     // Preserve the old create-and-use flow for an empty one-to-one chat.
     // In an existing conversation or a group, creating a gallery card must not replace the cast.
-    if (!state.value.groupChat.enabled) selectGalleryPersonaForCurrentChat(entry.id)
+    if (!state.value.chat.groupChat.enabled) selectGalleryPersonaForCurrentChat(entry.id)
     entry
 }
 suspend fun autoFillNewPersona(description: String): Result<PersonaProfile> = runSuspendResult {
     val snapshot = state.value
-    check(!snapshot.loading && !snapshot.running && snapshot.configured) { "请先配置模型并等待当前回复结束" }
-    personaAutoFillService.generate(
-        model = snapshot.model, baseUrl = snapshot.baseUrl,
-        profileId = snapshot.modelSelection.activeProfileId,
+    check(!snapshot.loading && !snapshot.kernel.running && snapshot.modelState.configured) { "请先配置模型并等待当前回复结束" }
+    chatUi.autoFillPersona(
+        model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
+        profileId = snapshot.modelState.modelSelection.activeProfileId,
         current = PersonaProfile(name = ""),
         recentMessages = emptyList(),
         description = description,
@@ -195,10 +190,10 @@ suspend fun inspectGalleryPersona(
     storyId: String?,
 ): Result<PersonaInspectionResult> {
     val snapshot = state.value
-    if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) {
+    if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) {
         return Result.failure(IllegalStateException("请在聊天空闲时检查人物"))
     }
-    if (!snapshot.configured) {
+    if (!snapshot.modelState.configured) {
         return Result.failure(IllegalStateException("请先配置聊天模型"))
     }
     val entry = gallery.value.firstOrNull { it.id == id }
@@ -206,8 +201,8 @@ suspend fun inspectGalleryPersona(
     val story = entry.story(storyId)
     val archived = story?.history.orEmpty()
     val dialogue = if (
-        snapshot.galleryId == id &&
-        snapshot.galleryStoryId == story?.id
+        snapshot.chat.galleryId == id &&
+        snapshot.chat.galleryStoryId == story?.id
     ) {
         val recent = withContext(Dispatchers.IO) {
             runtime.session.transcriptTailForUi(snapshot.sessionId, PERSONA_INSPECTION_RECENT_MESSAGES)
@@ -218,9 +213,9 @@ suspend fun inspectGalleryPersona(
         archived
     }
     return runSuspendResult {
-        personaInspectionService.inspect(
-            model = snapshot.model, baseUrl = snapshot.baseUrl,
-            profileId = snapshot.modelSelection.activeProfileId,
+        chatUi.inspectPersona(
+            model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
+            profileId = snapshot.modelState.modelSelection.activeProfileId,
             persona = entry.persona,
             messages = dialogue,
         )
@@ -233,11 +228,11 @@ suspend fun applyGallerySuggestions(
 ): Result<PersonaGalleryEntry> = runCatching {
     val updated = withContext(Dispatchers.IO) {
         check(suggestions.isNotEmpty()) { "请先选择要追加的内容" }
-        galleryStore.applySuggestions(id, suggestions)
+        chatUi.applyGallerySuggestions(id, suggestions)
             ?: error("图集条目已不存在")
     }
-    _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
-    if (state.value.galleryId == id) {
+    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
+    if (state.value.chat.galleryId == id) {
         runtime.chat.configureChatPersona(updated.persona)
     }
     updated
@@ -277,7 +272,7 @@ suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(target.absolutePath, bounds)
             require(bounds.outWidth > 0 && bounds.outHeight > 0) { "人物形象图无法识别" }
-            val saved = galleryStore.updatePortraitPath(id, target.absolutePath)
+            val saved = chatUi.updateGalleryPortrait(id, target.absolutePath)
                 ?: error("图集条目已不存在")
             deleteManagedPortrait(previous.portraitPath, keepPath = target.absolutePath)
             saved
@@ -286,7 +281,7 @@ suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry
             throw error
         }
     }
-    _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
+    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
     updated
 }
 
@@ -294,11 +289,11 @@ suspend fun removeGalleryPortrait(id: String): Result<PersonaGalleryEntry> = run
     val previous = gallery.value.firstOrNull { it.id == id }
         ?: error("图集条目已不存在")
     val updated = withContext(Dispatchers.IO) {
-        galleryStore.updatePortraitPath(id, "")
+        chatUi.updateGalleryPortrait(id, "")
             ?: error("图集条目已不存在")
     }
     deleteManagedPortrait(previous.portraitPath)
-    _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
+    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
     updated
 }
 
@@ -313,15 +308,15 @@ private fun deleteManagedPortrait(path: String, keepPath: String? = null) {
 
 suspend fun editGalleryNotes(id: String, storyId: String, notes: String): Result<Unit> = runCatching {
     withContext(Dispatchers.IO) {
-        check(galleryStore.updateStoryNotes(id, storyId, notes)) { "图集故事已不存在" }
-        _gallery.value = galleryStore.list()
+        check(chatUi.updateStoryNotes(id, storyId, notes)) { "图集故事已不存在" }
+        _gallery.value = chatUi.galleryEntries()
     }
 }
 
 suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> = runCatching {
     withContext(Dispatchers.IO) {
-        check(galleryStore.renameStory(id, storyId, title)) { "图集故事已不存在" }
-        _gallery.value = galleryStore.list()
+        check(chatUi.renameStory(id, storyId, title)) { "图集故事已不存在" }
+        _gallery.value = chatUi.galleryEntries()
     }
 }
 
@@ -336,15 +331,15 @@ internal suspend fun importGalleryPersona(
     mimeType: String?,
 ): Result<PersonaGalleryEntry> = runCatching {
     transfer.import(bytes, fileName, mimeType).also {
-        _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
+        _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
     }
 }
 
 suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runCatching {
     val preset = PersonaPresetCatalog.find(id) ?: error("人物预置不存在")
     val entry = withContext(Dispatchers.IO) {
-        PersonaPresetArtworkInstaller(appContext, galleryStore).install(preset).also {
-            _gallery.value = runCatching { galleryStore.list() }.getOrDefault(_gallery.value)
+        PersonaPresetArtworkInstaller(appContext, chatUi).install(preset).also {
+            _gallery.value = runCatching { chatUi.galleryEntries() }.getOrDefault(_gallery.value)
         }
     }
     entry
@@ -353,8 +348,8 @@ suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runC
 suspend fun deleteGalleryEntry(id: String): Result<Unit> = runCatching {
     val portraitPath = gallery.value.firstOrNull { it.id == id }?.portraitPath.orEmpty()
     withContext(Dispatchers.IO) {
-        check(galleryStore.delete(id)) { "图集条目已不存在" }
-        _gallery.value = galleryStore.list()
+        check(chatUi.deleteGallery(id)) { "图集条目已不存在" }
+        _gallery.value = chatUi.galleryEntries()
     }
     deleteManagedPortrait(portraitPath)
     runtime.chat.removeGroupChatMemberByGalleryId(id)
@@ -363,8 +358,8 @@ suspend fun deleteGalleryEntry(id: String): Result<Unit> = runCatching {
 
 suspend fun deleteGalleryStory(id: String, storyId: String): Result<Unit> = runCatching {
     withContext(Dispatchers.IO) {
-        check(galleryStore.deleteStory(id, storyId)) { "图集故事已不存在" }
-        _gallery.value = galleryStore.list()
+        check(chatUi.deleteStory(id, storyId)) { "图集故事已不存在" }
+        _gallery.value = chatUi.galleryEntries()
     }
     runtime.chat.clearChatGalleryBinding(expectedGalleryId = id, expectedStoryId = storyId, keepCharacter = true)
 }
@@ -375,8 +370,8 @@ suspend fun deleteGalleryHistoryMessage(
     messageKey: String,
 ): Result<Unit> = runCatching {
     withContext(Dispatchers.IO) {
-        check(galleryStore.deleteHistoryMessage(id, storyId, messageKey)) { "gallery_archive_missing" }
-        _gallery.value = galleryStore.list()
+        check(chatUi.deleteHistoryMessage(id, storyId, messageKey)) { "gallery_archive_missing" }
+        _gallery.value = chatUi.galleryEntries()
     }
 }
 
@@ -386,14 +381,12 @@ fun startFromGallery(
     freshStory: Boolean,
 ): Boolean {
     val snapshot = state.value
-    if (snapshot.loading || snapshot.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
+    if (snapshot.loading || snapshot.kernel.running || snapshot.usageMode != LocalUsageMode.CHAT) return false
     val entry = gallery.value.firstOrNull { it.id == id } ?: return false
-    return runtime.session.createSession(
-        mode = LocalConversationMode.INDEPENDENT,
-        usageMode = LocalUsageMode.CHAT,
-        galleryEntry = entry,
-        galleryStoryId = storyId,
-        freshGalleryStory = freshStory,
+    return runtime.chat.startSessionFromGallery(
+        entry = entry,
+        storyId = storyId,
+        freshStory = freshStory,
     )
 }
 

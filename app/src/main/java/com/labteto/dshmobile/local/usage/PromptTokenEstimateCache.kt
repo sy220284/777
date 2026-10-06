@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.usage
 
-import com.labteto.dshmobile.local.estimateModelTokens
-
+import com.labteto.dshmobile.local.model.estimateModelTokens
 import java.util.LinkedHashMap
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject

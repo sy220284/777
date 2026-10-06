@@ -4,46 +4,43 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.labteto.dshmobile.local.LocalImportedAttachment
-import com.labteto.dshmobile.local.LocalConversationMode
-import com.labteto.dshmobile.local.LocalChatUserEditResult
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.send.LocalSendResult
+import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.chat.ChatDiaryEntry
+import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
+import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
+import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
+import com.labteto.dshmobile.local.chat.PersonaInspectionResult
+import com.labteto.dshmobile.local.chat.PersonaPreset
+import com.labteto.dshmobile.local.presentation.PersonaPresetCatalog
+import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.PersonaTransferDocument
+import com.labteto.dshmobile.local.chat.PersonaTransferFormat
+import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
+import com.labteto.dshmobile.local.presentation.LocalSessionUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import com.labteto.dshmobile.local.presentation.projectChatSurfaceState
 import com.labteto.dshmobile.local.presentation.projectShellState
-import com.labteto.dshmobile.local.presentation.projectWorkSurfaceState
 import com.labteto.dshmobile.local.presentation.projectWorkState
-import com.labteto.dshmobile.local.chat.PersonaAutoFillService
-import com.labteto.dshmobile.local.chat.GroupAnnouncementService
-import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.PersonaPreset
-import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
-import com.labteto.dshmobile.local.chat.ChatDiaryEntry
-import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
-import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
-import com.labteto.dshmobile.local.chat.PersonaInspectionResult
-import com.labteto.dshmobile.local.chat.PersonaInspectionService
-import com.labteto.dshmobile.local.chat.PersonaTransferDocument
-import com.labteto.dshmobile.local.chat.PersonaTransferFormat
+import com.labteto.dshmobile.local.presentation.projectWorkSurfaceState
+import com.labteto.dshmobile.local.send.LocalSendResult
+import com.labteto.dshmobile.local.session.LocalConversationMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
     private val runtime: LocalUiRuntime,
-    private val personaAutoFillService: PersonaAutoFillService,
-    private val groupAnnouncementService: GroupAnnouncementService,
-    personaInspectionService: PersonaInspectionService,
-    galleryStore: ChatPersonaGalleryStore,
+    private val chatUi: LocalChatUiFacade,
+    private val sessionUi: LocalSessionUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
-    val state = runtime.session.state
-    val streamingState = runtime.session.streamingState; internal val sendFeedbackState = runtime.session.sendFeedbackState
+    val state = runtime.state
+    val streamingState = runtime.streamingState; internal val sendFeedbackState = runtime.sendFeedbackState
     val shellState = state.projectShellState(viewModelScope)
     val chatSurfaceState = state.projectChatSurfaceState(viewModelScope)
     val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)
@@ -51,21 +48,18 @@ class LocalHarnessViewModel @Inject constructor(
     val workState = state.projectWorkState(viewModelScope)
     private val personaGalleryController = LocalPersonaGalleryUiController(
         runtime = runtime,
-        personaAutoFillService = personaAutoFillService,
-        personaInspectionService = personaInspectionService,
-        galleryStore = galleryStore,
+        chatUi = chatUi,
         appContext = appContext,
         scope = viewModelScope,
     )
     private val chatModelAssistController = LocalChatModelAssistController(
         runtime = runtime,
-        personaAutoFillService = personaAutoFillService,
-        groupAnnouncementService = groupAnnouncementService,
+        chatUi = chatUi,
     )
     val gallery = personaGalleryController.gallery
     val personaPresets: List<PersonaPreset> = personaGalleryController.personaPresets
     private val transcriptHistoryController = LocalTranscriptHistoryController(
-        session = runtime.session,
+        session = sessionUi,
         currentSessionId = { state.value.sessionId },
         liveMessages = { state.value.messages },
         scope = viewModelScope,
@@ -138,7 +132,13 @@ class LocalHarnessViewModel @Inject constructor(
 
     fun configure(apiKey: String, model: String, baseUrl: String) = runtime.model.configure(apiKey, model, baseUrl)
     fun selectModel(model: String) = runtime.model.selectModel(model)
-    internal fun send(text: String, attachments: List<LocalImportedAttachment> = emptyList()): LocalSendResult = runtime.chat.send(text, attachments)
+    internal fun send(
+        text: String,
+        attachments: List<LocalImportedAttachment> = emptyList(),
+    ): LocalSendResult = when (state.value.usageMode) {
+        LocalUsageMode.WORK -> runtime.work.send(text, attachments)
+        LocalUsageMode.CHAT -> runtime.chat.send(text, attachments)
+    }
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
         withContext(Dispatchers.IO) { runtime.chat.diaryEntries(subjectKey) }
@@ -150,8 +150,8 @@ class LocalHarnessViewModel @Inject constructor(
         return runtime.chat.createGroupChatSession(entries)
     }
     fun createSingleChatSession() = runtime.chat.createSingleChatSession()
-    fun openGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.GROUP)
-    fun leaveGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.LocalChatMode.SINGLE)
+    fun openGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.chat.LocalChatMode.GROUP)
+    fun leaveGroupChatMode() = runtime.chat.switchChatMode(com.labteto.dshmobile.local.chat.LocalChatMode.SINGLE)
     fun configureGroupChatMembers(ids: List<String>): Boolean {
         val entriesById = gallery.value.associateBy(PersonaGalleryEntry::id)
         val entries = ids.distinct().mapNotNull(entriesById::get)
@@ -182,7 +182,10 @@ class LocalHarnessViewModel @Inject constructor(
 
     private fun refreshTranscriptHistoryAfterTimelineRewrite() =
         transcriptHistoryController.refreshAfterTimelineRewrite()
-    fun regenerateReply(messageId: String): Boolean = runtime.chat.regenerateReply(messageId)
+    fun regenerateReply(messageId: String): Boolean = when (state.value.usageMode) {
+        LocalUsageMode.WORK -> runtime.work.regenerateReply(messageId)
+        LocalUsageMode.CHAT -> runtime.chat.regenerateReply(messageId)
+    }
     fun toggleSessionPinned(sessionId: String) = conversationUiState.toggleSessionPinned(sessionId)
     fun renameSession(sessionId: String, title: String): Boolean = conversationUiState.renameSession(sessionId, title)
     suspend fun deleteSessions(ids: Set<String>): Int = conversationUiState.deleteSessions(ids, runtime.session::deleteSessions)
@@ -201,14 +204,22 @@ class LocalHarnessViewModel @Inject constructor(
     fun disableAutoApproval() = runtime.work.disableAutoApproval()
     fun answerQuestion(callId: String, answer: String) = runtime.work.answerQuestion(callId, answer)
     fun cancelQuestion(callId: String) = runtime.work.cancelQuestion(callId)
-    fun stop() = runtime.work.stop()
-    fun newSession() = runtime.session.createSession(LocalConversationMode.INDEPENDENT)
-    fun createSession(mode: LocalConversationMode) = runtime.session.createSession(mode)
+    fun stop() {
+        when (state.value.usageMode) {
+            LocalUsageMode.CHAT -> runtime.chat.stop()
+            LocalUsageMode.WORK -> runtime.work.stop()
+        }
+    }
+    fun newSession() = runtime.session.createSession(LocalConversationMode.INDEPENDENT, state.value.usageMode)
+    fun createSession(mode: LocalConversationMode) = runtime.session.createSession(mode, state.value.usageMode)
     fun setPlanMode(enabled: Boolean) = runtime.work.setPlanMode(enabled)
     fun switchUsageMode(mode: LocalUsageMode) = runtime.session.switchUsageMode(mode)
     suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = personaGalleryController.configureChatPersona(profile)
-    fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) =
-        runtime.chat.undoChatPersonaCorrection(noticeId, personaId, correction)
+    fun undoChatPersonaCorrection(noticeId: Long, personaId: String, correction: String) {
+        viewModelScope.launch {
+            runtime.chat.undoChatPersonaCorrection(noticeId, personaId, correction)
+        }
+    }
 
     suspend fun autoFillChatPersona(description: String): Result<PersonaProfile> =
         chatModelAssistController.autoFillCurrentPersona(description)

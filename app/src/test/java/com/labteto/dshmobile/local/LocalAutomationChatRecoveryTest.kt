@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.chat.recoverAutomationChatOutput
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull

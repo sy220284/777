@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.tools
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement

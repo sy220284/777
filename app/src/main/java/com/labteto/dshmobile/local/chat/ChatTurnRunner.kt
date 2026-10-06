@@ -1,8 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.ChatStyleGuard
-import com.labteto.dshmobile.local.DeepSeekTokenUsage
-import com.labteto.dshmobile.local.LocalModelReply
+import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
+import com.labteto.dshmobile.local.model.LocalModelReply
 import com.labteto.dshmobile.local.quality.LocalOutputQualityContext
 import com.labteto.dshmobile.local.quality.LocalOutputQualityPipeline
 import javax.inject.Inject

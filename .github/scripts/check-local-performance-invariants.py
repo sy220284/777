@@ -1,460 +1,431 @@
 #!/usr/bin/env python3
-"""Guard local Harness performance invariants that are easy to regress in code review."""
+"""Guard Architecture 3.0 execution and performance invariants.
+
+This guard checks hot-path anti-patterns and durable execution properties. It intentionally avoids
+UI styling, prompt wording, file-size budgets, constructor/method counts, and exact implementation
+shape. Product behavior belongs to tests; architecture ownership belongs to the structure guard.
+"""
 
 from pathlib import Path
 import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-ENGINE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
-LOCAL_SCREEN = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
-LOCAL_CONVERSATION_SURFACE = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationSurface.kt"
-LOCAL_CONVERSATION_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposer.kt"
-LOCAL_CONVERSATION_COMPOSER_ACTIONS = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalConversationComposerActions.kt"
-REMOTE_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/main/Composer.kt"
-SHARED_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/components/DsConversationComposer.kt"
-SESSION_STORE = ROOT / "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt"
-PERSONA_GALLERY = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt"
-LIFECYCLE_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt"
+LOCAL_ROOT = ROOT / "app/src/main/java/com/labteto/dshmobile/local"
+
 EVENT_LOG = ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionEventLog.kt"
-REPOSITORY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt"
+REPOSITORY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRepository.kt"
 DEEPSEEK = ROOT / "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"
-WEB_PROVIDER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalWebProvider.kt"
-WEB_DIAGNOSTICS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/web/LocalWebDiagnostics.kt"
 CONTEXT_BUDGET = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalContextBudget.kt"
-COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionCoordinator.kt"
-RUN_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalAgentRunCoordinator.kt"
-MODEL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt"
+SESSION_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionCoordinator.kt"
+SESSION_STORAGE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt"
+SESSION_SNAPSHOT_PROVIDER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalCurrentSessionSnapshotComposition.kt"
+SESSION_SNAPSHOT_BOUNDARY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalCurrentSessionSnapshotProvider.kt"
+TRANSCRIPT_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt"
+WORK_RUN_BINDING = ROOT / "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt"
 MODEL_HISTORY_BUFFER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryBuffer.kt"
 ENGINE_DEFAULTS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt"
-TRANSCRIPT_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt"
-AUTOMATION_CHAT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt"
-PROMPT_CONTEXT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/model/LocalPromptContext.kt"
-TOOL_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
-CHAT_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatTurnCoordinator.kt"
-CHAT_REPLY_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatReplyCoordinator.kt"
-CHAT_HISTORY_WINDOW = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatHistoryWindow.kt"
-CHAT_EDIT_SUPPORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatEditSupport.kt"
-CHAT_CONTEXT_REFRESH = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalChatContextRefreshCoordinator.kt"
-GROUP_CHAT_EXECUTOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt"
-SUBAGENT_RUNNER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt"
-TOKEN_USAGE_ANALYTICS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt"
-CLEANUP_WORKFLOW = ROOT / ".github/workflows/cleanup-old-releases.yml"
+TRANSCRIPT_HISTORY_LOADER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryLoader.kt"
+MODEL_REQUEST_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt"
+RUNTIME_STATE_STORE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt"
+TOOL_EXECUTION_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
+AGENT_RUN_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt"
+SESSION_RUNTIME_REGISTRY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionRuntimeRegistry.kt"
+AUTOMATION_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt"
+CHAT_AUTOMATION_PORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatAutomationExecutionPort.kt"
+WORK_AUTOMATION_PORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationExecutionPort.kt"
+AUTOMATION_WORKER = ROOT / "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationWorker.kt"
 
 violations: list[str] = []
 
-engine = ENGINE.read_text(encoding="utf-8")
 
-engine_lines = len(engine.splitlines())
-if engine_lines > 6_500:
-    violations.append(
-        f"LocalHarnessEngine.kt grew to {engine_lines} lines (budget: 6500); extract new logic behind a coordinator"
-    )
+def read(path: Path) -> str:
+    if not path.exists():
+        violations.append(f"required execution-invariant source is missing: {path.relative_to(ROOT)}")
+        return ""
+    return path.read_text(encoding="utf-8")
 
-local_screen = LOCAL_SCREEN.read_text(encoding="utf-8")
-local_conversation_surface = LOCAL_CONVERSATION_SURFACE.read_text(encoding="utf-8")
-local_conversation_composer = LOCAL_CONVERSATION_COMPOSER.read_text(encoding="utf-8")
-local_conversation_composer_actions = LOCAL_CONVERSATION_COMPOSER_ACTIONS.read_text(encoding="utf-8")
-remote_composer = REMOTE_COMPOSER.read_text(encoding="utf-8")
-shared_composer = SHARED_COMPOSER.read_text(encoding="utf-8")
 
-local_screen_lines = len(local_screen.splitlines())
-if local_screen_lines > 2_450:
-    violations.append(
-        f"LocalHarnessScreen.kt grew to {local_screen_lines} lines (budget: 2450); extract UI/state into focused components"
-    )
+def strip_comments(source: str) -> str:
+    source = re.sub(r"/\*[\s\S]*?\*/", "", source)
+    return re.sub(r"//.*$", "", source, flags=re.MULTILINE)
 
-if "DsConversationComposer(" not in local_conversation_composer:
-    violations.append("LocalConversationComposer.kt must use the shared DsConversationComposer shell")
-if "var focused" not in local_conversation_composer or "val expanded =" not in local_conversation_composer:
-    violations.append("LocalConversationComposer.kt must preserve focus-driven two-row composer expansion")
-if "var focused by remember(state.sessionId)" in local_conversation_composer:
-    violations.append("LocalConversationComposer focus must not reset on session changes while IME remains visible")
-if "DsAnimations.composerReveal" not in local_conversation_composer or "animateSize = false" not in local_conversation_composer:
-    violations.append("LocalConversationComposer must use targeted row reveal without nested shell size animation")
-if "shape = DsShapes.composer" in local_conversation_composer:
-    violations.append("LocalConversationComposer.kt must not rebuild composer geometry outside DsConversationComposer")
 
-if "DsConversationComposer(" not in remote_composer:
-    violations.append("Composer.kt must use the shared DsConversationComposer shell")
-if "composerFocused" not in remote_composer or "composerExpanded" not in remote_composer:
-    violations.append("Composer.kt must preserve focus-driven two-row composer expansion")
-if "shape = DsShapes.composer" in remote_composer:
-    violations.append("Composer.kt must not rebuild composer geometry outside DsConversationComposer")
+def kotlin_sources_under(relative_dir: str) -> dict[str, str]:
+    base = ROOT / relative_dir
+    if not base.exists():
+        return {}
+    return {
+        path.relative_to(ROOT).as_posix(): strip_comments(path.read_text(encoding="utf-8"))
+        for path in base.rglob("*.kt")
+    }
 
-if "object DsComposerMetrics" not in shared_composer or "fun DsComposerAction(" not in shared_composer:
-    violations.append("Shared composer must own compact action geometry and sizing tokens")
-if "LocalConversationComposerExpandedRow(" not in local_conversation_composer:
-    violations.append("LocalConversationComposer must delegate expanded actions to its focused component")
-if "icon = Icons.Outlined.ListAlt" not in local_conversation_composer_actions or "icon = Icons.Outlined.VerifiedUser" not in local_conversation_composer_actions:
-    violations.append("Work composer must keep clear planning and auto-approve actions in the expanded row")
-mode_pill = (ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalUsageModePill.kt").read_text(encoding="utf-8")
-if "graphicsLayer { translationX = indicatorOffsetPx }" not in mode_pill:
-    violations.append("Usage-mode indicator animation must stay on the render layer instead of relayout on every frame")
-if "val result = onSend(input, attachments.toList())" not in local_conversation_composer or "if (!result.accepted) return" not in local_conversation_composer:
-    violations.append("Local Chat/Work composer must preserve the draft until runtime accepts the send")
 
-persona_gallery_lines = len(PERSONA_GALLERY.read_text(encoding="utf-8").splitlines())
-if persona_gallery_lines > 1_160:
-    violations.append(
-        f"PersonaGalleryDialog.kt grew to {persona_gallery_lines} lines (budget: 1160); keep gallery features in extracted components"
-    )
+def merge_sources(*groups: dict[str, str]) -> dict[str, str]:
+    merged: dict[str, str] = {}
+    for group in groups:
+        merged.update(group)
+    return merged
 
-session_store_lines = len(SESSION_STORE.read_text(encoding="utf-8").splitlines())
-if session_store_lines > 2_050:
-    violations.append(
-        f"SessionStore.kt grew to {session_store_lines} lines (budget: 2050); extract protocol/state models or coordinators"
-    )
-event_log = EVENT_LOG.read_text(encoding="utf-8")
-repository = REPOSITORY.read_text(encoding="utf-8")
-deepseek = DEEPSEEK.read_text(encoding="utf-8")
-if "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION" not in deepseek or "sawTerminalFrame" not in deepseek:
-    violations.append("Model streaming must reject truncated SSE responses after admission without blind whole-request replay")
-web_provider = WEB_PROVIDER.read_text(encoding="utf-8")
-web_diagnostics = WEB_DIAGNOSTICS.read_text(encoding="utf-8")
-context_budget = CONTEXT_BUDGET.read_text(encoding="utf-8")
-coordinator = COORDINATOR.read_text(encoding="utf-8")
-run_coordinator = RUN_COORDINATOR.read_text(encoding="utf-8")
-model_coordinator = MODEL_COORDINATOR.read_text(encoding="utf-8")
-model_history_buffer = MODEL_HISTORY_BUFFER.read_text(encoding="utf-8")
-engine_defaults = ENGINE_DEFAULTS.read_text(encoding="utf-8")
-transcript_runtime = TRANSCRIPT_RUNTIME.read_text(encoding="utf-8")
-automation_chat = AUTOMATION_CHAT.read_text(encoding="utf-8")
-prompt_context = PROMPT_CONTEXT.read_text(encoding="utf-8")
-tool_coordinator = TOOL_COORDINATOR.read_text(encoding="utf-8")
-chat_coordinator = CHAT_COORDINATOR.read_text(encoding="utf-8")
-chat_reply_coordinator = CHAT_REPLY_COORDINATOR.read_text(encoding="utf-8")
-chat_history_window = CHAT_HISTORY_WINDOW.read_text(encoding="utf-8")
-chat_edit_support = CHAT_EDIT_SUPPORT.read_text(encoding="utf-8")
-chat_context_refresh = CHAT_CONTEXT_REFRESH.read_text(encoding="utf-8")
-group_chat_executor = GROUP_CHAT_EXECUTOR.read_text(encoding="utf-8")
-subagent_runner = SUBAGENT_RUNNER.read_text(encoding="utf-8")
-token_usage_analytics = TOKEN_USAGE_ANALYTICS.read_text(encoding="utf-8")
-lifecycle_coordinator = LIFECYCLE_COORDINATOR.read_text(encoding="utf-8")
-cleanup_workflow = CLEANUP_WORKFLOW.read_text(encoding="utf-8")
 
-for name, source in (
-    ("LocalChatTurnCoordinator.kt", chat_coordinator),
-    ("LocalChatReplyCoordinator.kt", chat_reply_coordinator),
-    ("LocalChatHistoryWindow.kt", chat_history_window),
-    ("LocalChatContextRefreshCoordinator.kt", chat_context_refresh),
-    ("LocalGroupChatTurnExecutor.kt", group_chat_executor),
+def contains_any(sources: dict[str, str], token: str) -> bool:
+    return any(token in source for source in sources.values())
+
+
+def paths_containing(sources: dict[str, str], token: str) -> list[str]:
+    return sorted(path for path, source in sources.items() if token in source)
+
+
+def ordered_in_source(source: str, *tokens: str) -> bool:
+    positions = [source.find(token) for token in tokens]
+    return min(positions) >= 0 and positions == sorted(positions)
+
+
+event_log = strip_comments(read(EVENT_LOG))
+repository = strip_comments(read(REPOSITORY))
+deepseek = strip_comments(read(DEEPSEEK))
+context_budget = strip_comments(read(CONTEXT_BUDGET))
+session_coordinator = strip_comments(read(SESSION_COORDINATOR))
+session_storage = strip_comments(read(SESSION_STORAGE))
+session_snapshot_provider = strip_comments(read(SESSION_SNAPSHOT_PROVIDER))
+session_snapshot_boundary = strip_comments(read(SESSION_SNAPSHOT_BOUNDARY))
+transcript_runtime = strip_comments(read(TRANSCRIPT_RUNTIME))
+work_run_binding = strip_comments(read(WORK_RUN_BINDING))
+model_history_buffer = strip_comments(read(MODEL_HISTORY_BUFFER))
+engine_defaults = strip_comments(read(ENGINE_DEFAULTS))
+transcript_history_loader = strip_comments(read(TRANSCRIPT_HISTORY_LOADER))
+model_request_coordinator = strip_comments(read(MODEL_REQUEST_COORDINATOR))
+runtime_state_store = strip_comments(read(RUNTIME_STATE_STORE))
+tool_execution_coordinator = strip_comments(read(TOOL_EXECUTION_COORDINATOR))
+agent_run_coordinator = strip_comments(read(AGENT_RUN_COORDINATOR))
+session_runtime_registry = strip_comments(read(SESSION_RUNTIME_REGISTRY))
+automation_runtime = strip_comments(read(AUTOMATION_RUNTIME))
+chat_automation_port = strip_comments(read(CHAT_AUTOMATION_PORT))
+work_automation_port = strip_comments(read(WORK_AUTOMATION_PORT))
+automation_worker = strip_comments(read(AUTOMATION_WORKER))
+
+chat_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/chat")
+work_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/work")
+session_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/session")
+automation_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/automation")
+runtime_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/runtime")
+all_local_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local")
+
+root_execution_sources = {}
+for relative in (
+    "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt",
 ):
-    if "withLegacyFallback" in source:
-        violations.append(
-            f"{name} must use ChatContextState as the runtime scene/continuity source; "
-            "legacy fallback is allowed only at persistence migration boundaries"
-        )
+    path = ROOT / relative
+    if path.exists():
+        root_execution_sources[relative] = strip_comments(path.read_text(encoding="utf-8"))
 
-for forbidden_runtime_fallback in (
-    ".withLegacyFallback(snapshot.chatState)",
-    ".withLegacyFallback(beforeAssistant.chatState)",
-    ".withLegacyFallback(nextChatState)",
-):
-    if forbidden_runtime_fallback in engine:
-        violations.append(
-            f"LocalHarnessEngine reintroduced runtime legacy chat-context fallback: {forbidden_runtime_fallback}"
-        )
+foreground_sources = merge_sources(chat_sources, work_sources, root_execution_sources)
+recovery_sources = merge_sources(work_sources, session_sources, runtime_sources, root_execution_sources)
 
-if "withLegacyFallback" in engine:
-    violations.append("LocalHarnessEngine must migrate legacy chat context at the session read boundary")
-if "withLegacyFallback" in automation_chat:
-    violations.append("Automation Chat must consume canonical ChatContextState from LocalSessionCoordinator")
+# Compatibility migrations may legitimately decode legacy Chat state. Only active execution
+# surfaces are forbidden from re-reading legacy context during a live turn.
+active_chat_context_sources = {
+    path: source
+    for path, source in merge_sources(chat_sources, root_execution_sources).items()
+    if path.endswith((
+        "LocalChatDirectTurnExecutor.kt",
+        "LocalChatContextRefreshCoordinator.kt",
+        "LocalGroupChatTurnExecutor.kt",
+        "LocalChatTurnCoordinator.kt",
+        "LocalChatReplyCoordinator.kt",
+    ))
+}
+active_chat_context_sources.update({
+    path: source
+    for path, source in automation_sources.items()
+    if path.endswith("LocalAutomationChatCoordinator.kt")
+})
 
-if "release:" not in cleanup_workflow or "types: [published]" not in cleanup_workflow:
-    violations.append("Release cleanup must stay event-driven from published releases")
-if "cron: '23 3 * * *'" not in cleanup_workflow or "*/30 * * * *" in cleanup_workflow:
-    violations.append("Release cleanup fallback must stay daily rather than every 30 minutes")
-if "keep = formal_releases[:3]" not in cleanup_workflow or "remove = formal_releases[3:]" not in cleanup_workflow:
-    violations.append("Release retention must keep exactly the three highest formal published versions")
-if "timedelta(" in cleanup_workflow or "cutoff =" in cleanup_workflow:
-    violations.append("Release retention must not add an age-based retention window")
+hot_sources = merge_sources(
+    foreground_sources,
+    session_sources,
+    runtime_sources,
+)
 
-def constant(name: str) -> int | None:
-    source = engine + "\n" + engine_defaults
-    match = re.search(rf"const val {re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", source)
+
+# ---- Bounded streaming and hot-state work ---------------------------------
+
+def numeric_constant(name: str) -> int | None:
+    match = re.search(rf"\bconst\s+val\s+{re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", engine_defaults)
     return int(match.group(1).replace("_", "")) if match else None
 
-preview_chars = constant("MAX_STREAM_PREVIEW_CHARS")
+
+preview_chars = numeric_constant("MAX_STREAM_PREVIEW_CHARS")
 if preview_chars is None or preview_chars > 8_192:
     violations.append(
-        f"MAX_STREAM_PREVIEW_CHARS must stay bounded at <= 8192, got {preview_chars}"
+        f"MAX_STREAM_PREVIEW_CHARS must remain bounded at <= 8192, got {preview_chars}"
     )
 
-preview_interval = constant("STREAM_PREVIEW_INTERVAL_MS")
+preview_interval = numeric_constant("STREAM_PREVIEW_INTERVAL_MS")
 if preview_interval is None or not 16 <= preview_interval <= 250:
     violations.append(
-        f"STREAM_PREVIEW_INTERVAL_MS must stay screen-friendly (16..250 ms), got {preview_interval}"
+        f"STREAM_PREVIEW_INTERVAL_MS must remain screen-friendly (16..250 ms), got {preview_interval}"
     )
 
-for forbidden in (
+for forbidden_hot_pattern in (
     "modelHistory.sumOf",
     "state.streamingAssistant + delta.content",
     "_state.update { it.copy(streamingAssistant",
     "state.messages.mapTo(hashSetOf()",
     "state.messages.maxOfOrNull(LocalHarnessMessage::createdAt)",
     'title = state.messages.firstOrNull { it.role == "user" }',
-    "val latestDialogueId = current.messages.lastOrNull",
-    'checkpointModelHistory("assistant/message")',
-    'checkpointModelHistory("tool/result")',
-    'checkpointModelHistory("user/message")',
-    'checkpointModelHistory("user/queue-consumed")',
-    "val directChat =",
-    "CHAT_MODE_TOOLS",
     "postTurnSnapshot.messages.lastOrNull",
 ):
-    if forbidden in engine:
-        violations.append(f"LocalHarnessEngine.kt reintroduced hot-path pattern: {forbidden}")
+    hits = paths_containing(hot_sources, forbidden_hot_pattern)
+    if hits:
+        violations.append(
+            f"hot execution surface reintroduced {forbidden_hot_pattern!r}: " + ", ".join(hits)
+        )
 
-# Engine must never mutate the underlying model-history collection directly. The dedicated
-# buffer owns every write together with its cached character/token accounting.
+# Model-history accounting has one owner. No extracted execution surface may mutate the raw list.
 for forbidden_mutation in (
     "modelHistory +=",
     "modelHistory.add(",
-    "modelHistory[0] =",
     "modelHistory.clear()",
 ):
-    if forbidden_mutation in engine:
+    hits = paths_containing(hot_sources, forbidden_mutation)
+    if hits:
         violations.append(
-            f"LocalHarnessEngine bypassed LocalModelHistoryBuffer: {forbidden_mutation}"
+            f"execution surface bypassed LocalModelHistoryBuffer via {forbidden_mutation!r}: "
+            + ", ".join(hits)
         )
+if re.search(r"\bmodelHistory\s*\[[^\]]+\]\s*=", "\n".join(hot_sources.values())):
+    violations.append("execution surface mutates raw modelHistory entries outside LocalModelHistoryBuffer")
 
-expected_buffer_counts = {
-    "messages +=": 2,      # append + reset
-    "messages.add(": 1,    # prepend
-    "messages[0] =": 1,    # replaceSystem
-    "messages.clear()": 1, # reset
-}
-historical_chat_full_scan_patterns = (
-    "sourceEventSequenceForMessage(eventLog.events()",
-    "restoreChatStateBefore(eventLog.events()",
-    "restoreGroupStateBefore(eventLog.events()",
-)
-for pattern in historical_chat_full_scan_patterns:
-    if pattern in engine:
-        violations.append(
-            "Historical Chat timeline rewrites must page event history instead of materializing the full archive"
-        )
+for cached_metric in ("encodedChars", "estimatedTokens"):
+    if re.search(rf"\bvar\s+{cached_metric}\s*:\s*Int", model_history_buffer) is None:
+        violations.append("LocalModelHistoryBuffer lost cached metric: " + cached_metric)
 
-for name, source, forbidden in (
-    ("LocalSubagentRunner.kt", subagent_runner, "eventLog().events()"),
-    ("TokenUsageAnalytics.kt", token_usage_analytics, "eventLog.events()"),
-):
-    if forbidden in source:
-        violations.append(
-            f"{name} must resolve recent run attribution with newest-first SessionEventLog lookup, not full-history events()"
-        )
 
-if "fun latestMatching(" not in event_log:
-    violations.append("SessionEventLog must keep newest-first predicate lookup for hot run attribution")
+# ---- Bounded durable history ----------------------------------------------
 
-for token, expected in expected_buffer_counts.items():
-    actual = model_history_buffer.count(token)
-    if actual != expected:
-        violations.append(
-            f"LocalModelHistoryBuffer accounting path changed unexpectedly: {token!r} count={actual}, expected={expected}"
-        )
+for required_event_api in ("pageBefore", "pageAfter", "latestMatching", "forEachAfter"):
+    if re.search(rf"\bfun\s+{required_event_api}\s*\(", event_log) is None:
+        violations.append("SessionEventLog lost bounded/recent history API: " + required_event_api)
 
 if "val events = snapshot()" in event_log:
-    violations.append("SessionEventLog.read must not materialize the whole event archive")
+    violations.append("SessionEventLog.read must not materialize the complete event archive")
 if "orderedFilesUnsafe().asReversed()" not in event_log:
-    violations.append("SessionEventLog tail/latest paths must keep newest-first segment traversal")
-if "RandomAccessFile(source, \"r\")" not in event_log or "REVERSE_READ_BUFFER_BYTES" not in event_log:
-    violations.append("SessionEventLog restart sequence recovery must keep buffered reverse reading")
-if "fun pageBefore(" not in event_log or "forEachEventReverseUnsafe" not in event_log:
-    violations.append("SessionEventLog must keep bounded reverse paging for infinite-session history")
+    violations.append("SessionEventLog newest-first paths lost reverse segment traversal")
+if "RandomAccessFile(source, \"r\")" not in event_log:
+    violations.append("SessionEventLog restart/tail recovery lost bounded reverse file access")
 
-if "summaryCache" not in repository or "snapshot.toSummary()" not in repository:
-    violations.append("LocalSessionRepository must keep lightweight session-summary caching")
+for token in (
+    "LOCAL_TRANSCRIPT_HISTORY_MAX_PAGES_PER_LOAD",
+    "LOCAL_TRANSCRIPT_HISTORY_MAX_RAW_MESSAGES_PER_LOAD",
+):
+    if token not in transcript_history_loader:
+        violations.append("foreground transcript loading lost total-call budget: " + token)
 
-snapshot_match = re.search(
-    r"private fun persistenceSnapshot\(binding: LocalWorkRunBinding\? = null\): LocalHarnessSession \{(.*?)\n    \}",
-    engine,
-    re.S,
-)
-persist_match = re.search(
-    r"private fun persist\(binding: LocalWorkRunBinding\? = null\) \{(.*?)\n    \}",
-    engine,
-    re.S,
-)
-if snapshot_match is not None:
-    persist_body = snapshot_match.group(1)
-elif persist_match is not None:
-    persist_body = persist_match.group(1)
-else:
-    persist_body = ""
-    violations.append("LocalHarnessEngine must keep the session snapshot persistence boundary")
+# Full-history events() is forbidden in foreground/recovery hot paths.
+for path, source in merge_sources(chat_sources, work_sources).items():
+    if ".events()" in source:
+        violations.append(f"{path} scans the full Session event archive on a Feature hot path")
 
-if persist_body:
-    control_pos = persist_body.find("val controlProjectedThroughSequence = log.latestSequence()")
-    transcript_pos = persist_body.find("val transcriptProjectedThroughSequence")
-    state_pos = persist_body.find("val state = binding?.state?.value ?: _state.value")
-    if min(control_pos, transcript_pos, state_pos) < 0 or not (
-        control_pos < state_pos and transcript_pos < state_pos
-    ):
+for relative, token in (
+    ("app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt", "eventLog().events()"),
+    ("app/src/main/java/com/labteto/dshmobile/local/TokenUsageAnalytics.kt", "eventLog.events()"),
+):
+    source = root_execution_sources.get(relative, "")
+    if token in source:
+        violations.append(f"{relative} uses full-history events() for recent attribution")
+
+if (
+    "fun appendMessages(messages: List<LocalHarnessMessage>, runtimeWindowMessages: Int)" not in transcript_runtime
+    or "state.appendMessages(messages, runtimeWindowMessages)" not in transcript_runtime
+    or "(current.messages + messages).takeLast(runtimeWindowMessages)" not in work_run_binding
+):
+    violations.append(
+        "Transcript projection must preserve a bounded visible window through its narrow state port"
+    )
+
+if (
+    "summaryCache" not in repository
+    or "LocalSessionSummaryIndex" not in repository
+):
+    violations.append("LocalSessionRepository lost lightweight summary caching/indexing")
+
+
+# ---- Session persistence and recovery ordering ----------------------------
+
+if (
+    "messages = emptyList()" not in session_snapshot_provider
+    or "transcriptWindow = state.messages.takeLast(runtimeWindowMessages)" not in session_snapshot_provider
+):
+    violations.append("Session snapshots must keep full transcript out of the snapshot payload")
+
+if "controlProjectedThroughSequence = eventLog.latestSequence()" not in session_snapshot_boundary:
+    violations.append("Session snapshot boundary lost durable control cursor capture")
+if not ordered_in_source(
+    session_storage,
+    "val boundary = localSessionSnapshotBoundary(",
+    "return currentSnapshotProvider.snapshot(",
+):
+    violations.append(
+        "Session persistence must capture durable projection cursors before materializing mutable Feature state"
+    )
+
+if contains_any(foreground_sources, 'eventLog.append("user/queue"'):
+    violations.append("legacy user/queue persistence returned; queued input must use durable Agent inbox facts")
+
+# Recovery must reject stale ownership before late foreground Work commits.
+if not contains_any(work_sources, "agentRunCoordinator.ensureCurrentOwner("):
+    violations.append("Work execution lost the durable late-commit ownership fence")
+
+
+# ---- Runtime ownership, route freeze, and tool execution ------------------
+
+resource_scheduler_owners = paths_containing(all_local_sources, "HarnessResourceScheduler(")
+expected_scheduler_owner = [
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt"
+]
+if resource_scheduler_owners != expected_scheduler_owner:
+    violations.append(
+        "HarnessResourceScheduler must have exactly one Runtime owner; found: "
+        + ", ".join(resource_scheduler_owners)
+    )
+for required_resource_contract in (
+    "internal val resourceScheduler = HarnessResourceScheduler(",
+    "internal suspend fun <T> withModelRequestResource(",
+    "HarnessResourceKind.MODEL_REQUEST",
+    "resourceScheduler.withResource(",
+):
+    if required_resource_contract not in runtime_state_store:
         violations.append(
-            "Session snapshot persistence must capture durable projection cursors before reading mutable state"
+            "LocalRuntimeStateStore lost shared resource ownership: " + required_resource_contract
         )
+if "runtimeStateStore.withModelRequestResource(block)" not in automation_runtime:
+    violations.append(
+        "Automation model requests must acquire MODEL_REQUEST through shared Runtime ownership"
+    )
+
+for port_name, source in (
+    ("Chat Automation execution Port", chat_automation_port),
+    ("Work Automation execution Port", work_automation_port),
+):
+    for terminal_status in ("DELIVERED", "SKIPPED", "BLOCKED", "CANCELLED", "FAILED"):
+        if terminal_status not in source:
+            violations.append(
+                f"{port_name} lost structured terminal status: {terminal_status}"
+            )
+    if "val status:" not in source:
+        violations.append(f"{port_name} must return a structured status instead of exception-only outcome")
+
+for terminal_status in ("DELIVERED", "SKIPPED", "BLOCKED", "CANCELLED", "FAILED"):
+    if f"LocalAutomationRunStatus.{terminal_status}" not in automation_worker:
+        violations.append(
+            "Automation Worker lost explicit settlement for terminal status: " + terminal_status
+        )
+
+tracked_tool_execution_owners = paths_containing(all_local_sources, ".executeTracked(")
+expected_tool_execution_owner = [
+    "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
+]
+if tracked_tool_execution_owners != expected_tool_execution_owner:
+    violations.append(
+        "tracked ToolRegistry execution must have one shared policy owner; found: "
+        + ", ".join(tracked_tool_execution_owners)
+    )
+for required_tool_boundary in (
+    "LocalToolPolicy.canonical(",
+    "planModeEnabled",
+    "allowMutation",
+    "ToolContext(",
+    "registry.executeTracked(",
+):
+    if required_tool_boundary not in tool_execution_coordinator:
+        violations.append(
+            "LocalToolExecutionCoordinator lost tool policy/side-effect boundary: "
+            + required_tool_boundary
+        )
+
+if model_request_coordinator.count("modelGateway.profileForRoute(") != 1:
+    violations.append(
+        "one model request must resolve the fallback route exactly once before retries/recovery"
+    )
+if not ordered_in_source(
+    model_request_coordinator,
+    "val frozenProfile = profile ?: modelGateway.profileForRoute(",
+    "val runSurface = frozenProfile.toRunModelSurface()",
+    "modelStepRuntime.recover(",
+):
+    violations.append(
+        "model route/profile must freeze before request recovery and retry orchestration"
+    )
+if re.search(
+    r"requestRuntime\.complete\s*\(\s*surface\s*=\s*runSurface\b",
+    model_request_coordinator,
+    re.DOTALL,
+) is None:
+    violations.append(
+        "provider invocation must use the frozen runSurface instead of re-reading mutable model settings"
+    )
+
+for required_agent_owner_fact in (
+    "private val foregroundOwners = ConcurrentHashMap<String, String>()",
+    "fun isCurrentOwner(context: LocalAgentRunContext)",
+    "fun ensureCurrentOwner(context: LocalAgentRunContext)",
+):
+    if required_agent_owner_fact not in agent_run_coordinator:
+        violations.append(
+            "LocalAgentRunCoordinator lost run-identity ownership fact: " + required_agent_owner_fact
+        )
+
+for required_session_owner_api in (
+    "class LocalSessionRuntimeLease",
+    "suspend fun <T> withOwner(",
+    "fun tryAcquire(",
+    "suspend fun acquire(",
+    "suspend fun acquireAll(",
+):
+    if required_session_owner_api not in session_runtime_registry:
+        violations.append(
+            "LocalSessionRuntimeRegistry lost process-wide session ownership API: "
+            + required_session_owner_api
+        )
+if ".distinct().sorted().forEach { sessionId ->" not in session_runtime_registry:
+    violations.append(
+        "multi-session ownership must acquire leases in stable order to avoid cross-session deadlock"
+    )
+
+
+# ---- Protocol/runtime anti-bypass rules -----------------------------------
 
 if "parse(synthetic.toString())" in deepseek:
-    violations.append("DeepSeek streaming replies must not rebuild and reparse a synthetic full response")
+    violations.append("DeepSeek streaming rebuilt a synthetic full response instead of incremental parsing")
 
 if "usageMode: LocalUsageMode" in context_budget or "DEFAULT_CHAT_TOOL_RESULT_TOKENS" in context_budget:
-    violations.append("Context/tool-result budgets must be shared across Chat and Work product surfaces")
+    violations.append("context/tool-result budget forked by product mode instead of using one shared capability")
 
-if 'eventLog.append("user/queue"' in engine:
-    violations.append("Queued user input must use the durable agent/inbox/spliced fact, not legacy user/queue writers")
-if "decodeLocalAgentInboxPending" not in engine or "pendingInputs.restore(" not in engine:
-    violations.append("LocalHarnessEngine must restore the durable Agent inbox on Session load")
-
-live_capture_pos = engine.find("liveWorkRun(sessionId)?.let { liveBinding ->")
-live_rebind_pos = engine.find("syncVisibleWorkRun(sessionId, liveBinding)")
-durable_read_pos = engine.find("sessionCoordinator.readWithLegacyApproval(sessionId)")
-durable_repair_pos = engine.find("eventLog.repairInterruptedTail()")
-if min(live_capture_pos, live_rebind_pos, durable_read_pos, durable_repair_pos) < 0 or not (
-    live_capture_pos < live_rebind_pos < durable_read_pos < durable_repair_pos
+for forbidden_fallback in (
+    '"to", "vision-tool"',
+    '"multimodal/fallback"',
 ):
-    violations.append(
-        "Live session-bound Work runtime must rebind before any durable recovery path"
-    )
-if "executeSafely(call.toLocalToolCall(), allowMutation = true, binding = binding)" not in engine:
-    violations.append(
-        "Bound Work single-tool execution must keep the originating session binding"
-    )
-if "binding = binding," not in engine or "executeToolBatch(" not in engine:
-    violations.append(
-        "Bound Work tool batches must keep the originating session binding"
-    )
-if "LocalRuntimeOwnershipPolicy.allowVisibleQueuedTurn(" not in engine:
-    violations.append(
-        "Shared visible queue must stay idle while the current session has a live Work owner"
-    )
-if "agentRunCoordinator.ensureCurrentOwner(runContext)" not in engine:
-    violations.append(
-        "Foreground Work execution must reject late work after runtime ownership transfers"
-    )
-if "val latestRunId = log.latest(eventType(kind))" not in run_coordinator:
-    violations.append(
-        "Recovery checkpoints must not overwrite a newer run for the same session"
-    )
-wake_path_count = (
-    engine.count("startNextQueuedTurnIfIdle()?.start()") +
-    lifecycle_coordinator.count("startNextQueuedTurnIfIdle()?.start()")
-)
-if wake_path_count < 5:
-    violations.append("Recovered durable Agent inbox must keep startup/session-switch wake paths")
-
-if "transcriptForBranchMaterialization(" not in engine or "restoreMaterializedChatBranchState(" not in engine:
-    violations.append("Chat branching must materialize full history only on demand and preserve durable branch graphs")
-if "(current.messages + messages).takeLast(runtimeWindowMessages)" not in transcript_runtime:
-    violations.append("Runtime transcript must stay bounded inside LocalTranscriptRuntime")
-if "LocalSessionCoordinator(" not in engine or "sessionCoordinator.snapshot(" not in engine:
-    violations.append("Session snapshot writes must stay routed through LocalSessionCoordinator")
-if (
-    "messages = emptyList()" not in coordinator or
-    "transcriptWindow = state.messages.takeLast(runtimeWindowMessages)" not in coordinator
-):
-    violations.append("Session snapshots must persist only a bounded transcriptWindow, never full state.messages")
-if "LocalSessionTranscriptPager(eventLog).all()" not in engine:
-    violations.append("Full transcript reads must go through the Session Event pager")
-for name, source in (
-    ("LocalChatEditSupport.kt", chat_edit_support),
-    ("LocalChatContextRefreshCoordinator.kt", chat_context_refresh),
-):
-    if ".events()" in source:
-        violations.append(f"{name} must page historical events instead of scanning the full archive")
-
-if "if (!policy.toolsEnabled) return JsonArray(emptyList())" not in tool_coordinator:
-    violations.append("Chat capability policy must project an empty model tool catalog through LocalToolExecutionCoordinator")
-if "toolCalls = if (runPolicy.allowToolExecution)" not in engine:
-    violations.append("Chat model replies must strip unexpected tool calls before AgentLoop execution")
-if '"to", "vision-tool"' in engine or '"multimodal/fallback"' in engine:
-    violations.append("Native-image failures must not fall back to a separate vision model")
-if "当前模型不支持图片理解" not in engine:
-    violations.append("Unsupported current-model image input must surface an explicit user-facing error")
-if "runGroupChatTurn(input" not in engine or "runAgentTurn(input, memoryInput" not in engine:
-    violations.append("Single chat must use the primary AgentLoop while group chat keeps multi-character orchestration")
-legacy_single_chat_step_policy = "maxSteps = if (runPolicy.allowToolExecution) mainMaxSteps else 1" in engine
-adaptive_single_chat_step_policy = (
-    re.search(
-        r"val mainStepLimit\s*=\s*if\s*\(runPolicy\.allowToolExecution\).*?else\s+1",
-        engine,
-        re.S,
-    ) is not None
-    and engine.count("maxSteps = mainStepLimit") >= 2
-)
-if not (legacy_single_chat_step_policy or adaptive_single_chat_step_policy):
-    violations.append("Single chat must remain a one-step primary-agent reply")
-if "底层能力与工作界面共用同一套 Agent、工具、权限和上下文治理" in engine:
-    violations.append("Chat prompt must not advertise Work tools or execution capabilities")
-if "以用户当前输入、明确纠正和当前状态为准" not in prompt_context or "当前模式只进行聊天，不执行工作任务或工具操作" not in prompt_context:
-    violations.append("Chat prompt must retain current-state priority and chat-only execution boundaries")
-if "持续到任务完成或遇到真实阻塞" not in prompt_context or "最终结论必须有实际结果支撑" not in prompt_context:
-    violations.append("Work prompt must retain abstract execution-discipline and evidence-based completion rules")
-if "const val PROBE_ATTEMPTS = 3" not in web_diagnostics or "const val SAFE_HTTP_RETRY_ATTEMPTS = 3" not in web_provider:
-    violations.append("Network diagnosis and safe HTTP reads must keep bounded three-attempt retry resilience")
-if '"X-RateLimit-Remaining"' not in web_provider or '"Retry-After"' not in web_provider:
-    violations.append("HTTP tooling must expose safe rate-limit response headers for error classification")
-
-if "agentRunCoordinator.start(" not in engine or "agentRunCoordinator.recoveryDecision(" not in engine:
-    violations.append("Foreground Agent runs must use durable LocalAgentRunCoordinator checkpoints and restart recovery")
-if "eventType(context.kind)" not in run_coordinator or "TOOL_OUTCOME_UNKNOWN" not in run_coordinator:
-    violations.append("Run checkpoints must stay isolated by execution kind and block unsafe side-effect recovery")
-if "runCoordinator?.recordEvent" not in subagent_runner or "runKind: LocalAgentRunKind" not in subagent_runner:
-    violations.append("Subagent and automation runs must share the unified run-context checkpoint boundary")
-if "modelRequestCoordinator.complete(" not in engine:
-    violations.append("Foreground model transport must stay routed through LocalModelRequestCoordinator")
-if "toolExecutionCoordinator.execute(" not in engine:
-    violations.append("Foreground registered tools must stay routed through LocalToolExecutionCoordinator")
-if "chatTurnCoordinator.prepare(" not in engine:
-    violations.append("Chat semantic preparation must stay routed through LocalChatTurnCoordinator")
-if "messages = emptyList()" not in coordinator:
-    violations.append("LocalSessionCoordinator must keep legacy full transcript out of new snapshots")
-
-for forbidden_direct in (
-    "toolRegistry.execute(",
-    "modelClient.complete(",
-    "modelClient.completeStreaming(",
-    "AgentRequestExecutor(",
-    "chatTurnRunner.",
-    "chatInteractionPlanner.",
-    "sessionRepository.read(",
-    "sessionRepository.enqueue(",
-    "sessionRepository.delete(",
-    "sessionRepository.summaries()",
-):
-    if forbidden_direct in engine:
+    hits = paths_containing(foreground_sources, forbidden_fallback)
+    if hits:
         violations.append(
-            f"LocalHarnessEngine bypassed an extracted coordinator: {forbidden_direct}"
+            "foreground execution reintroduced a separate vision-model fallback: " + ", ".join(hits)
         )
 
-run_agent = re.search(
-    r"private suspend fun runAgentTurn\(.*?\n    private fun AgentToolCall",
-    engine,
-    re.S,
-)
-if run_agent is None:
-    violations.append("Unified foreground Agent loop is missing")
-else:
-    run_agent_body = run_agent.group(0)
-    if "cancelChatPostTurn()" not in run_agent_body:
-        violations.append("Chat turns must cancel stale post-turn refresh before capturing new context")
-    if "withChatTurnContext(" not in run_agent_body:
-        violations.append("Unified Chat turns must preserve stable/dynamic context placement")
-if "chatReplyCoordinator.finalizeDirect(" not in engine:
-    violations.append("Direct Chat replies must pass the pre-commit scene continuity guard")
-if "chatReplyCoordinator.finalizeGroup(" not in group_chat_executor:
-    violations.append("Group Chat replies must pass the shared-scene continuity guard")
-if "chatReplyCoordinator.guardProactive(" not in automation_chat:
-    violations.append("Proactive Chat replies must pass the pre-commit scene continuity guard")
-
-if "before.chatBranches.nodes.isNotEmpty()" not in engine or "appendMaterializedChatBranchMessage(" not in engine:
-    violations.append("Chat branch continuation must only materialize after a real branch already exists")
+# Legacy chat-context fallback is allowed only in compatibility/persistence transforms, never
+# in an active turn or proactive execution path.
+for path, source in active_chat_context_sources.items():
+    if "withLegacyFallback" in source:
+        violations.append(
+            f"{path} uses legacy Chat context fallback inside active execution"
+        )
 
 if violations:
-    print("Local performance invariant guard failed:", file=sys.stderr)
+    print("Architecture 3.0 execution invariant guard failed:", file=sys.stderr)
     for violation in violations:
         print(f"  - {violation}", file=sys.stderr)
     sys.exit(1)
 
-print("Local performance invariant guard passed")
+print("[architecture-3] OK: execution/performance invariants hold")

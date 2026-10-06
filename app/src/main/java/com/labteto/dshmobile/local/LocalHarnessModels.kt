@@ -1,32 +1,16 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.model.LocalModelSelectionState
-
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatContextState
-import com.labteto.dshmobile.local.chat.ChatReplySuggestion
-import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.model.LocalCanonicalMessage
-import kotlinx.serialization.SerialName
+import com.labteto.dshmobile.local.chat.LocalChatState
+import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelState
+import com.labteto.dshmobile.local.runtime.LocalKernelState
+import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
+import com.labteto.dshmobile.local.work.LocalWorkState
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
-
-/** One durable row shown in the on-device Harness transcript. */
-@Serializable
-data class LocalHarnessMessage(
-    val id: String,
-    val role: String,
-    val content: String,
-    val toolName: String? = null,
-    val createdAt: Long,
-    val speakerId: String? = null,
-    val speakerName: String? = null,
-    /** Role-authored message produced without a new user turn, e.g. a scheduled roleplay interaction. */
-    val proactive: Boolean = false,
-    /** Null only for legacy tool rows without structured execution facts. */
-    val toolIsError: Boolean? = null,
-    val toolErrorCode: String? = null,
-)
 
 @Serializable
 enum class LocalUsageMode {
@@ -34,238 +18,15 @@ enum class LocalUsageMode {
     WORK,
 }
 
-@Serializable
-enum class LocalConversationMode {
-    INDEPENDENT,
-    PROJECT,
-    CONTINUATION,
-}
-
-/** Persisted model history and its user-facing projection. */
-@Serializable
-data class LocalHarnessSession(
-    val id: String = "",
-    val title: String = "新会话",
-    val updatedAt: Long = 0L,
-    val usageMode: LocalUsageMode = LocalUsageMode.WORK,
-    val personaId: String = PersonaProfile.DEFAULT_PERSONA_ID,
-    val chatState: ChatCharacterState = ChatCharacterState(),
-    val chatContext: ChatContextState = ChatContextState(),
-    val replySuggestions: List<ChatReplySuggestion> = emptyList(),
-    val chatBranches: LocalChatBranchState = LocalChatBranchState(),
-    val groupChat: LocalGroupChatState = LocalGroupChatState(),
-    val galleryId: String? = null,
-    val galleryStoryId: String? = null,
-    val gallerySaveSuppressedThrough: Long = 0L,
-    val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
-    val parentSessionId: String? = null,
-    val lineageId: String = "",
-    val projectId: String? = null,
-    val handoffSummary: String? = null,
-    /**
-     * Legacy compatibility only. New snapshots leave this empty; Session Event is the complete
-     * transcript source of truth.
-     */
-    val messages: List<LocalHarnessMessage> = emptyList(),
-    /** Bounded startup/runtime cache. This is never allowed to become complete history. */
-    val transcriptWindow: List<LocalHarnessMessage> = emptyList(),
-    val transcriptIndex: LocalTranscriptRuntimeIndex = LocalTranscriptRuntimeIndex(),
-    /**
-     * Legacy compatibility only. New snapshots leave this empty; model-visible history is restored
-     * from SessionEventLog checkpoints and semantic tail events.
-     */
-    @SerialName("modelHistory")
-    val legacyModelHistory: List<JsonObject> = emptyList(),
-    val plan: List<String> = emptyList(),
-    val todos: List<LocalTodoItem> = emptyList(),
-    val goal: LocalGoal? = null,
-    val planMode: Boolean = false,
-    /** Highest SessionEvent sequence already reflected in the materialized control-state snapshot. */
-    val controlProjectedThroughSequence: Long? = null,
-    /** Highest SessionEvent sequence already reflected in the materialized user-facing transcript. */
-    val transcriptProjectedThroughSequence: Long? = null,
-)
-
-enum class LocalImageInputMode {
-    AUTO,
-    NATIVE,
-    TOOL,
-}
-
-data class LocalImportedAttachment(
-    val name: String,
-    val relativePath: String,
-    val mediaType: String,
-    val bytes: Long,
-    val attachmentId: String? = null,
-    val width: Int? = null,
-    val height: Int? = null,
-)
-
-data class LocalSessionSummary(
-    val id: String,
-    val title: String,
-    val updatedAt: Long,
-    val usageMode: LocalUsageMode = LocalUsageMode.WORK,
-    val chatMode: LocalChatMode = LocalChatMode.SINGLE,
-    val groupMemberCount: Int = 0,
-    val personaId: String? = null,
-    val galleryId: String? = null,
-    val blank: Boolean = false,
-    /** 最近一条用户消息的预览（截断到 72 字符），供侧边栏第二行展示。 */
-    val summaryPreview: String? = null,
-    /** Lightweight authorization/search scope; avoids reopening the full Session document. */
-    val projectId: String? = null,
-    val lineageId: String? = null,
-)
-
-/** One real file currently present in the app-private local Harness workspace. */
-data class LocalWorkspaceFile(
-    val path: String,
-    val bytes: Long,
-    val modifiedAt: Long,
-)
-
-/** Current-session file projection derived from its durable tool event log. */
-data class LocalConversationFiles(
-    val artifacts: List<LocalWorkspaceFile> = emptyList(),
-    val involved: List<LocalWorkspaceFile> = emptyList(),
-) {
-    val isEmpty: Boolean get() = artifacts.isEmpty() && involved.isEmpty()
-}
-
-/** Result of one detached Work-mode automation run. */
-data class LocalAutomationRunResult(
-    val sessionId: String,
-    val output: String,
-    val delivered: Boolean = true,
-    val skipReason: String? = null,
-    val nextRunAtHint: Long? = null,
-    val waitingForUserReply: Boolean = false,
-)
-
-
-/** Lightweight local preview; binary files remain visible without forcing them through UTF-8. */
-data class LocalWorkspaceFilePreview(
-    val file: LocalWorkspaceFile,
-    val text: String? = null,
-    val truncated: Boolean = false,
-)
-
-/** One persisted implementation task, aligned with the official todo tool. */
-@Serializable
-data class LocalTodoItem(
-    val content: String,
-    val status: String,
-)
-
-/** The current durable session goal. */
-@Serializable
-data class LocalGoal(
-    val description: String,
-    val status: String = "active",
-    val note: String? = null,
-)
-
-enum class LocalApprovalImpact {
-    LOW,
-    MEDIUM,
-    HIGH,
-    CRITICAL,
-}
-
-/** A tool call waiting for the operator because it crossed an approval boundary. */
-data class LocalApproval(
-    val callId: String,
-    val toolName: String,
-    val summary: String,
-    val arguments: String,
-    val access: String,
-    val impact: LocalApprovalImpact = LocalApprovalImpact.HIGH,
-    val canAutoApproveSafely: Boolean = false,
-    val canApproveDeviceTurn: Boolean = false,
-)
-
-/** A model question that pauses the current turn until the user answers it. */
-data class LocalQuestion(
-    val callId: String,
-    val question: String,
-    val options: List<String> = emptyList(),
-)
-
-/** User-visible state for a background command. */
-data class LocalJobInfo(
-    val id: String,
-    val label: String,
-    val status: String,
-    val ownerSessionId: String? = null,
-)
-
-data class LocalWorkflowProgress(
-    val sessionId: String,
-    val stage: String,
-    val task: String,
-    val completed: Int,
-    val total: Int,
-    val blockedReason: String? = null,
-    val needsUserAction: Boolean = false,
-)
-
-data class ChatPersonaCorrectionNotice(
-    val id: Long,
-    val personaId: String,
-    val correction: String,
-)
-
-/** High-frequency model preview kept outside the aggregate runtime state. */
-data class LocalHarnessStreamingState(
-    val sessionId: String = "",
-    val requestId: String = "",
-    val usageMode: LocalUsageMode? = null,
-    val generation: Long = 0L,
-    val assistant: String = "",
-    val reasoning: String = "",
-)
-
-/** State rendered by the standalone, on-device Harness screen. */
-data class LocalHarnessResourceState(
-    val activeModelRequests: Int = 0,
-    val activeAgents: Int = 0,
-    val activeTerminals: Int = 0,
-    val activeVirtualDisplays: Int = 0,
-    val activeLanguageServers: Int = 0,
-    val maxModelRequests: Int = 1,
-    val maxAgents: Int = 1,
-    val maxTerminals: Int = 1,
-    val maxVirtualDisplays: Int = 1,
-    val maxLanguageServers: Int = 1,
-    val resourcePressure: String = "low",
-)
-
 data class LocalHarnessState(
     val loading: Boolean = true,
-    val configured: Boolean = false,
-    val model: String = "deepseek-flash",
-    val baseUrl: String = "https://api.deepseek.com",
-    val modelSelection: LocalModelSelectionState = LocalModelSelectionState(),
+    val modelState: LocalModelState = LocalModelState(),
     val mainMaxSteps: Int = 16,
     val subagentMaxSteps: Int = 20,
-    val modelAttempts: Int = 3,
-    val imageInputMode: LocalImageInputMode = LocalImageInputMode.AUTO,
     val workspacePath: String = "",
     val sessionId: String = "",
     val usageMode: LocalUsageMode = LocalUsageMode.WORK,
-    val personaId: String = PersonaProfile.DEFAULT_PERSONA_ID,
-    val galleryId: String? = null,
-    val galleryStoryId: String? = null,
-    val gallerySaveSuppressedThrough: Long = 0L,
-    val chatPersona: PersonaProfile = PersonaProfile(),
-    val chatState: ChatCharacterState = ChatCharacterState(),
-    val chatContext: ChatContextState = ChatContextState(),
-    val replySuggestions: List<ChatReplySuggestion> = emptyList(),
-    val chatBranches: LocalChatBranchState = LocalChatBranchState(),
-    val groupChat: LocalGroupChatState = LocalGroupChatState(),
-    val groupActiveSpeakerName: String? = null,
+    val chat: LocalChatState = LocalChatState(),
     val conversationMode: LocalConversationMode = LocalConversationMode.INDEPENDENT,
     val parentSessionId: String? = null,
     val lineageId: String = "",
@@ -274,76 +35,14 @@ data class LocalHarnessState(
     val userRules: String = "",
     val autoRecall: Boolean = true,
     val autoMemory: Boolean = true,
-    val chatStyleGuardEnabled: Boolean = true,
-    val chatStyleGuardCustomPhrases: List<String> = emptyList(),
-    val styleGuardHits: List<String> = emptyList(),
-    val personaCorrectionNotice: ChatPersonaCorrectionNotice? = null,
     val sessions: List<LocalSessionSummary> = emptyList(),
     val messages: List<LocalHarnessMessage> = emptyList(),
     val transcriptIndex: LocalTranscriptRuntimeIndex = LocalTranscriptRuntimeIndex(),
-    val plan: List<String> = emptyList(),
-    val todos: List<LocalTodoItem> = emptyList(),
-    val goal: LocalGoal? = null,
-    val planMode: Boolean = false,
+    val work: LocalWorkState = LocalWorkState(),
+    val kernel: LocalKernelState = LocalKernelState(),
     val safeAutoApprovalEnabled: Boolean = false,
-    val deviceApprovalLease: Boolean = false,
-    val jobs: List<LocalJobInfo> = emptyList(),
-    val workflowProgress: LocalWorkflowProgress? = null,
-    val queuedInputCount: Int = 0,
-    val resources: LocalHarnessResourceState = LocalHarnessResourceState(),
-    val contextChars: Int = 0,
-    val contextBudgetChars: Int = 0,
-    val running: Boolean = false,
-    val pendingApproval: LocalApproval? = null,
-    val pendingQuestion: LocalQuestion? = null,
     val usage: DeepSeekUsageSnapshot = DeepSeekUsageSnapshot(),
     val error: String? = null,
 ) {
-    val modelProfiles: List<LocalModelProfile> get() = modelSelection.profiles
+    val modelProfiles: List<LocalModelProfile> get() = modelState.modelSelection.profiles
 }
-
-/** One OpenAI-compatible function call emitted by the model. */
-data class LocalToolCall(
-    val id: String,
-    val name: String,
-    val arguments: JsonObject,
-    val rawArguments: String,
-)
-
-data class LocalModelDelta(
-    val content: String = "",
-    val reasoning: String = "",
-)
-
-/** Provider/account identity of the exact route that produced one model reply. */
-@Serializable
-data class LocalModelRouteIdentity(
-    val profileId: String? = null,
-    val provider: String = "",
-    val model: String = "",
-    val baseUrl: String = "",
-    val authKind: String = "",
-    val protocol: String = "",
-    val fingerprint: String = "",
-)
-
-data class LocalPromptCacheDiagnostic(
-    val type: String,
-    val reason: String? = null,
-    val comparisonReusableTokens: Long? = null,
-    val cacheMissedTokens: Long? = null,
-)
-
-/** Parsed model response retained verbatim for the next request. */
-data class LocalModelReply(
-    val message: JsonObject,
-    val content: String?,
-    val reasoning: String?,
-    val toolCalls: List<LocalToolCall>,
-    val usage: DeepSeekTokenUsage = DeepSeekTokenUsage(),
-    val requestId: String = "",
-    val promptBreakdown: TokenPromptBreakdown = TokenPromptBreakdown(),
-    val canonicalMessage: LocalCanonicalMessage? = null,
-    val routeIdentity: LocalModelRouteIdentity? = null,
-    val promptCacheDiagnostic: LocalPromptCacheDiagnostic? = null,
-)

@@ -1,4 +1,6 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.work
+
+
 
 /**
  * Fail-closed path validation for auto-approved git patches.

@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.labteto.dshmobile.local.runtime.BundledGitRuntime
+import com.labteto.dshmobile.local.runtime.BundledNodeRuntime
+import com.labteto.dshmobile.local.runtime.BundledPythonRuntime
 import com.labteto.dshmobile.local.runtime.BundledRuntimeLibraryStore
 import java.io.File
 import kotlinx.coroutines.runBlocking

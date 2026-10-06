@@ -5,10 +5,10 @@ import android.content.Context
 import android.database.DatabaseUtils
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
-import com.labteto.dshmobile.local.LocalSessionEventLog
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAggregate
 import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 

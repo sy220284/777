@@ -1,7 +1,12 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.chat.timelineRewriteModelHistory
 import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
+import com.labteto.dshmobile.local.model.LocalModelPromptUpdateMode
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.assistantModelMessageFromEvent
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull

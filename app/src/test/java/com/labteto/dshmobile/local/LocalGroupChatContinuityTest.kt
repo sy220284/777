@@ -5,6 +5,8 @@ import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatContinuityState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatSceneState
+import com.labteto.dshmobile.local.chat.finalizeGroupContextAfterRefresh
+import com.labteto.dshmobile.local.chat.mergeGroupContinuity
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

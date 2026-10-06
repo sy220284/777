@@ -1,8 +1,13 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolRegistry
+import com.labteto.dshmobile.local.LocalToolExecutionCoordinator
+import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
+import com.labteto.dshmobile.local.model.LocalModelState
+import com.labteto.dshmobile.local.runtime.SUBAGENT_EXCLUDED_TOOLS
+import com.labteto.dshmobile.local.runtime.SUBAGENT_VIRTUAL_SCREEN_TOOLS
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -38,20 +43,21 @@ internal class LocalToolSchemaProjection(
 
     fun modelSchemas(
         policy: LocalAgentRunPolicy,
-        state: LocalHarnessState,
+        modelState: LocalModelState,
+        planModeEnabled: Boolean,
         history: List<JsonObject>,
         enabledOptional: Set<String>? = null,
     ): JsonArray {
         if (!policy.toolsEnabled) return JsonArray(emptyList())
-        val promptBudget = optionalToolPromptBudgetForRoute(state, history)
+        val promptBudget = optionalToolPromptBudgetForRoute(modelState, history)
         val enabled = enabledOptional ?: executionCoordinator.enabledOptionalSnapshot()
         val tools = registry.names()
             .mapNotNull(registry::get)
             .filter { tool ->
-                !state.planMode || LocalToolPolicy.allowedInPlan(tool.name, tool.access)
+                !planModeEnabled || LocalToolPolicy.allowedInPlan(tool.name, tool.access)
             }
         return LocalToolRouter.visibleSchemas(
-            tools = if (state.planMode) tools.map(HarnessTool::forReadOnlyModelScope) else tools,
+            tools = if (planModeEnabled) tools.map(HarnessTool::forReadOnlyModelScope) else tools,
             enabledOptional = enabled,
             maxOptionalDefinitionTokens = promptBudget,
         )

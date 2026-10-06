@@ -1,6 +1,14 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.memory.*
+import com.labteto.dshmobile.local.memory.LocalMemoryTools
+import com.labteto.dshmobile.local.memory.LocalMemoryToolContext
+import com.labteto.dshmobile.local.memory.MemoryConflictResolver
+import com.labteto.dshmobile.local.memory.MemoryKind
+import com.labteto.dshmobile.local.memory.MemoryManager
+import com.labteto.dshmobile.local.memory.MemoryPolicy
+import com.labteto.dshmobile.local.memory.MemoryScope
+import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.local.session.LocalConversationMode
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Rule
@@ -13,7 +21,7 @@ class LocalMemoryToolsTest {
         val store = MemoryStore(temporary.root, Json)
         val manager = MemoryManager(store, MemoryPolicy(), MemoryConflictResolver())
         var state = LocalHarnessState(lineageId = "lineage")
-        val tools = LocalMemoryTools(store, manager, { state }, { "session" })
+        val tools = LocalMemoryTools(store, manager, { LocalMemoryToolContext(state.usageMode, state.conversationMode, state.projectId, state.lineageId) }, { "session" })
         val input = buildJsonObject { put("scope", "lineage"); put("content", "apples decision") }
         tools.execute("memory_remember", input, true)
         assertTrue(store.listActive(setOf(MemoryScope.LINEAGE), null, "lineage").isEmpty())
@@ -41,7 +49,7 @@ class LocalMemoryToolsTest {
             scope = MemoryScope.GLOBAL,
             kind = MemoryKind.PREFERENCE,
         )
-        val tools = LocalMemoryTools(store, manager, { state }, { "session" })
+        val tools = LocalMemoryTools(store, manager, { LocalMemoryToolContext(state.usageMode, state.conversationMode, state.projectId, state.lineageId) }, { "session" })
 
         assertFalse(
             tools.execute(
@@ -66,7 +74,7 @@ class LocalMemoryToolsTest {
         val store = MemoryStore(temporary.root, Json)
         val manager = MemoryManager(store, MemoryPolicy(), MemoryConflictResolver())
         var state = LocalHarnessState(conversationMode = LocalConversationMode.PROJECT, projectId = "project")
-        val tools = LocalMemoryTools(store, manager, { state }, { "session" })
+        val tools = LocalMemoryTools(store, manager, { LocalMemoryToolContext(state.usageMode, state.conversationMode, state.projectId, state.lineageId) }, { "session" })
         val remembered = tools.execute(
             "memory_remember",
             buildJsonObject {
@@ -105,7 +113,7 @@ class LocalMemoryToolsTest {
         val store = MemoryStore(temporary.root, Json)
         val manager = MemoryManager(store, MemoryPolicy(), MemoryConflictResolver())
         val state = LocalHarnessState(conversationMode = LocalConversationMode.INDEPENDENT)
-        val tools = LocalMemoryTools(store, manager, { state }, { "session" })
+        val tools = LocalMemoryTools(store, manager, { LocalMemoryToolContext(state.usageMode, state.conversationMode, state.projectId, state.lineageId) }, { "session" })
 
         val result = tools.execute(
             "memory_remember",

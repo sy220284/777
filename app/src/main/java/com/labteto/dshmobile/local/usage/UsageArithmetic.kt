@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.usage
 
-import com.labteto.dshmobile.local.DeepSeekTokenUsage
 import com.labteto.dshmobile.local.TokenUsageRecord
+import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
 
 internal fun saturatingUsageAdd(left: Long, right: Long): Long {
     val safeLeft = left.coerceAtLeast(0L)

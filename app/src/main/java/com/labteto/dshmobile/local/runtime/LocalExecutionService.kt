@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.runtime
 
 import android.app.Notification
 import android.app.PendingIntent
@@ -11,6 +11,8 @@ import androidx.core.content.ContextCompat
 import com.labteto.dshmobile.MainActivity
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.connection.HostsStore
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
+import com.labteto.dshmobile.local.tools.string
 import com.labteto.dshmobile.notify.DshNotifications
 import com.labteto.dshmobile.notify.stableNotificationId
 import com.labteto.dshmobile.observability.AppLog
@@ -25,7 +27,7 @@ import kotlinx.coroutines.launch
 /**
  * Pins user-initiated on-device work while a work turn or background job is still alive.
  *
- * The service owns no execution itself; LocalHarnessEngine remains the single execution owner.
+ * The service owns no execution itself; Feature/Shared runtime owners remain authoritative while the process service only pins lifecycle.
  * Keeping the process in foreground is enough to stop Android from freezing a long local turn when
  * the screen locks or the app moves behind another activity.
  */

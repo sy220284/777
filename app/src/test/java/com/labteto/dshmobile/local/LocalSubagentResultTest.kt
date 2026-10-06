@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.agent.LocalSubagentResult
+import com.labteto.dshmobile.local.agent.LocalSubagentStatus
+import com.labteto.dshmobile.local.agent.requireCompletedOutput
 import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
 import org.junit.Test

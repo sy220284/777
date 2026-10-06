@@ -105,6 +105,29 @@ if "actions/download-artifact@" not in CI:
 if ".gradle/runtime-cache" not in CI or "actions/cache@" not in CI:
     violations.append("CI must cache verified Runtime downloads instead of redownloading per runner")
 
+# Architecture 3.0 CI is authoritative on both PR and main. Main must classify every
+# change instead of bypassing control/test changes through workflow-level path ignores.
+if "paths-ignore:" in CI:
+    violations.append("main CI must classify every push; workflow-level paths-ignore is forbidden")
+for required_architecture_ci in (
+    "run_architecture:",
+    "architecture-3-gates:",
+    "check-local-architecture-boundaries.py",
+    "check-local-performance-invariants.py",
+    "REQUIRE_ARCHITECTURE:",
+    "ARCHITECTURE_RESULT:",
+):
+    if required_architecture_ci not in CI:
+        violations.append(
+            "Architecture 3.0 CI lane is incomplete: " + required_architecture_ci
+        )
+if CI.count("check-local-architecture-boundaries.py") != 1:
+    violations.append("Architecture 3.0 ownership guard must run exactly once in its dedicated lane")
+if CI.count("check-local-performance-invariants.py") != 1:
+    violations.append("Architecture 3.0 performance invariant guard must run exactly once in its dedicated lane")
+if "classify-ci-scope.py --self-test" not in CI:
+    violations.append("CI scope classifier must self-test before downstream validation")
+
 # release-version affects the app's versionName/versionCode and must never be ignored on main.
 if "- '.github/release-version'" in CI or '- ".github/release-version"' in CI:
     violations.append(".github/release-version must not be ignored by main CI")
@@ -120,6 +143,10 @@ if "release:" not in CLEANUP or "types: [published]" not in CLEANUP:
     violations.append("Cleanup must react to published releases")
 if "*/30 * * * *" in CLEANUP:
     violations.append("Cleanup fallback must not run every 30 minutes")
+if "keep = formal_releases[:3]" not in CLEANUP or "remove = formal_releases[3:]" not in CLEANUP:
+    violations.append("Release retention must keep exactly the three highest formal published versions")
+if "timedelta(" in CLEANUP or "cutoff =" in CLEANUP:
+    violations.append("Release retention must not add an age-based retention window")
 
 # Screenshot bot commits are docs-only; they must not dispatch a forced full CI.
 if "gh workflow run ci.yml" in CAPTURE:

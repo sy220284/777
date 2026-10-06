@@ -21,14 +21,14 @@ internal data class AutomationPlanningRevision(
 
 internal fun LocalHarnessState.toAutomationPlanningRevision() = AutomationPlanningRevision(
     sessionId = sessionId,
-    profileId = modelSelection.activeProfileId,
+    profileId = modelState.modelSelection.activeProfileId,
     usageMode = usageMode,
-    groupChatEnabled = groupChat.enabled,
-    personaId = personaId,
-    galleryId = galleryId,
-    galleryStoryId = galleryStoryId,
+    groupChatEnabled = chat.groupChat.enabled,
+    personaId = chat.personaId,
+    galleryId = chat.galleryId,
+    galleryStoryId = chat.galleryStoryId,
     latestDialogueMessageId = transcriptIndex.latestDialogueMessageId,
-    chatContextGeneration = chatContext.generation,
+    chatContextGeneration = chat.chatContext.generation,
 )
 
 private val AUTOMATION_PLANNING_REVISION_POLICY =
@@ -52,13 +52,13 @@ internal fun resolveAutomationPlanningRevision(
 internal fun LocalHarnessState.toAutomationPlanningContext() = AutomationPlanningContext(
     sessionId = sessionId,
     revision = toAutomationPlanningRevision(),
-    configured = configured,
+    configured = modelState.configured,
     usageMode = usageMode,
-    groupChatEnabled = groupChat.enabled,
-    model = model,
-    baseUrl = baseUrl,
-    profileId = modelSelection.activeProfileId,
-    personaName = chatPersona.name,
+    groupChatEnabled = chat.groupChat.enabled,
+    model = modelState.model,
+    baseUrl = modelState.baseUrl,
+    profileId = modelState.modelSelection.activeProfileId,
+    personaName = chat.chatPersona.name,
     recentMessages = messages
         .asSequence()
         .filter { it.role == "user" || it.role == "assistant" }

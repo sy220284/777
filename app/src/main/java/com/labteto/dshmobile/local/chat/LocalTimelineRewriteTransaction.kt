@@ -1,10 +1,9 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatContextState
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
-import com.labteto.dshmobile.local.chat.ChatDiaryStore
 import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import java.util.UUID
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -24,14 +23,11 @@ private const val LOCAL_TIMELINE_REWRITE_PROJECTION_COMMITTED = "chat/timeline-r
 
 @Serializable
 internal data class LocalTimelineRewriteState(
-    val plan: List<String>,
-    val todos: List<LocalTodoItem>,
-    val goal: LocalGoal?,
-    val planMode: Boolean,
     val chatState: ChatCharacterState,
     val chatContext: ChatContextState,
     val chatBranches: LocalChatBranchState,
     val groupChat: LocalGroupChatState,
+    val replySuggestions: List<ChatReplySuggestion>? = null,
 )
 
 @Serializable
@@ -72,6 +68,22 @@ private val timelineRewriteJson = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
 }
+
+internal fun appendChatProjectionCommit(
+    eventLog: LocalSessionEventLog,
+    reason: String,
+    activeTranscript: List<LocalHarnessMessage>,
+    modelHistory: List<JsonObject>,
+    state: LocalTimelineRewriteState,
+): LocalSessionEventLog.Event = eventLog.append("chat/active-transcript", buildJsonObject {
+    put("reason", reason)
+    put("transcript", encodeTranscriptMessages(activeTranscript))
+    put(LOCAL_TIMELINE_REWRITE_MODEL_HISTORY_KEY, JsonArray(modelHistory))
+    put(
+        LOCAL_TIMELINE_REWRITE_STATE_KEY,
+        timelineRewriteJson.encodeToJsonElement(LocalTimelineRewriteState.serializer(), state),
+    )
+})
 
 internal fun appendTimelineRewriteCommit(
     eventLog: LocalSessionEventLog,

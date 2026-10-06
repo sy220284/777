@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.memory
 
-import com.labteto.dshmobile.local.LocalConversationMode
+import com.labteto.dshmobile.local.session.LocalConversationMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame

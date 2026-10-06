@@ -1,9 +1,5 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.LocalModelAuthKind
-import com.labteto.dshmobile.local.LocalModelDelta
-import com.labteto.dshmobile.local.LocalModelProtocol
-import com.labteto.dshmobile.local.LocalModelRuntimeCapabilities
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.util.concurrent.CountDownLatch
@@ -22,11 +18,11 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.ForwardingSource
 import okio.buffer
@@ -323,7 +319,7 @@ class AnthropicMessagesClientTest {
     fun officialImageAndWholeRequestLimitsFailBeforeNetwork() = runBlocking {
         val exact = "data:image/png;base64," + "A".repeat(10_000_000)
         val image = LocalCanonicalMessage(LocalCanonicalRole.USER, listOf(LocalCanonicalContent.Image(exact)))
-        assertEquals(7_500_000L, com.labteto.dshmobile.local.LocalModelPresets.maxNativeImageBytesFor("claude-sonnet-5-5", "https://api.anthropic.com/v1"))
+        assertEquals(7_500_000L, com.labteto.dshmobile.local.model.LocalModelPresets.maxNativeImageBytesFor("claude-sonnet-5-5", "https://api.anthropic.com/v1"))
         assertTrue(client.buildPayload(route(), listOf(image), emptyList(), null).isNotEmpty())
         val tooLargeImage = image.copy(content = listOf(LocalCanonicalContent.Image(exact + "AAAA")))
         assertTrue(runCatching { client.buildPayload(route(), listOf(tooLargeImage), emptyList(), null) }.isFailure)

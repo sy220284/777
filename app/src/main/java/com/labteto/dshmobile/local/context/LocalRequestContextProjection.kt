@@ -1,37 +1,82 @@
-package com.labteto.dshmobile.local
+package com.labteto.dshmobile.local.context
 
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.model.LocalPromptCachePolicy
+import com.labteto.dshmobile.local.model.LocalPromptPressure
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
-/**
- * Shared request-context governance entry.
- *
- * Mode policy remains explicit: Work currently owns semantic steady-state projection; Chat keeps
- * its existing history policy and consumes the shared pressure/cache/overflow infrastructure.
- */
+/** Work-agnostic diagnostics emitted by an optional Feature-owned semantic projector. */
+internal data class LocalRequestContextAssessment(
+    val status: String,
+    val estimatedInputTokens: Int = 0,
+    val historyTokens: Int = 0,
+    val toolDefinitionTokens: Int = 0,
+    val historyRatioPermille: Int,
+    val toolRatioPermille: Int = 0,
+    val inputGrowthTokens: Int = 0,
+    val historyGrowthTokens: Int,
+    val effectiveProjectionTriggerTokens: Int,
+    val reasons: List<String>,
+)
+
+/** Shared request-context result. Feature-specific projection policy is supplied by composition. */
 internal data class LocalRequestContextProjection(
     val messages: List<JsonObject>,
     val projected: Boolean,
     val estimatedTokensBefore: Int,
     val estimatedTokensAfter: Int,
     val omittedMessages: Int = 0,
-    val preProjectionAssessment: LocalWorkStepContextAssessment? = null,
+    val preProjectionAssessment: LocalRequestContextAssessment? = null,
 )
 
+internal data class LocalRequestContextPolicyInput(
+    val messages: List<JsonObject>,
+    val tools: JsonArray,
+    val operationalLimitTokens: Int,
+    val measuredPressure: LocalPromptPressure,
+    val previousPressure: LocalPromptPressure?,
+    val cachePolicy: LocalPromptCachePolicy,
+    val allowSemanticProjection: Boolean,
+)
+
+internal data class LocalRequestContextAssessmentInput(
+    val current: LocalPromptPressure,
+    val previous: LocalPromptPressure?,
+    val operationalLimitTokens: Int,
+    val cachePolicy: LocalPromptCachePolicy,
+    val growthCurrent: LocalPromptPressure,
+)
+
+/**
+ * Shared context extension point. Product Features supply semantic projection/assessment without
+ * making Shared Model/Context import Feature internals.
+ */
+internal interface LocalRequestContextPolicy {
+    fun project(input: LocalRequestContextPolicyInput): LocalRequestContextProjection
+
+    fun assess(input: LocalRequestContextAssessmentInput): LocalRequestContextAssessment?
+}
+
+/**
+ * Shared mode gate for request-context governance.
+ *
+ * Shared Context owns only the neutral decision surface. WorkFeature supplies its semantic
+ * projection through [workProjection]; Chat keeps its own history policy and never imports Work
+ * internals through this package.
+ */
 internal fun projectLocalRequestContext(
     usageMode: LocalUsageMode,
     workProjectionEnabled: Boolean,
     messages: List<JsonObject>,
-    tools: JsonArray,
-    compactor: LocalHistoryCompactor,
-    operationalLimitTokens: Int,
     measuredPressure: LocalPromptPressure,
-    previousSourcePressure: LocalPromptPressure?,
-    structuredWorkState: LocalStructuredWorkState?,
-    cachePolicy: LocalPromptCachePolicy,
-    allowSemanticProjection: Boolean,
+    workProjection: (() -> LocalRequestContextProjection)?,
 ): LocalRequestContextProjection {
-    if (usageMode != LocalUsageMode.WORK || !workProjectionEnabled) {
+    if (
+        usageMode != LocalUsageMode.WORK ||
+        !workProjectionEnabled ||
+        workProjection == null
+    ) {
         return LocalRequestContextProjection(
             messages = messages,
             projected = false,
@@ -39,24 +84,5 @@ internal fun projectLocalRequestContext(
             estimatedTokensAfter = measuredPressure.estimatedInputTokens,
         )
     }
-
-    val projected = projectWorkRequestContext(
-        messages = messages,
-        tools = tools,
-        compactor = compactor,
-        operationalLimitTokens = operationalLimitTokens,
-        measuredPressure = measuredPressure,
-        previousPressure = previousSourcePressure,
-        structuredWorkState = structuredWorkState,
-        cachePolicy = cachePolicy,
-        allowSemanticProjection = allowSemanticProjection,
-    )
-    return LocalRequestContextProjection(
-        messages = projected.messages,
-        projected = projected.projected,
-        estimatedTokensBefore = projected.estimatedTokensBefore,
-        estimatedTokensAfter = projected.estimatedTokensAfter,
-        omittedMessages = projected.omittedMessages,
-        preProjectionAssessment = projected.preProjectionAssessment,
-    )
+    return workProjection()
 }

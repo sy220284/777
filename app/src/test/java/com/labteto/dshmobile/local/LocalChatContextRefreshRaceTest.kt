@@ -1,6 +1,27 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.chat.*
+import com.labteto.dshmobile.local.chat.LocalChatTurnCoordinator
+
+import com.labteto.dshmobile.local.chat.CharacterLoreEngine
+import com.labteto.dshmobile.local.chat.ChatContextState
+import com.labteto.dshmobile.local.chat.ChatDiaryStore
+import com.labteto.dshmobile.local.chat.ChatInteractionPlanner
+import com.labteto.dshmobile.local.chat.ChatPendingTurn
+import com.labteto.dshmobile.local.chat.ChatPersonaStore
+import com.labteto.dshmobile.local.chat.ChatRelationshipEngine
+import com.labteto.dshmobile.local.chat.ChatSceneState
+import com.labteto.dshmobile.local.chat.ChatTurnRunner
+import com.labteto.dshmobile.local.chat.LocalChatState
+import com.labteto.dshmobile.local.chat.LocalChatStatePort
+import com.labteto.dshmobile.local.chat.LocalChatContextRefreshCoordinator
+import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.chat.enqueuePendingDurably
+import com.labteto.dshmobile.local.chat.shouldRetryChatPostTurnRequest
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +62,7 @@ class LocalChatContextRefreshRaceTest {
         val context = ChatContextState(scene = ChatSceneState(location = "old")).enqueuePendingDurably(
             ChatPendingTurn(event.sequence, assistantMessageId = "a", branchHeadId = "a", assistantMessage = "reply"), log,
         )
-        val state = InterceptedFlow(MutableStateFlow(LocalHarnessState(sessionId = "s", usageMode = LocalUsageMode.CHAT, chatContext = context)))
+        val state = InterceptedFlow(MutableStateFlow(LocalHarnessState(sessionId = "s", usageMode = LocalUsageMode.CHAT, chat = LocalChatState(chatContext = context))))
         val turns = LocalChatTurnCoordinator(
             ChatTurnRunner(ChatPersonaStore(File(temporary.root, "personas.json"), json), ChatRelationshipEngine(), CharacterLoreEngine()),
             ChatInteractionPlanner(json),
@@ -50,14 +71,23 @@ class LocalChatContextRefreshRaceTest {
         val profile = LocalModelProfile("profile-a", "model-a", "https://example.test/v1")
         val observedProfiles = mutableListOf<String>()
         val coordinator = LocalChatContextRefreshCoordinator(
-            state, scope, turns,
+            readState = { state.value },
+            chatState = localAggregateChatStatePort(state),
+            chatTurnCoordinator = turns,
             diaryStore = ChatDiaryStore(File(temporary.root, "diary"), json),
             requestPlanner = { _, _, _, selectedProfile ->
                 observedProfiles += selectedProfile.id
                 LocalModelReply(
-                buildJsonObject {}, """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""", null, emptyList(),
-            ) },
-            recordUsage = { _, _ -> }, persistBranchState = {}, persist = { persisted++ },
+                    buildJsonObject {},
+                    """{"state":{},"suggestions":[],"turnSignificance":"NONE"}""",
+                    null,
+                    emptyList(),
+                )
+            },
+            recordUsage = { _, _ -> },
+            persistBranchState = { _, _ -> },
+            persistSnapshot = { persisted++ },
+            scope = scope,
         )
         return Fixture(log, state, coordinator, profile, observedProfiles) { persisted }
     }
@@ -65,9 +95,9 @@ class LocalChatContextRefreshRaceTest {
         val fixture = fixture(backgroundScope)
         val before = fixture.state.value
         fixture.state.beforeCompare = { fixture.state.delegate.value = before.copy(sessionId = "other") }
-        fixture.coordinator.refresh(PersonaProfile(), "s", before.chatState, before.chatContext.generation, fixture.log, fixture.profile)
+        fixture.coordinator.refresh(PersonaProfile(), "s", before.chat.chatState, before.chat.chatContext.generation, fixture.log, fixture.profile)
         assertEquals("other", fixture.state.value.sessionId)
-        assertEquals(before.chatContext.processedThroughSequence, fixture.state.value.chatContext.processedThroughSequence)
+        assertEquals(before.chat.chatContext.processedThroughSequence, fixture.state.value.chat.chatContext.processedThroughSequence)
         assertEquals("stale-discarded", fixture.log.latest("chat/post-turn")?.data?.get("status")?.jsonPrimitive?.content)
         assertEquals(0, fixture.persisted())
     }
@@ -76,22 +106,22 @@ class LocalChatContextRefreshRaceTest {
         val before = fixture.state.value
         fixture.state.beforeCompare = {
             val event = fixture.log.append("assistant/message", buildJsonObject {})
-            val context = before.chatContext.enqueuePendingDurably(
+            val context = before.chat.chatContext.enqueuePendingDurably(
                 ChatPendingTurn(event.sequence, assistantMessageId = "new", assistantMessage = "new fact"), fixture.log,
             ).copy(scene = ChatSceneState(location = "new"))
-            fixture.state.delegate.value = before.copy(chatContext = context)
+            fixture.state.delegate.value = before.copy(chat = before.chat.copy(chatContext = context))
         }
-        fixture.coordinator.refresh(PersonaProfile(), "s", before.chatState, before.chatContext.generation, fixture.log, fixture.profile)
-        assertEquals("new", fixture.state.value.chatContext.scene.location)
-        assertEquals(listOf("new"), fixture.state.value.chatContext.pendingTurns.map { it.assistantMessageId })
-        assertEquals(0L, fixture.state.value.chatContext.processedThroughSequence)
+        fixture.coordinator.refresh(PersonaProfile(), "s", before.chat.chatState, before.chat.chatContext.generation, fixture.log, fixture.profile)
+        assertEquals("new", fixture.state.value.chat.chatContext.scene.location)
+        assertEquals(listOf("new"), fixture.state.value.chat.chatContext.pendingTurns.map { it.assistantMessageId })
+        assertEquals(0L, fixture.state.value.chat.chatContext.processedThroughSequence)
         assertEquals(1, fixture.persisted())
     }
     @Test fun refreshPassesTheFrozenProfileToThePlanner() = runTest {
         val fixture = fixture(backgroundScope)
         val before = fixture.state.value
         fixture.coordinator.refresh(
-            PersonaProfile(), "s", before.chatState, before.chatContext.generation,
+            PersonaProfile(), "s", before.chat.chatState, before.chat.chatContext.generation,
             fixture.log, fixture.profile,
         )
         assertEquals(listOf("profile-a"), fixture.observedProfiles)
@@ -100,7 +130,7 @@ class LocalChatContextRefreshRaceTest {
     @Test fun remainingPendingContinuationCannotResetTheRetryBudgetForever() = runTest {
         val fixture = fixture(backgroundScope)
         val before = fixture.state.value
-        var context = before.chatContext
+        var context = before.chat.chatContext
         repeat(39) { index ->
             val id = "extra-$index"
             val message = LocalHarnessMessage(id, "assistant", "reply-$index", createdAt = index + 2L)
@@ -117,10 +147,10 @@ class LocalChatContextRefreshRaceTest {
                 fixture.log,
             )
         }
-        fixture.state.delegate.value = before.copy(chatContext = context)
+        fixture.state.delegate.value = before.copy(chat = before.chat.copy(chatContext = context))
 
         fixture.coordinator.refresh(
-            PersonaProfile(), "s", before.chatState, context.generation, fixture.log, fixture.profile,
+            PersonaProfile(), "s", before.chat.chatState, context.generation, fixture.log, fixture.profile,
         )
         advanceUntilIdle()
 

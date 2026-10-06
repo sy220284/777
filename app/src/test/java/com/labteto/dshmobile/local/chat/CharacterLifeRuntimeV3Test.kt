@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.estimateModelTokens
+import com.labteto.dshmobile.local.model.estimateModelTokens
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -38,27 +38,33 @@ class CharacterLifeRuntimeV3Test {
 
     @Test
     fun lifeRuntimeAdvancesWithElapsedTimeWithoutInventingNewFacts() {
-        val persona = PersonaProfile(
-            name = "叶澜",
-            lifeContext = "白天在出版社工作；晚上会整理插画稿；周末会去看外婆。",
-        )
-        val first = advanceCharacterLife(
-            persona = persona,
-            state = ChatCharacterState(currentAgenda = "手里还有一版封面没交"),
-            now = 12L * 60L * 60L * 1_000L,
-        )
-        val second = advanceCharacterLife(
-            persona = persona,
-            state = ChatCharacterState(
-                currentAgenda = "手里还有一版封面没交",
-                lifeState = first,
-            ),
-            now = 18L * 60L * 60L * 1_000L,
-        )
+        val previousZone = java.util.TimeZone.getDefault()
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"))
+        try {
+            val persona = PersonaProfile(
+                name = "叶澜",
+                lifeContext = "白天在出版社工作；晚上会整理插画稿；周末会去看外婆。",
+            )
+            val first = advanceCharacterLife(
+                persona = persona,
+                state = ChatCharacterState(currentAgenda = "手里还有一版封面没交"),
+                now = 12L * 60L * 60L * 1_000L,
+            )
+            val second = advanceCharacterLife(
+                persona = persona,
+                state = ChatCharacterState(
+                    currentAgenda = "手里还有一版封面没交",
+                    lifeState = first,
+                ),
+                now = 18L * 60L * 60L * 1_000L,
+            )
 
-        assertNotEquals(first.currentBeat, second.currentBeat)
-        assertTrue(second.activeEvents.any { it.summary.contains("封面") })
-        assertTrue(second.activeEvents.all { it.summary in persona.lifeContext || !it.source.equals("persona") })
+            assertNotEquals(first.currentBeat, second.currentBeat)
+            assertTrue(second.activeEvents.any { it.summary.contains("封面") })
+            assertTrue(second.activeEvents.all { it.summary in persona.lifeContext || !it.source.equals("persona") })
+        } finally {
+            java.util.TimeZone.setDefault(previousZone)
+        }
     }
 
     @Test

@@ -1,20 +1,20 @@
 package com.labteto.dshmobile.local.presentation
 
-import com.labteto.dshmobile.local.ChatPersonaCorrectionNotice
-import com.labteto.dshmobile.local.LocalApproval
-import com.labteto.dshmobile.local.LocalChatBranchState
-import com.labteto.dshmobile.local.LocalConversationMode
-import com.labteto.dshmobile.local.LocalGroupChatState
-import com.labteto.dshmobile.local.LocalHarnessMessage
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalImageInputMode
-import com.labteto.dshmobile.local.LocalModelProfile
-import com.labteto.dshmobile.local.LocalQuestion
-import com.labteto.dshmobile.local.LocalSessionSummary
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatPersonaCorrectionNotice
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
+import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.chat.LocalGroupChatState
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.interaction.LocalApproval
+import com.labteto.dshmobile.local.interaction.LocalQuestion
+import com.labteto.dshmobile.local.model.LocalImageInputMode
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalSessionSummary
 
 /**
  * Shared conversation substrate rendered by Chat and Work.
@@ -61,46 +61,46 @@ data class LocalConversationSurfaceState(
 internal fun LocalHarnessState.toChatSurfaceUiState(): LocalConversationSurfaceState =
     LocalConversationSurfaceState(
         loading = loading,
-        configured = configured,
+        configured = modelState.configured,
         sessionId = sessionId,
         usageMode = LocalUsageMode.CHAT,
-        running = running,
+        running = kernel.running,
         messages = messages,
         workspacePath = workspacePath,
         error = error,
-        galleryId = galleryId,
-        galleryStoryId = galleryStoryId,
-        chatPersona = chatPersona,
-        chatState = chatState,
-        replySuggestions = replySuggestions,
-        chatBranches = chatBranches,
-        groupChat = groupChat,
-        groupActiveSpeakerName = groupActiveSpeakerName,
+        galleryId = chat.galleryId,
+        galleryStoryId = chat.galleryStoryId,
+        chatPersona = chat.chatPersona,
+        chatState = chat.chatState,
+        replySuggestions = chat.replySuggestions,
+        chatBranches = chat.chatBranches,
+        groupChat = chat.groupChat,
+        groupActiveSpeakerName = chat.groupActiveSpeakerName,
         conversationMode = conversationMode,
-        personaCorrectionNotice = personaCorrectionNotice,
+        personaCorrectionNotice = chat.personaCorrectionNotice,
     )
 
 internal fun LocalHarnessState.toWorkSurfaceUiState(): LocalConversationSurfaceState =
     LocalConversationSurfaceState(
         loading = loading,
-        configured = configured,
+        configured = modelState.configured,
         sessionId = sessionId,
         usageMode = LocalUsageMode.WORK,
-        running = running,
+        running = kernel.running,
         messages = messages,
         workspacePath = workspacePath,
-        imageInputMode = imageInputMode,
+        imageInputMode = modelState.imageInputMode,
         error = error,
         sessions = sessions,
-        model = model,
-        baseUrl = baseUrl,
+        model = modelState.model,
+        baseUrl = modelState.baseUrl,
         modelProfiles = modelProfiles,
-        planMode = planMode,
+        planMode = work.planMode,
         safeAutoApprovalEnabled = safeAutoApprovalEnabled,
-        deviceApprovalLease = deviceApprovalLease,
-        queuedInputCount = queuedInputCount,
-        contextChars = contextChars,
-        contextBudgetChars = contextBudgetChars,
-        pendingApproval = pendingApproval,
-        pendingQuestion = pendingQuestion,
+        deviceApprovalLease = work.deviceApprovalLease,
+        queuedInputCount = kernel.queuedInputCount,
+        contextChars = kernel.contextChars,
+        contextBudgetChars = kernel.contextBudgetChars,
+        pendingApproval = work.pendingApproval,
+        pendingQuestion = work.pendingQuestion,
     )

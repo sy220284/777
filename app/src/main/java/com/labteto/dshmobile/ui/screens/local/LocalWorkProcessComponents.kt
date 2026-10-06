@@ -34,8 +34,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.LocalHarnessMessage
-import com.labteto.dshmobile.local.truncateWithoutSplittingSurrogatePair
+import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes

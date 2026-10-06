@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
-import com.labteto.dshmobile.local.LocalGroupChatMember
+
 
 /**
  * Single authoritative mapping from gallery entries to runtime group members.

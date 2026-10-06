@@ -98,9 +98,11 @@ audit metadata
 
 ## 5. Engine 继续收敛
 
-`LocalHarnessEngine` 保留跨能力编排。
+架构 3.0 的 #448 当前基线、功能迁移矩阵、后续阶段与验收出口见 [架构 3.0 后续执行方案](ARCHITECTURE-3-EXECUTION-PLAN.zh-CN.md)。
 
-持续下沉：
+旧 `LocalHarnessEngine` 已删除；跨能力事实分别由 Session / Agent / Resource / Recovery 等 Shared owner 持有，进程生命周期由 `LocalRuntimeKernel` 协调。
+
+后续继续约束：
 
 - capability 内业务规则。
 - 数据查询。
@@ -109,7 +111,7 @@ audit metadata
 - 任务专属状态。
 - 低频诊断逻辑。
 
-目标不是追求极小文件，而是确保 Engine 不重新成为所有功能的公共入口。
+目标是保持 Feature / Shared Capability 单向所有权，禁止再出现承接所有产品功能的中央入口。
 
 ## 6. UI 状态继续收敛
 
