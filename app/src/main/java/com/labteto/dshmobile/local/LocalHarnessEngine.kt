@@ -808,6 +808,7 @@ class LocalHarnessEngine @Inject internal constructor(
             sessionCoordinator = sessionCoordinator,
             eventLogFor = ::eventLogFor,
             agentRunCoordinator = agentRunCoordinator,
+            recoveryContextPolicy = LocalWorkRecoveryContextPolicy,
             runnerFactory = { sessionId, boundState, onApprovalBlocked ->
                 automationSubagentRunner(
                     sessionId = sessionId,
