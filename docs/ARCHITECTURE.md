@@ -598,7 +598,10 @@ Feature Catalog 与路由门禁现包括：
 
 ## 17. 相关权威文档
 
-- #448 后续实施计划：[`ARCHITECTURE-3-EXECUTION-PLAN.zh-CN.md`](ARCHITECTURE-3-EXECUTION-PLAN.zh-CN.md)；仅记录执行工作包与验收，不替代本架构定义。
+- 系统联审规范：[`SYSTEM-AUDIT-GUIDE.zh-CN.md`](SYSTEM-AUDIT-GUIDE.zh-CN.md)
+- 共享审计结论：[`SHARED-AUDIT-CONCLUSIONS.zh-CN.md`](SHARED-AUDIT-CONCLUSIONS.zh-CN.md)
+- 验证规范：[`VALIDATION.md`](VALIDATION.md)
+- Android Harness 当前状态：[`ANDROID-HARNESS-STATUS.zh-CN.md`](ANDROID-HARNESS-STATUS.zh-CN.md)
 - 系统执行规则：[`../AGENTS.md`](../AGENTS.md)
 - 系统联审：[`SYSTEM-AUDIT-GUIDE.zh-CN.md`](SYSTEM-AUDIT-GUIDE.zh-CN.md)
 - 验证规则：[`VALIDATION.md`](VALIDATION.md)
