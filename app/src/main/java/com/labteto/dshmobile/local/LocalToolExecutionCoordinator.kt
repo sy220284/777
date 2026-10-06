@@ -13,6 +13,7 @@ import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolRouter
 import com.labteto.dshmobile.observability.AppLog
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
@@ -37,7 +38,12 @@ internal class LocalToolExecutionCoordinator(
         tool: HarnessTool,
         summary: String,
     ) -> Boolean,
-    private val recordExecutionStarted: suspend (String, LocalToolCall) -> Unit = { _, _ -> },
+    private val recordExecutionStarted: suspend (
+        String,
+        LocalToolCall,
+        LocalToolExecutionIdentity,
+    ) -> Unit = { _, _, _ -> },
+    private val executionIdFactory: () -> String = { UUID.randomUUID().toString() },
 ) {
     fun clearTurnCapabilities(target: MutableSet<String> = enabledOptionalTools) {
         synchronized(target) { target.clear() }
@@ -207,6 +213,10 @@ internal class LocalToolExecutionCoordinator(
 
         var approvalDenied = false
         var executionStarted = false
+        val executionIdentity = LocalToolExecutionIdentity(
+            executionId = executionIdFactory(),
+            rootCallId = call.id,
+        )
         val invocation = try {
             registry.executeTracked(
                 name = call.name,
@@ -217,6 +227,9 @@ internal class LocalToolExecutionCoordinator(
                     allowMutation = allowMutation,
                     attributes = buildMap {
                         put("call_id", call.id)
+                        put("execution_id", executionIdentity.executionId)
+                        put("root_call_id", executionIdentity.rootCallId)
+                        executionIdentity.parentExecutionId?.let { put("parent_execution_id", it) }
                         currentCoroutineContext()[LocalModelRunContext]?.profile?.let { put("model_profile", it) }
                     },
                     approval = { tool ->
@@ -225,7 +238,7 @@ internal class LocalToolExecutionCoordinator(
                         granted
                     },
                     onExecutionStarted = {
-                        recordExecutionStarted(sessionId, call)
+                        recordExecutionStarted(sessionId, call, executionIdentity)
                         executionStarted = true
                     },
                 ),
@@ -335,6 +348,12 @@ internal class LocalToolExecutionCoordinator(
         )
     }
 }
+
+internal data class LocalToolExecutionIdentity(
+    val executionId: String,
+    val rootCallId: String,
+    val parentExecutionId: String? = null,
+)
 
 private fun JsonObject.optionalStringForCoordinator(key: String): String? =
     (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
