@@ -263,24 +263,38 @@ Android 界面
 
 777 采用 **架构 3.0：模块化单体 + 层级化 Feature 组合 + 共享能力契约 + 极薄运行内核**。
 
-产品能力不再继续围绕一个越来越大的 Engine 横向扩张，而是按所有权组织：子功能注册到所属 Feature，Feature 在启动期注册到不可变 `LocalFeatureCatalog`；Chat / Work / Automation 等跨域协作只能通过共享能力或明确 Port。
+产品能力按所有权组织：子功能注册到所属 Feature，Feature 在启动期注册到不可变 `LocalFeatureCatalog`；Chat / Work / Automation 等跨域协作通过 Shared Capability 或提供方拥有的稳定 Port。
+
+业务调用链：
 
 ```text
-Application Shell
+Application Shell / UI
       ↓
-LocalFeatureCatalog
+presentation / Feature API / projection
       ↓
 ChatFeature / WorkFeature / AutomationFeature / ToolsFeature / ...
       ↓
-Shared Capabilities
-Session / Model / Agent / Tool / Memory / Resource / Usage / Event
-      ↓
-Local Runtime Kernel
+Shared Capabilities（按需）
+Session / Model / Agent / Tool / Memory / Resource / Usage / Event / Persistence
       ↓
 harness-core / Android runtime / MCP / LSP / device
 ```
 
-架构 3.0 的业务所有权迁移已经完成：Chat / Work / Automation / Tools / Settings 均由所属 Feature 与 Shared Capability 持有，Feature UI contribution 已接管产品页面，旧 `LocalHarnessEngine` 已删除；进程级启动、恢复与维护由极薄的 `LocalRuntimeKernel` 承接。
+进程启动链独立存在：
+
+```text
+DshApplication
+      ↓
+LocalRuntimeKernel
+      ↓
+LocalRuntimeBootstrapPort
+      ↓
+应用组合根
+      ↓
+Shared Runtime / Feature 初始化与恢复
+```
+
+当前业务所有权已经按架构 3.0 收口：各 Feature 持有自己的领域状态、规则与公开 API；Shared Capability 持有中立共享事实；应用组合根负责 Feature / Provider 构造；`LocalRuntimeKernel` 只负责进程一次启动、生命周期 scope、bootstrap / recovery 触发与失败投影。
 
 完整边界、禁止依赖、迁移阶段和完成标准见 **[架构 3.0 权威文档](docs/ARCHITECTURE.md)**。
 
