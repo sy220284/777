@@ -167,6 +167,13 @@ session_execution_sources = merge_sources(
 )
 foreground_execution_sources = merge_sources(chat_execution_sources, work_execution_sources)
 run_recovery_sources = merge_sources(work_execution_sources, session_execution_sources)
+migration_engine_sources = {
+    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt": engine,
+} if engine else {}
+migration_recovery_sources = merge_sources(
+    run_recovery_sources,
+    migration_engine_sources,
+)
 session_snapshot_call_sources = {
     path: source
     for path, source in session_execution_sources.items()
@@ -318,18 +325,24 @@ if (
 ):
     violations.append("LocalSessionRepository must keep lightweight session-summary caching")
 
-if not contains_any(session_snapshot_call_sources, "localSessionPersistenceSnapshot("):
-    violations.append("Session snapshot callers must route persistence through the Session capability")
+for required_session_snapshot_capability in (
+    "internal fun currentSnapshot(expectedSessionId: String)",
+    "return coordinator.snapshot(",
+    "internal fun enqueueCurrentSnapshot(expectedSessionId: String): Boolean",
+    "coordinator.enqueue(snapshot)",
+):
+    if required_session_snapshot_capability not in session_storage_runtime:
+        violations.append(
+            "Session snapshot callers must route persistence through the Session capability: "
+            + required_session_snapshot_capability
+        )
 
-if "currentState: () -> LocalHarnessState" not in session_persistence_projection:
-    violations.append("Session snapshot projection must defer mutable state reads until after cursor capture")
-
-control_pos = session_persistence_projection.find(
+control_pos = session_storage_runtime.find(
     "val controlProjectedThroughSequence = eventLog.latestSequence()"
 )
-transcript_pos = session_persistence_projection.find("val transcriptProjectedThroughSequence")
-state_pos = session_persistence_projection.find(
-    "val state = currentState()"
+transcript_pos = session_storage_runtime.find("val transcriptProjectedThroughSequence")
+state_pos = session_storage_runtime.find(
+    "val state = runtimeStateStore.state.value"
 )
 if min(control_pos, transcript_pos, state_pos) < 0 or not (
     control_pos < state_pos and transcript_pos < state_pos
@@ -347,13 +360,15 @@ if "usageMode: LocalUsageMode" in context_budget or "DEFAULT_CHAT_TOOL_RESULT_TO
 if contains_any(foreground_execution_sources, 'eventLog.append("user/queue"'):
     violations.append("Queued user input must use the durable agent/inbox/spliced fact, not legacy user/queue writers")
 if (
-    not contains_any(run_recovery_sources, "decodeLocalAgentInboxPending")
-    or not contains_any(run_recovery_sources, "pendingInputs.restore(")
+    not contains_any(migration_recovery_sources, "decodeLocalAgentInboxPending")
+    or not contains_any(migration_recovery_sources, "pendingInputs.restore(")
+    or not contains_any(work_execution_sources, "pendingInputs.offer(queued)")
+    or not contains_any(work_execution_sources, "agentRunCoordinator.markRecoveryQueued(")
 ):
     violations.append("Session/Agent recovery must restore the durable Agent inbox")
 
 if not ordered_in_any(
-    run_recovery_sources,
+    migration_recovery_sources,
     "liveWorkRun(sessionId)?.let { liveBinding ->",
     "syncVisibleWorkRun(sessionId, liveBinding)",
     "sessionCoordinator.readWithLegacyApproval(sessionId)",
@@ -378,7 +393,7 @@ if (
     violations.append(
         "Bound Work tool batches must keep the originating session binding through the Work-owned tool runtime"
     )
-if not contains_any(work_execution_sources, "LocalRuntimeOwnershipPolicy.allowVisibleQueuedTurn("):
+if not contains_any(migration_recovery_sources, "LocalRuntimeOwnershipPolicy.allowVisibleQueuedTurn("):
     violations.append(
         "Shared visible queue must stay idle while the current session has a live Work owner"
     )
@@ -390,11 +405,15 @@ if "val latestRunId = log.latest(eventType(kind))" not in run_coordinator:
     violations.append(
         "Recovery checkpoints must not overwrite a newer run for the same session"
     )
+if not contains_any(chat_execution_sources, "queue.finishTurnAndStartNext("):
+    violations.append("Recovered durable Agent inbox must keep Chat-owned continuation wake paths")
+if not contains_any(work_execution_sources, "workRunRegistry.finishTurn("):
+    violations.append("Recovered durable Agent inbox must keep Work-owned continuation wake paths")
 wake_path_count = count_in_sources(
-    run_recovery_sources,
+    migration_recovery_sources,
     "startNextQueuedTurnIfIdle()?.start()",
 )
-if wake_path_count < 5:
+if wake_path_count < 2:
     violations.append("Recovered durable Agent inbox must keep startup/session-switch wake paths")
 
 if (
@@ -406,9 +425,8 @@ if "(current.messages + messages).takeLast(runtimeWindowMessages)" not in transc
     violations.append("Runtime transcript must stay bounded inside LocalTranscriptRuntime")
 if (
     "LocalSessionCoordinator(" not in session_storage_runtime
-    or "sessionCoordinator.snapshot(" not in session_persistence_projection
-    or "coordinator.snapshot(" not in session_storage_runtime
-    or not contains_any(session_snapshot_call_sources, "localSessionPersistenceSnapshot(")
+    or "return coordinator.snapshot(" not in session_storage_runtime
+    or "coordinator.enqueue(snapshot)" not in session_storage_runtime
 ):
     violations.append("Session snapshot writes must stay routed through LocalSessionCoordinator")
 if (
@@ -452,17 +470,23 @@ if '"X-RateLimit-Remaining"' not in web_provider or '"Retry-After"' not in web_p
     violations.append("HTTP tooling must expose safe rate-limit response headers for error classification")
 
 if (
-    not contains_any(run_recovery_sources, "agentRunCoordinator.start(")
-    or not contains_any(run_recovery_sources, "agentRunCoordinator.recoveryDecision(")
+    not contains_any(work_execution_sources, "agentRunCoordinator.start(")
+    or not contains_any(migration_recovery_sources, "agentRunCoordinator.recoveryDecision(")
 ):
     violations.append("Foreground Agent runs must use durable LocalAgentRunCoordinator checkpoints and restart recovery")
 if "eventType(context.kind)" not in run_coordinator or "TOOL_OUTCOME_UNKNOWN" not in run_coordinator:
     violations.append("Run checkpoints must stay isolated by execution kind and block unsafe side-effect recovery")
 if "runCoordinator?.recordEvent" not in subagent_runner or "runKind: LocalAgentRunKind" not in subagent_runner:
     violations.append("Subagent and automation runs must share the unified run-context checkpoint boundary")
-if not contains_any(foreground_execution_sources, "modelRequestCoordinator.complete("):
+if not (
+    contains_any(foreground_execution_sources, "modelRequests.complete(")
+    or contains_any(foreground_execution_sources, "modelRequestCoordinator.complete(")
+):
     violations.append("Foreground model transport must stay routed through LocalModelRequestCoordinator")
-if not contains_any(work_execution_sources, "toolExecutionCoordinator.execute("):
+if (
+    not contains_any(work_execution_sources, "workTurnToolRuntime.execute(")
+    or not contains_any(work_execution_sources, "execution.executeScoped(")
+):
     violations.append("Foreground registered tools must stay routed through LocalToolExecutionCoordinator")
 if not contains_any(chat_execution_sources, "chatTurnCoordinator.prepare("):
     violations.append("Chat semantic preparation must stay routed through LocalChatTurnCoordinator")
