@@ -240,6 +240,7 @@ UI_INTERNAL_IMPORT_MIGRATION_ALLOWLIST = {
     ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt", "com.labteto.dshmobile.local.memory.MemoryStore"),
     ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt", "com.labteto.dshmobile.local.model.DeepSeekPricingRepository"),
     ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt", "com.labteto.dshmobile.local.model.DeepSeekUsageTracker"),
+    ("app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt", "com.labteto.dshmobile.local.tools.LocalToolsRuntime"),
 }
 
 # Session is still being horizontally migrated; these neutral slices are already closed.
