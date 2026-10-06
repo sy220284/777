@@ -14,6 +14,7 @@ import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
 import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
+import com.labteto.dshmobile.local.runtime.LocalAgentRunRecoveryContextPolicy
 import com.labteto.dshmobile.local.runtime.LocalAutomationWorkException
 import com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
@@ -52,6 +53,7 @@ internal class LocalAutomationWorkCoordinator(
     private val sessionCoordinator: LocalSessionCoordinator,
     private val eventLogFor: (String) -> LocalSessionEventLog,
     private val agentRunCoordinator: LocalAgentRunCoordinator,
+    private val recoveryContextPolicy: LocalAgentRunRecoveryContextPolicy,
     private val runnerFactory: (
         sessionId: String,
         boundState: LocalHarnessState,
