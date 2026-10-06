@@ -30,6 +30,7 @@ import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.redactModelImages
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.toRunModelSurface
+import com.labteto.dshmobile.local.model.takeLastWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.model.buildLocalRequestEvidence
 import com.labteto.dshmobile.local.model.stableJsonSha256
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -357,6 +358,17 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         var failureContextDiagnosticLogged = false
         var lastProviderError: LocalModelException? = null
         var attemptStartedNanos = System.nanoTime()
+        var attemptStreamTail = ""
+        var attemptStreamChars = 0
+
+        fun appendAttemptStream(delta: String) {
+            if (delta.isEmpty()) return
+            attemptStreamChars += delta.length
+            attemptStreamTail = takeLastWithoutSplittingSurrogatePair(
+                attemptStreamTail + delta,
+                MAX_ATTEMPT_STREAM_TAIL_CHARS,
+            )
+        }
         val executor = modelStepRuntime.requestExecutor(
             maxAttempts = (maxAttemptsOverride ?: snapshot.modelState.modelAttempts).coerceIn(1, 5),
             retryable = { error ->
@@ -373,6 +385,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     is AgentRequestEvent.AttemptStarted -> {
                         attemptStartedNanos = System.nanoTime()
                         lastProviderError = null
+                        attemptStreamTail = ""
+                        attemptStreamChars = 0
                         previewOwner?.takeIf { previewGuard() }?.let(streamingPreviewStore::begin)
                     }
                     is AgentRequestEvent.AttemptFailed -> {
@@ -461,6 +475,11 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("step", step)
                             put("attempt", event.attempt)
                             put("status", "failed")
+                            put("stream_total_chars", attemptStreamChars)
+                            if (attemptStreamTail.isNotEmpty()) {
+                                put("stream_tail", attemptStreamTail)
+                                put("stream_tail_truncated", attemptStreamChars > attemptStreamTail.length)
+                            }
                             put("retryable", event.retryable)
                             put("will_retry", event.willRetry)
                             put("detail", event.reason.take(2_000))
@@ -482,6 +501,11 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("step", step)
                             put("attempt", event.attempt)
                             put("status", "cancelled")
+                            put("stream_total_chars", attemptStreamChars)
+                            if (attemptStreamTail.isNotEmpty()) {
+                                put("stream_tail", attemptStreamTail)
+                                put("stream_tail_truncated", attemptStreamChars > attemptStreamTail.length)
+                            }
                             put("will_retry", false)
                             event.reason?.let { put("detail", it.take(2_000)) }
                         })
@@ -584,6 +608,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             admission = admission,
                             onDelta = { delta ->
                                     val visible = streamFilter?.append(delta.content)?.text ?: delta.content
+                                    appendAttemptStream(visible)
                                     streamPreview.append(visible)
                                 },
                             )
@@ -730,5 +755,6 @@ internal class LocalModelRequestCoordinator @Inject constructor(
 
     private companion object {
         const val REQUEST_EVIDENCE_VERSION = 1
+        const val MAX_ATTEMPT_STREAM_TAIL_CHARS = 4_096
     }
 }
