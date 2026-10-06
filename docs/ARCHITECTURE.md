@@ -402,121 +402,95 @@ LocalRuntimeBootstrapPort
 - Kernel 不依赖 Feature internal，也不承载 Feature / Provider 构造；
 - 跨 Feature 调用必须通过稳定 Port，且 Port 归属于提供能力的一侧。
 
-## 12. 迁移阶段
+## 12. 当前运行边界核对
 
-> 本节记录架构 3.0 从旧 Engine 架构迁移到当前最终边界的历史时序，用于解释来源和设置永久防回归门禁。
->
-> 本节中的“仍需”“完成时”“后续”等措辞均指对应阶段当时的迁移条件，不代表当前允许旧 Engine / bridge / 跨层依赖继续存在，也不作为现行审计的合法中间状态。当前审计以本文前述最终所有权、当前阶段状态、§15 架构门禁和当前代码事实为准。
+架构 3.0 的当前实现必须持续满足以下边界。
 
-### 阶段 1：冻结 Kernel / Shared Capability 边界
+### 12.1 Feature 领域所有权
 
-状态：**已完成。**
+- ChatFeature 拥有人物、图集、群聊、日记、关系记忆、聊天时间线、回复建议与 Chat 领域解释。
+- WorkFeature 拥有计划、Todo、Goal、Work 上下文、Work 恢复语义、运行中心领域投影与 Work 专属规则。
+- AutomationFeature 拥有任务目录、调度、计划、Webhook、结算和 Automation 领域状态。
+- ToolsFeature 拥有用户可见工具管理与 MCP 设置体验；实际 Tool execution contract 属于 Shared Tool Capability。
+- SettingsFeature 只负责设置体验和配置入口，真实配置事实归对应 Feature 或 Shared Capability。
 
-- Session ownership 正式进入 `local.runtime` 共享运行层，前台、Automation、维护和删除继续共用同一 owner 事实源；
-- Agent run identity、迟到提交栅栏与 recovery coordinator 正式进入 `local.runtime`，Feature 不拥有第二套 run owner；
-- 进程唯一 `HarnessResourceScheduler` 从 `LocalHarnessEngine` 移交 `LocalRuntimeStateStore`；
-- 前台 transcript 投影游标由 `LocalRuntimeStateStore` 统一持有，Feature 后续持久化不再依赖 Engine 私有游标；
-- 共享 Runtime 自行投影可见 Kernel 资源状态；`LocalWorkRunRegistry` 单向订阅资源快照并维护脱离前台的 Work 绑定，`LocalHarnessEngine` 不再承担 Runtime → Work 的资源桥接；
-- Automation 规划模型请求直接从共享 Runtime 获取 `MODEL_REQUEST` 租约，对应 Engine 转发入口删除；
-- cancellation / recovery 继续以 Session owner、Agent run checkpoint、Foreground interaction owner 为共享边界；
-- 门禁锁定上述所有权，禁止 Engine 重新持有资源调度器。
+Feature 不持有 sibling Feature internal，不复制其他领域规则，不接收完整可写聚合状态。
 
-### 阶段 2：领域状态拆分
+### 12.2 Shared Runtime / Shared Capability
 
-状态：**已完成，继续保持单一事实源。**
+共享运行层负责跨 Feature 的中立事实与运行能力：
 
-- `LocalHarnessState` 已拆出 Chat / Work / Kernel / Model 领域状态；
-- UI 已通过 Chat / Work / Shell 投影消费状态，高频 streaming preview 独立；
-- UI 对 `LocalHarnessState` 的聚合状态豁免已清零，门禁同时检查 stale allowlist，已迁 UI 不得重新回读聚合状态；
-- 已迁字段禁止重新平铺回聚合状态，不保留长期双读/双写。
+- Session ownership / lease；
+- Agent run identity 与迟到提交栅栏；
+- resource scheduling / lease；
+- recovery coordination；
+- Session snapshot / EventLog / transcript 权威事实；
+- Model route/profile 与 credential 边界；
+- Tool execution / approval / structured result；
+- Memory / Usage / Diagnostics 等中立能力。
 
-### 阶段 3：建立 ChatFeature / WorkFeature
+每项共享事实只有一个 Owner，Feature 通过稳定契约消费，不建立第二套账本、调度器、Session owner 或恢复状态。
 
-状态：**代码闭环；实时验证状态以 PR / CI 为准。**
+### 12.3 应用组合根与 Runtime Kernel
 
-- Runtime 的 `engine.xxx()` 行为逐项迁入所属 Feature；
-- 每迁走一项立即删除对应 Engine 入口；
-- Feature internal 只依赖 Shared Capability / Kernel 契约；
-- 禁止用“Port → Engine 原样转发”冒充完成；
-- 完成时 ChatRuntime / WorkRuntime 对 `LocalHarnessEngine` 直接引用必须为 0。
+应用组合根负责：
 
-当前 Work 审批与后台任务子阶段已落实：
+- Feature / Provider 构造；
+- Hilt binding 与跨边界 Adapter；
+- `LocalRuntimeBootstrapPort` 实现；
+- Shared Runtime 与 Feature 的启动装配；
+- 平台 Provider / Plugin composition。
 
-- `LocalWorkApprovalCoordinator` 拥有全局自动审批切换、待审批授权、回合设备授权及撤销；WorkRuntime 直接消费该能力，Engine 对应业务入口删除。
-- `LocalApprovalPreferences` 与 `LocalSessionEventLogRegistry` 为共享注入对象；全局自动审批以设备级持久配置为权威，Session 快照不再为审批配置变化重复写盘。
-- 待审批操作在交互所有者内校验真实、未完成的等待者；过期或已回答点击不能改变全局模式或授予设备授权。开启全局自动批准会同步所有活跃 Work 状态并结算其审批等待。
-- 设备授权只修改目标会话的运行绑定；撤销不影响其他会话，前台恢复与后台取消继续使用各自交互所有者。
-- 插件组合根持有 GitHub 凭据操作和 Web 工具构造，Engine 不再直接依赖对应平台存储/Provider。
-- 进程唯一后台任务管理器由共享 Runtime 持有并继续使用原 `local-harness/jobs.json` 持久化；Work 单向订阅任务快照负责会话投影和前台通知，Engine 删除后台任务 UI 代理与任务管理器所有权。
-- WorkRuntime 对 Engine 的直接引用已由 4 → 2 → 1 → 0 清零；前台 Job、pending inbox、投影游标及取消顺序由 Shared Runtime 接管。旧 Engine 已在阶段 6 删除，对应旧访问器与路径由最终门禁永久禁止回归。
-- 前台与 Work 取消时，即使 inbox 取消日志写入失败，也必须取消真实 Job、清理排队投影和交互授权；Work teardown 等待真实 Job/mirror 退出后再发布空闲并释放运行引用，写盘错误继续向调用方反馈。
-- 计划模式由 `LocalWorkPlanModeCoordinator` 持有，维护租约隔离前台/Automation；先提交 `plan/mode` 权威事件，再发布 Work 状态与更新模型历史，事件写入失败不得留下已切换的界面。
-- Chat 已迁出人物选择、图集绑定、默认人物同步、行为调节、纠正撤销、回复建议结果提交、群聊成员配置/移除、前台停止、发送事务、直聊主回合、群聊前台准入/执行、时间线编辑与重生成、分支变体选择及 post-turn 归并；ChatRuntime 对 Engine 的直接引用已清零。`chatTurnPort` 已脱离 Engine，由 `LocalChatTurnStarter` 在组合根直接提供；上述 Chat 业务实现不得回流 Engine。
-- 后台任务快照的通知与持久化按统一提交顺序执行；Work 订阅重放和绑定接入在投影锁内读取当前任务事实，防止旧快照覆盖取消或完成终态。任务返回后再次验证取消状态与合法终态提交权，阻塞执行的迟到成功或异常均不得覆盖已取消终态。回归覆盖晚接入绑定、跨会话隔离、重启中断投影、并发取消与迟到成功/异常。
-- 已迁出的 Chat 领域写入统一采用“Session MAINTENANCE owner → durable Chat domain/timeline event → runtime projection → Session snapshot cache”提交顺序。人物/行为调节等跨文档写入在权威事件提交前失败必须恢复原文档；群聊成员、回复建议和分支选择不得再出现 UI 已更新但 EventLog/模型历史仍停留旧状态的半提交。
-- 回归覆盖多会话等待、全局模式启停、过期/已完成点击、设备授权隔离/撤销、显式审批工具与前台切换；本子阶段须通过最终 Head 的完整 CI 验证。
+`LocalRuntimeKernel` 只负责：
 
-当前阶段三已知 Engine Feature 业务根已清零，Chat / Work 的发送、主回合、时间线 / 分支、Work AgentLoop 与 Tool runtime 等真实实现已归所属 Feature。Shared Context 只保留中立 Policy / DTO，Work 的 structured state 与 cue 解释位于 `local.work`；Shared Agent recovery 只负责恢复安全与通用 continuation，Work checkpoint 的语义装饰由 `LocalWorkRecoveryContextPolicy` 持有。Chat post-turn coordinator 已归 `local.chat`，`chatTurnPort` 也已脱离 Engine。阶段三五个回合／管理组合 Port 已脱离 Engine；下一轮唤醒由独立应用组合协调器路由，Chat／Work 各自拥有队列消费与启动。Session 生命周期、Tools/plugin composition 与 Diagnostics 已有独立所有者。人物、群聊、分支恢复与 Chat 事件解释归 Chat；计划、Todo、目标回放归 Work。旧共享 Memory coordinator 已删除，Automation 的关系记忆请求也复用 Chat 唯一实现。Session envelope 的既有领域序列化字段继续保留原格式，不在共享层解释领域规则。
+- process start-once；
+- 生命周期 CoroutineScope；
+- 调用 `LocalRuntimeBootstrapPort`；
+- bootstrap / startup recovery 触发；
+- 初始化与 Runtime 后台失败投影。
 
-队列续跑采用锁内持久提交，写盘失败保留原输入和顺序；Work 启动失败或空队列会释放预取 Session 租约。群公告采用维护租约内先提交 Chat domain event、再发布投影、最后物化快照；快照失败不得撤销已提交事实。运行中批准计划通过单个 `plan/approved` 事件同时提交计划和退出规划模式。
+Kernel 不承担具体产品 Feature、Model Provider、Tool 领域、Settings 或 UI 业务。
 
-阶段三代码出口已经闭环：Chat / Work Execution Port 均具备显式目标 Session、timeout / recovery、结构化终态以及按 Session cancel / cancelAndJoin；阶段三 Engine composition bridge 已清零并由门禁锁定。阶段三仍需以 PR 最新 Head 的完整 CI / 设备 lane / merge-gate 完成最终验收，UI contribution 和 Engine 最终退出分别属于阶段五、六。
+### 12.4 状态与投影
 
-阶段 3 的完成状态只以 PR 最新 Head 的 `architecture-3-gates` 与完整 CI 为准；旧 Head 的成功、失败或取消结果都不能替代当前 Head 验收。实时 Head 与 Actions 编号属于 PR/CI 运行信息，不写入架构权威文档。
+- `LocalHarnessState` 只作为 Runtime-owned 兼容聚合与只读投影容器。
+- Chat / Work / Model / Runtime 等领域状态由各自 Owner 维护。
+- UI 只消费窄 presentation / Feature API / projection。
+- 高频 streaming preview 独立于低频 Shell / 页面聚合状态。
+- 配置、EventLog、Session snapshot、Jobs、Usage 等事实都必须保持单写。
 
-### 阶段 4：建立 AutomationFeature
+### 12.5 FeatureCatalog 与 UI contribution
 
-状态：**代码闭环；实时验证状态以 PR / CI 为准。**
+- `LocalFeatureCatalog` 是启动期产品路由归属事实源。
+- 每个 route 只属于一个 Feature。
+- 页面内容、Back policy、Drawer entry、restore policy 由对应 Feature contribution 持有。
+- Shell 只负责导航栈、抽屉和系统 Back 等宿主执行。
+- Product Feature Catalog 与 Runtime Plugin lifecycle 分离。
 
-- Automation Runtime → `LocalHarnessEngine` 已清零；
-- `LocalChatAutomationExecutionPort` / `LocalWorkAutomationExecutionPort` 通过 Adapter 进入完整 `ChatExecutionPort` / `WorkExecutionPort`；
-- Automation 不再进入 Chat / Work internal Coordinator、Store、runner 或 writable state；
-- 执行结果统一为 delivered / skipped / blocked / cancelled / failed 结构化终态；
-- `ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST` 与 Automation internal migration allowlist 均已清零，并由架构门禁阻止回归；
-- Session owner、scheduleGeneration、run ownership 与迟到提交栅栏继续属于共享运行边界。
+## 13. 架构变更约束
 
-### 阶段 5：FeatureCatalog + UI Contribution
-
-状态：**代码闭环；实时验证状态以 PR / CI 为准。**
-
-- 不可变 `LocalFeatureCatalog` 与唯一 route owner 已建立；
-- `LocalFeaturePageContent` 只解析 Feature owner / contribution，中央产品页面 `when(page)` 已删除；
-- Shell / Chat / Work / Automation / Tools / Settings 分别拥有页面内容 contribution；
-- contribution 契约同时拥有 Back policy、Drawer entry 与 restore policy，Shell 只保留导航栈、抽屉开合和系统 Back 的宿主执行；
-- Shell / Chat contribution 各自消费窄 `StateFlow`，其他 Feature 不接收无关 conversation state；所有 contribution 通过窄 state/actions 契约组合，不接收整个 `LocalHarnessViewModel`；
-- UI 对 Feature 顶层策略函数/常量以及 Store / Coordinator / Service / Runtime 等内部实现的直接穿透由门禁禁止，UI 只通过 presentation / Feature API 消费。
-
-### 阶段 6：收缩为 LocalRuntimeKernel
-
-状态：**代码闭环；实时验证状态以 PR / CI 为准。**
-
-- 旧 `LocalHarnessEngine.kt` 已删除，类型和旧路径均由门禁永久禁止回归；
-- `DshApplication → LocalRuntimeKernel → LocalRuntimeBootstrapPort` 已成为进程启动链；
-- Kernel 只负责 start-once、生命周期 scope、bootstrap / recovery 触发与初始化错误投影，具体 Feature / provider 构造装配留在应用组合根；
-- Shared Session envelope 对 Chat / Work 复杂领域字段仅保存不透明 JSON，typed decode / normalize / summary projection 分别由 Chat / Work domain codec 所有；Session / Memory / Model / Quality / Tool / Usage 等 Shared 业务包不直接依赖 `LocalHarnessState` 或 Feature internal，聚合状态只由 Runtime owner 持有并向兼容投影提供只读事实；
-- Settings 对 Chat 风格守卫只通过 Chat-owned 稳定 Port 配置，Chat 的开关、过滤词、命中事实与持久化归 Chat 所有；
-- Chat / Work Feature 不持有 `MutableStateFlow<LocalHarnessState>` 或完整聚合写 transform，聚合适配只存在于应用组合根；
-- Kernel 不理解 Persona / Gallery / Group / Todo / GitHub Token / UI 页面。
-
-## 13. 迁移约束
-
-迁移必须遵守：
+任何新增功能、重构或所有权调整都必须按当前边界完成闭环：
 
 ```text
-新边界接管
-→ 调用方切换
-→ 旧路径删除
-→ 测试/门禁锁定
-→ 再进入下一块
+确定 Feature / Shared Owner
+→ 定义公开 Port / API
+→ 明确状态与配置事实源
+→ 在应用组合根完成生产装配
+→ 接入 FeatureCatalog / UI projection（如适用）
+→ 验证 Session / Run / Recovery / 持久化语义
+→ 架构门禁与完整 CI
 ```
 
-禁止长期：
+要求：
 
-- 双读；
-- 双写；
-- 新旧状态互相同步；
-- Feature 和 Engine 同时拥有同一业务事实；
-- 为通过门禁只移动代码不移动所有权。
+- 同一领域事实只有一个可写 Owner。
+- 同一生产能力只有一套有效 DI / Registry / Worker / serializer / route 装配。
+- Shared Capability 保持中立，不能吸收 Feature 专属业务规则。
+- Kernel 不扩大为产品业务容器。
+- UI 不直接依赖领域 Store / Coordinator / Runtime。
+- 跨 Feature 调用通过提供方拥有的稳定 Port。
+- 兼容数据只在明确 normalize / migration 边界处理，正常运行主链只使用当前模型。
+- 任何当前架构债务必须精确记录消费文件、依赖边、退出条件和验证方式。
 
 ## 14. 当前必须保留的系统不变量
 
