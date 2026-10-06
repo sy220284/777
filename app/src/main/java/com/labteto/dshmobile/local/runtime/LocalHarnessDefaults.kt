@@ -55,6 +55,7 @@ internal val SUBAGENT_EXCLUDED_TOOLS = setOf(
     "subagent", "subagent_fork", "workflow", "ask_user_question",
     "session_event_search", "session_trace", "create_goal", "get_goal", "update_goal",
     "session_search", "session_event_trace", "session_event_read", "todo_write", "update_plan",
+    "exit_plan_mode",
     "memory_remember", "memory_update", "memory_forget", "vision_analyze_screen",
     "list_agents", "send_message", "interrupt_agent", "list_subagent_models",
     "schedule_task", "schedule_recurring_task", "cancel_scheduled_task",
