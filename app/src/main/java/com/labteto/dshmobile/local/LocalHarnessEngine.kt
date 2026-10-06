@@ -489,7 +489,14 @@ class LocalHarnessEngine @Inject internal constructor(
             },
         )
     }
-    private val tokenUsageBridge by lazy { LocalTokenUsageContextBridge(_state, workRunRegistry, ::eventLogFor) { currentSessionId } }
+    private val tokenUsageBridge by lazy {
+        LocalTokenUsageContextBridge(
+            state = _state,
+            runState = workRunRegistry::state,
+            eventLogFor = ::eventLogFor,
+            currentSessionId = { currentSessionId },
+        )
+    }
     private val pluginComposition by lazy {
         pluginCompositionFactory.create(
             workspaceRoot = File(workspace.path),
