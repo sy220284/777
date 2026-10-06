@@ -138,6 +138,8 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 :reference-validation:test
 ```
 
+其中本机语义单测必须覆盖：模型请求证据与 Surface 关联、失败/取消 `assistant/attempt` 不进入正式历史、ModelHistory Checkpoint 水位与 V1 兼容重写、压缩来源证据、工具真实 admission execution identity。官方黄金 fixture 继续只承担锁定参考版本的基础 AgentLoop 差分，不把本机高级语义单测包装成官方全量等价。
+
 ### build-arm64
 
 同一次 Gradle invocation 执行：
@@ -202,7 +204,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - 对比官方黄金结果。
 - 在官方基线更新时显式暴露行为差异。
 
-日常 CI 不自动追随上游最新版，防止无意改变产品语义。
+日常 CI 不自动追随上游最新版，防止无意改变产品语义。黄金 fixture 只证明其覆盖的基础 AgentLoop 调度语义；Session 请求重建、Checkpoint 水位、工具 admission identity、压缩来源等高级契约由对应模块测试证明，升级锁定版本时再逐项扩充官方差分向量。
 
 ## 架构门禁
 
