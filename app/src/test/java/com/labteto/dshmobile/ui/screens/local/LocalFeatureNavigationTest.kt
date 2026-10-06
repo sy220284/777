@@ -277,4 +277,88 @@ class LocalFeatureNavigationTest {
         )
     }
 
+    @Test
+    fun invalidOrEmptyNavigationStateFallsBackToHome() {
+        assertEquals(LocalFeaturePage.HOME, localFeatureCurrent(emptyList()))
+        assertEquals(LocalFeaturePage.HOME, localFeatureCurrent(listOf("UNKNOWN")))
+        assertEquals(listOf(LocalFeaturePage.HOME.name), localFeaturePop(emptyList()))
+        assertEquals(listOf(LocalFeaturePage.HOME.name), localFeaturePop(listOf(LocalFeaturePage.HOME.name)))
+    }
+
+    @Test
+    fun navigationHistoryIsBoundedToTwelveEntries() {
+        var stack = localFeatureHome()
+        repeat(20) { index ->
+            val page = if (index % 2 == 0) LocalFeaturePage.WORKSPACE else LocalFeaturePage.RUN_CENTER
+            stack = localFeaturePush(stack, page)
+        }
+
+        assertEquals(12, stack.size)
+        assertEquals(LocalFeaturePage.RUN_CENTER, localFeatureCurrent(stack))
+    }
+
+    @Test
+    fun restoreStackDropsUnknownAndUnownedPagesThenRestoresHomePrefix() {
+        val contributions = listOf(
+            LocalFeatureUiContribution(
+                moduleId = LocalFeatureModuleId.SHELL,
+                restorePage = ::localFeatureRestoreOwnedPage,
+                content = { },
+            ),
+            LocalFeatureUiContribution(
+                moduleId = LocalFeatureModuleId.WORK,
+                restorePage = { page -> page.takeIf { it == LocalFeaturePage.WORKSPACE } },
+                content = { },
+            ),
+            LocalFeatureUiContribution(
+                moduleId = LocalFeatureModuleId.CHAT,
+                restorePage = { null },
+                content = { },
+            ),
+        )
+
+        val restored = localFeatureRestoreStack(
+            listOf("UNKNOWN", LocalFeaturePage.WORKSPACE.name, LocalFeaturePage.DIARY.name),
+            contributions,
+        )
+
+        assertEquals(
+            listOf(LocalFeaturePage.HOME.name, LocalFeaturePage.WORKSPACE.name),
+            restored,
+        )
+    }
+
+    @Test
+    fun duplicateDrawerOwnersAndMissingPageOwnerFailFast() {
+        val duplicateDrawer = listOf(
+            LocalFeatureUiContribution(
+                moduleId = LocalFeatureModuleId.WORK,
+                drawerActions = mapOf(LocalFeatureDrawerEntry.WORKSPACE to { }),
+                content = { },
+            ),
+            LocalFeatureUiContribution(
+                moduleId = LocalFeatureModuleId.SHELL,
+                drawerActions = mapOf(LocalFeatureDrawerEntry.WORKSPACE to { }),
+                content = { },
+            ),
+        )
+        val duplicateFailure = runCatching {
+            localFeatureDrawerAction(LocalFeatureDrawerEntry.WORKSPACE, duplicateDrawer)
+        }.exceptionOrNull()
+        assertTrue(duplicateFailure?.message?.contains("multiple Feature owners") == true)
+
+        val missingFailure = runCatching {
+            localFeatureContributionFor(
+                LocalFeaturePage.SETTINGS,
+                listOf(
+                    LocalFeatureUiContribution(
+                        moduleId = LocalFeatureModuleId.SHELL,
+                        content = { },
+                    ),
+                ),
+            )
+        }.exceptionOrNull()
+        assertTrue(missingFailure?.message?.contains("Missing UI contribution") == true)
+    }
+
 }
