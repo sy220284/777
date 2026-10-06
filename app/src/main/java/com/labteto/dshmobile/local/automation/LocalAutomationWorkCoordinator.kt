@@ -26,6 +26,7 @@ import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.appendLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import com.labteto.dshmobile.local.session.localTranscriptIndexForSession
+import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
 import com.labteto.dshmobile.local.work.LocalWorkState
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -93,6 +94,7 @@ internal class LocalAutomationWorkCoordinator(
                 eventLog = boundEventLog,
                 profiles = state.value.modelProfiles,
                 agentRunCoordinator = agentRunCoordinator,
+                contextPolicy = LocalWorkRecoveryContextPolicy,
             )
         } else {
             LocalAutomationWorkRecoveryPlan(prompt)
