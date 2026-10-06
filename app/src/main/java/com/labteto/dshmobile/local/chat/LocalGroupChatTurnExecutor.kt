@@ -7,7 +7,6 @@ import com.labteto.dshmobile.local.LocalModelRequestCoordinator
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.boundedGroupChatRequestHistory
 import com.labteto.dshmobile.local.buildTokenUsageContext
-import com.labteto.dshmobile.local.finalizeGroupContextAfterRefresh
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
 import com.labteto.dshmobile.local.model.LocalImageInputMode
@@ -24,7 +23,6 @@ import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
 import com.labteto.dshmobile.local.model.withChatTurnContext
 import com.labteto.dshmobile.local.model.withTailEphemeralContext
 import com.labteto.dshmobile.local.record
-import com.labteto.dshmobile.local.renderPendingTurnsForPlanner
 import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
 import com.labteto.dshmobile.local.runtime.CHAT_ROLEPLAY_TEMPERATURE
 import com.labteto.dshmobile.local.runtime.GROUP_POST_TURN_PENDING_BATCH

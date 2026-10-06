@@ -620,6 +620,7 @@ class LocalHarnessEngine @Inject internal constructor(
     private val transcriptRuntime by lazy {
         LocalTranscriptRuntime(
             state = _state,
+            pruneToolResult = ::pruneToolResult,
             runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
             onProjected = { sequence ->
                 transcriptProjectionCursor = maxOf(transcriptProjectionCursor ?: -1L, sequence)
@@ -817,7 +818,6 @@ class LocalHarnessEngine @Inject internal constructor(
             runtimeStateStore = runtimeStateStore,
             sessionStorage = sessionStorageRuntime,
             workRunRegistry = workRunRegistry,
-            pruneToolResult = ::pruneToolResult,
             runTurn = { input, memoryInput, sourceMessageId, binding, preownedLease ->
                 workAgentTurnExecutor.run(
                     input = input,

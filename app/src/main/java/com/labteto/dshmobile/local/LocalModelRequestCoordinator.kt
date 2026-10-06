@@ -274,7 +274,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             put("history_tokens_estimate", pressure.historyTokens)
             put("current_user_tokens_estimate", pressure.currentUserTokens)
             put("tool_definition_tokens_estimate", pressure.toolDefinitionTokens)
-            workContextAssessment?.let { assessment ->
+            contextAssessment?.let { assessment ->
                 put("context_efficiency_status", assessment.status)
                 put("history_ratio_permille", assessment.historyRatioPermille)
                 put("tool_ratio_permille", assessment.toolRatioPermille)

@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.MAX_PENDING_INPUTS
+import com.labteto.dshmobile.local.send.LocalPreparedSend
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
