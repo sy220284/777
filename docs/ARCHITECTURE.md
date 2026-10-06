@@ -538,16 +538,17 @@ Feature Catalog 与路由门禁现包括：
 - Work 的计划、目标和任务清单归属 Work；审批/问答与后台任务类型分别归属共享 Interaction / Jobs 契约，避免 Runtime 反向依赖 Work internal；
 - 模型响应、会话/消息、附件、工具文件、Automation 结果与资源状态归位到对应契约目录，既有序列化字段与枚举值保持兼容。
 
-这轮包名和契约归位不代表运行状态边界已经完成。仍须移除 Feature 的完整可写聚合状态、收紧 Work run 所有权、建立审批配置的单一流式投影，并在实现完成后锁定跨 Feature internal 与聚合写入口门禁。
-
-后续随迁移继续增加：
+包名、领域契约与运行状态边界当前均按架构 3.0 最终门禁维护：
 
 - Feature 禁止互相导入 internal package；
-- UI 禁止引用领域 Store / Coordinator；
-- Chat / Work / Session / Model / Tools / Automation / Settings Runtime 已清零的 Engine 依赖永久禁止回归，不再保留“0 预算”兼容口径；
-- 旧 Engine composition bridge、外部直接消费者与已迁 Feature 业务根均已进入永久禁止回归集合；删除后不得以同数量的新代理、改名方法或新的历史白名单替代；
-- `LocalHarnessState` 字段与可写入口持续收缩；
-- CI 不再使用 Engine 方法数、构造依赖数、聚合状态字段数或 UI projection 字段数作为架构放行条件；这些代码形状不能证明所有权，真正门禁以依赖方向、唯一事实源、精确迁移债务和旧路径退出为准。
+- UI 禁止引用领域 Store / Coordinator 等内部实现，只通过 presentation / Feature API / projection 消费；
+- Chat / Work 不持有完整 `LocalHarnessState` 可写聚合状态；领域事实由所属 Feature / Shared Capability 单一拥有，聚合适配仅存在于应用组合根 / Runtime-owned 兼容投影边界；
+- Session ownership、Agent run identity、迟到提交栅栏与 recovery coordination 归共享 Runtime 所有，Feature 不建立第二套 run owner；
+- 全局审批配置以 `LocalApprovalPreferences` 为共享权威事实，Work 通过流式投影消费，不再从 Session 快照复制第二事实源；
+- Chat / Work / Session / Model / Tools / Automation / Settings Runtime 已清零的 Engine 依赖永久禁止回归；
+- 旧 Engine composition bridge、外部直接消费者与已迁 Feature 业务根均属于历史墓碑；不得以新代理、改名方法、0 预算或历史迁移白名单重新引入；
+- `LocalHarnessState` 只保留 Runtime-owned 兼容聚合与只读投影用途，已迁字段不得重新形成长期双读 / 双写；
+- CI 不使用 Engine 方法数、构造依赖数、聚合状态字段数、UI projection 字段数或文件行数作为架构放行条件；真正门禁以所有权、依赖方向、唯一事实源、运行不变量和旧路径退出为准。
 
 ## 16. 验证与完成标准
 
