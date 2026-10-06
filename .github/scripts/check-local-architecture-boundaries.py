@@ -893,7 +893,7 @@ constructor = re.search(
 ) if engine_exists else None
 if engine_exists and constructor is None:
     die("unable to locate LocalHarnessEngine constructor while the migration Engine exists")
-engine_constructor = engine_constructor if constructor is not None else ""
+engine_constructor = constructor.group(1) if constructor is not None else ""
 if has_typed_property(engine_constructor, "LocalHarnessSettingsCoordinator"):
     die("LocalHarnessEngine must not depend on the Settings capability")
 
