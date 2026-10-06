@@ -65,18 +65,11 @@ internal fun LocalTranscriptAutoPager(
 @Composable
 internal fun LocalComposerTailFollower(
     listState: LazyListState,
-    active: Boolean,
+    anchoredViewportExtent: Int?,
 ) {
-    LaunchedEffect(listState, active) {
-        if (!active) return@LaunchedEffect
-
-        fun viewportExtent(): Int {
-            val info = listState.layoutInfo
-            return info.viewportEndOffset - info.viewportStartOffset
-        }
-
-        var previousViewportExtent = viewportExtent()
-        snapshotFlow { viewportExtent() }
+    LaunchedEffect(listState, anchoredViewportExtent) {
+        var previousViewportExtent = anchoredViewportExtent ?: return@LaunchedEffect
+        snapshotFlow { listState.conversationViewportExtent() }
             .collect { currentViewportExtent ->
                 val viewportDelta = previousViewportExtent - currentViewportExtent
                 previousViewportExtent = currentViewportExtent
@@ -85,6 +78,11 @@ internal fun LocalComposerTailFollower(
                 }
             }
     }
+}
+
+internal fun LazyListState.conversationViewportExtent(): Int {
+    val info = layoutInfo
+    return info.viewportEndOffset - info.viewportStartOffset
 }
 
 internal fun LazyListState.isConversationTailVisible(): Boolean {
