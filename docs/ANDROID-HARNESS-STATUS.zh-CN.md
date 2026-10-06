@@ -80,7 +80,15 @@ sessionId
 
 ## Session 与恢复
 
-Session Event Log 是主要事实源。
+Session Event Log 是主要事实源。模型历史缓冲区与 Checkpoint 是 EventLog 的有界物化与恢复加速层；新写入的模型历史 Checkpoint 带 `as_of_sequence` 水位，恢复按事件序号重放尾部，旧 V1 Checkpoint 继续可读并在后续安全点重写。
+
+模型请求同时记录可重建证据：
+
+- `request/header` 持有 `request_uid`、路由身份、最终消息摘要、工具 Schema 摘要、上下文摘要以及对应 Surface 事件序号；
+- `request/tool-surface` 只在工具 Schema Surface 变化时记录完整 Schema；
+- `request/context-surface` 只在 system / developer 模型可见上下文变化时记录完整上下文切片；
+- retry / error / cancelled / completed / `assistant/attempt` 使用同一个 `request_uid` 关联，失败尝试不会伪造正式 assistant 历史；
+- `tool/execution-started` 在真实执行 admission 后记录独立 `execution_id` 与 `root_call_id`，与模型声明的 `tool/call` 分离。
 
 持久内容包括：
 
@@ -129,6 +137,7 @@ Work 压缩已经额外生成 typed `LocalWorkCheckpoint`，结构字段包括�
 已实现：
 
 - 有界提取式历史摘要。
+- 压缩事件记录压缩前 EventLog 水位、来源 Checkpoint、压缩前后消息量和摘要指纹；后续 Checkpoint 记录压缩提交后的事件水位。
 - context overflow 专用恢复。
 - system 指令保留。
 - Unicode / UTF-8 安全裁剪。
