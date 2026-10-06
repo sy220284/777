@@ -265,7 +265,7 @@ class HarnessAutomationScheduler @Inject constructor(
     ) {
         validateId(id)
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
-        require(silenceMinutes >= 60L) { "聊天沉默触发最短为 1 小时" }
+        require(silenceMinutes >= LocalChatAutomationPolicy.MIN_SILENCE_MINUTES) { "聊天沉默触发最短为 1 小时" }
         checkedAutomationMinutesToMillis(silenceMinutes, "沉默触发间隔", allowZero = false)
         validateChatPolicy(
             mode = AutomationMode.CHAT,
@@ -408,7 +408,7 @@ class HarnessAutomationScheduler @Inject constructor(
         val recurring = when (scheduleType) {
             AutomationScheduleType.SILENCE -> {
                 require(current.mode == AutomationMode.CHAT) { "沉默触发仅支持聊天模式" }
-                require((silenceMinutes ?: 0L) >= 60L) { "聊天沉默触发最短为 1 小时" }
+                require((silenceMinutes ?: 0L) >= LocalChatAutomationPolicy.MIN_SILENCE_MINUTES) { "聊天沉默触发最短为 1 小时" }
                 silenceMinutes
             }
             AutomationScheduleType.WINDOW -> {
@@ -573,10 +573,14 @@ class HarnessAutomationScheduler @Inject constructor(
         proactiveMaxUnanswered: Int,
     ) {
         if (mode != AutomationMode.CHAT) return
-        require(quietStartHour in 0..23 && quietEndHour in 0..23) { "免打扰小时无效" }
-        require(quietStartMinute in 0..59 && quietEndMinute in 0..59) { "免打扰分钟无效" }
-        require(proactiveMinGapMinutes >= 60L) { "主动互动最低间隔至少 1 小时" }
-        require(proactiveMaxUnanswered in 1..5) { "连续未回复上限必须为 1 到 5 次" }
+        LocalChatAutomationPolicy(
+            quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
+            quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
+        ).requireValid()
     }
 
     private fun validateId(id: String) {
