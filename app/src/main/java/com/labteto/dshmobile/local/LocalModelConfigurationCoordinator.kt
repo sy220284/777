@@ -167,8 +167,4 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         if (profile.authKind == LocalModelAuthKind.CHATGPT_PLAN) "ChatGPT 账户授权不可用，请重新连接"
         else "该模型密钥不可用，请编辑配置重新填写"
 
-    companion object {
-        const val LocalModelConfigContract.DEFAULT_MODEL = "deepseek-flash"
-        const val LocalModelConfigContract.DEFAULT_BASE_URL = "https://api.deepseek.com"
-    }
 }
