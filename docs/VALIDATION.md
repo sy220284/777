@@ -90,7 +90,7 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 1. `check-local-architecture-boundaries.py`
    - Feature / Shared Capability / Runtime Kernel 单向依赖；
    - cross-Feature internal 禁止；
-   - 已完成 Shared 边界禁止反向依赖 Feature；
+   - Shared Capability 保持 Feature-agnostic，不依赖 Feature internal；
    - 领域状态单写与 UI projection 边界；
    - Feature Catalog 与 Runtime Plugin 生命周期分离；
    - Feature / Shared Capability / Runtime Kernel 的 Owner、公开边界与依赖方向必须与 `ARCHITECTURE.md` 一致；
@@ -101,7 +101,7 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
    - streaming preview 有界；
    - model history 缓存与单一写入口；
    - Session snapshot / recovery 顺序；
-   - 旧 durable queue、模型 / Tool 直连、Vision fallback 等执行旁路禁止回归。
+   - Agent inbox、统一 Model / Tool Gateway 与冻结 profile 的 Vision 路由保持为当前执行入口，前台执行不得建立平行旁路。
 
 这两份脚本不再冻结 UI 样式、Prompt 文案、固定方法体、构造依赖数量、文件行数、字段数量或具体变量名。业务语义由单元 / conformance / 设备测试证明；架构门禁只证明 3.0 边界与关键运行不变量。
 
