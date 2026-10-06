@@ -7,19 +7,17 @@ import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
-import com.labteto.dshmobile.local.chat.GroupAnnouncementService
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
-import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
-import com.labteto.dshmobile.local.chat.PersonaInspectionService
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.PersonaTransferDocument
 import com.labteto.dshmobile.local.chat.PersonaTransferFormat
+import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
+import com.labteto.dshmobile.local.presentation.LocalSessionUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import com.labteto.dshmobile.local.presentation.projectChatSurfaceState
 import com.labteto.dshmobile.local.presentation.projectShellState
@@ -37,10 +35,8 @@ import kotlinx.coroutines.withContext
 @HiltViewModel
 class LocalHarnessViewModel @Inject constructor(
     private val runtime: LocalUiRuntime,
-    private val personaAutoFillService: PersonaAutoFillService,
-    private val groupAnnouncementService: GroupAnnouncementService,
-    personaInspectionService: PersonaInspectionService,
-    galleryStore: ChatPersonaGalleryStore,
+    private val chatUi: LocalChatUiFacade,
+    private val sessionUi: LocalSessionUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     val state = runtime.session.state
@@ -52,21 +48,18 @@ class LocalHarnessViewModel @Inject constructor(
     val workState = state.projectWorkState(viewModelScope)
     private val personaGalleryController = LocalPersonaGalleryUiController(
         runtime = runtime,
-        personaAutoFillService = personaAutoFillService,
-        personaInspectionService = personaInspectionService,
-        galleryStore = galleryStore,
+        chatUi = chatUi,
         appContext = appContext,
         scope = viewModelScope,
     )
     private val chatModelAssistController = LocalChatModelAssistController(
         runtime = runtime,
-        personaAutoFillService = personaAutoFillService,
-        groupAnnouncementService = groupAnnouncementService,
+        chatUi = chatUi,
     )
     val gallery = personaGalleryController.gallery
     val personaPresets: List<PersonaPreset> = personaGalleryController.personaPresets
     private val transcriptHistoryController = LocalTranscriptHistoryController(
-        session = runtime.session,
+        session = sessionUi,
         currentSessionId = { state.value.sessionId },
         liveMessages = { state.value.messages },
         scope = viewModelScope,

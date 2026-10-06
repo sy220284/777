@@ -7,12 +7,9 @@ import android.webkit.MimeTypeMap
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
-import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaInspectionResult
-import com.labteto.dshmobile.local.chat.PersonaInspectionService
 import com.labteto.dshmobile.local.chat.PersonaPreset
 import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -22,6 +19,7 @@ import com.labteto.dshmobile.local.chat.galleryEntryHasUnsavedChanges
 import com.labteto.dshmobile.local.chat.isMeaningfulGalleryPersona
 import com.labteto.dshmobile.local.chat.samePersonaIdentity
 import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
+import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -35,24 +33,22 @@ import kotlinx.coroutines.withContext
 /** Owns persona-gallery UI state, persistence, portraits and model-assisted maintenance. */
 internal class LocalPersonaGalleryUiController(
     private val runtime: LocalUiRuntime,
-    private val personaAutoFillService: PersonaAutoFillService,
-    private val personaInspectionService: PersonaInspectionService,
-    private val galleryStore: ChatPersonaGalleryStore,
+    private val chatUi: LocalChatUiFacade,
     private val appContext: Context,
     private val scope: CoroutineScope,
 ) {
     private val state = runtime.session.state
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
-    private val transfer = LocalPersonaTransferCoordinator(runtime, galleryStore)
+    private val transfer = LocalPersonaTransferCoordinator(runtime, chatUi)
     val gallery: StateFlow<List<PersonaGalleryEntry>> = _gallery.asStateFlow()
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
     suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = runSuspendResult {
         runtime.chat.configureChatPersona(profile).getOrThrow()
-        _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
+        _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
     }
     init {
         scope.launch(Dispatchers.IO) {
-            runCatching { galleryStore.list() }.onSuccess { _gallery.value = it }
+            runCatching { chatUi.galleryEntries() }.onSuccess { _gallery.value = it }
         }
     }
 
@@ -85,7 +81,7 @@ suspend fun saveCurrentToGallery(
         completeHistory
     }
     val outcome = withContext(Dispatchers.IO) {
-        galleryStore.save(
+        chatUi.saveGallery(
             persona = snapshot.chat.chatPersona,
             sourceSessionId = snapshot.sessionId,
             history = archiveHistory,
@@ -95,7 +91,7 @@ suspend fun saveCurrentToGallery(
             existingId = existingId ?: snapshot.chat.galleryId,
             existingStoryId = existingStoryId ?: snapshot.chat.galleryStoryId,
             forceNewStory = forceNewStory,
-        ).also { _gallery.value = galleryStore.list() }
+        ).also { _gallery.value = chatUi.galleryEntries() }
     }
     runtime.chat.bindChatGallery(outcome.entry.id, outcome.storyId)
     outcome.entry
@@ -164,13 +160,13 @@ suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGallery
     check(!state.value.loading && !state.value.kernel.running) { "请在聊天空闲时新建人物" }
     require(isMeaningfulGalleryPersona(profile)) { "请填写人物名称和至少一项人物设定" }
     val entry = withContext(Dispatchers.IO) {
-        galleryStore.save(
+        chatUi.saveGallery(
             persona = profile,
             sourceSessionId = "",
             history = emptyList(),
             chatState = ChatCharacterState(),
             notes = "",
-        ).entry.also { _gallery.value = galleryStore.list() }
+        ).entry.also { _gallery.value = chatUi.galleryEntries() }
     }
     // Preserve the old create-and-use flow for an empty one-to-one chat.
     // In an existing conversation or a group, creating a gallery card must not replace the cast.
@@ -180,7 +176,7 @@ suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGallery
 suspend fun autoFillNewPersona(description: String): Result<PersonaProfile> = runSuspendResult {
     val snapshot = state.value
     check(!snapshot.loading && !snapshot.kernel.running && snapshot.modelState.configured) { "请先配置模型并等待当前回复结束" }
-    personaAutoFillService.generate(
+    chatUi.autoFillPersona(
         model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
         profileId = snapshot.modelState.modelSelection.activeProfileId,
         current = PersonaProfile(name = ""),
@@ -217,7 +213,7 @@ suspend fun inspectGalleryPersona(
         archived
     }
     return runSuspendResult {
-        personaInspectionService.inspect(
+        chatUi.inspectPersona(
             model = snapshot.modelState.model, baseUrl = snapshot.modelState.baseUrl,
             profileId = snapshot.modelState.modelSelection.activeProfileId,
             persona = entry.persona,
@@ -232,10 +228,10 @@ suspend fun applyGallerySuggestions(
 ): Result<PersonaGalleryEntry> = runCatching {
     val updated = withContext(Dispatchers.IO) {
         check(suggestions.isNotEmpty()) { "请先选择要追加的内容" }
-        galleryStore.applySuggestions(id, suggestions)
+        chatUi.applyGallerySuggestions(id, suggestions)
             ?: error("图集条目已不存在")
     }
-    _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
+    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
     if (state.value.chat.galleryId == id) {
         runtime.chat.configureChatPersona(updated.persona)
     }
@@ -276,7 +272,7 @@ suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(target.absolutePath, bounds)
             require(bounds.outWidth > 0 && bounds.outHeight > 0) { "人物形象图无法识别" }
-            val saved = galleryStore.updatePortraitPath(id, target.absolutePath)
+            val saved = chatUi.updateGalleryPortrait(id, target.absolutePath)
                 ?: error("图集条目已不存在")
             deleteManagedPortrait(previous.portraitPath, keepPath = target.absolutePath)
             saved
@@ -285,7 +281,7 @@ suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry
             throw error
         }
     }
-    _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
+    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
     updated
 }
 
@@ -293,11 +289,11 @@ suspend fun removeGalleryPortrait(id: String): Result<PersonaGalleryEntry> = run
     val previous = gallery.value.firstOrNull { it.id == id }
         ?: error("图集条目已不存在")
     val updated = withContext(Dispatchers.IO) {
-        galleryStore.updatePortraitPath(id, "")
+        chatUi.updateGalleryPortrait(id, "")
             ?: error("图集条目已不存在")
     }
     deleteManagedPortrait(previous.portraitPath)
-    _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
+    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
     updated
 }
 
@@ -312,15 +308,15 @@ private fun deleteManagedPortrait(path: String, keepPath: String? = null) {
 
 suspend fun editGalleryNotes(id: String, storyId: String, notes: String): Result<Unit> = runCatching {
     withContext(Dispatchers.IO) {
-        check(galleryStore.updateStoryNotes(id, storyId, notes)) { "图集故事已不存在" }
-        _gallery.value = galleryStore.list()
+        check(chatUi.updateStoryNotes(id, storyId, notes)) { "图集故事已不存在" }
+        _gallery.value = chatUi.galleryEntries()
     }
 }
 
 suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> = runCatching {
     withContext(Dispatchers.IO) {
-        check(galleryStore.renameStory(id, storyId, title)) { "图集故事已不存在" }
-        _gallery.value = galleryStore.list()
+        check(chatUi.renameStory(id, storyId, title)) { "图集故事已不存在" }
+        _gallery.value = chatUi.galleryEntries()
     }
 }
 
@@ -335,15 +331,15 @@ internal suspend fun importGalleryPersona(
     mimeType: String?,
 ): Result<PersonaGalleryEntry> = runCatching {
     transfer.import(bytes, fileName, mimeType).also {
-        _gallery.value = withContext(Dispatchers.IO) { galleryStore.list() }
+        _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
     }
 }
 
 suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runCatching {
     val preset = PersonaPresetCatalog.find(id) ?: error("人物预置不存在")
     val entry = withContext(Dispatchers.IO) {
-        PersonaPresetArtworkInstaller(appContext, galleryStore).install(preset).also {
-            _gallery.value = runCatching { galleryStore.list() }.getOrDefault(_gallery.value)
+        PersonaPresetArtworkInstaller(appContext, chatUi).install(preset).also {
+            _gallery.value = runCatching { chatUi.galleryEntries() }.getOrDefault(_gallery.value)
         }
     }
     entry
@@ -352,8 +348,8 @@ suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runC
 suspend fun deleteGalleryEntry(id: String): Result<Unit> = runCatching {
     val portraitPath = gallery.value.firstOrNull { it.id == id }?.portraitPath.orEmpty()
     withContext(Dispatchers.IO) {
-        check(galleryStore.delete(id)) { "图集条目已不存在" }
-        _gallery.value = galleryStore.list()
+        check(chatUi.deleteGallery(id)) { "图集条目已不存在" }
+        _gallery.value = chatUi.galleryEntries()
     }
     deleteManagedPortrait(portraitPath)
     runtime.chat.removeGroupChatMemberByGalleryId(id)
@@ -362,8 +358,8 @@ suspend fun deleteGalleryEntry(id: String): Result<Unit> = runCatching {
 
 suspend fun deleteGalleryStory(id: String, storyId: String): Result<Unit> = runCatching {
     withContext(Dispatchers.IO) {
-        check(galleryStore.deleteStory(id, storyId)) { "图集故事已不存在" }
-        _gallery.value = galleryStore.list()
+        check(chatUi.deleteStory(id, storyId)) { "图集故事已不存在" }
+        _gallery.value = chatUi.galleryEntries()
     }
     runtime.chat.clearChatGalleryBinding(expectedGalleryId = id, expectedStoryId = storyId, keepCharacter = true)
 }
@@ -374,8 +370,8 @@ suspend fun deleteGalleryHistoryMessage(
     messageKey: String,
 ): Result<Unit> = runCatching {
     withContext(Dispatchers.IO) {
-        check(galleryStore.deleteHistoryMessage(id, storyId, messageKey)) { "gallery_archive_missing" }
-        _gallery.value = galleryStore.list()
+        check(chatUi.deleteHistoryMessage(id, storyId, messageKey)) { "gallery_archive_missing" }
+        _gallery.value = chatUi.galleryEntries()
     }
 }
 

@@ -184,30 +184,8 @@ UI_INTERNAL_IMPLEMENTATION_SUFFIXES = (
     "Gateway",
     "Port",
 )
-UI_INTERNAL_IMPORT_MIGRATION_ALLOWLIST = {
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatModelAssistController.kt", "com.labteto.dshmobile.local.chat.GroupAnnouncementService"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatModelAssistController.kt", "com.labteto.dshmobile.local.chat.PersonaAutoFillService"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt", "com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt", "com.labteto.dshmobile.local.chat.GroupAnnouncementService"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt", "com.labteto.dshmobile.local.chat.PersonaAutoFillService"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt", "com.labteto.dshmobile.local.chat.PersonaInspectionService"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt", "com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt", "com.labteto.dshmobile.local.chat.PersonaAutoFillService"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt", "com.labteto.dshmobile.local.chat.PersonaInspectionService"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaTransferCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaPresetArtworkInstaller.kt", "com.labteto.dshmobile.local.chat.ChatPersonaGalleryStore"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryController.kt", "com.labteto.dshmobile.local.session.LocalSessionRuntime"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryLoader.kt", "com.labteto.dshmobile.local.session.LocalSessionRuntime"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/AutomationPlannerUiController.kt", "com.labteto.dshmobile.local.automation.AutomationPlanningService"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/tasks/TasksViewModel.kt", "com.labteto.dshmobile.local.automation.AutomationPlanningService"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt", "com.labteto.dshmobile.local.memory.MemoryManager"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/MemorySettingsController.kt", "com.labteto.dshmobile.local.memory.MemoryStore"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt", "com.labteto.dshmobile.local.memory.MemoryManager"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt", "com.labteto.dshmobile.local.memory.MemoryStore"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt", "com.labteto.dshmobile.local.model.DeepSeekPricingRepository"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsViewModel.kt", "com.labteto.dshmobile.local.model.DeepSeekUsageTracker"),
-    ("app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt", "com.labteto.dshmobile.local.tools.LocalToolsRuntime"),
-}
+UI_INTERNAL_IMPORT_MIGRATION_ALLOWLIST: set[tuple[str, str]] = set()
+
 
 # Session is still being horizontally migrated; these neutral slices are already closed.
 FROZEN_SHARED_FILES = (
@@ -866,6 +844,43 @@ feature_navigation = strip_comments(read(
 ))
 if "LocalFeatureCatalog.resolve(" not in feature_navigation:
     die("Feature navigation must resolve product routes through LocalFeatureCatalog")
+
+feature_page_host_path = "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeaturePageContent.kt"
+feature_page_host = strip_comments(read(feature_page_host_path))
+if "LocalFeatureCatalog.ownerOf(page)" not in feature_page_host:
+    die("Feature page host must resolve its contribution owner through LocalFeatureCatalog")
+if re.search(r"\bwhen\s*\(\s*page\s*\)", feature_page_host):
+    die("central Feature page host must not dispatch product pages with when(page)")
+if "LocalFeatureUiContribution" not in feature_page_host:
+    die("Feature page host lost the Feature UI contribution contract")
+
+feature_contribution_paths = {
+    "SHELL": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalShellUiContribution.kt",
+    "CHAT": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalChatUiContribution.kt",
+    "WORK": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkUiContribution.kt",
+    "AUTOMATION": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalAutomationUiContribution.kt",
+    "TOOLS": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalToolsUiContribution.kt",
+    "SETTINGS": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSettingsUiContribution.kt",
+}
+if set(feature_contribution_paths) != module_ids:
+    die(
+        "Feature UI contribution owners must match LocalFeatureModuleId exactly: "
+        + ", ".join(sorted(set(feature_contribution_paths) ^ module_ids))
+    )
+for module_id, relative in feature_contribution_paths.items():
+    contribution = strip_comments(read(relative))
+    own_marker = f"LocalFeatureModuleId.{module_id}"
+    if contribution.count(own_marker) != 1:
+        die(f"Feature UI contribution {module_id} must declare its owner exactly once")
+    foreign_markers = {
+        other for other in module_ids
+        if other != module_id and f"LocalFeatureModuleId.{other}" in contribution
+    }
+    if foreign_markers:
+        die(
+            f"Feature UI contribution {module_id} must not compose sibling owners: "
+            + ", ".join(sorted(foreign_markers))
+        )
 
 plugin_composition = strip_comments(read(
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"

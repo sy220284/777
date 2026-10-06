@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import com.labteto.dshmobile.local.session.LocalSessionRuntime
+import com.labteto.dshmobile.local.presentation.LocalSessionUiFacade
 import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 
 /** Owns transcript-history paging state for the local conversation UI. */
 internal class LocalTranscriptHistoryController(
-    session: LocalSessionRuntime,
+    session: LocalSessionUiFacade,
     private val currentSessionId: () -> String,
     liveMessages: () -> List<com.labteto.dshmobile.local.session.LocalHarnessMessage>,
     private val scope: CoroutineScope,

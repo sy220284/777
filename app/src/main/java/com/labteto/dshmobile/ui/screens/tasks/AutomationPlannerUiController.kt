@@ -2,8 +2,8 @@ package com.labteto.dshmobile.ui.screens.tasks
 
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.automation.AutomationPlanDraft
-import com.labteto.dshmobile.local.automation.AutomationPlanningService
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
+import com.labteto.dshmobile.local.presentation.LocalAutomationPlanningFacade
 import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 internal class AutomationPlannerUiController(
     private val scope: CoroutineScope,
     private val localRuntime: LocalTaskRuntime,
-    private val planningService: AutomationPlanningService,
+    private val planningService: LocalAutomationPlanningFacade,
     private val _state: MutableStateFlow<TasksUiState>,
     private val save: (AutomationPlanDraft, String?, String) -> Boolean,
     private val tasks: () -> List<com.labteto.dshmobile.automation.AutomationTask>,

@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
-import com.labteto.dshmobile.local.session.LocalSessionRuntime
+import com.labteto.dshmobile.local.presentation.LocalSessionUiFacade
 import com.labteto.dshmobile.local.session.LocalTranscriptPage
 import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +20,7 @@ internal data class LocalTranscriptHistoryLoadResult(
  * loader only decides how many bounded pages are needed to satisfy the separate foreground quota.
  */
 internal class LocalTranscriptHistoryLoader(
-    private val session: LocalSessionRuntime,
+    private val session: LocalSessionUiFacade,
     private val currentSessionId: () -> String,
     private val liveMessages: () -> List<LocalHarnessMessage>,
 ) {
@@ -116,7 +116,7 @@ internal class LocalTranscriptHistoryLoader(
         sessionId: String,
         cursor: LocalTranscriptPageCursor?,
     ): LocalTranscriptPage = withContext(Dispatchers.IO) {
-        session.transcriptPageForUi(
+        session.transcriptPage(
             sessionId = sessionId,
             cursor = cursor,
             limit = LOCAL_TRANSCRIPT_HISTORY_PAGE_MESSAGES,

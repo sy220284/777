@@ -7,8 +7,8 @@ import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.HarnessAutomationScheduler
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.automation.AutomationPlanDraft
-import com.labteto.dshmobile.local.automation.AutomationPlanningService
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
+import com.labteto.dshmobile.local.presentation.LocalAutomationPlanningFacade
 import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -37,7 +37,7 @@ data class TasksUiState(
 class TasksViewModel @Inject constructor(
     private val scheduler: HarnessAutomationScheduler,
     private val localRuntime: LocalTaskRuntime,
-    private val planningService: AutomationPlanningService,
+    private val planningService: LocalAutomationPlanningFacade,
 ) : ViewModel() {
     val harnessState: StateFlow<LocalHarnessTaskState> = localRuntime.state.stateIn(
         scope = viewModelScope,

@@ -1,9 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.chat.GroupAnnouncementService
-import com.labteto.dshmobile.local.chat.PersonaAutoFillService
 import com.labteto.dshmobile.local.chat.PersonaProfile
+import com.labteto.dshmobile.local.presentation.LocalChatUiFacade
 import com.labteto.dshmobile.local.presentation.LocalUiRuntime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -12,8 +11,7 @@ import kotlinx.coroutines.withContext
 /** Owns UI-triggered model helper transactions that are independent from the main chat turn. */
 internal class LocalChatModelAssistController(
     private val runtime: LocalUiRuntime,
-    private val personaAutoFillService: PersonaAutoFillService,
-    private val groupAnnouncementService: GroupAnnouncementService,
+    private val chatUi: LocalChatUiFacade,
 ) {
     private val state = runtime.session.state
 
@@ -26,7 +24,7 @@ internal class LocalChatModelAssistController(
             check(snapshot.modelState.configured) { "请先配置聊天模型" }
             check(snapshot.chat.groupChat.members.size >= 2) { "请先添加至少两位群聊人物" }
             Result.success(
-                groupAnnouncementService.generate(
+                chatUi.generateGroupAnnouncement(
                     model = snapshot.modelState.model,
                     baseUrl = snapshot.modelState.baseUrl,
                     profileId = snapshot.modelState.modelSelection.activeProfileId,
@@ -58,7 +56,7 @@ internal class LocalChatModelAssistController(
             val recentMessages = withContext(Dispatchers.IO) {
                 runtime.session.transcriptTailForUi(snapshot.sessionId, PERSONA_AUTOFILL_RECENT_MESSAGES)
             }
-            val generated = personaAutoFillService.generate(
+            val generated = chatUi.autoFillPersona(
                 model = snapshot.modelState.model,
                 baseUrl = snapshot.modelState.baseUrl,
                 profileId = snapshot.modelState.modelSelection.activeProfileId,

@@ -216,6 +216,8 @@ Chat send、直聊回合、人物纠正、关系恢复、时间线编辑 / regen
 
 验收包括 Back / Drawer / 页面恢复、会话跳转、媒体 / 权限返回、任务打开会话、嵌套设置返回；复验手机单列、TalkBack、130% 字号和系统大字、长时间线、明 / 夜 / 墨及高对比壁纸。设备 UI 复验不能用静态截图或单元测试替代。
 
+当前阶段五代码迁移已完成：`LocalFeaturePageContent` 只按 `LocalFeatureCatalog.ownerOf(page)` 解析启动期不可变的 Feature UI contribution，中央产品页面 `when(page)` 已删除；Shell / Chat / Work / Automation / Tools / Settings 各自拥有独立 contribution 文件，门禁要求每个 `LocalFeatureModuleId` 恰好由对应 Feature contribution 声明一次且不得代管 sibling。UI 对 Store / Coordinator / Service / Runtime / Manager / Repository / Tracker / Executor / Registry / Gateway / Port 的直接实现依赖已清零，原调用通过 presentation facade 暴露窄 UI 能力。Architecture 3.0 所有权门禁、执行不变量门禁与 `compileDebugKotlin` 已通过；Back / Drawer、页面恢复、TalkBack / 字号 / 主题等真实设备体验仍保留为提交后的完整产品 CI / 设备验收，不用静态检查替代。
+
 ## 12. 阶段 6：Engine 收缩为 Runtime Kernel
 
 前置：所有 Feature / capability runtime 对 Engine 直接引用为 0；领域业务与 UI contribution 已迁出；共享能力无反向 Feature internal 依赖。

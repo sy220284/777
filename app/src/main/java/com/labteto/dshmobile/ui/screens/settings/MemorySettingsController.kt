@@ -1,9 +1,8 @@
 package com.labteto.dshmobile.ui.screens.settings
 
-import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
-import com.labteto.dshmobile.local.memory.MemoryStore
+import com.labteto.dshmobile.local.presentation.LocalSettingsDataFacade
 import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,8 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /** Owns Settings-facing local-memory scope, list and mutation behavior. */
 internal class MemorySettingsController(
     private val localHarness: LocalSettingsRuntime,
-    private val memoryStore: MemoryStore,
-    private val memoryManager: MemoryManager,
+    private val settingsData: LocalSettingsDataFacade,
 ) {
     private val _memories = MutableStateFlow<List<MemoryRecord>>(emptyList())
     val memories: StateFlow<List<MemoryRecord>> = _memories.asStateFlow()
@@ -27,12 +25,7 @@ internal class MemorySettingsController(
             LocalConversationMode.CONTINUATION ->
                 setOf(MemoryScope.GLOBAL, MemoryScope.PROJECT, MemoryScope.LINEAGE)
         }
-        _memories.value = memoryStore.listActive(
-            allowedScopes = scopes,
-            projectId = local.projectId,
-            lineageId = local.lineageId,
-            limit = 100,
-        )
+        _memories.value = settingsData.memories(scopes, local.projectId, local.lineageId)
     }
 
     fun update(
@@ -48,11 +41,7 @@ internal class MemorySettingsController(
             return
         }
         runCatching {
-            memoryManager.update(
-                existing = current,
-                content = content,
-                pinned = pinned,
-            )
+            settingsData.updateMemory(current, content, pinned)
         }.onSuccess {
             refresh()
             onDone(null)
@@ -62,7 +51,7 @@ internal class MemorySettingsController(
     }
 
     fun forget(id: String, onDone: (String?) -> Unit = {}) {
-        runCatching { memoryStore.forget(id) }
+        runCatching { settingsData.forgetMemory(id) }
             .onSuccess {
                 refresh()
                 onDone(null)
