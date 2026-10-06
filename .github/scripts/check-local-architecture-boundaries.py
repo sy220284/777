@@ -195,6 +195,8 @@ LEGACY_MOVED_IMPORTS = {
         "com.labteto.dshmobile.local.chat.LocalChatContextRefreshCoordinator",
     "com.labteto.dshmobile.local.settings.LocalAgentRuntimeLimits":
         "com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits",
+    "com.labteto.dshmobile.local.chat.ChatStreamFilter":
+        "com.labteto.dshmobile.local.model.LocalStreamPhraseFilter",
 }
 
 RETIRED_SETTINGS_RUNTIME_PATHS = (
