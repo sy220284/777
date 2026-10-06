@@ -511,6 +511,8 @@ Kernel 不承担具体产品 Feature、Model Provider、Tool 领域、Settings �
 
 CI 已将架构 3.0 从通用静态检查中独立为 `architecture-3-gates`。范围分类器识别 Feature / Shared Capability / Runtime Kernel 及架构控制文件；完整产品改动必须通过该 lane，main push 也必须重新执行对应控制面验证。
 
+`scope` 在动态分类前固定自举范围分类器与仓库 CI 完整性检查，分类后再独立复核关键控制文件的最低 lane；`check-*.py` 门禁脚本必须能从 workflow / 自动化链路真实到达，`merge-gate` 必须持续依赖并核对全部当前 lane 的选择结果与执行结果。架构权威文件、CI 主流程和架构门禁本身发生变化时，不能通过调整分类规则让自身跳过 `static-gates` 或 `architecture-3-gates`。
+
 架构 3.0 不设置 Kotlin 文件数量门禁，也不设置单文件行数门禁。拆成几个文件、每个文件多少行都不能证明所有权正确；CI 约束真实的 Feature / Shared Capability / Runtime Kernel 边界、依赖方向、状态归属、生产装配和运行不变量。若存在临时架构债务，必须单独记录消费文件、具体依赖边、退出条件和删除条件。
 
 Feature Catalog 与路由门禁现包括：
