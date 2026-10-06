@@ -67,17 +67,7 @@ ENGINE_STAGE3_WORK_BUILTIN_CANDIDATES = {
     "interrupt_agent",
     "workflow",
 }
-ENGINE_STAGE3_WORK_BUILTIN_ALLOWLIST = {
-    "subagent",
-    "spawn_subagent",
-    "subagent_fork",
-    "fork_subagent",
-    "list_subagent_models",
-    "list_agents",
-    "send_message",
-    "interrupt_agent",
-    "workflow",
-}
+ENGINE_STAGE3_WORK_BUILTIN_ALLOWLIST = set()
 ENGINE_REMOVED_PRIVATE_BUSINESS_METHODS = {
     "chatStreamFilterPhrases",
     "compactHistoryIfNeeded",
@@ -2397,6 +2387,22 @@ for removed_private_business_method in ENGINE_REMOVED_PRIVATE_BUSINESS_METHODS:
         die(
             "Removed Engine private business/helper implementation must not return: "
             + removed_private_business_method
+        )
+
+work_agent_control_builtin_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAgentControlBuiltinRuntime.kt")
+)
+for required_work_agent_control_boundary in (
+    "class LocalWorkAgentControlBuiltinRuntime",
+    "persistentJobs.startReadonlySubagent(",
+    "subagents.runWorkflow(",
+    "jobs.listAgents(run.sessionId)",
+    "Work 代理工具缺少活动运行上下文",
+):
+    if required_work_agent_control_boundary not in work_agent_control_builtin_source:
+        die(
+            "Work agent-control builtin ownership is incomplete: "
+            + required_work_agent_control_boundary
         )
 
 work_builtin_tool_source = strip_comments(
