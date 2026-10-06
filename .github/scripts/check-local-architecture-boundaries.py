@@ -2370,6 +2370,63 @@ for removed_private_business_method in ENGINE_REMOVED_PRIVATE_BUSINESS_METHODS:
             + removed_private_business_method
         )
 
+work_builtin_tool_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkBuiltinToolRuntime.kt")
+)
+removed_engine_work_builtin_tools = (
+    "update_plan",
+    "exit_plan_mode",
+    "todo_write",
+    "create_goal",
+    "get_goal",
+    "update_goal",
+    "ask_user_question",
+)
+for removed_work_builtin_tool in removed_engine_work_builtin_tools:
+    if re.search(
+        rf'^\s*"{re.escape(removed_work_builtin_tool)}"\s*->',
+        engine,
+        re.MULTILINE,
+    ):
+        die(
+            "Work-owned builtin tool dispatch must not return to LocalHarnessEngine: "
+            + removed_work_builtin_tool
+        )
+    if f'"{removed_work_builtin_tool}"' not in work_builtin_tool_source:
+        die(
+            "LocalWorkBuiltinToolRuntime lost Work-owned builtin dispatch: "
+            + removed_work_builtin_tool
+        )
+for required_work_builtin_boundary in (
+    "class LocalWorkBuiltinToolRuntime",
+    "LocalWorkProgressCoordinator(",
+    "exitWorkPlanMode(",
+    "run.interactions.awaitQuestion(",
+    "Work 工具缺少活动运行上下文",
+):
+    if required_work_builtin_boundary not in work_builtin_tool_source:
+        die(
+            "Work builtin task-tool ownership is incomplete: "
+            + required_work_builtin_boundary
+        )
+
+harness_defaults_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt")
+)
+subagent_excluded_start = harness_defaults_source.find("SUBAGENT_EXCLUDED_TOOLS = setOf(")
+subagent_excluded_end = harness_defaults_source.find(
+    "internal val PARALLEL_SUBAGENT_TOOLS",
+    subagent_excluded_start,
+)
+if (
+    subagent_excluded_start < 0
+    or subagent_excluded_end < 0
+    or '"exit_plan_mode"' not in harness_defaults_source[
+        subagent_excluded_start:subagent_excluded_end
+    ]
+):
+    die("Subagents must not regain the Work-run-bound exit_plan_mode tool")
+
 work_turn_port_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkTurnPort.kt")
 )
