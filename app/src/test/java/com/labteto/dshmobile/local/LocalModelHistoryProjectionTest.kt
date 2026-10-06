@@ -47,6 +47,57 @@ class LocalModelHistoryProjectionTest {
     }
 
     @Test
+    fun checkpointWatermarkDefinesExactReplayTail() {
+        val checkpointMessages = listOf(
+            message("system", "系统"),
+            message("user", "问题"),
+        )
+        val events = listOf(
+            event(0L, "system/prompt", buildJsonObject { put("content", "系统") }),
+            event(1L, "user/message", buildJsonObject { put("content", "问题") }),
+            event(
+                2L,
+                ModelHistoryCheckpointCodec.EVENT_TYPE,
+                codec.encode(
+                    messages = checkpointMessages,
+                    reason = "turn-boundary",
+                    asOfSequence = 1L,
+                ),
+            ),
+            event(3L, "assistant/message", message("assistant", "回答")),
+        )
+
+        val restored = restoreLocalModelHistory(events, emptyList(), codec)
+
+        assertEquals(
+            listOf("system", "user", "assistant"),
+            restored.messages.map { it["role"].toString().trim('"') },
+        )
+        assertEquals("回答", restored.messages.last()["content"].toString().trim('"'))
+        assertTrue(restored.replayedTail)
+        assertTrue(restored.checkpointRecommended)
+    }
+
+    @Test
+    fun versionOneCheckpointRemainsReadableButRequestsWatermarkRewrite() {
+        val messages = listOf(message("system", "旧检查点"))
+        val legacyCodec = ModelHistoryCheckpointCodec(version = 1)
+        val events = listOf(
+            event(
+                0L,
+                ModelHistoryCheckpointCodec.EVENT_TYPE,
+                legacyCodec.encode(messages, "legacy"),
+            ),
+        )
+
+        val restored = restoreLocalModelHistory(events, emptyList(), codec)
+
+        assertEquals(messages, restored.messages)
+        assertFalse(restored.replayedTail)
+        assertTrue(restored.checkpointRecommended)
+    }
+
+    @Test
     fun rebuildsFromSemanticEventsWhenNoCheckpointOrLegacyFallbackExists() {
         val events = listOf(
             event(0L, "system/prompt", buildJsonObject { put("content", "系统") }),
