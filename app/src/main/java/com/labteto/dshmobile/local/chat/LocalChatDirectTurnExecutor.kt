@@ -1,14 +1,11 @@
 package com.labteto.dshmobile.local.chat
 
 import android.content.Context
-import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.local.ForegroundTokenUsageSeed
 import com.labteto.dshmobile.local.LocalChatReplyCoordinator
 import com.labteto.dshmobile.local.LocalChatTurnCoordinator
 import com.labteto.dshmobile.local.LocalModelRequestCoordinator
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
-import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.boundedChatRequestHistory
 import com.labteto.dshmobile.local.model.LocalImageCapability
 import com.labteto.dshmobile.local.model.LocalModelPresets
@@ -74,6 +71,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
     private val replyCoordinator: LocalChatReplyCoordinator,
     private val branchCoordinator: LocalChatBranchCoordinator,
     private val postTurn: LocalChatContextRefreshCoordinator,
+    private val queue: LocalChatQueueRuntime,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val imageCapabilities
@@ -473,52 +471,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             )
             sessionStorage.enqueueCurrentSnapshot(sessionId)
 
-            val completedJob = currentCoroutineContext()[Job]
-            val handle = runtimeStateStore.foregroundRunHandle
-            synchronized(handle.lock) {
-                if (handle.job === completedJob) handle.job = null
-            }
-            startNextQueuedTurnIfIdle()?.start()
-        }
-    }
-
-    private fun startNextQueuedTurnIfIdle(): Job? {
-        val handle = runtimeStateStore.foregroundRunHandle
-        return synchronized(handle.lock) {
-            val state = runtimeStateStore.state.value
-            if (
-                state.usageMode != LocalUsageMode.CHAT ||
-                runtimeStateStore.sessionTransitioning ||
-                handle.hasLiveJob()
-            ) return@synchronized null
-
-            val next = handle.pendingInputs.poll() ?: return@synchronized null
-            val durableMessage = next.modelMessage ?: buildJsonObject {
-                put("role", "user")
-                put("content", next.content)
-            }
-            modelHistory.history.append(durableMessage)
-            modelHistory.refreshMetrics(state.sessionId)
-            runtimeStateStore.projection.setForegroundQueuedInputCount(
-                state.sessionId,
-                handle.pendingInputs.size(),
-            )
-            sessionStorage.eventLogs.get(state.sessionId).append(
-                LOCAL_AGENT_INBOX_EVENT_TYPE,
-                encodeLocalAgentInboxEvent(
-                    action = "resumed",
-                    pending = handle.pendingInputs.snapshot(),
-                    affected = listOf(next),
-                    modelMessages = listOf(durableMessage),
-                ),
-            )
-            sessionStorage.enqueueCurrentSnapshot(state.sessionId)
-
-            start(
-                input = next.content,
-                memoryInput = next.memoryInput,
-                sourceMessageId = next.id,
-            ).also { handle.job = it }
+            queue.finishTurnAndStartNext(currentCoroutineContext()[Job])
         }
     }
 }
