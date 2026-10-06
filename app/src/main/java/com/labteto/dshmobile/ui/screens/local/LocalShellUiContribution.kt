@@ -32,7 +32,7 @@ internal fun localShellFeatureUiContribution(
 ): LocalFeatureUiContribution {
     val scope = rememberCoroutineScope()
     return LocalFeatureUiContribution(LocalFeatureModuleId.SHELL) { page ->
-        check(page == LocalFeaturePage.HOME) { "Shell 收到非 HOME 路由：$page" }
+        check(page == LocalFeaturePage.HOME) { "Shell received non-HOME route: $page" }
         LocalConversationSurface(
             state = state,
             activeModelProfile = activeModelProfile,

@@ -11,7 +11,7 @@ internal fun localAutomationFeatureUiContribution(
     onResetNavigation: () -> Unit,
     onPopFeature: () -> Unit,
 ): LocalFeatureUiContribution = LocalFeatureUiContribution(LocalFeatureModuleId.AUTOMATION) { page ->
-    check(page == LocalFeaturePage.TASKS) { "Automation 收到非 TASKS 路由：$page" }
+    check(page == LocalFeaturePage.TASKS) { "Automation received non-TASKS route: $page" }
     TasksScreen(
         onClose = {
             onTaskModeChange(null)

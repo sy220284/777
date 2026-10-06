@@ -11,7 +11,7 @@ internal fun localToolsFeatureUiContribution(
     onPushFeature: (LocalFeaturePage) -> Unit,
     onPopFeature: () -> Unit,
 ): LocalFeatureUiContribution = LocalFeatureUiContribution(LocalFeatureModuleId.TOOLS) { page ->
-    check(page == LocalFeaturePage.TOOLS) { "Tools 收到非 TOOLS 路由：$page" }
+    check(page == LocalFeaturePage.TOOLS) { "Tools received non-TOOLS route: $page" }
     ToolsScreen(
         onClose = onPopFeature,
         handleRootSystemBack = false,

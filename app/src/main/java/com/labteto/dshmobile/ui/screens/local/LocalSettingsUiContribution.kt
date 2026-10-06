@@ -11,7 +11,7 @@ internal fun localSettingsFeatureUiContribution(
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
     onPopFeature: () -> Unit,
 ): LocalFeatureUiContribution = LocalFeatureUiContribution(LocalFeatureModuleId.SETTINGS) { page ->
-    check(page == LocalFeaturePage.SETTINGS) { "Settings 收到非 SETTINGS 路由：$page" }
+    check(page == LocalFeaturePage.SETTINGS) { "Settings received non-SETTINGS route: $page" }
     SettingsScreen(
         onClose = {
             onSettingsDestinationChange(SettingsDestination.ROOT)

@@ -20,7 +20,7 @@ internal fun LocalFeaturePageContent(
 ) {
     val owner = LocalFeatureCatalog.ownerOf(page)
     val contribution = contributions.singleOrNull { it.moduleId == owner }
-        ?: error("功能页面缺少 UI contribution：$page / $owner")
+        ?: error("Missing UI contribution for feature page: $page / $owner")
     Box(Modifier.fillMaxSize()) {
         contribution.content(page)
     }

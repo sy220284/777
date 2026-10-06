@@ -33,6 +33,6 @@ internal fun localWorkFeatureUiContribution(
                 onDismiss = onPopFeature,
             )
         }
-        else -> error("Work 收到非所属路由：$page")
+        else -> error("Work received route owned by another feature: $page")
     }
 }

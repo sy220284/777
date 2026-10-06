@@ -48,6 +48,6 @@ internal fun localChatFeatureUiContribution(
             onCreate = onNewPersona,
             onDismiss = onPopFeature,
         )
-        else -> error("Chat 收到非所属路由：$page")
+        else -> error("Chat received route owned by another feature: $page")
     }
 }
