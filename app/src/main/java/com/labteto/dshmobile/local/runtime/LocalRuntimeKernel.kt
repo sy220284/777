@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.runtime
 
-import com.labteto.dshmobile.local.persistence.LOCAL_HARNESS_PREFERENCES_NAME
+import com.labteto.dshmobile.local.persistence.LocalHarnessPreferences
 import android.content.Context
 import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -28,7 +28,7 @@ class LocalRuntimeKernel @Inject internal constructor(
     private val bootstrap: LocalRuntimeBootstrapPort,
 ) {
     private val started = AtomicBoolean(false)
-    private val preferences = context.getSharedPreferences(LOCAL_HARNESS_PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val preferences = LocalHarnessPreferences.from(context)
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO +
             CoroutineExceptionHandler { _, throwable ->
