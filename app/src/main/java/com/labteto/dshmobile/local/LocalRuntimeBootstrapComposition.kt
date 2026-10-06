@@ -2,6 +2,9 @@ package com.labteto.dshmobile.local
 
 import android.content.Context
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.attachment.cleanupLocalImageAttachments
+import com.labteto.dshmobile.local.attachment.collectLocalImageAttachmentReferences
+import com.labteto.dshmobile.local.attachment.mergeLocalImageAttachmentReferences
 import com.labteto.dshmobile.local.runtime.ATTACHMENT_GC_INTERVAL_MILLIS
 import com.labteto.dshmobile.local.runtime.KEY_ATTACHMENT_GC_AT
 import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
@@ -10,6 +13,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.session.LocalSessionArchiveMaintenance
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import com.labteto.dshmobile.local.work.LocalWorkComposition
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -20,6 +24,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /** App-level construction root for Runtime startup contributors. */
 @Singleton
@@ -98,5 +105,75 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
         }.onSuccess {
             preferences.edit().putLong(KEY_ATTACHMENT_GC_AT, now).apply()
         }
+    }
+}
+
+private fun migrateLegacySessionFiles(
+    root: File,
+    sessionsRoot: File,
+    currentSessionId: String,
+) {
+    val legacy = File(root, "session.json")
+    val destination = File(sessionsRoot, "$currentSessionId.json")
+    if (!legacy.isFile || destination.exists()) return
+    legacy.copyTo(destination, overwrite = false)
+    File(root, "session.events.jsonl").takeIf(File::isFile)
+        ?.copyTo(File(sessionsRoot, "$currentSessionId.events.jsonl"), overwrite = false)
+}
+
+private fun seedLocalWorkspaceGuide(workspacePath: String) {
+    val skill = File(workspacePath, ".dsh/skills/workspace-guide/SKILL.md")
+    if (skill.exists()) return
+    skill.parentFile?.mkdirs()
+    skill.writeText(
+        """
+        # 工作区指南
+
+        - 文件操作限当前工作区。
+        - 修改前读取，修改后复核。
+        - shell 使用 `/system/bin/sh` 和现有命令。
+        """.trimIndent() + "\n",
+    )
+}
+
+private fun cleanupUnreferencedLocalImagesNow(
+    sessionsRoot: File,
+    currentSessionId: String,
+    eventLogFor: (String) -> LocalSessionEventLog,
+    modelHistory: List<JsonObject>,
+    workspacePath: String,
+    eventLog: LocalSessionEventLog,
+) {
+    val sessionIds = sessionsRoot.listFiles().orEmpty()
+        .asSequence()
+        .filter(File::isFile)
+        .map(File::getName)
+        .filter { name -> ".events.jsonl" in name }
+        .map { name -> name.substringBefore(".events.jsonl") }
+        .filter { id -> id.matches(Regex("[A-Za-z0-9._-]{1,128}")) }
+        .plus(currentSessionId)
+        .distinct()
+        .toList()
+    val references = mergeLocalImageAttachmentReferences(
+        sessionIds.map { id ->
+            eventLogFor(id).withEvents { events ->
+                collectLocalImageAttachmentReferences(
+                    events = events,
+                    extraMessages = if (id == currentSessionId) modelHistory else emptyList(),
+                )
+            }
+        },
+    )
+    val result = cleanupLocalImageAttachments(
+        workspaceRoot = File(workspacePath),
+        references = references,
+    )
+    if (result.deletedFiles > 0) {
+        eventLog.append("attachment/gc", buildJsonObject {
+            put("status", "completed")
+            put("deleted_files", result.deletedFiles)
+            put("deleted_bytes", result.deletedBytes)
+            put("retained_image_bytes", result.retainedImageBytes)
+        })
     }
 }

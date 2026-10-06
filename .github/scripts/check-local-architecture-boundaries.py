@@ -17,6 +17,7 @@ LOCAL_SOURCE_ROOT = APP_SOURCE_ROOT / "local"
 UI_SOURCE_ROOT = APP_SOURCE_ROOT / "ui"
 
 RETIRED_ENGINE_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
+RETIRED_ENGINE_SUPPORT_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngineSupport.kt"
 RUNTIME_KERNEL_PATH = "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernel.kt"
 APPLICATION_PATH = "app/src/main/java/com/labteto/dshmobile/DshApplication.kt"
 COMPOSITION_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt"
@@ -476,6 +477,8 @@ for work_semantic in ("LocalWorkCheckpoint", "<work-checkpoint>", "最近持久�
 
 if (ROOT / RETIRED_ENGINE_PATH).exists():
     die("retired LocalHarnessEngine source returned; Architecture 3.0 uses LocalRuntimeKernel")
+if (ROOT / RETIRED_ENGINE_SUPPORT_PATH).exists():
+    die("retired LocalHarnessEngineSupport source returned; helpers must live with their real owner")
 
 for path, source in kotlin_sources_under(APP_SOURCE_ROOT):
     if references_type(source, "LocalHarnessEngine"):
@@ -620,6 +623,22 @@ for aggregate_container, relative, class_name in domain_sources:
             f"LocalHarnessState re-flattened {class_name} field(s): "
             + ", ".join(sorted(flattened))
         )
+
+for chat_owned_field in ("chatStyleGuardEnabled", "chatStyleGuardCustomPhrases", "styleGuardHits"):
+    if chat_owned_field in aggregate_fields:
+        die("LocalHarnessState re-flattened Chat-owned style guard field: " + chat_owned_field)
+
+settings_coordinator = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/settings/LocalHarnessSettingsCoordinator.kt"
+))
+for chat_owned_setting in (
+    "KEY_CHAT_STYLE_GUARD",
+    "KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES",
+    "configureChatStyleGuard(",
+    "recordStyleGuardHits(",
+):
+    if chat_owned_setting in settings_coordinator:
+        die("SettingsFeature reclaimed Chat-owned style guard semantics: " + chat_owned_setting)
 
 for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
     relative = path.relative_to(ROOT).as_posix()

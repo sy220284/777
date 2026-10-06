@@ -10,9 +10,9 @@ private const val LOCAL_QUESTION_EMPTY_RESPONSE = "用户未提供文字回答"
 /**
  * Narrow state surface owned by one interaction runtime.
  *
- * Approval/question coordination must not know the aggregate app state. The adapter below is the
- * migration boundary for the current aggregate projection; Work-run state can replace it later
- * without changing the interaction lifecycle.
+ * Approval/question coordination must not know the aggregate app state. Implementations expose only
+ * the interaction facts required by this lifecycle, so foreground and detached Work can share the
+ * same semantics without receiving a writable application aggregate.
  */
 internal interface LocalInteractionStatePort {
     fun pendingApproval(): LocalApproval?

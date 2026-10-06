@@ -4,6 +4,7 @@ import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
+import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.agent.decodeLocalAgentInboxPending
@@ -33,6 +34,7 @@ import com.labteto.dshmobile.local.runtime.PROJECTION_BASELINE_EVENT
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.session.projectionReplayCursor
 import com.labteto.dshmobile.local.settings.LocalHarnessSettingsCoordinator
@@ -42,6 +44,7 @@ import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -352,6 +355,47 @@ internal class LocalForegroundSessionLoader @Inject constructor(
                     contextBudgetChars = runtimeStateStore.historyBudgetFor(snapshot, resources).maxHistoryChars,
                 ),
             )
+        }
+    }
+}
+
+private fun loadModelHistoryReplayEvents(
+    eventLog: LocalSessionEventLog,
+    codec: ModelHistoryCheckpointCodec,
+    legacyFallback: List<JsonObject>,
+): List<LocalSessionEventLog.Event> {
+    var beforeSequence = Long.MAX_VALUE
+    while (true) {
+        val checkpoint = eventLog.latest(
+            ModelHistoryCheckpointCodec.EVENT_TYPE,
+            beforeSequenceExclusive = beforeSequence,
+        ) ?: break
+        if (codec.decode(checkpoint.data) != null) {
+            return eventLog.snapshotAfter(checkpoint.sequence - 1L)
+        }
+        beforeSequence = checkpoint.sequence
+    }
+    return if (legacyFallback.isNotEmpty()) emptyList() else eventLog.snapshot()
+}
+
+private fun buildRecoveredToolResultMessages(
+    modelHistory: List<JsonObject>,
+    recovery: SessionRepairResult,
+): List<JsonObject> {
+    if (recovery.toolResults.isEmpty()) return emptyList()
+    val seenCallIds = modelHistory.asSequence()
+        .filter { message -> message["role"]?.jsonPrimitive?.contentOrNull == "tool" }
+        .mapNotNull { message -> message["tool_call_id"]?.jsonPrimitive?.contentOrNull }
+        .toMutableSet()
+    return buildList {
+        recovery.toolResults.forEach { recovered ->
+            if (seenCallIds.add(recovered.callId)) {
+                add(buildJsonObject {
+                    put("role", "tool")
+                    put("tool_call_id", recovered.callId)
+                    put("content", recovered.modelContent)
+                })
+            }
         }
     }
 }

@@ -18,11 +18,11 @@
 | 官方阶段 | 当前事实 | 后续处理 |
 |---|---|---|
 | 1：共享能力 / Kernel 边界 | Session owner、run identity/recovery、资源调度和 Session 存储已有统一所有者 | 保留已建立边界；继续删除残留跨层适配 |
-| 2：领域状态 | 代码闭环、最新提交验收待闭环：Chat / Work / Kernel / Model 已拆分；Chat 风格守卫配置与命中状态已归 `LocalChatState`，Chat / Work 不再持有聚合可写状态入口 | 保持领域字段不得重新平铺、Feature 不得重新获得聚合写 transform |
-| 3：Chat / Work Feature | 代码闭环、最新 Head 验收待闭环：已知 Engine 业务根和阶段三 composition bridge 均清零；Chat / Work Execution Port 已具备显式目标 Session、timeout / recovery、结构化终态、cancel / cancelAndJoin；ChatRuntime / WorkRuntime 对 Engine 直接引用保持 0 | 保持永久禁止回归；只等待当前产品 Head 完整 CI / 设备 lane / merge-gate，不再追加阶段三迁移范围 |
-| 4：Automation Feature | 代码闭环、最新 Head 验收待闭环：Automation Runtime→Engine、Automation→Chat/Work internal、两个 Engine coordinator bridge 均已清零；Automation 专属 Port 通过 Adapter 进入完整 Chat / Work Execution Port，并返回结构化终态 | 保持阶段四退出路径永久禁止回归；等待当前产品 Head 完整 CI / 设备 lane / merge-gate |
-| 5：UI contribution | 代码闭环、最新提交验收待闭环：中央页面 `when` 已删除，各 Feature 分别拥有内容、Back、Drawer、restore contribution，并通过窄 state/actions 组合 | 保持 UI→Feature internal 穿透永久禁止；以完整 CI / Android 16 / 17 复验最终体验 |
-| 6：Runtime Kernel | 代码闭环、最新提交验收待闭环：旧 Engine 已删除，`LocalRuntimeKernel` / 中立 Bootstrap Port 已建立；Shared Session→Feature 与 Settings→Chat internal 反向边已清零 | 保持最终单向依赖与旧 Engine/旧 Shared 反向边永久禁止；等待当前 Head 完整 CI / 设备 / merge-gate |
+| 2：领域状态 | 代码闭环：Chat / Work / Kernel / Model 已拆分；Chat 风格守卫配置与命中状态已归 `LocalChatState`，Chat / Work 不再持有聚合可写状态入口 | 保持领域字段不得重新平铺、Feature 不得重新获得聚合写 transform |
+| 3：Chat / Work Feature | 代码闭环：已知 Engine 业务根和阶段三 composition bridge 均清零；Chat / Work Execution Port 已具备显式目标 Session、timeout / recovery、结构化终态、cancel / cancelAndJoin；ChatRuntime / WorkRuntime 对 Engine 直接引用保持 0 | 保持永久禁止回归；只等待当前产品 Head 完整 CI / 设备 lane / merge-gate，不再追加阶段三迁移范围 |
+| 4：Automation Feature | 代码闭环：Automation Runtime→Engine、Automation→Chat/Work internal、两个 Engine coordinator bridge 均已清零；Automation 专属 Port 通过 Adapter 进入完整 Chat / Work Execution Port，并返回结构化终态 | 保持阶段四退出路径永久禁止回归；等待当前产品 Head 完整 CI / 设备 lane / merge-gate |
+| 5：UI contribution | 代码闭环：中央页面 `when` 已删除，各 Feature 分别拥有内容、Back、Drawer、restore contribution，并通过窄 state/actions 组合 | 保持 UI→Feature internal 穿透永久禁止；以完整 CI / Android 16 / 17 复验最终体验 |
+| 6：Runtime Kernel | 代码闭环：旧 Engine 已删除，`LocalRuntimeKernel` / 中立 Bootstrap Port 已建立；Shared Session→Feature 与 Settings→Chat internal 反向边已清零 | 保持最终单向依赖与旧 Engine/旧 Shared 反向边永久禁止；等待当前 Head 完整 CI / 设备 / merge-gate |
 
 当前守卫基线已经切换到架构 3.0：
 
@@ -68,12 +68,12 @@
 
 进入后续迁移前完成以下收口：
 
-- [ ] 当前产品 Head 完整 CI：static-gates、architecture-3-gates、单测 / conformance、arm64 lint 与 APK、x86_64 测试产物、Android 16 / 17、merge-gate 全部成功。
-  - 当前最新验证：static-gates、architecture-3-gates（含 ownership / dependency 与 execution invariants）、单测 / Harness conformance、JVM 21 字节码验证已成功；arm64、x86_64、Android 16 / 17、merge-gate 尚未全部结束。
-- [ ] 确认本轮修复回归：取消日志故障仍停止真实 Job；维护发送保留草稿；启动失败释放租约；入队落盘前不能消费；资源重入不回放旧预算；设备授权撤销不残留；全局审批日志故障不阻断其他等待者；Work 进度先落盘；群聊异步结果不能覆盖新运行；设置最新值持久化。
-- [ ] 核对 WorkStatePort / InteractionStatePort 的全部生产调用方与测试迁移，无旧字段或旧构造残留；复验新迁出的群聊成员、Chat stop / post-turn Job 所有权及取消时序。
-- [ ] 补齐本次必要的故障 / 时序用例，不扩大迁移期 bridge / consumer allowlist，不绕过 architecture-3-gates 或设备 lane。
-- [ ] 更新 #448 描述中的 Head、进度、验证与未完成项。当前“编译修复已提交”不能代替“当前 Head 编译和测试通过”。
+- 最终放行必须以当前产品 Head 的 static-gates、architecture-3-gates、单测 / conformance、arm64 lint 与 APK、x86_64 测试产物、Android 16 / 17、merge-gate 全部成功为准；实时结果只看 PR / Actions，本文不缓存瞬时运行状态。
+  - 本轮本地已重新通过 static product guards、Architecture 3.0 ownership / execution 门禁、`compileDebugKotlin`、关键 Session / Feature navigation / Chat post-turn / Work completion 回归和完整 `:app:testDebugUnitTest`；提交后的远端完整 CI 仍必须在同一最新 Head 上重跑，旧 Head 结果不能替代。
+- [x] 确认本轮修复回归：取消日志故障仍停止真实 Job；维护发送保留草稿；启动失败释放租约；入队落盘前不能消费；资源重入不回放旧预算；设备授权撤销不残留；全局审批日志故障不阻断其他等待者；Work 进度先落盘；群聊异步结果不能覆盖新运行；设置 latest-wins 持久化均有现有或本轮补充回归覆盖，完整 app 单测已通过。
+- [x] 核对 WorkStatePort / InteractionStatePort 的全部生产调用方与测试迁移，无旧字段或旧构造残留；Chat stop / post-turn Job 已由 Chat owner 持有并通过现有取消 / 恢复测试覆盖。
+- [x] 已补齐本次必要的 Session opaque envelope、Feature navigation ownership 等回归，并复用现有故障 / 时序测试；迁移 bridge / consumer allowlist 未扩大，已清零债务改为最终禁止规则。
+- 最终放行时同步 #448 描述中的 Head、进度、验证与未完成项；本地验证只能作为提交前检查，不能替代当前 Head 远端完整 CI。
 
 P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修复后重新锁定基线。
 
@@ -107,13 +107,13 @@ P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修�
 | 功能 | 现有入口 / 核心实现 | 目标归属 | 必须一起迁移的关联链 |
 |---|---|---|---|
 | 发送 / 排队 / 附件 | `queueHumanTurn`、`queueWorkTurnLocked`、`recordUserTranscript` | WorkSend + Shared admission / inbox / transcript | UI Work 发送、Automation 后排队续跑、草稿反馈、落盘失败、取消前启动 |
-| 主代理运行 | `LocalWorkAgentTurnExecutor` 已接管 AgentLoop；Engine 仍有 `syncVisibleWorkRun` 等横向投影适配 | Work 执行协调器 + Shared Agent / run handle | 多 step、完成、失败、步数延长、切换前台、结束快照、排队下一轮 |
+| 主代理运行 | `LocalWorkAgentTurnExecutor` 已接管 AgentLoop；可见投影、run handle 与队列唤醒已由 Shared / Work 所有者接管 | Work 执行协调器 + Shared Agent / run handle | 多 step、完成、失败、步数延长、切换前台、结束快照、排队下一轮 |
 | 工具与审批 | `executeBuiltin`、`approve`、`askUser`、`exitPlanMode` | Shared Tool execution + Work 工具贡献 / 审批策略 | step 暴露集合、参数副作用、设备授权、Plan/Todo/Goal、问答、恢复 |
 | 子代理 / workflow | `workSubagents`、持久子代理工厂、`runWorkflow` | Shared Agent 执行 + Work workflow 策略 | 普通 / fork / 持久子代理、并行 / 流水线、父子取消、子代理模型身份 |
 | 上下文 / 输出 | history budget、Work request projection、compaction、quality | Shared Model / context 机制 + Work 策略 | prefix cache、工具结果 spill / read、完成声明门禁、typed checkpoint |
 | 重新生成 / 恢复 | `regenerateWorkReply`、中断恢复与 safe-job 入口 | WorkRecovery + Shared recovery adjudication | 未开始 / 结果未知副作用、历史重建、重复提交、进程死亡、任务恢复 |
 
-当前 Work send、主 AgentLoop、重生成、请求上下文策略以及 task / agent-control builtin 分发已经迁出 Engine；`ENGINE_STAGE3_WORK_BUILTIN_ALLOWLIST` 已清零。后续集中迁出共享 Tools/plugin composition 装配以解除 `workTurnPort`，再处理可见 Work 投影 / Session 横向适配；阶段四 persistent / automation subagent 装配继续单独处理。每次删除旧路径同步缩紧门禁。
+当前 Work send、主 AgentLoop、重生成、请求上下文策略以及 task / agent-control builtin 分发均已迁出旧 Engine；`workTurnPort`、Tools/plugin composition、可见 Work 投影与 Session 横向适配均已有独立所有者，旧 Engine 已删除。对应迁移 allowlist 已清零并改为最终禁止规则。
 
 建立提供方拥有的 `WorkExecutionPort`：接收明确目标会话、输入、超时 / 恢复选项，返回结构化完成 / 阻塞 / 取消 / 失败结果。所有实际执行复用唯一 Session owner、run coordinator、冻结模型身份和 Tool execution；端口不提供 `MutableStateFlow<LocalHarnessState>`、binding 或内部 runner 给调用方。
 
@@ -122,11 +122,11 @@ P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修�
 - [x] ViewModel / UI 的 Work send 和 regenerate 调用 Work API；Chat 不再作为 Work 执行的产品入口。
 - [x] 旧 Engine 已删除，Work 主回合、计划目标规则、Work 编排和恢复业务由 WorkFeature / Shared runtime 契约分别所有。
 - [x] WorkExecutionPort 具备真实实现；显式目标会话、后台继续运行、结构化终态、真实取消 / join 与多会话 Work 均收口到 Feature Port；当前 Head 的完整 CI / 设备 lane 仍由 P0 单独验收。
-- [ ] 使用现有 conformance / recovery / Tool tests 补真实迁移差异，覆盖供应商 overflow、副作用未知、只读 / 计划模式与长上下文。
+- [x] 现有 recovery / Tool / overflow / readonly / plan-mode / long-context 回归已覆盖真实迁移边界并随完整 app 单测通过；官方 Harness conformance 仍由 P0 的当前 Head 远端 CI 最终验收。
 
 ## 7. 阶段 3-C：Chat 发送和回合执行
 
-Chat send、直聊回合、人物纠正、关系恢复、时间线编辑 / regenerate、分支和 post-turn 已有 Feature owner；`runChatTurn` 等旧 Engine 业务根已清零，`chatTurnPort` 也已脱离 Engine，由 `LocalChatTurnStarter` 在组合根直接提供。Chat 主回合结束后的续跑已经由 `LocalChatQueueRuntime.finishTurnAndStartNext` 负责。当前重点是迁出 Engine 内仍用于启动恢复、Session 切换 / release、Automation release 和 Work 可见队列恢复的 `startNextQueuedTurnIfIdle()` 横向唤醒逻辑，并继续清理群聊 / Session 横向适配，保持 foreground owner 与迟到提交语义不变。
+Chat send、直聊回合、人物纠正、关系恢复、时间线编辑 / regenerate、分支和 post-turn 均已有 Feature owner；`runChatTurn` 等旧 Engine 业务根与 `chatTurnPort` 已退出旧 Engine。Chat 主回合续跑由 `LocalChatQueueRuntime.finishTurnAndStartNext` 负责，跨 Chat / Work 的前台唤醒由应用组合层窄协调器路由；启动恢复、Session 切换 / release、Automation release 与群聊 / Session 横向适配均已迁到明确所有者，foreground owner 与迟到提交栅栏保持共享事实源。
 
 目标分工：
 

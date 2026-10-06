@@ -12,11 +12,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * Temporary Architecture 3.0 migration seam for legacy feature coordinators that still need an
- * atomic aggregate compare/update while their domain StatePort is being extracted.
+ * Final Runtime-owned aggregate projection boundary.
  *
- * The writable StateFlow itself stays private to Runtime. Architecture guard freezes production
- * consumers of this port; that allowlist may only shrink.
+ * The writable StateFlow stays private to Runtime; Feature code receives only domain StatePorts or
+ * explicit projection commands. New callers must not turn this port into a general Feature write seam.
  */
 internal interface LocalAggregateProjectionPort {
     val value: LocalHarnessState

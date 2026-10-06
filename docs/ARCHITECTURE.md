@@ -190,7 +190,7 @@ SettingsFeature 负责设置体验和配置入口；模型身份、凭据解析�
 4. Catalog 在应用运行期间不可动态增删。
 5. 新 Feature 可以通过编译期组合加入系统，但不能靠运行时任意 `register/unregister` 改变产品结构。
 
-当前第一阶段已经建立：
+当前已建立完整的启动期 Feature Catalog：
 
 ```text
 LocalFeatureCatalog
@@ -299,7 +299,7 @@ Kernel 明确不应该理解：
 
 ## 8. 状态模型
 
-现有 `LocalHarnessState` 仍是迁移中的聚合状态。目标是拆成领域状态并由 UI 按需投影：
+现有 `LocalHarnessState` 仅保留为 Runtime-owned 的兼容聚合与只读投影容器；领域状态已经拆分，Feature 不得持有完整聚合可写入口：
 
 ```text
 KernelState
@@ -344,7 +344,7 @@ Feature route contribution
 Feature UI
 ```
 
-阶段 1 已把路由归属和页面状态枚举切到 `LocalFeatureCatalog`。
+路由归属和页面状态枚举已切到 `LocalFeatureCatalog`，并由最终架构门禁永久约束。
 
 中央 `LocalFeaturePageContent` 的产品页面 `when` 已删除；各 Feature 自己贡献页面渲染、Back ownership、Drawer 入口和恢复策略，Shell 只按 `LocalFeatureCatalog` 与 contribution 契约执行导航。
 
@@ -415,7 +415,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 ### 阶段 3：建立 ChatFeature / WorkFeature
 
-状态：**主体迁移已落地，最新 Head 完整验收待闭环。**
+状态：**代码闭环；实时验证状态以 PR / CI 为准。**
 
 - Runtime 的 `engine.xxx()` 行为逐项迁入所属 Feature；
 - 每迁走一项立即删除对应 Engine 入口；
@@ -449,7 +449,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 ### 阶段 4：建立 AutomationFeature
 
-状态：**代码闭环，最新 Head 完整验收待闭环。**
+状态：**代码闭环；实时验证状态以 PR / CI 为准。**
 
 - Automation Runtime → `LocalHarnessEngine` 已清零；
 - `LocalChatAutomationExecutionPort` / `LocalWorkAutomationExecutionPort` 通过 Adapter 进入完整 `ChatExecutionPort` / `WorkExecutionPort`；
@@ -460,7 +460,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 ### 阶段 5：FeatureCatalog + UI Contribution
 
-状态：**代码闭环，最新提交完整 CI / 设备验收待闭环。**
+状态：**代码闭环；实时验证状态以 PR / CI 为准。**
 
 - 不可变 `LocalFeatureCatalog` 与唯一 route owner 已建立；
 - `LocalFeaturePageContent` 只解析 Feature owner / contribution，中央产品页面 `when(page)` 已删除；
@@ -471,7 +471,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 ### 阶段 6：收缩为 LocalRuntimeKernel
 
-状态：**代码闭环，最新提交完整 CI / 设备验收待闭环。**
+状态：**代码闭环；实时验证状态以 PR / CI 为准。**
 
 - 旧 `LocalHarnessEngine.kt` 已删除，类型和旧路径均由门禁永久禁止回归；
 - `DshApplication → LocalRuntimeKernel → LocalRuntimeBootstrapPort` 已成为进程启动链；
@@ -520,9 +520,9 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 CI 已将架构 3.0 从通用静态检查中独立为 `architecture-3-gates`。范围分类器识别 Feature / Shared Capability / Runtime Kernel 及架构控制文件；完整产品改动必须通过该 lane，main push 也必须重新执行对应控制面验证。
 
-架构 3.0 不设置 Kotlin 文件数量门禁，也不设置单文件行数门禁。拆成几个文件、每个文件多少行都不能证明所有权正确；CI 只约束真实的架构边界、依赖方向、状态归属和运行不变量。已经清零的依赖使用永久禁止规则，尚在迁移的桥和业务根使用具体 allowlist 单向收缩。
+架构 3.0 不设置 Kotlin 文件数量门禁，也不设置单文件行数门禁。拆成几个文件、每个文件多少行都不能证明所有权正确；CI 只约束真实的架构边界、依赖方向、状态归属和运行不变量。本轮已清零的跨层依赖、旧 Engine 路径、聚合可写入口和 UI 穿透均使用永久禁止规则；后续若出现新的临时例外，必须单独记录债务、出口和删除条件，不能复用历史迁移白名单。
 
-阶段 1 已增加：
+Feature Catalog 与路由门禁现包括：
 
 - Chat / Work / Automation / Tools / Settings 一级模块存在性；
 - 重复路由注册拒绝；
@@ -545,7 +545,7 @@ CI 已将架构 3.0 从通用静态检查中独立为 `architecture-3-gates`。�
 - Feature 禁止互相导入 internal package；
 - UI 禁止引用领域 Store / Coordinator；
 - Chat / Work / Session / Model / Tools / Automation / Settings Runtime 已清零的 Engine 依赖永久禁止回归，不再保留“0 预算”兼容口径；
-- 迁移期 Engine composition bridge 与外部直接消费者采用具体 allowlist 单向收缩；已迁 Feature 业务根进入永久禁止回归集合，删除后不得以同数量的新代理或改名方法替代；
+- 旧 Engine composition bridge、外部直接消费者与已迁 Feature 业务根均已进入永久禁止回归集合；删除后不得以同数量的新代理、改名方法或新的历史白名单替代；
 - `LocalHarnessState` 字段与可写入口持续收缩；
 - CI 不再使用 Engine 方法数、构造依赖数、聚合状态字段数或 UI projection 字段数作为架构放行条件；这些代码形状不能证明所有权，真正门禁以依赖方向、唯一事实源、精确迁移债务和旧路径退出为准。
 
