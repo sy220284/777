@@ -191,8 +191,9 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
         binding.eventLog.append(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
             checkpointCodec.encode(
-                durableModelHistorySnapshot(binding.runHandle.modelHistory.snapshot()),
-                reason,
+                messages = durableModelHistorySnapshot(binding.runHandle.modelHistory.snapshot()),
+                reason = reason,
+                asOfSequence = binding.eventLog.latestSequence(),
             ),
         )
         binding.runHandle.turnsSinceModelHistoryCheckpoint = 0
