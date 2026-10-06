@@ -41,6 +41,8 @@ Session format reference: V4
 - JSON 参数。
 - 空工具输出。
 
+基础黄金 fixture 只证明锁定官方版本的 AgentLoop 核心调度结果；它不代表整个 Android Harness 与官方所有高级子系统语义等价。
+
 不适合表达为模型回复向量的状态，由对应模块测试覆盖，包括：
 
 - Cancel。
@@ -48,7 +50,10 @@ Session format reference: V4
 - Plan / Goal / Todo。
 - Job / Subagent / Workflow。
 - Session 恢复。
-- Agent run checkpoint。
+- Agent run checkpoint / Checkpoint 事件水位。
+- request evidence / Tool & Context Surface 关联。
+- tool execution admission identity。
+- compaction provenance。
 - Plugin Tool View。
 - Android device。
 
