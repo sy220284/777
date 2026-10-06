@@ -17,6 +17,13 @@ SETTINGS = (ROOT / "settings.gradle.kts").read_text(encoding="utf-8")
 VERSIONS = (ROOT / "gradle" / "libs.versions.toml").read_text(encoding="utf-8")
 WRAPPER = (ROOT / "gradle" / "wrapper" / "gradle-wrapper.properties").read_text(encoding="utf-8")
 VERIFY = (ROOT / "gradle" / "verification-metadata.xml").read_text(encoding="utf-8")
+SCRIPTS = ROOT / ".github" / "scripts"
+CLASSIFIER = (SCRIPTS / "classify-ci-scope.py").read_text(encoding="utf-8")
+AGENTS = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+ARCHITECTURE = (ROOT / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+AUDIT_GUIDE = (ROOT / "docs" / "SYSTEM-AUDIT-GUIDE.zh-CN.md").read_text(encoding="utf-8")
+VALIDATION = (ROOT / "docs" / "VALIDATION.md").read_text(encoding="utf-8")
+DOCS_INDEX = (ROOT / "docs" / "README.md").read_text(encoding="utf-8")
 
 violations: list[str] = []
 
@@ -45,6 +52,173 @@ for workflow in sorted(WORKFLOWS.glob("*.yml")):
             window = "\n".join(lines[index:index + 6])
             if "timeout-minutes:" not in window:
                 violations.append(f"{workflow.name}:{index + 1}: every runner job must declare timeout-minutes")
+
+# Authority documents and the CI control plane must stay mutually reachable and internally aligned.
+authority_refs = (
+    "docs/ARCHITECTURE.md",
+    "docs/SYSTEM-AUDIT-GUIDE.zh-CN.md",
+    "docs/VALIDATION.md",
+    "docs/DEVELOPMENT.md",
+    "docs/SECURITY.md",
+)
+for authority_ref in authority_refs:
+    if authority_ref not in AGENTS:
+        violations.append(f"AGENTS.md lost authoritative entry: {authority_ref}")
+
+architecture_refs = (
+    "SYSTEM-AUDIT-GUIDE.zh-CN.md",
+    "SHARED-AUDIT-CONCLUSIONS.zh-CN.md",
+    "VALIDATION.md",
+    "ANDROID-HARNESS-STATUS.zh-CN.md",
+    "../AGENTS.md",
+)
+for authority_ref in architecture_refs:
+    if authority_ref not in ARCHITECTURE:
+        violations.append(f"docs/ARCHITECTURE.md lost related authority reference: {authority_ref}")
+
+audit_contracts = (
+    "字段契约对账",
+    "配置与定义对账及共享配置提取",
+    "依赖、导入、声明与装配对账",
+    "关联功能协同",
+    "自动能力闭环",
+    "兼容与版本演进",
+    "验证证据",
+)
+for audit_contract in audit_contracts:
+    if audit_contract not in AUDIT_GUIDE:
+        violations.append(
+            "SYSTEM-AUDIT-GUIDE lost required system-audit dimension: " + audit_contract
+        )
+
+for raw_target in re.findall(r"\]\(([^)]+)\)", DOCS_INDEX):
+    target = raw_target.split("#", 1)[0]
+    if not target or "://" in target:
+        continue
+    resolved = (ROOT / "docs" / target).resolve()
+    try:
+        resolved.relative_to(ROOT.resolve())
+    except ValueError:
+        violations.append(f"docs/README.md contains out-of-repository link: {raw_target}")
+        continue
+    if not resolved.exists():
+        violations.append(f"docs/README.md links missing current document/resource: {raw_target}")
+
+required_ci_lanes = (
+    "scope",
+    "static-gates",
+    "architecture-3-gates",
+    "fixture-provenance",
+    "unit-tests",
+    "build-arm64",
+    "device-artifacts-x86",
+    "android-16-instrumented",
+    "android-17-instrumented",
+    "merge-gate",
+)
+for lane in required_ci_lanes:
+    if re.search(rf"^  {re.escape(lane)}:\s*$", CI, re.MULTILINE) is None:
+        violations.append(f"CI lost required lane: {lane}")
+    if lane not in VALIDATION:
+        violations.append(f"docs/VALIDATION.md lost current CI lane: {lane}")
+
+validation_merge_section = ""
+if "### merge-gate" in VALIDATION:
+    validation_merge_section = VALIDATION.split("### merge-gate", 1)[1].split("\n## ", 1)[0]
+for lane in (
+    "static-gates",
+    "architecture-3-gates",
+    "unit-tests",
+    "build-arm64",
+    "device-artifacts-x86",
+    "android-16-instrumented",
+    "android-17-instrumented",
+):
+    if lane not in validation_merge_section:
+        violations.append(f"docs/VALIDATION.md complete-product merge-gate list lost required lane: {lane}")
+
+bootstrap_index = CI.find("- name: Bootstrap CI control plane")
+classify_index = CI.find("- name: Classify CI scope")
+if bootstrap_index < 0 or classify_index < 0 or bootstrap_index > classify_index:
+    violations.append("scope must bootstrap CI control-plane checks before classifying changed files")
+for bootstrap_command in (
+    "python3 -m py_compile",
+    "classify-ci-scope.py --self-test",
+    "check-ci-repository-integrity.py",
+):
+    if bootstrap_command not in CI:
+        violations.append("scope bootstrap lost required control-plane check: " + bootstrap_command)
+
+if "- name: Verify selected scope coverage" not in CI:
+    violations.append("scope must independently verify that critical changes cannot weaken selected CI coverage")
+
+critical_architecture_controls = (
+    "AGENTS.md",
+    "docs/ARCHITECTURE.md",
+    "docs/SYSTEM-AUDIT-GUIDE.zh-CN.md",
+    "docs/VALIDATION.md",
+    ".github/workflows/ci.yml",
+    ".github/scripts/classify-ci-scope.py",
+    ".github/scripts/check-ci-repository-integrity.py",
+    ".github/scripts/check-local-architecture-boundaries.py",
+    ".github/scripts/check-local-performance-invariants.py",
+)
+for control_path in critical_architecture_controls:
+    if f'"{control_path}"' not in CLASSIFIER:
+        violations.append(f"CI classifier lost architecture authority/control path: {control_path}")
+    if control_path not in CI:
+        violations.append(f"scope coverage verification lost architecture control path: {control_path}")
+
+merge_gate = CI.split("\n  merge-gate:\n", 1)[1] if "\n  merge-gate:\n" in CI else ""
+for lane in required_ci_lanes[:-1]:
+    if f"      - {lane}" not in merge_gate:
+        violations.append(f"merge-gate no longer depends on required lane: {lane}")
+
+merge_gate_contracts = {
+    "static-gates": ("REQUIRE_STATIC:", "STATIC_RESULT:"),
+    "architecture-3-gates": ("REQUIRE_ARCHITECTURE:", "ARCHITECTURE_RESULT:"),
+    "fixture-provenance": ("REQUIRE_FIXTURE:", "FIXTURE_RESULT:"),
+    "unit-tests": ("REQUIRE_UNIT:", "UNIT_RESULT:"),
+    "build-arm64": ("REQUIRE_BUILD:", "BUILD_RESULT:"),
+    "device-artifacts-x86": ("REQUIRE_DEVICE:", "DEVICE_RESULT:"),
+    "android-16-instrumented": ("REQUIRE_ANDROID16:", "ANDROID16_RESULT:"),
+    "android-17-instrumented": ("REQUIRE_ANDROID17:", "ANDROID17_RESULT:"),
+}
+for lane, tokens in merge_gate_contracts.items():
+    for token in tokens:
+        if token not in merge_gate:
+            violations.append(f"merge-gate lost {lane} selection/result contract: {token}")
+
+# Every check-*.py file is a gate by convention; it must be reachable from a workflow,
+# directly or through another reachable automation script. Mutual references between orphaned
+# scripts do not count as execution coverage.
+script_sources: dict[Path, str] = {}
+for candidate in sorted(SCRIPTS.glob("*")):
+    if not candidate.is_file():
+        continue
+    try:
+        script_sources[candidate] = candidate.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        continue
+
+reachable_scripts: set[Path] = set()
+frontier_sources = [
+    workflow.read_text(encoding="utf-8")
+    for workflow in sorted(WORKFLOWS.glob("*.yml"))
+]
+while frontier_sources:
+    source = frontier_sources.pop()
+    for candidate, candidate_source in script_sources.items():
+        if candidate in reachable_scripts:
+            continue
+        relative = candidate.relative_to(ROOT).as_posix()
+        if candidate.name in source or relative in source:
+            reachable_scripts.add(candidate)
+            frontier_sources.append(candidate_source)
+
+for guard in sorted(SCRIPTS.glob("check-*.py")):
+    if guard not in reachable_scripts:
+        violations.append(f"{guard.name}: gate script is not reachable from any workflow execution chain")
 
 # Gradle wrapper and dependency verification are supply-chain boundaries.
 if "distributionSha256Sum=" not in WRAPPER:
@@ -121,10 +295,13 @@ for required_architecture_ci in (
         violations.append(
             "Architecture 3.0 CI lane is incomplete: " + required_architecture_ci
         )
-if CI.count("check-local-architecture-boundaries.py") != 1:
-    violations.append("Architecture 3.0 ownership guard must run exactly once in its dedicated lane")
-if CI.count("check-local-performance-invariants.py") != 1:
-    violations.append("Architecture 3.0 performance invariant guard must run exactly once in its dedicated lane")
+architecture_guard_command = "run: python3 .github/scripts/check-local-architecture-boundaries.py"
+performance_guard_command = "run: python3 .github/scripts/check-local-performance-invariants.py"
+normalized_ci_lines = [line.strip() for line in CI.splitlines()]
+if normalized_ci_lines.count(architecture_guard_command) != 1:
+    violations.append("Architecture 3.0 ownership guard must execute exactly once in its dedicated lane")
+if normalized_ci_lines.count(performance_guard_command) != 1:
+    violations.append("Architecture 3.0 performance invariant guard must execute exactly once in its dedicated lane")
 if "classify-ci-scope.py --self-test" not in CI:
     violations.append("CI scope classifier must self-test before downstream validation")
 

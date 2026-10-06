@@ -7,21 +7,51 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.Assert.*
 import org.junit.Test
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class WebhookExecutionTest {
+
+    @Test fun persistedWebhookStatusKeepsExistingWireValue() {
+        val json = Json { encodeDefaults = true }
+        val decoded = json.decodeFromString(
+            WebhookRunResult.serializer(),
+            """{"requestId":"r1","status":"queued","updatedAt":1}""",
+        )
+
+        assertEquals(WebhookRunStatus.QUEUED, decoded.status)
+        assertTrue(
+            json.encodeToString(WebhookRunResult.serializer(), decoded)
+                .contains("\"status\":\"queued\""),
+        )
+    }
+
+    @Test fun unknownPersistedWebhookStatusDegradesToFailedOnDowngrade() {
+        val json = Json { encodeDefaults = true }
+        val decoded = json.decodeFromString(
+            WebhookRunResult.serializer(),
+            """{"requestId":"r-future","status":"future_waiting","updatedAt":1}""",
+        )
+
+        assertEquals(WebhookRunStatus.FAILED, decoded.status)
+        assertTrue(
+            json.encodeToString(WebhookRunResult.serializer(), decoded)
+                .contains("\"status\":\"failed\""),
+        )
+    }
+
     @Test fun cancellationWhileRunningIsRecordedAndPropagated() = runTest {
-        val states = mutableListOf<String>()
+        val states = mutableListOf<WebhookRunStatus>()
         val job = launch { executeWebhookRun({ state, _, _ -> states += state }) { awaitCancellation() } }
         runCurrent()
         job.cancelAndJoin()
         assertTrue(job.isCancelled)
-        assertEquals(listOf("running", "cancelled"), states)
+        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.CANCELLED), states)
     }
     @Test fun cancellationBeforeWorkCompletesSettlesWithoutRetry() = runTest {
-        val states = mutableListOf<String>()
+        val states = mutableListOf<WebhookRunStatus>()
         val job = launch {
             executeWebhookRun({ state, _, _ -> states += state }) {
                 awaitCancellation()
@@ -29,13 +59,13 @@ class WebhookExecutionTest {
         }
         runCurrent()
         job.cancelAndJoin()
-        assertEquals(listOf("running", "cancelled"), states)
+        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.CANCELLED), states)
     }
     @Test fun successfulRunStoresResult() = runTest {
-        val states = mutableListOf<String>()
+        val states = mutableListOf<WebhookRunStatus>()
         var output: String? = null
         executeWebhookRun({ state, result, _ -> states += state; output = result }) { "done" }
-        assertEquals(listOf("running", "completed"), states)
+        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.COMPLETED), states)
         assertEquals("done", output)
     }
 
@@ -47,7 +77,7 @@ class WebhookExecutionTest {
             launch {
                 executeWebhookRun(
                     update = { state, _, _ ->
-                        if (state == "completed") completed += index
+                        if (state == WebhookRunStatus.COMPLETED) completed += index
                     },
                 ) {
                     active += 1
@@ -71,8 +101,8 @@ class WebhookExecutionTest {
     }
 
     @Test fun failedRunDoesNotPoisonNextQueuedRun() = runTest {
-        val firstStates = mutableListOf<String>()
-        val secondStates = mutableListOf<String>()
+        val firstStates = mutableListOf<WebhookRunStatus>()
+        val secondStates = mutableListOf<WebhookRunStatus>()
 
         val first = launch {
             executeWebhookRun({ state, _, _ -> firstStates += state }) {
@@ -88,8 +118,8 @@ class WebhookExecutionTest {
         advanceUntilIdle()
         assertTrue(first.isCompleted)
         assertTrue(second.isCompleted)
-        assertEquals(listOf("running", "failed"), firstStates)
-        assertEquals(listOf("running", "completed"), secondStates)
+        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.FAILED), firstStates)
+        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.COMPLETED), secondStates)
     }
 
 
@@ -129,19 +159,19 @@ class WebhookExecutionTest {
         assertTrue(
             shouldMarkWebhookQueuedCancellation(
                 cause = kotlinx.coroutines.CancellationException("stop"),
-                currentStatus = "queued",
+                currentStatus = WebhookRunStatus.QUEUED,
             ),
         )
         assertFalse(
             shouldMarkWebhookQueuedCancellation(
                 cause = kotlinx.coroutines.CancellationException("stop"),
-                currentStatus = "running",
+                currentStatus = WebhookRunStatus.RUNNING,
             ),
         )
         assertFalse(
             shouldMarkWebhookQueuedCancellation(
                 cause = IllegalStateException("boom"),
-                currentStatus = "queued",
+                currentStatus = WebhookRunStatus.QUEUED,
             ),
         )
     }

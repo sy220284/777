@@ -44,8 +44,8 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationRunReceipt
 import com.labteto.dshmobile.automation.AutomationScheduleType
+import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationTask
-import com.labteto.dshmobile.automation.HarnessAutomationScheduler
 import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -95,7 +95,9 @@ internal fun TaskCard(
     val backgroundTaskLabel = stringResource(R.string.tasks_background_task)
     val scheduleLabel = when (task.scheduleType) {
         AutomationScheduleType.SILENCE -> {
-            val minutes = task.silenceMinutes ?: task.recurringMinutes ?: 60L
+            val minutes = task.silenceMinutes ?: requireNotNull(task.recurringMinutes) {
+                "Normalized silence task requires a duration"
+            }
             stringResource(R.string.tasks_schedule_silence_value, minutes / 60L)
         }
         AutomationScheduleType.DAILY -> stringResource(R.string.tasks_schedule_daily)
@@ -136,9 +138,9 @@ internal fun TaskCard(
             .ifBlank { backgroundTaskLabel }
     }
     val terminalOneShot = task.recurringMinutes == null &&
-        task.status in setOf("completed", "failed", "blocked")
+        task.status in setOf(AutomationStatus.COMPLETED, AutomationStatus.FAILED, AutomationStatus.BLOCKED)
     val timing = when {
-        task.status == "waiting_user" ->
+        task.status == AutomationStatus.WAITING_USER ->
             stringResource(R.string.tasks_waiting_user_timing)
         terminalOneShot && task.lastRunAt != null ->
             stringResource(R.string.tasks_last_run, formatTime(task.lastRunAt))
@@ -257,10 +259,10 @@ internal fun TaskCard(
                 if (task.mode == AutomationMode.CHAT && task.recurringMinutes != null) {
                     DsButton(
                         text = stringResource(
-                            if (task.status == "paused") R.string.tasks_resume
+                            if (task.status == AutomationStatus.PAUSED) R.string.tasks_resume
                             else R.string.tasks_pause,
                         ),
-                        onClick = if (task.status == "paused") onResume else onPause,
+                        onClick = if (task.status == AutomationStatus.PAUSED) onResume else onPause,
                         size = DsButtonSize.Small,
                         variant = DsButtonVariant.Ghost,
                     )
@@ -313,45 +315,46 @@ internal fun TaskCard(
 @Composable
 private fun receiptStatusLabel(receipt: AutomationRunReceipt): String {
     val state = when (receipt.status) {
-        "completed" -> stringResource(R.string.tasks_run_completed)
-        "blocked" -> stringResource(R.string.tasks_run_blocked)
-        "failed" -> stringResource(R.string.tasks_run_failed)
-        "cancelled" -> stringResource(R.string.local_execution_notification_cancelled)
-        "skipped" -> stringResource(R.string.tasks_run_skipped)
-        else -> receipt.status
+        AutomationStatus.COMPLETED -> stringResource(R.string.tasks_run_completed)
+        AutomationStatus.BLOCKED -> stringResource(R.string.tasks_run_blocked)
+        AutomationStatus.FAILED -> stringResource(R.string.tasks_run_failed)
+        AutomationStatus.CANCELLED -> stringResource(R.string.local_execution_notification_cancelled)
+        AutomationStatus.SKIPPED -> stringResource(R.string.tasks_run_skipped)
+        AutomationStatus.RUNNING, AutomationStatus.QUEUED -> stringResource(R.string.tasks_status_running)
+        AutomationStatus.SCHEDULED -> stringResource(R.string.tasks_status_scheduled)
+        AutomationStatus.PAUSED -> stringResource(R.string.tasks_status_paused)
+        AutomationStatus.WAITING_USER -> stringResource(R.string.tasks_status_waiting_user)
     }
     val detail = receipt.errorPreview ?: receipt.resultPreview
     return if (detail.isNullOrBlank()) state else "$state · $detail"
 }
 
-private fun receiptStatus(status: String): DsStatus = when (status) {
-    "completed" -> DsStatus.Done
-    "blocked" -> DsStatus.Warning
-    "failed" -> DsStatus.Failed
-    "cancelled" -> DsStatus.Neutral
-    "running", "queued" -> DsStatus.Running
-    "skipped" -> DsStatus.Neutral
+private fun receiptStatus(status: AutomationStatus): DsStatus = when (status) {
+    AutomationStatus.COMPLETED -> DsStatus.Done
+    AutomationStatus.BLOCKED -> DsStatus.Warning
+    AutomationStatus.FAILED -> DsStatus.Failed
+    AutomationStatus.RUNNING, AutomationStatus.QUEUED -> DsStatus.Running
     else -> DsStatus.Neutral
 }
 
-private fun taskStatus(status: String): DsStatus = when (status) {
-    "running", "queued" -> DsStatus.Running
-    "completed" -> DsStatus.Done
-    "blocked" -> DsStatus.Warning
-    "failed" -> DsStatus.Failed
-    "paused", "waiting_user" -> DsStatus.Neutral
+private fun taskStatus(status: AutomationStatus): DsStatus = when (status) {
+    AutomationStatus.RUNNING, AutomationStatus.QUEUED -> DsStatus.Running
+    AutomationStatus.COMPLETED -> DsStatus.Done
+    AutomationStatus.BLOCKED -> DsStatus.Warning
+    AutomationStatus.FAILED -> DsStatus.Failed
     else -> DsStatus.Neutral
 }
 
 @Composable
-private fun taskStatusLabel(status: String): String = when (status) {
-    "running" -> stringResource(R.string.tasks_status_running)
-    "queued" -> stringResource(R.string.tasks_status_queued)
-    "scheduled" -> stringResource(R.string.tasks_status_scheduled)
-    "completed" -> stringResource(R.string.tasks_run_completed)
-    "blocked" -> stringResource(R.string.tasks_run_blocked)
-    "failed" -> stringResource(R.string.tasks_run_failed)
-    "paused" -> stringResource(R.string.tasks_status_paused)
-    "waiting_user" -> stringResource(R.string.tasks_status_waiting_user)
-    else -> stringResource(R.string.tasks_status_scheduled)
+private fun taskStatusLabel(status: AutomationStatus): String = when (status) {
+    AutomationStatus.RUNNING -> stringResource(R.string.tasks_status_running)
+    AutomationStatus.QUEUED -> stringResource(R.string.tasks_status_queued)
+    AutomationStatus.SCHEDULED -> stringResource(R.string.tasks_status_scheduled)
+    AutomationStatus.COMPLETED -> stringResource(R.string.tasks_run_completed)
+    AutomationStatus.BLOCKED -> stringResource(R.string.tasks_run_blocked)
+    AutomationStatus.FAILED -> stringResource(R.string.tasks_run_failed)
+    AutomationStatus.PAUSED -> stringResource(R.string.tasks_status_paused)
+    AutomationStatus.WAITING_USER -> stringResource(R.string.tasks_status_waiting_user)
+    AutomationStatus.CANCELLED -> stringResource(R.string.local_execution_notification_cancelled)
+    AutomationStatus.SKIPPED -> stringResource(R.string.tasks_run_skipped)
 }

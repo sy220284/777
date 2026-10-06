@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import android.content.Context
+import com.labteto.dshmobile.local.persistence.LocalHarnessPreferences
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -30,7 +31,7 @@ internal class LocalChatStyleGuardSettingsCoordinator @Inject constructor(
     @ApplicationContext context: Context,
     private val state: LocalChatStatePort,
 ) : LocalChatStyleGuardSettingsPort {
-    private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val preferences = LocalHarnessPreferences.from(context)
 
     override val builtInPhrases: List<String> get() = ChatStyleGuard.bannedPhrases
 
@@ -107,7 +108,6 @@ internal class LocalChatStyleGuardSettingsCoordinator @Inject constructor(
             ?.take(MAX_CUSTOM_CHAT_FILTER_CHARS)
 
     private companion object {
-        const val PREFERENCES_NAME = "local_harness"
         const val KEY_CHAT_STYLE_GUARD = "chat_style_guard_enabled"
         const val KEY_CHAT_STYLE_GUARD_CUSTOM_PHRASES = "chat_style_guard_custom_phrases"
         const val MAX_STYLE_GUARD_HITS = 20

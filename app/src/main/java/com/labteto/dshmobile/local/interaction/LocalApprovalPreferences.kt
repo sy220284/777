@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.interaction
 
+import com.labteto.dshmobile.local.persistence.LocalHarnessPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -40,7 +41,7 @@ class LocalApprovalPreferences internal constructor(
 
     @Inject
     internal constructor(@ApplicationContext context: Context) : this(
-        preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE),
+        preferences = LocalHarnessPreferences.from(context),
     )
 
     internal fun isSafeAutoApprovalEnabled(legacySessionValue: Boolean = false): Boolean {

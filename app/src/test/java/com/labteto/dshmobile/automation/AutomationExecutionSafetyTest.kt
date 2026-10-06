@@ -42,7 +42,7 @@ class AutomationExecutionSafetyTest {
                 "task-a",
                 predicate = { it.scheduleGeneration == 7L },
             ) {
-                it.copy(prompt = "新任务", scheduleGeneration = 8L, status = "scheduled")
+                it.copy(prompt = "新任务", scheduleGeneration = 8L, status = AutomationStatus.SCHEDULED)
             }
             assertNotNull(edited)
 
@@ -50,13 +50,13 @@ class AutomationExecutionSafetyTest {
                 "task-a",
                 predicate = { it.scheduleGeneration == 7L },
             ) {
-                it.copy(status = "completed", lastResult = "旧 Worker 结果")
+                it.copy(status = AutomationStatus.COMPLETED, lastResult = "旧 Worker 结果")
             }
 
             assertNull(staleCommit)
             assertEquals("新任务", store.get("task-a")!!.prompt)
             assertEquals(8L, store.get("task-a")!!.scheduleGeneration)
-            assertEquals("scheduled", store.get("task-a")!!.status)
+            assertEquals(AutomationStatus.SCHEDULED, store.get("task-a")!!.status)
             assertNull(store.get("task-a")!!.lastResult)
         } finally {
             directory.deleteRecursively()
@@ -74,7 +74,7 @@ class AutomationExecutionSafetyTest {
             scheduleType = AutomationScheduleType.INTERVAL,
             mode = AutomationMode.CHAT,
             targetSessionId = "session-a",
-            status = "waiting_user",
+            status = AutomationStatus.WAITING_USER,
         )
         val userMessageAt = 10_000L
 
@@ -88,7 +88,7 @@ class AutomationExecutionSafetyTest {
         val task = AutomationTask(
             id = "anchored-chat", prompt = "继续互动", createdAt = 1L, nextRunAt = 2L,
             recurringMinutes = 60L, scheduleType = AutomationScheduleType.INTERVAL,
-            mode = AutomationMode.CHAT, targetSessionId = "session-a", status = "waiting_user",
+            mode = AutomationMode.CHAT, targetSessionId = "session-a", status = AutomationStatus.WAITING_USER,
         )
         assertEquals(10_800_100L, nextAutomationRunAfterUserActivity(task, 7_200_100L))
     }
@@ -98,7 +98,7 @@ class AutomationExecutionSafetyTest {
         val task = AutomationTask(
             id = "silence-chat", prompt = "继续互动", createdAt = 1L, nextRunAt = 2L,
             silenceMinutes = 60L, scheduleType = AutomationScheduleType.SILENCE,
-            mode = AutomationMode.CHAT, targetSessionId = "session-a", status = "waiting_user",
+            mode = AutomationMode.CHAT, targetSessionId = "session-a", status = AutomationStatus.WAITING_USER,
         )
         assertEquals(3_610_000L, nextAutomationRunAfterUserActivity(task, 10_000L))
     }

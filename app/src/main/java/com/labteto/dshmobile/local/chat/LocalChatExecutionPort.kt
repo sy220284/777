@@ -1,15 +1,10 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.runtime.LocalExecutionStatus
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.send.LocalSendResult
 
-internal enum class LocalChatExecutionStatus {
-    DELIVERED,
-    SKIPPED,
-    BLOCKED,
-    CANCELLED,
-    FAILED,
-}
+internal typealias LocalChatExecutionStatus = LocalExecutionStatus
 
 internal data class LocalChatExecutionRequest(
     val instruction: String,
@@ -17,17 +12,19 @@ internal data class LocalChatExecutionRequest(
     val timeoutMillis: Long = 3 * 60_000L,
     val recoverInterrupted: Boolean = false,
     val recoveryStartedAt: Long? = null,
-    val quietHoursEnabled: Boolean = false,
-    val quietStartHour: Int = 23,
-    val quietStartMinute: Int = 0,
-    val quietEndHour: Int = 7,
-    val quietEndMinute: Int = 0,
-    val proactiveMinGapMinutes: Long = 6L * 60L,
-    val proactiveMaxUnanswered: Int = 2,
-    val minimumSilenceMinutes: Long? = null,
-    val silenceReferenceAt: Long? = null,
-    val bypassProactivePolicy: Boolean = false,
-)
+    val automationPolicy: LocalChatAutomationPolicy = LocalChatAutomationPolicy(),
+) {
+    val quietHoursEnabled: Boolean get() = automationPolicy.quietHoursEnabled
+    val quietStartHour: Int get() = automationPolicy.quietStartHour
+    val quietStartMinute: Int get() = automationPolicy.quietStartMinute
+    val quietEndHour: Int get() = automationPolicy.quietEndHour
+    val quietEndMinute: Int get() = automationPolicy.quietEndMinute
+    val proactiveMinGapMinutes: Long get() = automationPolicy.proactiveMinGapMinutes
+    val proactiveMaxUnanswered: Int get() = automationPolicy.proactiveMaxUnanswered
+    val minimumSilenceMinutes: Long? get() = automationPolicy.minimumSilenceMinutes
+    val silenceReferenceAt: Long? get() = automationPolicy.silenceReferenceAt
+    val bypassProactivePolicy: Boolean get() = automationPolicy.bypassProactivePolicy
+}
 
 internal data class LocalChatExecutionResult(
     val sessionId: String?,

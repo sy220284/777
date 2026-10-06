@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.tasks
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationTask
+import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.local.automation.parseAutomationPlan
 import com.labteto.dshmobile.local.automation.parseAutomationSuggestions
 import kotlinx.serialization.json.Json
@@ -64,9 +65,9 @@ class ChatAutomationPlanningPolicyTest {
 
     @Test
     fun visualStatusDistinguishesPendingOngoingAndCompleted() {
-        val pending = task(status = "scheduled", recurringMinutes = 24L * 60L)
+        val pending = task(status = AutomationStatus.SCHEDULED, recurringMinutes = 24L * 60L)
         val ongoing = pending.copy(lastRunAt = 10L)
-        val completed = task(status = "completed")
+        val completed = task(status = AutomationStatus.COMPLETED)
 
         assertEquals(ChatAutomationVisualStatus.PENDING, chatAutomationVisualStatus(pending))
         assertEquals(ChatAutomationVisualStatus.ONGOING, chatAutomationVisualStatus(ongoing))
@@ -75,10 +76,10 @@ class ChatAutomationPlanningPolicyTest {
     }
 
     private fun task(
-        status: String,
+        status: AutomationStatus,
         recurringMinutes: Long? = null,
     ) = AutomationTask(
-        id = "task-$status-${recurringMinutes ?: 0}",
+        id = "task-${status.wireValue}-${recurringMinutes ?: 0}",
         prompt = "测试事件",
         createdAt = 1L,
         nextRunAt = 2L,

@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.automation.AutomationPlanDraft
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.local.presentation.LocalAutomationPlanningFacade
+import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
 import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -154,12 +155,12 @@ class TasksViewModel @Inject constructor(
         windowStartMinuteOfDay: Int? = null,
         windowEndMinuteOfDay: Int? = null,
         quietHoursEnabled: Boolean = false,
-        quietStartHour: Int = 23,
-        quietStartMinute: Int = 0,
-        quietEndHour: Int = 7,
-        quietEndMinute: Int = 0,
-        proactiveMinGapMinutes: Long = 6L * 60L,
-        proactiveMaxUnanswered: Int = 2,
+        quietStartHour: Int = LocalAutomationPolicyProjection.defaults.quietStartHour,
+        quietStartMinute: Int = LocalAutomationPolicyProjection.defaults.quietStartMinute,
+        quietEndHour: Int = LocalAutomationPolicyProjection.defaults.quietEndHour,
+        quietEndMinute: Int = LocalAutomationPolicyProjection.defaults.quietEndMinute,
+        proactiveMinGapMinutes: Long = LocalAutomationPolicyProjection.defaults.proactiveMinGapMinutes,
+        proactiveMaxUnanswered: Int = LocalAutomationPolicyProjection.defaults.proactiveMaxUnanswered,
     ): Boolean {
         val now = System.currentTimeMillis()
         if (prompt.isBlank()) return false
@@ -169,7 +170,7 @@ class TasksViewModel @Inject constructor(
         val minimumRecurringMinutes = if (mode == AutomationMode.CHAT) 60L else 15L
         if (recurringMinutes != null && recurringMinutes < minimumRecurringMinutes) return false
         if (scheduleType == AutomationScheduleType.SILENCE &&
-            (silenceMinutes == null || silenceMinutes < 60L)
+            (silenceMinutes == null || silenceMinutes < LocalAutomationPolicyProjection.minimumSilenceMinutes)
         ) return false
         if (scheduleType == AutomationScheduleType.WINDOW &&
             (windowStartMinuteOfDay == null || windowEndMinuteOfDay == null ||

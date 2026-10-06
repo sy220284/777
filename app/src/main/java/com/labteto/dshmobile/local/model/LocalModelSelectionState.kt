@@ -2,8 +2,6 @@ package com.labteto.dshmobile.local.model
 
 
 
-internal const val LOCAL_WORKER_PROFILE_ID_PREFERENCE = "worker_profile_id"
-
 /** Saved routes and their active credential identity travel through UI state together. */
 data class LocalModelSelectionState(
     val profiles: List<LocalModelProfile> = emptyList(),

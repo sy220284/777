@@ -43,7 +43,7 @@ internal class AutomationWorkerSettlementCoordinator(
             task.recurringMinutes == null &&
             !run.delivered &&
             run.nextRunAtHint != null
-        val receiptStatus = if (run.delivered) "completed" else "skipped"
+        val receiptStatus = if (run.delivered) AutomationStatus.COMPLETED else AutomationStatus.SKIPPED
         val resultText = run.skipReason ?: run.output
         var committedNext: Long? = null
         var committedWaiting = false
@@ -71,9 +71,9 @@ internal class AutomationWorkerSettlementCoordinator(
             }
             val nextStatus = when {
                 manualRun -> current.status
-                committedWaiting -> "waiting_user"
-                chained || deferredOneShot || current.recurringMinutes != null -> "scheduled"
-                else -> "completed"
+                committedWaiting -> AutomationStatus.WAITING_USER
+                chained || deferredOneShot || current.recurringMinutes != null -> AutomationStatus.SCHEDULED
+                else -> AutomationStatus.COMPLETED
             }
             current.copy(
                 workSessionId = if (current.mode == AutomationMode.WORK) {
@@ -110,7 +110,7 @@ internal class AutomationWorkerSettlementCoordinator(
             )
         }
         if (
-            updated?.status == "scheduled" &&
+            updated?.status == AutomationStatus.SCHEDULED &&
             committedNext != null &&
             (usesChainedChatScheduling(updated) || updated.recurringMinutes == null)
         ) {
@@ -138,14 +138,14 @@ internal class AutomationWorkerSettlementCoordinator(
         ) { current ->
             current.copy(
                 workSessionId = sessionId ?: current.workSessionId,
-                status = if (manualRun) current.status else "blocked",
+                status = if (manualRun) current.status else AutomationStatus.BLOCKED,
                 lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
                 runReceipts = appendAutomationReceipt(
                     current.runReceipts,
                     AutomationRunReceipt(
                         startedAt = started,
                         finishedAt = finished,
-                        status = "blocked",
+                        status = AutomationStatus.BLOCKED,
                         sessionId = sessionId,
                         errorPreview = truncateWithoutSplittingSurrogatePair(detail, 320),
                     ),
@@ -170,7 +170,7 @@ internal class AutomationWorkerSettlementCoordinator(
         sessionId: String?,
         detail: String,
         persistWorkSessionId: Boolean,
-        receiptStatus: String = "failed",
+        receiptStatus: AutomationStatus = AutomationStatus.FAILED,
     ) {
         val finished = System.currentTimeMillis()
         if (manualRun) {
@@ -222,9 +222,9 @@ internal class AutomationWorkerSettlementCoordinator(
             current.copy(
                 workSessionId = if (persistWorkSessionId) sessionId else current.workSessionId,
                 status = when {
-                    autoPaused -> "paused"
-                    current.recurringMinutes == null -> "failed"
-                    else -> "scheduled"
+                    autoPaused -> AutomationStatus.PAUSED
+                    current.recurringMinutes == null -> AutomationStatus.FAILED
+                    else -> AutomationStatus.SCHEDULED
                 },
                 nextRunAt = committedNext ?: current.nextRunAt,
                 lastError = truncateWithoutSplittingSurrogatePair(detail, 4_000),
@@ -259,7 +259,7 @@ internal class AutomationWorkerSettlementCoordinator(
             }
             usesChainedChatScheduling(updated) &&
                 committedNext != null &&
-                updated.status == "scheduled" ->
+                updated.status == AutomationStatus.SCHEDULED ->
                 scheduler.enqueueNextChained(id, requireNotNull(committedNext), requestedGeneration)
         }
     }

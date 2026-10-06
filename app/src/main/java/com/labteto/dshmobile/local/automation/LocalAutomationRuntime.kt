@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalAutomationWorkException
 import com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.chat.LocalChatAutomationExecutionPort
+import com.labteto.dshmobile.local.chat.LocalChatAutomationPolicy
 import com.labteto.dshmobile.local.work.LocalWorkAutomationExecutionPort
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -66,7 +67,7 @@ class LocalAutomationRuntime @Inject internal constructor(
         LocalAutomationRunResult(
             sessionId = result.sessionId,
             output = result.output,
-            status = LocalAutomationRunStatus.valueOf(result.status.name),
+            status = result.status,
             detail = result.detail,
         )
     }
@@ -76,26 +77,19 @@ class LocalAutomationRuntime @Inject internal constructor(
         timeoutMillis: Long = 3 * 60_000L,
         recoverInterrupted: Boolean = false,
         recoveryStartedAt: Long? = null,
-        quietHoursEnabled: Boolean = false,
-        quietStartHour: Int = 23,
-        quietStartMinute: Int = 0,
-        quietEndHour: Int = 7,
-        quietEndMinute: Int = 0,
-        proactiveMinGapMinutes: Long = 6L * 60L,
-        proactiveMaxUnanswered: Int = 2,
-        minimumSilenceMinutes: Long? = null,
-        silenceReferenceAt: Long? = null,
-        bypassProactivePolicy: Boolean = false,
+        policy: LocalChatAutomationPolicy = LocalChatAutomationPolicy(),
     ): LocalAutomationRunResult = chatExecution.run(
-        instruction, targetSessionId, timeoutMillis, recoverInterrupted, recoveryStartedAt,
-        quietHoursEnabled, quietStartHour, quietStartMinute, quietEndHour, quietEndMinute,
-        proactiveMinGapMinutes, proactiveMaxUnanswered, minimumSilenceMinutes,
-        silenceReferenceAt, bypassProactivePolicy,
+        instruction = instruction,
+        targetSessionId = targetSessionId,
+        timeoutMillis = timeoutMillis,
+        recoverInterrupted = recoverInterrupted,
+        recoveryStartedAt = recoveryStartedAt,
+        policy = policy,
     ).let { result ->
         LocalAutomationRunResult(
             sessionId = result.sessionId,
             output = result.output,
-            status = LocalAutomationRunStatus.valueOf(result.status.name),
+            status = result.status,
             detail = result.detail,
             nextRunAtHint = result.nextRunAtHint,
             waitingForUserReply = result.waitingForUserReply,

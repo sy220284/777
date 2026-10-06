@@ -4,13 +4,46 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
+
+@Serializable(with = WebhookRunStatusSerializer::class)
+enum class WebhookRunStatus(val wireValue: String) {
+    QUEUED("queued"),
+    RUNNING("running"),
+    COMPLETED("completed"),
+    CANCELLED("cancelled"),
+    FAILED("failed");
+
+    override fun toString(): String = wireValue
+}
+
+internal object WebhookRunStatusSerializer : KSerializer<WebhookRunStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("WebhookRunStatus", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: WebhookRunStatus) {
+        encoder.encodeString(value.wireValue)
+    }
+
+    override fun deserialize(decoder: Decoder): WebhookRunStatus {
+        val wireValue = decoder.decodeString()
+        return WebhookRunStatus.entries.firstOrNull { it.wireValue == wireValue }
+            // Unknown future states remain readable on downgrade and settle conservatively.
+            ?: WebhookRunStatus.FAILED
+    }
+}
 
 @Serializable
 data class WebhookRunResult(
     val requestId: String,
-    val status: String,
+    val status: WebhookRunStatus,
     val updatedAt: Long,
     val result: String? = null,
     val error: String? = null,
@@ -44,7 +77,7 @@ class WebhookResultStore @Inject constructor(
     @Synchronized
     fun update(
         id: String,
-        status: String,
+        status: WebhookRunStatus,
         result: String? = null,
         error: String? = null,
     ) {

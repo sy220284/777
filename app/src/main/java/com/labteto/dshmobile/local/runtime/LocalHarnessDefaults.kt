@@ -2,18 +2,8 @@ package com.labteto.dshmobile.local.runtime
 
 
 
-internal const val KEY_MODEL = "model"
-internal const val KEY_CONFIGURED_MODELS = "configured_models"
-internal const val KEY_MODEL_PROFILES = "model_profiles_v3"
-internal const val KEY_MODEL_PROFILES_V2 = "model_profiles_v2"
-internal const val KEY_BASE_URL = "base_url"
 internal const val KEY_SESSION_ID = "session_id"
 internal const val KEY_ATTACHMENT_GC_AT = "attachment_gc_at"
-internal const val DEFAULT_MODEL = "deepseek-flash"
-internal const val DEFAULT_BASE_URL = "https://api.deepseek.com"
-internal const val DEFAULT_MAIN_MAX_STEPS = 16
-internal const val DEFAULT_SUBAGENT_MAX_STEPS = 20
-internal const val DEFAULT_MODEL_ATTEMPTS = 3
 internal const val DEFAULT_WEB_FETCH_BYTES = 4 * 1024 * 1024
 internal const val MAX_WEB_FETCH_BYTES = 4 * 1024 * 1024
 internal const val PERSISTENT_RECOVERY_RETRY_MILLIS = 500L

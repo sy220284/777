@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.persistence.LocalHarnessPreferences
 import android.content.Context
 import com.labteto.dshmobile.local.lsp.parseLanguageServerCommand
 import com.labteto.dshmobile.local.model.LocalImageCapability
@@ -55,7 +56,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
         dynamicSearchPaths = bundledRuntimeManager::searchPaths,
         baseEnvironment = bundledRuntimeManager::environment,
     )
-    private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
+    private val preferences = LocalHarnessPreferences.from(context)
     private val languageServerResolver = AutomaticLanguageServerResolver(
         root = File(workspace.path),
         commandAvailable = process::isCommandAvailable,

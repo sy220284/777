@@ -31,8 +31,9 @@ class LocalHarnessSettingsCoordinatorTest {
         val runtime = LocalRuntimeStateStore().apply { initialize(LocalHarnessState(sessionId = "s")) }
         val settings = LocalHarnessSettingsCoordinator(preferences, store, runtime, backgroundScope)
         repeat(100) { settings.configurePersonalization("edit-$it", false, true) }
-        assertEquals("edit-99", runtime.state.value.userRules)
+        assertEquals("", runtime.state.value.userRules)
         runCurrent()
+        assertEquals("edit-99", runtime.state.value.userRules)
         assertEquals(UserProfile("edit-99", false, true), store.read())
         // The recovery generation remains the baseline, proving pending edits did not all hit disk.
         assertEquals(baseline, UserProfileStore(File(file.parentFile, "user.json.bak"), Json).read())
@@ -46,10 +47,12 @@ class LocalHarnessSettingsCoordinatorTest {
         settings.configurePersonalization("first", true, false)
         runCurrent()
         assertNotNull(runtime.state.value.error)
+        assertEquals("", runtime.state.value.userRules)
         assertTrue(parent.delete())
         assertTrue(parent.mkdir())
         settings.configurePersonalization("second", false, true)
         runCurrent()
+        assertEquals("second", runtime.state.value.userRules)
         assertEquals(UserProfile("second", false, true), store.read())
     }
 }

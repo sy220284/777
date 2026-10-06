@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.automation
 
+import com.labteto.dshmobile.local.chat.LocalChatAutomationPolicy
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.Data
@@ -42,7 +43,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -68,11 +75,43 @@ enum class AutomationScheduleType {
     WINDOW,
 }
 
+@Serializable(with = AutomationStatusSerializer::class)
+enum class AutomationStatus(val wireValue: String) {
+    SCHEDULED("scheduled"),
+    RUNNING("running"),
+    WAITING_USER("waiting_user"),
+    PAUSED("paused"),
+    BLOCKED("blocked"),
+    FAILED("failed"),
+    COMPLETED("completed"),
+    CANCELLED("cancelled"),
+    SKIPPED("skipped"),
+    QUEUED("queued");
+
+    override fun toString(): String = wireValue
+}
+
+internal object AutomationStatusSerializer : KSerializer<AutomationStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AutomationStatus", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: AutomationStatus) {
+        encoder.encodeString(value.wireValue)
+    }
+
+    override fun deserialize(decoder: Decoder): AutomationStatus {
+        val wireValue = decoder.decodeString()
+        return AutomationStatus.entries.firstOrNull { it.wireValue == wireValue }
+            // A downgraded client must not execute a future state it cannot interpret.
+            ?: AutomationStatus.BLOCKED
+    }
+}
+
 @Serializable
 data class AutomationRunReceipt(
     val startedAt: Long,
     val finishedAt: Long,
-    val status: String,
+    val status: AutomationStatus,
     val sessionId: String? = null,
     val resultPreview: String? = null,
     val errorPreview: String? = null,
@@ -213,16 +252,16 @@ data class AutomationTask(
     val targetSessionId: String? = null,
     val actorName: String? = null,
     val quietHoursEnabled: Boolean = false,
-    val quietStartHour: Int = 23,
-    val quietStartMinute: Int = 0,
-    val quietEndHour: Int = 7,
-    val quietEndMinute: Int = 0,
-    val proactiveMinGapMinutes: Long = 6L * 60L,
-    val proactiveMaxUnanswered: Int = 2,
+    val quietStartHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_HOUR,
+    val quietStartMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_MINUTE,
+    val quietEndHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_HOUR,
+    val quietEndMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_MINUTE,
+    val proactiveMinGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+    val proactiveMaxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
     val failureStreak: Int = 0,
     /** Dedicated Work-mode session that owns this task's run history and artifacts. */
     val workSessionId: String? = null,
-    val status: String = "scheduled",
+    val status: AutomationStatus = AutomationStatus.SCHEDULED,
     val lastRunAt: Long? = null,
     val lastUserActivityAt: Long? = null,
     val lastResult: String? = null,
@@ -233,8 +272,10 @@ data class AutomationTask(
 internal fun normalizeAutomationTask(task: AutomationTask): AutomationTask {
     val silenceMinutes = when (task.scheduleType) {
         AutomationScheduleType.SILENCE ->
-            (task.silenceMinutes ?: task.recurringMinutes ?: 60L).coerceAtLeast(60L)
-        else -> task.silenceMinutes?.coerceAtLeast(60L)
+            LocalChatAutomationPolicy.normalizeSilenceMinutes(
+                task.silenceMinutes ?: task.recurringMinutes ?: LocalChatAutomationPolicy.MIN_SILENCE_MINUTES,
+            )
+        else -> task.silenceMinutes?.let(LocalChatAutomationPolicy::normalizeSilenceMinutes)
     }
     val recurringMinutes = when (task.scheduleType) {
         AutomationScheduleType.SILENCE -> silenceMinutes
@@ -262,12 +303,12 @@ internal fun normalizeAutomationTask(task: AutomationTask): AutomationTask {
         quietEndHour = task.quietEndHour.coerceIn(0, 23),
         quietEndMinute = task.quietEndMinute.coerceIn(0, 59),
         proactiveMinGapMinutes = if (task.mode == AutomationMode.CHAT) {
-            task.proactiveMinGapMinutes.coerceAtLeast(60L)
+            LocalChatAutomationPolicy.normalizeProactiveMinGapMinutes(task.proactiveMinGapMinutes)
         } else {
             task.proactiveMinGapMinutes.coerceAtLeast(0L)
         },
         proactiveMaxUnanswered = if (task.mode == AutomationMode.CHAT) {
-            task.proactiveMaxUnanswered.coerceIn(1, 5)
+            LocalChatAutomationPolicy.normalizeProactiveMaxUnanswered(task.proactiveMaxUnanswered)
         } else {
             task.proactiveMaxUnanswered.coerceAtLeast(1)
         },

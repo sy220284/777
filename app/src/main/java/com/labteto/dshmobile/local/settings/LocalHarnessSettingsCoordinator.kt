@@ -1,9 +1,10 @@
 package com.labteto.dshmobile.local.settings
 
+import com.labteto.dshmobile.local.persistence.LocalHarnessPreferences
 import android.content.Context
 import android.content.SharedPreferences
-import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
-import com.labteto.dshmobile.local.model.LOCAL_WORKER_PROFILE_ID_PREFERENCE
+import com.labteto.dshmobile.local.agent.LocalAgentRuntimeSettings
+import com.labteto.dshmobile.local.model.LocalModelExecutionSettings
 import com.labteto.dshmobile.local.profile.UserProfile
 import com.labteto.dshmobile.local.profile.UserProfileStore
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -42,7 +43,7 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
         userProfileStore: UserProfileStore,
         runtimeStateStore: LocalRuntimeStateStore,
     ) : this(
-        preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE),
+        preferences = LocalHarnessPreferences.from(context),
         userProfileStore = userProfileStore,
         statePort = localSettingsStatePort(runtimeStateStore),
     )
@@ -53,12 +54,28 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
 
     init {
         scope.launch {
+            var committedProfile = runCatching { userProfileStore.read() }.getOrDefault(UserProfile())
             // One writer preserves submission order; rapid edits retain only the latest pending
-            // value, so an older IO coroutine cannot overwrite newer persisted preferences.
+            // value. Runtime state is committed only after durable storage succeeds.
             for ((generation, profile) in personalizationWrites) {
                 runCatching { userProfileStore.write(profile) }
+                    .onSuccess {
+                        committedProfile = profile
+                        if (personalizationGeneration.get() == generation) {
+                            statePort.updatePersonalization(
+                                userRules = profile.customRules,
+                                autoRecall = profile.autoRecall,
+                                autoMemory = profile.autoMemory,
+                            )
+                        }
+                    }
                     .onFailure { error ->
                         if (personalizationGeneration.get() == generation) {
+                            statePort.updatePersonalization(
+                                userRules = committedProfile.customRules,
+                                autoRecall = committedProfile.autoRecall,
+                                autoMemory = committedProfile.autoMemory,
+                            )
                             statePort.publishError(error.message ?: "个性化设置保存失败")
                         }
                     }
@@ -73,31 +90,34 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
         subagentMaxSteps: Int,
         modelAttempts: Int,
     ) {
-        val main = LocalAgentRuntimeLimits.normalizeMainSteps(mainMaxSteps)
-        val subagent = LocalAgentRuntimeLimits.normalizeSubagentSteps(subagentMaxSteps)
-        val attempts = LocalAgentRuntimeLimits.normalizeModelAttempts(modelAttempts)
-        preferences.edit()
-            .putInt(KEY_MAIN_MAX_STEPS, main)
-            .putInt(KEY_SUBAGENT_MAX_STEPS, subagent)
-            .putInt(KEY_MODEL_ATTEMPTS, attempts)
-            .apply()
+        val current = state
+        val agent = LocalAgentRuntimeSettings.write(
+            preferences = preferences,
+            mainMaxSteps = mainMaxSteps,
+            subagentMaxSteps = subagentMaxSteps,
+        )
+        val model = LocalModelExecutionSettings.write(
+            preferences = preferences,
+            modelAttempts = modelAttempts,
+            workerProfileId = current.modelState.modelSelection.workerProfileId,
+            availableProfiles = current.modelState.modelSelection.profiles,
+        )
         statePort.updateRuntimeLimits(
-            mainMaxSteps = main,
-            subagentMaxSteps = subagent,
-            modelAttempts = attempts,
+            mainMaxSteps = agent.mainMaxSteps,
+            subagentMaxSteps = agent.subagentMaxSteps,
+            modelAttempts = model.modelAttempts,
         )
     }
 
     fun configureWorkerProfile(profileId: String?) {
-        val normalized = profileId?.trim()?.takeIf(String::isNotBlank)
         val current = state
-        require(normalized == null || current.modelState.modelSelection.profiles.any { it.id == normalized }) {
-            "子代理工作模型已不存在，请重新选择"
-        }
-        preferences.edit().apply {
-            if (normalized == null) remove(KEY_WORKER_PROFILE_ID) else putString(KEY_WORKER_PROFILE_ID, normalized)
-        }.apply()
-        statePort.updateWorkerProfile(normalized)
+        val model = LocalModelExecutionSettings.write(
+            preferences = preferences,
+            modelAttempts = current.modelState.modelAttempts,
+            workerProfileId = profileId,
+            availableProfiles = current.modelState.modelSelection.profiles,
+        )
+        statePort.updateWorkerProfile(model.workerProfileId)
     }
 
     @Synchronized
@@ -112,18 +132,6 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
             autoMemory = autoMemory,
         )
         val generation = personalizationGeneration.incrementAndGet()
-        statePort.updatePersonalization(
-            userRules = profile.customRules,
-            autoRecall = profile.autoRecall,
-            autoMemory = profile.autoMemory,
-        )
         personalizationWrites.trySend(generation to profile).getOrThrow()
-    }
-
-    companion object {
-        const val KEY_MAIN_MAX_STEPS = "main_max_steps"
-        const val KEY_SUBAGENT_MAX_STEPS = "subagent_max_steps"
-        const val KEY_MODEL_ATTEMPTS = "model_attempts"
-        const val KEY_WORKER_PROFILE_ID = LOCAL_WORKER_PROFILE_ID_PREFERENCE
     }
 }

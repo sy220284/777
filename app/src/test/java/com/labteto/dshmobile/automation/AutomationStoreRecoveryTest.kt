@@ -121,7 +121,7 @@ class AutomationStoreRecoveryTest {
             store.upsert(task("effect", 1_000L).copy(scheduleGeneration = 4L))
             var submissions = 0
             assertTrue(store.withCurrentGeneration("effect", 4L) { submissions++ })
-            store.update("effect") { it.copy(scheduleGeneration = 5L, status = "paused") }
+            store.update("effect") { it.copy(scheduleGeneration = 5L, status = AutomationStatus.PAUSED) }
             assertEquals(false, store.withCurrentGeneration("effect", 4L) { submissions++ })
             store.remove("effect")
             assertEquals(false, store.withCurrentGeneration("effect", 5L) { submissions++ })

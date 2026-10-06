@@ -30,8 +30,10 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
+import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -61,12 +63,12 @@ internal enum class ChatAutomationVisualStatus {
 }
 
 internal fun chatAutomationVisualStatus(task: AutomationTask): ChatAutomationVisualStatus = when (task.status) {
-    "running", "queued" -> ChatAutomationVisualStatus.RUNNING
-    "completed" -> ChatAutomationVisualStatus.COMPLETED
-    "paused" -> ChatAutomationVisualStatus.PAUSED
-    "waiting_user" -> ChatAutomationVisualStatus.WAITING
-    "blocked" -> ChatAutomationVisualStatus.BLOCKED
-    "failed" -> ChatAutomationVisualStatus.FAILED
+    AutomationStatus.RUNNING, AutomationStatus.QUEUED -> ChatAutomationVisualStatus.RUNNING
+    AutomationStatus.COMPLETED -> ChatAutomationVisualStatus.COMPLETED
+    AutomationStatus.PAUSED -> ChatAutomationVisualStatus.PAUSED
+    AutomationStatus.WAITING_USER -> ChatAutomationVisualStatus.WAITING
+    AutomationStatus.BLOCKED -> ChatAutomationVisualStatus.BLOCKED
+    AutomationStatus.FAILED -> ChatAutomationVisualStatus.FAILED
     else -> if (
         task.lastRunAt != null &&
         (task.recurringMinutes != null ||
@@ -358,9 +360,9 @@ private fun ChatAutomationEventRow(
             ) {
                 DsButton(
                     text = stringResource(
-                        if (task.status == "paused") R.string.tasks_resume else R.string.tasks_pause,
+                        if (task.status == AutomationStatus.PAUSED) R.string.tasks_resume else R.string.tasks_pause,
                     ),
-                    onClick = if (task.status == "paused") onResume else onPause,
+                    onClick = if (task.status == AutomationStatus.PAUSED) onResume else onPause,
                     variant = DsButtonVariant.Ghost,
                     size = DsButtonSize.Small,
                 )
@@ -448,7 +450,8 @@ private fun ChatAutomationVisualStatus.dsStatus(): DsStatus = when (this) {
 private fun chatScheduleDescription(task: AutomationTask): String = when (task.scheduleType) {
     AutomationScheduleType.SILENCE -> stringResource(
         R.string.tasks_chat_schedule_silence,
-        ((task.silenceMinutes ?: 60L) / 60L).coerceAtLeast(1L),
+        ((task.silenceMinutes ?: LocalAutomationPolicyProjection.minimumSilenceMinutes) / 60L)
+            .coerceAtLeast(LocalAutomationPolicyProjection.minimumSilenceMinutes / 60L),
     )
     AutomationScheduleType.WINDOW -> stringResource(
         R.string.tasks_chat_schedule_window,
