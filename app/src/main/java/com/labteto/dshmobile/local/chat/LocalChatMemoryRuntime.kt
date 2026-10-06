@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.documentedContextWindowTokens
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryManager
@@ -74,8 +75,21 @@ internal class LocalChatMemoryRuntime @Inject constructor(
         viewerSubjectKey: String? = null,
         viewerName: String? = null,
         groupAudience: Boolean = false,
+    ): String = relationshipContext(
+        query = query,
+        snapshot = runtimeStateStore.state.value,
+        viewerSubjectKey = viewerSubjectKey,
+        viewerName = viewerName,
+        groupAudience = groupAudience,
+    )
+
+    internal fun relationshipContext(
+        query: String,
+        snapshot: LocalHarnessState,
+        viewerSubjectKey: String? = null,
+        viewerName: String? = null,
+        groupAudience: Boolean = snapshot.chat.groupChat.enabled,
     ): String {
-        val snapshot = runtimeStateStore.state.value
         if (!snapshot.autoRecall) return ""
         val subjectKey = viewerSubjectKey ?: chatRelationshipSubjectKey(
             snapshot.chat.galleryId,
