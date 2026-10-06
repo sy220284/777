@@ -239,12 +239,14 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 }
             }
         }
-        val requestEvidence = buildLocalRequestEvidence(logMessages, tools)
+        val requestEvidence = buildLocalRequestEvidence(requestMessages, tools)
         val evidenceKey = snapshot.sessionId + "\u0000" + routeFingerprint
+        val evidenceLogSequence = log.latestSequence()
         val toolSurfaceSeq = ensureRequestEvidenceSurface(
             cache = toolSurfaceEvidence,
             key = evidenceKey,
             digest = requestEvidence.toolSchemaDigest,
+            currentLogSequence = evidenceLogSequence,
         ) {
             log.append("request/tool-surface", buildJsonObject {
                 put("version", REQUEST_EVIDENCE_VERSION)
@@ -256,6 +258,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             cache = contextSurfaceEvidence,
             key = evidenceKey,
             digest = requestEvidence.contextDigest,
+            currentLogSequence = log.latestSequence(),
         ) {
             log.append("request/context-surface", buildJsonObject {
                 put("version", REQUEST_EVIDENCE_VERSION)
@@ -696,10 +699,14 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         cache: MutableMap<String, RequestEvidenceRef>,
         key: String,
         digest: String,
+        currentLogSequence: Long,
         append: () -> Long,
     ): Long = synchronized(evidenceLock) {
         val existing = cache[key]
-        if (existing?.digest == digest) {
+        if (
+            existing?.digest == digest &&
+            existing.sequence <= currentLogSequence
+        ) {
             existing.sequence
         } else {
             val sequence = append()
