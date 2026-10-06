@@ -197,6 +197,7 @@ internal fun LocalConversationSurface(
     var renameSessionOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val attachments = remember(state.sessionId) { mutableStateListOf<LocalImportedAttachment>() }
     val listState = rememberLazyListState()
+    var composerTailViewportAnchor by remember(state.sessionId) { mutableStateOf<Int?>(null) }
     val (scrollHint, scrollConnection) = rememberConversationScrollHint(listState, reverseLayout = false)
     var transcriptInitialPositionReady by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var planReviewBusy by remember(state.pendingQuestion?.callId) { mutableStateOf(false) }
@@ -324,6 +325,10 @@ internal fun LocalConversationSurface(
             !loadingOlderTranscript &&
             transcriptHistoryError == null,
         onLoadOlder = onLoadOlderTranscript,
+    )
+    LocalComposerTailFollower(
+        listState = listState,
+        anchoredViewportExtent = composerTailViewportAnchor,
     )
 
     LaunchedEffect(state.messages.size, transcriptItems.size) {
@@ -737,6 +742,13 @@ internal fun LocalConversationSurface(
             onPlanModeChange = onPlanModeChange,
             onAutoApprove = onAutoApprove,
             onDisableAutoApprove = onDisableAutoApprove,
+            onFocusChanged = { focused ->
+                composerTailViewportAnchor = if (focused && listState.isConversationTailVisible()) {
+                    listState.conversationViewportExtent().takeIf { it > 0 }
+                } else {
+                    null
+                }
+            },
         )
 
     }
