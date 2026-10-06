@@ -125,6 +125,12 @@ if CI.count("check-local-architecture-boundaries.py") != 1:
     violations.append("Architecture 3.0 ownership guard must run exactly once in its dedicated lane")
 if CI.count("check-local-performance-invariants.py") != 1:
     violations.append("Architecture 3.0 performance invariant guard must run exactly once in its dedicated lane")
+if "Validate Architecture 3.0 ownership and dependencies" not in CI:
+    violations.append("Architecture 3.0 ownership guard must have its own diagnosable CI step")
+if "Validate Architecture 3.0 execution invariants" not in CI:
+    violations.append("Architecture 3.0 execution invariant guard must have its own diagnosable CI step")
+if "classify-ci-scope.py --self-test" not in CI:
+    violations.append("CI scope classifier must self-test before downstream validation")
 
 # release-version affects the app's versionName/versionCode and must never be ignored on main.
 if "- '.github/release-version'" in CI or '- ".github/release-version"' in CI:
@@ -141,6 +147,10 @@ if "release:" not in CLEANUP or "types: [published]" not in CLEANUP:
     violations.append("Cleanup must react to published releases")
 if "*/30 * * * *" in CLEANUP:
     violations.append("Cleanup fallback must not run every 30 minutes")
+if "keep = formal_releases[:3]" not in CLEANUP or "remove = formal_releases[3:]" not in CLEANUP:
+    violations.append("Release retention must keep exactly the three highest formal published versions")
+if "timedelta(" in CLEANUP or "cutoff =" in CLEANUP:
+    violations.append("Release retention must not add an age-based retention window")
 
 # Screenshot bot commits are docs-only; they must not dispatch a forced full CI.
 if "gh workflow run ci.yml" in CAPTURE:
