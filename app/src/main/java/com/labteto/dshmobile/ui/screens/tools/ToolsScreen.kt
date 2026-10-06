@@ -69,6 +69,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 enum class ToolsNotice {
     LOAD_FAILED,
@@ -88,6 +90,12 @@ data class ToolsUiState(
     val notice: ToolsNotice? = null,
 )
 
+internal class ToolsOperationGate {
+    private val mutex = Mutex()
+
+    suspend fun <T> run(block: suspend () -> T): T = mutex.withLock { block() }
+}
+
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
     private val localTools: LocalToolsUiFacade,
@@ -95,6 +103,13 @@ class ToolsViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(ToolsUiState())
     val state: StateFlow<ToolsUiState> = _state.asStateFlow()
+    private val operationGate = ToolsOperationGate()
+
+    private fun launchOperation(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            operationGate.run(block)
+        }
+    }
 
     init {
         refresh()
@@ -107,7 +122,7 @@ class ToolsViewModel @Inject constructor(
     }
 
     fun refresh() {
-        viewModelScope.launch {
+        launchOperation {
             _state.value = _state.value.copy(loading = true, notice = null)
             try {
                 sessionStore.refreshPlugins()
@@ -131,7 +146,7 @@ class ToolsViewModel @Inject constructor(
     }
 
     fun connectHttp(serverId: String, endpoint: String) {
-        viewModelScope.launch {
+        launchOperation {
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
                 localTools.connectHttp(serverId, endpoint)
@@ -153,7 +168,7 @@ class ToolsViewModel @Inject constructor(
     }
 
     fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) {
-        viewModelScope.launch {
+        launchOperation {
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
                 localTools.connectStdio(serverId, command, workingDirectory)
@@ -175,7 +190,7 @@ class ToolsViewModel @Inject constructor(
     }
 
     fun configureGitHub(token: String) {
-        viewModelScope.launch {
+        launchOperation {
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
                 localTools.configureGitHub(token)
@@ -197,7 +212,8 @@ class ToolsViewModel @Inject constructor(
     }
 
     fun clearGitHub() {
-        viewModelScope.launch {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, notice = null)
             try {
                 localTools.clearGitHub()
                 _state.value = _state.value.copy(
@@ -208,13 +224,17 @@ class ToolsViewModel @Inject constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                _state.value = _state.value.copy(notice = ToolsNotice.DISCONNECT_FAILED)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    notice = ToolsNotice.DISCONNECT_FAILED,
+                )
             }
         }
     }
 
     fun disconnect(serverId: String) {
-        viewModelScope.launch {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, notice = null)
             try {
                 localTools.disconnect(serverId)
                 _state.value = _state.value.copy(
@@ -226,7 +246,10 @@ class ToolsViewModel @Inject constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                _state.value = _state.value.copy(notice = ToolsNotice.DISCONNECT_FAILED)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    notice = ToolsNotice.DISCONNECT_FAILED,
+                )
             }
         }
     }
@@ -552,6 +575,7 @@ fun ToolsScreen(
                         DsButton(
                             text = stringResource(R.string.tools_disconnect),
                             onClick = { viewModel.disconnect(server.id) },
+                            enabled = !state.loading,
                             size = DsButtonSize.Small,
                             variant = DsButtonVariant.Ghost,
                         )
@@ -656,6 +680,7 @@ fun ToolsScreen(
                 DsButton(
                     text = stringResource(R.string.common_cancel),
                     onClick = { confirmClearGitHub = false },
+                    enabled = !state.loading,
                     variant = DsButtonVariant.Ghost,
                 )
                 DsButton(
@@ -664,6 +689,7 @@ fun ToolsScreen(
                         confirmClearGitHub = false
                         viewModel.clearGitHub()
                     },
+                    enabled = !state.loading,
                     variant = DsButtonVariant.Danger,
                 )
             }

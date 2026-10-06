@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import com.labteto.dshmobile.connection.HostsStore
+import com.labteto.dshmobile.local.presentation.ChatGptSettingsController
 import com.labteto.dshmobile.notify.DshNotifications
 import com.labteto.dshmobile.ui.AppRoot
 import dagger.hilt.android.AndroidEntryPoint
@@ -22,7 +23,7 @@ import javax.inject.Inject
 class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var hostsStore: HostsStore
-    @Inject lateinit var chatGptAuth: com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
+    @Inject lateinit var chatGptAccounts: ChatGptSettingsController
     @Inject lateinit var notifications: DshNotifications
 
     private val requestedSession = mutableStateOf<String?>(null)
@@ -76,7 +77,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        lifecycleScope.launch { chatGptAuth.refresh() }
+        lifecycleScope.launch { chatGptAccounts.refresh() }
     }
 
     private fun notificationSession(intent: Intent): String? {

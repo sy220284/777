@@ -159,7 +159,6 @@ class SessionStore @Inject constructor(
     )
 
     private val workspaceRuntime = SessionWorkspaceRuntime(
-        apiProvider = ::apiOrNull,
         apiForHost = ::apiForHost,
         activeHostKey = { activeHostKey },
         onWorkspaceUpsert = ::upsertWorkspace,
@@ -178,7 +177,8 @@ class SessionStore @Inject constructor(
     )
 
     private val sessionLifecycleRuntime = SessionLifecycleRuntime(
-        apiProvider = ::apiOrNull,
+        apiForHost = ::apiForHost,
+        activeHostKey = { activeHostKey },
         reusableBlankSession = { workspaceId ->
             synchronized(lock) { indexState.reusableBlankSession(workspaceId) }
         },
@@ -188,7 +188,10 @@ class SessionStore @Inject constructor(
         onConnectionError = ::setConnectionError,
     )
 
-    private val searchRuntime = SessionSearchRuntime(apiProvider = ::apiOrNull)
+    private val searchRuntime = SessionSearchRuntime(
+        apiForHost = ::apiForHost,
+        activeHostKey = { activeHostKey },
+    )
     val searchResults: StateFlow<List<Pair<String, String>>> get() = searchRuntime.results
     val contentSearchAvailable: StateFlow<Boolean> get() = searchRuntime.available
 

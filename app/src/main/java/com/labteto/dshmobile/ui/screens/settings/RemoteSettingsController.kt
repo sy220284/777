@@ -31,6 +31,34 @@ data class ModelServicesState(
     val error: String? = null,
 )
 
+internal data class RemoteSettingsRequestToken(
+    val epoch: Long,
+    val channel: String,
+    val revision: Long,
+)
+
+internal class RemoteSettingsRequestGate {
+    private var epoch = 0L
+    private val revisions = mutableMapOf<String, Long>()
+
+    @Synchronized
+    fun capture(channel: String): RemoteSettingsRequestToken {
+        val revision = (revisions[channel] ?: 0L) + 1L
+        revisions[channel] = revision
+        return RemoteSettingsRequestToken(epoch, channel, revision)
+    }
+
+    @Synchronized
+    fun reset() {
+        epoch += 1L
+        revisions.clear()
+    }
+
+    @Synchronized
+    fun isCurrent(token: RemoteSettingsRequestToken): Boolean =
+        token.epoch == epoch && revisions[token.channel] == token.revision
+}
+
 /** Owns remote Harness settings discovery, mutation and model-provider discovery. */
 internal class RemoteSettingsController(
     private val connectionManager: ConnectionManager,
@@ -41,19 +69,28 @@ internal class RemoteSettingsController(
 
     private val _modelServices = MutableStateFlow(ModelServicesState())
     val modelServices: StateFlow<ModelServicesState> = _modelServices.asStateFlow()
+    private val requests = RemoteSettingsRequestGate()
+
+    private fun current(token: RemoteSettingsRequestToken, api: com.labteto.dshmobile.core.wire.DshApiClient): Boolean =
+        requests.isCurrent(token) &&
+            connectionManager.state.value.phase == ConnectionPhase.CONNECTED &&
+            connectionManager.connectedApi === api
 
     fun refresh() {
         scope.launch {
             val api = connectionManager.connectedApi
             if (api == null || connectionManager.state.value.phase != ConnectionPhase.CONNECTED) {
+                requests.reset()
                 _projectSettings.value = RemoteProjectSettingsState()
                 _modelServices.value = ModelServicesState()
                 return@launch
             }
 
+            val projectRequest = requests.capture("project")
             _projectSettings.value = _projectSettings.value.copy(loading = true, error = null)
             when (val result = api.settingsDescribe()) {
                 is RpcResult.Ok -> {
+                    if (!current(projectRequest, api)) return@launch
                     val value: SettingsDescribeValue = result.value
                     _projectSettings.value = RemoteProjectSettingsState(
                         loading = false,
@@ -63,6 +100,7 @@ internal class RemoteSettingsController(
                     )
                 }
                 is RpcResult.Err -> {
+                    if (!current(projectRequest, api)) return@launch
                     _projectSettings.value = RemoteProjectSettingsState(
                         loading = false,
                         error = result.error.message,
@@ -70,9 +108,12 @@ internal class RemoteSettingsController(
                 }
             }
 
+            if (!current(projectRequest, api)) return@launch
+            val modelRequest = requests.capture("models")
             _modelServices.value = _modelServices.value.copy(loading = true, error = null)
             when (val result = api.llmListConfigurableProviders()) {
                 is RpcResult.Ok -> {
+                    if (!current(modelRequest, api)) return@launch
                     _modelServices.value = _modelServices.value.copy(
                         loading = false,
                         providers = result.value,
@@ -80,6 +121,7 @@ internal class RemoteSettingsController(
                     )
                 }
                 is RpcResult.Err -> {
+                    if (!current(modelRequest, api)) return@launch
                     _modelServices.value = ModelServicesState(
                         loading = false,
                         error = result.error.message,
@@ -101,6 +143,7 @@ internal class RemoteSettingsController(
                 onDone("当前没有已连接的 Harness")
                 return@launch
             }
+            val request = requests.capture("project")
             val revision = namespace.revision.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
             when (
                 val result = api.settingsMutate(
@@ -110,10 +153,12 @@ internal class RemoteSettingsController(
                 )
             ) {
                 is RpcResult.Ok -> {
+                    if (!current(request, api)) return@launch
                     replaceNamespace(result.value)
                     onDone(null)
                 }
                 is RpcResult.Err -> {
+                    if (!current(request, api)) return@launch
                     onDone(result.error.message)
                     refresh()
                 }
@@ -132,6 +177,7 @@ internal class RemoteSettingsController(
                 onDone("当前没有已连接的 Harness")
                 return@launch
             }
+            val request = requests.capture("project")
             val revision = namespace.revision.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
             when (
                 val result = api.settingsMutate(
@@ -141,10 +187,12 @@ internal class RemoteSettingsController(
                 )
             ) {
                 is RpcResult.Ok -> {
+                    if (!current(request, api)) return@launch
                     replaceNamespace(result.value)
                     onDone(null)
                 }
                 is RpcResult.Err -> {
+                    if (!current(request, api)) return@launch
                     onDone(result.error.message)
                     refresh()
                 }
@@ -155,6 +203,8 @@ internal class RemoteSettingsController(
     fun discoverModels(provider: LlmConfigurableProvider) {
         scope.launch {
             val api = connectionManager.connectedApi ?: return@launch
+            if (connectionManager.state.value.phase != ConnectionPhase.CONNECTED) return@launch
+            val request = requests.capture("models")
             _modelServices.value = _modelServices.value.copy(loading = true, error = null)
             when (
                 val result = api.llmDiscoverModels(
@@ -163,6 +213,7 @@ internal class RemoteSettingsController(
                 )
             ) {
                 is RpcResult.Ok -> {
+                    if (!current(request, api)) return@launch
                     _modelServices.value = _modelServices.value.copy(
                         loading = false,
                         discovered = _modelServices.value.discovered +
@@ -171,6 +222,7 @@ internal class RemoteSettingsController(
                     )
                 }
                 is RpcResult.Err -> {
+                    if (!current(request, api)) return@launch
                     _modelServices.value = _modelServices.value.copy(
                         loading = false,
                         error = result.error.message,

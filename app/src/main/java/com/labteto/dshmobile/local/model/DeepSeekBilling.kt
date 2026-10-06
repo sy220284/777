@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.core.wire.withCancellableHttpResponse
 import android.content.Context
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot
@@ -21,12 +22,15 @@ import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -69,6 +73,9 @@ data class DeepSeekPricingState(
     val error: String? = null,
     val sourceUrl: String = DeepSeekPricingRepository.OFFICIAL_PRICING_URL,
 )
+
+internal fun deepSeekPricingStateAfterCancellation(before: DeepSeekPricingState): DeepSeekPricingState =
+    before.copy(refreshing = false)
 
 data class DeepSeekTokenUsage(
     val promptTokens: Long = 0L,
@@ -242,27 +249,25 @@ class DeepSeekPricingRepository @Inject constructor(
     private val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val _state = MutableStateFlow(loadPersistedState())
     val state: StateFlow<DeepSeekPricingState> = _state.asStateFlow()
+    private val refreshMutex = Mutex()
 
-    suspend fun refreshFromOfficial() {
-        _state.update { it.copy(refreshing = true, error = null) }
-        val result = runCatching {
-            withContext(Dispatchers.IO) {
-                val request = Request.Builder()
-                    .url(OFFICIAL_PRICING_URL)
-                    .header("Accept-Language", "zh-CN,zh;q=0.9")
-                    .header("User-Agent", "DSH-Mobile/777 DeepSeek-Pricing")
-                    .get()
-                    .build()
-                http.newCall(request).execute().use { response ->
-                    check(response.isSuccessful) { "官网返回 HTTP ${response.code}" }
-                    val html = response.body?.string().orEmpty()
-                    check(html.isNotBlank()) { "官网价格页为空" }
-                    check(html.length <= MAX_PRICING_HTML_CHARS) { "官网价格页异常过大" }
-                    parseDeepSeekPricingPage(html)
-                }
+    suspend fun refreshFromOfficial() = refreshMutex.withLock {
+        val before = _state.value
+        _state.value = before.copy(refreshing = true, error = null)
+        try {
+            val request = Request.Builder()
+                .url(OFFICIAL_PRICING_URL)
+                .header("Accept-Language", "zh-CN,zh;q=0.9")
+                .header("User-Agent", "DSH-Mobile/777 DeepSeek-Pricing")
+                .get()
+                .build()
+            val models = withCancellableHttpResponse(http.newCall(request)) { response ->
+                check(response.isSuccessful) { "官网返回 HTTP ${response.code}" }
+                val html = response.body?.string().orEmpty()
+                check(html.isNotBlank()) { "官网价格页为空" }
+                check(html.length <= MAX_PRICING_HTML_CHARS) { "官网价格页异常过大" }
+                parseDeepSeekPricingPage(html)
             }
-        }
-        result.onSuccess { models ->
             val now = System.currentTimeMillis()
             persist(models, now)
             _state.value = DeepSeekPricingState(
@@ -271,7 +276,10 @@ class DeepSeekPricingRepository @Inject constructor(
                 refreshing = false,
                 error = null,
             )
-        }.onFailure { error ->
+        } catch (cancelled: CancellationException) {
+            _state.value = deepSeekPricingStateAfterCancellation(before)
+            throw cancelled
+        } catch (error: Exception) {
             _state.update {
                 it.copy(
                     refreshing = false,
