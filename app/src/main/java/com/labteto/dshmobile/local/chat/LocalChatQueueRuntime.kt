@@ -31,42 +31,51 @@ internal class LocalChatQueueRuntime @Inject constructor(
         val next = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
             val handle = runtimeStateStore.foregroundRunHandle
             if (handle.job === completedJob) handle.job = null
-
-            val state = runtimeStateStore.state.value
-            if (
-                state.usageMode != LocalUsageMode.CHAT ||
-                runtimeStateStore.sessionTransitioning ||
-                handle.hasLiveJob()
-            ) return@synchronized null
-
-            val queued = handle.pendingInputs.poll() ?: return@synchronized null
-            val durableMessage = queued.modelMessage ?: buildJsonObject {
-                put("role", "user")
-                put("content", queued.content)
-            }
-            modelHistory.history.append(durableMessage)
-            modelHistory.refreshMetrics(state.sessionId)
-            runtimeStateStore.projection.setForegroundQueuedInputCount(
-                state.sessionId,
-                handle.pendingInputs.size(),
-            )
-            sessionStorage.eventLogs.get(state.sessionId).append(
-                LOCAL_AGENT_INBOX_EVENT_TYPE,
-                encodeLocalAgentInboxEvent(
-                    action = "resumed",
-                    pending = handle.pendingInputs.snapshot(),
-                    affected = listOf(queued),
-                    modelMessages = listOf(durableMessage),
-                ),
-            )
-            sessionStorage.enqueueCurrentSnapshot(state.sessionId)
-
-            starter.get().start(
-                content = queued.content,
-                memoryInput = queued.memoryInput,
-                sourceMessageId = queued.id,
-            ).also { handle.job = it }
+            prepareNextLocked()
         }
         next?.start()
+    }
+
+    internal fun startNextIfIdle(): Job? =
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            prepareNextLocked()
+        }
+
+    private fun prepareNextLocked(): Job? {
+        val handle = runtimeStateStore.foregroundRunHandle
+        val state = runtimeStateStore.state.value
+        if (
+            state.usageMode != LocalUsageMode.CHAT ||
+            runtimeStateStore.sessionTransitioning ||
+            handle.hasLiveJob()
+        ) return null
+
+        val queued = handle.pendingInputs.poll() ?: return null
+        val durableMessage = queued.modelMessage ?: buildJsonObject {
+            put("role", "user")
+            put("content", queued.content)
+        }
+        modelHistory.history.append(durableMessage)
+        modelHistory.refreshMetrics(state.sessionId)
+        runtimeStateStore.projection.setForegroundQueuedInputCount(
+            state.sessionId,
+            handle.pendingInputs.size(),
+        )
+        sessionStorage.eventLogs.get(state.sessionId).append(
+            LOCAL_AGENT_INBOX_EVENT_TYPE,
+            encodeLocalAgentInboxEvent(
+                action = "resumed",
+                pending = handle.pendingInputs.snapshot(),
+                affected = listOf(queued),
+                modelMessages = listOf(durableMessage),
+            ),
+        )
+        sessionStorage.enqueueCurrentSnapshot(state.sessionId)
+
+        return starter.get().start(
+            content = queued.content,
+            memoryInput = queued.memoryInput,
+            sourceMessageId = queued.id,
+        ).also { handle.job = it }
     }
 }
