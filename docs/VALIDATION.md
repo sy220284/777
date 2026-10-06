@@ -202,9 +202,12 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - **所有权与依赖门禁**：Feature / Shared Capability / Runtime Kernel 单向依赖、跨 Feature Port、Feature Catalog 唯一路由归属、领域状态单写、UI 不直接消费聚合状态、UI 不新增 Store / Coordinator / Service / Runtime 等实现穿透、已迁旧路径永久禁止回归。
 - **执行不变量门禁**：有界历史访问与 streaming、模型历史缓存、Session / Agent run ownership 与迟到提交、进程唯一资源调度器、MODEL_REQUEST 租约、工具执行唯一策略入口、模型 route/profile 冻结、Session 持久化与恢复顺序等运行时行为。
 
-迁移期债务必须按真实边精确记录。Shared→Feature、Automation→Chat/Work、Settings→其他 Feature、UI→内部实现均使用“消费文件 + 具体 import”白名单；新增边直接失败，已删除边未同步缩白名单也直接失败。Engine bridge 同样按具体桥名称分阶段维护，阶段三与阶段四分开收缩。允许文件本身存在，不代表允许在同一文件里替换成另一条依赖。
+历史迁移债务和 Engine bridge 已完成清零的部分，不再作为当前可用白名单或合法中间状态。当前架构门禁只允许：
+- 当前权威文档明确记录且尚未退出的精确债务；
+- 对应具体消费文件、依赖边、出口条件和删除条件；
+- 新增边默认失败，已经删除的历史边、旧 Engine bridge、旧跨 Feature / UI 穿透不得借用历史迁移白名单重新引入。
 
-当前不再把 Engine 方法数、构造依赖数、聚合状态字段数、UI projection 字段数或文件行数当作架构完成条件。已迁 Feature 业务根、旧包路径、Runtime→Engine 依赖与 Engine 私有业务实现使用永久禁止回归规则。
+当前不把 Engine 方法数、构造依赖数、聚合状态字段数、UI projection 字段数或文件行数当作架构完成条件。已迁 Feature 业务根、旧包路径、Runtime→Engine 依赖、Engine 私有业务实现、已清零的 Shared→Feature / Settings→Feature / UI→internal 旧边均按永久禁止回归处理。
 
 门禁失败应修复真实所有权、依赖方向或运行不变量，禁止通过提高数字预算、改名、等量代理替换或移动文件规避。
 
