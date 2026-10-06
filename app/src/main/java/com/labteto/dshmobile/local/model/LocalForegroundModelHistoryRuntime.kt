@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -61,6 +62,10 @@ internal class LocalForegroundModelHistoryRuntime @Inject constructor(
             state,
             runtimeStateStore.resourceSnapshot(),
         )
+        val eventLog = sessionStorage.eventLogs.get(expectedSessionId)
+        val sourceAsOfSequence = eventLog.latestSequence()
+        val sourceCheckpointSequence = eventLog.latest(ModelHistoryCheckpointCodec.EVENT_TYPE)?.sequence
+        val sourceMessageCount = history.snapshot().size
         val compaction = history.compact(
             compactor = compactor,
             budget = budget,
@@ -72,10 +77,15 @@ internal class LocalForegroundModelHistoryRuntime @Inject constructor(
             expectedSessionId,
             compaction.estimatedTokensAfter,
         )
-        val eventLog = sessionStorage.eventLogs.get(expectedSessionId)
         eventLog.append("session/compaction", buildJsonObject {
+            put("version", 2)
+            put("source_as_of_sequence", sourceAsOfSequence)
+            sourceCheckpointSequence?.let { put("source_checkpoint_sequence", it) }
+            put("source_message_count", sourceMessageCount)
+            put("result_message_count", history.snapshot().size)
             put("omitted_messages", compaction.omittedMessages)
             put("summary", compaction.summary)
+            put("summary_digest", stableJsonSha256(JsonPrimitive(compaction.summary)))
             put("estimated_tokens_before", compaction.estimatedTokensBefore)
             put("estimated_tokens_after", compaction.estimatedTokensAfter)
             put("extra_request_tokens", extraTokens)
