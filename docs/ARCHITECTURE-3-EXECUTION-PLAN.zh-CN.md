@@ -30,6 +30,8 @@
 - 阶段三已迁出的 Work task / agent-control 工具分发和 `sendChat`、`runAgentTurn`、`runChatTurn`、`runWorkAgentTurn`、`regenerate*`、`workSubagents` 等旧业务根进入永久禁止回归集合；不再用“空 allowlist”表达完成状态。
 - 阶段三组合桥与阶段四 Automation 桥分开维护具体 allowlist，只能缩小，不能用等量新代理替换。
 - Chat / Work provider Feature 禁止导入 sibling Feature internal；Shared Context 已改为中立 `LocalRequestContextPolicy` / DTO，由 Work 提供语义投影策略。
+- Shared→Feature、Automation→Feature、Settings→Feature 与 UI→内部实现的剩余迁移债务全部按“消费文件 + 具体 import”精确锁定；新增、替换或 stale 边均失败，只允许单向缩小。
+- UI 的 presentation facade / projection 可以继续作为展示边界；直接 Store / Coordinator / Service / 非 presentation Runtime / Manager / Repository / Tracker / Executor / Registry / Gateway / Port 属于阶段五迁移债务。
 - Chat timeline durable state 只承载 Chat 领域状态，不再通过 Chat event 写回 Work 控制状态。
 - 已删除的 Engine 迁移死代码建立永久禁止回归集合；Engine 外部直接消费者与 composition bridge 使用精确白名单单向收缩。方法数、构造依赖数、聚合状态字段数和 UI projection 字段数不再作为架构放行门禁。
 
