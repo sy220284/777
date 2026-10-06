@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.automation.LocalAutomationWorkCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatExecutionCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
 import com.labteto.dshmobile.local.chat.LocalChatTurnPort
+import com.labteto.dshmobile.local.chat.LocalChatTurnStarter
 import com.labteto.dshmobile.local.chat.LocalChatUserActivityPort
 import com.labteto.dshmobile.local.runtime.LocalDiagnosticsPort
 import com.labteto.dshmobile.local.session.LocalActiveSessionScopeProvider
@@ -68,8 +69,8 @@ internal object LocalFeatureExecutionPortModule {
 
     @Provides
     @Singleton
-    fun provideLocalChatTurnPort(engine: LocalHarnessEngine): LocalChatTurnPort =
-        engine.chatTurnPort
+    fun provideLocalChatTurnPort(starter: LocalChatTurnStarter): LocalChatTurnPort =
+        starter
 
     @Provides
     @Singleton
