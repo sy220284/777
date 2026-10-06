@@ -32,6 +32,7 @@ import com.labteto.dshmobile.local.runtime.AUTOMATION_CHAT_HISTORY_MESSAGES
 import com.labteto.dshmobile.local.runtime.CHAT_POST_TURN_MODEL_STEP
 import com.labteto.dshmobile.local.runtime.CHAT_ROLEPLAY_TEMPERATURE
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
+import com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
@@ -39,7 +40,9 @@ import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.appendLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import com.labteto.dshmobile.local.session.localTranscriptIndexForSession
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -76,6 +79,68 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
 
 
     override suspend fun run(
+        instruction: String,
+        targetSessionId: String,
+        timeoutMillis: Long,
+        recoverInterrupted: Boolean,
+        recoveryStartedAt: Long?,
+        quietHoursEnabled: Boolean,
+        quietStartHour: Int,
+        quietStartMinute: Int,
+        quietEndHour: Int,
+        quietEndMinute: Int,
+        proactiveMinGapMinutes: Long,
+        proactiveMaxUnanswered: Int,
+        minimumSilenceMinutes: Long?,
+        silenceReferenceAt: Long?,
+        bypassProactivePolicy: Boolean,
+    ): LocalChatAutomationResult = try {
+        runInternal(
+            instruction = instruction,
+            targetSessionId = targetSessionId,
+            timeoutMillis = timeoutMillis,
+            recoverInterrupted = recoverInterrupted,
+            recoveryStartedAt = recoveryStartedAt,
+            quietHoursEnabled = quietHoursEnabled,
+            quietStartHour = quietStartHour,
+            quietStartMinute = quietStartMinute,
+            quietEndHour = quietEndHour,
+            quietEndMinute = quietEndMinute,
+            proactiveMinGapMinutes = proactiveMinGapMinutes,
+            proactiveMaxUnanswered = proactiveMaxUnanswered,
+            minimumSilenceMinutes = minimumSilenceMinutes,
+            silenceReferenceAt = silenceReferenceAt,
+            bypassProactivePolicy = bypassProactivePolicy,
+        )
+    } catch (timeout: TimeoutCancellationException) {
+        val detail = "定时互动执行超时，已停止本轮任务"
+        LocalChatAutomationResult(
+            sessionId = targetSessionId,
+            output = detail,
+            status = LocalChatAutomationStatus.FAILED,
+            detail = detail,
+        )
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (blocked: LocalHarnessBlockedException) {
+        val detail = blocked.message ?: "定时互动需要人工处理"
+        LocalChatAutomationResult(
+            sessionId = blocked.sessionId ?: targetSessionId,
+            output = detail,
+            status = LocalChatAutomationStatus.BLOCKED,
+            detail = detail,
+        )
+    } catch (error: Exception) {
+        val detail = "定时互动失败：" + (error.message ?: error::class.java.simpleName)
+        LocalChatAutomationResult(
+            sessionId = targetSessionId,
+            output = detail,
+            status = LocalChatAutomationStatus.FAILED,
+            detail = detail,
+        )
+    }
+
+    private suspend fun runInternal(
         instruction: String,
         targetSessionId: String,
         timeoutMillis: Long,
@@ -141,8 +206,8 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
             return LocalChatAutomationResult(
                 sessionId = targetSessionId,
                 output = reason,
-                delivered = false,
-                skipReason = reason,
+                status = LocalChatAutomationStatus.SKIPPED,
+                detail = reason,
                 nextRunAtHint = earlyQuietDecision.retryAt,
             )
         }
@@ -179,8 +244,8 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                 return LocalChatAutomationResult(
                     sessionId = targetSessionId,
                     output = reason,
-                    delivered = false,
-                    skipReason = reason,
+                    status = LocalChatAutomationStatus.SKIPPED,
+                    detail = reason,
                     nextRunAtHint = silenceDecision.retryAt,
                 )
             }
@@ -225,8 +290,8 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                         return@withTimeout LocalChatAutomationResult(
                             sessionId = session.id,
                             output = reason,
-                            delivered = false,
-                            skipReason = reason,
+                            status = LocalChatAutomationStatus.SKIPPED,
+                            detail = reason,
                             nextRunAtHint = silenceDecision.retryAt,
                         )
                     }
@@ -258,8 +323,8 @@ internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject cons
                     return@withTimeout LocalChatAutomationResult(
                         sessionId = session.id,
                         output = reason,
-                        delivered = false,
-                        skipReason = reason,
+                        status = LocalChatAutomationStatus.SKIPPED,
+                        detail = reason,
                         nextRunAtHint = proactiveDecision.retryAt,
                         waitingForUserReply = proactiveDecision.waitingForUserReply,
                     )

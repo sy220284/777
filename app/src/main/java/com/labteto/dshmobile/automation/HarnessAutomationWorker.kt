@@ -18,8 +18,7 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.local.automation.LocalAutomationRuntime
-import com.labteto.dshmobile.local.runtime.LocalAutomationWorkException
-import com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException
+import com.labteto.dshmobile.local.automation.LocalAutomationRunStatus
 import com.labteto.dshmobile.notify.DshNotifications
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -188,40 +187,50 @@ class HarnessAutomationWorker(
                     bypassProactivePolicy = manualRun,
                 )
             }
-            settlement.settleSuccess(
-                id = id,
-                requestedGeneration = requestedGeneration,
-                task = task,
-                manualRun = manualRun,
-                started = started,
-                run = run,
-            )
+            when (run.status) {
+                LocalAutomationRunStatus.DELIVERED,
+                LocalAutomationRunStatus.SKIPPED -> settlement.settleSuccess(
+                    id = id,
+                    requestedGeneration = requestedGeneration,
+                    task = task,
+                    manualRun = manualRun,
+                    started = started,
+                    run = run,
+                )
+                LocalAutomationRunStatus.BLOCKED -> settlement.settleBlocked(
+                    id = id,
+                    requestedGeneration = requestedGeneration,
+                    task = task,
+                    manualRun = manualRun,
+                    started = started,
+                    sessionId = run.sessionId,
+                    detail = run.detail ?: run.output,
+                )
+                LocalAutomationRunStatus.CANCELLED -> settlement.settleFailure(
+                    id = id,
+                    requestedGeneration = requestedGeneration,
+                    task = task,
+                    manualRun = manualRun,
+                    started = started,
+                    sessionId = run.sessionId,
+                    detail = run.detail ?: run.output,
+                    persistWorkSessionId = task.mode == AutomationMode.WORK,
+                    receiptStatus = "cancelled",
+                )
+                LocalAutomationRunStatus.FAILED -> settlement.settleFailure(
+                    id = id,
+                    requestedGeneration = requestedGeneration,
+                    task = task,
+                    manualRun = manualRun,
+                    started = started,
+                    sessionId = run.sessionId,
+                    detail = run.detail ?: run.output,
+                    persistWorkSessionId = task.mode == AutomationMode.WORK,
+                )
+            }
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (blocked: LocalHarnessBlockedException) {
-            settlement.settleBlocked(
-                id = id,
-                requestedGeneration = requestedGeneration,
-                task = task,
-                manualRun = manualRun,
-                started = started,
-                sessionId = blocked.sessionId ?: task.workSessionId,
-                detail = blocked.message ?: "需要人工处理",
-            )
-            Result.success()
-        } catch (error: LocalAutomationWorkException) {
-            settlement.settleFailure(
-                id = id,
-                requestedGeneration = requestedGeneration,
-                task = task,
-                manualRun = manualRun,
-                started = started,
-                sessionId = error.sessionId,
-                detail = error.message ?: "后台任务失败",
-                persistWorkSessionId = true,
-            )
-            Result.success()
         } catch (error: Throwable) {
             settlement.settleFailure(
                 id = id,

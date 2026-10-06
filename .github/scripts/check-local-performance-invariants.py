@@ -30,6 +30,9 @@ TOOL_EXECUTION_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/loc
 AGENT_RUN_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt"
 SESSION_RUNTIME_REGISTRY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionRuntimeRegistry.kt"
 AUTOMATION_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt"
+CHAT_AUTOMATION_PORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatAutomationExecutionPort.kt"
+WORK_AUTOMATION_PORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationExecutionPort.kt"
+AUTOMATION_WORKER = ROOT / "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationWorker.kt"
 
 violations: list[str] = []
 
@@ -93,6 +96,9 @@ tool_execution_coordinator = strip_comments(read(TOOL_EXECUTION_COORDINATOR))
 agent_run_coordinator = strip_comments(read(AGENT_RUN_COORDINATOR))
 session_runtime_registry = strip_comments(read(SESSION_RUNTIME_REGISTRY))
 automation_runtime = strip_comments(read(AUTOMATION_RUNTIME))
+chat_automation_port = strip_comments(read(CHAT_AUTOMATION_PORT))
+work_automation_port = strip_comments(read(WORK_AUTOMATION_PORT))
+automation_worker = strip_comments(read(AUTOMATION_WORKER))
 
 chat_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/chat")
 work_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/work")
@@ -294,6 +300,24 @@ if "runtimeStateStore.withModelRequestResource(block)" not in automation_runtime
     violations.append(
         "Automation model requests must acquire MODEL_REQUEST through shared Runtime ownership"
     )
+
+for port_name, source in (
+    ("Chat Automation execution Port", chat_automation_port),
+    ("Work Automation execution Port", work_automation_port),
+):
+    for terminal_status in ("DELIVERED", "SKIPPED", "BLOCKED", "CANCELLED", "FAILED"):
+        if terminal_status not in source:
+            violations.append(
+                f"{port_name} lost structured terminal status: {terminal_status}"
+            )
+    if "val status:" not in source:
+        violations.append(f"{port_name} must return a structured status instead of exception-only outcome")
+
+for terminal_status in ("DELIVERED", "SKIPPED", "BLOCKED", "CANCELLED", "FAILED"):
+    if f"LocalAutomationRunStatus.{terminal_status}" not in automation_worker:
+        violations.append(
+            "Automation Worker lost explicit settlement for terminal status: " + terminal_status
+        )
 
 tracked_tool_execution_owners = paths_containing(all_local_sources, ".executeTracked(")
 expected_tool_execution_owner = [

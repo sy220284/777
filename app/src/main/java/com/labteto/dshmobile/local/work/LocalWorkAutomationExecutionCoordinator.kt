@@ -5,14 +5,12 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalForegroundTurnWakeCoordinator
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
-import com.labteto.dshmobile.local.agent.requireCompletedOutput
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
-import com.labteto.dshmobile.local.runtime.LocalAutomationWorkException
 import com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.MAX_EVENT_CHARS
@@ -79,17 +77,27 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
         val session = requireWorkAutomationSession(sessionStorage.coordinator.read(sessionId))
         val boundState = boundState(session)
         val boundEventLog = sessionStorage.eventLogs.get(sessionId)
-        val recovery = if (recoverInterrupted) {
-            prepareWorkAutomationRecovery(
-                prompt = prompt,
+        val recovery = try {
+            if (recoverInterrupted) {
+                prepareWorkAutomationRecovery(
+                    prompt = prompt,
+                    sessionId = sessionId,
+                    eventLog = boundEventLog,
+                    profiles = runtimeStateStore.state.value.modelProfiles,
+                    agentRunCoordinator = sessionStorage.agentRunCoordinator,
+                    contextPolicy = LocalWorkRecoveryContextPolicy,
+                )
+            } else {
+                LocalWorkAutomationRecoveryPlan(prompt)
+            }
+        } catch (blocked: LocalHarnessBlockedException) {
+            val detail = blocked.message ?: "后台任务需要人工处理"
+            return LocalWorkAutomationResult(
                 sessionId = sessionId,
-                eventLog = boundEventLog,
-                profiles = runtimeStateStore.state.value.modelProfiles,
-                agentRunCoordinator = sessionStorage.agentRunCoordinator,
-                contextPolicy = LocalWorkRecoveryContextPolicy,
+                output = detail,
+                status = LocalWorkAutomationStatus.BLOCKED,
+                detail = detail,
             )
-        } else {
-            LocalWorkAutomationRecoveryPlan(prompt)
         }
         recovery.completedOutput?.let { output ->
             ensureRecoveredTranscript(
@@ -139,7 +147,6 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                     withContext(LocalModelRunContext(profile)) { execute() }
                 } ?: execute()
             }
-            val output = result.requireCompletedOutput().ifBlank { "后台任务已完成" }
 
             blockedReason?.let { reason ->
                 persistTranscript(
@@ -149,19 +156,41 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                     finalContent = reason,
                     eventLog = boundEventLog,
                 )
-                throw LocalHarnessBlockedException(reason, sessionId)
+                return LocalWorkAutomationResult(
+                    sessionId = sessionId,
+                    output = reason,
+                    status = LocalWorkAutomationStatus.BLOCKED,
+                    detail = reason,
+                )
             }
 
+            val status = when (result.status) {
+                com.labteto.dshmobile.local.agent.LocalSubagentStatus.COMPLETED ->
+                    LocalWorkAutomationStatus.DELIVERED
+                com.labteto.dshmobile.local.agent.LocalSubagentStatus.CANCELLED ->
+                    LocalWorkAutomationStatus.CANCELLED
+                com.labteto.dshmobile.local.agent.LocalSubagentStatus.STEP_LIMIT,
+                com.labteto.dshmobile.local.agent.LocalSubagentStatus.FAILED ->
+                    LocalWorkAutomationStatus.FAILED
+            }
+            val output = when (status) {
+                LocalWorkAutomationStatus.DELIVERED -> result.output.ifBlank { "后台任务已完成" }
+                LocalWorkAutomationStatus.CANCELLED -> result.output.ifBlank { "后台任务已取消" }
+                else -> result.output.ifBlank { "后台任务失败" }
+            }
             persistTranscript(
                 session = session,
                 messages = listOf(userMessage),
-                finalRole = "assistant",
+                finalRole = if (status == LocalWorkAutomationStatus.DELIVERED) "assistant" else "system",
                 finalContent = output,
                 eventLog = boundEventLog,
             )
-            LocalWorkAutomationResult(sessionId = sessionId, output = output)
-        } catch (blocked: LocalHarnessBlockedException) {
-            throw blocked
+            LocalWorkAutomationResult(
+                sessionId = sessionId,
+                output = output,
+                status = status,
+                detail = output.takeIf { status != LocalWorkAutomationStatus.DELIVERED },
+            )
         } catch (timeout: TimeoutCancellationException) {
             val detail = "后台任务执行超时，已停止本轮任务"
             persistTranscript(
@@ -171,7 +200,12 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                 finalContent = detail,
                 eventLog = boundEventLog,
             )
-            throw LocalAutomationWorkException(detail, sessionId, timeout)
+            LocalWorkAutomationResult(
+                sessionId = sessionId,
+                output = detail,
+                status = LocalWorkAutomationStatus.FAILED,
+                detail = detail,
+            )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -183,7 +217,12 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                 finalContent = detail,
                 eventLog = boundEventLog,
             )
-            throw LocalAutomationWorkException(detail, sessionId, error)
+            LocalWorkAutomationResult(
+                sessionId = sessionId,
+                output = detail,
+                status = LocalWorkAutomationStatus.FAILED,
+                detail = detail,
+            )
         }
         } finally {
             sessionLease.close()

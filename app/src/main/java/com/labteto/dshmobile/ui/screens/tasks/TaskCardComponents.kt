@@ -316,6 +316,7 @@ private fun receiptStatusLabel(receipt: AutomationRunReceipt): String {
         "completed" -> stringResource(R.string.tasks_run_completed)
         "blocked" -> stringResource(R.string.tasks_run_blocked)
         "failed" -> stringResource(R.string.tasks_run_failed)
+        "cancelled" -> stringResource(R.string.local_execution_notification_cancelled)
         "skipped" -> stringResource(R.string.tasks_run_skipped)
         else -> receipt.status
     }
@@ -327,6 +328,7 @@ private fun receiptStatus(status: String): DsStatus = when (status) {
     "completed" -> DsStatus.Done
     "blocked" -> DsStatus.Warning
     "failed" -> DsStatus.Failed
+    "cancelled" -> DsStatus.Neutral
     "running", "queued" -> DsStatus.Running
     "skipped" -> DsStatus.Neutral
     else -> DsStatus.Neutral

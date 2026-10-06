@@ -12,6 +12,14 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+internal enum class LocalChatAutomationStatus {
+    DELIVERED,
+    SKIPPED,
+    BLOCKED,
+    CANCELLED,
+    FAILED,
+}
+
 /** ChatFeature-owned Automation entrypoint. */
 internal interface LocalChatAutomationExecutionPort {
     suspend fun run(
@@ -36,8 +44,8 @@ internal interface LocalChatAutomationExecutionPort {
 internal data class LocalChatAutomationResult(
     val sessionId: String,
     val output: String,
-    val delivered: Boolean = true,
-    val skipReason: String? = null,
+    val status: LocalChatAutomationStatus = LocalChatAutomationStatus.DELIVERED,
+    val detail: String? = null,
     val nextRunAtHint: Long? = null,
     val waitingForUserReply: Boolean = false,
 )
@@ -128,7 +136,7 @@ internal fun rejectStaleAutomationProactiveReply(
     return LocalChatAutomationResult(
         sessionId = sessionId,
         output = reason,
-        delivered = false,
-        skipReason = reason,
+        status = LocalChatAutomationStatus.SKIPPED,
+        detail = reason,
     )
 }

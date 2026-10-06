@@ -1,5 +1,13 @@
 package com.labteto.dshmobile.local.work
 
+internal enum class LocalWorkAutomationStatus {
+    DELIVERED,
+    SKIPPED,
+    BLOCKED,
+    CANCELLED,
+    FAILED,
+}
+
 /** WorkFeature-owned Automation entrypoint. Automation receives only a bounded execution result. */
 internal interface LocalWorkAutomationExecutionPort {
     suspend fun prepareSession(text: String, preferredSessionId: String? = null): String
@@ -15,4 +23,6 @@ internal interface LocalWorkAutomationExecutionPort {
 internal data class LocalWorkAutomationResult(
     val sessionId: String,
     val output: String,
+    val status: LocalWorkAutomationStatus = LocalWorkAutomationStatus.DELIVERED,
+    val detail: String? = null,
 )

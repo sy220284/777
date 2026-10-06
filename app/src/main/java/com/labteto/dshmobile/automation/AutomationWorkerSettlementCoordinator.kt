@@ -170,6 +170,7 @@ internal class AutomationWorkerSettlementCoordinator(
         sessionId: String?,
         detail: String,
         persistWorkSessionId: Boolean,
+        receiptStatus: String = "failed",
     ) {
         val finished = System.currentTimeMillis()
         if (manualRun) {
@@ -185,7 +186,7 @@ internal class AutomationWorkerSettlementCoordinator(
                         AutomationRunReceipt(
                             startedAt = started,
                             finishedAt = finished,
-                            status = "failed",
+                            status = receiptStatus,
                             sessionId = sessionId,
                             errorPreview = truncateWithoutSplittingSurrogatePair(detail, 320),
                         ),
@@ -233,7 +234,7 @@ internal class AutomationWorkerSettlementCoordinator(
                     AutomationRunReceipt(
                         startedAt = started,
                         finishedAt = finished,
-                        status = "failed",
+                        status = receiptStatus,
                         sessionId = sessionId,
                         errorPreview = truncateWithoutSplittingSurrogatePair(detail, 320),
                     ),

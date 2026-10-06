@@ -1,9 +1,12 @@
 package com.labteto.dshmobile.local.automation
 
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalAutomationWorkException
+import com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.chat.LocalChatAutomationExecutionPort
 import com.labteto.dshmobile.local.work.LocalWorkAutomationExecutionPort
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -25,8 +28,23 @@ class LocalAutomationRuntime @Inject internal constructor(
     internal fun planningRevision(): AutomationPlanningRevision =
         runtimeState.value.toAutomationPlanningRevision()
 
-    internal suspend fun runPrompt(text: String, timeoutMillis: Long = 5 * 60_000L): String =
-        runWork(text = text, timeoutMillis = timeoutMillis).output
+    internal suspend fun runPrompt(text: String, timeoutMillis: Long = 5 * 60_000L): String {
+        val result = runWork(text = text, timeoutMillis = timeoutMillis)
+        return when (result.status) {
+            LocalAutomationRunStatus.DELIVERED, LocalAutomationRunStatus.SKIPPED -> result.output
+            LocalAutomationRunStatus.BLOCKED -> throw LocalHarnessBlockedException(
+                result.detail ?: result.output,
+                result.sessionId,
+            )
+            LocalAutomationRunStatus.CANCELLED -> throw CancellationException(
+                result.detail ?: result.output,
+            )
+            LocalAutomationRunStatus.FAILED -> throw LocalAutomationWorkException(
+                result.detail ?: result.output,
+                result.sessionId,
+            )
+        }
+    }
 
     internal suspend fun <T> withModelRequestResource(block: suspend () -> T): T =
         runtimeStateStore.withModelRequestResource(block)
@@ -48,6 +66,8 @@ class LocalAutomationRuntime @Inject internal constructor(
         LocalAutomationRunResult(
             sessionId = result.sessionId,
             output = result.output,
+            status = LocalAutomationRunStatus.valueOf(result.status.name),
+            detail = result.detail,
         )
     }
     internal suspend fun runChat(
@@ -75,8 +95,8 @@ class LocalAutomationRuntime @Inject internal constructor(
         LocalAutomationRunResult(
             sessionId = result.sessionId,
             output = result.output,
-            delivered = result.delivered,
-            skipReason = result.skipReason,
+            status = LocalAutomationRunStatus.valueOf(result.status.name),
+            detail = result.detail,
             nextRunAtHint = result.nextRunAtHint,
             waitingForUserReply = result.waitingForUserReply,
         )

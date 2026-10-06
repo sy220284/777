@@ -194,7 +194,7 @@ Chat send、直聊回合、人物纠正、关系恢复、时间线编辑 / regen
 
 出口：AutomationRuntime 3 → 0；Automation 禁止导入 Chat / Work internal Store、Coordinator、runner 和 writable state。Port 的返回值区分 delivered、skipped、blocked、cancelled、failed，避免“调用成功但未执行”的回执。
 
-当前阶段四代码迁移已完成：Engine 的 `automationChatCoordinator` / `automationWorkCoordinator` 组合桥与 Automation→Chat/Work internal 精确迁移债务均已清零；Chat / Work 分别提供 Automation 执行 Port、恢复与领域策略 owner，`LocalAutomationRuntime` 只保留调度与结果适配。本地 Architecture 3.0 所有权门禁、执行不变量门禁与 `compileDebugKotlin` 已通过；完整仓库 CI 继续作为提交后的远端验收。
+当前阶段四代码迁移已完成：Engine 的 `automationChatCoordinator` / `automationWorkCoordinator` 组合桥与 Automation→Chat/Work internal 精确迁移债务均已清零；Chat / Work 分别提供 Automation 执行 Port、恢复与领域策略 owner，`LocalAutomationRuntime` 只保留调度与结果适配。执行 Port 已统一返回 `delivered / skipped / blocked / cancelled / failed` 结构化终态，Worker 按终态结算，不再依赖异常来表达“调用完成但任务未执行”的业务结果。本地 Architecture 3.0 所有权门禁、执行不变量门禁与 `compileDebugKotlin` 已通过；完整仓库 CI 继续作为提交后的远端验收。
 
 ## 11. 阶段 5：Feature UI contribution
 
