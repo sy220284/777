@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.model
 
-import com.labteto.dshmobile.local.persistence.LOCAL_HARNESS_PREFERENCES_NAME
+import com.labteto.dshmobile.local.persistence.LocalHarnessPreferences
 import android.content.Context
 import com.labteto.dshmobile.local.LocalModelException
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,7 +15,7 @@ class LocalModelRouteCatalog @Inject constructor(
     json: Json,
 ) {
     private val store = LocalModelProfileStore(
-        context.getSharedPreferences(LOCAL_HARNESS_PREFERENCES_NAME, Context.MODE_PRIVATE), json,
+        LocalHarnessPreferences.from(context), json,
     )
 
     fun profiles(): List<LocalModelProfile> = store.read()
