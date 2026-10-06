@@ -61,11 +61,13 @@ CI_CONTROL_FILES = {
     ".github/scripts/check-ci-repository-integrity.py",
     ".github/scripts/check-android-security-boundaries.py",
 }
-ARCHITECTURE_3_CONTROL_FILES = {
+ARCHITECTURE_AUTHORITY_FILES = {
     "AGENTS.md",
     "docs/ARCHITECTURE.md",
     "docs/SYSTEM-AUDIT-GUIDE.zh-CN.md",
     "docs/VALIDATION.md",
+}
+ARCHITECTURE_3_CONTROL_FILES = ARCHITECTURE_AUTHORITY_FILES | {
     ".github/workflows/ci.yml",
     ".github/scripts/classify-ci-scope.py",
     ".github/scripts/check-ci-repository-integrity.py",
@@ -316,6 +318,43 @@ def self_test() -> None:
         actual = classify(paths)
         if actual != expected:
             raise AssertionError(f"{paths}: expected {expected}, got {actual}")
+
+    # Control-plane coverage is an invariant, not a hand-maintained list of examples.
+    for path in sorted(ARCHITECTURE_AUTHORITY_FILES):
+        plan = classify([path])
+        if not (plan.run_static and plan.run_architecture):
+            raise AssertionError(f"{path}: architecture authority must run static + architecture gates: {plan}")
+
+    for path in sorted(CI_CONTROL_FILES):
+        plan = classify([path])
+        if not plan.run_static:
+            raise AssertionError(f"{path}: CI control file must run static gates: {plan}")
+
+    for path in sorted(ARCHITECTURE_3_CONTROL_FILES):
+        plan = classify([path])
+        if not (plan.run_static and plan.run_architecture):
+            raise AssertionError(f"{path}: architecture control file must run static + architecture gates: {plan}")
+
+    synthetic_guard = classify([".github/scripts/check-new-guard.py"])
+    if not synthetic_guard.run_static:
+        raise AssertionError("new check-*.py guards must automatically enter static-gates")
+
+    for path in sorted(FULL_VALIDATION_SCRIPTS):
+        plan = classify([path])
+        if not (
+            plan.run_static
+            and plan.run_architecture
+            and plan.run_unit
+            and plan.run_build
+            and plan.run_device
+            and plan.run_android
+        ):
+            raise AssertionError(f"{path}: full validation control must run the full product matrix: {plan}")
+
+    for path in sorted(FIXTURE_PROVENANCE_PATHS):
+        plan = classify([path])
+        if not (plan.run_static and plan.run_unit and plan.run_fixture):
+            raise AssertionError(f"{path}: fixture provenance change lost required verification: {plan}")
 
 
 def main() -> None:
