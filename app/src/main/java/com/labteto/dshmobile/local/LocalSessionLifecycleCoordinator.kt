@@ -2,35 +2,9 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
-import com.labteto.dshmobile.harness.session.HandoffGoal
-import com.labteto.dshmobile.harness.session.HandoffMessage
-import com.labteto.dshmobile.harness.session.HandoffState
-import com.labteto.dshmobile.harness.session.HandoffTodo
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatDiaryStore
-import com.labteto.dshmobile.local.chat.ChatPersonaStore
-import com.labteto.dshmobile.local.chat.LocalChatBranchState
-import com.labteto.dshmobile.local.chat.LocalChatSessionCreateSpec
-import com.labteto.dshmobile.local.chat.LocalChatSessionModeCommand
-import com.labteto.dshmobile.local.chat.LocalChatMode
-import com.labteto.dshmobile.local.chat.LocalChatState
-import com.labteto.dshmobile.local.chat.LocalGroupChatState
-import com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_MEMBERS
-import com.labteto.dshmobile.local.chat.MIN_GROUP_CHAT_MEMBERS
-import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
-import com.labteto.dshmobile.local.chat.PersonaProfile
-import com.labteto.dshmobile.local.chat.activeChatBranchMessages
-import com.labteto.dshmobile.local.chat.canonicalizeLegacyCharacterState
-import com.labteto.dshmobile.local.chat.continuePendingInSession
-import com.labteto.dshmobile.local.chat.findEstablishedGroupChatSession
-import com.labteto.dshmobile.local.chat.groupTranscriptLine
-import com.labteto.dshmobile.local.chat.hasChatBranchAlternatives
-import com.labteto.dshmobile.local.chat.isUnboundChatPersona
-import com.labteto.dshmobile.local.chat.resolveCharacterBehaviorTuning
-import com.labteto.dshmobile.local.chat.resolveLocalGroupChatMembers
-import com.labteto.dshmobile.local.chat.withLegacyFallback
-import com.labteto.dshmobile.local.chat.withoutLegacyConversationContext
+import com.labteto.dshmobile.local.chat.LocalChatSessionLifecyclePlanner
+import com.labteto.dshmobile.local.chat.LocalChatSessionModeRoute
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.memory.MemoryStore
@@ -38,15 +12,14 @@ import com.labteto.dshmobile.local.runtime.LocalKernelState
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
-import com.labteto.dshmobile.local.runtime.projectExecutionJobs
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.session.LocalConversationFilesCoordinator
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalSessionDomainCreateSpec
 import com.labteto.dshmobile.local.session.LocalSessionDomainModeCommand
 import com.labteto.dshmobile.local.session.LocalSessionSummary
+import com.labteto.dshmobile.local.work.LocalWorkSessionLifecyclePlanner
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
-import com.labteto.dshmobile.local.work.LocalWorkState
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
@@ -59,17 +32,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-
-internal fun shouldContinueSingleChatBinding(
-    mode: LocalConversationMode,
-    targetUsageMode: LocalUsageMode,
-    sourceUsageMode: LocalUsageMode,
-    sourceGroupEnabled: Boolean,
-): Boolean =
-    mode == LocalConversationMode.CONTINUATION &&
-        targetUsageMode == LocalUsageMode.CHAT &&
-        sourceUsageMode == LocalUsageMode.CHAT &&
-        !sourceGroupEnabled
 
 /**
  * Session navigation only waits for the visible runtime or another session transition.
@@ -88,7 +50,7 @@ internal class LocalSessionLifecycleCoordinator(
     private val transitionMutex: Mutex,
     private val jobs: LocalJobManager,
     private val sessionCoordinator: LocalSessionCoordinator,
-    private val chatPersonaStore: ChatPersonaStore,
+    private val chatSessionLifecycle: LocalChatSessionLifecyclePlanner,
     private val approvalPreferences: LocalApprovalPreferences,
     private val resourceScheduler: HarnessResourceScheduler,
     private val handoffBuilder: ConversationHandoffBuilder,
@@ -129,38 +91,10 @@ internal class LocalSessionLifecycleCoordinator(
         usageMode: LocalUsageMode,
         domainSpec: LocalSessionDomainCreateSpec? = null,
     ): Boolean {
-        val chatSpec = when (domainSpec) {
-            null -> null
-            is LocalChatSessionCreateSpec -> domainSpec
-            else -> return false
-        }
-        if (chatSpec != null && usageMode != LocalUsageMode.CHAT) return false
-        val galleryEntry = chatSpec?.galleryEntry
-        val galleryStoryId = chatSpec?.galleryStoryId
-        val freshGalleryStory = chatSpec?.freshGalleryStory == true
-        val chatMode = chatSpec?.chatMode
-        val groupEntries = chatSpec?.groupEntries.orEmpty()
-        if (
-            chatMode == LocalChatMode.GROUP &&
-            groupEntries.distinctBy(PersonaGalleryEntry::id).size !in
-                MIN_GROUP_CHAT_MEMBERS..MAX_GROUP_CHAT_MEMBERS
-        ) return false
+        if (!chatSessionLifecycle.acceptsCreateSpec(usageMode, domainSpec)) return false
         if (!beginTransition()) return false
         val sourceId = currentSessionId()
         val sourceState = state.value
-        val continueSingleChatBinding = shouldContinueSingleChatBinding(
-            mode = mode,
-            targetUsageMode = usageMode,
-            sourceUsageMode = sourceState.usageMode,
-            sourceGroupEnabled = sourceState.chat.groupChat.enabled,
-        )
-        val resolvedChatMode = when {
-            usageMode != LocalUsageMode.CHAT -> LocalChatMode.SINGLE
-            galleryEntry != null -> LocalChatMode.SINGLE
-            chatMode != null -> chatMode
-            sourceState.usageMode == LocalUsageMode.CHAT -> sourceState.chat.groupChat.mode
-            else -> LocalChatMode.SINGLE
-        }
         state.update {
             it.copy(
                 loading = true,
@@ -200,140 +134,30 @@ internal class LocalSessionLifecycleCoordinator(
                         LocalConversationMode.PROJECT -> sourceState.projectId ?: localProjectId
                         LocalConversationMode.CONTINUATION -> sourceState.projectId
                     }
-                    val selectedGalleryStory = galleryEntry?.story(galleryStoryId)
-                    val handoff = if (galleryEntry != null && !freshGalleryStory) {
-                        selectedGalleryStory?.context(galleryEntry.persona.name).orEmpty()
-                    } else if (mode == LocalConversationMode.CONTINUATION) {
-                        if (
-                            usageMode == LocalUsageMode.CHAT &&
-                            sourceState.usageMode == LocalUsageMode.CHAT
-                        ) {
-                            // Chat continuity/pending state is transferred below. Long-range
-                            // narrative recall now comes from character diaries, so duplicating old
-                            // dialogue into a handoff summary only wastes context.
-                            null
-                        } else {
+                    val chatPlan = chatSessionLifecycle.prepareCreate(
+                        mode = mode,
+                        usageMode = usageMode,
+                        domainSpec = domainSpec,
+                        sourceSessionId = sourceId,
+                        nextSessionId = nextSessionId,
+                        sourceUsageMode = sourceState.usageMode,
+                        sourceChat = sourceState.chat,
+                        sessionsRoot = sessionsRoot,
+                    )
+                    val handoff = when (val override = chatPlan.handoffOverride) {
+                        null -> if (mode == LocalConversationMode.CONTINUATION) {
                             buildHandoffSummary(sourceState)
+                        } else {
+                            null
                         }
-                    } else {
-                        null
+                        else -> override.value
                     }
-                    val continuedPersona = if (
-                        continueSingleChatBinding &&
-                        sourceState.chat.personaId != PersonaProfile.DEFAULT_PERSONA_ID
-                    ) {
-                        chatPersonaStore.get(sourceState.chat.personaId)
-                            .takeUnless(PersonaProfile::isUnboundChatPersona)
-                    } else {
-                        null
-                    }
-                    val personaId = if (resolvedChatMode == LocalChatMode.GROUP) {
-                        PersonaProfile.DEFAULT_PERSONA_ID
-                    } else if (galleryEntry != null) {
-                        chatPersonaStore.upsert(
-                            galleryEntry.persona.copy(id = "persona-${UUID.randomUUID()}"),
-                        ).id
-                    } else {
-                        continuedPersona?.id ?: PersonaProfile.DEFAULT_PERSONA_ID
-                    }
-                    val chatPersona = when {
-                        resolvedChatMode == LocalChatMode.GROUP -> PersonaProfile()
-                        galleryEntry != null -> chatPersonaStore.get(personaId)
-                        else -> continuedPersona ?: PersonaProfile()
-                    }
-                    val chatState = if (resolvedChatMode == LocalChatMode.GROUP) {
-                        ChatCharacterState()
-                    } else if (
-                        galleryEntry != null &&
-                        usageMode == LocalUsageMode.CHAT &&
-                        !freshGalleryStory
-                    ) {
-                        selectedGalleryStory?.chatState?.let { storyState ->
-                            storyState.canonicalizeLegacyCharacterState().copy(
-                                behaviorTuning = resolveCharacterBehaviorTuning(
-                                    storyState.behaviorTuning, chatPersona.behaviorTuning,
-                                ),
-                            )
-                        } ?: ChatCharacterState(behaviorTuning = chatPersona.behaviorTuning)
-                    } else if (continueSingleChatBinding) {
-                        sourceState.chat.chatState
-                    } else {
-                        ChatCharacterState(behaviorTuning = chatPersona.behaviorTuning)
-                    }
-
-                    val initialGroupMembers = if (
-                        resolvedChatMode == LocalChatMode.GROUP && groupEntries.isNotEmpty()
-                    ) {
-                        resolveLocalGroupChatMembers(
-                            entries = groupEntries.take(MAX_GROUP_CHAT_MEMBERS),
-                            previousMembers = emptyList(),
-                            chatPersonaStore = chatPersonaStore,
-                        )
-                    } else {
-                        emptyList()
-                    }
-
-                    val chatContext = when {
-                        resolvedChatMode == LocalChatMode.GROUP -> ChatContextState()
-                        galleryEntry != null && usageMode == LocalUsageMode.CHAT && !freshGalleryStory ->
-                            selectedGalleryStory?.chatContext?.withLegacyFallback(chatState)
-                                ?: ChatContextState().withLegacyFallback(chatState)
-                        continueSingleChatBinding -> sourceState.chat.chatContext.continuePendingInSession(
-                            sessionsRoot, sourceId, nextSessionId, "direct",
-                            if (hasChatBranchAlternatives(sourceState.chat.chatBranches)) {
-                                activeChatBranchMessages(sourceState.chat.chatBranches).mapTo(hashSetOf()) { it.id }
-                            } else null,
-                        )
-                        else -> ChatContextState()
-                    }
-
-                    val continuedGroup = if (
-                        resolvedChatMode == LocalChatMode.GROUP && mode == LocalConversationMode.CONTINUATION &&
-                        sourceState.usageMode == LocalUsageMode.CHAT && sourceState.chat.groupChat.enabled
-                    ) {
-                        sourceState.chat.groupChat.copy(context = sourceState.chat.groupChat.context.continuePendingInSession(
-                            sessionsRoot, sourceId, nextSessionId, "group",
-                            if (hasChatBranchAlternatives(sourceState.chat.chatBranches)) {
-                                activeChatBranchMessages(sourceState.chat.chatBranches).mapTo(hashSetOf()) { it.id }
-                            } else null,
-                        ))
-                    } else null
                     state.update {
                         it.copy(
                             loading = false,
                             sessionId = nextSessionId,
                             usageMode = usageMode,
-                            chat = LocalChatState(
-                                personaId = personaId,
-                                galleryId = if (resolvedChatMode == LocalChatMode.GROUP) {
-                                    null
-                                } else {
-                                    galleryEntry?.id ?: sourceState.chat.galleryId.takeIf {
-                                        continueSingleChatBinding
-                                    }
-                                },
-                                galleryStoryId = when {
-                                    resolvedChatMode == LocalChatMode.GROUP -> null
-                                    galleryEntry != null && !freshGalleryStory -> selectedGalleryStory?.id
-                                    galleryEntry != null -> null
-                                    continueSingleChatBinding -> sourceState.chat.galleryStoryId
-                                    else -> null
-                                },
-                                gallerySaveSuppressedThrough = 0L,
-                                chatPersona = chatPersona,
-                                chatState = chatState.withoutLegacyConversationContext(),
-                                chatContext = chatContext,
-                                replySuggestions = emptyList(),
-                                chatBranches = LocalChatBranchState(),
-                                groupChat = if (resolvedChatMode == LocalChatMode.GROUP) {
-                                    continuedGroup ?: LocalGroupChatState(
-                                        mode = LocalChatMode.GROUP,
-                                        members = initialGroupMembers,
-                                    )
-                                } else LocalGroupChatState(),
-                                groupActiveSpeakerName = null,
-                                personaCorrectionNotice = null,
-                            ),
+                            chat = chatPlan.chat,
                             conversationMode = mode,
                             parentSessionId = sourceId.takeIf {
                                 mode == LocalConversationMode.CONTINUATION
@@ -343,9 +167,10 @@ internal class LocalSessionLifecycleCoordinator(
                             handoffSummary = handoff,
                             messages = emptyList(),
                             transcriptIndex = LocalTranscriptRuntimeIndex(),
-                            work = LocalWorkState(
-                                jobs = projectExecutionJobs(usageMode, nextSessionId, jobs.snapshotInfos()),
-                                deviceApprovalLease = false,
+                            work = LocalWorkSessionLifecyclePlanner.initialState(
+                                usageMode = usageMode,
+                                sessionId = nextSessionId,
+                                jobs = jobs.snapshotInfos(),
                             ),
                             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(),
                             kernel = LocalKernelState(
@@ -367,35 +192,27 @@ internal class LocalSessionLifecycleCoordinator(
     }
 
     fun switchDomainMode(command: LocalSessionDomainModeCommand) {
-        when (command) {
-            is LocalChatSessionModeCommand -> switchChatMode(command.mode)
-            else -> Unit
-        }
-    }
-
-    private fun switchChatMode(mode: LocalChatMode) {
         val snapshot = state.value
         if (snapshot.loading || snapshot.kernel.running) return
-        if (
-            snapshot.usageMode == LocalUsageMode.CHAT &&
-            snapshot.chat.groupChat.mode == mode
-        ) return
+        applyChatModeRoute(
+            chatSessionLifecycle.resolveModeCommand(
+                command = command,
+                usageMode = snapshot.usageMode,
+                chat = snapshot.chat,
+                sessions = snapshot.sessions,
+            ),
+        )
+    }
 
-        val eligible = if (mode == LocalChatMode.GROUP) {
-            listOfNotNull(findEstablishedGroupChatSession(snapshot.sessions))
-        } else {
-            snapshot.sessions.filter {
-                it.usageMode == LocalUsageMode.CHAT && it.chatMode == mode.name
-            }
-        }
-        val target = eligible.firstOrNull { !it.blank } ?: eligible.firstOrNull()
-        if (target != null) {
-            switchSession(target.id)
-        } else if (mode != LocalChatMode.GROUP) {
-            createSession(
+    private fun applyChatModeRoute(route: LocalChatSessionModeRoute?) {
+        when (route) {
+            null,
+            LocalChatSessionModeRoute.Noop -> Unit
+            is LocalChatSessionModeRoute.Switch -> switchSession(route.sessionId)
+            is LocalChatSessionModeRoute.Create -> createSession(
                 mode = LocalConversationMode.INDEPENDENT,
                 usageMode = LocalUsageMode.CHAT,
-                domainSpec = LocalChatSessionCreateSpec(chatMode = mode),
+                domainSpec = route.spec,
             )
         }
     }
@@ -412,17 +229,24 @@ internal class LocalSessionLifecycleCoordinator(
         // Chat turn still owns the visible runtime and therefore keeps the existing guard.
         if (snapshot.kernel.running && snapshot.usageMode != LocalUsageMode.WORK) return
         if (mode == LocalUsageMode.CHAT && snapshot.usageMode == LocalUsageMode.CHAT) {
-            if (snapshot.chat.groupChat.enabled) switchChatMode(LocalChatMode.SINGLE)
+            applyChatModeRoute(
+                chatSessionLifecycle.resolveSingleMode(
+                    usageMode = snapshot.usageMode,
+                    chat = snapshot.chat,
+                    sessions = snapshot.sessions,
+                ),
+            )
             return
         }
         if (snapshot.usageMode == mode) return
-        val target = snapshot.sessions.firstOrNull {
-            it.usageMode == mode &&
-                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE.name) &&
-                !it.blank
-        } ?: snapshot.sessions.firstOrNull {
-            it.usageMode == mode &&
-                (mode != LocalUsageMode.CHAT || it.chatMode == LocalChatMode.SINGLE.name)
+        val target = if (mode == LocalUsageMode.CHAT) {
+            chatSessionLifecycle.preferredSingleSession(snapshot.sessions)
+        } else {
+            snapshot.sessions.firstOrNull {
+                it.usageMode == mode && !it.blank
+            } ?: snapshot.sessions.firstOrNull {
+                it.usageMode == mode
+            }
         }
         val accepted = if (target != null) {
             switchSession(target.id)
@@ -431,7 +255,7 @@ internal class LocalSessionLifecycleCoordinator(
                 mode = LocalConversationMode.INDEPENDENT,
                 usageMode = mode,
                 domainSpec = if (mode == LocalUsageMode.CHAT) {
-                    LocalChatSessionCreateSpec(chatMode = LocalChatMode.SINGLE)
+                    chatSessionLifecycle.singleCreateSpec()
                 } else {
                     null
                 },
@@ -547,27 +371,12 @@ internal class LocalSessionLifecycleCoordinator(
 
     private fun buildHandoffSummary(snapshot: LocalHarnessState): String =
         handoffBuilder.build(
-            HandoffState(
-                goal = snapshot.work.goal?.let { goal ->
-                    HandoffGoal(goal.status, goal.description)
-                },
-                plan = snapshot.work.plan,
-                todos = snapshot.work.todos.map { todo ->
-                    HandoffTodo(todo.status, todo.content)
-                },
-                messages = snapshot.messages.map { message ->
-                    HandoffMessage(
-                        message.role,
-                        if (
-                            snapshot.chat.groupChat.enabled &&
-                            message.role == "assistant"
-                        ) {
-                            groupTranscriptLine(message)
-                        } else {
-                            message.content
-                        },
-                    )
-                },
+            LocalWorkSessionLifecyclePlanner.handoffState(
+                work = snapshot.work,
+                messages = chatSessionLifecycle.handoffMessages(
+                    chat = snapshot.chat,
+                    messages = snapshot.messages,
+                ),
             ),
         )
 
