@@ -34,10 +34,7 @@ internal class SessionIndexState {
     fun initialSnapshot(): Triple<List<SessionRow>, List<WorkspaceRow>, Set<String>> =
         Triple(sessionRows.values.toList(), orderedWorkspaces(), archived)
 
-    fun renderSessions(): List<SessionRow> =
-        sessionRows.values.map { row ->
-            row.copy(pendingInteraction = pendingInteractionOf(pendingKinds[row.sessionId]))
-        }
+    fun renderSessions(): List<SessionRow> = sessionRows.values.toList()
 
     fun orderedWorkspaces(): List<WorkspaceRow> =
         workspaceOrder.mapNotNull { workspaceRows[it] } +
@@ -152,12 +149,22 @@ internal class SessionIndexState {
             ?.sessionId
 
     fun addPending(sessionId: String, kind: String) {
-        pendingKinds.getOrPut(sessionId) { LinkedHashSet() }.add(kind)
+        val changed = pendingKinds.getOrPut(sessionId) { LinkedHashSet() }.add(kind)
+        if (changed) syncPendingInteraction(sessionId)
     }
 
     fun removePending(sessionId: String, kind: String) {
-        pendingKinds[sessionId]?.remove(kind)
+        val changed = pendingKinds[sessionId]?.remove(kind) == true
         if (pendingKinds[sessionId].isNullOrEmpty()) pendingKinds.remove(sessionId)
+        if (changed) syncPendingInteraction(sessionId)
+    }
+
+    private fun syncPendingInteraction(sessionId: String) {
+        val row = sessionRows[sessionId] ?: return
+        val pending = pendingInteractionOf(pendingKinds[sessionId])
+        if (row.pendingInteraction != pending) {
+            sessionRows[sessionId] = row.copy(pendingInteraction = pending)
+        }
     }
 
     private fun SessionSummary.toRow(title: String?, running: Boolean): SessionRow = SessionRow(
@@ -170,7 +177,7 @@ internal class SessionIndexState {
         cwd = cwd,
         agentPreset = agentPreset,
         updatedAt = updatedAt,
-        pendingInteraction = null,
+        pendingInteraction = pendingInteractionOf(pendingKinds[sessionId]),
     )
 
     private fun WorkspaceView.toRow(): WorkspaceRow = WorkspaceRow(
