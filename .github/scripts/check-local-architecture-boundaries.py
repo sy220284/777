@@ -1065,10 +1065,11 @@ for required_chat_turn_owner in (
     "personaCorrections.captureDirect(memoryInput)",
     "relationshipHydrator.hydrate()",
     "runOwnedGroupChatTurn(",
-    "LocalExecutionService.withTurn(",
 ):
     if required_chat_turn_owner not in chat_turn_dispatcher_source:
         die("Chat turn dispatcher ownership is incomplete: " + required_chat_turn_owner)
+if "LocalExecutionService.withTurn(" not in group_execution_owner_source:
+    die("Group Chat execution owner must retain the Shared foreground-service lifetime boundary")
 for required_persona_owner in (
     "internal fun captureDirect(text: String)",
     "internal fun captureGroup(text: String)",
