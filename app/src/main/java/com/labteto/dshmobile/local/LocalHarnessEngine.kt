@@ -43,6 +43,7 @@ import com.labteto.dshmobile.local.chat.LocalChatBranchCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatContextRefreshCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatBranchNode
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
+import com.labteto.dshmobile.local.chat.LocalChatComposition
 import com.labteto.dshmobile.local.chat.LocalChatDirectTurnExecutor
 import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
 import com.labteto.dshmobile.local.chat.LocalChatMode
@@ -362,7 +363,7 @@ class LocalHarnessEngine @Inject internal constructor(
     private val memoryManager: MemoryManager,
     private val contextComposer: ContextComposer,
     private val chatPersistence: LocalChatPersistence,
-    private val chatTurnCoordinator: LocalChatTurnCoordinator,
+    private val chatComposition: LocalChatComposition,
     private val workRunRegistry: LocalWorkRunRegistry,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val approvalPreferences: LocalApprovalPreferences,
@@ -372,6 +373,7 @@ class LocalHarnessEngine @Inject internal constructor(
     private val chatPersonaStore get() = chatPersistence.personaStore
     private val chatPersonaGalleryStore get() = chatPersistence.galleryStore
     private val chatDiaryStore get() = chatPersistence.diaryStore
+    private val chatTurnCoordinator get() = chatComposition.turnCoordinator
     private val memoryClassMb get() = runtimeStateStore.memoryClassMb
     private val workspace: LocalWorkspace
         get() = sessionStorageRuntime.files.workspace
@@ -541,48 +543,6 @@ class LocalHarnessEngine @Inject internal constructor(
         get() = runtimeStateStore.currentSessionId
 
     private val engineChatStatePort by lazy { LocalChatStatePort(_state) }
-    private val engineChatPersonaCorrections by lazy {
-        LocalChatPersonaCorrectionCoordinator(
-            chatState = engineChatStatePort,
-            personaStore = chatPersonaStore,
-            eventLogs = eventLogRegistry,
-            sessionStorage = sessionStorageRuntime,
-        )
-    }
-    private val engineChatRelationshipHydrator by lazy {
-        LocalChatRelationshipHydrator(
-            chatState = engineChatStatePort,
-            memoryStore = memoryStore,
-            eventLogs = eventLogRegistry,
-            sessionStorage = sessionStorageRuntime,
-        )
-    }
-    private val engineChatMemoryRuntime by lazy {
-        LocalChatMemoryRuntime(
-            runtimeStateStore = runtimeStateStore,
-            memoryStore = memoryStore,
-            memoryManager = memoryManager,
-            persistence = chatPersistence,
-            sessionStorage = sessionStorageRuntime,
-        )
-    }
-
-    private val chatTurnDispatcher by lazy {
-        LocalChatTurnDispatcher(
-            context = context,
-            runtimeStateStore = runtimeStateStore,
-            personaCorrections = engineChatPersonaCorrections,
-            relationshipHydrator = engineChatRelationshipHydrator,
-            groupExecutor = groupChatTurnExecutor,
-            directTurn = { input, sourceMessageId ->
-                engineChatDirectTurnExecutor.run(
-                    input = input,
-                    sourceMessageId = sourceMessageId,
-                )
-            },
-        )
-    }
-
     /**
      * Architecture 3.0 migration bridge kept only at the composition root.
      *
@@ -660,50 +620,6 @@ class LocalHarnessEngine @Inject internal constructor(
             chatTurnCoordinator = chatTurnCoordinator,
             usageTracker = usageTracker,
             runtimeStateStore = runtimeStateStore,
-        )
-    }
-
-    private val engineChatDirectTurnExecutor by lazy {
-        LocalChatDirectTurnExecutor(
-            context = context,
-            runtimeStateStore = runtimeStateStore,
-            chatState = engineChatStatePort,
-            sessionStorage = sessionStorageRuntime,
-            modelHistory = engineForegroundModelHistoryRuntime,
-            modelRequests = modelRequestCoordinator,
-            chatTurnCoordinator = chatTurnCoordinator,
-            chatMemory = engineChatMemoryRuntime,
-            replyCoordinator = chatReplyCoordinator,
-            branchCoordinator = engineChatBranchCoordinator,
-            postTurn = chatContextRefreshCoordinator,
-        )
-    }
-
-    private val engineChatTranscriptRuntime by lazy {
-        LocalChatTranscriptRuntime(runtimeStateStore)
-    }
-
-    private val groupChatTurnExecutor by lazy {
-        LocalGroupChatTurnExecutor(
-            runtimeStateStore = runtimeStateStore,
-            chatState = engineChatStatePort,
-            modelGateway = modelGateway,
-            modelRequests = modelRequestCoordinator,
-            modelHistoryRuntime = engineForegroundModelHistoryRuntime,
-            sessionStorage = sessionStorageRuntime,
-            chatMemory = engineChatMemoryRuntime,
-            branchCoordinator = engineChatBranchCoordinator,
-            transcriptRuntime = engineChatTranscriptRuntime,
-            chatPersonaStore = chatPersonaStore,
-            chatPersistence = chatPersistence,
-            chatReplyCoordinator = chatReplyCoordinator,
-            chatTurnCoordinator = chatTurnCoordinator,
-            usageTracker = usageTracker,
-            json = json,
-            finishTurn = { completedJob ->
-                synchronized(runStateLock) { if (activeJob === completedJob) activeJob = null }
-                startNextQueuedTurnIfIdle()?.start()
-            },
         )
     }
 
@@ -1218,17 +1134,6 @@ class LocalHarnessEngine @Inject internal constructor(
 
     }
 
-    internal val chatTurnPort: LocalChatTurnPort = object : LocalChatTurnPort {
-        override fun start(
-            content: String,
-            memoryInput: String,
-            sourceMessageId: String,
-        ): Job = scope.launch(start = CoroutineStart.LAZY) {
-            chatTurnDispatcher.run(content, memoryInput, sourceMessageId)
-        }
-
-    }
-
     private fun syncVisibleWorkRun(
         sessionId: String,
         ownedBinding: LocalWorkRunBinding? = null,
@@ -1445,54 +1350,33 @@ class LocalHarnessEngine @Inject internal constructor(
         snapshot: LocalHarnessState,
     ): String = memoryCoordinator.chatRelationshipMemoryContext(query, snapshot)
 
-    private fun startNextQueuedTurnIfIdle(): Job? = synchronized(runStateLock) {
-        val liveWorkOwner = liveWorkRun(currentSessionId) != null
-        if (
-            !LocalRuntimeOwnershipPolicy.allowVisibleQueuedTurn(
-                sessionTransitioning = sessionTransitioning,
-                visibleRunActive = activeJob?.isCompleted == false,
-                liveWorkOwner = liveWorkOwner,
-            )
-        ) return@synchronized null
+    private fun startNextQueuedTurnIfIdle(): Job? {
+        if (_state.value.usageMode == LocalUsageMode.CHAT) {
+            return chatComposition.queue.startNextIfIdle()
+        }
+        return synchronized(runStateLock) {
+            val liveWorkOwner = liveWorkRun(currentSessionId) != null
+            if (
+                !LocalRuntimeOwnershipPolicy.allowVisibleQueuedTurn(
+                    sessionTransitioning = sessionTransitioning,
+                    visibleRunActive = activeJob?.isCompleted == false,
+                    liveWorkOwner = liveWorkOwner,
+                )
+            ) return@synchronized null
 
-        val workLease = if (_state.value.usageMode == LocalUsageMode.WORK) {
-            LocalSessionRuntimeRegistry.tryAcquire(
+            val workLease = LocalSessionRuntimeRegistry.tryAcquire(
                 currentSessionId,
                 LocalSessionRuntimeKind.FOREGROUND,
             ) ?: return@synchronized null
-        } else {
-            null
-        }
-        val next = pendingInputs.poll()
-        if (next == null) {
-            workLease?.close()
-            return@synchronized null
-        }
-        if (_state.value.usageMode == LocalUsageMode.WORK) {
+            val next = pendingInputs.poll()
+            if (next == null) {
+                workLease.close()
+                return@synchronized null
+            }
             workTurnStarter.startResumed(
                 input = next,
-                sessionLease = requireNotNull(workLease),
+                sessionLease = workLease,
             )
-        } else {
-            val durableMessage = next.modelMessage ?: buildJsonObject {
-                put("role", "user")
-                put("content", next.content)
-            }
-            _state.update { it.copy(kernel = it.kernel.copy(queuedInputCount = pendingInputs.size())) }
-            appendUserToModelHistory(durableMessage)
-            eventLog.append(
-                LOCAL_AGENT_INBOX_EVENT_TYPE,
-                encodeLocalAgentInboxEvent(
-                    action = "resumed",
-                    pending = pendingInputs.snapshot(),
-                    affected = listOf(next),
-                    modelMessages = listOf(durableMessage),
-                ),
-            )
-            persist()
-            scope.launch(start = CoroutineStart.LAZY) {
-                chatTurnDispatcher.run(next.content, next.memoryInput, next.id)
-            }.also { activeJob = it }
         }
     }
 
