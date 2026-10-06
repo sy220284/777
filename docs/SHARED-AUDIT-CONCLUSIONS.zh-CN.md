@@ -134,7 +134,7 @@
 
 - 主入口完整，旁路只执行一半；
 - 手动入口完整，自动入口漏后处理；
-- 页面内调用走 Coordinator，生命周期回调直接调底层；
+- 页面内入口走 Feature-owned 稳定 API / Port，生命周期回调却直接穿透 internal / Shared 实现；
 - 恢复入口没有执行正常路径中的对账逻辑。
 
 #### 完成标准
@@ -166,12 +166,12 @@
 对同一业务能力搜索全部调用方，比较调用层级：
 
 ```text
-入口 A → Presentation / Coordinator → Runtime → Store
-入口 B →                    Runtime → Store
-入口 C →                              Store
+入口 A → Feature API / Port → Feature Owner → Shared Capability（如适用）
+入口 B → Feature internal
+入口 C → Shared / Store / Platform 具体实现
 ```
 
-如果不同入口调用层级不同，必须继续证明遗漏的上层语义是否确实不需要。
+审计关注的是“是否绕过权威 Owner 与公开边界”，不能用旧式固定层数判断正确性。如果入口 B / C 绕过 Feature 所有权、状态对账、策略或生命周期语义，默认进入候选问题复核。
 
 #### 默认候选问题
 
@@ -617,14 +617,14 @@ Producer
 
 - UI 是否直接导入 Store / Service / Repository / Gateway；
 - Feature 是否直接导入 sibling Feature internal；
-- 是否绕过统一 Coordinator / Policy / Registry；
+- 是否绕过该能力所属 Owner 的公开 Port / Policy / Registry；
 - 同类入口是否依赖不同层级对象；
 - 是否存在直接构造而绕过单例 / 组合根；
 - 新实现接管后旧依赖是否仍有调用方。
 
 #### 目标
 
-同一业务能力原则上通过同一公开边界进入。
+同一业务能力通过其权威 Owner 的公开边界进入；Feature-owned 能力不因多个消费者就上收到 Shared，Shared-owned 能力也不得反向解释 Feature 领域规则。
 
 ---
 
