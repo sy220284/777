@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
+import com.labteto.dshmobile.local.model.LocalModelConfigContract
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -90,7 +91,7 @@ internal fun LocalAgentSettingsCard(
             label = stringResource(R.string.advanced_model_attempts),
             hint = null,
             value = local.modelAttempts,
-            range = LocalAgentRuntimeLimits.MODEL_ATTEMPTS_MIN..LocalAgentRuntimeLimits.MODEL_ATTEMPTS_MAX,
+            range = LocalModelConfigContract.MODEL_ATTEMPTS_MIN..LocalModelConfigContract.MODEL_ATTEMPTS_MAX,
             onValueChange = {
                 viewModel.configureLocalAgent(
                     local.mainMaxSteps,
