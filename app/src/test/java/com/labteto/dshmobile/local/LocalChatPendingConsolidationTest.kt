@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
+import com.labteto.dshmobile.local.chat.renderPendingTurnsForPlanner
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
