@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +51,46 @@ internal fun LocalTranscriptAutoPager(
                 if (nearStart) onLoadOlder(sessionId)
             }
     }
+}
+
+/**
+ * Keeps a transcript tail that was already visible pinned to the composer while focus changes the
+ * available viewport.
+ *
+ * IME insets and the expanded composer both resize the LazyColumn frame by frame. Following the
+ * measured viewport delta keeps the last message moving with that resize instead of letting the
+ * keyboard/composer cover it. The caller only enables this after confirming the tail is visible,
+ * so focusing the composer while reading older history does not steal the reader's position.
+ */
+@Composable
+internal fun LocalComposerTailFollower(
+    listState: LazyListState,
+    active: Boolean,
+) {
+    LaunchedEffect(listState, active) {
+        if (!active) return@LaunchedEffect
+
+        fun viewportExtent(): Int {
+            val info = listState.layoutInfo
+            return info.viewportEndOffset - info.viewportStartOffset
+        }
+
+        var previousViewportExtent = viewportExtent()
+        snapshotFlow { viewportExtent() }
+            .collect { currentViewportExtent ->
+                val viewportDelta = previousViewportExtent - currentViewportExtent
+                previousViewportExtent = currentViewportExtent
+                if (viewportDelta != 0) {
+                    listState.scrollBy(viewportDelta.toFloat())
+                }
+            }
+    }
+}
+
+internal fun LazyListState.isConversationTailVisible(): Boolean {
+    val info = layoutInfo
+    if (info.totalItemsCount <= 0) return false
+    return info.visibleItemsInfo.lastOrNull()?.index == info.totalItemsCount - 1
 }
 
 /** Small status surface for the exceptional history-loading states only. */
