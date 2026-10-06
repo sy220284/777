@@ -107,6 +107,29 @@ def strip_comments(source: str) -> str:
     return re.sub(r"//.*$", "", source, flags=re.MULTILINE)
 
 
+authoritative_architecture_doc = read("docs/ARCHITECTURE.md")
+for required_architecture_contract in (
+    "# 架构 3.0",
+    "本文是 777 当前唯一系统架构权威文档",
+    "模块化单体 + 层级化 Feature 组合 + 共享能力契约 + 极薄运行内核",
+    "### 阶段 3：建立 ChatFeature / WorkFeature",
+):
+    if required_architecture_contract not in authoritative_architecture_doc:
+        die(
+            "docs/ARCHITECTURE.md must remain the Architecture 3.0 authority: "
+            + required_architecture_contract
+        )
+for forbidden_architecture_regression in (
+    "LocalHarnessEngine\n  cross-capability turn/session orchestration",
+    "`LocalHarnessEngine` owns consistency across a local turn/session",
+):
+    if forbidden_architecture_regression in authoritative_architecture_doc:
+        die(
+            "docs/ARCHITECTURE.md regressed to the retired Engine-centered architecture: "
+            + forbidden_architecture_regression
+        )
+
+
 def has_typed_property(source: str, type_name: str) -> bool:
     """Match a retained Kotlin property by type, including generics, without coupling to its variable name."""
     return re.search(
