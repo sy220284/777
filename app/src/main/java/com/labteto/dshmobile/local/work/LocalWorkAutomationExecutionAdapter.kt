@@ -32,7 +32,7 @@ internal class LocalWorkAutomationExecutionAdapter @Inject constructor(
         return LocalWorkAutomationResult(
             sessionId = sessionId,
             output = result.output,
-            status = LocalWorkAutomationStatus.valueOf(result.status.name),
+            status = result.status,
             detail = result.detail,
         )
     }

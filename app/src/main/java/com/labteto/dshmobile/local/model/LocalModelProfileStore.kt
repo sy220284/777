@@ -18,8 +18,8 @@ internal class LocalModelProfileStore(
     private val json: Json,
 ) {
     fun read(): List<LocalModelProfile> = runCatching {
-        val raw = preferences.getString(KEY_PROFILES_V3, null)
-            ?: preferences.getString(KEY_PROFILES_V2, "[]")
+        val raw = preferences.getString(LocalModelConfigContract.KEY_PROFILES_V3, null)
+            ?: preferences.getString(LocalModelConfigContract.KEY_PROFILES_V2, "[]")
             ?: "[]"
         json.parseToJsonElement(raw).jsonArray.mapNotNull { item ->
             val obj = item.jsonObject
@@ -56,10 +56,10 @@ internal class LocalModelProfileStore(
     }.getOrDefault(emptyList())
 
     fun write(profiles: List<LocalModelProfile>) {
-        val editor = preferences.edit().putString(KEY_PROFILES_V3, encode(profiles))
-        preferences.getString(LOCAL_WORKER_PROFILE_ID_PREFERENCE, null)
+        val editor = preferences.edit().putString(LocalModelConfigContract.KEY_PROFILES_V3, encode(profiles))
+        preferences.getString(LocalModelConfigContract.KEY_WORKER_PROFILE_ID, null)
             ?.takeIf { workerId -> profiles.none { it.id == workerId } }
-            ?.let { editor.remove(LOCAL_WORKER_PROFILE_ID_PREFERENCE) }
+            ?.let { editor.remove(LocalModelConfigContract.KEY_WORKER_PROFILE_ID) }
         editor.apply()
     }
 
@@ -67,19 +67,19 @@ internal class LocalModelProfileStore(
         refreshChatGptPlanProfiles(read(), accountId, models).also(::write)
 
     fun migrateV2IfNeeded() {
-        if (preferences.contains(KEY_PROFILES_V3)) return
+        if (preferences.contains(LocalModelConfigContract.KEY_PROFILES_V3)) return
         write(read())
     }
 
-    fun hasV3(): Boolean = preferences.contains(KEY_PROFILES_V3)
-    fun hasV2(): Boolean = preferences.contains(KEY_PROFILES_V2)
+    fun hasV3(): Boolean = preferences.contains(LocalModelConfigContract.KEY_PROFILES_V3)
+    fun hasV2(): Boolean = preferences.contains(LocalModelConfigContract.KEY_PROFILES_V2)
 
     fun active(
         currentModel: String,
         currentBaseUrl: String,
         profiles: List<LocalModelProfile> = read(),
     ): LocalModelProfile? {
-        preferences.getString(KEY_ACTIVE_PROFILE_ID, null)?.let { id ->
+        preferences.getString(LocalModelConfigContract.KEY_ACTIVE_PROFILE_ID, null)?.let { id ->
             return profiles.firstOrNull { it.id == id }
         }
         return profiles.filter {
@@ -89,17 +89,17 @@ internal class LocalModelProfileStore(
 
     fun setActive(profile: LocalModelProfile) {
         preferences.edit()
-            .putString(KEY_MODEL, profile.model)
-            .putString(KEY_BASE_URL, profile.baseUrl)
-            .putString(KEY_ACTIVE_PROFILE_ID, profile.id)
+            .putString(LocalModelConfigContract.KEY_MODEL, profile.model)
+            .putString(LocalModelConfigContract.KEY_BASE_URL, profile.baseUrl)
+            .putString(LocalModelConfigContract.KEY_ACTIVE_PROFILE_ID, profile.id)
             .apply()
     }
 
     fun clearActive(model: String, baseUrl: String) {
         preferences.edit()
-            .remove(KEY_ACTIVE_PROFILE_ID)
-            .putString(KEY_MODEL, model)
-            .putString(KEY_BASE_URL, baseUrl)
+            .remove(LocalModelConfigContract.KEY_ACTIVE_PROFILE_ID)
+            .putString(LocalModelConfigContract.KEY_MODEL, model)
+            .putString(LocalModelConfigContract.KEY_BASE_URL, baseUrl)
             .apply()
     }
 
@@ -119,11 +119,4 @@ internal class LocalModelProfileStore(
         }
     }.toString()
 
-    companion object {
-        const val KEY_PROFILES_V3 = "model_profiles_v3"
-        const val KEY_PROFILES_V2 = "model_profiles_v2"
-        private const val KEY_ACTIVE_PROFILE_ID = "model_profile_active_v3"
-        private const val KEY_MODEL = "model"
-        private const val KEY_BASE_URL = "base_url"
-    }
 }

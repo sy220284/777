@@ -1,12 +1,7 @@
 package com.labteto.dshmobile.local.work
 
-internal enum class LocalWorkAutomationStatus {
-    DELIVERED,
-    SKIPPED,
-    BLOCKED,
-    CANCELLED,
-    FAILED,
-}
+import com.labteto.dshmobile.local.runtime.LocalExecutionStatus
+internal typealias LocalWorkAutomationStatus = LocalExecutionStatus
 
 /** WorkFeature-owned Automation entrypoint. Automation receives only a bounded execution result. */
 internal interface LocalWorkAutomationExecutionPort {

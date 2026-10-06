@@ -33,20 +33,18 @@ internal fun evaluateChatSilenceTrigger(
     }
 }
 
-private const val DEFAULT_PROACTIVE_MIN_GAP_MINUTES = 6L * 60L
-private const val DEFAULT_PROACTIVE_MAX_UNANSWERED = 2
 private const val MAX_RECENT_PROACTIVE_FOR_CONTEXT = 5
 
 internal fun evaluateChatProactivePolicy(
     messages: List<LocalHarnessMessage>,
     nowMillis: Long,
     quietHoursEnabled: Boolean = false,
-    quietStartHour: Int = 23,
-    quietStartMinute: Int = 0,
-    quietEndHour: Int = 7,
-    quietEndMinute: Int = 0,
-    minimumGapMinutes: Long = DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
-    maxUnanswered: Int = DEFAULT_PROACTIVE_MAX_UNANSWERED,
+    quietStartHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_HOUR,
+    quietStartMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_MINUTE,
+    quietEndHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_HOUR,
+    quietEndMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_MINUTE,
+    minimumGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+    maxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
 ): ChatProactiveDecision {
     require(minimumGapMinutes >= 0L) { "minimumGapMinutes must be non-negative" }
     require(maxUnanswered >= 1) { "maxUnanswered must be at least 1" }

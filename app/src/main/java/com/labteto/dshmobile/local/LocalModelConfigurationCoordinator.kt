@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.persistence.LOCAL_HARNESS_PREFERENCES_NAME
 import android.content.Context
 import com.labteto.dshmobile.local.model.LocalApiKeyStore
 import com.labteto.dshmobile.local.model.LocalDeepSeekSearchCredentialResolver
@@ -14,8 +15,7 @@ import com.labteto.dshmobile.local.model.LocalModelStartupMigrator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.model.modelProfileId
 import com.labteto.dshmobile.local.model.resolveLocalModelApiKeyDraft
-import com.labteto.dshmobile.local.runtime.DEFAULT_BASE_URL
-import com.labteto.dshmobile.local.runtime.DEFAULT_MODEL
+import com.labteto.dshmobile.local.model.LocalModelConfigContract
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -36,7 +36,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
     private val tester: LocalModelConnectionTester,
     json: Json,
 ) {
-    private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
+    private val preferences = context.getSharedPreferences(LOCAL_HARNESS_PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val profiles = LocalModelProfileStore(preferences, json)
     private val startup = LocalModelStartupMigrator(preferences, profiles, apiKeys, gateway)
     internal suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null): LocalModelConfigurationResult =
@@ -128,8 +128,8 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         profiles.active(model, baseUrl, all)
 
     internal fun normalizeModel(model: String): String =
-        model.trim().ifBlank { DEFAULT_MODEL }.let {
-            if (it.equals("deepseek-chat", true) || it.equals("deepseek-reasoner", true)) DEFAULT_MODEL else it
+        model.trim().ifBlank { LocalModelConfigContract.DEFAULT_MODEL }.let {
+            if (it.equals("deepseek-chat", true) || it.equals("deepseek-reasoner", true)) LocalModelConfigContract.DEFAULT_MODEL else it
         }
 
     private suspend fun finishRemoval(
@@ -145,8 +145,8 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         if (next != null) activate(next) else reset()
         return LocalModelConfigurationResult(
             configured = next != null,
-            model = next?.model ?: DEFAULT_MODEL,
-            baseUrl = next?.baseUrl ?: DEFAULT_BASE_URL,
+            model = next?.model ?: LocalModelConfigContract.DEFAULT_MODEL,
+            baseUrl = next?.baseUrl ?: LocalModelConfigContract.DEFAULT_BASE_URL,
             profiles = remaining,
             activeProfileId = next?.id,
         )
@@ -159,8 +159,8 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
     }
 
     private fun reset() {
-        profiles.clearActive(DEFAULT_MODEL, DEFAULT_BASE_URL); gateway.clearActive()
-        apiKeys.activate(modelProfileId(DEFAULT_MODEL, DEFAULT_BASE_URL))
+        profiles.clearActive(LocalModelConfigContract.DEFAULT_MODEL, LocalModelConfigContract.DEFAULT_BASE_URL); gateway.clearActive()
+        apiKeys.activate(modelProfileId(LocalModelConfigContract.DEFAULT_MODEL, LocalModelConfigContract.DEFAULT_BASE_URL))
     }
 
     private fun credentialError(profile: LocalModelProfile): String =
@@ -168,7 +168,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         else "该模型密钥不可用，请编辑配置重新填写"
 
     companion object {
-        const val DEFAULT_MODEL = "deepseek-flash"
-        const val DEFAULT_BASE_URL = "https://api.deepseek.com"
+        const val LocalModelConfigContract.DEFAULT_MODEL = "deepseek-flash"
+        const val LocalModelConfigContract.DEFAULT_BASE_URL = "https://api.deepseek.com"
     }
 }

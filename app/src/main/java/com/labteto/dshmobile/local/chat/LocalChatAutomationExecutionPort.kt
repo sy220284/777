@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.runtime.LocalExecutionStatus
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
@@ -12,13 +13,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal enum class LocalChatAutomationStatus {
-    DELIVERED,
-    SKIPPED,
-    BLOCKED,
-    CANCELLED,
-    FAILED,
-}
+internal typealias LocalChatAutomationStatus = LocalExecutionStatus
 
 /** ChatFeature-owned Automation entrypoint. */
 internal interface LocalChatAutomationExecutionPort {
@@ -28,16 +23,7 @@ internal interface LocalChatAutomationExecutionPort {
         timeoutMillis: Long = 3 * 60_000L,
         recoverInterrupted: Boolean = false,
         recoveryStartedAt: Long? = null,
-        quietHoursEnabled: Boolean = false,
-        quietStartHour: Int = 23,
-        quietStartMinute: Int = 0,
-        quietEndHour: Int = 7,
-        quietEndMinute: Int = 0,
-        proactiveMinGapMinutes: Long = 6L * 60L,
-        proactiveMaxUnanswered: Int = 2,
-        minimumSilenceMinutes: Long? = null,
-        silenceReferenceAt: Long? = null,
-        bypassProactivePolicy: Boolean = false,
+        policy: LocalChatAutomationPolicy = LocalChatAutomationPolicy(),
     ): LocalChatAutomationResult
 }
 

@@ -1,27 +1,26 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.persistence.LOCAL_HARNESS_PREFERENCES_NAME
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
-import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
+import com.labteto.dshmobile.local.agent.LocalAgentRuntimeSettings
 import com.labteto.dshmobile.local.agent.decodeLocalAgentInboxPending
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalImageInputMode
+import com.labteto.dshmobile.local.model.LocalModelConfigContract
+import com.labteto.dshmobile.local.model.LocalModelExecutionSettings
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
-import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
 import com.labteto.dshmobile.local.model.LocalModelState
 import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
 import com.labteto.dshmobile.local.model.migrateOfficialClaudeModel
 import com.labteto.dshmobile.local.model.workSystemPrompt
-import com.labteto.dshmobile.local.runtime.DEFAULT_BASE_URL
-import com.labteto.dshmobile.local.runtime.DEFAULT_MODEL
-import com.labteto.dshmobile.local.runtime.DEFAULT_MODEL_ATTEMPTS
 import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
 import com.labteto.dshmobile.local.chat.projectChatSessionControls
 import com.labteto.dshmobile.local.work.LocalForegroundRecoveryCoordinator
@@ -37,7 +36,6 @@ import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.session.projectionReplayCursor
-import com.labteto.dshmobile.local.settings.LocalHarnessSettingsCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
 import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
@@ -64,7 +62,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
     private val chatRestore: com.labteto.dshmobile.local.chat.LocalChatSessionRestorer,
     private val approvalPreferences: LocalApprovalPreferences,
 ) {
-    private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
+    private val preferences = context.getSharedPreferences(LOCAL_HARNESS_PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val workspace get() = sessionStorage.files.workspace
     private val coordinator get() = sessionStorage.coordinator
     private val agentRunCoordinator get() = sessionStorage.agentRunCoordinator
@@ -77,13 +75,13 @@ internal class LocalForegroundSessionLoader @Inject constructor(
     }
 
     internal suspend fun loadStartup(deferReady: Boolean = false) {
-        val storedModel = preferences.getString(com.labteto.dshmobile.local.runtime.KEY_MODEL, DEFAULT_MODEL)
-            ?: DEFAULT_MODEL
-        val baseUrl = preferences.getString(com.labteto.dshmobile.local.runtime.KEY_BASE_URL, DEFAULT_BASE_URL)
-            ?: DEFAULT_BASE_URL
+        val storedModel = preferences.getString(LocalModelConfigContract.KEY_MODEL, LocalModelConfigContract.DEFAULT_MODEL)
+            ?: LocalModelConfigContract.DEFAULT_MODEL
+        val baseUrl = preferences.getString(LocalModelConfigContract.KEY_BASE_URL, LocalModelConfigContract.DEFAULT_BASE_URL)
+            ?: LocalModelConfigContract.DEFAULT_BASE_URL
         val model = migrateOfficialClaudeModel(modelConfiguration.normalizeModel(storedModel), baseUrl)
         if (model != storedModel) {
-            preferences.edit().putString(com.labteto.dshmobile.local.runtime.KEY_MODEL, model).apply()
+            preferences.edit().putString(LocalModelConfigContract.KEY_MODEL, model).apply()
         }
         modelConfiguration.prepareStartup(model, baseUrl)
         loadSession(runtimeStateStore.currentSessionId, model, baseUrl, deferReady)
@@ -91,10 +89,10 @@ internal class LocalForegroundSessionLoader @Inject constructor(
 
     internal suspend fun loadSession(
         sessionId: String,
-        model: String = preferences.getString(com.labteto.dshmobile.local.runtime.KEY_MODEL, DEFAULT_MODEL)
-            ?: DEFAULT_MODEL,
-        baseUrl: String = preferences.getString(com.labteto.dshmobile.local.runtime.KEY_BASE_URL, DEFAULT_BASE_URL)
-            ?: DEFAULT_BASE_URL,
+        model: String = preferences.getString(LocalModelConfigContract.KEY_MODEL, LocalModelConfigContract.DEFAULT_MODEL)
+            ?: LocalModelConfigContract.DEFAULT_MODEL,
+        baseUrl: String = preferences.getString(LocalModelConfigContract.KEY_BASE_URL, LocalModelConfigContract.DEFAULT_BASE_URL)
+            ?: LocalModelConfigContract.DEFAULT_BASE_URL,
         deferReady: Boolean = false,
     ) {
         workRuns.live(sessionId)?.let { liveBinding ->
@@ -154,6 +152,8 @@ internal class LocalForegroundSessionLoader @Inject constructor(
         pendingInputs.restore(restoredInbox)
 
         val modelProfiles = modelConfiguration.readProfiles()
+        val agentSettings = LocalAgentRuntimeSettings.read(preferences)
+        val modelExecutionSettings = LocalModelExecutionSettings.read(preferences, modelProfiles)
         val recoveryDecision = agentRunCoordinator.recoveryDecision(
             sessionId = sessionId,
             repair = repaired,
@@ -197,26 +197,20 @@ internal class LocalForegroundSessionLoader @Inject constructor(
                 modelSelection = LocalModelSelectionState.restored(
                     modelProfiles,
                     activeModelProfile?.id,
-                    preferences.getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null),
+                    modelExecutionSettings.workerProfileId,
                 ),
-                modelAttempts = LocalAgentRuntimeLimits.normalizeModelAttempts(
-                    preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS),
-                ),
+                modelAttempts = modelExecutionSettings.modelAttempts,
                 imageInputMode = runCatching {
                     LocalImageInputMode.valueOf(
                         preferences.getString(
-                            LocalModelSettingsCoordinator.KEY_IMAGE_INPUT_MODE,
+                            LocalModelConfigContract.KEY_IMAGE_INPUT_MODE,
                             LocalImageInputMode.AUTO.name,
                         ) ?: LocalImageInputMode.AUTO.name,
                     )
                 }.getOrDefault(LocalImageInputMode.AUTO),
             ),
-            mainMaxSteps = LocalAgentRuntimeLimits.normalizeMainSteps(
-                preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, com.labteto.dshmobile.local.runtime.DEFAULT_MAIN_MAX_STEPS),
-            ),
-            subagentMaxSteps = LocalAgentRuntimeLimits.normalizeSubagentSteps(
-                preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, com.labteto.dshmobile.local.runtime.DEFAULT_SUBAGENT_MAX_STEPS),
-            ),
+            mainMaxSteps = agentSettings.mainMaxSteps,
+            subagentMaxSteps = agentSettings.subagentMaxSteps,
             workspacePath = workspace.path,
             sessionId = sessionId,
             usageMode = stored.usageMode,

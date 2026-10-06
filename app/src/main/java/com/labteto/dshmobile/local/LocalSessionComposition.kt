@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.persistence.LOCAL_HARNESS_PREFERENCES_NAME
 import android.content.Context
 import com.labteto.dshmobile.harness.session.ConversationHandoffBuilder
 import com.labteto.dshmobile.local.chat.LocalChatComposition
@@ -45,7 +46,7 @@ internal class LocalSessionComposition @Inject constructor(
     wake: LocalForegroundTurnWakeCoordinator,
     memoryStore: MemoryStore,
 ) : LocalSessionLifecyclePort {
-    private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
+    private val preferences = context.getSharedPreferences(LOCAL_HARNESS_PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val sessionsRoot = File(context.filesDir, "local-harness/sessions").apply { mkdirs() }
     private val transitionMutex = Mutex()
     private val scope = CoroutineScope(

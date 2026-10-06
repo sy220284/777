@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.automation
 
+import com.labteto.dshmobile.local.chat.LocalChatAutomationPolicy
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.Data
@@ -79,12 +80,12 @@ class HarnessAutomationScheduler @Inject constructor(
         targetSessionId: String? = null,
         actorName: String? = null,
         quietHoursEnabled: Boolean = false,
-        quietStartHour: Int = 23,
-        quietStartMinute: Int = 0,
-        quietEndHour: Int = 7,
-        quietEndMinute: Int = 0,
-        proactiveMinGapMinutes: Long = 6L * 60L,
-        proactiveMaxUnanswered: Int = 2,
+        quietStartHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_HOUR,
+        quietStartMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_MINUTE,
+        quietEndHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_HOUR,
+        quietEndMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_MINUTE,
+        proactiveMinGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+        proactiveMaxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
     ) {
         validateId(id)
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
@@ -133,12 +134,12 @@ class HarnessAutomationScheduler @Inject constructor(
         targetSessionId: String? = null,
         actorName: String? = null,
         quietHoursEnabled: Boolean = false,
-        quietStartHour: Int = 23,
-        quietStartMinute: Int = 0,
-        quietEndHour: Int = 7,
-        quietEndMinute: Int = 0,
-        proactiveMinGapMinutes: Long = 6L * 60L,
-        proactiveMaxUnanswered: Int = 2,
+        quietStartHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_HOUR,
+        quietStartMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_MINUTE,
+        quietEndHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_HOUR,
+        quietEndMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_MINUTE,
+        proactiveMinGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+        proactiveMaxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
         scheduleType: AutomationScheduleType = AutomationScheduleType.LEGACY,
     ) {
         validateId(id)
@@ -196,12 +197,12 @@ class HarnessAutomationScheduler @Inject constructor(
         targetSessionId: String,
         actorName: String? = null,
         quietHoursEnabled: Boolean = true,
-        quietStartHour: Int = 23,
-        quietStartMinute: Int = 0,
-        quietEndHour: Int = 7,
-        quietEndMinute: Int = 0,
-        proactiveMinGapMinutes: Long = 6L * 60L,
-        proactiveMaxUnanswered: Int = 2,
+        quietStartHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_HOUR,
+        quietStartMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_MINUTE,
+        quietEndHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_HOUR,
+        quietEndMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_MINUTE,
+        proactiveMinGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+        proactiveMaxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
     ) {
         validateId(id)
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
@@ -255,12 +256,12 @@ class HarnessAutomationScheduler @Inject constructor(
         targetSessionId: String,
         actorName: String? = null,
         quietHoursEnabled: Boolean = true,
-        quietStartHour: Int = 23,
-        quietStartMinute: Int = 0,
-        quietEndHour: Int = 7,
-        quietEndMinute: Int = 0,
-        proactiveMinGapMinutes: Long = 6L * 60L,
-        proactiveMaxUnanswered: Int = 2,
+        quietStartHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_HOUR,
+        quietStartMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_MINUTE,
+        quietEndHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_HOUR,
+        quietEndMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_MINUTE,
+        proactiveMinGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+        proactiveMaxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
     ) {
         validateId(id)
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
@@ -311,25 +312,25 @@ class HarnessAutomationScheduler @Inject constructor(
 
     fun pauseTask(id: String): Boolean {
         val task = store.get(id) ?: return false
-        if (task.status == "paused") return true
+        if (task.status == AutomationStatus.PAUSED) return true
         require(task.scheduleGeneration < Long.MAX_VALUE) { "自动任务排程 generation 已耗尽" }
         val paused = store.updateIf(
             id,
             predicate = { it.scheduleGeneration == task.scheduleGeneration },
         ) {
             it.copy(
-                status = "paused",
+                status = AutomationStatus.PAUSED,
                 scheduleGeneration = it.scheduleGeneration + 1L,
             )
         } ?: return false
         workManager.cancelUniqueWork(workName(id, task.scheduleGeneration))
         workManager.cancelUniqueWork(manualWorkName(id))
-        return paused.status == "paused"
+        return paused.status == AutomationStatus.PAUSED
     }
 
     fun resumeTask(id: String): Boolean {
         val task = store.get(id) ?: return false
-        if (task.status != "paused") return false
+        if (task.status != AutomationStatus.PAUSED) return false
 
         val now = System.currentTimeMillis()
         val runAt = when {
@@ -340,7 +341,7 @@ class HarnessAutomationScheduler @Inject constructor(
         }
         val resumed = store.update(id) {
             it.copy(
-                status = "scheduled",
+                status = AutomationStatus.SCHEDULED,
                 nextRunAt = runAt,
                 lastError = null,
                 failureStreak = 0,
@@ -385,12 +386,12 @@ class HarnessAutomationScheduler @Inject constructor(
         windowStartMinuteOfDay: Int? = null,
         windowEndMinuteOfDay: Int? = null,
         quietHoursEnabled: Boolean,
-        quietStartHour: Int = 23,
-        quietStartMinute: Int = 0,
-        quietEndHour: Int = 7,
-        quietEndMinute: Int = 0,
-        proactiveMinGapMinutes: Long = 6L * 60L,
-        proactiveMaxUnanswered: Int = 2,
+        quietStartHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_HOUR,
+        quietStartMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_MINUTE,
+        quietEndHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_HOUR,
+        quietEndMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_MINUTE,
+        proactiveMinGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+        proactiveMaxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
     ): Boolean {
         val current = store.get(id) ?: return false
         require(prompt.isNotBlank()) { "任务提示词不能为空" }
@@ -473,12 +474,12 @@ class HarnessAutomationScheduler @Inject constructor(
                 quietEndMinute = quietEndMinute,
                 proactiveMinGapMinutes = proactiveMinGapMinutes,
                 proactiveMaxUnanswered = proactiveMaxUnanswered,
-                status = if (latest.status == "paused") "paused" else "scheduled",
+                status = if (latest.status == AutomationStatus.PAUSED) "paused" else "scheduled",
                 lastError = null,
                 failureStreak = 0,
             )
         } ?: return false
-        if (updated.status != "paused") {
+        if (updated.status != AutomationStatus.PAUSED) {
             if (usesChainedChatScheduling(updated) || updated.recurringMinutes == null) {
                 enqueueOneTime(id, nextRun)
             } else {
@@ -509,7 +510,7 @@ class HarnessAutomationScheduler @Inject constructor(
                         resumedFromWaiting = current.status == "waiting_user"
                         if (resumedFromWaiting) {
                             current.copy(
-                                status = "scheduled",
+                                status = AutomationStatus.SCHEDULED,
                                 nextRunAt = nextAutomationRunAfterUserActivity(current, latestActivity),
                                 lastUserActivityAt = latestActivity,
                                 lastError = null,
@@ -542,7 +543,7 @@ class HarnessAutomationScheduler @Inject constructor(
 
     internal fun enqueueNextChained(id: String, runAt: Long, generation: Long) {
         store.withCurrentGeneration(id, generation) { current ->
-            if (current.status == "scheduled" && current.nextRunAt == runAt) {
+            if (current.status == AutomationStatus.SCHEDULED && current.nextRunAt == runAt) {
                 enqueueAutomationOneTime(workManager, id, generation, runAt, ExistingWorkPolicy.REPLACE)
             }
         }

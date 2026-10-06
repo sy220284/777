@@ -21,6 +21,7 @@ RETIRED_ENGINE_SUPPORT_PATH = "app/src/main/java/com/labteto/dshmobile/local/Loc
 RUNTIME_KERNEL_PATH = "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernel.kt"
 APPLICATION_PATH = "app/src/main/java/com/labteto/dshmobile/DshApplication.kt"
 COMPOSITION_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt"
+EXECUTION_STATUS_PATH = "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalExecutionStatus.kt"
 
 
 # Chat/Work are provider Features. Their internals may depend on Shared capabilities, never siblings.
@@ -75,6 +76,7 @@ AUTOMATION_ALLOWED_CROSS_FEATURE_API_SYMBOLS = {
     "LocalWorkTurnPort",
     "LocalChatAutomationExecutionPort",
     "LocalWorkAutomationExecutionPort",
+    "LocalChatAutomationPolicy",
 }
 
 
@@ -368,7 +370,7 @@ for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "session"):
             "use a neutral Session snapshot/provider contract"
         )
 
-# Automation may consume provider-owned execution Ports; all other Chat/Work internals are forbidden.
+# Automation may consume provider-owned execution API contracts; all other Chat/Work internals are forbidden.
 automation_internal_edges: set[tuple[str, str]] = set()
 for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "automation"):
     relative = path.relative_to(ROOT).as_posix()
@@ -641,6 +643,40 @@ for chat_owned_setting in (
     if chat_owned_setting in settings_coordinator:
         die("SettingsFeature reclaimed Chat-owned style guard semantics: " + chat_owned_setting)
 
+for domain_owned_setting in (
+    "KEY_MAIN_MAX_STEPS",
+    "KEY_SUBAGENT_MAX_STEPS",
+    "KEY_MODEL_ATTEMPTS",
+    "KEY_WORKER_PROFILE_ID",
+):
+    if domain_owned_setting in settings_coordinator:
+        die("SettingsFeature reclaimed Agent/Model configuration fact: " + domain_owned_setting)
+
+runtime_defaults = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt"
+))
+for domain_owned_default in (
+    "DEFAULT_MODEL",
+    "DEFAULT_BASE_URL",
+    "DEFAULT_MODEL_ATTEMPTS",
+    "DEFAULT_MAIN_MAX_STEPS",
+    "DEFAULT_SUBAGENT_MAX_STEPS",
+    "KEY_MODEL",
+    "KEY_BASE_URL",
+):
+    if domain_owned_default in runtime_defaults:
+        die("Runtime reclaimed domain-owned configuration fact: " + domain_owned_default)
+
+for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
+    relative = path.relative_to(ROOT).as_posix()
+    if "valueOf(result.status.name)" in source:
+        die(relative + " maps execution state by enum name; use the shared terminal status contract")
+    if (
+        '"local_harness"' in source
+        and relative != "app/src/main/java/com/labteto/dshmobile/local/persistence/LocalHarnessPreferences.kt"
+    ):
+        die(relative + " duplicates the local Harness preferences container name")
+
 for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT):
     relative = path.relative_to(ROOT).as_posix()
     if "runtimeStateStore.mutableState" in source or "runtime.mutableState" in source:
@@ -704,6 +740,11 @@ for relative in NARROW_PORT_PATHS:
 
 
 # Stage-3 Chat/Work Execution Ports must remain complete lifecycle contracts.
+execution_status_contract = strip_comments(read(EXECUTION_STATUS_PATH))
+for terminal_status in ("DELIVERED", "SKIPPED", "BLOCKED", "CANCELLED", "FAILED"):
+    if terminal_status not in execution_status_contract:
+        die(EXECUTION_STATUS_PATH + " lost shared terminal status: " + terminal_status)
+
 for relative, request_type, result_type in (
     (
         "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionPort.kt",
@@ -723,10 +764,7 @@ for relative, request_type, result_type in (
         "targetSessionId",
         "timeoutMillis",
         "recoverInterrupted",
-        "DELIVERED",
-        "BLOCKED",
-        "CANCELLED",
-        "FAILED",
+        "LocalExecutionStatus",
         "execute(",
         "cancel(",
         "cancelAndJoin(",

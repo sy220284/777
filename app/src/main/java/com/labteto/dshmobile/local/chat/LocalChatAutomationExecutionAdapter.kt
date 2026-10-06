@@ -14,16 +14,7 @@ internal class LocalChatAutomationExecutionAdapter @Inject constructor(
         timeoutMillis: Long,
         recoverInterrupted: Boolean,
         recoveryStartedAt: Long?,
-        quietHoursEnabled: Boolean,
-        quietStartHour: Int,
-        quietStartMinute: Int,
-        quietEndHour: Int,
-        quietEndMinute: Int,
-        proactiveMinGapMinutes: Long,
-        proactiveMaxUnanswered: Int,
-        minimumSilenceMinutes: Long?,
-        silenceReferenceAt: Long?,
-        bypassProactivePolicy: Boolean,
+        policy: LocalChatAutomationPolicy,
     ): LocalChatAutomationResult {
         val result = execution.execute(
             LocalChatExecutionRequest(
@@ -32,16 +23,7 @@ internal class LocalChatAutomationExecutionAdapter @Inject constructor(
                 timeoutMillis = timeoutMillis,
                 recoverInterrupted = recoverInterrupted,
                 recoveryStartedAt = recoveryStartedAt,
-                quietHoursEnabled = quietHoursEnabled,
-                quietStartHour = quietStartHour,
-                quietStartMinute = quietStartMinute,
-                quietEndHour = quietEndHour,
-                quietEndMinute = quietEndMinute,
-                proactiveMinGapMinutes = proactiveMinGapMinutes,
-                proactiveMaxUnanswered = proactiveMaxUnanswered,
-                minimumSilenceMinutes = minimumSilenceMinutes,
-                silenceReferenceAt = silenceReferenceAt,
-                bypassProactivePolicy = bypassProactivePolicy,
+                automationPolicy = policy,
             ),
         )
         val sessionId = result.sessionId
@@ -49,7 +31,7 @@ internal class LocalChatAutomationExecutionAdapter @Inject constructor(
         return LocalChatAutomationResult(
             sessionId = sessionId,
             output = result.output,
-            status = LocalChatAutomationStatus.valueOf(result.status.name),
+            status = result.status,
             detail = result.detail,
             nextRunAtHint = result.nextRunAtHint,
             waitingForUserReply = result.waitingForUserReply,

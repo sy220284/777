@@ -18,6 +18,7 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.local.automation.LocalAutomationRuntime
+import com.labteto.dshmobile.local.chat.LocalChatAutomationPolicy
 import com.labteto.dshmobile.local.automation.LocalAutomationRunStatus
 import com.labteto.dshmobile.notify.DshNotifications
 import dagger.hilt.EntryPoint
@@ -84,7 +85,7 @@ class HarnessAutomationWorker(
         )
         if (
             preflightTask.scheduleGeneration != requestedGeneration ||
-            (preflightTask.status in setOf("paused", "waiting_user") && !manualRun)
+            (preflightTask.status in setOf(AutomationStatus.PAUSED, AutomationStatus.WAITING_USER) && !manualRun)
         ) return Result.success()
 
         // A manual request is a real user action, not a disposable probe. If another trigger owns
@@ -117,21 +118,21 @@ class HarnessAutomationWorker(
         var task = store.get(id) ?: return Result.success()
         if (
             task.scheduleGeneration != requestedGeneration ||
-            (task.status in setOf("paused", "waiting_user") && !manualRun)
+            (task.status in setOf(AutomationStatus.PAUSED, AutomationStatus.WAITING_USER) && !manualRun)
         ) return Result.success()
 
-        val recovering = !manualRun && task.status == "running" && task.lastRunAt != null
+        val recovering = !manualRun && task.status == AutomationStatus.RUNNING && task.lastRunAt != null
         val started = if (recovering) task.lastRunAt!! else System.currentTimeMillis()
         if (!manualRun) {
             task = store.updateIf(
                 id,
                 predicate = {
                     it.scheduleGeneration == requestedGeneration &&
-                        it.status !in setOf("paused", "waiting_user")
+                        it.status !in setOf(AutomationStatus.PAUSED, AutomationStatus.WAITING_USER)
                 },
             ) {
                 it.copy(
-                    status = "running",
+                    status = AutomationStatus.RUNNING,
                     lastRunAt = started,
                     lastError = null,
                 )
@@ -168,23 +169,25 @@ class HarnessAutomationWorker(
                     },
                     recoverInterrupted = recovering,
                     recoveryStartedAt = started,
-                    quietHoursEnabled = task.quietHoursEnabled && !manualRun,
-                    quietStartHour = task.quietStartHour,
-                    quietStartMinute = task.quietStartMinute,
-                    quietEndHour = task.quietEndHour,
-                    quietEndMinute = task.quietEndMinute,
-                    proactiveMinGapMinutes = task.proactiveMinGapMinutes,
-                    proactiveMaxUnanswered = task.proactiveMaxUnanswered,
-                    minimumSilenceMinutes = if (
-                        !manualRun &&
-                        task.scheduleType == AutomationScheduleType.SILENCE
-                    ) {
-                        task.silenceMinutes
-                    } else {
-                        null
-                    },
-                    silenceReferenceAt = task.createdAt,
-                    bypassProactivePolicy = manualRun,
+                    policy = LocalChatAutomationPolicy(
+                        quietHoursEnabled = task.quietHoursEnabled && !manualRun,
+                        quietStartHour = task.quietStartHour,
+                        quietStartMinute = task.quietStartMinute,
+                        quietEndHour = task.quietEndHour,
+                        quietEndMinute = task.quietEndMinute,
+                        proactiveMinGapMinutes = task.proactiveMinGapMinutes,
+                        proactiveMaxUnanswered = task.proactiveMaxUnanswered,
+                        minimumSilenceMinutes = if (
+                            !manualRun &&
+                            task.scheduleType == AutomationScheduleType.SILENCE
+                        ) {
+                            task.silenceMinutes
+                        } else {
+                            null
+                        },
+                        silenceReferenceAt = task.createdAt,
+                        bypassProactivePolicy = manualRun,
+                    ),
                 )
             }
             when (run.status) {
@@ -215,7 +218,7 @@ class HarnessAutomationWorker(
                     sessionId = run.sessionId,
                     detail = run.detail ?: run.output,
                     persistWorkSessionId = task.mode == AutomationMode.WORK,
-                    receiptStatus = "cancelled",
+                    receiptStatus = AutomationStatus.CANCELLED,
                 )
                 LocalAutomationRunStatus.FAILED -> settlement.settleFailure(
                     id = id,

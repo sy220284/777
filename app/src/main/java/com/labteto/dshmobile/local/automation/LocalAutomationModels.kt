@@ -1,15 +1,10 @@
 package com.labteto.dshmobile.local.automation
 
-enum class LocalAutomationRunStatus {
-    DELIVERED,
-    SKIPPED,
-    BLOCKED,
-    CANCELLED,
-    FAILED,
-}
+import com.labteto.dshmobile.local.runtime.LocalExecutionStatus
+internal typealias LocalAutomationRunStatus = LocalExecutionStatus
 
 /** Result of one detached automation execution. */
-data class LocalAutomationRunResult(
+internal data class LocalAutomationRunResult(
     val sessionId: String,
     val output: String,
     val status: LocalAutomationRunStatus = LocalAutomationRunStatus.DELIVERED,

@@ -1,15 +1,10 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.runtime.LocalExecutionStatus
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.send.LocalSendResult
 
-internal enum class LocalWorkExecutionStatus {
-    DELIVERED,
-    SKIPPED,
-    BLOCKED,
-    CANCELLED,
-    FAILED,
-}
+internal typealias LocalWorkExecutionStatus = LocalExecutionStatus
 
 internal data class LocalWorkExecutionRequest(
     val text: String,

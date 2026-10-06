@@ -76,7 +76,7 @@ internal fun reconcileAutomationSchedules(
     workManager: WorkManager,
 ) {
     store.list()
-        .filter { it.status == "scheduled" }
+        .filter { it.status == AutomationStatus.SCHEDULED }
         .forEach { task ->
             val runAt = task.nextRunAt.coerceAtLeast(System.currentTimeMillis())
             if (usesChainedChatScheduling(task) || task.recurringMinutes == null) {

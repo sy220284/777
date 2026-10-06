@@ -4,13 +4,25 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
+enum class WebhookRunStatus(val wireValue: String) {
+    @SerialName("queued") QUEUED("queued"),
+    @SerialName("running") RUNNING("running"),
+    @SerialName("completed") COMPLETED("completed"),
+    @SerialName("cancelled") CANCELLED("cancelled"),
+    @SerialName("failed") FAILED("failed");
+
+    override fun toString(): String = wireValue
+}
+
+@Serializable
 data class WebhookRunResult(
     val requestId: String,
-    val status: String,
+    val status: WebhookRunStatus,
     val updatedAt: Long,
     val result: String? = null,
     val error: String? = null,
@@ -44,7 +56,7 @@ class WebhookResultStore @Inject constructor(
     @Synchronized
     fun update(
         id: String,
-        status: String,
+        status: WebhookRunStatus,
         result: String? = null,
         error: String? = null,
     ) {

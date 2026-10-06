@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
+import com.labteto.dshmobile.local.model.LocalModelConfigContract
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -21,8 +22,8 @@ class LocalAgentRuntimeLimitsTest {
 
     @Test
     fun modelAttemptsKeepExistingBoundary() {
-        assertEquals(1, LocalAgentRuntimeLimits.normalizeModelAttempts(0))
-        assertEquals(3, LocalAgentRuntimeLimits.normalizeModelAttempts(3))
-        assertEquals(5, LocalAgentRuntimeLimits.normalizeModelAttempts(99))
+        assertEquals(1, LocalModelConfigContract.normalizeModelAttempts(0))
+        assertEquals(3, LocalModelConfigContract.normalizeModelAttempts(3))
+        assertEquals(5, LocalModelConfigContract.normalizeModelAttempts(99))
     }
 }

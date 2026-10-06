@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.automation
 
+import com.labteto.dshmobile.local.chat.LocalChatAutomationPolicy
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.Data
@@ -42,6 +43,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -69,10 +71,26 @@ enum class AutomationScheduleType {
 }
 
 @Serializable
+enum class AutomationStatus(val wireValue: String) {
+    @SerialName("scheduled") SCHEDULED("scheduled"),
+    @SerialName("running") RUNNING("running"),
+    @SerialName("waiting_user") WAITING_USER("waiting_user"),
+    @SerialName("paused") PAUSED("paused"),
+    @SerialName("blocked") BLOCKED("blocked"),
+    @SerialName("failed") FAILED("failed"),
+    @SerialName("completed") COMPLETED("completed"),
+    @SerialName("cancelled") CANCELLED("cancelled"),
+    @SerialName("skipped") SKIPPED("skipped"),
+    @SerialName("queued") QUEUED("queued");
+
+    override fun toString(): String = wireValue
+}
+
+@Serializable
 data class AutomationRunReceipt(
     val startedAt: Long,
     val finishedAt: Long,
-    val status: String,
+    val status: AutomationStatus,
     val sessionId: String? = null,
     val resultPreview: String? = null,
     val errorPreview: String? = null,
@@ -213,16 +231,16 @@ data class AutomationTask(
     val targetSessionId: String? = null,
     val actorName: String? = null,
     val quietHoursEnabled: Boolean = false,
-    val quietStartHour: Int = 23,
-    val quietStartMinute: Int = 0,
-    val quietEndHour: Int = 7,
-    val quietEndMinute: Int = 0,
-    val proactiveMinGapMinutes: Long = 6L * 60L,
-    val proactiveMaxUnanswered: Int = 2,
+    val quietStartHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_HOUR,
+    val quietStartMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_MINUTE,
+    val quietEndHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_HOUR,
+    val quietEndMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_MINUTE,
+    val proactiveMinGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+    val proactiveMaxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
     val failureStreak: Int = 0,
     /** Dedicated Work-mode session that owns this task's run history and artifacts. */
     val workSessionId: String? = null,
-    val status: String = "scheduled",
+    val status: AutomationStatus = AutomationStatus.SCHEDULED,
     val lastRunAt: Long? = null,
     val lastUserActivityAt: Long? = null,
     val lastResult: String? = null,

@@ -35,6 +35,7 @@ AUTOMATION_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/autom
 CHAT_AUTOMATION_PORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatAutomationExecutionPort.kt"
 WORK_AUTOMATION_PORT = ROOT / "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkAutomationExecutionPort.kt"
 AUTOMATION_WORKER = ROOT / "app/src/main/java/com/labteto/dshmobile/automation/HarnessAutomationWorker.kt"
+EXECUTION_STATUS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalExecutionStatus.kt"
 
 violations: list[str] = []
 
@@ -306,17 +307,19 @@ if "runtimeStateStore.withModelRequestResource(block)" not in automation_runtime
         "Automation model requests must acquire MODEL_REQUEST through shared Runtime ownership"
     )
 
+execution_status = read(EXECUTION_STATUS)
+for terminal_status in ("DELIVERED", "SKIPPED", "BLOCKED", "CANCELLED", "FAILED"):
+    if terminal_status not in execution_status:
+        violations.append("shared execution status lost terminal state: " + terminal_status)
+
 for port_name, source in (
     ("Chat Automation execution Port", chat_automation_port),
     ("Work Automation execution Port", work_automation_port),
 ):
-    for terminal_status in ("DELIVERED", "SKIPPED", "BLOCKED", "CANCELLED", "FAILED"):
-        if terminal_status not in source:
-            violations.append(
-                f"{port_name} lost structured terminal status: {terminal_status}"
-            )
     if "val status:" not in source:
         violations.append(f"{port_name} must return a structured status instead of exception-only outcome")
+    if "LocalExecutionStatus" not in source:
+        violations.append(f"{port_name} must use the shared execution terminal status contract")
 
 for terminal_status in ("DELIVERED", "SKIPPED", "BLOCKED", "CANCELLED", "FAILED"):
     if f"LocalAutomationRunStatus.{terminal_status}" not in automation_worker:

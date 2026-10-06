@@ -362,7 +362,7 @@ class HarnessWebhookService : Service() {
             var handedOff = false
             try {
                 val requestId = UUID.randomUUID().toString()
-                resultStore.update(requestId, status = "queued")
+                resultStore.update(requestId, status = WebhookRunStatus.QUEUED)
                 respond(client, 202, """{"accepted":true,"request_id":"$requestId","result_url":"/result/$requestId"}""")
                 val job = scope.launch {
                     executeWebhookRun(
@@ -379,7 +379,7 @@ class HarnessWebhookService : Service() {
                     ) {
                         resultStore.update(
                             requestId,
-                            status = "cancelled",
+                            status = WebhookRunStatus.CANCELLED,
                             error = "Webhook 服务已停止",
                         )
                     }

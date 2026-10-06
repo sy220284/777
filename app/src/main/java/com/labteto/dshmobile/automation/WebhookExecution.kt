@@ -4,17 +4,17 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 
 internal suspend fun executeWebhookRun(
-    update: (status: String, result: String?, error: String?) -> Unit,
+    update: (status: WebhookRunStatus, result: String?, error: String?) -> Unit,
     run: suspend () -> String,
 ) {
     try {
-        update("running", null, null)
-        update("completed", run(), null)
+        update(WebhookRunStatus.RUNNING, null, null)
+        update(WebhookRunStatus.COMPLETED, run(), null)
     } catch (cancelled: CancellationException) {
-        update("cancelled", null, "Webhook 服务已停止")
+        update(WebhookRunStatus.CANCELLED, null, "Webhook 服务已停止")
         throw cancelled
     } catch (error: Exception) {
-        update("failed", null, error.message ?: error::class.java.simpleName)
+        update(WebhookRunStatus.FAILED, null, error.message ?: error::class.java.simpleName)
     }
 }
 
@@ -50,6 +50,6 @@ internal class WebhookExecutionLimiter(
 
 internal fun shouldMarkWebhookQueuedCancellation(
     cause: Throwable?,
-    currentStatus: String?,
+    currentStatus: WebhookRunStatus?,
 ): Boolean =
-    cause is CancellationException && currentStatus == "queued"
+    cause is CancellationException && currentStatus == WebhookRunStatus.QUEUED

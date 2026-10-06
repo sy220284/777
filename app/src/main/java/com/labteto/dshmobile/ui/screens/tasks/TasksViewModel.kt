@@ -1,4 +1,5 @@
 package com.labteto.dshmobile.ui.screens.tasks
+import com.labteto.dshmobile.local.chat.LocalChatAutomationPolicy
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.automation.AutomationMode
@@ -154,12 +155,12 @@ class TasksViewModel @Inject constructor(
         windowStartMinuteOfDay: Int? = null,
         windowEndMinuteOfDay: Int? = null,
         quietHoursEnabled: Boolean = false,
-        quietStartHour: Int = 23,
-        quietStartMinute: Int = 0,
-        quietEndHour: Int = 7,
-        quietEndMinute: Int = 0,
-        proactiveMinGapMinutes: Long = 6L * 60L,
-        proactiveMaxUnanswered: Int = 2,
+        quietStartHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_HOUR,
+        quietStartMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_MINUTE,
+        quietEndHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_HOUR,
+        quietEndMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_MINUTE,
+        proactiveMinGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
+        proactiveMaxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
     ): Boolean {
         val now = System.currentTimeMillis()
         if (prompt.isBlank()) return false

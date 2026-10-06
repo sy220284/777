@@ -1,11 +1,28 @@
 package com.labteto.dshmobile.automation
 
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AutomationReceiptTest {
+
+    @Test
+    fun persistedLegacyStatusStringsDecodeIntoTypedAutomationStatus() {
+        val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val decoded = json.decodeFromString(
+            AutomationTask.serializer(),
+            """{"id":"legacy","prompt":"task","createdAt":1,"nextRunAt":2,"status":"waiting_user"}""",
+        )
+
+        assertEquals(AutomationStatus.WAITING_USER, decoded.status)
+        assertTrue(
+            json.encodeToString(AutomationTask.serializer(), decoded)
+                .contains("\"status\":\"waiting_user\""),
+        )
+    }
+
     @Test
     fun scheduleGenerationGetsDistinctWorkIdentityAndKeepsLegacyGenerationZero() {
         assertEquals("harness-automation-task", automationWorkName("task", 0L))
@@ -35,7 +52,7 @@ class AutomationReceiptTest {
                 AutomationRunReceipt(
                     startedAt = index.toLong(),
                     finishedAt = index.toLong(),
-                    status = "completed",
+                    status = AutomationStatus.COMPLETED,
                 ),
             )
         }
@@ -48,13 +65,13 @@ class AutomationReceiptTest {
     @Test
     fun prunesReceiptsOutsideThirtyDayWindow() {
         val day = 24L * 60L * 60L * 1000L
-        val old = AutomationRunReceipt(0L, 0L, "completed")
-        val recent = AutomationRunReceipt(31L * day, 31L * day, "failed")
+        val old = AutomationRunReceipt(0L, 0L, AutomationStatus.COMPLETED)
+        val recent = AutomationRunReceipt(31L * day, 31L * day, AutomationStatus.FAILED)
 
         val history = appendAutomationReceipt(listOf(old), recent)
 
         assertEquals(1, history.size)
-        assertTrue(history.single().status == "failed")
+        assertTrue(history.single().status == AutomationStatus.FAILED)
     }
 
     @Test
@@ -253,8 +270,8 @@ class AutomationReceiptTest {
     @Test
     fun keepsReceiptExactlyAtThirtyDayCutoff() {
         val day = 24L * 60L * 60L * 1000L
-        val atCutoff = AutomationRunReceipt(day, day, "completed")
-        val recent = AutomationRunReceipt(31L * day, 31L * day, "failed")
+        val atCutoff = AutomationRunReceipt(day, day, AutomationStatus.COMPLETED)
+        val recent = AutomationRunReceipt(31L * day, 31L * day, AutomationStatus.FAILED)
 
         val history = appendAutomationReceipt(listOf(atCutoff), recent)
 
