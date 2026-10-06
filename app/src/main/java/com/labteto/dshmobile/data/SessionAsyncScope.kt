@@ -12,3 +12,11 @@ internal data class SessionAsyncScope(
         requestCurrent() && hostKey == activeHostKey() &&
             (sessionId == null || sessionId == currentSessionId())
 }
+
+internal fun <T : Any> isCurrentHostRequest(
+    hostKey: String?,
+    capturedApi: T,
+    activeHostKey: () -> String?,
+    apiForHost: (String?) -> T?,
+): Boolean =
+    hostKey == activeHostKey() && apiForHost(hostKey) === capturedApi

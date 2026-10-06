@@ -10,7 +10,6 @@ import com.labteto.dshmobile.core.wire.dto.WorkspaceView
 
 /** Owns workspace mutation RPCs while SessionStore remains the single workspace state owner. */
 internal class SessionWorkspaceRuntime(
-    private val apiProvider: () -> DshApiClient?,
     private val apiForHost: (String?) -> DshApiClient?,
     private val activeHostKey: () -> String?,
     private val onWorkspaceUpsert: (WorkspaceView) -> Unit,
@@ -20,32 +19,44 @@ internal class SessionWorkspaceRuntime(
     private val onConnectionError: (String?) -> Unit,
 ) {
     suspend fun create(path: String) {
-        val api = apiProvider() ?: return
-        when (val result = api.workspaceCreate(WorkspaceCreateRequest(path))) {
+        val key = activeHostKey()
+        val api = apiForHost(key) ?: return
+        val result = api.workspaceCreate(WorkspaceCreateRequest(path))
+        if (!isCurrentHostRequest(key, api, activeHostKey, apiForHost)) return
+        when (result) {
             is RpcResult.Ok -> onWorkspaceUpsert(result.value.workspace)
             is RpcResult.Err -> onConnectionError(result.error.message)
         }
     }
 
     suspend fun rename(id: String, title: String) {
-        val api = apiProvider() ?: return
-        when (val result = api.workspaceRename(WorkspaceRenameRequest(id, title))) {
+        val key = activeHostKey()
+        val api = apiForHost(key) ?: return
+        val result = api.workspaceRename(WorkspaceRenameRequest(id, title))
+        if (!isCurrentHostRequest(key, api, activeHostKey, apiForHost)) return
+        when (result) {
             is RpcResult.Ok -> onWorkspaceUpsert(result.value.workspace)
             is RpcResult.Err -> onConnectionError(result.error.message)
         }
     }
 
     suspend fun delete(id: String) {
-        val api = apiProvider() ?: return
-        when (val result = api.workspaceDelete(WorkspaceDeleteRequest(id))) {
+        val key = activeHostKey()
+        val api = apiForHost(key) ?: return
+        val result = api.workspaceDelete(WorkspaceDeleteRequest(id))
+        if (!isCurrentHostRequest(key, api, activeHostKey, apiForHost)) return
+        when (result) {
             is RpcResult.Ok -> onWorkspaceRemove(id)
             is RpcResult.Err -> onConnectionError(result.error.message)
         }
     }
 
     suspend fun archiveSession(sessionId: String) {
-        val api = apiProvider() ?: return
-        when (val result = api.workspaceArchiveSession(WorkspaceArchiveSessionRequest(sessionId))) {
+        val key = activeHostKey()
+        val api = apiForHost(key) ?: return
+        val result = api.workspaceArchiveSession(WorkspaceArchiveSessionRequest(sessionId))
+        if (!isCurrentHostRequest(key, api, activeHostKey, apiForHost)) return
+        when (result) {
             is RpcResult.Ok -> {
                 onArchivedChanged(result.value.archivedSessionIds)
                 refreshSessions()
@@ -56,8 +67,9 @@ internal class SessionWorkspaceRuntime(
 
     suspend fun unarchiveSession(sessionId: String): Boolean {
         val key = activeHostKey()
-        val result = apiForHost(key)?.workspaceUnarchiveSession(sessionId) ?: return false
-        if (key != activeHostKey()) return false
+        val api = apiForHost(key) ?: return false
+        val result = api.workspaceUnarchiveSession(sessionId)
+        if (!isCurrentHostRequest(key, api, activeHostKey, apiForHost)) return false
         return when (result) {
             is RpcResult.Ok -> {
                 onArchivedChanged(result.value.archivedSessionIds)

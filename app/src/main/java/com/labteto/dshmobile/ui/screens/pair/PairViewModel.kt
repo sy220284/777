@@ -19,14 +19,20 @@ import com.labteto.dshmobile.core.wire.RelayTls
 import com.labteto.dshmobile.core.wire.TransportFailure
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import javax.inject.Inject
+
+internal suspend fun <T> completeRelayClaimPersistence(block: suspend () -> T): T =
+    withContext(NonCancellable) { block() }
+
 
 /** How far the pairing attempt has got. */
 enum class PairStage { Idle, Claiming, Paired }
@@ -253,25 +259,30 @@ class PairViewModel @Inject constructor(
         pin: String?,
     ) {
         val response = outcome.response
-        val config = hostsStore.rememberHost(
-            name = url.host,
-            host = url.host,
-            port = url.port,
-            isLoopback = false,
-            relay = RelayIdentity(
-                deviceId = response.deviceId,
-                useTls = url.scheme == "https",
-                // The relay repeats its pin in the claim answer, which is what makes a typed
-                // pairing pinnable at all. Preferring it over the observed key means a relay that
-                // renews with the same key keeps working, and a mismatch between the two would
-                // already have failed the request.
-                fingerprint = response.fingerprint ?: pin,
-                tokenExpiresAt = response.expiresAt,
-            ),
-        )
-        credentials.put(config.id, response.token)
-        connectionManager.connect(config)
-        _state.update { it.copy(stage = PairStage.Paired, paired = config, failure = null) }
+        // A successful relay claim returns the bearer token exactly once. Once that irreversible
+        // remote side effect has happened, cancellation must not interrupt local persistence and
+        // leave a remembered relay without its matching credential (or lose the token entirely).
+        completeRelayClaimPersistence {
+            val config = hostsStore.rememberHost(
+                name = url.host,
+                host = url.host,
+                port = url.port,
+                isLoopback = false,
+                relay = RelayIdentity(
+                    deviceId = response.deviceId,
+                    useTls = url.scheme == "https",
+                    // The relay repeats its pin in the claim answer, which is what makes a typed
+                    // pairing pinnable at all. Preferring it over the observed key means a relay that
+                    // renews with the same key keeps working, and a mismatch between the two would
+                    // already have failed the request.
+                    fingerprint = response.fingerprint ?: pin,
+                    tokenExpiresAt = response.expiresAt,
+                ),
+            )
+            credentials.put(config.id, response.token)
+            connectionManager.connect(config)
+            _state.update { it.copy(stage = PairStage.Paired, paired = config, failure = null) }
+        }
     }
 
     /**

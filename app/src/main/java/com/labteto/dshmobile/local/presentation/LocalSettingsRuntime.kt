@@ -5,8 +5,6 @@ import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelRuntime
 import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
-import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
-import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanConnectionTester
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.local.runtime.LocalDiagnosticsPort
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -31,8 +29,7 @@ data class LocalSettingsMemoryContext(
 @Singleton
 class LocalSettingsRuntime @Inject internal constructor(
     private val diagnostics: LocalDiagnosticsPort,
-    chatGptAuth: ChatGptAuthCoordinator,
-    chatGptPlanTester: ChatGptPlanConnectionTester,
+    private val chatGpt: ChatGptSettingsController,
     private val modelRuntime: LocalModelRuntime,
     private val modelSettings: LocalModelSettingsCoordinator,
     private val settingsCoordinator: LocalHarnessSettingsCoordinator,
@@ -41,14 +38,6 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val sessionStorage: LocalSessionStorageRuntime,
     runtimeStateStore: LocalRuntimeStateStore,
 ) {
-    private val chatGpt = ChatGptSettingsController(
-        auth = chatGptAuth,
-        requireAccountSelectionAllowed = modelRuntime::requireChatGptAccountSelectionAllowed,
-        syncModels = modelRuntime::syncChatGptModels,
-        retireProfiles = modelRuntime::retireChatGptAccountProfiles,
-        removeProfiles = modelRuntime::removeChatGptAccountProfiles,
-        testAccount = chatGptPlanTester::test,
-    )
     private val runtimeState = runtimeStateStore.state
     val state: Flow<LocalHarnessSettingsState> = runtimeState.map { it.toSettingsUiState() }.distinctUntilChanged()
     val initialState get() = runtimeState.value.toSettingsUiState()

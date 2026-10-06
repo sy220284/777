@@ -14,4 +14,11 @@ class LocalModelAccountStateCoordinatorTest {
     fun accountSelectionAdmissionAllowsIdleRuntime() {
         assertTrue(canStartChatGptAccountSelection(isBusy = false))
     }
+
+    @Test
+    fun backgroundCatalogSyncDefersWhileRuntimeIsBusy() {
+        assertTrue(shouldDeferBackgroundChatGptModelSync(selectFirst = false, isBusy = true))
+        assertFalse(shouldDeferBackgroundChatGptModelSync(selectFirst = false, isBusy = false))
+        assertFalse(shouldDeferBackgroundChatGptModelSync(selectFirst = true, isBusy = true))
+    }
 }
