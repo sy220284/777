@@ -180,8 +180,9 @@ internal class LocalWorkReplyRegenerator @Inject constructor(
         log.append(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
             checkpointCodec.encode(
-                durableModelHistorySnapshot(history.snapshot()),
-                "work/regenerated",
+                messages = durableModelHistorySnapshot(history.snapshot()),
+                reason = "work/regenerated",
+                asOfSequence = log.latestSequence(),
             ),
         )
         runtimeStateStore.foregroundRunHandle.turnsSinceModelHistoryCheckpoint = 0
