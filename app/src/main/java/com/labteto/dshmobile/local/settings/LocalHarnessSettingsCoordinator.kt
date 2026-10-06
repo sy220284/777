@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local.settings
 
-import com.labteto.dshmobile.local.persistence.LOCAL_HARNESS_PREFERENCES_NAME
+import com.labteto.dshmobile.local.persistence.LocalHarnessPreferences
 import android.content.Context
 import android.content.SharedPreferences
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeSettings
@@ -43,7 +43,7 @@ internal class LocalHarnessSettingsCoordinator internal constructor(
         userProfileStore: UserProfileStore,
         runtimeStateStore: LocalRuntimeStateStore,
     ) : this(
-        preferences = context.getSharedPreferences(LOCAL_HARNESS_PREFERENCES_NAME, Context.MODE_PRIVATE),
+        preferences = LocalHarnessPreferences.from(context),
         userProfileStore = userProfileStore,
         statePort = localSettingsStatePort(runtimeStateStore),
     )
