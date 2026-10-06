@@ -7,7 +7,6 @@ import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.runtime.LocalAgentRunRecoveryContextPolicy
 import com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.local.runtime.LocalAgentRunRecoveryContextPolicy
 
 internal data class LocalAutomationWorkRecoveryPlan(
     val executionTask: String,
