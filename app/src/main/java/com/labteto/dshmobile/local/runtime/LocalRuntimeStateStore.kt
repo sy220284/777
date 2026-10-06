@@ -98,7 +98,7 @@ class LocalRuntimeStateStore internal constructor(
         get() = sessionTransitionInProgress
 
     internal fun beginSessionTransition(): Boolean = synchronized(foregroundRunHandle.lock) {
-        if (state.value.loading || sessionTransitionInProgress) {
+        if (sessionTransitionInProgress) {
             false
         } else {
             sessionTransitionInProgress = true
