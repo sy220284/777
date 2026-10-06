@@ -5,10 +5,10 @@ import com.labteto.dshmobile.local.send.LocalPreparedSend
 import kotlinx.coroutines.Job
 
 /**
- * Transitional low-level Work turn start bridge.
+ * Work-owned low-level turn-start contract.
  *
- * WorkFeature owns product admission, regeneration and Agent execution. This bridge now only starts
- * an already-admitted first Work turn until the remaining composition dependencies leave Engine.
+ * WorkFeature owns product admission, regeneration and Agent execution. This port only starts an
+ * already-admitted Work turn and does not expose Work internals to callers.
  */
 internal interface LocalWorkTurnPort {
     fun startPrepared(

@@ -25,7 +25,7 @@ import kotlinx.serialization.json.put
  * Work-owned durable model-history transaction boundary.
  *
  * A Work run owns its history/inbox projection while Shared Runtime supplies only resource budgets
- * and Session snapshot storage. Engine must not coordinate Work history compaction or checkpoints.
+ * and Session snapshot storage. Shared Runtime does not coordinate Work history compaction or checkpoints.
  */
 @Singleton
 internal class LocalWorkModelHistoryRuntime @Inject constructor(

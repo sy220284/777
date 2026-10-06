@@ -29,7 +29,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 
-/** App composition owner for Session lifecycle transactions after the Engine bridge is removed. */
+/** App composition owner for Session lifecycle transactions across Feature boundaries. */
 @Singleton
 internal class LocalSessionComposition @Inject constructor(
     @ApplicationContext context: Context,

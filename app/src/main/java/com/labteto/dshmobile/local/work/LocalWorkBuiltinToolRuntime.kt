@@ -11,7 +11,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * Work-owned execution for task-state built-ins.
  *
  * The active Work binding is the only mutable owner for plan/todo/goal/question state during a run.
- * Shared plugin routing may invoke this adapter, but Engine must not interpret these Work tools.
+ * Shared plugin routing may invoke this adapter, but the Shared Tool layer must not interpret Work semantics.
  */
 internal class LocalWorkBuiltinToolRuntime(
     private val persist: (LocalWorkRunBinding) -> Unit,

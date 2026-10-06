@@ -48,9 +48,9 @@ import kotlinx.serialization.json.put
 /**
  * Owns multi-character group-chat turn execution.
  *
- * The engine supplies only its live session boundaries and persistence/model callbacks. Group reply
- * fan-out, per-character state refresh, shared-scene consolidation and transcript projection stay
- * together here under ChatFeature ownership.
+ * Shared Runtime supplies live Session boundaries while Chat-owned collaborators provide persistence
+ * and model operations. Group reply fan-out, per-character state refresh, shared-scene consolidation
+ * and transcript projection stay together here under ChatFeature ownership.
  */
 @Singleton
 internal class LocalGroupChatTurnExecutor @Inject constructor(

@@ -380,7 +380,7 @@ fun LocalHarnessScreen(
             shell.usageMode == pending && !shell.loading -> pendingUsageMode = null
             !shell.loading -> {
                 // A rejected/no-op transition should not leave the sidebar showing a phantom mode.
-                // Give the engine one frame window to publish loading=true before rolling back.
+                // Give the runtime transition one frame window to publish loading=true before rolling back.
                 delay(250)
                 if (!shell.loading && shell.usageMode != pending) pendingUsageMode = null
             }

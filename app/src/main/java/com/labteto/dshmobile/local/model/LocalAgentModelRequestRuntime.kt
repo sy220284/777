@@ -52,7 +52,7 @@ internal fun validateModelRequestAdmission(request: LocalModelAdmissionRequest) 
 /**
  * Shared admitted provider-call boundary for foreground agents, subagents and bounded auxiliary work.
  *
- * Foreground/subagent callers pass the Engine-owned resource scheduler. Auxiliary calls may omit it;
+ * Foreground/subagent callers pass the Shared Runtime resource scheduler. Auxiliary calls may omit it;
  * they still share frozen route, context admission and provider invocation without creating a second
  * resource-scheduling fact source.
  */

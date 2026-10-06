@@ -6,7 +6,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.withContext
 
-/** A background caller owns its run even though the engine launches it in another scope. */
+/** A background caller owns its run even when the scheduler launches it in another scope. */
 internal suspend fun <T> owningAutomationRun(job: Job, awaitResult: suspend () -> T): T = try {
     awaitResult()
 } catch (cancelled: CancellationException) {

@@ -11,7 +11,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
  * Chat-owned foreground turn dispatcher.
  *
  * Group/direct selection, explicit-correction capture and fresh relationship hydration belong to
- * ChatFeature. The direct turn body remains a temporary callback until runChatTurn is migrated.
+ * ChatFeature. Direct and group turn bodies are both owned by Chat execution components.
  */
 @Singleton
 internal class LocalChatTurnDispatcher @Inject constructor(

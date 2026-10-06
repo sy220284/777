@@ -27,7 +27,7 @@ import kotlinx.serialization.json.put
  *
  * Session EventLog is the durable authority; the materialized Session snapshot may lag and is
  * repaired from plan/mode on restore. Model-history continuity is updated through Shared Runtime,
- * so changing plan mode no longer routes through LocalHarnessEngine.
+ * so changing plan mode stays within the Work/Shared capability boundary.
  */
 @Singleton
 internal class LocalWorkPlanModeCoordinator @Inject constructor(

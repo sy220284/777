@@ -54,8 +54,8 @@ import kotlinx.serialization.json.put
 /**
  * Owns proactive scheduled Chat generation and detached-session persistence.
  *
- * The engine retains only the visible-session transaction callbacks that touch its live run lock,
- * model history, and hot transcript.
+ * Visible-session transaction ownership is delegated through LocalChatAutomationVisibleTurnOwner;
+ * detached execution uses Shared Session/Runtime and Chat-owned collaborators.
  */
 @javax.inject.Singleton
 internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject constructor(

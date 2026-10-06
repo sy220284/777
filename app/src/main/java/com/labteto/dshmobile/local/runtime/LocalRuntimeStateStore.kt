@@ -41,7 +41,7 @@ import kotlinx.serialization.json.Json
  * Process-wide owner of shared local runtime state and scarce-resource scheduling.
  *
  * Feature capabilities may observe shared resource snapshots, but this Runtime owner never imports
- * Feature internals. Engine bootstrap initializes the first visible snapshot exactly once.
+ * Feature internals. Runtime bootstrap initializes the first visible snapshot exactly once.
  */
 @Singleton
 class LocalRuntimeStateStore internal constructor(

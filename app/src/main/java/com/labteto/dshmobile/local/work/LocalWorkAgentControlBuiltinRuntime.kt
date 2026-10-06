@@ -15,8 +15,8 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Work-owned model-facing subagent/workflow control.
  *
- * Every operation is bound to the originating Work run. Engine and the currently visible Session
- * are not valid fallbacks for agent-control tools.
+ * Every operation is bound to the originating Work run. Global Runtime state and the currently
+ * visible Session are not valid fallbacks for agent-control tools.
  */
 internal class LocalWorkAgentControlBuiltinRuntime(
     private val jobs: LocalJobManager,
