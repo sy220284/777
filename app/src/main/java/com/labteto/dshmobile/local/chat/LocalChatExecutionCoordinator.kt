@@ -72,16 +72,7 @@ internal class LocalChatExecutionCoordinator @Inject constructor(
                 timeoutMillis = request.timeoutMillis,
                 recoverInterrupted = request.recoverInterrupted,
                 recoveryStartedAt = request.recoveryStartedAt,
-                quietHoursEnabled = request.quietHoursEnabled,
-                quietStartHour = request.quietStartHour,
-                quietStartMinute = request.quietStartMinute,
-                quietEndHour = request.quietEndHour,
-                quietEndMinute = request.quietEndMinute,
-                proactiveMinGapMinutes = request.proactiveMinGapMinutes,
-                proactiveMaxUnanswered = request.proactiveMaxUnanswered,
-                minimumSilenceMinutes = request.minimumSilenceMinutes,
-                silenceReferenceAt = request.silenceReferenceAt,
-                bypassProactivePolicy = request.bypassProactivePolicy,
+                policy = request.automationPolicy,
             )
         }
         while (true) {
@@ -103,7 +94,7 @@ internal class LocalChatExecutionCoordinator @Inject constructor(
             LocalChatExecutionResult(
                 sessionId = result.sessionId,
                 output = result.output,
-                status = LocalChatExecutionStatus.valueOf(result.status.name),
+                status = result.status,
                 detail = result.detail,
                 nextRunAtHint = result.nextRunAtHint,
                 waitingForUserReply = result.waitingForUserReply,
