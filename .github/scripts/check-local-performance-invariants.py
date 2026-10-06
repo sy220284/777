@@ -24,6 +24,12 @@ TRANSCRIPT_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/sessi
 MODEL_HISTORY_BUFFER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryBuffer.kt"
 ENGINE_DEFAULTS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt"
 TRANSCRIPT_HISTORY_LOADER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryLoader.kt"
+MODEL_REQUEST_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt"
+RUNTIME_STATE_STORE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt"
+TOOL_EXECUTION_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
+AGENT_RUN_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalAgentRunCoordinator.kt"
+SESSION_RUNTIME_REGISTRY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionRuntimeRegistry.kt"
+AUTOMATION_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt"
 
 violations: list[str] = []
 
@@ -81,12 +87,19 @@ transcript_runtime = strip_comments(read(TRANSCRIPT_RUNTIME))
 model_history_buffer = strip_comments(read(MODEL_HISTORY_BUFFER))
 engine_defaults = strip_comments(read(ENGINE_DEFAULTS))
 transcript_history_loader = strip_comments(read(TRANSCRIPT_HISTORY_LOADER))
+model_request_coordinator = strip_comments(read(MODEL_REQUEST_COORDINATOR))
+runtime_state_store = strip_comments(read(RUNTIME_STATE_STORE))
+tool_execution_coordinator = strip_comments(read(TOOL_EXECUTION_COORDINATOR))
+agent_run_coordinator = strip_comments(read(AGENT_RUN_COORDINATOR))
+session_runtime_registry = strip_comments(read(SESSION_RUNTIME_REGISTRY))
+automation_runtime = strip_comments(read(AUTOMATION_RUNTIME))
 
 chat_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/chat")
 work_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/work")
 session_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/session")
 automation_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/automation")
 runtime_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/runtime")
+all_local_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local")
 
 root_execution_sources = {}
 for relative in (
@@ -254,6 +267,104 @@ if contains_any(foreground_sources, 'eventLog.append("user/queue"'):
 # Recovery must reject stale ownership before late foreground Work commits.
 if not contains_any(work_sources, "agentRunCoordinator.ensureCurrentOwner("):
     violations.append("Work execution lost the durable late-commit ownership fence")
+
+
+# ---- Runtime ownership, route freeze, and tool execution ------------------
+
+resource_scheduler_owners = paths_containing(all_local_sources, "HarnessResourceScheduler(")
+expected_scheduler_owner = [
+    "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt"
+]
+if resource_scheduler_owners != expected_scheduler_owner:
+    violations.append(
+        "HarnessResourceScheduler must have exactly one Runtime owner; found: "
+        + ", ".join(resource_scheduler_owners)
+    )
+for required_resource_contract in (
+    "internal val resourceScheduler = HarnessResourceScheduler(",
+    "internal suspend fun <T> withModelRequestResource(",
+    "HarnessResourceKind.MODEL_REQUEST",
+    "resourceScheduler.withResource(",
+):
+    if required_resource_contract not in runtime_state_store:
+        violations.append(
+            "LocalRuntimeStateStore lost shared resource ownership: " + required_resource_contract
+        )
+if "runtimeStateStore.withModelRequestResource(block)" not in automation_runtime:
+    violations.append(
+        "Automation model requests must acquire MODEL_REQUEST through shared Runtime ownership"
+    )
+
+tracked_tool_execution_owners = paths_containing(all_local_sources, ".executeTracked(")
+expected_tool_execution_owner = [
+    "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
+]
+if tracked_tool_execution_owners != expected_tool_execution_owner:
+    violations.append(
+        "tracked ToolRegistry execution must have one shared policy owner; found: "
+        + ", ".join(tracked_tool_execution_owners)
+    )
+for required_tool_boundary in (
+    "LocalToolPolicy.canonical(",
+    "planModeEnabled",
+    "allowMutation",
+    "ToolContext(",
+    "registry.executeTracked(",
+):
+    if required_tool_boundary not in tool_execution_coordinator:
+        violations.append(
+            "LocalToolExecutionCoordinator lost tool policy/side-effect boundary: "
+            + required_tool_boundary
+        )
+
+if model_request_coordinator.count("modelGateway.profileForRoute(") != 1:
+    violations.append(
+        "one model request must resolve the fallback route exactly once before retries/recovery"
+    )
+if not ordered_in_source(
+    model_request_coordinator,
+    "val frozenProfile = profile ?: modelGateway.profileForRoute(",
+    "val runSurface = frozenProfile.toRunModelSurface()",
+    "modelStepRuntime.recover(",
+):
+    violations.append(
+        "model route/profile must freeze before request recovery and retry orchestration"
+    )
+if re.search(
+    r"requestRuntime\.complete\s*\(\s*surface\s*=\s*runSurface\b",
+    model_request_coordinator,
+    re.DOTALL,
+) is None:
+    violations.append(
+        "provider invocation must use the frozen runSurface instead of re-reading mutable model settings"
+    )
+
+for required_agent_owner_fact in (
+    "private val foregroundOwners = ConcurrentHashMap<String, String>()",
+    "fun isCurrentOwner(context: LocalAgentRunContext)",
+    "fun ensureCurrentOwner(context: LocalAgentRunContext)",
+):
+    if required_agent_owner_fact not in agent_run_coordinator:
+        violations.append(
+            "LocalAgentRunCoordinator lost run-identity ownership fact: " + required_agent_owner_fact
+        )
+
+for required_session_owner_api in (
+    "class LocalSessionRuntimeLease",
+    "suspend fun <T> withOwner(",
+    "fun tryAcquire(",
+    "suspend fun acquire(",
+    "suspend fun acquireAll(",
+):
+    if required_session_owner_api not in session_runtime_registry:
+        violations.append(
+            "LocalSessionRuntimeRegistry lost process-wide session ownership API: "
+            + required_session_owner_api
+        )
+if ".distinct().sorted().forEach { sessionId ->" not in session_runtime_registry:
+    violations.append(
+        "multi-session ownership must acquire leases in stable order to avoid cross-session deadlock"
+    )
 
 
 # ---- Protocol/runtime anti-bypass rules -----------------------------------
