@@ -1,6 +1,6 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.persistence.LOCAL_HARNESS_PREFERENCES_NAME
+import com.labteto.dshmobile.local.persistence.LocalHarnessPreferences
 import android.content.Context
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.attachment.cleanupLocalImageAttachments
@@ -46,7 +46,7 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
 ) : LocalRuntimeBootstrapPort {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
-    private val preferences = context.getSharedPreferences(LOCAL_HARNESS_PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val preferences = LocalHarnessPreferences.from(context)
     private val workspace get() = sessionStorage.files.workspace
 
     override fun initialize(scope: CoroutineScope, initialSessionId: String) {
