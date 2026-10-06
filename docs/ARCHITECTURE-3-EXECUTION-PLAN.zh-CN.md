@@ -27,11 +27,11 @@
 当前守卫基线已经切换到架构 3.0：
 
 - Chat / Work / Session / Model / Tools / Automation / Settings Runtime → `LocalHarnessEngine` 已归零路径全部为永久禁止项。
-- `ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST` 与 `ENGINE_STAGE3_WORK_BUILTIN_ALLOWLIST` 均已为空；已迁出的 Work task / agent-control 工具分发和 `sendChat`、`runAgentTurn`、`runChatTurn`、`runWorkAgentTurn`、`regenerate*`、`workSubagents` 等旧业务根重新出现直接失败。
+- 阶段三已迁出的 Work task / agent-control 工具分发和 `sendChat`、`runAgentTurn`、`runChatTurn`、`runWorkAgentTurn`、`regenerate*`、`workSubagents` 等旧业务根进入永久禁止回归集合；不再用“空 allowlist”表达完成状态。
 - 阶段三组合桥与阶段四 Automation 桥分开维护具体 allowlist，只能缩小，不能用等量新代理替换。
 - Chat / Work provider Feature 禁止导入 sibling Feature internal；Shared Context 已改为中立 `LocalRequestContextPolicy` / DTO，由 Work 提供语义投影策略。
 - Chat timeline durable state 只承载 Chat 领域状态，不再通过 Chat event 写回 Work 控制状态。
-- 已删除的 Engine 迁移死代码建立永久禁止回归集合；Engine 直接消费者、构造依赖、internal surface 和聚合状态规模继续作为防回涨辅助。
+- 已删除的 Engine 迁移死代码建立永久禁止回归集合；Engine 外部直接消费者与 composition bridge 使用精确白名单单向收缩。方法数、构造依赖数、聚合状态字段数和 UI projection 字段数不再作为架构放行门禁。
 
 阶段完成必须由真实 Feature 所有权、Shared 依赖方向、领域单写、旧实现删除、组合桥清零和当前 Head `architecture-3-gates` / 完整 CI 共同证明。
 
@@ -53,16 +53,14 @@
 
 ## 4. P0：稳定 #448 当前已完成部分
 
-当前产品 Head：`735206e6a272027287d1c6e950fd95f839621908`。
-
-最新 CI #4827：`scope`、`static-gates` 成功；`architecture-3-gates` 失败，错误为 `Direct Chat main turn ownership is incomplete: startNextQueuedTurnIfIdle()?.start()`。因此 unit-tests、build-arm64、device-artifacts-x86、Android 16 / 17 尚未在该 Head 上执行，merge-gate 失败。该失败属于当前真实所有权残留，不能按假红跳过。
+当前基线以 PR #448 最新 Head 为准；Head 与 Actions 编号只在 PR/CI 中实时追踪，不固化进执行计划。任何 architecture-3-gates 失败都先按真实所有权、依赖方向和运行不变量核查，不用旧 Head 或旧预算解释覆盖。
 
 进入后续迁移前完成以下收口：
 
 - [ ] 当前产品 Head 完整 CI：static-gates、architecture-3-gates、单测 / conformance、arm64 lint 与 APK、x86_64 测试产物、Android 16 / 17、merge-gate 全部成功。
 - [ ] 确认本轮修复回归：取消日志故障仍停止真实 Job；维护发送保留草稿；启动失败释放租约；入队落盘前不能消费；资源重入不回放旧预算；设备授权撤销不残留；全局审批日志故障不阻断其他等待者；Work 进度先落盘；群聊异步结果不能覆盖新运行；设置最新值持久化。
 - [ ] 核对 WorkStatePort / InteractionStatePort 的全部生产调用方与测试迁移，无旧字段或旧构造残留；复验新迁出的群聊成员、Chat stop / post-turn Job 所有权及取消时序。
-- [ ] 补齐本次必要的故障 / 时序用例，不扩大迁移期 allowlist / 热点上限，不绕过 architecture-3-gates 或设备 lane。
+- [ ] 补齐本次必要的故障 / 时序用例，不扩大迁移期 bridge / consumer allowlist，不绕过 architecture-3-gates 或设备 lane。
 - [ ] 更新 #448 描述中的 Head、进度、验证与未完成项。当前“编译修复已提交”不能代替“当前 Head 编译和测试通过”。
 
 P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修复后重新锁定基线。
