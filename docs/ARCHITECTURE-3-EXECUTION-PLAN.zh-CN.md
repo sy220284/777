@@ -19,7 +19,7 @@
 |---|---|---|
 | 1：共享能力 / Kernel 边界 | Session owner、run identity/recovery、资源调度和 Session 存储已有统一所有者 | 保留已建立边界；继续删除残留跨层适配 |
 | 2：领域状态 | Chat / Work / Kernel / Model 已拆分；Chat timeline rewrite 已停止承载 Work plan/todo/goal/planMode | 继续收缩聚合状态迁移适配层 |
-| 3：Chat / Work Feature | 7 类 Runtime→Engine 依赖永久归零；已知阶段三 Engine 业务根已清零；Engine 内 Work task / agent-control builtin 分发也已清零；Work 主 AgentLoop、工具运行、发送/重生成与 Chat 发送、直聊回合、时间线/分支等真实实现已归 Feature | 清零 5 个阶段三 Engine 组合桥：`chatTurnPort`、`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort`；继续迁出共享 Tools 组合与 Session 横向适配 |
+| 3：Chat / Work Feature | 7 类 Runtime→Engine 依赖永久归零；已知阶段三 Engine 业务根已清零；Engine 内 Work task / agent-control builtin 分发也已清零；Work 主 AgentLoop、工具运行、发送/重生成与 Chat 发送、直聊回合、时间线/分支等真实实现已归 Feature；`chatTurnPort` 已脱离 Engine，由 `LocalChatTurnStarter` 直接提供 | 清零剩余 4 个阶段三 Engine 组合桥：`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort`；迁出 `startNextQueuedTurnIfIdle()` 的跨 Feature 下一轮决定权，以及共享 Tools 组合与 Session 横向适配 |
 | 4：Automation Feature | Automation Runtime→Engine 已永久归零，但组合根仍由 Engine 提供 Automation Chat / Work coordinator | 迁出 `automationChatCoordinator`、`automationWorkCoordinator` 两个阶段四桥并切换后台入口 |
 | 5：UI contribution | Catalog 不可变，路由归属及页面枚举已接管 | 中央页面 `when`、页面依赖、Back、入口及恢复继续下沉 |
 | 6：Runtime Kernel | 共享运行状态已接管运行身份、资源、前台句柄等事实 | 删除剩余产品装配/迁移适配后再替换 Engine；仅更名不算完成 |
@@ -37,7 +37,7 @@
 
 当前需要补齐：
 
-1. 清零阶段三 5 个 Engine 组合桥；Chat / Work turn 的领域执行和 Work task / agent-control builtin 已在 Feature，`workTurnPort` 当前主要受共享 Tools/plugin composition 仍在 Engine 装配所阻塞，禁止用新的 Engine 工具代理替换。
+1. 清零阶段三剩余 4 个 Engine 组合桥：`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort`。`chatTurnPort` 已完成脱离 Engine；Chat / Work turn 的领域执行和 Work task / agent-control builtin 已在 Feature。`workTurnPort` 当前主要受共享 Tools/plugin composition 仍在 Engine 装配所阻塞，禁止用新的 Engine 工具代理替换。
 2. 将 Session 生命周期、可见 Work 投影、诊断和 Tools 管理的剩余 Engine 横向适配迁入明确 capability / composition owner。
 3. 阶段四单独处理 Automation 两个 Engine coordinator bridge，以及 persistent / automation subagent 等后台装配，不再混入阶段三进度。
 4. 继续删除迁移后无调用旧实现，并同步收紧门禁。
@@ -52,6 +52,10 @@
 本方案不要求为每个 Feature 新建 Gradle module。平台无关语义继续属于 `harness-core` 等既有模块；Android 产品 Feature 继续在 `app` 中按 API、internal、UI 和组合根形成边界。
 
 ## 4. P0：稳定 #448 当前已完成部分
+
+当前产品 Head：`735206e6a272027287d1c6e950fd95f839621908`。
+
+最新 CI #4827：`scope`、`static-gates` 成功；`architecture-3-gates` 失败，错误为 `Direct Chat main turn ownership is incomplete: startNextQueuedTurnIfIdle()?.start()`。因此 unit-tests、build-arm64、device-artifacts-x86、Android 16 / 17 尚未在该 Head 上执行，merge-gate 失败。该失败属于当前真实所有权残留，不能按假红跳过。
 
 进入后续迁移前完成以下收口：
 
@@ -112,7 +116,7 @@ P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修�
 
 ## 7. 阶段 3-C：Chat 发送和回合执行
 
-Chat send、直聊回合、人物纠正、关系恢复、时间线编辑 / regenerate、分支和 post-turn 已有 Feature owner；`runChatTurn` 等旧 Engine 业务根已清零。当前重点是移除 `chatTurnPort` 装配桥并继续清理群聊 / Session 横向适配，保持 foreground owner 与迟到提交语义不变。
+Chat send、直聊回合、人物纠正、关系恢复、时间线编辑 / regenerate、分支和 post-turn 已有 Feature owner；`runChatTurn` 等旧 Engine 业务根已清零，`chatTurnPort` 也已脱离 Engine，由 `LocalChatTurnStarter` 在组合根直接提供。当前重点转为迁出 Engine 内 `startNextQueuedTurnIfIdle()` 对 Chat / Work 下一轮的跨 Feature 决策，并继续清理群聊 / Session 横向适配，保持 foreground owner 与迟到提交语义不变。
 
 目标分工：
 
@@ -251,10 +255,11 @@ Chat send、直聊回合、人物纠正、关系恢复、时间线编辑 / regen
 
 ## 15. 下一步可直接执行的任务
 
-1. 取得当前产品 Head 的完整 CI；已修复 #4792 性能门禁假红与 #282 Kotlin 编译残留，任何新的失败继续按真实日志闭环。
-2. 先清零 `chatTurnPort` / `workTurnPort` 两个阶段三核心装配桥，使已迁出的 Chat / Work 执行不再由 Engine 提供启动 Port。
-3. 再迁 `sessionLifecyclePort`，同步收口 `syncVisibleWorkRun`、transition / cancel / load / snapshot 等横向适配，保持 detached Work 与前台切换语义。
-4. 迁出 `toolsManagementPort` 与 `diagnosticsPort`，完成阶段三 5 个组合桥清零并收紧 allowlist。
-5. 阶段三通过最新完整 CI 后进入阶段四，单独处理 `automationChatCoordinator` / `automationWorkCoordinator` 和后台 subagent 装配。
+1. 先修复当前 Head CI #4827 的真实架构门禁失败：迁出 `startNextQueuedTurnIfIdle()` 对 Chat / Work 下一轮的跨 Feature 决定权，并保持启动、Session release、Automation release 后续跑语义一致。
+2. 清零 `workTurnPort`，使 Work 启动 Port 不再由 Engine 提供；`chatTurnPort` 已完成迁移，不再列入剩余项。
+3. 迁出 `sessionLifecyclePort`，同步收口 `syncVisibleWorkRun`、transition / cancel / load / snapshot 等横向适配，保持 detached Work 与前台切换语义。
+4. 迁出 `toolsManagementPort` 与 `diagnosticsPort`，完成阶段三剩余 4 个组合桥清零并将 `ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST` 收缩为空。
+5. 取得当前产品 Head 的完整 CI；阶段三只有在 architecture-3-gates、单测、构建、Android 16 / 17 与 merge-gate 全部通过后才能关闭。
+6. 随后进入阶段四，单独处理 `automationChatCoordinator` / `automationWorkCoordinator` 和后台 subagent 装配。
 
 后续执行者按已完成工作包和出口条件更新本方案，不以正文计划或某次旧 CI 判断架构 3.0 已完成。

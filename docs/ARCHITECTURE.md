@@ -434,12 +434,14 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 - WorkRuntime 对 Engine 的直接引用已由 4 → 2 → 1 → 0 清零；前台 Job、pending inbox、投影游标及取消顺序由 Shared Runtime 接管，Work 停止通过共享运行所有者执行。Engine 仍有迁移期访问器，后续必须继续收缩，不能据此宣称 Kernel 已完成。
 - 前台与 Work 取消时，即使 inbox 取消日志写入失败，也必须取消真实 Job、清理排队投影和交互授权；Work teardown 等待真实 Job/mirror 退出后再发布空闲并释放运行引用，写盘错误继续向调用方反馈。
 - 计划模式由 `LocalWorkPlanModeCoordinator` 持有，维护租约隔离前台/Automation；先提交 `plan/mode` 权威事件，再发布 Work 状态与更新模型历史，事件写入失败不得留下已切换的界面。
-- Chat 已迁出人物选择、图集绑定、默认人物同步、行为调节、纠正撤销、回复建议结果提交、群聊成员配置/移除、前台停止、发送事务、直聊主回合、群聊前台准入/执行、时间线编辑与重生成、分支变体选择及 post-turn 归并；ChatRuntime 对 Engine 的直接引用已清零。组合根仍保留迁移期 `chatTurnPort`，但上述 Chat 业务实现不得回流 Engine。
+- Chat 已迁出人物选择、图集绑定、默认人物同步、行为调节、纠正撤销、回复建议结果提交、群聊成员配置/移除、前台停止、发送事务、直聊主回合、群聊前台准入/执行、时间线编辑与重生成、分支变体选择及 post-turn 归并；ChatRuntime 对 Engine 的直接引用已清零。`chatTurnPort` 已脱离 Engine，由 `LocalChatTurnStarter` 在组合根直接提供；上述 Chat 业务实现不得回流 Engine。
 - 后台任务快照的通知与持久化按统一提交顺序执行；Work 订阅重放和绑定接入在投影锁内读取当前任务事实，防止旧快照覆盖取消或完成终态。任务返回后再次验证取消状态与合法终态提交权，阻塞执行的迟到成功或异常均不得覆盖已取消终态。回归覆盖晚接入绑定、跨会话隔离、重启中断投影、并发取消与迟到成功/异常。
 - 已迁出的 Chat 领域写入统一采用“Session MAINTENANCE owner → durable Chat domain/timeline event → runtime projection → Session snapshot cache”提交顺序。人物/行为调节等跨文档写入在权威事件提交前失败必须恢复原文档；群聊成员、回复建议和分支选择不得再出现 UI 已更新但 EventLog/模型历史仍停留旧状态的半提交。
 - 回归覆盖多会话等待、全局模式启停、过期/已完成点击、设备授权隔离/撤销、显式审批工具与前台切换；本子阶段须通过最终 Head 的完整 CI 验证。
 
-当前阶段三已知 Engine Feature 业务根已清零，Chat / Work 的发送、主回合、时间线 / 分支、Work AgentLoop 与 Tool runtime 等真实实现已归所属 Feature。Shared Context 只保留中立 Policy / DTO，Work 的 structured state 与 cue 解释位于 `local.work`；Shared Agent recovery 只负责恢复安全与通用 continuation，Work checkpoint 的语义装饰由 `LocalWorkRecoveryContextPolicy` 持有。Chat post-turn coordinator 已归 `local.chat`。阶段 3 仍不能标记完成：组合根尚有 `chatTurnPort`、`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort` 五个 Engine bridge，Session / 可见 Work 投影等横向适配仍待迁出。Automation 的两个 Engine coordinator bridge 属于阶段 4，单独验收。
+当前阶段三已知 Engine Feature 业务根已清零，Chat / Work 的发送、主回合、时间线 / 分支、Work AgentLoop 与 Tool runtime 等真实实现已归所属 Feature。Shared Context 只保留中立 Policy / DTO，Work 的 structured state 与 cue 解释位于 `local.work`；Shared Agent recovery 只负责恢复安全与通用 continuation，Work checkpoint 的语义装饰由 `LocalWorkRecoveryContextPolicy` 持有。Chat post-turn coordinator 已归 `local.chat`，`chatTurnPort` 也已脱离 Engine。阶段 3 仍不能标记完成：组合根当前剩余 `workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort` 四个 Engine bridge；`startNextQueuedTurnIfIdle()` 仍在 Engine 内同时决定 Chat / Work 下一轮启动，Session / 可见 Work 投影、transition / cancel / load 等横向适配也仍待迁出。Automation 的两个 Engine coordinator bridge 属于阶段 4，单独验收。
+
+当前产品 Head `735206e6` 的 CI #4827 已执行到架构门禁：`scope` 与 `static-gates` 成功，`architecture-3-gates` 因 `startNextQueuedTurnIfIdle()?.start()` 仍体现 Direct Chat main turn ownership 而失败，后续单测、构建和 Android 16 / 17 设备 lane 因依赖关系未执行。因此阶段 3 当前仍处于真实未完成状态，旧 Head 的成功结果不能替代本 Head 验收。
 
 ### 阶段 4：建立 AutomationFeature
 
