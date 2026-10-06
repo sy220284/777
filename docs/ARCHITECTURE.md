@@ -429,7 +429,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 - `LocalApprovalPreferences` 与 `LocalSessionEventLogRegistry` 为共享注入对象；全局自动审批以设备级持久配置为权威，Session 快照不再为审批配置变化重复写盘。
 - 待审批操作在交互所有者内校验真实、未完成的等待者；过期或已回答点击不能改变全局模式或授予设备授权。开启全局自动批准会同步所有活跃 Work 状态并结算其审批等待。
 - 设备授权只修改目标会话的运行绑定；撤销不影响其他会话，前台恢复与后台取消继续使用各自交互所有者。
-- 插件组合根持有 GitHub 凭据操作和 Web 工具构造，Engine 不再直接依赖对应平台存储/Provider；构造依赖预算维持 17。
+- 插件组合根持有 GitHub 凭据操作和 Web 工具构造，Engine 不再直接依赖对应平台存储/Provider。
 - 进程唯一后台任务管理器由共享 Runtime 持有并继续使用原 `local-harness/jobs.json` 持久化；Work 单向订阅任务快照负责会话投影和前台通知，Engine 删除后台任务 UI 代理与任务管理器所有权。
 - WorkRuntime 对 Engine 的直接引用已由 4 → 2 → 1 → 0 清零；前台 Job、pending inbox、投影游标及取消顺序由 Shared Runtime 接管，Work 停止通过共享运行所有者执行。Engine 仍有迁移期访问器，后续必须继续收缩，不能据此宣称 Kernel 已完成。
 - 前台与 Work 取消时，即使 inbox 取消日志写入失败，也必须取消真实 Job、清理排队投影和交互授权；Work teardown 等待真实 Job/mirror 退出后再发布空闲并释放运行引用，写盘错误继续向调用方反馈。
@@ -441,7 +441,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 当前阶段三已知 Engine Feature 业务根已清零，Chat / Work 的发送、主回合、时间线 / 分支、Work AgentLoop 与 Tool runtime 等真实实现已归所属 Feature。Shared Context 只保留中立 Policy / DTO，Work 的 structured state 与 cue 解释位于 `local.work`；Shared Agent recovery 只负责恢复安全与通用 continuation，Work checkpoint 的语义装饰由 `LocalWorkRecoveryContextPolicy` 持有。Chat post-turn coordinator 已归 `local.chat`，`chatTurnPort` 也已脱离 Engine。阶段 3 仍不能标记完成：组合根当前剩余 `workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort` 四个 Engine bridge；`startNextQueuedTurnIfIdle()` 仍在 Engine 内同时决定 Chat / Work 下一轮启动，Session / 可见 Work 投影、transition / cancel / load 等横向适配也仍待迁出。Automation 的两个 Engine coordinator bridge 属于阶段 4，单独验收。
 
-当前产品 Head `735206e6` 的 CI #4827 已执行到架构门禁：`scope` 与 `static-gates` 成功，`architecture-3-gates` 因 `startNextQueuedTurnIfIdle()?.start()` 仍体现 Direct Chat main turn ownership 而失败，后续单测、构建和 Android 16 / 17 设备 lane 因依赖关系未执行。因此阶段 3 当前仍处于真实未完成状态，旧 Head 的成功结果不能替代本 Head 验收。
+阶段 3 的完成状态只以 PR 最新 Head 的 `architecture-3-gates` 与完整 CI 为准；旧 Head 的成功、失败或取消结果都不能替代当前 Head 验收。实时 Head 与 Actions 编号属于 PR/CI 运行信息，不写入架构权威文档。
 
 ### 阶段 4：建立 AutomationFeature
 
@@ -465,7 +465,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 - `LocalHarnessEngine` 的 Feature 业务规则、Feature API 与迁移期代理全部退出；
 - Kernel 只保留 Session/run ownership、跨域事务、取消传播、资源租约、run identity、recovery 与生命周期协调；
-- Engine 构造依赖、internal API、直接消费者门禁持续向下 ratchet，最终更名/替换为 `LocalRuntimeKernel`；
+- Engine 迁移桥与外部直接消费者使用精确白名单持续收缩；已迁业务根使用永久禁止回归集合，最终删除 Engine 并由 `LocalRuntimeKernel` 接管真正 Kernel 职责；
 - Kernel 不得理解 Persona / Gallery / Todo / GitHub Token / UI 页面。
 
 ## 13. 迁移约束
@@ -532,9 +532,9 @@ CI 已将架构 3.0 从通用静态检查中独立为 `architecture-3-gates`。�
 - Feature 禁止互相导入 internal package；
 - UI 禁止引用领域 Store / Coordinator；
 - Chat / Work / Session / Model / Tools / Automation / Settings Runtime 已清零的 Engine 依赖永久禁止回归，不再保留“0 预算”兼容口径；
-- 迁移期 Engine composition bridge、Feature 业务根和直接消费者采用具体 allowlist 单向收缩，删除后不得以同数量的新代理替代；
+- 迁移期 Engine composition bridge 与外部直接消费者采用具体 allowlist 单向收缩；已迁 Feature 业务根进入永久禁止回归集合，删除后不得以同数量的新代理或改名方法替代；
 - `LocalHarnessState` 字段与可写入口持续收缩；
-- Engine 构造依赖 / internal API 等热点上限仅用于防止重新中心化，不能单独作为阶段完成证明。
+- CI 不再使用 Engine 方法数、构造依赖数、聚合状态字段数或 UI projection 字段数作为架构放行条件；这些代码形状不能证明所有权，真正门禁以依赖方向、唯一事实源、精确迁移债务和旧路径退出为准。
 
 ## 16. 验证与完成标准
 
