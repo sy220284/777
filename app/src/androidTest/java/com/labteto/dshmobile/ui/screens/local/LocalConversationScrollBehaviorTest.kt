@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -29,7 +30,7 @@ class LocalConversationScrollBehaviorTest {
     fun visibleTailTracksComposerAndImeViewportShrink() {
         lateinit var listState: LazyListState
         val viewportHeight = mutableStateOf(420.dp)
-        val followTail = mutableStateOf(false)
+        val tailViewportAnchor = mutableStateOf<Int?>(null)
 
         compose.setContent {
             DshTheme {
@@ -52,7 +53,7 @@ class LocalConversationScrollBehaviorTest {
                     }
                     LocalComposerTailFollower(
                         listState = listState,
-                        active = followTail.value,
+                        anchoredViewportExtent = tailViewportAnchor.value,
                     )
                 }
             }
@@ -66,7 +67,7 @@ class LocalConversationScrollBehaviorTest {
         compose.onNodeWithText("tail-row-29").assertIsDisplayed()
         compose.runOnIdle {
             assertTrue(listState.isConversationTailVisible())
-            followTail.value = true
+            tailViewportAnchor.value = listState.conversationViewportExtent()
         }
         compose.waitForIdle()
 
@@ -86,7 +87,7 @@ class LocalConversationScrollBehaviorTest {
     fun focusingComposerWhileReadingHistoryDoesNotStealPosition() {
         lateinit var listState: LazyListState
         val viewportHeight = mutableStateOf(420.dp)
-        val followTail = mutableStateOf(false)
+        val tailViewportAnchor = mutableStateOf<Int?>(null)
 
         compose.setContent {
             DshTheme {
@@ -109,7 +110,7 @@ class LocalConversationScrollBehaviorTest {
                     }
                     LocalComposerTailFollower(
                         listState = listState,
-                        active = followTail.value,
+                        anchoredViewportExtent = tailViewportAnchor.value,
                     )
                 }
             }
@@ -121,8 +122,8 @@ class LocalConversationScrollBehaviorTest {
         }
         compose.waitForIdle()
         compose.runOnIdle {
-            assertTrue(!listState.isConversationTailVisible())
-            followTail.value = listState.isConversationTailVisible()
+            assertFalse(listState.isConversationTailVisible())
+            tailViewportAnchor.value = null
         }
 
         compose.runOnIdle {
