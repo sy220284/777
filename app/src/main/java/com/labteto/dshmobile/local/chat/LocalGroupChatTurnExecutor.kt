@@ -32,6 +32,8 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -53,7 +55,8 @@ import kotlinx.serialization.json.put
  * fan-out, per-character state refresh, shared-scene consolidation and transcript projection stay
  * together here instead of expanding LocalHarnessEngine.
  */
-internal class LocalGroupChatTurnExecutor(
+@Singleton
+internal class LocalGroupChatTurnExecutor @Inject constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val chatState: LocalChatStatePort,
     private val modelGateway: LocalModelGateway,
@@ -63,13 +66,12 @@ internal class LocalGroupChatTurnExecutor(
     private val chatMemory: LocalChatMemoryRuntime,
     private val branchCoordinator: LocalChatBranchCoordinator,
     private val transcriptRuntime: LocalChatTranscriptRuntime,
-    private val chatPersonaStore: ChatPersonaStore,
     private val chatPersistence: LocalChatPersistence,
     private val chatReplyCoordinator: LocalChatReplyCoordinator,
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
     private val usageTracker: DeepSeekUsageTracker,
     private val json: Json,
-    private val finishTurn: (Job?) -> Unit,
+    private val queue: LocalChatQueueRuntime,
 ) {
     private val sessionId: String
         get() = runtimeStateStore.currentSessionId
@@ -77,6 +79,8 @@ internal class LocalGroupChatTurnExecutor(
         get() = sessionStorage.eventLogs.get(sessionId)
     private val modelHistory
         get() = modelHistoryRuntime.history
+    private val chatPersonaStore
+        get() = chatPersistence.personaStore
     private val chatPersonaGalleryStore
         get() = chatPersistence.galleryStore
     private val diaryStore
@@ -925,7 +929,7 @@ internal class LocalGroupChatTurnExecutor(
                 }
             }
             persist()
-            finishTurn(currentCoroutineContext()[Job])
+            queue.finishTurnAndStartNext(currentCoroutineContext()[Job])
         }
     }
     private suspend fun modelRequestMarkerOrNull(snapshot: LocalHarnessState): String? =
