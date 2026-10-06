@@ -15,7 +15,7 @@ import com.labteto.dshmobile.local.runtime.DEFAULT_WEB_FETCH_BYTES
 import com.labteto.dshmobile.local.runtime.MAX_WEB_FETCH_BYTES
 import com.labteto.dshmobile.local.runtime.PERSISTENT_RECOVERY_RETRY_MILLIS
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
-import com.labteto.dshmobile.local.settings.LocalAgentRuntimeLimits
+import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.web.LocalWebTools
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
