@@ -233,6 +233,8 @@ Shared Capability 是多个 Feature 可以安全复用的纯能力边界。
 - Session owner / lease；
 - 删除与维护事务；
 - EventLog / transcript 权威事实；
+- 模型请求可重建证据、模型可见 Context / Tool Surface 版本；
+- ModelHistory Checkpoint 事件水位与尾部重放；
 - 恢复时的所有权裁决。
 
 Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建立第二套 Session 所有权。
@@ -427,6 +429,7 @@ Feature 不持有 sibling Feature internal，不复制其他领域规则，不�
 - Session snapshot / EventLog / transcript 权威事实；
 - Model route/profile 与 credential 边界；
 - Tool execution / approval / structured result；
+- 模型声明 `tool/call` 与真实 admission `tool/execution-started` 分离，真实执行拥有稳定 execution identity；
 - Memory / Usage / Diagnostics 等中立能力。
 
 每项共享事实只有一个 Owner，Feature 通过稳定契约消费，不建立第二套账本、调度器、Session owner 或恢复状态。
@@ -501,7 +504,8 @@ Kernel 不承担具体产品 Feature、Model Provider、Tool 领域、Settings �
 - `LocalAgentRunCoordinator` 的迟到结果栅栏；
 - 模型 Run 冻结 profile / route identity；
 - Tool side-effect 不明时禁止盲目重放；
-- EventLog 继续作为持久事实流；
+- EventLog 继续作为持久事实流，模型历史缓存 / Checkpoint 只能作为带水位的派生物；
+- 每次模型请求必须留下可校验的 request evidence；工具与模型可见 Context Surface 变化必须可追踪；
 - Chat / Work UI projection 隔离；
 - streaming preview 独立；
 - Token ledger 单一账本；
