@@ -170,7 +170,7 @@ class TasksViewModel @Inject constructor(
         val minimumRecurringMinutes = if (mode == AutomationMode.CHAT) 60L else 15L
         if (recurringMinutes != null && recurringMinutes < minimumRecurringMinutes) return false
         if (scheduleType == AutomationScheduleType.SILENCE &&
-            (silenceMinutes == null || silenceMinutes < 60L)
+            (silenceMinutes == null || silenceMinutes < LocalChatAutomationPolicy.MIN_SILENCE_MINUTES)
         ) return false
         if (scheduleType == AutomationScheduleType.WINDOW &&
             (windowStartMinuteOfDay == null || windowEndMinuteOfDay == null ||
