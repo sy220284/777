@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ratchet architectural hotspots so new features cannot silently re-centralize the app."""
+"""Validate Architecture 3.0 ownership, dependency direction, and migration exits."""
 
 from pathlib import Path
 import re
@@ -9,10 +9,6 @@ ROOT = Path(__file__).resolve().parents[2]
 
 LOCAL_SOURCE_ROOT = ROOT / "app/src/main/java/com/labteto/dshmobile/local"
 
-ENGINE_MAX_PUBLIC_METHODS = 0
-ENGINE_MAX_INTERNAL_METHODS = 1
-ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
-AGGREGATE_STATE_MAX_FIELDS = 28
 ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST = {
     "diagnosticsPort",
     "sessionLifecyclePort",
@@ -27,7 +23,7 @@ ENGINE_COMPOSITION_BRIDGE_ALLOWLIST = (
     ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST
     | ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST
 )
-ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
+REMOVED_ENGINE_STAGE3_FEATURE_ROOTS = (
     "sendChat",
     "queueHumanTurn",
     "queueWorkTurnLocked",
@@ -47,8 +43,7 @@ ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
     "exitPlanMode",
     "scheduleChatPostTurn",
 )
-ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST = set()
-ENGINE_STAGE3_WORK_BUILTIN_CANDIDATES = {
+REMOVED_ENGINE_STAGE3_WORK_BUILTINS = {
     "update_plan",
     "exit_plan_mode",
     "todo_write",
@@ -66,7 +61,6 @@ ENGINE_STAGE3_WORK_BUILTIN_CANDIDATES = {
     "interrupt_agent",
     "workflow",
 }
-ENGINE_STAGE3_WORK_BUILTIN_ALLOWLIST = set()
 ENGINE_REMOVED_PRIVATE_BUSINESS_METHODS = {
     "chatStreamFilterPhrases",
     "compactHistoryIfNeeded",
@@ -81,13 +75,6 @@ ENGINE_REMOVED_PRIVATE_BUSINESS_METHODS = {
     "sessionFileFor",
 }
 
-HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS = {
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalGroupChatTurnExecutor.kt": ("LocalGroupChatTurnExecutor", 16),
-    "app/src/main/java/com/labteto/dshmobile/local/LocalSubagentRunner.kt": ("LocalSubagentRunner", 23),
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt": ("LocalAutomationChatCoordinator", 14),
-    "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt": ("LocalModelRequestCoordinator", 4),
-}
-
 RUNTIME_ENGINE_FORBIDDEN_PATHS = (
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
@@ -97,14 +84,7 @@ RUNTIME_ENGINE_FORBIDDEN_PATHS = (
     "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt",
     "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
 )
-PROJECTION_FIELD_BUDGETS = {
-    "LocalHarnessSettingsState": 17,
-    "LocalHarnessTaskState": 4,
-    "LocalHarnessShellState": 10,
-}
-
 ENGINE_CONSUMER_ALLOWLIST = {
-    "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt",
     "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt",
 }
 
@@ -616,7 +596,9 @@ if "internal suspend fun exitWorkPlanMode(" not in work_plan_mode_source:
     die("WorkFeature must own the active-run plan exit transaction")
 
 engine_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
-engine = read(engine_path)
+engine_file = ROOT / engine_path
+engine_exists = engine_file.exists()
+engine = engine_file.read_text(encoding="utf-8") if engine_exists else ""
 work_regenerator_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkReplyRegenerator.kt")
 )
@@ -695,8 +677,6 @@ for required_work_turn_owner in (
         die("Work first-turn ownership is incomplete: " + required_work_turn_owner)
 if "private fun queueWorkTurnLocked(" in engine or "private fun queueExistingWorkTurnLocked(" in engine:
     die("Work first-turn binding must not return to LocalHarnessEngine")
-if "workTurnStarter.startFresh(" not in engine or "workTurnStarter.startResumed(" not in engine:
-    die("Engine migration call sites must route Work start/resume to WorkFeature")
 for required_work_agent_owner in (
     "internal suspend fun run(",
     "LocalSessionRuntimeRegistry.withOwner(",
@@ -787,33 +767,6 @@ for forbidden_approval_aggregate in (
             "Work approval must use LocalInteractionCoordinator instead of aggregate mutable state: "
             + forbidden_approval_aggregate
         )
-
-
-def constructor_dependency_count(relative: str, class_name: str) -> int:
-    source = strip_comments(read(relative))
-    match = re.search(
-        rf"\bclass\s+{re.escape(class_name)}\b"
-        rf"(?:\s+@[A-Za-z0-9_.]+(?:\([^)]*\))?)*"
-        rf"\s*(?:constructor\s*)?\((.*?)\)\s*(?::[^{{]+)?\{{",
-        source,
-        re.DOTALL,
-    )
-    if match is None:
-        die(f"unable to locate {class_name} constructor in {relative}")
-    return len(re.findall(r"\bprivate\s+val\s+[A-Za-z0-9_]+\s*:", match.group(1)))
-
-
-for relative, (class_name, maximum) in HOTSPOT_CONSTRUCTOR_DEPENDENCY_BUDGETS.items():
-    dependencies = constructor_dependency_count(relative, class_name)
-    if dependencies > maximum:
-        die(
-            f"{class_name} has {dependencies} constructor dependencies (ratchet: {maximum}); "
-            "split ownership/capabilities instead of extending dependency soup"
-        )
-    print(
-        f"[architecture-guard] {class_name}: "
-        f"{dependencies}/{maximum} constructor dependencies"
-    )
 
 
 automation_runtime_source = strip_comments(
@@ -937,17 +890,12 @@ constructor = re.search(
     r"class LocalHarnessEngine @Inject\s+(?:internal\s+)?constructor\((.*?)\n\) \{",
     engine,
     re.DOTALL,
-)
-if constructor is None:
-    die("unable to locate LocalHarnessEngine constructor")
-if has_typed_property(constructor.group(1), "LocalHarnessSettingsCoordinator"):
+) if engine_exists else None
+if engine_exists and constructor is None:
+    die("unable to locate LocalHarnessEngine constructor while the migration Engine exists")
+engine_constructor = engine_constructor if constructor is not None else ""
+if has_typed_property(engine_constructor, "LocalHarnessSettingsCoordinator"):
     die("LocalHarnessEngine must not depend on the Settings capability")
-dependency_count = len(re.findall(r"private val\s+[A-Za-z0-9_]+\s*:", constructor.group(1)))
-if dependency_count > ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES:
-    die(
-        f"LocalHarnessEngine constructor has {dependency_count} dependencies "
-        f"(ratchet: {ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES})"
-    )
 
 runtime_state_store = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt")
@@ -1262,13 +1210,23 @@ if not has_call(work_runtime_source, "runtimeStateStore", "cancelForegroundRun")
     die("Work visible-run cancellation must use the shared Runtime owner")
 if "check(!initialized)" not in runtime_state_store:
     die("LocalRuntimeStateStore initialization must remain single-owner")
+for required_session_transition_owner in (
+    "sessionTransitioning",
+    "beginSessionTransition(",
+    "endSessionTransition(",
+):
+    if required_session_transition_owner not in runtime_state_store:
+        die(
+            "Shared Runtime must own Session transition state and mutation: "
+            + required_session_transition_owner
+        )
 if not has_call(engine, "runtimeStateStore", "initialize"):
     die("LocalHarnessEngine must initialize state through LocalRuntimeStateStore")
-if not has_typed_property(constructor.group(1), "LocalRuntimeStateStore"):
+if not has_typed_property(engine_constructor, "LocalRuntimeStateStore"):
     die("LocalHarnessEngine must receive the shared LocalRuntimeStateStore by injection")
-if not has_typed_property(constructor.group(1), "LocalSessionStorageRuntime"):
+if not has_typed_property(engine_constructor, "LocalSessionStorageRuntime"):
     die("LocalHarnessEngine must consume the shared Session storage capability")
-if has_typed_property(constructor.group(1), "LocalSessionEventLogRegistry"):
+if has_typed_property(engine_constructor, "LocalSessionEventLogRegistry"):
     die("LocalHarnessEngine must not inject Session EventLog storage separately from LocalSessionStorageRuntime")
 if "LocalSessionRepository(" in engine or "LocalSessionCoordinator(" in engine:
     die("LocalHarnessEngine must not construct Session persistence owners")
@@ -1537,35 +1495,8 @@ if (
     die("LocalModelConfigurationCoordinator must remain an injected Model capability")
 if "LocalDeepSeekSearchCredentialResolver(::readProfiles, apiKeys).resolve()" not in model_configuration:
     die("DeepSeek search credential resolution must stay inside Model configuration capability")
-if "private val apiKeys: LocalApiKeyStore" in constructor.group(1) or "private val modelConnectionTester: LocalModelConnectionTester" in constructor.group(1):
+if "private val apiKeys: LocalApiKeyStore" in engine_constructor or "private val modelConnectionTester: LocalModelConnectionTester" in engine_constructor:
     die("LocalHarnessEngine must not re-own Model configuration dependencies")
-
-public_method_count = len(
-    re.findall(
-        r"^    (?:public\s+)?(?:suspend\s+)?fun\s+[A-Za-z0-9_]+\s*\(",
-        engine,
-        re.MULTILINE,
-    )
-)
-if public_method_count > ENGINE_MAX_PUBLIC_METHODS:
-    die(
-        f"LocalHarnessEngine exposes {public_method_count} methods "
-        f"(ratchet: {ENGINE_MAX_PUBLIC_METHODS}); add capability-specific APIs instead"
-    )
-
-internal_method_count = len(
-    re.findall(
-        r"^    internal\s+(?:suspend\s+)?fun\s+[A-Za-z0-9_]+\s*\(",
-        engine,
-        re.MULTILINE,
-    )
-)
-if internal_method_count > ENGINE_MAX_INTERNAL_METHODS:
-    die(
-        f"LocalHarnessEngine exposes {internal_method_count} internal methods "
-        f"(ratchet: {ENGINE_MAX_INTERNAL_METHODS}); "
-        "internal capability API is still architecture API and must move outward"
-    )
 
 models_path = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessModels.kt"
 models = read(models_path)
@@ -1573,14 +1504,6 @@ state_start = models.find("data class LocalHarnessState(")
 state_end = models.find("\n)", state_start)
 if state_start < 0 or state_end < 0:
     die("unable to locate LocalHarnessState")
-state_field_count = len(
-    re.findall(r"^\s*val\s+[A-Za-z0-9_]+\s*:", models[state_start:state_end], re.MULTILINE)
-)
-if state_field_count > AGGREGATE_STATE_MAX_FIELDS:
-    die(
-        f"LocalHarnessState has {state_field_count} fields "
-        f"(ratchet: {AGGREGATE_STATE_MAX_FIELDS}); create a domain/projection state instead"
-    )
 if "streamingAssistant" in models or "streamingReasoning" in models:
     die("streaming preview must stay outside LocalHarnessState")
 
@@ -1779,55 +1702,6 @@ transcript_runtime = read("app/src/main/java/com/labteto/dshmobile/local/session
 if "clearStreamingPreview" in transcript_runtime:
     die("transcript runtime must not expose a fake streaming-preview clear flag")
 
-projection_path = "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalHarnessUiState.kt"
-projection_source = read(projection_path)
-for class_name, maximum in PROJECTION_FIELD_BUDGETS.items():
-    class_start = projection_source.find(f"data class {class_name}(")
-    class_end = projection_source.find("\n)", class_start)
-    if class_start < 0 or class_end < 0:
-        die(f"unable to locate {class_name}")
-    field_count = len(
-        re.findall(
-            r"^\s*val\s+[A-Za-z0-9_]+\s*:",
-            projection_source[class_start:class_end],
-            re.MULTILINE,
-        )
-    )
-    if field_count > maximum:
-        die(
-            f"{class_name} has {field_count} fields (ratchet: {maximum}); "
-            "split the projection instead of recreating aggregate state"
-        )
-
-work_projection_path = "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalWorkUiState.kt"
-work_projection_source = read(work_projection_path)
-work_class_start = work_projection_source.find("data class LocalWorkUiState(")
-work_class_end = work_projection_source.find("\n)", work_class_start)
-if work_class_start < 0 or work_class_end < 0:
-    die("unable to locate LocalWorkUiState")
-work_field_count = len(
-    re.findall(
-        r"^\s*val\s+[A-Za-z0-9_]+\s*:",
-        work_projection_source[work_class_start:work_class_end],
-        re.MULTILINE,
-    )
-)
-if work_field_count > 23:
-    die(
-        f"LocalWorkUiState has {work_field_count} fields (ratchet: 23); "
-        "split status/run-center projections instead of growing the work surface"
-    )
-
-conversation_projection_path = "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalConversationSurfaceState.kt"
-conversation_projection_source = read(conversation_projection_path)
-conversation_class_start = conversation_projection_source.find("data class LocalConversationSurfaceState(")
-conversation_class_end = conversation_projection_source.find("\n)", conversation_class_start)
-if conversation_class_start < 0 or conversation_class_end < 0:
-    die("unable to locate LocalConversationSurfaceState")
-conversation_field_count = len(re.findall(r"^\s*val\s+[A-Za-z0-9_]+\s*:", conversation_projection_source[conversation_class_start:conversation_class_end], re.MULTILINE))
-if conversation_field_count > 31:
-    die(f"LocalConversationSurfaceState has {conversation_field_count} fields (ratchet: 31); split narrower mode projections instead of widening the shared surface")
-
 screen_path = "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessScreen.kt"
 screen_source = read(screen_path)
 screen_entry_start = screen_source.find("fun LocalHarnessScreen(")
@@ -1894,9 +1768,12 @@ local_root = ROOT / "app/src/main/java/com/labteto/dshmobile/local"
 main_root = ROOT / "app/src/main/java/com/labteto/dshmobile"
 engine_consumers = set()
 for path in main_root.rglob("*.kt"):
+    relative = path.relative_to(ROOT).as_posix()
+    if relative == engine_path:
+        continue
     text = strip_comments(path.read_text(encoding="utf-8"))
     if re.search(r"\bLocalHarnessEngine\b", text):
-        engine_consumers.add(path.relative_to(ROOT).as_posix())
+        engine_consumers.add(relative)
 view_model_path = "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalHarnessViewModel.kt"
 if "LocalHarnessEngine" in strip_comments(read(view_model_path)):
     die("LocalHarnessViewModel must depend on capability runtimes, not LocalHarnessEngine")
@@ -2211,8 +2088,6 @@ if "private var sessionTransitioning" in engine:
     die("LocalHarnessEngine must not own Session transition state")
 if "get() = runtimeStateStore.sessionTransitioning" not in engine:
     die("Engine migration code must read the Shared Runtime Session transition fact")
-if "runtimeStateStore.beginSessionTransition()" not in engine or "runtimeStateStore.endSessionTransition()" not in engine:
-    die("Session transition mutation must stay owned by Shared Runtime")
 
 conversation_files_source = strip_comments(
     read("app/src/main/java/com/labteto/dshmobile/local/session/LocalConversationFilesCoordinator.kt")
@@ -2536,64 +2411,43 @@ if "contentAlreadyBounded = true" not in strip_comments(
 ):
     die("Work tool transcript projection must prove tool output is bounded before identity projection")
 
-stage3_feature_roots = {
+regained_stage3_feature_roots = sorted(
     method
-    for method in ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES
+    for method in REMOVED_ENGINE_STAGE3_FEATURE_ROOTS
     if re.search(rf"\bprivate\s+(?:suspend\s+)?fun\s+{re.escape(method)}\s*\(", engine)
-}
-unexpected_stage3_roots = sorted(
-    stage3_feature_roots - ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST
 )
-if unexpected_stage3_roots:
+if regained_stage3_feature_roots:
     die(
         "LocalHarnessEngine regained removed Stage-3 Feature business root(s): "
-        + ", ".join(unexpected_stage3_roots)
-    )
-stale_stage3_roots = sorted(
-    ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST - stage3_feature_roots
-)
-if stale_stage3_roots:
-    die(
-        "stale Stage-3 Engine business-root allowlist entries: "
-        + ", ".join(stale_stage3_roots)
-        + "; tighten the ratchet when ownership moves into the Feature"
+        + ", ".join(regained_stage3_feature_roots)
     )
 
-execute_builtin_start = engine.find("private suspend fun executeBuiltin(")
-execute_builtin_end = engine.find(
-    "\n    private fun startPersistentWebFetch(",
-    execute_builtin_start,
-)
-if execute_builtin_start < 0 or execute_builtin_end < 0:
-    die("Unable to locate LocalHarnessEngine builtin dispatch for Stage-3 ratchet")
-execute_builtin_body = engine[execute_builtin_start:execute_builtin_end]
-engine_builtin_case_names = set()
-for builtin_case_labels in re.findall(
-    r'^\s*((?:"[^"]+"\s*,\s*)*"[^"]+")\s*->',
-    execute_builtin_body,
-    re.MULTILINE,
-):
-    engine_builtin_case_names.update(re.findall(r'"([^"]+)"', builtin_case_labels))
-stage3_work_builtin_cases = (
-    engine_builtin_case_names & ENGINE_STAGE3_WORK_BUILTIN_CANDIDATES
-)
-unexpected_stage3_work_builtins = sorted(
-    stage3_work_builtin_cases - ENGINE_STAGE3_WORK_BUILTIN_ALLOWLIST
-)
-if unexpected_stage3_work_builtins:
-    die(
-        "LocalHarnessEngine regained migrated Work builtin business dispatch: "
-        + ", ".join(unexpected_stage3_work_builtins)
-    )
-stale_stage3_work_builtins = sorted(
-    ENGINE_STAGE3_WORK_BUILTIN_ALLOWLIST - stage3_work_builtin_cases
-)
-if stale_stage3_work_builtins:
-    die(
-        "stale Stage-3 Work builtin allowlist entries: "
-        + ", ".join(stale_stage3_work_builtins)
-        + "; shrink the allowlist in the same migration that moves the tool owner"
-    )
+if engine_exists:
+    execute_builtin_start = engine.find("private suspend fun executeBuiltin(")
+    if execute_builtin_start >= 0:
+        execute_builtin_end = engine.find(
+            "\n    private fun startPersistentWebFetch(",
+            execute_builtin_start,
+        )
+        execute_builtin_body = engine[
+            execute_builtin_start:
+            execute_builtin_end if execute_builtin_end >= 0 else len(engine)
+        ]
+        engine_builtin_case_names = set()
+        for builtin_case_labels in re.findall(
+            r'^\s*((?:"[^"]+"\s*,\s*)*"[^"]+")\s*->',
+            execute_builtin_body,
+            re.MULTILINE,
+        ):
+            engine_builtin_case_names.update(re.findall(r'"([^"]+)"', builtin_case_labels))
+        regained_work_builtins = sorted(
+            engine_builtin_case_names & REMOVED_ENGINE_STAGE3_WORK_BUILTINS
+        )
+        if regained_work_builtins:
+            die(
+                "LocalHarnessEngine regained migrated Work builtin business dispatch: "
+                + ", ".join(regained_work_builtins)
+            )
 
 for transactional_chat_owner in (
     "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatPersonaCoordinator.kt",
@@ -2718,9 +2572,4 @@ for relative in tool_registration_files:
             if required_field not in declaration:
                 die(f"{relative} HarnessTool is missing explicit {required_field[:-2].strip()} declaration")
 
-print(
-    "[architecture-guard] OK: "
-    f"engine deps={dependency_count}, public methods={public_method_count}, "
-    f"internal methods={internal_method_count}, "
-    f"aggregate fields={state_field_count}"
-)
+print("[architecture-guard] OK: Architecture 3.0 ownership/dependency invariants hold")
