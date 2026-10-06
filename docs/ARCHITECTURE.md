@@ -1,8 +1,8 @@
 # 架构 3.0
 
-> 本文是 777 当前唯一系统架构权威文档。旧版“UI → capability runtime → LocalHarnessEngine → coordinator”的架构描述已经被本版本替代。
+> 本文是 777 当前唯一系统架构权威文档。
 >
-> 架构 3.0 的目标是：**模块化单体 + 层级化 Feature 组合 + 共享能力契约 + 极薄运行内核**。迁移按阶段推进；本文同时记录目标边界和当前迁移状态，禁止把尚未完成的迁移描述成已完成。
+> 架构 3.0 的当前边界是：**模块化单体 + 层级化 Feature 组合 + 共享能力契约 + 极薄进程运行内核**。本文前半部分定义现行架构，后半部分保留迁移阶段记录用于解释演进。
 
 ## 1. 核心结论
 
@@ -51,14 +51,8 @@ Application Shell / Feature Host
 │                                                            │
 │ Session │ Model │ Agent │ Tool │ Memory │ Resource         │
 │ Usage   │ Event │ Runtime │ Persistence │ Diagnostics      │
-└───────────────────────────┬────────────────────────────────┘
-                            │
-                            ▼
-┌────────────────────────────────────────────────────────────┐
-│                   LocalRuntimeKernel                       │
 │                                                            │
-│ Run identity / ownership / transaction / cancellation      │
-│ resource lease / recovery / lifecycle                      │
+│ Session / Run ownership │ resource scheduling │ recovery   │
 └───────────────────────────┬────────────────────────────────┘
                             │
                             ▼
@@ -67,6 +61,18 @@ Application Shell / Feature Host
 │ harness-core / Android runtime / MCP / LSP / device        │
 │ persistence / network / third-party integrations           │
 └────────────────────────────────────────────────────────────┘
+
+进程启动侧单独存在极薄 `LocalRuntimeKernel`：
+
+```text
+DshApplication
+→ LocalRuntimeKernel
+→ LocalRuntimeBootstrapPort
+→ 应用组合根
+→ Shared Runtime / Feature 初始化与恢复
+```
+
+Kernel 只负责进程 start-once、生命周期 scope、bootstrap / recovery 触发与初始化错误投影，不位于每条 Feature 业务调用链中。
 ```
 
 ## 3. Gradle 模块边界
@@ -108,7 +114,7 @@ Feature 不得：
 
 - 直接读取另一个 Feature 的 Store / Coordinator / mutable state；
 - 把跨 Feature 规则复制到多个入口；
-- 为调用方便直接穿透到 `LocalHarnessEngine`；
+- 绕过所属 Feature 的公开 API / Port，直接穿透到其他领域或共享实现；
 - 通过全局 Service Locator 获取任意内部对象；
 - 把 UI 页面本身当成业务所有权。
 
@@ -152,7 +158,7 @@ WorkFeature
 └─ OutputQuality
 ```
 
-Work 的计划、Todo、目标、审批、问答和运行中心属于同一业务域，不继续散落在 Engine、UI 和 jobs 包之间形成多点所有权。
+Work 的计划、Todo、目标、审批、问答和运行中心属于同一业务域，由 WorkFeature 统一解释领域语义；共享 Interaction / Jobs 能力只提供中立运行契约和事实。
 
 ### 4.3 AutomationFeature
 
@@ -176,7 +182,7 @@ Automation 不允许进入 Chat / Work 内部实现。需要执行聊天或工�
 
 ToolsFeature 负责工具管理、MCP 集成和用户可见工具入口；运行时真正的 Tool execution contract 属于 Shared Capability。
 
-SettingsFeature 负责设置体验和配置入口；模型身份、凭据解析、运行时资源等真实能力仍由对应 Shared Capability 所有。
+SettingsFeature 负责设置体验和配置入口；真实配置事实仍归对应业务 Owner：Feature 专属配置归所属 Feature，中立跨域配置归对应 Shared Capability。
 
 ## 5. 子功能注册与 LocalFeatureCatalog
 
@@ -218,7 +224,7 @@ Shared Capability 是多个 Feature 可以安全复用的纯能力边界。
 
 ### Session Capability
 
-`LocalSessionStorageRuntime` 统一持有 Session snapshot Repository/Coordinator，并复用唯一 `LocalSessionEventLogRegistry`；Feature 的持久化不得再借道 Engine 私有 Session 对象。
+`LocalSessionStorageRuntime` 统一持有 Session snapshot Repository / Coordinator，并复用唯一 `LocalSessionEventLogRegistry`；Feature 通过 Session Capability 完成共享会话持久化，不建立独立 Session 所有权。
 
 
 负责：
@@ -274,28 +280,28 @@ Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建
 
 ## 7. LocalRuntimeKernel
 
-`LocalRuntimeKernel` 是架构 3.0 最底部的跨 Feature 运行时核心。
+`LocalRuntimeKernel` 是架构 3.0 的极薄进程生命周期内核，不承担领域业务和共享运行事实的所有权。
 
-最终只保留：
+当前职责只有：
 
-- Run identity；
-- Session / run ownership；
-- 跨域事务边界；
-- cancellation propagation；
-- resource lease；
-- recovery 入口；
-- 系统启动、关闭与 Feature 生命周期协调。
+- 进程 start-once；
+- 进程级 CoroutineScope / 生命周期；
+- 调用中立 `LocalRuntimeBootstrapPort`；
+- 触发 bootstrap / startup recovery；
+- 初始化与后台 Runtime 失败投影。
 
-Kernel 明确不应该理解：
+Session ownership、Agent run identity、迟到提交栅栏、资源调度、共享持久化与 recovery coordination 属于 Shared Runtime / Shared Capability，由对应单一 Owner 持有。
 
-- 人物、图集、日记；
-- 群聊成员；
+具体 Feature / Provider 的构造和装配位于应用组合根。
+
+Kernel 不理解：
+
+- 人物、图集、日记、群聊；
 - Work 计划 / Todo / Goal；
-- GitHub Token；
-- MCP 设置页面；
-- 具体 UI 页面。
-
-当前旧 `LocalHarnessEngine` 已删除。`DshApplication` 显式启动 `LocalRuntimeKernel`；Kernel 仅持有进程 start-once、生命周期作用域、bootstrap / recovery 触发与初始化错误投影。具体 Feature / provider 装配位于应用组合根，通过中立 `LocalRuntimeBootstrapPort` 接入；Runtime Kernel 不反向依赖产品 Feature internal。
+- Model Provider 业务；
+- GitHub Token / Tool 领域配置；
+- Settings 页面或其他具体 UI；
+- Feature 专属状态与规则。
 
 ## 8. 状态模型
 
@@ -361,33 +367,40 @@ Feature UI
 
 ## 11. 单向依赖规则
 
-允许：
+业务调用依赖：
 
 ```text
 UI
 ↓
-Feature API
+presentation / Feature API / projection
 ↓
 Feature internal
 ↓
-Shared Capability
+Shared Capability / Shared Runtime contract（按需）
 ↓
-Kernel / Platform
+Platform / Infrastructure
 ```
 
-禁止：
+进程启动依赖：
 
 ```text
-Kernel → Feature
-Shared Capability → Feature
-Chat internal → Work internal
-Work internal → Chat internal
-Automation → Chat/Work internal
-UI → Coordinator / Store
-Feature Runtime → LocalHarnessEngine 纯转发继续增长
+DshApplication
+↓
+LocalRuntimeKernel
+↓
+LocalRuntimeBootstrapPort
+↓
+应用组合根
 ```
 
-跨 Feature 调用必须通过稳定 Port，且 Port 归属于提供能力的一侧。
+边界要求：
+
+- Shared Capability 不依赖 Feature internal；
+- Feature internal 不依赖 sibling Feature internal；
+- Automation 通过 Chat / Work Execution Port 调用提供方能力；
+- UI 不直接依赖领域 Store / Coordinator / Runtime；
+- Kernel 不依赖 Feature internal，也不承载 Feature / Provider 构造；
+- 跨 Feature 调用必须通过稳定 Port，且 Port 归属于提供能力的一侧。
 
 ## 12. 迁移阶段
 
@@ -524,7 +537,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 CI 已将架构 3.0 从通用静态检查中独立为 `architecture-3-gates`。范围分类器识别 Feature / Shared Capability / Runtime Kernel 及架构控制文件；完整产品改动必须通过该 lane，main push 也必须重新执行对应控制面验证。
 
-架构 3.0 不设置 Kotlin 文件数量门禁，也不设置单文件行数门禁。拆成几个文件、每个文件多少行都不能证明所有权正确；CI 只约束真实的架构边界、依赖方向、状态归属和运行不变量。本轮已清零的跨层依赖、旧 Engine 路径、聚合可写入口和 UI 穿透均使用永久禁止规则；后续若出现新的临时例外，必须单独记录债务、出口和删除条件，不能复用历史迁移白名单。
+架构 3.0 不设置 Kotlin 文件数量门禁，也不设置单文件行数门禁。拆成几个文件、每个文件多少行都不能证明所有权正确；CI 约束真实的 Feature / Shared Capability / Runtime Kernel 边界、依赖方向、状态归属、生产装配和运行不变量。若存在临时架构债务，必须单独记录消费文件、具体依赖边、退出条件和删除条件。
 
 Feature Catalog 与路由门禁现包括：
 
@@ -549,10 +562,11 @@ Feature Catalog 与路由门禁现包括：
 - Chat / Work 不持有完整 `LocalHarnessState` 可写聚合状态；领域事实由所属 Feature / Shared Capability 单一拥有，聚合适配仅存在于应用组合根 / Runtime-owned 兼容投影边界；
 - Session ownership、Agent run identity、迟到提交栅栏与 recovery coordination 归共享 Runtime 所有，Feature 不建立第二套 run owner；
 - 全局审批配置以 `LocalApprovalPreferences` 为共享权威事实，Work 通过流式投影消费，不再从 Session 快照复制第二事实源；
-- Chat / Work / Session / Model / Tools / Automation / Settings Runtime 已清零的 Engine 依赖永久禁止回归；
-- 旧 Engine composition bridge、外部直接消费者与已迁 Feature 业务根均属于历史墓碑；不得以新代理、改名方法、0 预算或历史迁移白名单重新引入；
-- `LocalHarnessState` 只保留 Runtime-owned 兼容聚合与只读投影用途，已迁字段不得重新形成长期双读 / 双写；
-- CI 不使用 Engine 方法数、构造依赖数、聚合状态字段数、UI projection 字段数或文件行数作为架构放行条件；真正门禁以所有权、依赖方向、唯一事实源、运行不变量和旧路径退出为准。
+- Chat / Work / Automation / Tools / Settings 的领域状态、规则和公开 API 均由所属 Feature 单一拥有；
+- Session / Model / Agent / Tool / Memory / Resource / Usage / Event / Persistence 等共享能力保持中立单一事实源；
+- 应用组合根负责 Feature / Provider 构造装配，`LocalRuntimeKernel` 不承载产品组合；
+- `LocalHarnessState` 只保留 Runtime-owned 兼容聚合与只读投影用途，领域写入通过所属 Owner 完成；
+- CI 以所有权、依赖方向、唯一事实源、生产装配、运行不变量和投影边界作为架构放行条件。
 
 ## 16. 验证与完成标准
 
@@ -571,14 +585,16 @@ Feature Catalog 与路由门禁现包括：
 
 整个架构 3.0 只有在以下条件同时成立时才完成：
 
-- Feature 拥有真实业务所有权，不是 Engine proxy；
-- Feature 之间只通过能力契约协作；
-- 共享能力只有一个事实源；
-- Kernel 不包含产品业务；
-- UI 由 Feature contribution 驱动；
-- 旧 Engine 业务入口退出；
-- 没有长期兼容双路；
-- 架构门禁能够阻止重新中心化。
+- 每个 Feature 拥有自己的领域状态、规则、写入与公开 API；
+- Feature 之间只通过稳定能力契约 / Port 协作；
+- Shared Capability 保持中立且每项共享事实只有一个 Owner；
+- Session ownership、Agent run identity、资源调度与恢复协调保持单一共享运行事实源；
+- `LocalRuntimeKernel` 只承担进程生命周期和 bootstrap / recovery 触发；
+- Feature / Provider 构造集中在应用组合根；
+- FeatureCatalog 的 route owner 与 UI contribution 归属唯一；
+- UI 只通过 presentation / Feature API / projection 消费；
+- `LocalHarnessState` 只承担兼容聚合 / 只读投影，不成为领域写入口；
+- 架构门禁持续验证上述所有权、依赖、装配和运行不变量。
 
 ## 17. 相关权威文档
 
