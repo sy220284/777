@@ -8,7 +8,10 @@ import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
 import com.labteto.dshmobile.local.send.LocalPreparedSend
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -42,6 +45,66 @@ class LocalWorkExecutionCoordinatorTest {
     }
 
     @Test
+    fun detachedExecutionTargetsExplicitSessionAndReturnsStructuredCompletion() = runTest {
+        val fake = RecordingTurnPort()
+        val coordinator = coordinator(
+            turn = fake,
+            prepareDetachedSession = { _, preferred -> preferred ?: "created-session" },
+            runDetached = { text, target, timeout, recover ->
+                assertEquals("后台任务", text)
+                assertEquals("session-b", target)
+                assertEquals(12_000L, timeout)
+                assertTrue(recover)
+                LocalWorkAutomationResult(requireNotNull(target), "完成")
+            },
+        )
+
+        val result = coordinator.execute(
+            LocalWorkExecutionRequest(
+                text = " 后台任务 ",
+                targetSessionId = "session-b",
+                timeoutMillis = 12_000L,
+                recoverInterrupted = true,
+            ),
+        )
+
+        assertEquals(LocalWorkExecutionStatus.DELIVERED, result.status)
+        assertEquals("session-b", result.sessionId)
+        assertEquals("完成", result.output)
+    }
+
+    @Test
+    fun cancellingDetachedExecutionReturnsStructuredCancellation() = runTest {
+        val fake = RecordingTurnPort()
+        val started = CompletableDeferred<Unit>()
+        val never = CompletableDeferred<Unit>()
+        val coordinator = coordinator(
+            turn = fake,
+            prepareDetachedSession = { _, preferred -> requireNotNull(preferred) },
+            runDetached = { _, target, _, _ ->
+                started.complete(Unit)
+                never.await()
+                LocalWorkAutomationResult(requireNotNull(target), "不会到达")
+            },
+        )
+
+        val running = async {
+            coordinator.execute(
+                LocalWorkExecutionRequest(
+                    text = "执行",
+                    targetSessionId = "session-c",
+                ),
+            )
+        }
+        started.await()
+        assertTrue(coordinator.cancel("session-c"))
+
+        val result = running.await()
+        assertEquals(LocalWorkExecutionStatus.CANCELLED, result.status)
+        assertEquals("session-c", result.sessionId)
+    }
+
+    @Test
     fun regenerateAdmissionIsOwnedByWorkFeatureBeforeStartingRegenerationOwner() {
         val fake = RecordingTurnPort()
         val runtime = readyRuntimeForRegeneration()
@@ -58,6 +121,11 @@ class LocalWorkExecutionCoordinatorTest {
     private fun coordinator(
         turn: RecordingTurnPort,
         runtime: LocalRuntimeStateStore = defaultRuntime(),
+        prepareDetachedSession: suspend (String, String?) -> String = { _, preferred ->
+            preferred ?: "detached-test"
+        },
+        runDetached: suspend (String, String?, Long, Boolean) -> LocalWorkAutomationResult =
+            { _, target, _, _ -> LocalWorkAutomationResult(requireNotNull(target), "ok") },
     ): LocalWorkExecutionCoordinator =
         LocalWorkExecutionCoordinator(
             workRunRegistry = LocalWorkRunRegistry(runtime),
@@ -66,6 +134,8 @@ class LocalWorkExecutionCoordinatorTest {
             enqueueSnapshot = { error("首轮启动不得写排队快照") },
             startPreparedTurn = turn::startPrepared,
             startRegeneration = turn::startRegeneration,
+            prepareDetachedSession = prepareDetachedSession,
+            runDetached = runDetached,
         )
 
     private fun defaultRuntime(): LocalRuntimeStateStore =

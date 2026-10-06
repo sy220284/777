@@ -51,7 +51,7 @@
 - 群公告统一到维护所有权与 Chat domain event；计划批准改为一个可回放的 `plan/approved` 事件。
 - Chat 恢复与 Chat／Work 事件解释回到提供方领域；删除旧共享 Memory coordinator、Engine 旧包装并收紧永久禁止回归规则。
 - Session envelope 保留既有领域序列化类型与文件格式；这些精确数据边界不允许替换为 Store／Coordinator／执行器依赖。
-- 本轮未完成后台目标会话 Execution Port；其真实实现仍是 3-B 出口与阶段四后台接入的依赖，保持未勾选，不通过调整阶段口径计为完成。
+- 本轮已补齐后台目标会话 Execution Port：普通 Work / Chat Port 现已包含显式目标会话、超时／恢复选项、结构化终态以及按会话 cancel / join；Automation 专属 Port 通过适配器进入普通 Feature Execution Port。当前 Head 完整 CI 仍须单独验收。
 - 当前 Head 完整 CI 尚待验证；旧 Head 的成功不能替代。
 
 ## 3. 总体推进顺序
@@ -121,7 +121,7 @@ P0 不做新的大块迁移。CI 失败先查根因与同类调用路径，修�
 
 - [ ] ViewModel / UI 的 Work send 和 regenerate 调用 Work API；Chat 不再作为 Work 执行的产品入口。
 - [ ] Engine 不再定义 Work 主回合、计划目标规则、Work 编排和恢复业务。
-- [ ] WorkExecutionPort 具备真实实现；多会话 Work、后台继续运行、切回投影、真实取消 / join 和下一轮队列均通过。
+- [x] WorkExecutionPort 具备真实实现；显式目标会话、后台继续运行、结构化终态、真实取消 / join 与多会话 Work 均收口到 Feature Port；当前 Head 的完整 CI / 设备 lane 仍由 P0 单独验收。
 - [ ] 使用现有 conformance / recovery / Tool tests 补真实迁移差异，覆盖供应商 overflow、副作用未知、只读 / 计划模式与长上下文。
 
 ## 7. 阶段 3-C：Chat 发送和回合执行

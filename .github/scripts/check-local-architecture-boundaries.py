@@ -775,6 +775,46 @@ for relative in NARROW_PORT_PATHS:
             )
 
 
+
+# Stage-3 Chat/Work Execution Ports must remain complete lifecycle contracts.
+for relative, request_type, result_type in (
+    (
+        "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkExecutionPort.kt",
+        "LocalWorkExecutionRequest",
+        "LocalWorkExecutionResult",
+    ),
+    (
+        "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatExecutionPort.kt",
+        "LocalChatExecutionRequest",
+        "LocalChatExecutionResult",
+    ),
+):
+    contract = strip_comments(read(relative))
+    for required in (
+        request_type,
+        result_type,
+        "targetSessionId",
+        "timeoutMillis",
+        "recoverInterrupted",
+        "DELIVERED",
+        "BLOCKED",
+        "CANCELLED",
+        "FAILED",
+        "execute(",
+        "cancel(",
+        "cancelAndJoin(",
+    ):
+        if required not in contract:
+            die(relative + " lost stage-3 execution lifecycle capability: " + required)
+
+feature_execution_composition = strip_comments(read(COMPOSITION_PATH))
+for adapter in (
+    "LocalWorkAutomationExecutionAdapter",
+    "LocalChatAutomationExecutionAdapter",
+):
+    if adapter not in feature_execution_composition:
+        die("Automation must enter the complete Feature Execution Port through " + adapter)
+
 # ---- Product Feature composition vs Runtime plugins -----------------------
 
 feature_catalog_path = "app/src/main/java/com/labteto/dshmobile/local/feature/LocalFeatureCatalog.kt"

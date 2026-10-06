@@ -17,9 +17,20 @@ import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.coordinateOwnedLocalSend
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -32,6 +43,11 @@ internal class LocalWorkExecutionCoordinator internal constructor(
     private val enqueueSnapshot: (String) -> Boolean,
     private val startPreparedTurn: (LocalPreparedSend, com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease) -> Job,
     private val startRegeneration: (String) -> Job,
+    private val prepareDetachedSession: suspend (String, String?) -> String = { _, _ ->
+        error("Work 后台执行入口尚未装配")
+    },
+    private val runDetached: suspend (String, String?, Long, Boolean) -> LocalWorkAutomationResult =
+        { _, _, _, _ -> error("Work 后台执行入口尚未装配") },
 ) : LocalWorkExecutionPort {
     @Inject
     internal constructor(
@@ -40,6 +56,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         sessionStorage: LocalSessionStorageRuntime,
         turn: LocalWorkTurnPort,
         regenerator: LocalWorkReplyRegenerator,
+        automationExecution: LocalWorkAutomationExecutionCoordinator,
     ) : this(
         workRunRegistry = workRunRegistry,
         runtimeStateStore = runtimeStateStore,
@@ -47,7 +64,162 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         enqueueSnapshot = sessionStorage::enqueueCurrentSnapshot,
         startPreparedTurn = turn::startPrepared,
         startRegeneration = regenerator::start,
+        prepareDetachedSession = automationExecution::prepareSession,
+        runDetached = automationExecution::run,
     )
+
+    private val detachedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val detachedRuns =
+        ConcurrentHashMap<String, Deferred<LocalWorkAutomationResult>>()
+
+    override suspend fun prepareSession(
+        text: String,
+        preferredSessionId: String?,
+    ): String = prepareDetachedSession(text, preferredSessionId)
+
+    override suspend fun execute(request: LocalWorkExecutionRequest): LocalWorkExecutionResult {
+        val prompt = request.text.trim()
+        if (prompt.isEmpty()) {
+            return LocalWorkExecutionResult(
+                sessionId = request.targetSessionId,
+                output = "Work 执行输入不能为空",
+                status = LocalWorkExecutionStatus.FAILED,
+                detail = "Work 执行输入不能为空",
+            )
+        }
+        val sessionId = try {
+            prepareDetachedSession(prompt, request.targetSessionId)
+        } catch (timeout: TimeoutCancellationException) {
+            return LocalWorkExecutionResult(
+                sessionId = request.targetSessionId,
+                output = "Work 执行会话准备超时",
+                status = LocalWorkExecutionStatus.FAILED,
+                detail = "Work 执行会话准备超时",
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            val detail = error.message ?: error::class.java.simpleName
+            return LocalWorkExecutionResult(
+                sessionId = request.targetSessionId,
+                output = detail,
+                status = LocalWorkExecutionStatus.FAILED,
+                detail = detail,
+            )
+        }
+
+        val deferred = detachedScope.async(start = CoroutineStart.LAZY) {
+            runDetached(
+                prompt,
+                sessionId,
+                request.timeoutMillis,
+                request.recoverInterrupted,
+            )
+        }
+        while (true) {
+            val current = detachedRuns.putIfAbsent(sessionId, deferred)
+            if (current == null) break
+            if (current.isCompleted && detachedRuns.remove(sessionId, current)) continue
+            deferred.cancel()
+            val detail = "目标 Work 会话已有执行正在运行"
+            return LocalWorkExecutionResult(
+                sessionId = sessionId,
+                output = detail,
+                status = LocalWorkExecutionStatus.BLOCKED,
+                detail = detail,
+            )
+        }
+        deferred.start()
+        return try {
+            val result = deferred.await()
+            LocalWorkExecutionResult(
+                sessionId = result.sessionId,
+                output = result.output,
+                status = LocalWorkExecutionStatus.valueOf(result.status.name),
+                detail = result.detail,
+            )
+        } catch (timeout: TimeoutCancellationException) {
+            LocalWorkExecutionResult(
+                sessionId = sessionId,
+                output = "Work 后台执行超时",
+                status = LocalWorkExecutionStatus.FAILED,
+                detail = "Work 后台执行超时",
+            )
+        } catch (cancelled: CancellationException) {
+            if (!currentCoroutineContext().isActive) {
+                deferred.cancel()
+                throw cancelled
+            }
+            val detail = cancelled.message ?: "任务已取消"
+            LocalWorkExecutionResult(
+                sessionId = sessionId,
+                output = detail,
+                status = LocalWorkExecutionStatus.CANCELLED,
+                detail = detail,
+            )
+        } catch (error: Throwable) {
+            val detail = error.message ?: error::class.java.simpleName
+            LocalWorkExecutionResult(
+                sessionId = sessionId,
+                output = detail,
+                status = LocalWorkExecutionStatus.FAILED,
+                detail = detail,
+            )
+        } finally {
+            detachedRuns.remove(sessionId, deferred)
+        }
+    }
+
+    override fun cancel(sessionId: String): Boolean {
+        if (sessionId.isBlank()) return false
+        var requested = false
+        detachedRuns[sessionId]?.takeIf { !it.isCompleted }?.let { run ->
+            run.cancel()
+            requested = true
+        }
+        if (workRunRegistry.requestCancel(sessionId)) requested = true
+
+        val snapshot = runtimeStateStore.state.value
+        if (
+            snapshot.sessionId == sessionId &&
+            snapshot.usageMode == LocalUsageMode.WORK &&
+            runtimeStateStore.foregroundRunHandle.hasLiveJob()
+        ) {
+            requested = runtimeStateStore.cancelForegroundRun(eventLogFor(sessionId)) || requested
+        }
+        return requested
+    }
+
+    override suspend fun cancelAndJoin(sessionId: String): Boolean {
+        if (sessionId.isBlank()) return false
+        var requested = false
+        detachedRuns[sessionId]?.let { run ->
+            if (!run.isCompleted) {
+                run.cancel()
+                requested = true
+            }
+            run.join()
+        }
+        workRunRegistry[sessionId]?.let { binding ->
+            try {
+                binding.cancelAndJoin()
+                requested = true
+            } finally {
+                workRunRegistry.detach(binding)
+            }
+        }
+
+        val snapshot = runtimeStateStore.state.value
+        if (
+            snapshot.sessionId == sessionId &&
+            snapshot.usageMode == LocalUsageMode.WORK &&
+            runtimeStateStore.foregroundRunHandle.hasLiveJob()
+        ) {
+            runtimeStateStore.cancelForegroundRunAndJoin(eventLogFor(sessionId))
+            requested = true
+        }
+        return requested
+    }
 
     override fun send(
         text: String,

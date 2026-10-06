@@ -3,11 +3,33 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.send.LocalSendResult
 
+internal enum class LocalWorkExecutionStatus {
+    DELIVERED,
+    SKIPPED,
+    BLOCKED,
+    CANCELLED,
+    FAILED,
+}
+
+internal data class LocalWorkExecutionRequest(
+    val text: String,
+    val targetSessionId: String? = null,
+    val timeoutMillis: Long = 5 * 60_000L,
+    val recoverInterrupted: Boolean = false,
+)
+
+internal data class LocalWorkExecutionResult(
+    val sessionId: String?,
+    val output: String,
+    val status: LocalWorkExecutionStatus,
+    val detail: String? = null,
+)
+
 /**
  * Work-owned product execution entrypoint.
  *
- * The UI calls this contract directly in Work mode. WorkFeature owns the implementation; only the
- * lower-level turn bridge remains temporarily composed at the app boundary during stage-3 migration.
+ * Visible UI sends and explicit target-Session execution share this contract. Callers receive a
+ * structured terminal result and never obtain Work binding, runner or writable aggregate state.
  */
 internal interface LocalWorkExecutionPort {
     fun send(
@@ -16,4 +38,15 @@ internal interface LocalWorkExecutionPort {
     ): LocalSendResult
 
     fun regenerateReply(messageId: String): Boolean
+
+    suspend fun prepareSession(
+        text: String,
+        preferredSessionId: String? = null,
+    ): String
+
+    suspend fun execute(request: LocalWorkExecutionRequest): LocalWorkExecutionResult
+
+    fun cancel(sessionId: String): Boolean
+
+    suspend fun cancelAndJoin(sessionId: String): Boolean
 }

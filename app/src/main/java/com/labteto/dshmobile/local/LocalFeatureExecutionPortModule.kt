@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.automation.LocalAutomationChatUserActivityAdapter
-import com.labteto.dshmobile.local.chat.LocalChatAutomationExecutionCoordinator
+import com.labteto.dshmobile.local.chat.LocalChatAutomationExecutionAdapter
 import com.labteto.dshmobile.local.chat.LocalChatAutomationExecutionPort
 import com.labteto.dshmobile.local.chat.LocalChatExecutionCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
@@ -15,7 +15,7 @@ import com.labteto.dshmobile.local.session.LocalActiveSessionScopeProvider
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.session.LocalSessionLifecyclePort
 import com.labteto.dshmobile.local.tools.LocalToolsManagementPort
-import com.labteto.dshmobile.local.work.LocalWorkAutomationExecutionCoordinator
+import com.labteto.dshmobile.local.work.LocalWorkAutomationExecutionAdapter
 import com.labteto.dshmobile.local.work.LocalWorkAutomationExecutionPort
 import com.labteto.dshmobile.local.work.LocalWorkExecutionCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkExecutionPort
@@ -47,14 +47,14 @@ internal object LocalFeatureExecutionPortModule {
     @Provides
     @Singleton
     fun provideLocalChatAutomationExecutionPort(
-        coordinator: LocalChatAutomationExecutionCoordinator,
-    ): LocalChatAutomationExecutionPort = coordinator
+        adapter: LocalChatAutomationExecutionAdapter,
+    ): LocalChatAutomationExecutionPort = adapter
 
     @Provides
     @Singleton
     fun provideLocalWorkAutomationExecutionPort(
-        coordinator: LocalWorkAutomationExecutionCoordinator,
-    ): LocalWorkAutomationExecutionPort = coordinator
+        adapter: LocalWorkAutomationExecutionAdapter,
+    ): LocalWorkAutomationExecutionPort = adapter
 
     @Provides
     @Singleton
