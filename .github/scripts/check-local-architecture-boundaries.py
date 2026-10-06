@@ -137,6 +137,23 @@ FEATURE_INTERNAL_IMPORT_PREFIXES = (
     "com.labteto.dshmobile.local.settings.",
 )
 
+# Remaining reverse/cross-Feature edges are explicit migration debt. They may only shrink.
+SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST = {
+    "app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt",
+}
+AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST = {
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt",
+    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt",
+}
+AUTOMATION_ALLOWED_CROSS_FEATURE_API_SYMBOLS = {
+    "LocalChatExecutionPort",
+    "LocalChatTurnPort",
+    "LocalChatUserActivityPort",
+    "LocalWorkExecutionPort",
+    "LocalWorkTurnPort",
+}
+
 # Session is still being horizontally migrated; these neutral slices are already closed.
 FROZEN_SHARED_FILES = (
     "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionPersistenceProjection.kt",
@@ -319,6 +336,73 @@ for relative in FROZEN_SHARED_FILES:
             die(
                 f"{relative} is a closed Shared boundary but imports Feature internal {prefix}"
             )
+
+# Session/Memory still contain known reverse Feature dependencies. Track exact files so the
+# remaining migration debt cannot spread while domain codecs and memory ownership are extracted.
+shared_reverse_dependency_consumers: set[str] = set()
+for package_name in ("session", "memory"):
+    for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / package_name):
+        source_imports = imports(source)
+        if any(
+            item.startswith(prefix)
+            for item in source_imports
+            for prefix in FEATURE_INTERNAL_IMPORT_PREFIXES
+        ):
+            shared_reverse_dependency_consumers.add(path.relative_to(ROOT).as_posix())
+
+unexpected_shared_reverse = sorted(
+    shared_reverse_dependency_consumers - SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST
+)
+if unexpected_shared_reverse:
+    die(
+        "new Shared→Feature migration debt: "
+        + ", ".join(unexpected_shared_reverse)
+        + "; invert it through a neutral Shared contract instead"
+    )
+stale_shared_reverse = sorted(
+    SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST - shared_reverse_dependency_consumers
+)
+if stale_shared_reverse:
+    die(
+        "stale Shared→Feature migration allowlist entries: "
+        + ", ".join(stale_shared_reverse)
+        + "; shrink the ratchet with the migration"
+    )
+
+# Automation may consume provider-owned execution Ports, but remaining direct internal imports are
+# Stage-4 debt restricted to the two legacy coordinators.
+automation_internal_consumers: set[str] = set()
+for path, source in kotlin_sources_under(LOCAL_SOURCE_ROOT / "automation"):
+    relative = path.relative_to(ROOT).as_posix()
+    for imported in imports(source):
+        if not imported.startswith((
+            "com.labteto.dshmobile.local.chat.",
+            "com.labteto.dshmobile.local.work.",
+        )):
+            continue
+        symbol = imported.rsplit(".", 1)[-1]
+        if symbol in AUTOMATION_ALLOWED_CROSS_FEATURE_API_SYMBOLS:
+            continue
+        automation_internal_consumers.add(relative)
+
+unexpected_automation_internal = sorted(
+    automation_internal_consumers - AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST
+)
+if unexpected_automation_internal:
+    die(
+        "new Automation→Feature-internal migration debt: "
+        + ", ".join(unexpected_automation_internal)
+        + "; consume Chat/Work execution Ports instead"
+    )
+stale_automation_internal = sorted(
+    AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST - automation_internal_consumers
+)
+if stale_automation_internal:
+    die(
+        "stale Automation internal-import migration allowlist entries: "
+        + ", ".join(stale_automation_internal)
+        + "; shrink Stage 4 debt with the Port migration"
+    )
 
 # Shared recovery must remain semantically neutral even when types are not imported.
 agent_recovery = strip_comments(
@@ -538,6 +622,46 @@ for dynamic_feature_api in ("register(", "unregister(", "MutableStateFlow", "mut
         die("Product Feature catalog must stay startup-immutable: " + dynamic_feature_api)
 if "PluginManager" in feature_catalog or "PluginCatalog" in feature_catalog:
     die("Product Feature catalog must remain separate from Runtime plugin lifecycle")
+
+def enum_entries(source: str, enum_name: str) -> set[str]:
+    match = re.search(
+        rf"\benum\s+class\s+{re.escape(enum_name)}\s*\{{(.*?)\}}",
+        source,
+        re.DOTALL,
+    )
+    if match is None:
+        die("Feature Catalog lost enum contract: " + enum_name)
+    return set(re.findall(r"^\s*([A-Z][A-Z0-9_]*)\s*,?\s*$", match.group(1), re.MULTILINE))
+
+module_ids = enum_entries(feature_catalog, "LocalFeatureModuleId")
+route_ids = enum_entries(feature_catalog, "LocalFeatureRoute")
+modules_block_start = feature_catalog.find("val modules: List<LocalFeatureModule>")
+modules_block_end = feature_catalog.find("private val ownerByRoute", modules_block_start)
+if modules_block_start < 0 or modules_block_end < 0:
+    die("LocalFeatureCatalog lost its startup module composition block")
+modules_block = feature_catalog[modules_block_start:modules_block_end]
+
+for module_id in module_ids:
+    count = len(re.findall(
+        rf"LocalFeatureModule\s*\(\s*LocalFeatureModuleId\.{re.escape(module_id)}\b",
+        modules_block,
+    ))
+    if count != 1:
+        die(f"Feature module {module_id} must be composed exactly once, found {count}")
+
+for route_id in route_ids:
+    count = len(re.findall(
+        rf"LocalFeatureRoute\.{re.escape(route_id)}\b",
+        modules_block,
+    ))
+    if count != 1:
+        die(f"Feature route {route_id} must have exactly one startup owner, found {count}")
+
+feature_navigation = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalFeatureNavigation.kt"
+))
+if "LocalFeatureCatalog.resolve(" not in feature_navigation:
+    die("Feature navigation must resolve product routes through LocalFeatureCatalog")
 
 plugin_composition = strip_comments(read(
     "app/src/main/java/com/labteto/dshmobile/local/tools/LocalPluginComposition.kt"
