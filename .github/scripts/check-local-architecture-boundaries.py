@@ -107,10 +107,12 @@ FEATURE_FORBIDDEN_IMPORT_PREFIXES = {
     "chat": (
         "com.labteto.dshmobile.local.work.",
         "com.labteto.dshmobile.local.automation.",
+        "com.labteto.dshmobile.local.settings.",
     ),
     "work": (
         "com.labteto.dshmobile.local.chat.",
         "com.labteto.dshmobile.local.automation.",
+        "com.labteto.dshmobile.local.settings.",
     ),
 }
 
@@ -194,6 +196,10 @@ LEGACY_MOVED_IMPORTS = {
     "com.labteto.dshmobile.local.settings.LocalAgentRuntimeLimits":
         "com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits",
 }
+
+RETIRED_SETTINGS_RUNTIME_PATHS = (
+    "app/src/main/java/com/labteto/dshmobile/local/settings/LocalAgentRuntimeLimits.kt",
+)
 
 RETIRED_SHARED_WORK_SEMANTIC_PATHS = (
     "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalStructuredWorkStateProjection.kt",
@@ -301,6 +307,10 @@ for kotlin_root in (
                     f"{path.relative_to(ROOT)} imports retired path {legacy_import}; "
                     f"use {replacement}"
                 )
+
+for retired in RETIRED_SETTINGS_RUNTIME_PATHS:
+    if (ROOT / retired).exists():
+        die("shared Agent runtime limit contract returned to SettingsFeature: " + retired)
 
 for retired in RETIRED_SHARED_WORK_SEMANTIC_PATHS:
     if (ROOT / retired).exists():
