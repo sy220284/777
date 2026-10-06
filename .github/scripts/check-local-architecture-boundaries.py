@@ -20,12 +20,7 @@ ENGINE_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.
 COMPOSITION_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt"
 
 # Transitional bridges are exact, shrink-only migration debt.
-ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST = {
-    "diagnosticsPort",
-    "sessionLifecyclePort",
-    "toolsManagementPort",
-    "workTurnPort",
-}
+ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST: set[str] = set()
 ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST = {
     "automationChatCoordinator",
     "automationWorkCoordinator",

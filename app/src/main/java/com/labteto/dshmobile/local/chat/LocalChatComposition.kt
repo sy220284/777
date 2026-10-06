@@ -1,18 +1,53 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.LocalChatReplyCoordinator
 import com.labteto.dshmobile.local.LocalChatTurnCoordinator
+import com.labteto.dshmobile.local.LocalModelRequestCoordinator
+import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.LocalForegroundModelHistoryRuntime
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * ChatFeature composition surface consumed by the temporary app composition root.
- *
- * Product execution remains inside Chat; Engine may only use these narrow lifecycle/queue hooks
- * while the remaining horizontal migration is being completed.
- */
+/** ChatFeature composition surface for queue, branching and post-turn lifecycle. */
 @Singleton
 internal class LocalChatComposition @Inject constructor(
     internal val turnCoordinator: LocalChatTurnCoordinator,
     internal val queue: LocalChatQueueRuntime,
     internal val memory: LocalChatMemoryRuntime,
-)
+    runtimeStateStore: LocalRuntimeStateStore,
+    persistence: LocalChatPersistence,
+    modelRequests: LocalModelRequestCoordinator,
+    usageTracker: DeepSeekUsageTracker,
+    sessionStorage: LocalSessionStorageRuntime,
+    private val chatState: LocalChatStatePort,
+) {
+    private val modelHistory = LocalForegroundModelHistoryRuntime(
+        runtimeStateStore = runtimeStateStore,
+        sessionStorage = sessionStorage,
+    )
+    internal val branchCoordinator = LocalChatBranchCoordinator(
+        runtimeStateStore = runtimeStateStore,
+        chatState = chatState,
+        sessionStorage = sessionStorage,
+        modelHistoryRuntime = modelHistory,
+    )
+    internal val contextRefresh = LocalChatContextRefreshCoordinator(
+        runtimeStateStore = runtimeStateStore,
+        chatState = chatState,
+        chatTurnCoordinator = turnCoordinator,
+        persistence = persistence,
+        modelRequests = modelRequests,
+        usageTracker = usageTracker,
+        sessionStorage = sessionStorage,
+        branchCoordinator = branchCoordinator,
+    )
+    internal val replyCoordinator = LocalChatReplyCoordinator(
+        chatTurnCoordinator = turnCoordinator,
+        usageTracker = usageTracker,
+        runtimeStateStore = runtimeStateStore,
+    )
+
+    internal fun cancelPostTurn() = contextRefresh.cancelScheduledRefresh()
+}

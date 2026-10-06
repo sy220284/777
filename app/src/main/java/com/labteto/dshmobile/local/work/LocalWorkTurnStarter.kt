@@ -41,8 +41,18 @@ internal class LocalWorkTurnStarter(
         binding: LocalWorkRunBinding,
         preownedLease: LocalSessionRuntimeLease,
     ) -> Unit,
-) {
+) : LocalWorkTurnPort {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun startPrepared(
+        prepared: com.labteto.dshmobile.local.send.LocalPreparedSend,
+        sessionLease: LocalSessionRuntimeLease,
+    ): Job = startFresh(
+        content = prepared.content,
+        memoryInput = prepared.memoryInput,
+        modelMessage = prepared.modelMessage,
+        sessionLease = sessionLease,
+    )
 
     internal fun startFresh(
         content: String,

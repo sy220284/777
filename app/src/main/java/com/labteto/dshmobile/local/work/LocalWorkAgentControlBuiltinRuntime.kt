@@ -95,9 +95,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     ?.mapNotNull { it.jsonPrimitive.contentOrNull }
                     .orEmpty(),
                 modelOverride = args.optionalString("model"),
-                state = run.workState,
-                snapshot = run::aggregateSnapshot,
-                sessionId = run.sessionId,
+                binding = run,
                 runner = runner,
             )
             else -> error("未覆盖的 Work 代理工具：${call.name}")

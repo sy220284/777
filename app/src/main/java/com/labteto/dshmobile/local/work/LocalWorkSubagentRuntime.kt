@@ -1,21 +1,15 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.AgentToolResult
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalSubagentRunner
-import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.agent.LocalSubagentRunnerFactory
 import com.labteto.dshmobile.local.agent.requireCompletedOutput
 import com.labteto.dshmobile.local.memory.LocalMemoryTools
 import com.labteto.dshmobile.local.model.LocalToolCall
+import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import kotlinx.serialization.json.JsonArray
 
-/**
- * Work-owned subagent and workflow composition.
- *
- * Shared Agent/Tool implementations are injected as narrow capabilities. Work keeps ownership of
- * its runner binding, worker selection and workflow progress projection.
- */
+/** Work-owned subagent and workflow composition bound to the originating Work run. */
 internal class LocalWorkSubagentRuntime(
     private val factory: LocalSubagentRunnerFactory,
     private val schemasProvider: (Boolean, Boolean, Set<String>) -> JsonArray,
@@ -26,7 +20,7 @@ internal class LocalWorkSubagentRuntime(
         memoryTools: LocalMemoryTools,
         enabledOptionalTools: MutableSet<String>,
     ) -> AgentToolResult,
-    private val pruneOutput: (String) -> String,
+    private val pruneOutput: (LocalWorkRunBinding, String) -> String,
 ) {
     internal fun runner(binding: LocalWorkRunBinding): LocalSubagentRunner =
         factory.createBound(
@@ -46,13 +40,11 @@ internal class LocalWorkSubagentRuntime(
         mode: String,
         requiredEvidence: List<String>,
         modelOverride: String?,
-        state: LocalWorkStatePort,
-        snapshot: () -> LocalHarnessState,
-        sessionId: String,
+        binding: LocalWorkRunBinding,
         runner: LocalSubagentRunner,
     ): String {
-        val workerSelection = LocalWorkerModelRouter.resolve(modelOverride, snapshot())
-        state.update { current -> current.copy(workflowProgress = null) }
+        val workerSelection = LocalWorkerModelRouter.resolve(modelOverride, binding.aggregateSnapshot())
+        binding.workState.update { current -> current.copy(workflowProgress = null) }
 
         return LocalWorkflowCoordinator(
             execute = { prompt ->
@@ -61,17 +53,17 @@ internal class LocalWorkSubagentRuntime(
                     inheritHistory = false,
                     allowMutation = false,
                     modelOverride = workerSelection,
-                    maxSteps = snapshot().subagentMaxSteps,
+                    maxSteps = binding.aggregateSnapshot().subagentMaxSteps,
                 ).requireCompletedOutput()
             },
-            pruneOutput = pruneOutput,
+            pruneOutput = { value -> pruneOutput(binding, value) },
             onProgress = { progress ->
-                state.update { current ->
+                binding.workState.update { current ->
                     val previousBlock = current.workflowProgress?.takeIf { it.needsUserAction }
                     val blocked = progress.stage == "受阻"
                     current.copy(
                         workflowProgress = LocalWorkflowProgress(
-                            sessionId = sessionId,
+                            sessionId = binding.sessionId,
                             stage = progress.stage,
                             task = progress.task,
                             completed = progress.completed,

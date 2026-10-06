@@ -26,8 +26,6 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -46,7 +44,7 @@ internal fun localSessionNavigationBusy(
 
 internal class LocalSessionLifecycleCoordinator(
     private val scope: CoroutineScope,
-    private val state: MutableStateFlow<LocalHarnessState>,
+    private val state: com.labteto.dshmobile.local.runtime.LocalAggregateProjectionPort,
     private val transitionMutex: Mutex,
     private val jobs: LocalJobManager,
     private val sessionCoordinator: LocalSessionCoordinator,

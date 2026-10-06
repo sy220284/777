@@ -19,7 +19,7 @@
 |---|---|---|
 | 1：共享能力 / Kernel 边界 | Session owner、run identity/recovery、资源调度和 Session 存储已有统一所有者 | 保留已建立边界；继续删除残留跨层适配 |
 | 2：领域状态 | Chat / Work / Kernel / Model 已拆分；Chat timeline rewrite 已停止承载 Work plan/todo/goal/planMode | 继续收缩聚合状态迁移适配层 |
-| 3：Chat / Work Feature | 7 类 Runtime→Engine 依赖永久归零；已知阶段三 Engine 业务根已清零；Engine 内 Work task / agent-control builtin 分发也已清零；Work 主 AgentLoop、工具运行、发送/重生成与 Chat 发送、直聊回合、时间线/分支等真实实现已归 Feature；`chatTurnPort` 已脱离 Engine，由 `LocalChatTurnStarter` 直接提供；Chat 主回合结束已由 `LocalChatQueueRuntime` 自己续跑 | 清零剩余 4 个阶段三 Engine 组合桥：`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort`；迁出仍留在 Engine 的 `startNextQueuedTurnIfIdle()` 横向唤醒 / Work 队列决定权，以及共享 Tools 组合与 Session 横向适配 |
+| 3：Chat / Work Feature | 阶段三代码迁移已完成：7 类 Runtime→Engine 依赖与已知 Engine 业务根永久归零；`chatTurnPort`、`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort` 均已脱离 Engine；横向下一轮唤醒迁入独立协调器；共享 Tools/plugin composition、Session 前台恢复与 Diagnostics 均已有明确 owner | 保持阶段三退出路径永久禁止回归；当前批次本地 architecture / execution 门禁与 `compileDebugKotlin` 已通过，仓库 CI 由本批提交继续验证 |
 | 4：Automation Feature | Automation Runtime→Engine 已永久归零，但组合根仍由 Engine 提供 Automation Chat / Work coordinator | 迁出 `automationChatCoordinator`、`automationWorkCoordinator` 两个阶段四桥并切换后台入口 |
 | 5：UI contribution | Catalog 不可变，路由归属及页面枚举已接管 | 中央页面 `when`、页面依赖、Back、入口及恢复继续下沉 |
 | 6：Runtime Kernel | 共享运行状态已接管运行身份、资源、前台句柄等事实 | 删除剩余产品装配/迁移适配后再替换 Engine；仅更名不算完成 |
@@ -39,11 +39,10 @@
 
 当前需要补齐：
 
-1. 清零阶段三剩余 4 个 Engine 组合桥：`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort`。`chatTurnPort` 已完成脱离 Engine；Chat / Work turn 的领域执行和 Work task / agent-control builtin 已在 Feature。`workTurnPort` 当前主要受共享 Tools/plugin composition 仍在 Engine 装配所阻塞，禁止用新的 Engine 工具代理替换。
-2. 将 Session 生命周期、可见 Work 投影、诊断和 Tools 管理的剩余 Engine 横向适配迁入明确 capability / composition owner。
-3. 阶段四单独处理 Automation 两个 Engine coordinator bridge，以及 persistent / automation subagent 等后台装配，不再混入阶段三进度。
-4. 继续删除迁移后无调用旧实现，并同步收紧门禁。
-5. 取得当前产品 Head 的完整 CI；旧 Head 成功、失败或取消均不能替代。
+1. 阶段三实现已完成，`ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST` 已收缩为空；继续把这些退出路径作为永久禁止回归规则维护。
+2. 阶段四单独处理 Automation 两个 Engine coordinator bridge，以及 persistent / automation subagent 等后台装配，不再混入阶段三进度。
+3. 继续删除迁移后无调用旧实现，并同步收紧门禁。
+4. 本地只要求 architecture / execution 门禁与 Kotlin 编译通过；仓库完整 CI 仍负责当前 Head 的 arm64、x86_64、Android 16 / 17 与 merge-gate 最终验收。旧 Head 成功、失败或取消均不能替代。
 
 ## 3. 总体推进顺序
 
@@ -256,11 +255,10 @@ Chat send、直聊回合、人物纠正、关系恢复、时间线编辑 / regen
 
 ## 15. 下一步可直接执行的任务
 
-1. 先完成当前最新 Head 的 P0 全量验证。当前 architecture-3-gates、execution invariants、单测 / Harness conformance 与 JVM 21 验证已通过；继续等待并核对 arm64、x86_64、Android 16 / 17 与 merge-gate，同一 Head 全绿后锁定迁移基线。
-2. 迁出 Engine 中仍存在的 `startNextQueuedTurnIfIdle()` 横向唤醒逻辑。Chat 回合结束续跑已经归 `LocalChatQueueRuntime`；剩余重点是 Work 可见队列恢复、启动恢复、Session 切换 / release 和 Automation release 的调用方改接明确 owner。
-3. 清零 `workTurnPort`，使 Work 启动 Port 不再由 Engine 提供；迁移共享 Tools / plugin composition 的真实依赖，禁止用新的 Engine 代理替代。
-4. 迁出 `sessionLifecyclePort`，同步拆分 Chat / Work 领域初始化与 `syncVisibleWorkRun`、transition / cancel / load / snapshot 等横向适配，保持 detached Work 与前台切换语义。
-5. 迁出 `toolsManagementPort` 与 `diagnosticsPort`，完成阶段三剩余 4 个组合桥清零并将 `ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST` 收缩为空。
-6. 阶段三在最新 Head 完整 CI 通过后关闭；随后进入阶段四，单独处理 `automationChatCoordinator` / `automationWorkCoordinator` 和后台 subagent 装配。
+1. 阶段三本地实现已完成：四个剩余 Engine 组合桥、横向唤醒、共享 Tools/plugin composition、Session 前台恢复与 Diagnostics owner 已迁出；最新 architecture / execution 门禁与 `compileDebugKotlin` 通过。提交阶段三批次后由仓库 CI 继续做完整产品验证。
+2. 进入阶段四：先迁出 `automationWorkCoordinator`，让 Automation 仅通过 `LocalWorkExecutionPort` 获取结构化执行结果，并消除 Automation→Work internal 依赖。
+3. 再迁出 `automationChatCoordinator`，把主动互动、人物/场景/去重/消息交付归还 Chat 提供方，仅保留 Automation 的触发、调度与回执。
+4. 阶段四结束时将 `ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST` 收缩为空，并验证 Worker / Scheduler / 立即运行 / Webhook / recovery 全部走 provider-owned Port。
+5. 阶段四本地门禁与 Kotlin 编译通过后单独提交一批，再进入阶段五 UI contribution。
 
 后续执行者按已完成工作包和出口条件更新本方案，不以正文计划或某次旧 CI 判断架构 3.0 已完成。

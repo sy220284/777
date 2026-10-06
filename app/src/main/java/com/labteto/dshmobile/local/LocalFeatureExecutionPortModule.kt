@@ -9,12 +9,16 @@ import com.labteto.dshmobile.local.chat.LocalChatTurnPort
 import com.labteto.dshmobile.local.chat.LocalChatTurnStarter
 import com.labteto.dshmobile.local.chat.LocalChatUserActivityPort
 import com.labteto.dshmobile.local.runtime.LocalDiagnosticsPort
+import com.labteto.dshmobile.local.runtime.LocalDiagnosticsRuntime
+import com.labteto.dshmobile.local.runtime.LocalWorkDiagnosticsProvider
 import com.labteto.dshmobile.local.session.LocalActiveSessionScopeProvider
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.session.LocalSessionLifecyclePort
 import com.labteto.dshmobile.local.tools.LocalToolsManagementPort
 import com.labteto.dshmobile.local.work.LocalWorkExecutionCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkExecutionPort
+import com.labteto.dshmobile.local.work.LocalWorkComposition
+import com.labteto.dshmobile.local.work.LocalWorkDiagnosticsAdapter
 import com.labteto.dshmobile.local.work.LocalWorkTurnPort
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import dagger.Module
@@ -58,8 +62,8 @@ internal object LocalFeatureExecutionPortModule {
 
     @Provides
     @Singleton
-    fun provideLocalWorkTurnPort(engine: LocalHarnessEngine): LocalWorkTurnPort =
-        engine.workTurnPort
+    fun provideLocalWorkTurnPort(composition: LocalWorkComposition): LocalWorkTurnPort =
+        composition.turnStarter
 
     @Provides
     @Singleton
@@ -74,18 +78,25 @@ internal object LocalFeatureExecutionPortModule {
 
     @Provides
     @Singleton
-    fun provideLocalSessionLifecyclePort(engine: LocalHarnessEngine): LocalSessionLifecyclePort =
-        engine.sessionLifecyclePort
+    fun provideLocalSessionLifecyclePort(
+        composition: LocalSessionComposition,
+    ): LocalSessionLifecyclePort = composition
 
     @Provides
     @Singleton
-    fun provideLocalToolsManagementPort(engine: LocalHarnessEngine): LocalToolsManagementPort =
-        engine.toolsManagementPort
+    fun provideLocalToolsManagementPort(root: LocalToolCompositionRoot): LocalToolsManagementPort =
+        root
 
     @Provides
     @Singleton
-    fun provideLocalDiagnosticsPort(engine: LocalHarnessEngine): LocalDiagnosticsPort =
-        engine.diagnosticsPort
+    fun provideLocalDiagnosticsPort(runtime: LocalDiagnosticsRuntime): LocalDiagnosticsPort =
+        runtime
+
+    @Provides
+    @Singleton
+    fun provideLocalWorkDiagnosticsProvider(
+        adapter: LocalWorkDiagnosticsAdapter,
+    ): LocalWorkDiagnosticsProvider = adapter
 
     @Provides
     @Singleton

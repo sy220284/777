@@ -359,7 +359,6 @@ class LocalHarnessEngine @Inject internal constructor(
     private val bundledRuntimeManager: LocalBundledRuntimeManager,
     private val json: Json,
     private val modelRequestCoordinator: LocalModelRequestCoordinator,
-    private val pluginCompositionFactory: LocalPluginCompositionFactory,
     private val memoryStore: MemoryStore,
     private val memoryManager: MemoryManager,
     private val contextComposer: ContextComposer,
@@ -369,6 +368,10 @@ class LocalHarnessEngine @Inject internal constructor(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val approvalPreferences: LocalApprovalPreferences,
     private val sessionStorageRuntime: LocalSessionStorageRuntime,
+    private val toolCompositionRoot: LocalToolCompositionRoot,
+    private val workComposition: com.labteto.dshmobile.local.work.LocalWorkComposition,
+    private val foregroundWake: LocalForegroundTurnWakeCoordinator,
+    private val foregroundSessionLoader: LocalForegroundSessionLoader,
 ) {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
     private val chatPersonaStore get() = chatPersistence.personaStore
@@ -379,15 +382,9 @@ class LocalHarnessEngine @Inject internal constructor(
     private val memoryClassMb get() = runtimeStateStore.memoryClassMb
     private val workspace: LocalWorkspace
         get() = sessionStorageRuntime.files.workspace
-    private val fileInspector = LocalFileInspector(File(workspace.path))
-    private val toolOutputStore = LocalToolOutputStore(
-        File(context.noBackupFilesDir, "local-harness/tool-output"),
-    )
+    private val toolOutputStore get() = toolCompositionRoot.toolOutputStore
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
-    private val webTools = pluginCompositionFactory.createWebTools(
-        searchKeyProvider = modelConfiguration::resolveDeepSeekSearchCredential,
-        workspace = workspace,
-    )
+    private val webTools get() = toolCompositionRoot.webTools
     private val sessionsRoot = File(root, "sessions").apply { mkdirs() }
     private val eventLogRegistry: LocalSessionEventLogRegistry
         get() = sessionStorageRuntime.eventLogs
@@ -421,110 +418,20 @@ class LocalHarnessEngine @Inject internal constructor(
     private val foregroundRecoveryCoordinator by lazy {
         LocalForegroundRecoveryCoordinator(agentRunCoordinator, modelGateway::hasCredential)
     }
-    private val toolRegistry
-        get() = pluginComposition.tools
-    private val toolExecutionCoordinator by lazy {
-        LocalToolExecutionCoordinator(
-            registry = toolRegistry,
-            currentSessionId = { currentSessionId },
-            planMode = { _state.value.work.planMode },
-            requestApproval = { call, tool, summary -> approve(call, summary, tool) },
-            recordExecutionStarted = { sessionId, call ->
-                eventLogFor(sessionId).append("tool/execution-started", buildJsonObject {
-                    put("id", call.id)
-                    put("name", call.name)
-                })
-            },
-        )
-    }
-    private val toolSchemaProjection by lazy {
-        LocalToolSchemaProjection(toolRegistry, toolExecutionCoordinator)
-    }
-    private val runtimeProcess = AndroidProcessRuntime(
-        defaultWorkingDirectory = File(workspace.path),
-        dynamicSearchPaths = bundledRuntimeManager::searchPaths,
-        baseEnvironment = bundledRuntimeManager::environment,
-    )
-    private val automaticLanguageServerResolver = AutomaticLanguageServerResolver(
-        root = File(workspace.path),
-        commandAvailable = runtimeProcess::isCommandAvailable,
-        legacyCommand = {
-            parseLanguageServerCommand(
-                preferences.getString("language_server_command", "").orEmpty(),
-            )
-        },
-    )
-    private val runtimeTerminal = PersistentPipeTerminalProvider(
-        defaultWorkingDirectory = File(workspace.path),
-        extraSearchPaths = bundledRuntimeManager::searchPaths,
-        baseEnvironment = bundledRuntimeManager::environment,
-    )
+    private val toolRegistry get() = toolCompositionRoot.registry
+    private val toolExecutionCoordinator get() = toolCompositionRoot.execution
+    private val toolSchemaProjection get() = toolCompositionRoot.schemas
+    private val runtimeProcess get() = toolCompositionRoot.process
+    private val pluginComposition get() = toolCompositionRoot.plugins
     private val handoffBuilder = ConversationHandoffBuilder(MAX_HANDOFF_CHARS)
     private val modelHistoryCheckpointCodec = ModelHistoryCheckpointCodec()
     private val historyCompactor = LocalHistoryCompactor()
     private val requestPressureStore
         get() = runtimeStateStore.requestPressureStore
-    private val environmentInfoCoordinator by lazy {
-        LocalEnvironmentInfoCoordinator(
-            workspacePath = { workspace.path },
-            resourceSnapshot = resourceScheduler::snapshot,
-            foregroundHistoryBudgetChars = { currentHistoryBudget().maxHistoryChars },
-            requestPressureStore = requestPressureStore,
-            usageTracker = usageTracker,
-            toolExecutionCoordinator = toolExecutionCoordinator,
-            commandAvailable = runtimeProcess::isCommandAvailable,
-            runtimeStatuses = bundledRuntimeManager::statuses,
-            diagnostics = AppLog::snapshot,
-            storageStatus = { LocalSessionArchiveMaintenance.storageStatus(sessionsRoot) },
-            processExitStatus = { LocalProcessExitStatus.read(context) },
-            foregroundSessionId = { currentSessionId },
-            foregroundHistory = { modelHistory },
-            foregroundPendingInputs = { pendingInputs.size() },
-            pendingInputLimit = MAX_PENDING_INPUTS,
-            workContextAssessment = { sessionId ->
-                requestPressureStore.workAssessment(sessionId)?.toEnvironmentWorkContextAssessment()
-            },
-            foregroundWorkBudget = { sessionId ->
-                workRunRegistry[sessionId]?.executionControl?.budget?.snapshot()?.toEnvironmentWorkBudget()
-            },
-        )
-    }
-    private val tokenUsageBridge by lazy {
-        LocalTokenUsageContextBridge(
-            state = _state,
-            runState = workRunRegistry::state,
-            eventLogFor = ::eventLogFor,
-            currentSessionId = { currentSessionId },
-        )
-    }
-    private val pluginComposition by lazy {
-        pluginCompositionFactory.create(
-            workspaceRoot = File(workspace.path),
-            runtimeProcess = runtimeProcess,
-            runtimeTerminal = runtimeTerminal,
-            languageServerCommand = automaticLanguageServerResolver::resolve,
-            resourceScheduler = resourceScheduler,
-            routeProvider = {
-                val current = _state.value
-                current.modelState.modelSelection.activeProfile?.takeIf { current.modelState.configured }
-                    ?.let { LocalVisionRoute(it.baseUrl, it.model, profile = it) }
-            },
-            imageSupportProvider = { route ->
-                when (imageCapabilities.state(route.baseUrl, route.model)) {
-                    LocalImageCapability.SUPPORTED -> true
-                    LocalImageCapability.UNSUPPORTED -> false
-                    LocalImageCapability.UNKNOWN -> null
-                }
-            },
-            executeBuiltin = ::executeBuiltin,
-            usageContextProvider = { sessionId, callId -> tokenUsageBridge.resolve(sessionId, callId, TokenUsageAction.VISION) },
-        )
-    }
     private val initialSessionId = preferences.getString(KEY_SESSION_ID, null)
         ?: UUID.randomUUID().toString()
-    // Opening the log scans its latest segment. The startup coroutine initializes it after any
-    // legacy migration, before the loading screen admits session actions.
-    @Volatile private lateinit var eventLog: LocalSessionEventLog
+    private val eventLog: LocalSessionEventLog
+        get() = eventLogFor(currentSessionId)
     private val conversationFilesCoordinator
         get() = sessionStorageRuntime.files.coordinator
     private var transcriptProjectionCursor: Long?
@@ -551,7 +458,6 @@ class LocalHarnessEngine @Inject internal constructor(
     private val currentSessionId: String
         get() = runtimeStateStore.currentSessionId
 
-    private val engineChatStatePort by lazy { LocalChatStatePort(_state) }
     /**
      * Architecture 3.0 migration bridge kept only at the composition root.
      *
@@ -595,42 +501,8 @@ class LocalHarnessEngine @Inject internal constructor(
         )
     }
 
-    private val engineForegroundModelHistoryRuntime by lazy {
-        LocalForegroundModelHistoryRuntime(
-            runtimeStateStore = runtimeStateStore,
-            sessionStorage = sessionStorageRuntime,
-        )
-    }
-
-    private val engineChatBranchCoordinator by lazy {
-        LocalChatBranchCoordinator(
-            runtimeStateStore = runtimeStateStore,
-            chatState = engineChatStatePort,
-            sessionStorage = sessionStorageRuntime,
-            modelHistoryRuntime = engineForegroundModelHistoryRuntime,
-        )
-    }
-
-    private val chatContextRefreshCoordinator by lazy {
-        LocalChatContextRefreshCoordinator(
-            runtimeStateStore = runtimeStateStore,
-            chatState = engineChatStatePort,
-            chatTurnCoordinator = chatTurnCoordinator,
-            persistence = chatPersistence,
-            modelRequests = modelRequestCoordinator,
-            usageTracker = usageTracker,
-            sessionStorage = sessionStorageRuntime,
-            branchCoordinator = engineChatBranchCoordinator,
-        )
-    }
-
-    private val chatReplyCoordinator by lazy {
-        LocalChatReplyCoordinator(
-            chatTurnCoordinator = chatTurnCoordinator,
-            usageTracker = usageTracker,
-            runtimeStateStore = runtimeStateStore,
-        )
-    }
+    private val chatContextRefreshCoordinator get() = chatComposition.contextRefresh
+    private val chatReplyCoordinator get() = chatComposition.replyCoordinator
 
     // SupervisorJob keeps one failed child from cancelling unrelated engine work. The handler is the
     // final visibility boundary; operation-specific busy/loading state is still owned by each launch.
@@ -690,118 +562,6 @@ class LocalHarnessEngine @Inject internal constructor(
             defaultSessionId = { currentSessionId },
         )
     }
-    private val workMemoryRuntime by lazy {
-        LocalWorkMemoryRuntime(memoryManager)
-    }
-
-    private val workModelHistoryRuntime by lazy {
-        LocalWorkModelHistoryRuntime(
-            runtimeStateStore = runtimeStateStore,
-            sessionStorage = sessionStorageRuntime,
-            workMemory = workMemoryRuntime,
-        )
-    }
-
-    private val workBuiltinToolRuntime by lazy {
-        LocalWorkBuiltinToolRuntime(
-            persist = { binding ->
-                sessionCoordinator.enqueue(binding.persistenceSnapshot())
-            },
-            updateContextMetrics = workModelHistoryRuntime::updateContextMetrics,
-        )
-    }
-
-    private val workToolResultRuntime by lazy {
-        LocalWorkToolResultRuntime(
-            runtimeStateStore = runtimeStateStore,
-            toolOutputStore = toolOutputStore,
-        )
-    }
-
-    private val workTurnToolRuntime by lazy {
-        LocalWorkTurnToolRuntime(
-            registry = toolRegistry,
-            execution = toolExecutionCoordinator,
-            schemas = toolSchemaProjection,
-            approvalPreferences = approvalPreferences,
-            githubConfigured = pluginComposition::githubConfigured,
-        )
-    }
-
-    private val workAgentTurnExecutor by lazy {
-        LocalWorkAgentTurnExecutor(
-            context = context,
-            runtimeStateStore = runtimeStateStore,
-            sessionStorage = sessionStorageRuntime,
-            modelGateway = modelGateway,
-            modelRequests = modelRequestCoordinator,
-            usageTracker = usageTracker,
-            contextComposer = contextComposer,
-            workRunRegistry = workRunRegistry,
-            workMemoryRuntime = workMemoryRuntime,
-            workModelHistoryRuntime = workModelHistoryRuntime,
-            workToolResultRuntime = workToolResultRuntime,
-            workTurnToolRuntime = workTurnToolRuntime,
-        )
-    }
-
-    private val workTurnStarter by lazy {
-        LocalWorkTurnStarter(
-            runtimeStateStore = runtimeStateStore,
-            sessionStorage = sessionStorageRuntime,
-            workRunRegistry = workRunRegistry,
-            runTurn = { input, memoryInput, sourceMessageId, binding, preownedLease ->
-                workAgentTurnExecutor.run(
-                    input = input,
-                    memoryInput = memoryInput,
-                    sourceMessageId = sourceMessageId,
-                    binding = binding,
-                    preownedLease = preownedLease,
-                )
-            },
-        )
-    }
-
-    private val workSubagentRuntime by lazy {
-        LocalWorkSubagentRuntime(
-            factory = subagentRunnerFactory,
-            schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
-                toolSchemaProjection.subagentSchemas(
-                    allowMutation = allowMutation,
-                    allowVirtualScreen = allowVirtualScreen,
-                    enabledOptional = enabledOptional,
-                )
-            },
-            executeTool = { binding, call, allowMutation, boundMemoryTools, enabledOptional ->
-                executePersistentSubagentTool(
-                    call = call,
-                    allowMutation = allowMutation,
-                    sessionId = binding.sessionId,
-                    memoryTools = boundMemoryTools,
-                    enabledOptionalTools = enabledOptional,
-                )
-            },
-            pruneOutput = ::pruneToolResult,
-        )
-    }
-
-    private val persistentJobRecoveryCoordinator by lazy {
-        LocalPersistentJobRecoveryCoordinator(
-            scope = scope,
-            jobs = jobs,
-            json = json,
-            modelGateway = modelGateway,
-            webTools = webTools,
-            currentSessionId = { currentSessionId },
-            currentState = { _state.value },
-            defaultHistory = modelHistory::snapshot,
-            subagentRunner = { sessionId, boundState, history ->
-                persistentSubagentRunner(sessionId, boundState, history)
-            },
-            eventLogFor = ::eventLogFor,
-        )
-    }
-
     internal val automationWorkCoordinator by lazy {
         LocalAutomationWorkCoordinator(
             state = runtimeStateStore.state,
@@ -817,7 +577,7 @@ class LocalHarnessEngine @Inject internal constructor(
                 )
             },
             onSessionReleased = { sessionId ->
-                if (currentSessionId == sessionId && _state.value.sessionId == sessionId) startNextQueuedTurnIfIdle()?.start()
+                if (currentSessionId == sessionId && _state.value.sessionId == sessionId) foregroundWake.startNextIfIdle()?.start()
             },
         )
     }
@@ -962,56 +722,7 @@ class LocalHarnessEngine @Inject internal constructor(
             persist = ::persist,
         )
     }
-    private val workAgentControlBuiltinRuntime by lazy {
-        LocalWorkAgentControlBuiltinRuntime(
-            jobs = jobs,
-            modelGateway = modelGateway,
-            subagents = workSubagentRuntime,
-            persistentJobs = persistentJobRecoveryCoordinator,
-        )
-    }
 
-    private val sessionLifecycle by lazy {
-        LocalSessionLifecycleCoordinator(
-            scope = scope,
-            state = _state,
-            transitionMutex = sessionTransitionMutex,
-            jobs = jobs,
-            sessionCoordinator = sessionCoordinator,
-            chatSessionLifecycle = chatSessionLifecyclePlanner,
-            approvalPreferences = approvalPreferences,
-            resourceScheduler = resourceScheduler,
-            handoffBuilder = handoffBuilder,
-            toolOutputStore = toolOutputStore,
-            sessionsRoot = sessionsRoot,
-            conversationFilesCoordinator = conversationFilesCoordinator,
-            memoryStore = memoryStore,
-            diaryStore = chatDiaryStore,
-            currentSessionId = { currentSessionId },
-            activateSession = { id, transcriptCursor ->
-                runtimeStateStore.activateSession(id)
-                preferences.edit().putString(KEY_SESSION_ID, id).apply()
-                eventLog = eventLogFor(id)
-                transcriptProjectionCursor = transcriptCursor
-            },
-            beginTransition = ::beginSessionTransition,
-            endTransition = ::endSessionTransition,
-            navigationBusy = { synchronized(runStateLock) { localSessionNavigationBusy(sessionTransitioning, activeJob?.isCompleted == false) } },
-            cancelActiveRunAndJoin = ::cancelActiveRunAndJoin,
-            cancelWorkRunsAndJoin = ::cancelWorkRunsAndJoin,
-            resetModelHistory = { modelHistory.reset() },
-            persist = ::persist,
-            loadSession = { id ->
-                loadSession(id)
-                syncVisibleWorkRun(id)
-            },
-            restartInterruptedSafeJobs = persistentJobRecoveryCoordinator::schedule,
-            startNextQueuedTurnIfIdle = ::startNextQueuedTurnIfIdle,
-            sessionSummaries = ::sessionSummaries,
-            beforeEventLogsDeleted = eventLogRegistry::clearAndEvict,
-            localProjectId = LOCAL_PROJECT_ID,
-        )
-    }
 
     init {
         preferences.edit().putString(KEY_SESSION_ID, currentSessionId).apply()
@@ -1033,19 +744,16 @@ class LocalHarnessEngine @Inject internal constructor(
             runCatching {
                 seedLocalWorkspaceGuide(workspace.path)
                 migrateLegacySessionFiles(root, sessionsRoot, currentSessionId)
-                // Migration may have copied an event log after the field was first constructed.
-                // Reopen it before any session load or tool can append to the migrated log.
-                eventLog = eventLogFor(currentSessionId)
                 prepareLocalHarnessStartup(
                     prepareRuntime = bundledRuntimeManager::prepare,
                     installPlugins = { pluginComposition.installStartup() },
-                    restoreSession = { load(deferReady = true) },
+                    restoreSession = { foregroundSessionLoader.loadStartup(deferReady = true) },
                 )
                 _state.update { current ->
                     if (current.loading) current.copy(loading = false) else current
                 }
-                startNextQueuedTurnIfIdle()?.start()
-                persistentJobRecoveryCoordinator.schedule()
+                foregroundWake.startNextIfIdle()?.start()
+                workComposition.schedulePersistentRecovery()
                 scope.launch { maybeCleanupUnreferencedLocalImages() }
                 scope.launch { LocalSessionArchiveMaintenance(sessionsRoot, json, { currentSessionId }).run() }
             }.onFailure { error ->
@@ -1072,100 +780,6 @@ class LocalHarnessEngine @Inject internal constructor(
         }
     }
 
-    /** Feature execution and lifecycle ports are exposed to Hilt from the composition root below. */
-    internal val sessionLifecyclePort: LocalSessionLifecyclePort = object : LocalSessionLifecyclePort {
-        override fun createSession(
-            mode: LocalConversationMode,
-            usageMode: LocalUsageMode,
-            domainSpec: LocalSessionDomainCreateSpec?,
-        ): Boolean = sessionLifecycle.createSession(mode, usageMode, domainSpec)
-
-        override fun switchDomainMode(command: LocalSessionDomainModeCommand) {
-            sessionLifecycle.switchDomainMode(command)
-        }
-
-        override fun switchUsageMode(mode: LocalUsageMode) {
-            sessionLifecycle.switchUsageMode(mode)
-        }
-
-        override fun switchSession(sessionId: String): Boolean =
-            sessionLifecycle.switchSession(sessionId)
-
-        override suspend fun deleteSessions(ids: Set<String>): Int =
-            sessionLifecycle.deleteSessions(ids)
-    }
-
-    internal val diagnosticsPort: LocalDiagnosticsPort = object : LocalDiagnosticsPort {
-        override suspend fun environmentInfo(): String = withContext(Dispatchers.IO) {
-            environmentInfoCoordinator.build(null)
-        }
-
-        override suspend fun diagnosticReport(): String = withContext(Dispatchers.IO) {
-            val appLogs = AppLog.exportSnapshot()
-            val baseReport = DiagnosticReport.build(appLogs, environmentInfoCoordinator.build(null))
-            appendLocalDiagnosticDetails(
-                baseReport = baseReport,
-                sessionId = currentSessionId,
-                eventLog = eventLogFor(currentSessionId),
-                usageTracker = usageTracker,
-                appLogs = appLogs,
-            )
-        }
-    }
-
-    internal val toolsManagementPort: LocalToolsManagementPort = object : LocalToolsManagementPort {
-        override suspend fun servers(): List<McpServerSnapshot> = pluginComposition.mcpServers()
-
-        override fun installedPluginIds(): List<String> = pluginComposition.installedPluginIds()
-
-        override suspend fun connectHttp(serverId: String, endpoint: String): String =
-            pluginComposition.connectMcpHttp(serverId, endpoint)
-
-        override suspend fun connectStdio(
-            serverId: String,
-            command: List<String>,
-            workingDirectory: String?,
-        ): String = pluginComposition.connectMcpStdio(serverId, command, workingDirectory)
-
-        override suspend fun disconnect(serverId: String): String =
-            pluginComposition.disconnectMcp(serverId)
-    }
-
-    internal val workTurnPort: LocalWorkTurnPort = object : LocalWorkTurnPort {
-        override fun startPrepared(
-            prepared: LocalPreparedSend,
-            sessionLease: LocalSessionRuntimeLease,
-        ): Job = workTurnStarter.startFresh(
-            content = prepared.content,
-            memoryInput = prepared.memoryInput,
-            modelMessage = prepared.modelMessage,
-            sessionLease = sessionLease,
-        )
-
-    }
-
-    private fun syncVisibleWorkRun(
-        sessionId: String,
-        ownedBinding: LocalWorkRunBinding? = null,
-    ) {
-        val binding = ownedBinding ?: liveWorkRun(sessionId) ?: return
-        val liveState = binding.aggregateSnapshot()
-        liveState.modelState.modelSelection.activeProfile
-            ?.takeIf { liveState.modelState.configured }
-            ?.let(modelGateway::activate)
-        val resources = resourceScheduler.snapshot()
-        _state.value = liveState.copy(
-            loading = _state.value.loading,
-            usage = usageTracker.state.value,
-            sessions = sessionSummaries(),
-            kernel = liveState.kernel.copy(
-                resources = resources.toLocalHarnessResourceState(liveState.usageMode),
-                contextBudgetChars = localHistoryBudgetFor(memoryClassMb, resources.pressure).maxHistoryChars,
-            ),
-        )
-        modelHistory.reset(binding.runHandle.modelHistory.snapshot())
-        transcriptProjectionCursor = binding.runHandle.transcriptProjectionCursor
-    }
 
     private fun appendUserToModelHistory(
         message: JsonObject,
@@ -1298,42 +912,11 @@ class LocalHarnessEngine @Inject internal constructor(
         synchronized(runStateLock) {
             if (activeJob === automationJob) activeJob = null
         }
-        startNextQueuedTurnIfIdle()?.start()
+        foregroundWake.startNextIfIdle()?.start()
     }
 
 
     internal suspend fun diagnoseNetwork(target: String): String = webTools.diagnose(target)
-
-    private fun beginSessionTransition(): Boolean =
-        runtimeStateStore.beginSessionTransition().also { started ->
-            if (started) cancelChatPostTurn()
-        }
-
-    private fun endSessionTransition() {
-        runtimeStateStore.endSessionTransition()
-    }
-
-    private suspend fun cancelWorkRunsAndJoin(sessionIds: Set<String>) {
-        val cancelled = synchronized(runStateLock) {
-            workRunRegistry.detachAll(sessionIds)
-        }
-        withContext(NonCancellable) {
-            var failure: Throwable? = null
-            cancelled.forEach { binding ->
-                try {
-                    binding.cancelAndJoin()
-                } catch (error: Throwable) {
-                    if (failure == null) failure = error
-                    else if (failure !== error) failure?.addSuppressed(error)
-                }
-            }
-            failure?.let { throw it }
-        }
-    }
-
-    private suspend fun cancelActiveRunAndJoin() {
-        runtimeStateStore.cancelForegroundRunAndJoin(eventLog)
-    }
 
     private suspend fun captureAutoMemoryDirective(
         text: String,
@@ -1360,35 +943,6 @@ class LocalHarnessEngine @Inject internal constructor(
         snapshot: LocalHarnessState,
     ): String = memoryCoordinator.chatRelationshipMemoryContext(query, snapshot)
 
-    private fun startNextQueuedTurnIfIdle(): Job? {
-        if (_state.value.usageMode == LocalUsageMode.CHAT) {
-            return chatComposition.queue.startNextIfIdle()
-        }
-        return synchronized(runStateLock) {
-            val liveWorkOwner = liveWorkRun(currentSessionId) != null
-            if (
-                !LocalRuntimeOwnershipPolicy.allowVisibleQueuedTurn(
-                    sessionTransitioning = sessionTransitioning,
-                    visibleRunActive = activeJob?.isCompleted == false,
-                    liveWorkOwner = liveWorkOwner,
-                )
-            ) return@synchronized null
-
-            val workLease = LocalSessionRuntimeRegistry.tryAcquire(
-                currentSessionId,
-                LocalSessionRuntimeKind.FOREGROUND,
-            ) ?: return@synchronized null
-            val next = pendingInputs.poll()
-            if (next == null) {
-                workLease.close()
-                return@synchronized null
-            }
-            workTurnStarter.startResumed(
-                input = next,
-                sessionLease = workLease,
-            )
-        }
-    }
 
     private fun refreshGroupModelSystemPrompt() {
         val system = buildJsonObject {
@@ -1668,218 +1222,6 @@ class LocalHarnessEngine @Inject internal constructor(
     private fun searchCapabilities(query: String, target: MutableSet<String>): String =
         toolExecutionCoordinator.searchCapabilities(query, target)
 
-    private suspend fun executeBuiltin(
-        call: LocalToolCall,
-        allowMutation: Boolean,
-        executionSessionId: String?,
-    ): String {
-        val args = call.arguments
-        val binding = executionSessionId?.let(workRunRegistry::get)
-        val executionState = aggregateRunState(binding)
-        val boundSessionId = binding?.sessionId ?: currentSessionId
-        if (executionState.value.work.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
-            return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
-        }
-        workBuiltinToolRuntime.execute(call, binding)?.let { return it }
-        workAgentControlBuiltinRuntime.execute(call, allowMutation, binding)?.let { return it }
-        return when (call.name) {
-            "read", "read_file" -> workspace.read(
-                relativePath = args.string("path"),
-                startLine = args.int("start_line", 1),
-                endLine = args.int("end_line", args.int("start_line", 1) + 399),
-            )
-            "tool_output_read" -> toolOutputStore.read(
-                sessionId = boundSessionId,
-                callId = args.string("call_id"),
-                startByte = args.int("start_byte", 0),
-                maxBytes = args.int("max_bytes", LocalToolOutputStore.DEFAULT_READ_BYTES),
-            )
-            "file_inspect" -> fileInspector.inspect(args.string("path"))
-            "write", "write_file" -> {
-                if (!allowMutation) return "子代理无写入权限"
-                val path = args.string("path")
-                workspace.write(path, args.string("content"))
-            }
-            "edit", "edit_file" -> {
-                if (!allowMutation) return "该子任务处于只读模式"
-                val path = args.string("path")
-                workspace.requireFreshObservation(path)
-                workspace.edit(path, args.string("old_text"), args.string("new_text"))
-            }
-            "apply_patch" -> {
-                if (!allowMutation) return "该子任务处于只读模式"
-                val patch = args.string("patch")
-                require(patch.length <= MAX_PATCH_CHARS) { "补丁超过 ${MAX_PATCH_CHARS} 字符上限" }
-                validateWorkspacePatchPaths(patch)
-                val check = runtimeProcess.execute(
-                    ProcessRequest(
-                        command = listOf("git", "apply", "--check", "--whitespace=nowarn", "-"),
-                        workingDirectory = workspace.path,
-                        stdin = patch,
-                        timeoutMillis = 30_000L,
-                    ),
-                )
-                if (check.exitCode != 0) {
-                    return "[apply_patch][CHECK_FAILED] 补丁预检失败：\n" +
-                        (check.stderr.ifBlank { check.stdout }).take(20_000)
-                }
-                val stat = runtimeProcess.execute(
-                    ProcessRequest(
-                        command = listOf("git", "apply", "--stat", "-"),
-                        workingDirectory = workspace.path,
-                        stdin = patch,
-                        timeoutMillis = 30_000L,
-                    ),
-                )
-                val applied = runtimeProcess.execute(
-                    ProcessRequest(
-                        command = listOf("git", "apply", "--whitespace=nowarn", "-"),
-                        workingDirectory = workspace.path,
-                        stdin = patch,
-                        timeoutMillis = 30_000L,
-                    ),
-                )
-                if (applied.exitCode != 0) {
-                    return "[apply_patch][APPLY_FAILED] 补丁应用失败：\n" +
-                        (applied.stderr.ifBlank { applied.stdout }).take(20_000)
-                }
-                "补丁已应用" + stat.stdout.takeIf(String::isNotBlank)?.let { "\n$it" }.orEmpty()
-            }
-            "list_files" -> workspace.list(args.optionalString("path") ?: ".", args.int("depth", 3))
-            "glob", "glob_files" -> workspace.glob(args.string("pattern"), args.optionalString("path") ?: ".")
-            "grep", "search_text" -> workspace.search(
-                args.string("query"),
-                args.optionalString("path") ?: ".",
-                args.boolean("regex", false),
-            )
-            "bash", "run_shell" -> {
-                if (!allowMutation) return "该子任务处于只读模式"
-                LocalShellTool.execute(args, workspace, jobs, boundSessionId)
-            }
-            "job_list" -> jobs.list(boundSessionId)
-            "job_output" -> jobs.output(args.string("job_id"), boundSessionId)
-            "job_kill" -> jobs.kill(args.string("job_id"), boundSessionId)
-            "web_search" -> {
-                val queries = args["queries"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-                webTools.search(queries, tokenUsageBridge.resolve(boundSessionId, call.id, TokenUsageAction.WEB_SEARCH, queries.firstOrNull()))
-            }
-            "web_fetch" -> {
-                val input = args.string("url")
-                val maxBytes = args.int("max_bytes", DEFAULT_WEB_FETCH_BYTES).coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES)
-                val format = args.optionalString("format") ?: "text"
-                val background = args.boolean("run_in_background", false)
-                val readOnlyScope = !allowMutation || executionState.value.work.planMode
-                if (background && readOnlyScope) {
-                    return "当前为只读/规划作用域，不能创建后台网页抓取任务"
-                }
-                val timeout = if (background) BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS else FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS
-                if (background) {
-                    startPersistentWebFetch(input, maxBytes, format, timeout, boundSessionId)
-                } else {
-                    webTools.fetch(
-                        input,
-                        maxBytes,
-                        format,
-                        timeout,
-                        allowArtifactWrite = !readOnlyScope,
-                    )
-                }
-            }
-            "http_request" -> {
-                if (
-                    (!allowMutation || executionState.value.work.planMode) &&
-                    args.string("method").uppercase() !in setOf("GET", "HEAD")
-                ) {
-                    return "只读/规划作用域仅允许 GET/HEAD 请求"
-                }
-                val headers = args["headers"]?.jsonObject?.mapValues { (_, value) ->
-                    value.jsonPrimitive.content
-                }.orEmpty()
-                webTools.httpRequest(
-                    method = args.string("method"),
-                    url = args.string("url"),
-                    headers = headers,
-                    body = args.optionalString("body"),
-                    maxBytes = args.int("max_bytes", DEFAULT_WEB_FETCH_BYTES)
-                        .coerceIn(16 * 1024, MAX_WEB_FETCH_BYTES),
-                    timeoutSeconds = FOREGROUND_WEB_FETCH_TIMEOUT_SECONDS,
-                )
-            }
-            "download_file" -> {
-                if (!allowMutation) return "只读子任务不能下载写入文件"
-                webTools.download(
-                url = args.string("url"),
-                path = args.string("path"),
-                maxBytes = args.int("max_bytes", DEFAULT_DOWNLOAD_BYTES)
-                    .coerceIn(1_024, MAX_DOWNLOAD_BYTES)
-                    .toLong(),
-                timeoutSeconds = BACKGROUND_WEB_FETCH_TIMEOUT_SECONDS,
-            )
-            }
-            "json_query" -> webTools.jsonQuery(
-                path = args.string("path"),
-                query = args.optionalString("query").orEmpty(),
-                allowArtifactWrite = allowMutation && !executionState.value.work.planMode,
-            )
-            "network_diagnose" -> webTools.diagnose(args.string("url"))
-            "environment_info" -> environmentInfoCoordinator.build(
-                binding?.toEnvironmentRunSnapshot(currentHistoryBudget(binding).maxHistoryChars),
-            )
-            "capability_search" -> if (binding == null) {
-                searchCapabilities(args.string("query"))
-            } else {
-                searchCapabilities(args.string("query"), binding.enabledOptionalTools)
-            }
-            "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(workspace::readSkill)
-                ?: workspace.skills().takeIf { it.isNotEmpty() }?.joinToString("\n") ?: "未安装技能"
-            "list_skills" -> workspace.skills().takeIf { it.isNotEmpty() }?.joinToString("\n") ?: "未安装技能"
-            "read_skill" -> workspace.readSkill(args.string("name"))
-            "session_search" -> sessionAccessCoordinator.search(args.string("query"), boundSessionId)
-            "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
-                memoryTools(binding).execute(call.name, args, allowMutation)
-            "session_event_search" -> sessionAccessCoordinator.authorizedLog(args.optionalString("session_id"), boundSessionId).search(
-                query = args.string("query"),
-                limit = args.int("limit", 50),
-                afterSequence = args.long("after_sequence", -1L),
-            )
-            "session_trace" -> sessionAccessCoordinator.authorizedLog(args.optionalString("session_id"), boundSessionId).tail(args.int("limit", 40))
-            "session_event_trace" -> sessionAccessCoordinator.authorizedLog(args.optionalString("session_id"), boundSessionId)
-                .read(args.int("seq", -1).toLong(), before = 1, after = 1)
-            "session_event_read" -> sessionAccessCoordinator.authorizedLog(args.optionalString("session_id"), boundSessionId).read(
-                sequence = args.int("seq", -1).toLong(),
-                before = args.int("before", 0),
-                after = args.int("after", 0), offsetChars = args.int("offset_chars", 0),
-            )
-            "present" -> workspace.present(args.string("path"))
-            else -> "未知工具：${call.name}"
-        }
-    }
-
-    private fun startPersistentWebFetch(
-        url: String,
-        maxBytes: Int,
-        format: String,
-        timeoutSeconds: Long,
-        sessionId: String = currentSessionId,
-    ): String {
-        val payload = buildJsonObject {
-            put("session_id", sessionId)
-            put("url", url)
-            put("max_bytes", maxBytes)
-            put("format", format)
-            put("timeout_seconds", timeoutSeconds)
-        }.toString()
-        return jobs.startPersistent(
-            label = "网页抓取：${url.take(120)}",
-            resumeKind = "web_fetch",
-            resumePayload = payload,
-            ownerSessionId = sessionId,
-        ) { _, report ->
-            report("正在抓取：$url")
-            webTools.fetch(url, maxBytes, format, timeoutSeconds)
-        }
-    }
-
     private suspend fun approve(
         call: LocalToolCall,
         summary: String,
@@ -2097,238 +1439,6 @@ class LocalHarnessEngine @Inject internal constructor(
                 workSystemPrompt(workspace.path, snapshot.work.planMode)
             snapshot.chat.groupChat.enabled -> groupChatSystemPrompt()
             else -> chatSystemPrompt()
-        }
-    }
-
-    private suspend fun load(deferReady: Boolean = false) {
-        val storedModel = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
-        val baseUrl = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
-        val model = migrateOfficialClaudeModel(modelConfiguration.normalizeModel(storedModel), baseUrl)
-        if (model != storedModel) preferences.edit().putString(KEY_MODEL, model).apply()
-        modelConfiguration.prepareStartup(model, baseUrl)
-        loadSession(currentSessionId, model, baseUrl, deferReady = deferReady)
-    }
-
-    private suspend fun loadSession(
-        sessionId: String,
-        model: String = preferences.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL,
-        baseUrl: String = preferences.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL,
-        deferReady: Boolean = false,
-    ) {
-        liveWorkRun(sessionId)?.let { liveBinding ->
-            pendingInputs.clear()
-            syncVisibleWorkRun(sessionId, liveBinding)
-            return
-        }
-
-        val loaded = try {
-            sessionCoordinator.readWithLegacyApproval(sessionId)
-        } catch (future: FutureSessionVersionException) {
-            _state.update {
-                it.copy(
-                    loading = false,
-                    sessionId = sessionId,
-                    error = future.message,
-                )
-            }
-            return
-        }
-        val recovery = eventLog.repairInterruptedTail()
-        recoverPendingTimelineRewriteProjection(eventLog, memoryStore, chatPersonaGalleryStore, chatDiaryStore)
-        val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
-        val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
-            eventLog.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: eventLog.append(
-                PROJECTION_BASELINE_EVENT,
-                buildJsonObject { put("source", "legacy-session-snapshot") },
-            ).sequence
-        } else {
-            null
-        }
-        val projectionCursor = projectionReplayCursor(
-            snapshot = stored,
-            persistedSnapshotExists = loaded != null,
-            legacyBaselineSequence = legacyProjectionBaseline,
-        )
-        val projectedControls = projectSessionControlTail(
-            snapshot = stored,
-            events = eventLog.snapshotAfter(projectionCursor),
-            sequenceExclusive = projectionCursor,
-        )
-        val restoredTranscript = sessionCoordinator.restoreTranscript(
-            stored = stored,
-            persistedSnapshotExists = loaded != null,
-        )
-        transcriptProjectionCursor = restoredTranscript.projectedThroughSequence
-        val restoredHistory = restoreLocalModelHistory(
-            events = loadModelHistoryReplayEvents(eventLog, modelHistoryCheckpointCodec, stored.legacyModelHistory),
-            legacyFallback = stored.legacyModelHistory,
-            codec = modelHistoryCheckpointCodec,
-        )
-        modelHistory.reset(restoredHistory.messages)
-        buildRecoveredToolResultMessages(modelHistory.snapshot(), recovery).forEach { modelHistory.append(it) }
-        val restoredInbox = eventLog.latest(LOCAL_AGENT_INBOX_EVENT_TYPE)
-            ?.let { event -> decodeLocalAgentInboxPending(event.data) }
-            .orEmpty()
-        pendingInputs.restore(restoredInbox)
-        val modelProfiles = modelConfiguration.readProfiles()
-        val recoveryDecision = agentRunCoordinator.recoveryDecision(
-            sessionId = sessionId,
-            repair = recovery,
-            contextPolicy = LocalWorkRecoveryContextPolicy,
-        )
-        val recoveryState = foregroundRecoveryCoordinator.restore(
-            sessionId, recoveryDecision, modelProfiles, pendingInputs, eventLog,
-        )
-        val recoveredRunProfile = recoveryState.profile
-        val runRecoveryError = recoveryState.error
-        val profile = contextComposer.userProfile()
-        val restoredBehavior = withContext(Dispatchers.IO) {
-            reconcileCharacterBehaviorTuning(
-                chatPersonaStore,
-                chatPersonaGalleryStore,
-                projectedControls.personaId,
-                projectedControls.galleryId,
-                projectedControls.chatState,
-            )
-        }
-        val restoredGroupChat = if (stored.usageMode == LocalUsageMode.CHAT) {
-            projectedControls.groupChat.copy(
-                context = projectedControls.groupChat.context.boundDurablePending(eventLog, "group"),
-            )
-        } else LocalGroupChatState()
-        val restoredLineageId = stored.lineageId.ifBlank { stored.id.ifBlank { sessionId } }
-        val restoredProjectId = stored.projectId ?: when (stored.conversationMode) {
-            LocalConversationMode.INDEPENDENT -> null
-            LocalConversationMode.PROJECT,
-            LocalConversationMode.CONTINUATION -> LOCAL_PROJECT_ID
-        }
-        val activeModelProfile = recoveredRunProfile
-            ?: modelConfiguration.activeProfile(model, baseUrl, modelProfiles)
-        val modelConfigured = activeModelProfile != null && modelGateway.hasCredential(activeModelProfile)
-        activeModelProfile?.takeIf { modelConfigured }?.let(modelGateway::activate)
-        val restoredModel = activeModelProfile?.model ?: model
-        val restoredBaseUrl = activeModelProfile?.baseUrl ?: baseUrl
-        _state.value = LocalHarnessState(
-            loading = deferReady,
-            modelState = LocalModelState(
-                configured = modelConfigured,
-                model = restoredModel,
-                baseUrl = restoredBaseUrl,
-                modelSelection = LocalModelSelectionState.restored(
-                    modelProfiles, activeModelProfile?.id,
-                    preferences.getString(LocalHarnessSettingsCoordinator.KEY_WORKER_PROFILE_ID, null),
-                ),
-                modelAttempts = LocalAgentRuntimeLimits.normalizeModelAttempts(
-                    preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MODEL_ATTEMPTS, DEFAULT_MODEL_ATTEMPTS),
-                ),
-                imageInputMode = runCatching {
-                    LocalImageInputMode.valueOf(
-                        preferences.getString(LocalModelSettingsCoordinator.KEY_IMAGE_INPUT_MODE, LocalImageInputMode.AUTO.name)
-                            ?: LocalImageInputMode.AUTO.name,
-                    )
-                }.getOrDefault(LocalImageInputMode.AUTO),
-            ),
-            mainMaxSteps = LocalAgentRuntimeLimits.normalizeMainSteps(
-                preferences.getInt(LocalHarnessSettingsCoordinator.KEY_MAIN_MAX_STEPS, DEFAULT_MAIN_MAX_STEPS),
-            ),
-            subagentMaxSteps = LocalAgentRuntimeLimits.normalizeSubagentSteps(
-                preferences.getInt(LocalHarnessSettingsCoordinator.KEY_SUBAGENT_MAX_STEPS, DEFAULT_SUBAGENT_MAX_STEPS),
-            ),
-            workspacePath = workspace.path,
-            sessionId = sessionId,
-            usageMode = stored.usageMode,
-            chat = LocalChatState(
-                personaId = projectedControls.personaId,
-                galleryId = projectedControls.galleryId,
-                galleryStoryId = projectedControls.galleryStoryId,
-                gallerySaveSuppressedThrough = projectedControls.gallerySaveSuppressedThrough,
-                chatPersona = restoredBehavior.persona,
-                chatState = restoredBehavior.chatState,
-                chatContext = projectedControls.chatContext.boundDurablePending(eventLog),
-                replySuggestions = projectedControls.replySuggestions,
-                chatBranches = if (stored.usageMode == LocalUsageMode.CHAT && !projectedControls.groupChat.enabled) {
-                    restoreMaterializedChatBranchState(
-                        current = projectedControls.chatBranches,
-                        activeMessages = restoredTranscript.messages,
-                        chatState = restoredBehavior.chatState,
-                        replySuggestions = projectedControls.replySuggestions,
-                    )
-                } else {
-                    LocalChatBranchState()
-                },
-                groupChat = reconcileGroupCharacterBehaviorTuning(
-                    restoredGroupChat, chatPersonaStore, chatPersonaGalleryStore,
-                ),
-            ),
-            conversationMode = stored.conversationMode,
-            parentSessionId = stored.parentSessionId,
-            lineageId = restoredLineageId,
-            projectId = restoredProjectId,
-            handoffSummary = projectedControls.handoffSummary,
-            userRules = profile.customRules,
-            autoRecall = profile.autoRecall,
-            autoMemory = profile.autoMemory,
-            usage = usageTracker.state.value,
-            sessions = sessionSummaries(),
-            messages = restoredTranscript.messages,
-            transcriptIndex = restoredTranscript.index,
-            work = com.labteto.dshmobile.local.work.LocalWorkState(
-                plan = projectedControls.plan,
-                todos = projectedControls.todos,
-                goal = projectedControls.goal,
-                planMode = projectedControls.planMode,
-                jobs = projectExecutionJobs(stored.usageMode, stored.id, jobs.snapshotInfos()),
-            ),
-            safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
-                loaded?.legacySafeAutoApproval == true,
-            ),
-            kernel = com.labteto.dshmobile.local.runtime.LocalKernelState(
-                queuedInputCount = pendingInputs.size(),
-                resources = resourceScheduler.snapshot().toLocalHarnessResourceState(stored.usageMode),
-                contextChars = modelHistory.encodedChars,
-                contextBudgetChars = currentHistoryBudget().maxHistoryChars,
-            ),
-            error = runRecoveryError,
-        )
-        LocalSessionRuntimeRegistry.submitWhenIdle(sessionId) {
-            var wroteHistoryCheckpoint = false
-            if (_state.value.chat.groupChat.enabled) {
-                projectGroupGalleryState(_state.value.chat.groupChat, chatPersonaGalleryStore).failures.forEach { failure ->
-                    AppLog.warn(
-                        "LocalHarnessEngine",
-                        "群聊人物库投影恢复失败 galleryId=${failure.galleryId} detail=${failure.detail}",
-                    )
-                }
-                // Group model history is already restored from its durable checkpoint/event tail.
-                // Rebuilding it from the bounded UI transcript would silently discard older context.
-                refreshGroupModelSystemPrompt()
-                checkpointModelHistory("load/group-system-refresh")
-                wroteHistoryCheckpoint = true
-            } else if (modelHistory.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
-                modelHistory.replaceSystem(
-                    buildJsonObject { put("role", "system"); put("content", systemPrompt()) },
-                )
-                updateContextMetrics()
-                checkpointModelHistory("load/system-refresh")
-                wroteHistoryCheckpoint = true
-            } else if (recovery.repaired || restoredHistory.checkpointRecommended) {
-                checkpointModelHistory(
-                    if (restoredHistory.usedLegacyFallback) "load/legacy-history-migration"
-                    else "load/event-replay",
-                )
-                wroteHistoryCheckpoint = true
-            }
-            if (restoredHistory.usedLegacyFallback && !wroteHistoryCheckpoint) {
-                checkpointModelHistory("load/legacy-history-migration")
-            }
-            if (
-                restoredHistory.usedLegacyFallback ||
-                restoredTranscript.needsPersist ||
-                restoredBehavior.changed
-            ) {
-                // Materialize migrated/replayed projections so later restarts only fold the new tail.
-                persist()
-            }
         }
     }
 
