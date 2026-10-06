@@ -210,6 +210,8 @@ private val DIAGNOSTIC_EVENT_KEYS = listOf(
     "duration_ms",
     "retryable",
     "will_retry",
+    "stream_total_chars",
+    "stream_tail_truncated",
     "side_effect",
     "execution_id",
     "root_call_id",
