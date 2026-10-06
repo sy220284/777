@@ -24,7 +24,7 @@ SESSION_SNAPSHOT_BOUNDARY = ROOT / "app/src/main/java/com/labteto/dshmobile/loca
 TRANSCRIPT_RUNTIME = ROOT / "app/src/main/java/com/labteto/dshmobile/local/session/LocalTranscriptRuntime.kt"
 WORK_RUN_BINDING = ROOT / "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRunBinding.kt"
 MODEL_HISTORY_BUFFER = ROOT / "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelHistoryBuffer.kt"
-ENGINE_DEFAULTS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt"
+RUNTIME_DEFAULTS = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalHarnessDefaults.kt"
 TRANSCRIPT_HISTORY_LOADER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalTranscriptHistoryLoader.kt"
 MODEL_REQUEST_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt"
 RUNTIME_STATE_STORE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeStateStore.kt"
@@ -93,7 +93,7 @@ session_snapshot_boundary = strip_comments(read(SESSION_SNAPSHOT_BOUNDARY))
 transcript_runtime = strip_comments(read(TRANSCRIPT_RUNTIME))
 work_run_binding = strip_comments(read(WORK_RUN_BINDING))
 model_history_buffer = strip_comments(read(MODEL_HISTORY_BUFFER))
-engine_defaults = strip_comments(read(ENGINE_DEFAULTS))
+runtime_defaults = strip_comments(read(RUNTIME_DEFAULTS))
 transcript_history_loader = strip_comments(read(TRANSCRIPT_HISTORY_LOADER))
 model_request_coordinator = strip_comments(read(MODEL_REQUEST_COORDINATOR))
 runtime_state_store = strip_comments(read(RUNTIME_STATE_STORE))
@@ -104,6 +104,7 @@ automation_runtime = strip_comments(read(AUTOMATION_RUNTIME))
 chat_automation_port = strip_comments(read(CHAT_AUTOMATION_PORT))
 work_automation_port = strip_comments(read(WORK_AUTOMATION_PORT))
 automation_worker = strip_comments(read(AUTOMATION_WORKER))
+execution_status = strip_comments(read(EXECUTION_STATUS))
 
 chat_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/chat")
 work_sources = kotlin_sources_under("app/src/main/java/com/labteto/dshmobile/local/work")
@@ -125,8 +126,8 @@ for relative in (
 foreground_sources = merge_sources(chat_sources, work_sources, root_execution_sources)
 recovery_sources = merge_sources(work_sources, session_sources, runtime_sources, root_execution_sources)
 
-# Compatibility migrations may legitimately decode legacy Chat state. Only active execution
-# surfaces are forbidden from re-reading legacy context during a live turn.
+# Historical Chat data may still be decoded at compatibility/persistence boundaries. Active
+# execution must use the current Chat context projection during a live turn.
 active_chat_context_sources = {
     path: source
     for path, source in merge_sources(chat_sources, root_execution_sources).items()
@@ -154,7 +155,7 @@ hot_sources = merge_sources(
 # ---- Bounded streaming and hot-state work ---------------------------------
 
 def numeric_constant(name: str) -> int | None:
-    match = re.search(rf"\bconst\s+val\s+{re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", engine_defaults)
+    match = re.search(rf"\bconst\s+val\s+{re.escape(name)}\s*=\s*([0-9_]+)(?:L)?", runtime_defaults)
     return int(match.group(1).replace("_", "")) if match else None
 
 
@@ -182,7 +183,7 @@ for forbidden_hot_pattern in (
     hits = paths_containing(hot_sources, forbidden_hot_pattern)
     if hits:
         violations.append(
-            f"hot execution surface reintroduced {forbidden_hot_pattern!r}: " + ", ".join(hits)
+            f"hot execution surface contains forbidden unbounded pattern {forbidden_hot_pattern!r}: " + ", ".join(hits)
         )
 
 # Model-history accounting has one owner. No extracted execution surface may mutate the raw list.
@@ -273,8 +274,22 @@ if not ordered_in_source(
         "Session persistence must capture durable projection cursors before materializing mutable Feature state"
     )
 
-if contains_any(foreground_sources, 'eventLog.append("user/queue"'):
-    violations.append("legacy user/queue persistence returned; queued input must use durable Agent inbox facts")
+agent_inbox_persistence_path = (
+    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentInboxPersistence.kt"
+)
+agent_inbox_persistence = all_local_sources.get(agent_inbox_persistence_path, "")
+if 'LOCAL_AGENT_INBOX_EVENT_TYPE = "agent/inbox/spliced"' not in agent_inbox_persistence:
+    violations.append("LocalAgentInboxPersistence must own the canonical durable inbox event type")
+
+for path, source in all_local_sources.items():
+    if path != agent_inbox_persistence_path and '"agent/inbox/spliced"' in source:
+        violations.append(
+            f"{path} hard-codes the durable Agent inbox event type; use LOCAL_AGENT_INBOX_EVENT_TYPE"
+        )
+    if "eventLog.append(LOCAL_AGENT_INBOX_EVENT_TYPE" in source and "encodeLocalAgentInboxEvent(" not in source:
+        violations.append(
+            f"{path} writes Agent inbox state without encodeLocalAgentInboxEvent"
+        )
 
 # Recovery must reject stale ownership before late foreground Work commits.
 if not contains_any(work_sources, "agentRunCoordinator.ensureCurrentOwner("):
@@ -307,7 +322,6 @@ if "runtimeStateStore.withModelRequestResource(block)" not in automation_runtime
         "Automation model requests must acquire MODEL_REQUEST through shared Runtime ownership"
     )
 
-execution_status = read(EXECUTION_STATUS)
 for terminal_status in ("DELIVERED", "SKIPPED", "BLOCKED", "CANCELLED", "FAILED"):
     if terminal_status not in execution_status:
         violations.append("shared execution status lost terminal state: " + terminal_status)
@@ -414,15 +428,15 @@ for forbidden_fallback in (
     hits = paths_containing(foreground_sources, forbidden_fallback)
     if hits:
         violations.append(
-            "foreground execution reintroduced a separate vision-model fallback: " + ", ".join(hits)
+            "foreground execution must use the unified frozen-profile Vision route; "
+            "parallel fallback found in: " + ", ".join(hits)
         )
 
-# Legacy chat-context fallback is allowed only in compatibility/persistence transforms, never
-# in an active turn or proactive execution path.
+# Compatibility Chat-context decoding stays outside active/proactive execution paths.
 for path, source in active_chat_context_sources.items():
     if "withLegacyFallback" in source:
         violations.append(
-            f"{path} uses legacy Chat context fallback inside active execution"
+            f"{path} uses compatibility Chat context fallback inside active execution"
         )
 
 if violations:
