@@ -184,12 +184,12 @@ internal fun ColumnScope.TaskEditorPane(
                                 windowStartMinuteOfDay = null,
                                 windowEndMinuteOfDay = null,
                                 quietHoursEnabled = false,
-                                quietStartHour = 23,
-                                quietStartMinute = 0,
-                                quietEndHour = 7,
-                                quietEndMinute = 0,
-                                proactiveMinGapMinutes = 6L * 60L,
-                                proactiveMaxUnanswered = 2,
+                                quietStartHour = LocalAutomationPolicyProjection.defaults.quietStartHour,
+                                quietStartMinute = LocalAutomationPolicyProjection.defaults.quietStartMinute,
+                                quietEndHour = LocalAutomationPolicyProjection.defaults.quietEndHour,
+                                quietEndMinute = LocalAutomationPolicyProjection.defaults.quietEndMinute,
+                                proactiveMinGapMinutes = LocalAutomationPolicyProjection.defaults.proactiveMinGapMinutes,
+                                proactiveMaxUnanswered = LocalAutomationPolicyProjection.defaults.proactiveMaxUnanswered,
                             )
                         } ?: viewModel.createAt(
                             prompt = prompt,

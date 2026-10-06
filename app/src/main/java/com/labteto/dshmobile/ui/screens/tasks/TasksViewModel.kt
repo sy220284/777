@@ -1,5 +1,4 @@
 package com.labteto.dshmobile.ui.screens.tasks
-import com.labteto.dshmobile.local.chat.LocalChatAutomationPolicy
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.automation.AutomationMode
@@ -10,6 +9,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.automation.AutomationPlanDraft
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.local.presentation.LocalAutomationPlanningFacade
+import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
 import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -155,12 +155,12 @@ class TasksViewModel @Inject constructor(
         windowStartMinuteOfDay: Int? = null,
         windowEndMinuteOfDay: Int? = null,
         quietHoursEnabled: Boolean = false,
-        quietStartHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_HOUR,
-        quietStartMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_START_MINUTE,
-        quietEndHour: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_HOUR,
-        quietEndMinute: Int = LocalChatAutomationPolicy.DEFAULT_QUIET_END_MINUTE,
-        proactiveMinGapMinutes: Long = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MIN_GAP_MINUTES,
-        proactiveMaxUnanswered: Int = LocalChatAutomationPolicy.DEFAULT_PROACTIVE_MAX_UNANSWERED,
+        quietStartHour: Int = LocalAutomationPolicyProjection.defaults.quietStartHour,
+        quietStartMinute: Int = LocalAutomationPolicyProjection.defaults.quietStartMinute,
+        quietEndHour: Int = LocalAutomationPolicyProjection.defaults.quietEndHour,
+        quietEndMinute: Int = LocalAutomationPolicyProjection.defaults.quietEndMinute,
+        proactiveMinGapMinutes: Long = LocalAutomationPolicyProjection.defaults.proactiveMinGapMinutes,
+        proactiveMaxUnanswered: Int = LocalAutomationPolicyProjection.defaults.proactiveMaxUnanswered,
     ): Boolean {
         val now = System.currentTimeMillis()
         if (prompt.isBlank()) return false
@@ -170,7 +170,7 @@ class TasksViewModel @Inject constructor(
         val minimumRecurringMinutes = if (mode == AutomationMode.CHAT) 60L else 15L
         if (recurringMinutes != null && recurringMinutes < minimumRecurringMinutes) return false
         if (scheduleType == AutomationScheduleType.SILENCE &&
-            (silenceMinutes == null || silenceMinutes < LocalChatAutomationPolicy.MIN_SILENCE_MINUTES)
+            (silenceMinutes == null || silenceMinutes < LocalAutomationPolicyProjection.minimumSilenceMinutes)
         ) return false
         if (scheduleType == AutomationScheduleType.WINDOW &&
             (windowStartMinuteOfDay == null || windowEndMinuteOfDay == null ||

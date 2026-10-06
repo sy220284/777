@@ -46,7 +46,6 @@ import com.labteto.dshmobile.automation.AutomationRunReceipt
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.automation.AutomationStatus
 import com.labteto.dshmobile.automation.AutomationTask
-import com.labteto.dshmobile.automation.HarnessAutomationScheduler
 import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
 import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
 import com.labteto.dshmobile.local.LocalUsageMode
