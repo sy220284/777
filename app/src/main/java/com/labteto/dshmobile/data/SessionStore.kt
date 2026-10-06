@@ -513,304 +513,78 @@ class SessionStore @Inject constructor(
      * state, which belongs to `session/control`. What is left is notifications and the two
      * agent-scoped waterfalls.
      */
-    private fun handleEventFrame(frame: RemoteEventFrame) {
-        when (frame) {
-            is RemoteEventFrame.Emit -> handleNotification(frame.event, frame.args)
-            is RemoteEventFrame.Waterfall -> handleWaterfall(frame)
-            is RemoteEventFrame.Cancel -> handleWaterfallCancelled(frame.eventId)
-            // Consumed by the connection loop's handshake; it never forwards one.
-            is RemoteEventFrame.Ready -> Unit
-            is RemoteEventFrame.Unknown -> log("unknown host event frame ${frame.type}")
-        }
+    private val eventReduce: SessionEventReduceRuntime by lazy {
+        SessionEventReduceRuntime(
+            scope = scope,
+            lock = lock,
+            currentIdOf = { currentId },
+            indexState = indexState,
+            openSessionState = openSessionState,
+            queuesBySession = queuesBySession,
+            rebuildTicks = rebuildTicks,
+            interactionRuntime = interactionRuntime,
+            sessions = _sessions,
+            workspaces = _workspaces,
+            archivedSessionIds = _archivedSessionIds,
+            currentConversation = _currentConversation,
+            jobsState = _jobs,
+            notificationSinkOf = { notificationSink },
+            setConnectionErrorOf = ::setConnectionError,
+            logOf = ::log,
+            refreshPermissionCatalog = { refreshPermissionCatalog() },
+            refreshCommands = { refreshCommands() },
+            refreshAgentPresets = { refreshAgentPresets() },
+        )
     }
 
-    /**
-     * One ordinary host notification.
-     *
-     * Arguments are positional — the host forwards the Cordis listener's own argument list — so
-     * these read by index rather than by key. None of them is replayed after a reconnect, which
-     * is why every one of them is either repairable from the session list baseline or purely
-     * advisory.
-     */
-    private fun handleNotification(event: String, args: List<JsonElement>) {
-        fun str(i: Int) = args.getOrNull(i)?.jsonPrimitive?.contentOrNull
-        when (event) {
-            "api-session/added" -> args.firstOrNull()?.let { onSessionAdded(it) }
-            "api-session/removed" -> str(0)?.let { onSessionRemoved(it) }
-            "api-session/status" -> {
-                val sid = str(0) ?: return
-                val running = args.getOrNull(1)?.jsonPrimitive?.booleanOrNull ?: false
-                setRunning(sid, running)
-            }
-            "permission-presets/catalog-changed" -> scope.launch { refreshPermissionCatalog() }
-            "api-session/activity" -> {
-                // Only reorders the list; the durable value is the session's own projection, so a
-                // missed one is corrected by the next list read rather than lost.
-                val sid = str(0) ?: return
-                val updatedAt = args.getOrNull(1)?.jsonPrimitive?.longOrNull ?: return
-                setUpdatedAt(sid, updatedAt)
-            }
-            "api-session/error" -> setConnectionError(str(1))
-            "commands/change" -> scope.launch { refreshCommands() }
-            "agent-preset/selected" -> scope.launch {
-                refreshAgentPresets()
-                refreshCommands()
-            }
-            else -> Unit
-        }
-    }
+    private fun handleEventFrame(frame: RemoteEventFrame) = eventReduce.handleEventFrame(frame)
 
-    /** One pending agent-scoped request awaiting this client's answer. */
-    private fun handleWaterfall(frame: RemoteEventFrame.Waterfall) {
-        when (frame.event) {
-            APPROVAL_REQUEST_EVENT -> {
-                val request = runCatching {
-                    decodeFromJsonElement(ApprovalRequestEvent.serializer(), frame.request)
-                }.getOrNull() ?: return
-                interactionRuntime.installApproval(frame.eventId, frame.agentId, request)
-            }
-            USER_QUESTIONS_REQUEST_EVENT -> {
-                val request = runCatching {
-                    decodeFromJsonElement(AskUserQuestionRequestEvent.serializer(), frame.request)
-                }.getOrNull() ?: return
-                interactionRuntime.installQuestions(frame.eventId, frame.agentId, request.questions)
-            }
-            else -> log("unhandled waterfall ${frame.event}")
-        }
-    }
+    private fun handleControlFrame(frame: SessionControlFrame) = eventReduce.handleControlFrame(frame)
 
-    /**
-     * A pending request was withdrawn: another client answered it, or the host's caller cancelled.
-     *
-     * Replaces the `approval/resolved` and `question/resolved` frames, and covers both — an
-     * `eventId` identifies the request without saying which kind it was, so both registries are
-     * checked.
-     *
-     * It is *not* the only way a request leaves: the host drops the answering client's delivery
-     * before it cancels the rest, so this frame reaches every client except the one that acted.
-     * That client settles its own card in [answerOutcome].
-     */
-    private fun handleWaterfallCancelled(eventId: String) = interactionRuntime.forgetEvent(eventId)
+    private fun handleWorkspaceFrame(frame: WorkspaceFollowFrame) = eventReduce.handleWorkspaceFrame(frame)
 
-    // ------------------------------------------------------------------ control stream
-    /**
-     * One frame of the host-wide live-control stream.
-     *
-     * Queue and job values are complete replacements applied last-wins, never deltas, so an
-     * empty value is a real "nothing pending" rather than an absent update.
-     */
-    private fun handleControlFrame(frame: SessionControlFrame) {
-        when (frame) {
-            is SessionControlFrame.Baseline -> {
-                queuesBySession.value = frame.value.queues.mapValues { (_, items) -> items.map(::queuedInboxItemToQueueItem) }
-                val sid = synchronized(lock) { currentId } ?: return
-                frame.value.queues[sid]?.let { items -> applyQueue(sid, items) }
-                frame.value.jobs[sid]?.let { jobs -> applyJobs(sid, jobs) }
-                frame.value.projections[sid]?.let { block -> applyProjectionBaseline(sid, block) }
-            }
-            is SessionControlFrame.Queue -> applyQueue(frame.sessionId, frame.items)
-            is SessionControlFrame.Jobs -> applyJobs(frame.sessionId, frame.jobs)
-            is SessionControlFrame.Projection -> synchronized(lock) {
-                if (frame.sessionId == currentId) {
-                    openSessionState.mergeProjection(frame.key, frame.seq, frame.value)
-                    rebuildCurrentLocked()
-                }
-            }
-            is SessionControlFrame.Unknown -> log("unknown control frame ${frame.type}")
-        }
-    }
+    private fun handleSessionEvent(sessionId: String, envelope: SessionEventEnvelope) =
+        eventReduce.handleSessionEvent(sessionId, envelope)
 
-    private fun applyQueue(sessionId: String, items: List<QueuedInboxItem>) {
-        queuesBySession.value = queuesBySession.value + (sessionId to items.map(::queuedInboxItemToQueueItem))
-        synchronized(lock) {
-            if (sessionId == currentId) {
-                openSessionState.setQueue(items.map { queuedInboxItemToQueueItem(it) })
-                rebuildCurrentLocked()
-            }
-        }
-    }
+    private fun applyQueue(sessionId: String, items: List<QueuedInboxItem>) =
+        eventReduce.applyQueue(sessionId, items)
 
-    private fun applyJobs(sessionId: String, jobs: List<JobView>) {
-        synchronized(lock) {
-            if (sessionId == currentId) _jobs.value = jobs
-        }
-    }
+    private fun applyJobs(sessionId: String, jobs: List<JobView>) =
+        eventReduce.applyJobs(sessionId, jobs)
 
-    /**
-     * Merge a projection baseline for one session.
-     *
-     * The tail page's baseline and the control stream's are produced independently, so neither is
-     * authoritative on its own; [OpenSessionFoldState.mergeProjection] keeps whichever carries the higher
-     * watermark.
-     */
-    private fun applyProjectionBaseline(sessionId: String, block: JsonObject) {
-        synchronized(lock) {
-            if (sessionId != currentId) return@synchronized
-            val asOf = block["asOfSeq"]?.jsonPrimitive?.intOrNull ?: 0
-            (block["values"] as? JsonObject)?.forEach { (key, value) ->
-                openSessionState.mergeProjection(key, asOf, value)
-            }
-            rebuildCurrentLocked()
-        }
-    }
+    private fun applyProjectionBaseline(sessionId: String, block: JsonObject) =
+        eventReduce.applyProjectionBaseline(sessionId, block)
 
-    // ------------------------------------------------------------------ workspace stream
-    /**
-     * One frame of the workspace registry stream.
-     *
-     * The `order` frame is complete and authoritative; display order is never inferred from the
-     * arrival order of upserts, which is what makes the list converge after a reconnect baseline.
-     */
-    private fun handleWorkspaceFrame(frame: WorkspaceFollowFrame) {
-        when (frame) {
-            is WorkspaceFollowFrame.Baseline -> synchronized(lock) {
-                indexState.replaceWorkspaceBaseline(
-                    frame.workspaces,
-                    frame.workspaceIds,
-                    frame.archivedSessionIds,
-                )
-                _archivedSessionIds.value = indexState.archivedIds()
-                emitWorkspacesLocked()
-            }
-            is WorkspaceFollowFrame.Upsert -> upsertWorkspace(frame.workspace)
-            is WorkspaceFollowFrame.Remove -> removeWorkspace(frame.workspaceId)
-            is WorkspaceFollowFrame.Order -> setWorkspaceOrder(frame.workspaceIds)
-            is WorkspaceFollowFrame.Archived -> setArchived(frame.archivedSessionIds)
-            is WorkspaceFollowFrame.Unknown -> log("unknown workspace frame ${frame.type}")
-        }
-    }
+    private fun onSessionAdded(summary: JsonElement) = eventReduce.onSessionAdded(summary)
 
-    /**
-     * One event from the open session's follow stream.
-     *
-     * Through 0.1.1 this arrived for every session at once on the mux, which is how the store
-     * kept list state for sessions nobody had opened. 0.1.2 has no such stream: an event is only
-     * seen for the session actually being followed, and everything else about the list comes from
-     * a notification or a list read.
-     */
-    private fun handleSessionEvent(sessionId: String, envelope: SessionEventEnvelope) {
-        when (envelope.type) {
-            "turn/start" -> {
-                setRunning(sessionId, true)
-                setBlank(sessionId, false)
-            }
-            "turn/end" -> setRunning(sessionId, false)
-            "user/message" -> setBlank(sessionId, false)
-            "session/title" -> {
-                val title = envelope.data.jsonObject["title"]?.jsonPrimitive?.contentOrNull
-                if (title != null) setTitle(sessionId, title)
-            }
-        }
-        // Completion notifications used to be classified from the all-session mux. That stream is
-        // gone, so the session that owns the event forwards it to whoever is watching for one.
-        notificationSink?.invoke(sessionId, envelope)
-        synchronized(lock) {
-            if (sessionId == currentId) {
-                // The durable settlement and the transient rows say the same thing; the moment
-                // the settlement lands the preview is redundant, and a fold that saw both would
-                // show the reply twice.
-                openSessionState.acceptDurable(envelope)
-                rebuildTicks.trySend(Unit)
-            }
-        }
-    }
+    private fun onSessionAdded(item: SessionSummary) = eventReduce.onSessionAdded(item)
 
-    /**
-     * Where session events go for completion notifications.
-     *
-     * A hook rather than a direct dependency: the notification observer already depends on this
-     * store, and 0.1.2 leaves no all-session stream for it to read instead.
-     */
+    private fun onSessionRemoved(sessionId: String) = eventReduce.onSessionRemoved(sessionId)
+
+    private fun setRunning(sessionId: String, running: Boolean) = eventReduce.setRunning(sessionId, running)
+
+    private fun setUpdatedAt(sessionId: String, updatedAt: Long) = eventReduce.setUpdatedAt(sessionId, updatedAt)
+
+    private fun setBlank(sessionId: String, blank: Boolean) = eventReduce.setBlank(sessionId, blank)
+
+    private fun setTitle(sessionId: String, title: String) = eventReduce.setTitle(sessionId, title)
+
+    private fun upsertWorkspace(workspace: WorkspaceView) = eventReduce.upsertWorkspace(workspace)
+
+    private fun removeWorkspace(workspaceId: String) = eventReduce.removeWorkspace(workspaceId)
+
+    private fun setWorkspaceOrder(ids: List<String>) = eventReduce.setWorkspaceOrder(ids)
+
+    private fun setArchived(ids: List<String>) = eventReduce.setArchived(ids)
+
+    private fun rebuildCurrentLocked() = eventReduce.rebuildCurrentLocked()
+
+    private fun emitSessionsLocked() = eventReduce.emitSessionsLocked()
+
+    private fun emitWorkspacesLocked() = eventReduce.emitWorkspacesLocked()
+
     @Volatile
     var notificationSink: ((String, SessionEventEnvelope) -> Unit)? = null
-
-    // ------------------------------------------------------------------ session list state updates
-    /**
-     * One session became visible to list consumers.
-     *
-     * The notification carries the whole list row rather than the loose fields the old
-     * `host/session-added` frame did, so this decodes a summary and folds it in.
-     */
-    private fun onSessionAdded(summary: JsonElement) {
-        val item = runCatching {
-            decodeFromJsonElement(SessionSummary.serializer(), summary)
-        }.getOrNull() ?: return
-        onSessionAdded(item)
-    }
-
-    private fun onSessionAdded(item: SessionSummary) {
-        synchronized(lock) {
-            indexState.addSession(item)
-            emitSessionsLocked()
-        }
-    }
-
-    private fun onSessionRemoved(sessionId: String) {
-        synchronized(lock) {
-            indexState.removeSession(sessionId)
-            interactionRuntime.discardSession(sessionId)
-            emitSessionsLocked()
-        }
-    }
-
-    private fun setRunning(sessionId: String, running: Boolean) {
-        synchronized(lock) {
-            indexState.setRunning(sessionId, running)
-            if (sessionId == currentId) rebuildCurrentLocked()
-            emitSessionsLocked()
-        }
-    }
-
-    /** Reorder one session on a durable user message, without touching anything else about it. */
-    private fun setUpdatedAt(sessionId: String, updatedAt: Long) {
-        synchronized(lock) {
-            indexState.setUpdatedAt(sessionId, updatedAt)
-            emitSessionsLocked()
-        }
-    }
-
-    private fun setBlank(sessionId: String, blank: Boolean) {
-        synchronized(lock) {
-            indexState.setBlank(sessionId, blank)
-            if (sessionId == currentId) openSessionState.setBlank(blank)
-            emitSessionsLocked()
-        }
-    }
-
-    private fun setTitle(sessionId: String, title: String) {
-        synchronized(lock) {
-            indexState.setTitle(sessionId, title)
-            emitSessionsLocked()
-        }
-    }
-
-    private fun upsertWorkspace(workspace: WorkspaceView) {
-        synchronized(lock) {
-            indexState.upsertWorkspace(workspace)
-            emitWorkspacesLocked()
-        }
-    }
-
-    private fun removeWorkspace(workspaceId: String) {
-        synchronized(lock) {
-            indexState.removeWorkspace(workspaceId)
-            emitWorkspacesLocked()
-        }
-    }
-
-    private fun setWorkspaceOrder(ids: List<String>) {
-        synchronized(lock) {
-            indexState.setWorkspaceOrder(ids)
-            emitWorkspacesLocked()
-        }
-    }
-
-    private fun setArchived(ids: List<String>) {
-        synchronized(lock) {
-            _archivedSessionIds.value = indexState.setArchived(ids)
-        }
-    }
-
     private fun setConnectionError(message: String?) {
         _connectionError.value = message
     }
@@ -826,19 +600,6 @@ class SessionStore @Inject constructor(
         if (_connectionError.value != null) _connectionError.value = null
     }
 
-    // ------------------------------------------------------------------ open-session fold
-    private fun rebuildCurrentLocked() {
-        val sid = currentId ?: return
-        _currentConversation.value = openSessionState.rebuild(sid, indexState.running(sid))
-    }
-
-    private fun emitSessionsLocked() {
-        _sessions.value = indexState.renderSessions()
-    }
-
-    private fun emitWorkspacesLocked() {
-        _workspaces.value = indexState.orderedWorkspaces()
-    }
 
     private fun addPendingLocked(sessionId: String, kind: String) {
         indexState.addPending(sessionId, kind)

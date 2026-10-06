@@ -14,6 +14,7 @@ LOCAL_CONVERSATION_COMPOSER_ACTIONS = ROOT / "app/src/main/java/com/labteto/dshm
 REMOTE_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/main/Composer.kt"
 SHARED_COMPOSER = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/components/DsConversationComposer.kt"
 SESSION_STORE = ROOT / "app/src/main/java/com/labteto/dshmobile/data/SessionStore.kt"
+SESSION_EVENT_REDUCE = ROOT / "app/src/main/java/com/labteto/dshmobile/data/SessionEventReduceRuntime.kt"
 PERSONA_GALLERY = ROOT / "app/src/main/java/com/labteto/dshmobile/ui/screens/local/PersonaGalleryDialog.kt"
 LIFECYCLE_COORDINATOR = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionLifecycleCoordinator.kt"
 EVENT_LOG = ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionEventLog.kt"
@@ -101,9 +102,14 @@ if persona_gallery_lines > 1_160:
     )
 
 session_store_lines = len(SESSION_STORE.read_text(encoding="utf-8").splitlines())
-if session_store_lines > 2_050:
+if session_store_lines > 1_150:
     violations.append(
-        f"SessionStore.kt grew to {session_store_lines} lines (budget: 2050); extract protocol/state models or coordinators"
+        f"SessionStore.kt grew to {session_store_lines} lines (budget: 1150); extract protocol/state models or coordinators"
+    )
+session_event_reduce_lines = len(SESSION_EVENT_REDUCE.read_text(encoding="utf-8").splitlines())
+if session_event_reduce_lines > 620:
+    violations.append(
+        f"SessionEventReduceRuntime.kt grew to {session_event_reduce_lines} lines (budget: 620); keep ingestion and reduction responsibilities bounded"
     )
 event_log = EVENT_LOG.read_text(encoding="utf-8")
 repository = REPOSITORY.read_text(encoding="utf-8")
