@@ -45,10 +45,11 @@ internal fun restoreLocalModelHistory(
         val event = events[index]
         if (event.type != ModelHistoryCheckpointCodec.EVENT_TYPE) continue
         val decoded = codec.decodeCheckpoint(event.data) ?: continue
-        if (decoded.asOfSequence != null && decoded.asOfSequence >= event.sequence) continue
+        val decodedWatermark = decoded.asOfSequence
+        if (decodedWatermark != null && decodedWatermark >= event.sequence) continue
         checkpointIndex = index
         checkpointMessages = decoded.messages
-        checkpointAsOfSequence = decoded.asOfSequence
+        checkpointAsOfSequence = decodedWatermark
         break
     }
 
