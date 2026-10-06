@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.local.chat
 
 import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 
@@ -10,13 +13,14 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
  * Group/direct selection, explicit-correction capture and fresh relationship hydration belong to
  * ChatFeature. The direct turn body remains a temporary callback until runChatTurn is migrated.
  */
-internal class LocalChatTurnDispatcher(
-    private val context: Context,
+@Singleton
+internal class LocalChatTurnDispatcher @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val personaCorrections: LocalChatPersonaCorrectionCoordinator,
     private val relationshipHydrator: LocalChatRelationshipHydrator,
     private val groupExecutor: LocalGroupChatTurnExecutor,
-    private val directTurn: suspend (input: String, sourceMessageId: String?) -> Unit,
+    private val directExecutor: LocalChatDirectTurnExecutor,
 ) {
     internal suspend fun run(
         input: String,
@@ -44,6 +48,10 @@ internal class LocalChatTurnDispatcher(
 
         personaCorrections.captureDirect(memoryInput)
         relationshipHydrator.hydrate()
-        directTurn(input, sourceMessageId)
+        directExecutor.run(
+            input = input,
+            memoryInput = memoryInput,
+            sourceMessageId = sourceMessageId,
+        )
     }
 }
