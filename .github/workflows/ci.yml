@@ -31,6 +31,14 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+      - name: Bootstrap CI control plane
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            .github/scripts/classify-ci-scope.py \
+            .github/scripts/check-ci-repository-integrity.py
+          python3 .github/scripts/classify-ci-scope.py --self-test
+          python3 .github/scripts/check-ci-repository-integrity.py
       - name: Collect changed files
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -64,6 +72,54 @@ jobs:
             args+=(--force-full)
           fi
           python3 .github/scripts/classify-ci-scope.py "${args[@]}"
+      - name: Verify selected scope coverage
+        env:
+          RUN_STATIC: ${{ steps.classify.outputs.run_static }}
+          RUN_ARCHITECTURE: ${{ steps.classify.outputs.run_architecture }}
+          RUN_UNIT: ${{ steps.classify.outputs.run_unit }}
+          RUN_BUILD: ${{ steps.classify.outputs.run_build }}
+          RUN_DEVICE: ${{ steps.classify.outputs.run_device }}
+          RUN_ANDROID16: ${{ steps.classify.outputs.run_android16 }}
+          RUN_ANDROID17: ${{ steps.classify.outputs.run_android17 }}
+          RUN_FIXTURE: ${{ steps.classify.outputs.run_fixture }}
+        run: |
+          set -euo pipefail
+
+          require_true() {
+            value="$1"
+            label="$2"
+            path="$3"
+            if [ "$value" != "true" ]; then
+              echo "::error::$path 必须启用 $label，但范围分类结果为 $value"
+              exit 1
+            fi
+          }
+
+          while IFS= read -r path; do
+            case "$path" in
+              AGENTS.md|docs/ARCHITECTURE.md|docs/SYSTEM-AUDIT-GUIDE.zh-CN.md|docs/VALIDATION.md|.github/workflows/ci.yml|.github/scripts/classify-ci-scope.py|.github/scripts/check-ci-repository-integrity.py|.github/scripts/check-local-architecture-boundaries.py|.github/scripts/check-local-performance-invariants.py)
+                require_true "$RUN_STATIC" "static-gates" "$path"
+                require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
+                ;;
+              .github/scripts/verify-android16-apk.sh|.github/scripts/smoke-test-android-startup.sh|.github/scripts/check-apk-runtime-layout.py)
+                require_true "$RUN_STATIC" "static-gates" "$path"
+                require_true "$RUN_ARCHITECTURE" "architecture-3-gates" "$path"
+                require_true "$RUN_UNIT" "unit-tests" "$path"
+                require_true "$RUN_BUILD" "build-arm64" "$path"
+                require_true "$RUN_DEVICE" "device-artifacts-x86" "$path"
+                require_true "$RUN_ANDROID16" "android-16-instrumented" "$path"
+                require_true "$RUN_ANDROID17" "android-17-instrumented" "$path"
+                ;;
+              upstream/deepseek-harness.lock.json|tools/reference-validation/official-runner.ts|tools/reference-validation/refresh-official-fixtures.sh|tools/reference-validation/package.json|tools/reference-validation/package-lock.json)
+                require_true "$RUN_STATIC" "static-gates" "$path"
+                require_true "$RUN_UNIT" "unit-tests" "$path"
+                require_true "$RUN_FIXTURE" "fixture-provenance" "$path"
+                ;;
+              .github/scripts/check-*.py)
+                require_true "$RUN_STATIC" "static-gates" "$path"
+                ;;
+            esac
+          done < changed-files.txt
 
   static-gates:
     needs: scope
@@ -72,8 +128,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Validate CI scope policy
-        run: python3 .github/scripts/classify-ci-scope.py --self-test
       - name: Validate workflow semantics
         run: |
           set -euo pipefail
@@ -92,10 +146,8 @@ jobs:
           while IFS= read -r -d '' file; do
             bash -n "$file"
           done < <(find .github/scripts tools/runtime tools/reference-validation -type f -name '*.sh' -print0)
-      - name: Validate repository and Android security boundaries
-        run: |
-          python3 .github/scripts/check-ci-repository-integrity.py
-          python3 .github/scripts/check-android-security-boundaries.py
+      - name: Validate Android security boundaries
+        run: python3 .github/scripts/check-android-security-boundaries.py
       - name: Validate static product guards
         run: |
           python3 .github/scripts/check-ui-hardcoded-cjk.py
