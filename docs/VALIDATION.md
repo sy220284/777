@@ -168,16 +168,14 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 
 ## 架构门禁
 
-架构门禁至少保护：
+`architecture-3-gates` 分成两类可独立诊断的检查：
 
-- `LocalHarnessEngine` public surface。
-- Engine 构造依赖。
-- 已知热点文件行数。
-- UI / Worker 直接依赖 Engine 的 allowlist。
-- capability package 边界。
-- 聚合状态规模。
+- **所有权与依赖门禁**：Feature / Shared Capability / Runtime Kernel 单向依赖、跨 Feature Port、Feature Catalog 唯一路由归属、领域状态单写、UI 不直接消费聚合状态、已迁旧路径永久禁止回归。
+- **执行不变量门禁**：有界历史访问、streaming、模型历史缓存、Session / run 恢复、资源与工具执行边界、模型路由冻结等运行时行为。
 
-门禁失败应下沉职责，不应提高预算。
+当前不再把 Engine 方法数、构造依赖数、聚合状态字段数、UI projection 字段数或文件行数当作架构完成条件。迁移期只对真实 Engine bridge / 直接消费者维护精确 allowlist，并要求随迁移单向缩小；已迁 Feature 业务根进入永久禁止回归集合。
+
+门禁失败应修复真实所有权、依赖方向或运行不变量，禁止通过提高数字预算、改名或移动文件规避。
 
 ## 性能门禁
 
