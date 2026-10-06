@@ -112,7 +112,6 @@ import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.jobs.LocalPersistentJobRecoveryCoordinator
 import com.labteto.dshmobile.local.lsp.parseLanguageServerCommand
-import com.labteto.dshmobile.local.memory.LocalMemoryCoordinator
 import com.labteto.dshmobile.local.memory.LocalMemoryTools
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryStore
@@ -593,7 +592,9 @@ class LocalHarnessEngine @Inject internal constructor(
             usageTracker = usageTracker,
             modelGateway = modelGateway,
             modelRequestCoordinator = modelRequestCoordinator,
-            chatRelationshipMemoryContext = ::chatRelationshipMemoryContext,
+            chatRelationshipMemoryContext = { query, snapshot ->
+                chatComposition.memory.relationshipContext(query, snapshot)
+            },
             recordStyleGuardHits = ::recordStyleGuardHits,
             acquireVisibleTurn = ::acquireAutomationChatVisibleTurn,
             commitVisibleReply = ::commitVisibleAutomationChatReply,
@@ -711,17 +712,6 @@ class LocalHarnessEngine @Inject internal constructor(
         set(value) {
             runtimeStateStore.foregroundRunHandle.job = value
         }
-    private val memoryCoordinator by lazy {
-        LocalMemoryCoordinator(
-            state = _state,
-            memoryStore = memoryStore,
-            memoryManager = memoryManager,
-            diaryStore = chatDiaryStore,
-            currentSessionId = { currentSessionId },
-            eventLog = { eventLog },
-            persist = ::persist,
-        )
-    }
 
 
     init {
@@ -917,32 +907,6 @@ class LocalHarnessEngine @Inject internal constructor(
 
 
     internal suspend fun diagnoseNetwork(target: String): String = webTools.diagnose(target)
-
-    private suspend fun captureAutoMemoryDirective(
-        text: String,
-        sourceMessageId: String? = null,
-        binding: LocalWorkRunBinding? = null,
-    ) {
-        if (binding == null) {
-            memoryCoordinator.captureAutoMemoryDirective(text, sourceMessageId)
-            return
-        }
-        LocalMemoryCoordinator(
-            state = MutableStateFlow(binding.aggregateSnapshot()),
-            memoryStore = memoryStore,
-            memoryManager = memoryManager,
-            diaryStore = chatDiaryStore,
-            currentSessionId = { binding.sessionId },
-            eventLog = { binding.eventLog },
-            persist = { persist(binding) },
-        ).captureAutoMemoryDirective(text, sourceMessageId)
-    }
-
-    private fun chatRelationshipMemoryContext(
-        query: String,
-        snapshot: LocalHarnessState,
-    ): String = memoryCoordinator.chatRelationshipMemoryContext(query, snapshot)
-
 
     private fun refreshGroupModelSystemPrompt() {
         val system = buildJsonObject {

@@ -415,7 +415,7 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 ### 阶段 3：建立 ChatFeature / WorkFeature
 
-状态：**进行中。**
+状态：**主体迁移已落地，最新 Head 完整验收待闭环。**
 
 - Runtime 的 `engine.xxx()` 行为逐项迁入所属 Feature；
 - 每迁走一项立即删除对应 Engine 入口；
@@ -439,7 +439,11 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 - 已迁出的 Chat 领域写入统一采用“Session MAINTENANCE owner → durable Chat domain/timeline event → runtime projection → Session snapshot cache”提交顺序。人物/行为调节等跨文档写入在权威事件提交前失败必须恢复原文档；群聊成员、回复建议和分支选择不得再出现 UI 已更新但 EventLog/模型历史仍停留旧状态的半提交。
 - 回归覆盖多会话等待、全局模式启停、过期/已完成点击、设备授权隔离/撤销、显式审批工具与前台切换；本子阶段须通过最终 Head 的完整 CI 验证。
 
-当前阶段三已知 Engine Feature 业务根已清零，Chat / Work 的发送、主回合、时间线 / 分支、Work AgentLoop 与 Tool runtime 等真实实现已归所属 Feature。Shared Context 只保留中立 Policy / DTO，Work 的 structured state 与 cue 解释位于 `local.work`；Shared Agent recovery 只负责恢复安全与通用 continuation，Work checkpoint 的语义装饰由 `LocalWorkRecoveryContextPolicy` 持有。Chat post-turn coordinator 已归 `local.chat`，`chatTurnPort` 也已脱离 Engine。阶段 3 仍不能标记完成：组合根当前剩余 `workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort` 四个 Engine bridge；`startNextQueuedTurnIfIdle()` 仍在 Engine 内同时决定 Chat / Work 下一轮启动，Session / 可见 Work 投影、transition / cancel / load 等横向适配也仍待迁出。Automation 的两个 Engine coordinator bridge 属于阶段 4，单独验收。
+当前阶段三已知 Engine Feature 业务根已清零，Chat / Work 的发送、主回合、时间线 / 分支、Work AgentLoop 与 Tool runtime 等真实实现已归所属 Feature。Shared Context 只保留中立 Policy / DTO，Work 的 structured state 与 cue 解释位于 `local.work`；Shared Agent recovery 只负责恢复安全与通用 continuation，Work checkpoint 的语义装饰由 `LocalWorkRecoveryContextPolicy` 持有。Chat post-turn coordinator 已归 `local.chat`，`chatTurnPort` 也已脱离 Engine。阶段三五个回合／管理组合 Port 已脱离 Engine；下一轮唤醒由独立应用组合协调器路由，Chat／Work 各自拥有队列消费与启动。Session 生命周期、Tools/plugin composition 与 Diagnostics 已有独立所有者。人物、群聊、分支恢复与 Chat 事件解释归 Chat；计划、Todo、目标回放归 Work。旧共享 Memory coordinator 已删除，Automation 的关系记忆请求也复用 Chat 唯一实现。Session envelope 的既有领域序列化字段继续保留原格式，不在共享层解释领域规则。
+
+队列续跑采用锁内持久提交，写盘失败保留原输入和顺序；Work 启动失败或空队列会释放预取 Session 租约。群公告采用维护租约内先提交 Chat domain event、再发布投影、最后物化快照；快照失败不得撤销已提交事实。运行中批准计划通过单个 `plan/approved` 事件同时提交计划和退出规划模式。
+
+第三阶段仍不能以本地迁移或门禁通过替代完整验收。面向后台目标会话、超时／恢复参数和结构化终态的完整 Execution Port 仍待阶段四依赖收口，执行计划的相关出口保持未勾选；Automation 两个 Engine coordinator bridge 继续单独登记，UI contribution 和 Engine 最终退出分别属于阶段五、六。
 
 阶段 3 的完成状态只以 PR 最新 Head 的 `architecture-3-gates` 与完整 CI 为准；旧 Head 的成功、失败或取消结果都不能替代当前 Head 验收。实时 Head 与 Actions 编号属于 PR/CI 运行信息，不写入架构权威文档。
 

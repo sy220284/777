@@ -46,6 +46,20 @@ class AgentInputQueue(
         if (items.isEmpty()) null else items.removeFirst()
     }
 
+    /** Commit consumption while the queue is locked; failed writes preserve the original order. */
+    fun pollCommitted(commit: (QueuedAgentInput, List<QueuedAgentInput>) -> Unit): QueuedAgentInput? =
+        synchronized(lock) {
+            if (items.isEmpty()) return@synchronized null
+            val input = items.removeFirst()
+            try {
+                commit(input, items.toList())
+                input
+            } catch (error: Throwable) {
+                items.addFirst(input)
+                throw error
+            }
+        }
+
     fun clear(): Int = synchronized(lock) {
         val count = items.size
         items.clear()

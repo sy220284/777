@@ -50,7 +50,21 @@ internal class LocalChatQueueRuntime @Inject constructor(
             handle.hasLiveJob()
         ) return null
 
-        val queued = handle.pendingInputs.poll() ?: return null
+        val queued = handle.pendingInputs.pollCommitted { input, remaining ->
+            val message = input.modelMessage ?: buildJsonObject {
+                put("role", "user")
+                put("content", input.content)
+            }
+            sessionStorage.eventLogs.get(state.sessionId).append(
+                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent(
+                    action = "resumed",
+                    pending = remaining,
+                    affected = listOf(input),
+                    modelMessages = listOf(message),
+                ),
+            )
+        } ?: return null
         val durableMessage = queued.modelMessage ?: buildJsonObject {
             put("role", "user")
             put("content", queued.content)
@@ -61,16 +75,11 @@ internal class LocalChatQueueRuntime @Inject constructor(
             state.sessionId,
             handle.pendingInputs.size(),
         )
-        sessionStorage.eventLogs.get(state.sessionId).append(
-            LOCAL_AGENT_INBOX_EVENT_TYPE,
-            encodeLocalAgentInboxEvent(
-                action = "resumed",
-                pending = handle.pendingInputs.snapshot(),
-                affected = listOf(queued),
-                modelMessages = listOf(durableMessage),
-            ),
-        )
-        sessionStorage.enqueueCurrentSnapshot(state.sessionId)
+        runtimeStateStore.performVisibleOperation("Chat 排队续跑快照保存失败") {
+            check(sessionStorage.enqueueCurrentSnapshot(state.sessionId)) {
+                "Chat 排队续跑前台会话已切换"
+            }
+        }
 
         return starter.get().start(
             content = queued.content,

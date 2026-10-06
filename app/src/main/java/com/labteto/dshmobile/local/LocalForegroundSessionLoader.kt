@@ -7,28 +7,15 @@ import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.agent.decodeLocalAgentInboxPending
-import com.labteto.dshmobile.local.chat.LocalChatBranchState
-import com.labteto.dshmobile.local.chat.LocalChatPersistence
-import com.labteto.dshmobile.local.chat.LocalChatState
-import com.labteto.dshmobile.local.chat.LocalGroupChatState
-import com.labteto.dshmobile.local.chat.boundDurablePending
-import com.labteto.dshmobile.local.chat.projectGroupGalleryState
-import com.labteto.dshmobile.local.chat.reconcileCharacterBehaviorTuning
-import com.labteto.dshmobile.local.chat.reconcileGroupCharacterBehaviorTuning
-import com.labteto.dshmobile.local.chat.recoverPendingTimelineRewriteProjection
-import com.labteto.dshmobile.local.chat.restoreMaterializedChatBranchState
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
-import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
 import com.labteto.dshmobile.local.model.LocalImageInputMode
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelSelectionState
 import com.labteto.dshmobile.local.model.LocalModelSettingsCoordinator
 import com.labteto.dshmobile.local.model.LocalModelState
-import com.labteto.dshmobile.local.model.chatSystemPrompt
 import com.labteto.dshmobile.local.model.durableModelHistorySnapshot
-import com.labteto.dshmobile.local.model.groupChatSystemPrompt
 import com.labteto.dshmobile.local.model.migrateOfficialClaudeModel
 import com.labteto.dshmobile.local.model.workSystemPrompt
 import com.labteto.dshmobile.local.runtime.DEFAULT_BASE_URL
@@ -50,14 +37,9 @@ import com.labteto.dshmobile.local.settings.LocalHarnessSettingsCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
 import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
-import com.labteto.dshmobile.local.work.LocalWorkState
-import com.labteto.dshmobile.local.runtime.projectExecutionJobs
-import com.labteto.dshmobile.observability.AppLog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -74,8 +56,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
     private val modelConfiguration: LocalModelConfigurationCoordinator,
     private val usageTracker: DeepSeekUsageTracker,
     private val contextComposer: ContextComposer,
-    private val chatPersistence: LocalChatPersistence,
-    private val memoryStore: MemoryStore,
+    private val chatRestore: com.labteto.dshmobile.local.chat.LocalChatSessionRestorer,
     private val approvalPreferences: LocalApprovalPreferences,
 ) {
     private val preferences = context.getSharedPreferences("local_harness", Context.MODE_PRIVATE)
@@ -127,12 +108,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             return
         }
         val repaired = log.repairInterruptedTail()
-        recoverPendingTimelineRewriteProjection(
-            log,
-            memoryStore,
-            chatPersistence.galleryStore,
-            chatPersistence.diaryStore,
-        )
+        chatRestore.repairTimeline(log)
         val stored = loaded?.session ?: LocalHarnessSession(id = sessionId)
         val legacyProjectionBaseline = if (stored.controlProjectedThroughSequence == null && loaded != null) {
             log.latest(PROJECTION_BASELINE_EVENT)?.sequence ?: log.append(
@@ -184,22 +160,12 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             log,
         )
         val profile = contextComposer.userProfile()
-        val restoredBehavior = withContext(Dispatchers.IO) {
-            reconcileCharacterBehaviorTuning(
-                chatPersistence.personaStore,
-                chatPersistence.galleryStore,
-                projectedControls.personaId,
-                projectedControls.galleryId,
-                projectedControls.chatState,
-            )
-        }
-        val restoredGroupChat = if (stored.usageMode == LocalUsageMode.CHAT) {
-            projectedControls.groupChat.copy(
-                context = projectedControls.groupChat.context.boundDurablePending(log, "group"),
-            )
-        } else {
-            LocalGroupChatState()
-        }
+        val restoredChat = chatRestore.restore(
+            usageMode = stored.usageMode,
+            controls = projectedControls,
+            messages = restoredTranscript.messages,
+            log = log,
+        )
         val restoredLineageId = stored.lineageId.ifBlank { stored.id.ifBlank { sessionId } }
         val restoredProjectId = stored.projectId ?: when (stored.conversationMode) {
             LocalConversationMode.INDEPENDENT -> null
@@ -245,33 +211,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             workspacePath = workspace.path,
             sessionId = sessionId,
             usageMode = stored.usageMode,
-            chat = LocalChatState(
-                personaId = projectedControls.personaId,
-                galleryId = projectedControls.galleryId,
-                galleryStoryId = projectedControls.galleryStoryId,
-                gallerySaveSuppressedThrough = projectedControls.gallerySaveSuppressedThrough,
-                chatPersona = restoredBehavior.persona,
-                chatState = restoredBehavior.chatState,
-                chatContext = projectedControls.chatContext.boundDurablePending(log),
-                replySuggestions = projectedControls.replySuggestions,
-                chatBranches = if (
-                    stored.usageMode == LocalUsageMode.CHAT && !projectedControls.groupChat.enabled
-                ) {
-                    restoreMaterializedChatBranchState(
-                        current = projectedControls.chatBranches,
-                        activeMessages = restoredTranscript.messages,
-                        chatState = restoredBehavior.chatState,
-                        replySuggestions = projectedControls.replySuggestions,
-                    )
-                } else {
-                    LocalChatBranchState()
-                },
-                groupChat = reconcileGroupCharacterBehaviorTuning(
-                    restoredGroupChat,
-                    chatPersistence.personaStore,
-                    chatPersistence.galleryStore,
-                ),
-            ),
+            chat = restoredChat.chat,
             conversationMode = stored.conversationMode,
             parentSessionId = stored.parentSessionId,
             lineageId = restoredLineageId,
@@ -284,12 +224,8 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             sessions = summaries(),
             messages = restoredTranscript.messages,
             transcriptIndex = restoredTranscript.index,
-            work = LocalWorkState(
-                plan = projectedControls.plan,
-                todos = projectedControls.todos,
-                goal = projectedControls.goal,
-                planMode = projectedControls.planMode,
-                jobs = projectExecutionJobs(stored.usageMode, stored.id, runtimeStateStore.jobManager.snapshotInfos()),
+            work = com.labteto.dshmobile.local.work.LocalWorkSessionLifecyclePlanner.restoreState(
+                projectedControls, stored.usageMode, stored.id, runtimeStateStore.jobManager.snapshotInfos(),
             ),
             safeAutoApprovalEnabled = approvalPreferences.isSafeAutoApprovalEnabled(
                 loaded?.legacySafeAutoApproval == true,
@@ -311,12 +247,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             var wroteHistoryCheckpoint = false
             val state = runtimeStateStore.state.value
             if (state.chat.groupChat.enabled) {
-                projectGroupGalleryState(state.chat.groupChat, chatPersistence.galleryStore).failures.forEach { failure ->
-                    AppLog.warn(
-                        "LocalForegroundSessionLoader",
-                        "群聊人物库投影恢复失败 galleryId=${failure.galleryId} detail=${failure.detail}",
-                    )
-                }
+                chatRestore.restoreGalleryProjection(state.chat)
                 refreshSystemPrompt()
                 checkpointModelHistory("load/group-system-refresh")
                 wroteHistoryCheckpoint = true
@@ -337,7 +268,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             if (restoredHistory.usedLegacyFallback && !wroteHistoryCheckpoint) {
                 checkpointModelHistory("load/legacy-history-migration")
             }
-            if (restoredHistory.usedLegacyFallback || restoredTranscript.needsPersist || restoredBehavior.changed) {
+            if (restoredHistory.usedLegacyFallback || restoredTranscript.needsPersist || restoredChat.needsPersist) {
                 persistCurrent()
             }
         }
@@ -400,8 +331,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
         val snapshot = runtimeStateStore.state.value
         return when {
             snapshot.usageMode != LocalUsageMode.CHAT -> workSystemPrompt(workspace.path, snapshot.work.planMode)
-            snapshot.chat.groupChat.enabled -> groupChatSystemPrompt()
-            else -> chatSystemPrompt()
+            else -> chatRestore.systemPrompt(snapshot.chat.groupChat.enabled)
         }
     }
 

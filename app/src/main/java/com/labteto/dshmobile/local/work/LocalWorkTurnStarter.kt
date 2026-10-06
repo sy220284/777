@@ -1,10 +1,8 @@
 package com.labteto.dshmobile.local.work
 
-import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
-import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
@@ -99,36 +97,40 @@ internal class LocalWorkTurnStarter(
         )
     }
 
-    internal fun startResumed(
-        input: QueuedAgentInput,
-        sessionLease: LocalSessionRuntimeLease,
-    ): Job {
+    internal fun startNextResumed(sessionLease: LocalSessionRuntimeLease): Job? {
         val sessionId = requireWorkSession()
+        check(sessionStorage.currentSnapshot(sessionId) != null) {
+            "Work 排队续跑前台会话已切换"
+        }
+        val pending = runtimeStateStore.foregroundRunHandle.pendingInputs
+        val input = pending.pollCommitted { next, remaining ->
+            val message = next.modelMessage ?: buildJsonObject {
+                put("role", "user")
+                put("content", next.content)
+            }
+            sessionStorage.eventLogs.get(sessionId).append(
+                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent(
+                    action = "resumed",
+                    pending = remaining,
+                    affected = listOf(next),
+                    modelMessages = listOf(message),
+                ),
+            )
+        } ?: return null
         val durableMessage = input.modelMessage ?: buildJsonObject {
             put("role", "user")
             put("content", input.content)
         }
         appendForegroundHistory(sessionId, durableMessage)
-        val pending = runtimeStateStore.foregroundRunHandle.pendingInputs
         runtimeStateStore.projection.setForegroundQueuedInputCount(sessionId, pending.size())
-        sessionStorage.eventLogs.get(sessionId).append(
-            LOCAL_AGENT_INBOX_EVENT_TYPE,
-            encodeLocalAgentInboxEvent(
-                action = "resumed",
-                pending = pending.snapshot(),
-                affected = listOf(input),
-                modelMessages = listOf(durableMessage),
-            ),
-        )
-        check(sessionStorage.enqueueCurrentSnapshot(sessionId)) {
-            "Work 排队续跑持久化时前台会话已切换"
+        // The event is authoritative. Snapshot materialization must not prevent an admitted turn.
+        runtimeStateStore.performVisibleOperation("Work 排队续跑快照保存失败") {
+            check(sessionStorage.enqueueCurrentSnapshot(sessionId)) {
+                "Work 排队续跑持久化时前台会话已切换"
+            }
         }
-        return startBound(
-            content = input.content,
-            memoryInput = input.memoryInput,
-            sourceMessageId = input.id,
-            sessionLease = sessionLease,
-        )
+        return startBound(input.content, input.memoryInput, input.id, sessionLease)
     }
 
     internal fun startExisting(

@@ -11,7 +11,7 @@
 - 规则依据：[AGENTS.md](../AGENTS.md)、[系统联审](SYSTEM-AUDIT-GUIDE.zh-CN.md)、[架构 3.0](ARCHITECTURE.md)、[验证](VALIDATION.md)、[安全](SECURITY.md)、[UI / UX](UI-UX.zh-CN.md)、[协议](PROTOCOL.md)、[兼容性](COMPATIBILITY.md)。
 - 实现事实由当前代码、构建配置、锁定文件和 CI 确认；文档中的旧版本号及旧 Engine 链路描述不能覆盖新架构和当前代码。
 
-当前最新 Head 已进入新的完整 CI。架构 3.0 ownership / dependency 门禁与 execution invariants 已切换到当前真实 owner，并在最新验证中通过；单测 / Harness conformance 与 JVM 21 字节码验证也已通过。arm64、x86_64、Android 16 / 17 与 merge-gate 仍须在同一最新 Head 上全部成功后，才能把 P0 计为闭环。此前由旧字面串断言触发的 Chat 下一轮门禁假红和门禁脚本构造器解析错误均已修复，不再把门禁实现问题误记为产品所有权缺陷。
+本轮本地验证覆盖 architecture / execution 门禁、Kotlin 编译及关联回归。当前产品 Head 的完整 CI 尚未验收；旧 Head 的单测、构建或设备验证结果不能替代本轮结果。arm64、x86_64、Android 16 / 17 与 merge-gate 必须在同一最新 Head 上全部成功后，才能把 P0 计为闭环。
 
 ## 2. 当前进度与真实剩余量
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | 1：共享能力 / Kernel 边界 | Session owner、run identity/recovery、资源调度和 Session 存储已有统一所有者 | 保留已建立边界；继续删除残留跨层适配 |
 | 2：领域状态 | Chat / Work / Kernel / Model 已拆分；Chat timeline rewrite 已停止承载 Work plan/todo/goal/planMode | 继续收缩聚合状态迁移适配层 |
-| 3：Chat / Work Feature | 阶段三代码迁移已完成：7 类 Runtime→Engine 依赖与已知 Engine 业务根永久归零；`chatTurnPort`、`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort` 均已脱离 Engine；横向下一轮唤醒迁入独立协调器；共享 Tools/plugin composition、Session 前台恢复与 Diagnostics 均已有明确 owner | 保持阶段三退出路径永久禁止回归；当前批次本地 architecture / execution 门禁与 `compileDebugKotlin` 已通过，仓库 CI 由本批提交继续验证 |
+| 3：Chat / Work Feature | 阶段三主体迁移已落地，验收待闭环：7 类 Runtime→Engine 依赖与已知 Engine 业务根永久归零；`chatTurnPort`、`workTurnPort`、`sessionLifecyclePort`、`toolsManagementPort`、`diagnosticsPort` 均已脱离 Engine；横向下一轮唤醒迁入独立协调器；共享 Tools/plugin composition、Session 前台恢复与 Diagnostics 均已有明确 owner | 保持阶段三退出路径永久禁止回归；本轮补齐队列失败保护、群公告权威事件、原子计划批准和领域恢复 owner；当前 Head 完整 CI 仍须单独验收 |
 | 4：Automation Feature | Automation Runtime→Engine 已永久归零，但组合根仍由 Engine 提供 Automation Chat / Work coordinator | 迁出 `automationChatCoordinator`、`automationWorkCoordinator` 两个阶段四桥并切换后台入口 |
 | 5：UI contribution | Catalog 不可变，路由归属及页面枚举已接管 | 中央页面 `when`、页面依赖、Back、入口及恢复继续下沉 |
 | 6：Runtime Kernel | 共享运行状态已接管运行身份、资源、前台句柄等事实 | 删除剩余产品装配/迁移适配后再替换 Engine；仅更名不算完成 |
@@ -39,10 +39,20 @@
 
 当前需要补齐：
 
-1. 阶段三实现已完成，`ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST` 已收缩为空；继续把这些退出路径作为永久禁止回归规则维护。
+1. 阶段三主体迁移已落地，`ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST` 已收缩为空；继续把这些退出路径作为永久禁止回归规则维护。
 2. 阶段四单独处理 Automation 两个 Engine coordinator bridge，以及 persistent / automation subagent 等后台装配，不再混入阶段三进度。
 3. 继续删除迁移后无调用旧实现，并同步收紧门禁。
 4. 本地只要求 architecture / execution 门禁与 Kotlin 编译通过；仓库完整 CI 仍负责当前 Head 的 arm64、x86_64、Android 16 / 17 与 merge-gate 最终验收。旧 Head 成功、失败或取消均不能替代。
+
+### 本轮审计修复与仍未完成项
+
+- 已修复 Chat／Work 续轮消费先改内存后写盘问题：持久提交失败保留队列顺序，历史和数量投影只在事件成功后更新；派生快照失败不阻断已提交续轮。
+- 已修复 Work 前台续轮启动异常／空队列的 Session 租约释放。
+- 群公告统一到维护所有权与 Chat domain event；计划批准改为一个可回放的 `plan/approved` 事件。
+- Chat 恢复与 Chat／Work 事件解释回到提供方领域；删除旧共享 Memory coordinator、Engine 旧包装并收紧永久禁止回归规则。
+- Session envelope 保留既有领域序列化类型与文件格式；这些精确数据边界不允许替换为 Store／Coordinator／执行器依赖。
+- 本轮未完成后台目标会话 Execution Port；其真实实现仍是 3-B 出口与阶段四后台接入的依赖，保持未勾选，不通过调整阶段口径计为完成。
+- 当前 Head 完整 CI 尚待验证；旧 Head 的成功不能替代。
 
 ## 3. 总体推进顺序
 
@@ -255,7 +265,7 @@ Chat send、直聊回合、人物纠正、关系恢复、时间线编辑 / regen
 
 ## 15. 下一步可直接执行的任务
 
-1. 阶段三本地实现已完成：四个剩余 Engine 组合桥、横向唤醒、共享 Tools/plugin composition、Session 前台恢复与 Diagnostics owner 已迁出；最新 architecture / execution 门禁与 `compileDebugKotlin` 通过。提交阶段三批次后由仓库 CI 继续做完整产品验证。
+1. 阶段三主体迁移已落地：四个剩余 Engine 组合桥、横向唤醒、共享 Tools/plugin composition、Session 前台恢复与 Diagnostics owner 已迁出；最新 architecture / execution 门禁与 `compileDebugKotlin` 通过。提交阶段三批次后由仓库 CI 继续做完整产品验证。
 2. 进入阶段四：先迁出 `automationWorkCoordinator`，让 Automation 仅通过 `LocalWorkExecutionPort` 获取结构化执行结果，并消除 Automation→Work internal 依赖。
 3. 再迁出 `automationChatCoordinator`，把主动互动、人物/场景/去重/消息交付归还 Chat 提供方，仅保留 Automation 的触发、调度与回执。
 4. 阶段四结束时将 `ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST` 收缩为空，并验证 Worker / Scheduler / 立即运行 / Webhook / recovery 全部走 provider-owned Port。

@@ -124,16 +124,12 @@ internal suspend fun exitWorkPlanMode(
         .filter(String::isNotEmpty)
         .take(20)
 
-    state.update { current ->
-        current.copy(
-            planMode = false,
-            plan = approvedPlan,
-        )
+    commitApprovedWorkPlan(state, approvedPlan) { items ->
+        eventLog.append("plan/approved", buildJsonObject {
+            put("items", JsonArray(items.map { item -> JsonPrimitive(item) }))
+            put("active", false)
+        })
     }
-    eventLog.append("plan/state", buildJsonObject {
-        put("items", JsonArray(approvedPlan.map { item -> JsonPrimitive(item) }))
-    })
-    eventLog.append("plan/mode", buildJsonObject { put("active", false) })
 
     val snapshot = aggregateSnapshot()
     if (history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
@@ -147,4 +143,14 @@ internal suspend fun exitWorkPlanMode(
     }
     persist()
     return "计划已获批准，已进入执行模式"
+}
+
+/** Commit both approval facts before exposing either through Work state. */
+internal fun commitApprovedWorkPlan(
+    state: LocalWorkStatePort,
+    approvedPlan: List<String>,
+    commit: (List<String>) -> Unit,
+) {
+    commit(approvedPlan)
+    state.update { current -> current.copy(planMode = false, plan = approvedPlan) }
 }

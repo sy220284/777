@@ -24,6 +24,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import java.util.UUID
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
@@ -176,7 +177,21 @@ class LocalWorkRunRegistry internal constructor(
         checkpointModelHistory(binding, "work/background-turn-end")
         persistBinding(binding)
 
-        val next = binding.runHandle.pendingInputs.poll()
+        val next = binding.runHandle.pendingInputs.pollCommitted { input, remaining ->
+            val message = input.modelMessage ?: buildJsonObject {
+                put("role", "user")
+                put("content", input.content)
+            }
+            binding.eventLog.append(
+                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent(
+                    action = "resumed",
+                    pending = remaining,
+                    affected = listOf(input),
+                    modelMessages = listOf(message),
+                ),
+            )
+        }
         if (next == null) {
             binding.runHandle.job = null
             detach(binding)
@@ -209,16 +224,16 @@ class LocalWorkRunRegistry internal constructor(
         }
         binding.runHandle.modelHistory.append(durableMessage)
         refreshBindingContextMetrics(binding)
-        binding.eventLog.append(
-            LOCAL_AGENT_INBOX_EVENT_TYPE,
-            encodeLocalAgentInboxEvent(
-                action = "resumed",
-                pending = binding.runHandle.pendingInputs.snapshot(),
-                affected = listOf(next),
-                modelMessages = listOf(durableMessage),
-            ),
-        )
-        persistBinding(binding)
+        // The durable inbox event already admitted this turn; a cache failure cannot undo it.
+        try {
+            persistBinding(binding)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            binding.state.update { current ->
+                current.copy(error = "Work 续轮已提交，快照保存失败：${error.message}")
+            }
+        }
         startNext(next, binding).also { nextJob ->
             binding.runHandle.job = nextJob
         }

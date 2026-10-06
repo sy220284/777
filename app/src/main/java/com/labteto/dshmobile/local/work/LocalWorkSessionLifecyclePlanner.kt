@@ -15,6 +15,18 @@ import com.labteto.dshmobile.local.runtime.projectExecutionJobs
  * task state is projected into a continuation handoff.
  */
 internal object LocalWorkSessionLifecyclePlanner {
+    internal fun restoreState(
+        controls: com.labteto.dshmobile.local.LocalSessionControlProjection,
+        usageMode: com.labteto.dshmobile.local.LocalUsageMode,
+        sessionId: String,
+        jobs: List<com.labteto.dshmobile.local.jobs.LocalJobInfo>,
+    ): LocalWorkState = initialState(usageMode, sessionId, jobs).copy(
+        plan = controls.plan,
+        todos = controls.todos,
+        goal = controls.goal,
+        planMode = controls.planMode,
+    )
+
     internal fun initialState(
         usageMode: LocalUsageMode,
         sessionId: String,

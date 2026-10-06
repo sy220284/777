@@ -87,6 +87,25 @@ class AgentInputQueueTest {
         }
     }
 
+    @Test
+    fun failedConsumptionPreservesOrderAndDoesNotExposeRemoval() {
+        val queue = AgentInputQueue(4)
+        queue.offer(QueuedAgentInput("一", id = "q1"))
+        queue.offer(QueuedAgentInput("二", id = "q2"))
+        val failure = IllegalStateException("disk failure")
+        val result = runCatching {
+            queue.pollCommitted { input, remaining ->
+                assertEquals("q1", input.id)
+                assertEquals(listOf("q2"), remaining.map { it.id })
+                throw failure
+            }
+        }
+        assertTrue(result.exceptionOrNull() === failure)
+        assertEquals(listOf("q1", "q2"), queue.snapshot().map { it.id })
+        assertEquals("q1", queue.pollCommitted { _, _ -> }?.id)
+        assertEquals(listOf("q2"), queue.snapshot().map { it.id })
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun restoreRejectsDuplicateDurableIds() {
         AgentInputQueue(capacity = 4).restore(

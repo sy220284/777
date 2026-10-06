@@ -84,6 +84,8 @@ REMOVED_ENGINE_STAGE3_WORK_BUILTINS = {
     "workflow",
 }
 REMOVED_ENGINE_PRIVATE_BUSINESS_METHODS = {
+    "captureAutoMemoryDirective",
+    "chatRelationshipMemoryContext",
     "chatStreamFilterPhrases",
     "compactHistoryIfNeeded",
     "enforceChatStyle",
@@ -139,17 +141,6 @@ FEATURE_INTERNAL_IMPORT_PREFIXES = (
 # Every allowance is an exact (consumer file, imported symbol) edge so debt cannot be replaced
 # with a different internal dependency inside the same file.
 SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST = {
-    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatDiaryStore"),
-    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatMemorySelector"),
-    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.PersonaProfile"),
-    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.chatLongTermMemoryBudget"),
-    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey"),
-    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.diaryRecallItemLimit"),
-    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.diaryRecallUsageInstruction"),
-    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.isUnboundChatPersona"),
-    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.relationshipMemoryMatchesSubject"),
-    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.shouldSearchDiary"),
-    ("app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt", "com.labteto.dshmobile.local.chat.takeWithinModelTokenBudget"),
     ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.ChatCharacterState"),
     ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.ChatContextState"),
     ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.chat.ChatReplySuggestion"),
@@ -400,6 +391,23 @@ for retired in RETIRED_SHARED_WORK_SEMANTIC_PATHS:
     if (ROOT / retired).exists():
         die("Work semantic interpretation returned to Shared Runtime: " + retired)
 
+
+# Retired shared implementations must stay deleted after their Feature owner takes over.
+if (ROOT / "app/src/main/java/com/labteto/dshmobile/local/memory/LocalMemoryCoordinator.kt").exists():
+    die("legacy shared Memory coordinator returned; use Chat/Work owned memory runtimes")
+
+foreground_loader = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/LocalForegroundSessionLoader.kt"
+))
+for forbidden in (
+    "reconcileCharacterBehaviorTuning(",
+    "reconcileGroupCharacterBehaviorTuning(",
+    "restoreMaterializedChatBranchState(",
+    "recoverPendingTimelineRewriteProjection(",
+    "projectGroupGalleryState(",
+):
+    if forbidden in foreground_loader:
+        die("foreground composition reclaimed Chat domain restore semantics: " + forbidden)
 
 # ---- Dependency direction --------------------------------------------------
 

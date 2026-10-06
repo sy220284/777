@@ -91,6 +91,11 @@ class LocalChatRuntime @Inject internal constructor(
             state = chatState,
             text = text,
             sessionId = sessionId,
+            commitDomainState = { target ->
+                appendChatDomainStateCommit(
+                    sessionStorage.eventLogs.get(sessionId), target, "group-announcement-updated",
+                )
+            },
             persistNow = sessionStorage::writeCurrentSnapshotNow,
         )
     }

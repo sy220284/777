@@ -25,6 +25,19 @@ import org.junit.Test
 
 class LocalSessionControlProjectionTest {
     @Test
+    fun approvedPlanReplaysPlanAndModeAsOneFact() {
+        val snapshot = LocalHarnessSession(id = "s1", plan = listOf("旧计划"), planMode = true)
+        val projected = projectSessionControlTail(snapshot, listOf(
+            event(1L, "plan/approved", buildJsonObject {
+                put("items", buildJsonArray { add(JsonPrimitive("批准计划")) })
+                put("active", false)
+            }),
+        ), -1L)
+        assertEquals(listOf("批准计划"), projected.plan)
+        assertFalse(projected.planMode)
+    }
+
+    @Test
     fun replaysOnlyEventsNewerThanSnapshotCursor() {
         val snapshot = LocalHarnessSession(
             id = "s1",

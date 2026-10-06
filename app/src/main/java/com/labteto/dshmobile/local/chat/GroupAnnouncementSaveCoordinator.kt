@@ -1,78 +1,54 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import kotlinx.coroutines.CancellationException
 
-/**
- * Owns the explicit user-save transaction for a group announcement.
- *
- * Runtime state is updated optimistically so the UI stays responsive, but success is returned only
- * after the complete session snapshot is durable. A failed durable write restores the previous
- * announcement when no newer edit has replaced it.
- */
+/** Chat owns the durable announcement; Session snapshots are derived caches. */
 internal suspend fun saveGroupChatAnnouncement(
     state: LocalChatStatePort,
     text: String,
     sessionId: String,
+    commitDomainState: (LocalChatProjectionState) -> Unit,
     persistNow: suspend (String) -> Boolean,
 ): Result<Unit> {
-    val before = state.value
-    if (
-        before.loading ||
-        before.kernel.running ||
-        before.sessionId != sessionId ||
-        before.usageMode != LocalUsageMode.CHAT ||
-        !before.chat.groupChat.enabled
-    ) {
-        return Result.failure(IllegalStateException("当前状态暂时无法保存群公告"))
-    }
-
-    val announcement = text.trim().take(2_000)
-    if (announcement == before.chat.groupChat.announcement) return Result.success(Unit)
-
-    state.update { current ->
-        if (current.sessionId == sessionId && current.chat.groupChat.enabled) {
-            current.copy(chat = current.chat.copy(groupChat = current.chat.groupChat.copy(announcement = announcement)))
-        } else {
-            current
+    val lease = LocalSessionRuntimeRegistry.tryAcquire(sessionId, LocalSessionRuntimeKind.MAINTENANCE)
+        ?: return Result.failure(IllegalStateException("当前会话忙，请稍后保存群公告"))
+    try {
+        val before = state.value
+        if (
+            before.loading || before.kernel.running || before.sessionId != sessionId ||
+            before.usageMode != LocalUsageMode.CHAT || !before.chat.groupChat.enabled
+        ) return Result.failure(IllegalStateException("当前状态暂时无法保存群公告"))
+        val announcement = text.trim().take(2_000)
+        if (announcement == before.chat.groupChat.announcement) return Result.success(Unit)
+        val target = before.copy(
+            chat = before.chat.copy(groupChat = before.chat.groupChat.copy(announcement = announcement)),
+        )
+        // Failed authority writes leave the projection untouched.
+        commitDomainState(target)
+        state.update { current ->
+            if (current.sessionId == sessionId) current.copy(chat = target.chat) else current
         }
-    }
-    val updated = state.value
-    if (updated.sessionId != sessionId || updated.chat.groupChat.announcement != announcement) {
-        return Result.failure(IllegalStateException("会话状态已变化，请重新保存群公告"))
-    }
-
-    return try {
-        check(persistNow(sessionId)) { "会话状态已变化，请重新保存群公告" }
-        Result.success(Unit)
+        try {
+            check(persistNow(sessionId)) { "会话已切换，群公告将在恢复时重新物化" }
+        } catch (cancelled: CancellationException) {
+            // The fact is already committed. Cancellation cannot roll it back.
+            throw cancelled
+        } catch (error: Throwable) {
+            state.update { current ->
+                if (current.sessionId == sessionId) current.copy(
+                    error = "群公告已保存，快照更新失败：${error.message}",
+                ) else current
+            }
+        }
+        return Result.success(Unit)
     } catch (cancelled: CancellationException) {
-        rollbackGroupAnnouncement(state, before, announcement)
         throw cancelled
     } catch (error: Throwable) {
-        rollbackGroupAnnouncement(state, before, announcement)
-        Result.failure(error)
-    }
-}
-
-private fun rollbackGroupAnnouncement(
-    state: LocalChatStatePort,
-    before: LocalChatProjectionState,
-    failedAnnouncement: String,
-) {
-    state.update { current ->
-        if (
-            current.sessionId == before.sessionId &&
-            current.chat.groupChat.announcement == failedAnnouncement
-        ) {
-            current.copy(
-                chat = current.chat.copy(
-                    groupChat = current.chat.groupChat.copy(
-                        announcement = before.chat.groupChat.announcement,
-                    ),
-                ),
-            )
-        } else {
-            current
-        }
+        return Result.failure(error)
+    } finally {
+        lease.close()
     }
 }

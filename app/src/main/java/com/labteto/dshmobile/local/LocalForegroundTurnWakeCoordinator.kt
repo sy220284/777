@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.chat.LocalChatComposition
 import com.labteto.dshmobile.local.work.LocalRuntimeOwnershipPolicy
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.work.LocalWorkComposition
@@ -44,12 +45,18 @@ internal class LocalForegroundTurnWakeCoordinator @Inject constructor(
                 sessionId,
                 LocalSessionRuntimeKind.FOREGROUND,
             ) ?: return@synchronized null
-            val next = handle.pendingInputs.poll()
-            if (next == null) {
-                lease.close()
-                return@synchronized null
-            }
-            work.turnStarter.startResumed(next, lease)
+            handoffForegroundSessionLease(lease) { work.turnStarter.startNextResumed(lease) }
         }
     }
+}
+
+/** A turn owns the lease only after the lazy Job is returned successfully. */
+internal fun handoffForegroundSessionLease(
+    lease: LocalSessionRuntimeLease,
+    start: () -> Job?,
+): Job? = try {
+    start().also { if (it == null) lease.close() }
+} catch (error: Throwable) {
+    lease.close()
+    throw error
 }
