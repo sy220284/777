@@ -28,6 +28,20 @@ class WebhookExecutionTest {
         )
     }
 
+    @Test fun unknownPersistedWebhookStatusDegradesToFailedOnDowngrade() {
+        val json = Json { encodeDefaults = true }
+        val decoded = json.decodeFromString(
+            WebhookRunResult.serializer(),
+            """{"requestId":"r-future","status":"future_waiting","updatedAt":1}""",
+        )
+
+        assertEquals(WebhookRunStatus.FAILED, decoded.status)
+        assertTrue(
+            json.encodeToString(WebhookRunResult.serializer(), decoded)
+                .contains("\"status\":\"failed\""),
+        )
+    }
+
     @Test fun cancellationWhileRunningIsRecordedAndPropagated() = runTest {
         val states = mutableListOf<WebhookRunStatus>()
         val job = launch { executeWebhookRun({ state, _, _ -> states += state }) { awaitCancellation() } }

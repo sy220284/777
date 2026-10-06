@@ -24,6 +24,21 @@ class AutomationReceiptTest {
     }
 
     @Test
+    fun unknownPersistedAutomationStatusDegradesToBlockedOnDowngrade() {
+        val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val decoded = json.decodeFromString(
+            AutomationTask.serializer(),
+            """{"id":"future","prompt":"task","createdAt":1,"nextRunAt":2,"status":"future_waiting"}""",
+        )
+
+        assertEquals(AutomationStatus.BLOCKED, decoded.status)
+        assertTrue(
+            json.encodeToString(AutomationTask.serializer(), decoded)
+                .contains("\"status\":\"blocked\""),
+        )
+    }
+
+    @Test
     fun scheduleGenerationGetsDistinctWorkIdentityAndKeepsLegacyGenerationZero() {
         assertEquals("harness-automation-task", automationWorkName("task", 0L))
         assertEquals("harness-automation-task-g1", automationWorkName("task", 1L))

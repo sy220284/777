@@ -43,8 +43,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.SerialName
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -70,20 +75,36 @@ enum class AutomationScheduleType {
     WINDOW,
 }
 
-@Serializable
+@Serializable(with = AutomationStatusSerializer::class)
 enum class AutomationStatus(val wireValue: String) {
-    @SerialName("scheduled") SCHEDULED("scheduled"),
-    @SerialName("running") RUNNING("running"),
-    @SerialName("waiting_user") WAITING_USER("waiting_user"),
-    @SerialName("paused") PAUSED("paused"),
-    @SerialName("blocked") BLOCKED("blocked"),
-    @SerialName("failed") FAILED("failed"),
-    @SerialName("completed") COMPLETED("completed"),
-    @SerialName("cancelled") CANCELLED("cancelled"),
-    @SerialName("skipped") SKIPPED("skipped"),
-    @SerialName("queued") QUEUED("queued");
+    SCHEDULED("scheduled"),
+    RUNNING("running"),
+    WAITING_USER("waiting_user"),
+    PAUSED("paused"),
+    BLOCKED("blocked"),
+    FAILED("failed"),
+    COMPLETED("completed"),
+    CANCELLED("cancelled"),
+    SKIPPED("skipped"),
+    QUEUED("queued");
 
     override fun toString(): String = wireValue
+}
+
+internal object AutomationStatusSerializer : KSerializer<AutomationStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AutomationStatus", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: AutomationStatus) {
+        encoder.encodeString(value.wireValue)
+    }
+
+    override fun deserialize(decoder: Decoder): AutomationStatus {
+        val wireValue = decoder.decodeString()
+        return AutomationStatus.entries.firstOrNull { it.wireValue == wireValue }
+            // A downgraded client must not execute a future state it cannot interpret.
+            ?: AutomationStatus.BLOCKED
+    }
 }
 
 @Serializable
