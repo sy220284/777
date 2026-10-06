@@ -137,7 +137,11 @@ internal class LocalForegroundModelHistoryRuntime @Inject constructor(
         val eventLog = sessionStorage.eventLogs.get(expectedSessionId)
         eventLog.append(
             ModelHistoryCheckpointCodec.EVENT_TYPE,
-            codec.encode(durableModelHistorySnapshot(history.snapshot()), reason),
+            codec.encode(
+                messages = durableModelHistorySnapshot(history.snapshot()),
+                reason = reason,
+                asOfSequence = eventLog.latestSequence(),
+            ),
         )
         runtimeStateStore.foregroundRunHandle.turnsSinceModelHistoryCheckpoint = 0
         return true
