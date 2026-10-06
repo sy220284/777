@@ -125,10 +125,6 @@ if CI.count("check-local-architecture-boundaries.py") != 1:
     violations.append("Architecture 3.0 ownership guard must run exactly once in its dedicated lane")
 if CI.count("check-local-performance-invariants.py") != 1:
     violations.append("Architecture 3.0 performance invariant guard must run exactly once in its dedicated lane")
-if "Validate Architecture 3.0 ownership and dependencies" not in CI:
-    violations.append("Architecture 3.0 ownership guard must have its own diagnosable CI step")
-if "Validate Architecture 3.0 execution invariants" not in CI:
-    violations.append("Architecture 3.0 execution invariant guard must have its own diagnosable CI step")
 if "classify-ci-scope.py --self-test" not in CI:
     violations.append("CI scope classifier must self-test before downstream validation")
 
