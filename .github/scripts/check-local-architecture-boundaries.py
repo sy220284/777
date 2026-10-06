@@ -21,17 +21,14 @@ COMPOSITION_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureEx
 
 # Transitional bridges are exact, shrink-only migration debt.
 ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST: set[str] = set()
-ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST = {
-    "automationChatCoordinator",
-    "automationWorkCoordinator",
-}
+ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST: set[str] = set()
 ENGINE_COMPOSITION_BRIDGE_ALLOWLIST = (
     ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST
     | ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST
 )
 
 # Outside the app composition root, Architecture 3.0 code must not depend on the legacy Engine.
-ENGINE_CONSUMER_ALLOWLIST = {COMPOSITION_PATH}
+ENGINE_CONSUMER_ALLOWLIST: set[str] = set()
 UI_AGGREGATE_STATE_ALLOWLIST: set[str] = set()
 
 # Feature-owned runtime surfaces that have already exited Engine are permanent exits.
@@ -151,33 +148,16 @@ SHARED_REVERSE_DEPENDENCY_MIGRATION_ALLOWLIST = {
     ("app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionModels.kt", "com.labteto.dshmobile.local.work.LocalTodoItem"),
 }
 
-AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST = {
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatPendingTurn"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatPersonaStore"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.LocalChatState"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.appendMaterializedChatBranchMessage"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.applySceneTurn"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.characterProactiveDirective"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.enqueuePending"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.evaluateChatProactivePolicy"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.evaluateChatSilenceTrigger"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.isNearDuplicateProactive"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.proactiveConversationFocus"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.recentProactiveAvoidanceContext"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.chat.withoutLegacyConversationContext"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationChatCoordinator.kt", "com.labteto.dshmobile.local.work.LocalWorkState"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt", "com.labteto.dshmobile.local.chat.ChatCharacterState"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt", "com.labteto.dshmobile.local.chat.LocalChatState"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt", "com.labteto.dshmobile.local.chat.PersonaProfile"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt", "com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy"),
-    ("app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationWorkCoordinator.kt", "com.labteto.dshmobile.local.work.LocalWorkState"),
-}
+AUTOMATION_INTERNAL_IMPORT_MIGRATION_ALLOWLIST = set()
 AUTOMATION_ALLOWED_CROSS_FEATURE_API_SYMBOLS = {
     "LocalChatExecutionPort",
     "LocalChatTurnPort",
     "LocalChatUserActivityPort",
+    "LocalWorkAutomationExecutionPort",
     "LocalWorkExecutionPort",
     "LocalWorkTurnPort",
+    "LocalChatAutomationExecutionPort",
+    "LocalWorkAutomationExecutionPort",
 }
 
 SETTINGS_INTERNAL_IMPORT_MIGRATION_ALLOWLIST = {

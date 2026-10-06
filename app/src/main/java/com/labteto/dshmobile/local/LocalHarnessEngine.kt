@@ -31,9 +31,6 @@ import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.agent.localAgentRunPolicy
 import com.labteto.dshmobile.local.agent.requireCompletedOutput
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
-import com.labteto.dshmobile.local.automation.LocalAutomationChatCoordinator
-import com.labteto.dshmobile.local.automation.LocalAutomationRunResult
-import com.labteto.dshmobile.local.automation.LocalAutomationWorkCoordinator
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatPendingTurn
 import com.labteto.dshmobile.local.chat.ChatPersonaCorrectionNotice
@@ -561,46 +558,6 @@ class LocalHarnessEngine @Inject internal constructor(
             defaultSessionId = { currentSessionId },
         )
     }
-    internal val automationWorkCoordinator by lazy {
-        LocalAutomationWorkCoordinator(
-            state = runtimeStateStore.state,
-            sessionCoordinator = sessionCoordinator,
-            eventLogFor = ::eventLogFor,
-            agentRunCoordinator = agentRunCoordinator,
-            recoveryContextPolicy = LocalWorkRecoveryContextPolicy,
-            runnerFactory = { sessionId, boundState, onApprovalBlocked ->
-                automationSubagentRunner(
-                    sessionId = sessionId,
-                    boundState = boundState,
-                    onApprovalBlocked = onApprovalBlocked,
-                )
-            },
-            onSessionReleased = { sessionId ->
-                if (currentSessionId == sessionId && _state.value.sessionId == sessionId) foregroundWake.startNextIfIdle()?.start()
-            },
-        )
-    }
-
-    internal val automationChatCoordinator by lazy {
-        LocalAutomationChatCoordinator(
-            state = runtimeStateStore.state,
-            sessionCoordinator = sessionCoordinator,
-            eventLogFor = ::eventLogFor,
-            chatPersonaStore = chatPersonaStore,
-            chatTurnCoordinator = chatTurnCoordinator,
-            chatReplyCoordinator = chatReplyCoordinator,
-            usageTracker = usageTracker,
-            modelGateway = modelGateway,
-            modelRequestCoordinator = modelRequestCoordinator,
-            chatRelationshipMemoryContext = { query, snapshot ->
-                chatComposition.memory.relationshipContext(query, snapshot)
-            },
-            recordStyleGuardHits = ::recordStyleGuardHits,
-            acquireVisibleTurn = ::acquireAutomationChatVisibleTurn,
-            commitVisibleReply = ::commitVisibleAutomationChatReply,
-            releaseVisibleTurn = ::releaseAutomationChatVisibleTurn,
-        )
-    }
 
     private val subagents by lazy {
         subagentRunnerFactory.create(
@@ -672,33 +629,6 @@ class LocalHarnessEngine @Inject internal constructor(
      * approval-gated tool may proceed; otherwise the task is marked blocked so a background task
      * cannot surface a work prompt inside Chat mode.
      */
-    private fun automationSubagentRunner(
-        sessionId: String,
-        boundState: LocalHarnessState,
-        onApprovalBlocked: (String) -> Unit,
-    ): LocalSubagentRunner = subagentRunnerFactory.createBound(
-        sessionId = sessionId,
-        boundState = boundState,
-        runKind = LocalAgentRunKind.AUTOMATION,
-        schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
-            toolSchemaProjection.subagentSchemas(
-                allowMutation = allowMutation,
-                allowVirtualScreen = allowVirtualScreen,
-                enabledOptional = enabledOptional,
-            )
-        },
-        executeTool = { call, allowMutation, memoryTools, enabledOptional ->
-            executeAutomationSubagentTool(
-                call = call,
-                allowMutation = allowMutation,
-                sessionId = sessionId,
-                memoryTools = memoryTools,
-                enabledOptionalTools = enabledOptional,
-                onApprovalBlocked = onApprovalBlocked,
-            )
-        },
-        modelAdmission = LocalWorkExecutionControl().asModelAdmissionPort(),
-    )
 
     private val runStateLock: Any
         get() = runtimeStateStore.foregroundRunHandle.lock
@@ -778,133 +708,6 @@ class LocalHarnessEngine @Inject internal constructor(
         (binding?.runHandle?.modelHistory ?: modelHistory).append(message)
         updateContextMetrics(binding)
     }
-
-    private suspend fun acquireAutomationChatVisibleTurn(
-        targetSessionId: String,
-        automationJob: Job?,
-    ): Boolean {
-        if (_state.value.sessionId != targetSessionId) return false
-        var ownsVisibleTurn = false
-        withTimeout(60_000L) {
-            while (!ownsVisibleTurn) {
-                ownsVisibleTurn = synchronized(runStateLock) {
-                    val busy = sessionTransitioning ||
-                        _state.value.kernel.running ||
-                        activeJob?.isCompleted == false
-                    if (!busy) {
-                        activeJob = automationJob
-                        true
-                    } else {
-                        false
-                    }
-                }
-                if (!ownsVisibleTurn) delay(100)
-            }
-        }
-        _state.update { current ->
-            if (current.sessionId == targetSessionId) {
-                current.copy(kernel = current.kernel.copy(running = true), error = null)
-            } else {
-                current
-            }
-        }
-        return ownsVisibleTurn
-    }
-
-    private fun commitVisibleAutomationChatReply(
-        session: LocalHarnessSession,
-        reply: LocalModelReply,
-        content: String,
-        proactiveMessage: LocalHarnessMessage,
-        assistantEventSequence: Long,
-    ) {
-        val beforeProactive = _state.value
-        val nextChatState = chatTurnCoordinator.applyDeterministicInteractionState(
-            previous = beforeProactive.chat.chatState.withoutLegacyConversationContext(),
-            userMessage = "",
-            assistantMessage = content,
-        ).withoutLegacyConversationContext()
-        modelHistory.append(reply.message)
-        updateContextMetrics()
-        transcriptRuntime.applyMessages(
-            listOf(proactiveMessage),
-            assistantEventSequence,
-        )
-        _state.update { current ->
-            if (current.sessionId != session.id) {
-                current
-            } else {
-                val baseContext = current.chat.chatContext
-                    .applySceneTurn(
-                        userMessage = "",
-                        assistantMessage = content,
-                        sequence = assistantEventSequence,
-                    )
-                val pending = ChatPendingTurn(
-                    sequence = assistantEventSequence,
-                    assistantMessageId = proactiveMessage.id,
-                    branchHeadId = proactiveMessage.id,
-                    userMessage = "",
-                    assistantMessage = content,
-                    generation = baseContext.generation,
-                )
-                current.copy(
-                    chat = current.chat.copy(
-                        chatState = nextChatState,
-                        chatContext = baseContext.enqueuePendingDurably(pending, eventLog),
-                    ),
-                )
-            }
-        }
-        if (
-            pendingInputs.size() == 0 &&
-            beforeProactive.transcriptIndex.branchingEligible &&
-            beforeProactive.chat.chatBranches.nodes.isNotEmpty()
-        ) {
-            _state.update { current ->
-                current.copy(
-                    chat = current.chat.copy(
-                        chatBranches = appendMaterializedChatBranchMessage(
-                            current = current.chat.chatBranches,
-                            activeMessages = emptyList(),
-                            message = proactiveMessage,
-                            parentId = beforeProactive.transcriptIndex.latestDialogueMessageId,
-                            chatState = current.chat.chatState,
-                            chatContext = current.chat.chatContext,
-                            replySuggestions = current.chat.replySuggestions,
-                        ),
-                    ),
-                )
-            }
-        }
-        checkpointModelHistory("chat/proactive-automation")
-        persist()
-    }
-
-    private fun releaseAutomationChatVisibleTurn(
-        targetSessionId: String,
-        automationJob: Job?,
-    ) {
-        _state.update { current ->
-            if (current.sessionId == targetSessionId) {
-                current.copy(
-                    work = current.work.copy(
-                        pendingApproval = null,
-                        pendingQuestion = null,
-                        deviceApprovalLease = false,
-                    ),
-                    kernel = current.kernel.copy(running = false),
-                )
-            } else {
-                current
-            }
-        }
-        synchronized(runStateLock) {
-            if (activeJob === automationJob) activeJob = null
-        }
-        foregroundWake.startNextIfIdle()?.start()
-    }
-
 
     internal suspend fun diagnoseNetwork(target: String): String = webTools.diagnose(target)
 
@@ -1004,124 +807,6 @@ class LocalHarnessEngine @Inject internal constructor(
         },
     )
 
-    private suspend fun executeAutomationSubagentTool(
-        call: LocalToolCall,
-        allowMutation: Boolean,
-        sessionId: String,
-        memoryTools: LocalMemoryTools,
-        enabledOptionalTools: MutableSet<String>,
-        onApprovalBlocked: (String) -> Unit,
-    ): AgentToolResult {
-        val canonical = call.copy(name = LocalToolPolicy.canonical(call.name))
-        val normalized = if (
-            canonical.name in setOf("bash", "run_shell", "web_fetch") &&
-            canonical.arguments["run_in_background"]?.jsonPrimitive?.booleanOrNull == true
-        ) {
-            canonical.copy(
-                arguments = JsonObject(
-                    canonical.arguments + ("run_in_background" to JsonPrimitive(false)),
-                ),
-            )
-        } else {
-            canonical
-        }
-        val log = eventLogFor(sessionId)
-        log.append("tool/call", buildJsonObject {
-            put("id", normalized.id)
-            put("name", normalized.name)
-            put("arguments", normalized.arguments)
-            put("execution_started", false)
-            put("automation", true)
-        })
-        val result = try {
-            when (normalized.name) {
-                "capability_search" -> AgentToolResult(
-                    searchCapabilities(normalized.arguments.string("query"), enabledOptionalTools),
-                )
-                "memory_search", "memory_list" -> AgentToolResult(
-                    memoryTools.execute(normalized.name, normalized.arguments, allowMutation = false),
-                )
-                "tool_output_read" -> AgentToolResult(
-                    toolOutputStore.read(
-                        sessionId = sessionId,
-                        callId = normalized.arguments.string("call_id"),
-                        startByte = normalized.arguments.int("start_byte", 0),
-                        maxBytes = normalized.arguments.int(
-                            "max_bytes",
-                            LocalToolOutputStore.DEFAULT_READ_BYTES,
-                        ),
-                    ),
-                )
-                else -> executeAutomationRegistered(
-                    original = normalized,
-                    allowMutation = allowMutation,
-                    sessionId = sessionId,
-                    onApprovalBlocked = onApprovalBlocked,
-                )
-            }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            toolFailureResult(
-                normalized,
-                "AUTOMATION_TOOL_ERROR",
-                error.message ?: error::class.java.simpleName,
-            )
-        }
-        log.append("tool/result", buildJsonObject {
-            put("id", normalized.id)
-            put("name", normalized.name)
-            put("content", truncateWithoutSplittingSurrogatePair(result.content, MAX_EVENT_CHARS))
-            put("is_error", result.isError)
-            result.errorCode?.let { put("error_code", it) }
-            put("retryable", result.retryable)
-            put("side_effect", result.sideEffect.name.lowercase())
-            result.recoveryHint?.let { put("recovery_hint", it) }
-            put("automation", true)
-        })
-        return result
-    }
-
-    private suspend fun executeAutomationRegistered(
-        original: LocalToolCall,
-        allowMutation: Boolean,
-        sessionId: String,
-        onApprovalBlocked: (String) -> Unit,
-    ): AgentToolResult {
-        val result = toolExecutionCoordinator.executeScoped(
-            original = original,
-            sessionId = sessionId,
-            allowMutation = allowMutation,
-            planModeEnabled = false,
-            approval = { call, tool, _ ->
-                if (approvalPreferences.isSafeAutoApprovalEnabled()) {
-                    eventLogFor(sessionId).append("approval/auto", buildJsonObject {
-                        put("tool", call.name)
-                        put("access", tool.access.name.lowercase())
-                        put("mode", "automation-global")
-                    })
-                    true
-                } else {
-                    val reason = "后台任务需要人工审批：" + tool.name
-                    onApprovalBlocked(reason)
-                    eventLogFor(sessionId).append("approval/blocked", buildJsonObject {
-                        put("tool", call.name)
-                        put("access", tool.access.name.lowercase())
-                        put("mode", "automation-noninteractive")
-                    })
-                    false
-                }
-            },
-        )
-        return if (result.isError) {
-            result.copy(
-                recoveryHint = "后台任务不能弹出人工审批；可在工作模式中打开该任务继续处理。" +
-                    result.recoveryHint?.let { " " + it }.orEmpty(),
-            )
-        } else {
-            result
-        }
-    }
 
     private fun formatToolFailure(call: LocalToolCall, code: String, detail: String): String =
         "[${call.name}][$code] 工具执行失败：$detail\n调用 id：${call.id}"

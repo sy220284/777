@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local.automation
+package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.resolveRecoveryModelProfile
@@ -8,30 +8,30 @@ import com.labteto.dshmobile.local.runtime.LocalAgentRunRecoveryContextPolicy
 import com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 
-internal data class LocalAutomationWorkRecoveryPlan(
+internal data class LocalWorkAutomationRecoveryPlan(
     val executionTask: String,
     val profile: LocalModelProfile? = null,
     val completedOutput: String? = null,
 )
 
-internal fun prepareAutomationWorkRecovery(
+internal fun prepareWorkAutomationRecovery(
     prompt: String,
     sessionId: String,
     eventLog: LocalSessionEventLog,
     profiles: List<LocalModelProfile>,
     agentRunCoordinator: LocalAgentRunCoordinator,
     contextPolicy: LocalAgentRunRecoveryContextPolicy? = null,
-): LocalAutomationWorkRecoveryPlan {
+): LocalWorkAutomationRecoveryPlan {
     val repair = eventLog.repairInterruptedTail(force = true)
     val decision = agentRunCoordinator.recoveryDecision(
         sessionId = sessionId,
         repair = repair,
         kind = LocalAgentRunKind.AUTOMATION,
         contextPolicy = contextPolicy,
-    ) ?: return LocalAutomationWorkRecoveryPlan(prompt)
+    ) ?: return LocalWorkAutomationRecoveryPlan(prompt)
 
     decision.completedOutput?.let { output ->
-        return LocalAutomationWorkRecoveryPlan(
+        return LocalWorkAutomationRecoveryPlan(
             executionTask = prompt,
             completedOutput = output.ifBlank { "后台任务已完成" },
         )
@@ -47,7 +47,7 @@ internal fun prepareAutomationWorkRecovery(
         throw LocalHarnessBlockedException(reason, sessionId)
     }
 
-    val queued = decision.queuedInput ?: return LocalAutomationWorkRecoveryPlan(prompt)
+    val queued = decision.queuedInput ?: return LocalWorkAutomationRecoveryPlan(prompt)
     val identity = decision.route
     val profile = identity?.let { resolveRecoveryModelProfile(profiles, it) }
     if (identity == null || profile == null) {
@@ -66,7 +66,7 @@ internal fun prepareAutomationWorkRecovery(
         runId = decision.runId,
         kind = LocalAgentRunKind.AUTOMATION,
     )
-    return LocalAutomationWorkRecoveryPlan(
+    return LocalWorkAutomationRecoveryPlan(
         executionTask = queued.content,
         profile = profile,
     )

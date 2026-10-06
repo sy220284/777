@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local.automation
+package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
@@ -12,8 +12,37 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** One wall-clock budget shared by Automation queueing, ownership acquisition and execution. */
-internal class LocalAutomationTimeoutBudget(
+/** ChatFeature-owned Automation entrypoint. */
+internal interface LocalChatAutomationExecutionPort {
+    suspend fun run(
+        instruction: String,
+        targetSessionId: String,
+        timeoutMillis: Long = 3 * 60_000L,
+        recoverInterrupted: Boolean = false,
+        recoveryStartedAt: Long? = null,
+        quietHoursEnabled: Boolean = false,
+        quietStartHour: Int = 23,
+        quietStartMinute: Int = 0,
+        quietEndHour: Int = 7,
+        quietEndMinute: Int = 0,
+        proactiveMinGapMinutes: Long = 6L * 60L,
+        proactiveMaxUnanswered: Int = 2,
+        minimumSilenceMinutes: Long? = null,
+        silenceReferenceAt: Long? = null,
+        bypassProactivePolicy: Boolean = false,
+    ): LocalChatAutomationResult
+}
+
+internal data class LocalChatAutomationResult(
+    val sessionId: String,
+    val output: String,
+    val delivered: Boolean = true,
+    val skipReason: String? = null,
+    val nextRunAtHint: Long? = null,
+    val waitingForUserReply: Boolean = false,
+)
+
+internal class LocalChatAutomationTimeoutBudget(
     timeoutMillis: Long,
     maxMillis: Long,
 ) {
@@ -38,19 +67,12 @@ internal fun requireAutomationChatSession(session: LocalHarnessSession?): LocalH
     return current
 }
 
-internal fun requireAutomationWorkSession(session: LocalHarnessSession?): LocalHarnessSession {
-    val current = session ?: error("后台任务会话已不存在")
-    require(current.usageMode == LocalUsageMode.WORK) { "后台任务会话已不在工作模式" }
-    return current
-}
-
-private val AUTOMATION_USER_ACTIVITY_EVENTS =
-    setOf("user/message", LOCAL_AGENT_INBOX_EVENT_TYPE)
+private val AUTOMATION_USER_ACTIVITY_EVENTS = setOf("user/message", LOCAL_AGENT_INBOX_EVENT_TYPE)
 
 internal fun LocalSessionEventLog.latestAutomationUserActivitySequence(): Long? =
     latestOf(AUTOMATION_USER_ACTIVITY_EVENTS)?.sequence
 
-internal class LocalAutomationChatOwnership(
+internal class LocalChatAutomationOwnership(
     private val sessionLease: LocalSessionRuntimeLease,
     val visibleTurnOwned: Boolean,
     private val targetSessionId: String,
@@ -58,7 +80,6 @@ internal class LocalAutomationChatOwnership(
     private val releaseVisibleTurn: (String, Job?) -> Unit,
 ) : AutoCloseable {
     override fun close() {
-        // Release in reverse acquisition order. releaseVisibleTurn may wake queued foreground work.
         sessionLease.close()
         if (visibleTurnOwned) releaseVisibleTurn(targetSessionId, automationJob)
     }
@@ -67,10 +88,10 @@ internal class LocalAutomationChatOwnership(
 internal suspend fun acquireAutomationChatOwnership(
     targetSessionId: String,
     automationJob: Job?,
-    budget: LocalAutomationTimeoutBudget,
+    budget: LocalChatAutomationTimeoutBudget,
     acquireVisibleTurn: suspend (String, Job?) -> Boolean,
     releaseVisibleTurn: (String, Job?) -> Unit,
-): LocalAutomationChatOwnership {
+): LocalChatAutomationOwnership {
     val visibleTurnOwned = withTimeout(budget.remainingMillis()) {
         acquireVisibleTurn(targetSessionId, automationJob)
     }
@@ -80,7 +101,7 @@ internal suspend fun acquireAutomationChatOwnership(
         if (visibleTurnOwned) releaseVisibleTurn(targetSessionId, automationJob)
         throw error
     }
-    return LocalAutomationChatOwnership(
+    return LocalChatAutomationOwnership(
         sessionLease = sessionLease,
         visibleTurnOwned = visibleTurnOwned,
         targetSessionId = targetSessionId,
@@ -89,13 +110,12 @@ internal suspend fun acquireAutomationChatOwnership(
     )
 }
 
-
 internal fun rejectStaleAutomationProactiveReply(
     eventLog: LocalSessionEventLog,
     expectedUserActivitySequence: Long?,
     sessionId: String,
     personaId: String,
-): LocalAutomationRunResult? {
+): LocalChatAutomationResult? {
     if (eventLog.latestAutomationUserActivitySequence() == expectedUserActivitySequence) return null
     val reason = "用户刚有新的互动，本轮主动消息已取消"
     eventLog.append("chat/proactive-skipped", buildJsonObject {
@@ -105,7 +125,7 @@ internal fun rejectStaleAutomationProactiveReply(
         put("user_activity_during_generation", true)
         put("persona_id", personaId)
     })
-    return LocalAutomationRunResult(
+    return LocalChatAutomationResult(
         sessionId = sessionId,
         output = reason,
         delivered = false,

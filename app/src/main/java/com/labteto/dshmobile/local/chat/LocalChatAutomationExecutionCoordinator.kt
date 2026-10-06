@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local.automation
+package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalChatReplyCoordinator
 import com.labteto.dshmobile.local.LocalChatTurnCoordinator
@@ -39,7 +39,6 @@ import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.appendLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import com.labteto.dshmobile.local.session.localTranscriptIndexForSession
-import com.labteto.dshmobile.local.work.LocalWorkState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -57,45 +56,42 @@ import kotlinx.serialization.json.put
  * The engine retains only the visible-session transaction callbacks that touch its live run lock,
  * model history, and hot transcript.
  */
-internal class LocalAutomationChatCoordinator(
-    private val state: StateFlow<LocalHarnessState>,
-    private val sessionCoordinator: LocalSessionCoordinator,
-    private val eventLogFor: (String) -> LocalSessionEventLog,
-    private val chatPersonaStore: ChatPersonaStore,
-    private val chatTurnCoordinator: LocalChatTurnCoordinator,
-    private val chatReplyCoordinator: LocalChatReplyCoordinator,
+@javax.inject.Singleton
+internal class LocalChatAutomationExecutionCoordinator @javax.inject.Inject constructor(
+    private val runtimeStateStore: com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore,
+    private val sessionStorage: com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime,
+    private val persistence: LocalChatPersistence,
+    private val chatComposition: LocalChatComposition,
     private val usageTracker: DeepSeekUsageTracker,
     private val modelGateway: LocalModelGateway,
     private val modelRequestCoordinator: LocalModelRequestCoordinator,
-    private val chatRelationshipMemoryContext: (String, LocalHarnessState) -> String,
-    private val recordStyleGuardHits: (List<String>) -> Unit,
-    private val acquireVisibleTurn: suspend (String, Job?) -> Boolean,
-    private val commitVisibleReply: (
-        LocalHarnessSession,
-        LocalModelReply,
-        String,
-        LocalHarnessMessage,
-        Long,
-    ) -> Unit,
-    private val releaseVisibleTurn: (String, Job?) -> Unit,
-) {
-    suspend fun run(
+    private val visibleTurnOwner: LocalChatAutomationVisibleTurnOwner,
+) : LocalChatAutomationExecutionPort {
+    private val state = runtimeStateStore.state
+    private val sessionCoordinator get() = sessionStorage.coordinator
+    private fun eventLogFor(sessionId: String): LocalSessionEventLog = sessionStorage.eventLogs.get(sessionId)
+    private val chatPersonaStore get() = persistence.personaStore
+    private val chatTurnCoordinator get() = chatComposition.turnCoordinator
+    private val chatReplyCoordinator get() = chatComposition.replyCoordinator
+
+
+    override suspend fun run(
         instruction: String,
         targetSessionId: String,
-        timeoutMillis: Long = 3 * 60_000L,
-        recoverInterrupted: Boolean = false,
-        recoveryStartedAt: Long? = null,
-        quietHoursEnabled: Boolean = false,
-        quietStartHour: Int = 23,
-        quietStartMinute: Int = 0,
-        quietEndHour: Int = 7,
-        quietEndMinute: Int = 0,
-        proactiveMinGapMinutes: Long = 6L * 60L,
-        proactiveMaxUnanswered: Int = 2,
-        minimumSilenceMinutes: Long? = null,
-        silenceReferenceAt: Long? = null,
-        bypassProactivePolicy: Boolean = false,
-    ): LocalAutomationRunResult {
+        timeoutMillis: Long,
+        recoverInterrupted: Boolean,
+        recoveryStartedAt: Long?,
+        quietHoursEnabled: Boolean,
+        quietStartHour: Int,
+        quietStartMinute: Int,
+        quietEndHour: Int,
+        quietEndMinute: Int,
+        proactiveMinGapMinutes: Long,
+        proactiveMaxUnanswered: Int,
+        minimumSilenceMinutes: Long?,
+        silenceReferenceAt: Long?,
+        bypassProactivePolicy: Boolean,
+    ): LocalChatAutomationResult {
         val trigger = instruction.trim()
         require(trigger.isNotEmpty()) { "定时互动意图不能为空" }
         withTimeout(15_000L) {
@@ -104,9 +100,9 @@ internal class LocalAutomationChatCoordinator(
         require(state.value.modelState.configured) { "本机 Harness 尚未配置模型" }
 
         var initialSession = requireAutomationChatSession(sessionCoordinator.read(targetSessionId))
-        val budget = LocalAutomationTimeoutBudget(timeoutMillis, 10 * 60_000L)
+        val budget = LocalChatAutomationTimeoutBudget(timeoutMillis, 10 * 60_000L)
         val ownership = acquireAutomationChatOwnership(
-            targetSessionId, currentCoroutineContext()[Job], budget, acquireVisibleTurn, releaseVisibleTurn,
+            targetSessionId, currentCoroutineContext()[Job], budget, visibleTurnOwner::acquire, visibleTurnOwner::release,
         )
         try {
         initialSession = requireAutomationChatSession(sessionCoordinator.read(targetSessionId))
@@ -115,7 +111,7 @@ internal class LocalAutomationChatCoordinator(
                 eventLog = eventLogFor(targetSessionId),
                 startedAt = recoveryStartedAt,
             )?.let { recovered ->
-                return LocalAutomationRunResult(sessionId = targetSessionId, output = recovered)
+                return LocalChatAutomationResult(sessionId = targetSessionId, output = recovered)
             }
         }
 
@@ -142,7 +138,7 @@ internal class LocalAutomationChatCoordinator(
                 put("proactive", true)
                 put("persona_id", initialSession.personaId)
             })
-            return LocalAutomationRunResult(
+            return LocalChatAutomationResult(
                 sessionId = targetSessionId,
                 output = reason,
                 delivered = false,
@@ -180,7 +176,7 @@ internal class LocalAutomationChatCoordinator(
                     put("silence_trigger", true)
                     put("persona_id", initialSession.personaId)
                 })
-                return LocalAutomationRunResult(
+                return LocalChatAutomationResult(
                     sessionId = targetSessionId,
                     output = reason,
                     delivered = false,
@@ -226,7 +222,7 @@ internal class LocalAutomationChatCoordinator(
                             put("rechecked", true)
                             put("persona_id", persona.id)
                         })
-                        return@withTimeout LocalAutomationRunResult(
+                        return@withTimeout LocalChatAutomationResult(
                             sessionId = session.id,
                             output = reason,
                             delivered = false,
@@ -259,7 +255,7 @@ internal class LocalAutomationChatCoordinator(
                         put("proactive", true)
                         put("persona_id", persona.id)
                     })
-                    return@withTimeout LocalAutomationRunResult(
+                    return@withTimeout LocalChatAutomationResult(
                         sessionId = session.id,
                         output = reason,
                         delivered = false,
@@ -296,7 +292,7 @@ internal class LocalAutomationChatCoordinator(
                     handoffSummary = session.handoffSummary,
                     messages = recentTranscript,
                     transcriptIndex = sessionTranscriptIndex,
-                    work = LocalWorkState(),
+                    work = runtime.work,
                     kernel = runtime.kernel.copy(running = false, queuedInputCount = 0),
                     error = null,
                 )
@@ -307,7 +303,7 @@ internal class LocalAutomationChatCoordinator(
                     userInput = conversationFocus,
                     storyContext = session.handoffSummary,
                 )
-                val relationshipMemory = chatRelationshipMemoryContext(conversationFocus, boundState)
+                val relationshipMemory = chatComposition.memory.relationshipContext(conversationFocus, boundState)
                 val proactiveAvoidance = recentProactiveAvoidanceContext(recentTranscript)
                 val proactiveDirective = characterProactiveDirective(
                     trigger = trigger,
@@ -361,7 +357,7 @@ internal class LocalAutomationChatCoordinator(
                     reply = rawReply,
                     recordUsage = { candidate -> usageTracker.recordAutomation(boundState, candidate, TokenUsageAction.AUTOMATION_CHAT, proactiveDirective) },
                     onGuardEvent = { action, violations ->
-                        recordStyleGuardHits(violations)
+                        runtimeStateStore.projection.recordStyleGuardHits(violations, 20)
                         boundEventLog.append("chat/style-guard", buildJsonObject {
                             put("action", action)
                             put("automation", true)
@@ -392,7 +388,7 @@ internal class LocalAutomationChatCoordinator(
                         reply = retryRawReply,
                         recordUsage = { candidate -> usageTracker.recordAutomation(boundState, candidate, TokenUsageAction.CHAT_REPAIR, proactiveDirective) },
                         onGuardEvent = { action, violations ->
-                            recordStyleGuardHits(violations)
+                            runtimeStateStore.projection.recordStyleGuardHits(violations, 20)
                             boundEventLog.append("chat/style-guard", buildJsonObject {
                                 put("action", action)
                                 put("automation", true)
@@ -446,7 +442,7 @@ internal class LocalAutomationChatCoordinator(
                 })
 
                 if (ownership.visibleTurnOwned && state.value.sessionId == session.id) {
-                    commitVisibleReply(
+                    visibleTurnOwner.commit(
                         session,
                         reply,
                         content,
@@ -523,7 +519,7 @@ internal class LocalAutomationChatCoordinator(
                     put("automation", true)
                     put("proactive", true)
                 })
-                LocalAutomationRunResult(sessionId = session.id, output = content)
+                LocalChatAutomationResult(sessionId = session.id, output = content)
             }
         } finally {
             ownership.close()

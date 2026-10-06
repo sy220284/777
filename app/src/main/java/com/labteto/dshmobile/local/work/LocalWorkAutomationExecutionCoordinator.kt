@@ -1,39 +1,34 @@
-package com.labteto.dshmobile.local.automation
+package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.LocalHarnessState
-import com.labteto.dshmobile.local.LocalSessionCoordinator
-import com.labteto.dshmobile.local.LocalSubagentRunner
+import com.labteto.dshmobile.local.LocalForegroundTurnWakeCoordinator
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
 import com.labteto.dshmobile.local.agent.requireCompletedOutput
-import com.labteto.dshmobile.local.chat.ChatCharacterState
-import com.labteto.dshmobile.local.chat.LocalChatState
-import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
-import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
-import com.labteto.dshmobile.local.runtime.LocalAgentRunRecoveryContextPolicy
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.LocalAutomationWorkException
 import com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.MAX_EVENT_CHARS
-import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.appendLocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import com.labteto.dshmobile.local.session.localTranscriptIndexForSession
-import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
-import com.labteto.dshmobile.local.work.LocalWorkState
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.booleanOrNull
@@ -45,25 +40,20 @@ import kotlinx.serialization.json.put
 /**
  * Owns durable Work-automation execution and transcript persistence.
  *
- * Automation stays detached from the visible UI session; the engine only supplies the shared
- * runner factory and durable session/event boundaries.
+ * Automation stays detached from the visible UI session. Work owns runner construction,
+ * recovery semantics, non-interactive approval and durable transcript delivery.
  */
-internal class LocalAutomationWorkCoordinator(
-    private val state: StateFlow<LocalHarnessState>,
-    private val sessionCoordinator: LocalSessionCoordinator,
-    private val eventLogFor: (String) -> LocalSessionEventLog,
-    private val agentRunCoordinator: LocalAgentRunCoordinator,
-    private val recoveryContextPolicy: LocalAgentRunRecoveryContextPolicy,
-    private val runnerFactory: (
-        sessionId: String,
-        boundState: LocalHarnessState,
-        onApprovalBlocked: (String) -> Unit,
-    ) -> LocalSubagentRunner,
-    private val onSessionReleased: (String) -> Unit = {},
-) {
-    suspend fun prepareWorkSession(
+@javax.inject.Singleton
+internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject constructor(
+    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val sessionStorage: LocalSessionStorageRuntime,
+    private val work: LocalWorkComposition,
+    private val wake: LocalForegroundTurnWakeCoordinator,
+) : LocalWorkAutomationExecutionPort {
+    private val sessionCoordinator get() = sessionStorage.coordinator
+    override suspend fun prepareSession(
         text: String,
-        preferredSessionId: String? = null,
+        preferredSessionId: String?,
     ): String {
         val prompt = text.trim()
         require(prompt.isNotEmpty()) { "后台任务提示词不能为空" }
@@ -71,35 +61,35 @@ internal class LocalAutomationWorkCoordinator(
         return resolveSession(preferredSessionId, prompt).id
     }
 
-    suspend fun runWork(
+    override suspend fun run(
         text: String,
-        preferredSessionId: String? = null,
-        timeoutMillis: Long = 5 * 60_000L,
-        recoverInterrupted: Boolean = false,
-    ): LocalAutomationRunResult {
+        preferredSessionId: String?,
+        timeoutMillis: Long,
+        recoverInterrupted: Boolean,
+    ): LocalWorkAutomationResult {
         val prompt = text.trim()
         require(prompt.isNotEmpty()) { "后台任务提示词不能为空" }
         awaitReady()
 
         val sessionId = resolveSession(preferredSessionId, prompt).id
-        val budget = LocalAutomationTimeoutBudget(timeoutMillis, 15 * 60_000L)
+        val budget = LocalWorkAutomationTimeoutBudget(timeoutMillis, 15 * 60_000L)
         val sessionLease = budget.acquireSession(sessionId, LocalSessionRuntimeKind.AUTOMATION_WORK)
         try {
         // Re-read after ownership so deletion cannot be undone by a stale preflight snapshot.
-        val session = requireAutomationWorkSession(sessionCoordinator.read(sessionId))
+        val session = requireWorkAutomationSession(sessionStorage.coordinator.read(sessionId))
         val boundState = boundState(session)
-        val boundEventLog = eventLogFor(sessionId)
+        val boundEventLog = sessionStorage.eventLogs.get(sessionId)
         val recovery = if (recoverInterrupted) {
-            prepareAutomationWorkRecovery(
+            prepareWorkAutomationRecovery(
                 prompt = prompt,
                 sessionId = sessionId,
                 eventLog = boundEventLog,
-                profiles = state.value.modelProfiles,
-                agentRunCoordinator = agentRunCoordinator,
+                profiles = runtimeStateStore.state.value.modelProfiles,
+                agentRunCoordinator = sessionStorage.agentRunCoordinator,
                 contextPolicy = LocalWorkRecoveryContextPolicy,
             )
         } else {
-            LocalAutomationWorkRecoveryPlan(prompt)
+            LocalWorkAutomationRecoveryPlan(prompt)
         }
         recovery.completedOutput?.let { output ->
             ensureRecoveredTranscript(
@@ -107,7 +97,7 @@ internal class LocalAutomationWorkCoordinator(
                 output = output,
                 eventLog = boundEventLog,
             )
-            return LocalAutomationRunResult(sessionId = sessionId, output = output)
+            return LocalWorkAutomationResult(sessionId = sessionId, output = output)
         }
         val executionTask = recovery.executionTask
         val recoveredProfile = recovery.profile
@@ -127,12 +117,13 @@ internal class LocalAutomationWorkCoordinator(
         }
 
         var blockedReason: String? = null
-        val runner = runnerFactory(
-            sessionId,
-            boundState,
-        ) { reason ->
-            if (blockedReason == null) blockedReason = reason
-        }
+        val runner = work.automationRunner(
+            sessionId = sessionId,
+            boundState = boundState,
+            onApprovalBlocked = { reason ->
+                if (blockedReason == null) blockedReason = reason
+            },
+        )
 
         return try {
             val result = withTimeout(budget.remainingMillis()) {
@@ -168,7 +159,7 @@ internal class LocalAutomationWorkCoordinator(
                 finalContent = output,
                 eventLog = boundEventLog,
             )
-            LocalAutomationRunResult(sessionId = sessionId, output = output)
+            LocalWorkAutomationResult(sessionId = sessionId, output = output)
         } catch (blocked: LocalHarnessBlockedException) {
             throw blocked
         } catch (timeout: TimeoutCancellationException) {
@@ -196,15 +187,19 @@ internal class LocalAutomationWorkCoordinator(
         }
         } finally {
             sessionLease.close()
-            onSessionReleased(sessionId)
+            if (runtimeStateStore.currentSessionId == sessionId &&
+                runtimeStateStore.state.value.sessionId == sessionId
+            ) {
+                wake.startNextIfIdle()?.start()
+            }
         }
     }
 
     private suspend fun awaitReady() {
         withTimeout(15_000L) {
-            while (state.value.loading) delay(50)
+            while (runtimeStateStore.state.value.loading) delay(50)
         }
-        require(state.value.modelState.configured) { "本机 Harness 尚未配置模型" }
+        require(runtimeStateStore.state.value.modelState.configured) { "本机 Harness 尚未配置模型" }
     }
 
     private fun resolveSession(
@@ -230,28 +225,33 @@ internal class LocalAutomationWorkCoordinator(
             lineageId = id,
             projectId = LOCAL_PROJECT_ID,
         )
-        sessionCoordinator.enqueue(session)
+        sessionStorage.coordinator.enqueue(session)
         return session
     }
 
     private fun boundState(session: LocalHarnessSession): LocalHarnessState {
-        val runtime = state.value
-        val recentTranscript = LocalSessionTranscriptPager(eventLogFor(session.id))
+        val runtime = runtimeStateStore.state.value
+        val recentTranscript = LocalSessionTranscriptPager(sessionStorage.eventLogs.get(session.id))
             .page(limit = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
             .messages
             .ifEmpty {
                 session.transcriptWindow
                     .ifEmpty { session.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES) }
             }
-        return runtime.copy(
+        return LocalWorkRunState(
+            modelState = runtime.modelState,
+            mainMaxSteps = runtime.mainMaxSteps,
+            subagentMaxSteps = runtime.subagentMaxSteps,
+            workspacePath = runtime.workspacePath,
             sessionId = session.id,
-            usageMode = LocalUsageMode.WORK,
-            chat = LocalChatState(),
             conversationMode = session.conversationMode,
             parentSessionId = session.parentSessionId,
             lineageId = session.lineageId.ifBlank { session.id },
             projectId = session.projectId ?: LOCAL_PROJECT_ID,
             handoffSummary = session.handoffSummary,
+            userRules = runtime.userRules,
+            autoRecall = runtime.autoRecall,
+            autoMemory = runtime.autoMemory,
             messages = recentTranscript,
             transcriptIndex = localTranscriptIndexForSession(session),
             work = LocalWorkState(
@@ -264,8 +264,9 @@ internal class LocalAutomationWorkCoordinator(
                 pendingQuestion = null,
             ),
             kernel = runtime.kernel.copy(running = false, queuedInputCount = 0),
+            safeAutoApprovalEnabled = runtime.safeAutoApprovalEnabled,
             error = null,
-        )
+        ).toAggregateSnapshot()
     }
 
     private fun hasMatchingUser(
@@ -317,12 +318,12 @@ internal class LocalAutomationWorkCoordinator(
                 put("transcript", encodeTranscriptMessages(listOf(finalMessage)))
             },
         )
-        val latest = sessionCoordinator.read(session.id) ?: session
+        val latest = sessionStorage.coordinator.read(session.id) ?: session
         val appendedTranscript = messages + finalMessage
         val latestWindow = latest.transcriptWindow.ifEmpty {
             latest.messages.takeLast(LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES)
         }
-        sessionCoordinator.enqueue(
+        sessionStorage.coordinator.enqueue(
             latest.copy(
                 title = latest.title.takeIf { it.isNotBlank() && it != "新会话" } ?: session.title,
                 updatedAt = System.currentTimeMillis(),
@@ -337,4 +338,29 @@ internal class LocalAutomationWorkCoordinator(
             ),
         )
     }
+
+    private class LocalWorkAutomationTimeoutBudget(
+        timeoutMillis: Long,
+        maxMillis: Long,
+    ) {
+        private val deadlineNanos =
+            System.nanoTime() + timeoutMillis.coerceIn(5_000L, maxMillis) * 1_000_000L
+
+        fun remainingMillis(): Long =
+            ((deadlineNanos - System.nanoTime()) / 1_000_000L).coerceAtLeast(1L)
+
+        suspend fun acquireSession(
+            sessionId: String,
+            kind: LocalSessionRuntimeKind,
+        ): LocalSessionRuntimeLease = withTimeout(remainingMillis()) {
+            LocalSessionRuntimeRegistry.acquire(sessionId, kind)
+        }
+    }
+
+    private fun requireWorkAutomationSession(session: LocalHarnessSession?): LocalHarnessSession {
+        val current = session ?: error("后台任务会话已不存在")
+        require(current.usageMode == LocalUsageMode.WORK) { "后台任务会话已不在工作模式" }
+        return current
+    }
+
 }

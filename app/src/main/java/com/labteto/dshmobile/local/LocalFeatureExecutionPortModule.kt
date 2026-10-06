@@ -1,8 +1,8 @@
 package com.labteto.dshmobile.local
 
-import com.labteto.dshmobile.local.automation.LocalAutomationChatCoordinator
 import com.labteto.dshmobile.local.automation.LocalAutomationChatUserActivityAdapter
-import com.labteto.dshmobile.local.automation.LocalAutomationWorkCoordinator
+import com.labteto.dshmobile.local.chat.LocalChatAutomationExecutionCoordinator
+import com.labteto.dshmobile.local.chat.LocalChatAutomationExecutionPort
 import com.labteto.dshmobile.local.chat.LocalChatExecutionCoordinator
 import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
 import com.labteto.dshmobile.local.chat.LocalChatTurnPort
@@ -15,6 +15,8 @@ import com.labteto.dshmobile.local.session.LocalActiveSessionScopeProvider
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
 import com.labteto.dshmobile.local.session.LocalSessionLifecyclePort
 import com.labteto.dshmobile.local.tools.LocalToolsManagementPort
+import com.labteto.dshmobile.local.work.LocalWorkAutomationExecutionCoordinator
+import com.labteto.dshmobile.local.work.LocalWorkAutomationExecutionPort
 import com.labteto.dshmobile.local.work.LocalWorkExecutionCoordinator
 import com.labteto.dshmobile.local.work.LocalWorkExecutionPort
 import com.labteto.dshmobile.local.work.LocalWorkComposition
@@ -44,15 +46,15 @@ internal object LocalFeatureExecutionPortModule {
 
     @Provides
     @Singleton
-    fun provideLocalAutomationChatCoordinator(
-        engine: LocalHarnessEngine,
-    ): LocalAutomationChatCoordinator = engine.automationChatCoordinator
+    fun provideLocalChatAutomationExecutionPort(
+        coordinator: LocalChatAutomationExecutionCoordinator,
+    ): LocalChatAutomationExecutionPort = coordinator
 
     @Provides
     @Singleton
-    fun provideLocalAutomationWorkCoordinator(
-        engine: LocalHarnessEngine,
-    ): LocalAutomationWorkCoordinator = engine.automationWorkCoordinator
+    fun provideLocalWorkAutomationExecutionPort(
+        coordinator: LocalWorkAutomationExecutionCoordinator,
+    ): LocalWorkAutomationExecutionPort = coordinator
 
     @Provides
     @Singleton

@@ -1,4 +1,4 @@
-package com.labteto.dshmobile.local.automation
+package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.decodeTranscriptMessages
