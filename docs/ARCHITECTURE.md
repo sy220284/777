@@ -295,7 +295,7 @@ Kernel 明确不应该理解：
 - MCP 设置页面；
 - 具体 UI 页面。
 
-当前 `LocalHarnessEngine` 仍承担一部分 Feature 业务和共享能力编排，因此它是迁移中的旧中心，不是架构 3.0 的最终形态。
+当前 `LocalHarnessEngine` 仍承担迁移期产品装配、横向适配与部分旧代理职责；阶段 1～4 的 Feature 业务所有权已基本迁出，但 Engine 尚未收缩为最终 Kernel，因此它仍是待退场的迁移中心。
 
 ## 8. 状态模型
 
@@ -443,33 +443,47 @@ Feature Runtime → LocalHarnessEngine 纯转发继续增长
 
 队列续跑采用锁内持久提交，写盘失败保留原输入和顺序；Work 启动失败或空队列会释放预取 Session 租约。群公告采用维护租约内先提交 Chat domain event、再发布投影、最后物化快照；快照失败不得撤销已提交事实。运行中批准计划通过单个 `plan/approved` 事件同时提交计划和退出规划模式。
 
-第三阶段仍不能以本地迁移或门禁通过替代完整验收。面向后台目标会话、超时／恢复参数和结构化终态的完整 Execution Port 仍待阶段四依赖收口，执行计划的相关出口保持未勾选；Automation 两个 Engine coordinator bridge 继续单独登记，UI contribution 和 Engine 最终退出分别属于阶段五、六。
+阶段三代码出口已经闭环：Chat / Work Execution Port 均具备显式目标 Session、timeout / recovery、结构化终态以及按 Session cancel / cancelAndJoin；阶段三 Engine composition bridge 已清零并由门禁锁定。阶段三仍需以 PR 最新 Head 的完整 CI / 设备 lane / merge-gate 完成最终验收，UI contribution 和 Engine 最终退出分别属于阶段五、六。
 
 阶段 3 的完成状态只以 PR 最新 Head 的 `architecture-3-gates` 与完整 CI 为准；旧 Head 的成功、失败或取消结果都不能替代当前 Head 验收。实时 Head 与 Actions 编号属于 PR/CI 运行信息，不写入架构权威文档。
 
 ### 阶段 4：建立 AutomationFeature
 
-状态：**待完成。**
+状态：**代码闭环，最新 Head 完整验收待闭环。**
 
-- Automation 只通过 `ChatExecutionPort` / `WorkExecutionPort` / Session Capability 工作；
-- 不进入 Chat / Work internal Coordinator；
+- Automation Runtime → `LocalHarnessEngine` 已清零；
+- `LocalChatAutomationExecutionPort` / `LocalWorkAutomationExecutionPort` 通过 Adapter 进入完整 `ChatExecutionPort` / `WorkExecutionPort`；
+- Automation 不再进入 Chat / Work internal Coordinator、Store、runner 或 writable state；
+- 执行结果统一为 delivered / skipped / blocked / cancelled / failed 结构化终态；
+- `ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST` 与 Automation internal migration allowlist 均已清零，并由架构门禁阻止回归；
 - Session owner、scheduleGeneration、run ownership 与迟到提交栅栏继续属于共享运行边界。
 
 ### 阶段 5：FeatureCatalog + UI Contribution
 
-状态：**部分基础已提前落地，待按本阶段完成验收。**
+状态：**部分完成，当前主线。**
 
-- 不可变 `LocalFeatureCatalog` 与唯一 route owner 继续保留；
-- 页面渲染、Back ownership、Drawer 入口、Settings/Diagnostics contribution 迁入 Feature；
-- 删除中央 `LocalFeaturePageContent` 巨大分发。
+已完成：
+
+- 不可变 `LocalFeatureCatalog` 与唯一 route owner 已建立；
+- `LocalFeatureNavigation` 已通过 Catalog 解析路由；
+- Shell 已统一使用 Feature route。
+
+尚未完成：
+
+- `LocalFeaturePageContent` 仍保留中央 `when(page)` 页面分发；
+- Chat / Work / Automation / Tools / Settings 页面内容尚未分别下沉为 Feature contribution；
+- Back ownership、Drawer 入口、页面恢复、Settings / Diagnostics contribution 仍由中央层持有或尚未拆出；
+- 本阶段完成时删除中央产品页面分发，只保留 Shell 导航宿主。
 
 ### 阶段 6：收缩为 LocalRuntimeKernel
 
-状态：**待完成。**
+状态：**未完成。**
 
-- `LocalHarnessEngine` 的 Feature 业务规则、Feature API 与迁移期代理全部退出；
-- Kernel 只保留 Session/run ownership、跨域事务、取消传播、资源租约、run identity、recovery 与生命周期协调；
-- Engine 迁移桥与外部直接消费者使用精确白名单持续收缩；已迁业务根使用永久禁止回归集合，最终删除 Engine 并由 `LocalRuntimeKernel` 接管真正 Kernel 职责；
+- `LocalHarnessEngine.kt` 当前仍存在，仍承担迁移期产品装配、横向适配和旧代理职责；
+- 当前仓库尚无最终 `LocalRuntimeKernel` 实现；
+- 阶段 5 UI contribution 完成后，继续迁出 Engine 剩余构造装配、coordinator factory、callback、getter、helper 与迁移适配；
+- Kernel 最终只保留 Session/run ownership、跨域事务、取消传播、资源租约、run identity、recovery 与生命周期协调；
+- Engine 外部直接消费者与迁移桥持续收缩，最终删除 `LocalHarnessEngine` 并由 `LocalRuntimeKernel` 接管真正 Kernel 职责；
 - Kernel 不得理解 Persona / Gallery / Todo / GitHub Token / UI 页面。
 
 ## 13. 迁移约束
