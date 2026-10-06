@@ -1161,7 +1161,7 @@ for required_direct_chat_turn_owner in (
     "modelRequests.complete(",
     "replyCoordinator.finalizeDirect(",
     "postTurn.schedule(",
-    "startNextQueuedTurnIfIdle()?.start()",
+    "queue.finishTurnAndStartNext(currentCoroutineContext()[Job])",
 ):
     if required_direct_chat_turn_owner not in chat_direct_turn_source:
         die("Direct Chat main turn ownership is incomplete: " + required_direct_chat_turn_owner)
