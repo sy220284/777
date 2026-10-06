@@ -26,11 +26,12 @@ internal class LocalForegroundTurnWakeCoordinator @Inject constructor(
     private val workRuns: LocalWorkRunRegistry,
 ) {
     internal fun startNextIfIdle(): Job? {
+        val handle = runtimeStateStore.foregroundRunHandle
+        if (handle.recoveryBlockedReason != null || handle.cancellationRequested) return null
         val snapshot = runtimeStateStore.state.value
         if (snapshot.usageMode == LocalUsageMode.CHAT) {
             return chat.queue.startNextIfIdle()
         }
-        val handle = runtimeStateStore.foregroundRunHandle
         return synchronized(handle.lock) {
             val sessionId = runtimeStateStore.currentSessionId
             if (

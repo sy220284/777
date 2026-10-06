@@ -27,6 +27,12 @@ internal class LocalAgentRunHandle(
         private set
 
     @Volatile
+    var cancellationRequested: Boolean = false
+
+    @Volatile
+    var recoveryBlockedReason: String? = null
+
+    @Volatile
     var job: Job? = null
 
     /** Optional projection/observer Job owned by the same run lifecycle. */
@@ -49,6 +55,8 @@ internal class LocalAgentRunHandle(
         require(nextSessionId.isNotBlank()) { "运行句柄会话编号不能为空" }
         synchronized(lock) {
             check(!hasLiveJob()) { "运行中的句柄不能切换会话" }
+            cancellationRequested = false
+            recoveryBlockedReason = null
             job = null
             projectionJob?.cancel()
             projectionJob = null

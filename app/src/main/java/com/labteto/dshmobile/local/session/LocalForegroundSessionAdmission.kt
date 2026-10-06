@@ -10,13 +10,12 @@ import com.labteto.dshmobile.local.send.coordinateLocalSend
 /**
  * One synchronous send-admission snapshot.
  *
- * Chat already owns a visible activeJob slot. Work does not, so its first turn must reserve the
- * session mutex before transcript/history mutation; otherwise Automation can slip between admission
- * and LocalWorkRunBinding creation.
+ * Every fresh foreground turn reserves the session mutex before domain preparation and durable
+ * input mutation. A visible Job alone cannot exclude Automation or maintenance ownership.
  */
 internal data class LocalForegroundSendOwnership(
     val activeRun: Boolean,
-    val reservedWorkLease: LocalSessionRuntimeLease? = null,
+    val reservedLease: LocalSessionRuntimeLease? = null,
     val inputBlocked: Boolean = false,
 )
 
@@ -29,12 +28,11 @@ internal fun reserveForegroundSendOwnership(
 ): LocalForegroundSendOwnership {
     val localRunActive =
         workBindingActive ||
-            (usageMode != LocalUsageMode.WORK && visibleJobActive)
+            visibleJobActive
     val admission = LocalSessionRuntimeRegistry.inputAdmission(sessionId)
     val runtimeOwnerActive = admission.ownerActive
 
     if (
-        usageMode != LocalUsageMode.WORK ||
         workBindingActive ||
         localRunActive ||
         runtimeOwnerActive ||
@@ -52,7 +50,7 @@ internal fun reserveForegroundSendOwnership(
     )
     return LocalForegroundSendOwnership(
         activeRun = lease == null,
-        reservedWorkLease = lease,
+        reservedLease = lease,
         inputBlocked = lease == null && LocalSessionRuntimeRegistry.inputAdmission(sessionId).inputBlocked,
     )
 }
@@ -94,11 +92,11 @@ internal fun coordinateOwnedLocalSend(
             enqueue = enqueue,
             onQueued = onQueued,
             onStart = {
-                onStart(ownership.reservedWorkLease)
+                onStart(ownership.reservedLease)
                 leaseHandedOff = true
             },
         )
     } finally {
-        if (!leaseHandedOff) ownership.reservedWorkLease?.close()
+        if (!leaseHandedOff) ownership.reservedLease?.close()
     }
 }

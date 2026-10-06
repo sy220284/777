@@ -55,18 +55,28 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
 
     internal suspend fun drainPendingInputs(binding: LocalWorkRunBinding) {
         val pending = binding.runHandle.pendingInputs
-        val queued = pending.drain()
+        val queued = pending.drainCommitted { inputs ->
+            binding.eventLog.append(
+                LOCAL_AGENT_INBOX_EVENT_TYPE,
+                encodeLocalAgentInboxEvent(
+                    action = "claimed",
+                    pending = emptyList(),
+                    affected = inputs,
+                    modelMessages = inputs.map { input -> input.modelMessage ?: buildJsonObject {
+                        put("role", "user")
+                        put("content", input.content)
+                    } },
+                ),
+            )
+        }
         if (queued.isEmpty()) return
 
         val history = binding.runHandle.modelHistory
-        val durableMessages = mutableListOf<JsonObject>()
         queued.forEach { input ->
-            val durableMessage = input.modelMessage ?: buildJsonObject {
+            history.append(input.modelMessage ?: buildJsonObject {
                 put("role", "user")
                 put("content", input.content)
-            }
-            history.append(durableMessage)
-            durableMessages += durableMessage
+            })
             workMemory.captureAutoMemoryDirective(
                 text = input.memoryInput,
                 sourceMessageId = input.id,
@@ -78,15 +88,6 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
                 kernel = current.kernel.copy(queuedInputCount = pending.size()),
             )
         }
-        binding.eventLog.append(
-            LOCAL_AGENT_INBOX_EVENT_TYPE,
-            encodeLocalAgentInboxEvent(
-                action = "claimed",
-                pending = pending.snapshot(),
-                affected = queued,
-                modelMessages = durableMessages,
-            ),
-        )
         updateContextMetrics(binding)
         persist(binding)
     }

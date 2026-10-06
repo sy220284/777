@@ -18,6 +18,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.toLocalHarnessResourceState
 import com.labteto.dshmobile.local.send.LocalPreparedSend
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
+import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.coordinateOwnedLocalSend
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -96,6 +97,9 @@ class LocalWorkRunRegistry internal constructor(
             val snapshot = runtimeStateStore.state.value
             if (snapshot.usageMode != LocalUsageMode.WORK) return@synchronized null
             val binding = live(snapshot.sessionId) ?: return@synchronized null
+            if (binding.runHandle.cancellationRequested) {
+                return@synchronized LocalSendResult.rejected(LocalSendRejectReason.SESSION_TRANSITION)
+            }
             val pending = binding.runHandle.pendingInputs
             val queuedInput = QueuedAgentInput(
                 prepared.content,
@@ -174,68 +178,98 @@ class LocalWorkRunRegistry internal constructor(
     ): Job? = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
         if (binding.runHandle.job !== completedJob) return@synchronized null
 
-        checkpointModelHistory(binding, "work/background-turn-end")
-        persistBinding(binding)
-
-        val next = binding.runHandle.pendingInputs.pollCommitted { input, remaining ->
-            val message = input.modelMessage ?: buildJsonObject {
-                put("role", "user")
-                put("content", input.content)
+        var successor: Job? = null
+        try {
+            try {
+                checkpointModelHistory(binding, "work/background-turn-end")
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                reportPersistenceFailure(binding, "Work 回合检查点保存失败", error)
+                return@synchronized null
             }
-            binding.eventLog.append(
-                LOCAL_AGENT_INBOX_EVENT_TYPE,
-                encodeLocalAgentInboxEvent(
-                    action = "resumed",
-                    pending = remaining,
-                    affected = listOf(input),
-                    modelMessages = listOf(message),
-                ),
-            )
-        }
-        if (next == null) {
-            binding.runHandle.job = null
-            detach(binding)
-            binding.runHandle.projectionJob?.cancel()
-            binding.runHandle.projectionJob = null
-            if (
-                runtimeStateStore.currentSessionId == binding.sessionId &&
-                runtimeStateStore.state.value.sessionId == binding.sessionId
-            ) {
-                runtimeStateStore.foregroundRunHandle.modelHistory.reset(
-                    binding.runHandle.modelHistory.snapshot(),
+            persistDerivedBinding(binding)
+            if (binding.runHandle.cancellationRequested) return@synchronized null
+
+            val next = binding.runHandle.pendingInputs.pollCommitted { input, remaining ->
+                val message = input.modelMessage ?: buildJsonObject {
+                    put("role", "user")
+                    put("content", input.content)
+                }
+                binding.eventLog.append(
+                    LOCAL_AGENT_INBOX_EVENT_TYPE,
+                    encodeLocalAgentInboxEvent(
+                        action = "resumed",
+                        pending = remaining,
+                        affected = listOf(input),
+                        modelMessages = listOf(message),
+                    ),
                 )
-                runtimeStateStore.foregroundRunHandle.transcriptProjectionCursor =
-                    binding.runHandle.transcriptProjectionCursor
-                mirrorVisible(binding)
             }
-            return@synchronized null
-        }
+            if (next == null) return@synchronized null
 
-        val durableMessage = next.modelMessage ?: buildJsonObject {
-            put("role", "user")
-            put("content", next.content)
+            val durableMessage = next.modelMessage ?: buildJsonObject {
+                put("role", "user")
+                put("content", next.content)
+            }
+            binding.state.update { current ->
+                current.copy(
+                    kernel = current.kernel.copy(
+                        queuedInputCount = binding.runHandle.pendingInputs.size(),
+                    ),
+                )
+            }
+            binding.runHandle.modelHistory.append(durableMessage)
+            refreshBindingContextMetrics(binding)
+            persistDerivedBinding(binding)
+            successor = startNext(next, binding)
+            binding.runHandle.job = successor
+            successor
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            reportPersistenceFailure(binding, "Work 续轮失败，已有输入保留在会话日志", error)
+            null
+        } finally {
+            if (successor == null) releaseFinishedBinding(binding)
         }
-        binding.state.update { current ->
-            current.copy(
-                kernel = current.kernel.copy(
-                    queuedInputCount = binding.runHandle.pendingInputs.size(),
-                ),
-            )
+    }
+
+    /** Also covers cancellation before a lazy turn starts and failures during turn setup. */
+    internal fun releaseCompletedTurn(binding: LocalWorkRunBinding, completedJob: Job) {
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            if (binding.runHandle.job === completedJob) releaseFinishedBinding(binding)
         }
-        binding.runHandle.modelHistory.append(durableMessage)
-        refreshBindingContextMetrics(binding)
-        // The durable inbox event already admitted this turn; a cache failure cannot undo it.
+    }
+
+    private fun persistDerivedBinding(binding: LocalWorkRunBinding) {
         try {
             persistBinding(binding)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
         } catch (error: Exception) {
-            binding.state.update { current ->
-                current.copy(error = "Work 续轮已提交，快照保存失败：${error.message}")
-            }
+            if (error is CancellationException) throw error
+            reportPersistenceFailure(binding, "Work 已提交，快照保存失败", error)
         }
-        startNext(next, binding).also { nextJob ->
-            binding.runHandle.job = nextJob
+    }
+
+    private fun reportPersistenceFailure(binding: LocalWorkRunBinding, message: String, error: Throwable) {
+        binding.state.update { current -> current.copy(error = "$message：${error.message}") }
+        mirrorVisible(binding)
+    }
+
+    private fun releaseFinishedBinding(binding: LocalWorkRunBinding) {
+        binding.runHandle.job = null
+        detach(binding)
+        binding.runHandle.projectionJob?.cancel()
+        binding.runHandle.projectionJob = null
+        binding.state.update { current -> current.copy(kernel = current.kernel.copy(running = false)) }
+        if (
+            runtimeStateStore.currentSessionId == binding.sessionId &&
+            runtimeStateStore.state.value.sessionId == binding.sessionId
+        ) {
+            val foreground = runtimeStateStore.foregroundRunHandle
+            foreground.modelHistory.reset(binding.runHandle.modelHistory.snapshot())
+            foreground.transcriptProjectionCursor = binding.runHandle.transcriptProjectionCursor
+            foreground.cancellationRequested = binding.runHandle.cancellationRequested
+            binding.runHandle.pendingInputs.transferTo(foreground.pendingInputs)
+            mirrorVisible(binding)
         }
     }
 

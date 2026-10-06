@@ -190,24 +190,36 @@ internal class LocalWorkTurnStarter(
             ),
             eventLog = sessionStorage.eventLogs.get(sessionId),
         )
-        workRunRegistry.attach(binding)
-        binding.runHandle.projectionJob = scope.launch {
-            binding.state.collect {
-                workRunRegistry.mirrorVisible(binding)
+        // The recovered foreground inbox becomes this Work run's single executable inbox.
+        runHandle.pendingInputs.transferTo(binding.runHandle.pendingInputs)
+        try {
+            workRunRegistry.attach(binding)
+            binding.runHandle.projectionJob = scope.launch {
+                binding.state.collect {
+                    workRunRegistry.mirrorVisible(binding)
+                }
             }
+            val job = scope.launch(start = CoroutineStart.LAZY) {
+                runTurn(
+                    content,
+                    memoryInput,
+                    sourceMessageId,
+                    binding,
+                    sessionLease,
+                )
+            }
+            job.invokeOnCompletion {
+                try { workRunRegistry.releaseCompletedTurn(binding, job) }
+                finally { sessionLease.close() }
+            }
+            binding.runHandle.job = job
+            return job
+        } catch (error: Throwable) {
+            binding.runHandle.projectionJob?.cancel()
+            workRunRegistry.detach(binding)
+            binding.runHandle.pendingInputs.transferTo(runHandle.pendingInputs)
+            throw error
         }
-        val job = scope.launch(start = CoroutineStart.LAZY) {
-            runTurn(
-                content,
-                memoryInput,
-                sourceMessageId,
-                binding,
-                sessionLease,
-            )
-        }
-        job.invokeOnCompletion { sessionLease.close() }
-        binding.runHandle.job = job
-        return job
     }
 
     private fun requireWorkSession(): String {

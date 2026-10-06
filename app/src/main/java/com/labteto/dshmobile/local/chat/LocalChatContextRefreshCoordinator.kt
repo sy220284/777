@@ -19,7 +19,11 @@ import com.labteto.dshmobile.local.session.decodeTranscriptMessages
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -458,106 +462,120 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
             pendingTurns = pending,
         )
         val deterministicState = plan.state.withoutLegacyConversationContext()
+        val lease = LocalSessionRuntimeRegistry.tryAcquire(expectedSessionId, LocalSessionRuntimeKind.MAINTENANCE)
+        if (lease == null) {
+            scheduleRetry(persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "session-busy")
+            return
+        }
         var nextContext = baseContext
-        var applied = false
-        chatState.update { current ->
-            applied = false
+        var domainCommitted = false
+        try {
+            currentCoroutineContext().ensureActive()
+            val current = chatState.value
             val currentContext = current.chat.chatContext
-            if (
-                current.sessionId != expectedSessionId ||
+            if (current.sessionId != expectedSessionId ||
                 currentContext.generation != expectedGeneration ||
                 current.chat.chatState != expectedBaseState ||
                 currentContext.processedThroughSequence != baseContext.processedThroughSequence
             ) {
-                current
-            } else {
-                applied = true
-                nextContext = currentContext.commitProcessed(
-                    scene = currentContext.scene,
-                    continuity = groundedContinuity,
-                    throughSequence = throughSequence,
-                )
-                current.copy(
-                    chat = current.chat.copy(
-                        // The legacy mirror keeps old gallery/session data readable. Generation uses
-                        // conversation-scoped chatContext as the canonical continuity state.
-                        chatState = deterministicState,
-                        chatContext = nextContext,
-                        chatBranches = if (current.transcriptIndex.branchingEligible) {
-                            updateChatBranchNodeSnapshot(
-                                state = current.chat.chatBranches,
-                                messageId = pending.last().assistantMessageId,
-                                chatState = deterministicState,
-                                replySuggestions = current.chat.replySuggestions,
-                                chatContext = nextContext,
-                            )
-                        } else {
-                            current.chat.chatBranches
-                        },
-                    ),
-                )
+                boundEventLog.append("chat/post-turn", buildJsonObject {
+                    put("status", "stale-discarded")
+                    put("through_sequence", throughSequence)
+                    put("pending_preserved", true)
+                })
+                scheduleRetry(persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "stale-discarded")
+                return
             }
-        }
-        if (!applied) {
-            boundEventLog.append("chat/post-turn", buildJsonObject {
-                put("status", "stale-discarded")
-                put("through_sequence", throughSequence)
-                put("pending_preserved", true)
-            })
-            scheduleRetry(
-                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "stale-discarded",
+            nextContext = currentContext.commitProcessed(currentContext.scene, groundedContinuity, throughSequence)
+            val target = current.copy(chat = current.chat.copy(
+                chatState = deterministicState,
+                chatContext = nextContext,
+                chatBranches = if (current.transcriptIndex.branchingEligible) {
+                    updateChatBranchNodeSnapshot(current.chat.chatBranches, pending.last().assistantMessageId,
+                        deterministicState, current.chat.replySuggestions, nextContext)
+                } else current.chat.chatBranches,
+            ))
+            val diary = if (before.autoMemory) chatRelationshipSubjectKey(before.chat.galleryId, before.chat.personaId)?.let {
+                ChatDiaryWriteRequest(
+                    subjectKey = it, personaName = persona.name, delta = plan.diaryDelta,
+                    turnSignificance = plan.turnSignificance, sourceMode = ChatDiarySourceMode.DIRECT,
+                    sourceSessionId = expectedSessionId,
+                    sourceUserMessageIds = pending.map(ChatPendingTurn::userMessageId),
+                    sourceAssistantMessageIds = pending.map(ChatPendingTurn::assistantMessageId),
+                    evidenceText = pending.joinToString("\n") { turn ->
+                        listOf(turn.userMessage, turn.assistantMessage).filter(String::isNotBlank).joinToString(" ")
+                    },
+                    generation = expectedGeneration,
+                )
+            } else null
+            // The full domain state and projection recipe are durable before publishing the cursor.
+            appendChatPostTurnCommit(boundEventLog, target, diary)
+            domainCommitted = true
+            var applied = false
+            chatState.update { latest ->
+                applied = false
+                if (latest.sessionId != expectedSessionId ||
+                    latest.chat.chatContext.generation != expectedGeneration ||
+                    latest.chat.chatState != expectedBaseState ||
+                    latest.chat.chatContext.processedThroughSequence != baseContext.processedThroughSequence
+                ) latest else {
+                    applied = true
+                    nextContext = latest.chat.chatContext.commitProcessed(
+                        latest.chat.chatContext.scene, groundedContinuity, throughSequence,
+                    )
+                    latest.copy(chat = latest.chat.copy(
+                        chatState = deterministicState, chatContext = nextContext,
+                        chatBranches = if (latest.transcriptIndex.branchingEligible) {
+                            updateChatBranchNodeSnapshot(latest.chat.chatBranches, pending.last().assistantMessageId,
+                                deterministicState, latest.chat.replySuggestions, nextContext)
+                        } else latest.chat.chatBranches,
+                    ))
+                }
+            }
+            if (!applied) {
+                boundEventLog.append("chat/post-turn", buildJsonObject {
+                    put("status", "stale-discarded")
+                    put("domain_committed", true)
+                })
+                return
+            }
+            try {
+                currentCoroutineContext().ensureActive()
+                val context = currentCoroutineContext()
+                recoverChatPostTurnProjections(boundEventLog, diaryStore) { context.ensureActive() }
+                boundEventLog.append("chat/post-turn", buildJsonObject {
+                    put("status", "updated")
+                    put("processed_through_sequence", throughSequence)
+                    put("remaining_pending", nextContext.pendingTurns.size)
+                })
+                if (hasChatBranchAlternatives(readState().chat.chatBranches)) {
+                    persistBranchState(expectedSessionId, "chat/post-turn-updated")
+                }
+                persistSnapshot(expectedSessionId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                chatState.update { latest ->
+                    if (latest.sessionId == expectedSessionId) latest.copy(
+                        error = "人物状态已保存，后处理投影待恢复：${error.message}",
+                    ) else latest
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            chatState.update { latest ->
+                if (latest.sessionId == expectedSessionId) latest.copy(
+                    error = "人物状态提交失败，保留待处理输入：${error.message}",
+                ) else latest
+            }
+            if (!domainCommitted) scheduleRetry(
+                persona, expectedSessionId, expectedGeneration, boundEventLog, profile, retryAttempt, "commit-failed",
             )
             return
+        } finally {
+            lease.close()
         }
-
-        if (before.autoMemory) chatRelationshipSubjectKey(before.chat.galleryId, before.chat.personaId)?.let { subjectKey ->
-            runCatching {
-                diaryStore.record(
-                    ChatDiaryWriteRequest(
-                        subjectKey = subjectKey,
-                        personaName = persona.name,
-                        delta = plan.diaryDelta,
-                        turnSignificance = plan.turnSignificance,
-                        sourceMode = ChatDiarySourceMode.DIRECT,
-                        sourceSessionId = expectedSessionId,
-                        sourceUserMessageIds = pending.map(ChatPendingTurn::userMessageId),
-                        sourceAssistantMessageIds = pending.map(ChatPendingTurn::assistantMessageId),
-                        evidenceText = pending.joinToString("\n") { turn ->
-                            listOf(turn.userMessage, turn.assistantMessage)
-                                .filter(String::isNotBlank)
-                                .joinToString(" ")
-                        },
-                        generation = expectedGeneration,
-                    ),
-                )
-            }.onSuccess { diary ->
-                if (diary != null) {
-                    boundEventLog.append("chat/diary", buildJsonObject {
-                        put("status", "recorded")
-                        put("diary_id", diary.id)
-                        put("importance", diary.importance)
-                        put("source_mode", diary.sourceMode.name.lowercase())
-                    })
-                }
-            }.onFailure { error ->
-                boundEventLog.append("chat/diary", buildJsonObject {
-                    put("status", "failed")
-                    put("detail", error.message.orEmpty().take(800))
-                })
-            }
-        }
-
-        boundEventLog.append("chat/post-turn", buildJsonObject {
-            put("status", "updated")
-            put("mood", deterministicState.mood)
-            put("relationship_state", deterministicState.relationshipState)
-            put("processed_through_sequence", throughSequence)
-            put("remaining_pending", nextContext.pendingTurns.size)
-        })
-        if (hasChatBranchAlternatives(readState().chat.chatBranches)) {
-            persistBranchState(expectedSessionId, "chat/post-turn-updated")
-        }
-        persistSnapshot(expectedSessionId)
         if (nextContext.pendingTurns.any { pending ->
                 pending.sequence > nextContext.processedThroughSequence &&
                     pending.generation == expectedGeneration

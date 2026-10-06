@@ -42,6 +42,25 @@ class AgentInputQueue(
         }
     }
 
+    /** Batch consumption commits atomically; a failed authority write keeps the original queue. */
+    fun drainCommitted(commit: (List<QueuedAgentInput>) -> Unit): List<QueuedAgentInput> =
+        synchronized(lock) {
+            val drained = items.toList()
+            if (drained.isEmpty()) return@synchronized emptyList()
+            commit(drained)
+            items.clear()
+            drained
+        }
+
+    /** Move the existing inbox to a newly created, unpublished run owner. */
+    fun transferTo(target: AgentInputQueue) {
+        require(target !== this) { "输入队列不能移交给自身" }
+        drainCommitted { pending ->
+            check(target.size() == 0) { "输入队列只能移交给空的运行句柄" }
+            target.restore(pending)
+        }
+    }
+
     fun poll(): QueuedAgentInput? = synchronized(lock) {
         if (items.isEmpty()) null else items.removeFirst()
     }

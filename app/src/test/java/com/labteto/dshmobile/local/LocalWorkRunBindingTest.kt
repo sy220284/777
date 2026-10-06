@@ -194,7 +194,8 @@ class LocalWorkRunBindingTest {
                     if (join) binding.cancelAndJoin() else binding.requestCancel()
                 }.isFailure)
                 assertTrue(job.isCancelled)
-                assertEquals(0, binding.state.value.kernel.queuedInputCount)
+                assertEquals(1, binding.state.value.kernel.queuedInputCount)
+                assertEquals(1, binding.runHandle.pendingInputs.size())
                 assertFalse(binding.state.value.work.deviceApprovalLease)
                 if (join) {
                     assertTrue(mirror.isCancelled)

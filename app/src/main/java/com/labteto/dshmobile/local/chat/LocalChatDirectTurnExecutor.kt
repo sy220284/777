@@ -103,27 +103,31 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
         replacingMessageId: String? = null,
     ) {
         val admittedSessionId = runtimeStateStore.currentSessionId
-        LocalSessionRuntimeRegistry.withOwner(
-            admittedSessionId,
-            LocalSessionRuntimeKind.FOREGROUND,
-        ) { ownedSessionId ->
-            if (runtimeStateStore.currentSessionId != ownedSessionId) {
-                throw CancellationException("会话已切换")
-            }
-            LocalExecutionService.withTurn(
-                context = context,
-                sessionId = ownedSessionId,
-                error = { runtimeStateStore.state.value.error },
+        try {
+            LocalSessionRuntimeRegistry.withOwner(
+                admittedSessionId, LocalSessionRuntimeKind.FOREGROUND,
             ) {
-                runOwned(
-                    sessionId = ownedSessionId,
-                    input = input,
-                    memoryInput = memoryInput,
-                    sourceMessageId = sourceMessageId,
-                    replacingMessageId = replacingMessageId,
-                )
+                runUnderSessionOwner(admittedSessionId, input, memoryInput, sourceMessageId, replacingMessageId)
             }
+        } finally {
+            queue.finishTurnAndStartNext(currentCoroutineContext()[Job])
         }
+    }
+
+    /** Called only by a foreground owner; preparation and execution share the same Session lease. */
+    internal suspend fun runUnderSessionOwner(
+        sessionId: String,
+        input: String,
+        memoryInput: String = input,
+        sourceMessageId: String? = null,
+        replacingMessageId: String? = null,
+    ) {
+        if (runtimeStateStore.currentSessionId != sessionId) throw CancellationException("会话已切换")
+        LocalExecutionService.withTurn(
+            context = context,
+            sessionId = sessionId,
+            error = { runtimeStateStore.state.value.error },
+        ) { runOwned(sessionId, input, memoryInput, sourceMessageId, replacingMessageId) }
     }
 
     private suspend fun runOwned(
@@ -471,7 +475,6 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
             )
             sessionStorage.enqueueCurrentSnapshot(sessionId)
 
-            queue.finishTurnAndStartNext(currentCoroutineContext()[Job])
         }
     }
 }

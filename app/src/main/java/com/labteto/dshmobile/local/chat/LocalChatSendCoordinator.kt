@@ -50,7 +50,7 @@ internal class LocalChatSendCoordinator @Inject constructor(
 
         val result = synchronized(handle.lock) {
             val snapshot = runtimeStateStore.state.value
-            if (snapshot.usageMode != LocalUsageMode.CHAT) {
+            if ((handle.cancellationRequested && handle.hasLiveJob()) || snapshot.usageMode != LocalUsageMode.CHAT) {
                 return@synchronized reject(
                     snapshot.sessionId,
                     LocalSendResult.rejected(LocalSendRejectReason.SESSION_TRANSITION),
@@ -97,7 +97,8 @@ internal class LocalChatSendCoordinator @Inject constructor(
                         "Chat 排队保存时前台会话已切换"
                     }
                 },
-                onStart = {
+                onStart = { reservedLease ->
+                    runtimeStateStore.prepareForegroundRestart(sessionStorage.eventLogs.get(sessionId))
                     val sourceMessageId = recordUserTranscript(prepared)
                     appendUserHistory(sessionId, prepared.modelMessage)
                     check(sessionStorage.enqueueCurrentSnapshot(sessionId)) {
@@ -107,6 +108,7 @@ internal class LocalChatSendCoordinator @Inject constructor(
                         content = prepared.content,
                         memoryInput = prepared.memoryInput,
                         sourceMessageId = sourceMessageId,
+                        sessionLease = requireNotNull(reservedLease),
                     ).also { handle.job = it }
                 },
             )

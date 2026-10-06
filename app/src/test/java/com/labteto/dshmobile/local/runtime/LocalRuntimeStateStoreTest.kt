@@ -88,7 +88,7 @@ class LocalRuntimeStateStoreTest {
     }
 
     @Test
-    fun failedInboxCancellationWriteStillCancelsJobAndClearsVisibleQueue() {
+    fun failedInboxCancellationWriteStopsJobAndPreservesUncommittedInbox() {
         val store = LocalRuntimeStateStore()
         store.initialize(LocalHarnessState(
             sessionId = "session-a",
@@ -105,8 +105,9 @@ class LocalRuntimeStateStoreTest {
             assertTrue(runCatching { store.cancelForegroundRun(log) }.isFailure)
             assertTrue(job.isCancelled)
             assertTrue(store.state.value.kernel.running)
-            assertEquals(0, store.state.value.kernel.queuedInputCount)
-            assertEquals(0, store.foregroundRunHandle.pendingInputs.size())
+            assertEquals(1, store.state.value.kernel.queuedInputCount)
+            assertEquals(1, store.foregroundRunHandle.pendingInputs.size())
+            assertTrue(store.foregroundRunHandle.cancellationRequested)
         } finally {
             log.close()
         }

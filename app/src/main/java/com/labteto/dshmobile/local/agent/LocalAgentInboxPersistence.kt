@@ -28,6 +28,7 @@ internal fun encodeLocalAgentInboxEvent(
     put("pending", JsonArray(pending.map(::encodeQueuedAgentInput)))
     if (affected.isNotEmpty()) {
         put("queue_ids", JsonArray(affected.map { JsonPrimitive(it.id) }))
+        put("affected", JsonArray(affected.map(::encodeQueuedAgentInput)))
     }
     if (modelMessages.isNotEmpty()) {
         put("model_messages", JsonArray(modelMessages))

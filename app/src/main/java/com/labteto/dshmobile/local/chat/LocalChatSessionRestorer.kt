@@ -64,6 +64,9 @@ internal class LocalChatSessionRestorer @Inject constructor(
         )
     }
 
+    internal fun repairPostTurnProjections(log: LocalSessionEventLog) =
+        recoverChatPostTurnProjections(log, persistence.diaryStore)
+
     internal fun restoreGalleryProjection(chat: LocalChatState) {
         projectGroupGalleryState(chat.groupChat, persistence.galleryStore).failures.forEach { failure ->
             AppLog.warn(

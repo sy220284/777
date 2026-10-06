@@ -8,6 +8,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
@@ -16,17 +21,14 @@ import kotlinx.coroutines.launch
 internal class LocalChatTurnStarter @Inject constructor(
     private val dispatcher: LocalChatTurnDispatcher,
     private val chatState: LocalChatStatePort,
+    private val runtimeStateStore: LocalRuntimeStateStore,
+    private val queue: LocalChatQueueRuntime,
 ) : LocalChatTurnPort {
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO +
             CoroutineExceptionHandler { _, throwable ->
                 AppLog.error("LocalChatTurnStarter", "chat turn failure", throwable)
-                chatState.update { current ->
-                    current.copy(
-                        error = throwable.message?.takeIf(String::isNotBlank)
-                            ?: "聊天回合失败：${throwable::class.java.simpleName}",
-                    )
-                }
+
             },
     )
 
@@ -34,7 +36,30 @@ internal class LocalChatTurnStarter @Inject constructor(
         content: String,
         memoryInput: String,
         sourceMessageId: String,
-    ): Job = scope.launch(start = CoroutineStart.LAZY) {
-        dispatcher.run(content, memoryInput, sourceMessageId)
+        sessionLease: LocalSessionRuntimeLease?,
+    ): Job {
+        val sessionId = runtimeStateStore.currentSessionId
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            try {
+                LocalSessionRuntimeRegistry.withOwner(
+                    sessionId, LocalSessionRuntimeKind.FOREGROUND, sessionLease,
+                ) {
+                    dispatcher.run(sessionId, content, memoryInput, sourceMessageId)
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                chatState.update { current ->
+                    if (current.sessionId == sessionId) current.copy(
+                        error = error.message ?: "聊天回合失败",
+                    ) else current
+                }
+                throw error
+            } finally {
+                // The next turn can reserve ownership only after this turn's lease is released.
+                queue.finishTurnAndStartNext(currentCoroutineContext()[Job])
+            }
+        }
+        job.invokeOnCompletion { sessionLease?.close() }
+        return job
     }
 }

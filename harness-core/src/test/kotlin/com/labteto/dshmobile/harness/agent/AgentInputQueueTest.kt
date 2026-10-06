@@ -106,6 +106,37 @@ class AgentInputQueueTest {
         assertEquals(listOf("q2"), queue.snapshot().map { it.id })
     }
 
+    @Test
+    fun batchCommitFailureKeepsEveryInputAndOrder() {
+        val queue = AgentInputQueue(4)
+        queue.offer(QueuedAgentInput("one", id = "1"))
+        queue.offer(QueuedAgentInput("two", id = "2"))
+        assertTrue(runCatching {
+            queue.drainCommitted { batch ->
+                assertEquals(listOf("1", "2"), batch.map { it.id })
+                throw java.io.IOException("disk full")
+            }
+        }.isFailure)
+        assertEquals(listOf("1", "2"), queue.snapshot().map { it.id })
+        queue.drainCommitted { }
+        assertEquals(0, queue.size())
+    }
+
+    @Test
+    fun transferPreservesRemainingInputsAndRejectsInsufficientCapacity() {
+        val source = AgentInputQueue(4)
+        source.restore(listOf(QueuedAgentInput("one", id = "1"), QueuedAgentInput("two", id = "2")))
+        val small = AgentInputQueue(1)
+        assertTrue(runCatching { source.transferTo(small) }.isFailure)
+        assertEquals(listOf("1", "2"), source.snapshot().map { it.id })
+        assertEquals(0, small.size())
+        val target = AgentInputQueue(4)
+        source.pollCommitted { _, _ -> }
+        source.transferTo(target)
+        assertEquals(0, source.size())
+        assertEquals(listOf("2"), target.snapshot().map { it.id })
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun restoreRejectsDuplicateDurableIds() {
         AgentInputQueue(capacity = 4).restore(

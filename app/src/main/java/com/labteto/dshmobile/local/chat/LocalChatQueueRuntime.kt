@@ -10,6 +10,8 @@ import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
 import kotlinx.coroutines.Job
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -47,44 +49,53 @@ internal class LocalChatQueueRuntime @Inject constructor(
         if (
             state.usageMode != LocalUsageMode.CHAT ||
             runtimeStateStore.sessionTransitioning ||
-            handle.hasLiveJob()
+            handle.hasLiveJob() || state.loading || !state.modelState.configured ||
+            handle.cancellationRequested || handle.recoveryBlockedReason != null
         ) return null
 
-        val queued = handle.pendingInputs.pollCommitted { input, remaining ->
-            val message = input.modelMessage ?: buildJsonObject {
+        val lease = LocalSessionRuntimeRegistry.tryAcquire(state.sessionId, LocalSessionRuntimeKind.FOREGROUND)
+            ?: return null
+        var handedOff = false
+        try {
+            val queued = handle.pendingInputs.pollCommitted { input, remaining ->
+                val message = input.modelMessage ?: buildJsonObject {
+                    put("role", "user")
+                    put("content", input.content)
+                }
+                sessionStorage.eventLogs.get(state.sessionId).append(
+                    LOCAL_AGENT_INBOX_EVENT_TYPE,
+                    encodeLocalAgentInboxEvent(
+                        action = "resumed",
+                        pending = remaining,
+                        affected = listOf(input),
+                        modelMessages = listOf(message),
+                    ),
+                )
+            } ?: return null
+            val durableMessage = queued.modelMessage ?: buildJsonObject {
                 put("role", "user")
-                put("content", input.content)
+                put("content", queued.content)
             }
-            sessionStorage.eventLogs.get(state.sessionId).append(
-                LOCAL_AGENT_INBOX_EVENT_TYPE,
-                encodeLocalAgentInboxEvent(
-                    action = "resumed",
-                    pending = remaining,
-                    affected = listOf(input),
-                    modelMessages = listOf(message),
-                ),
+            modelHistory.history.append(durableMessage)
+            modelHistory.refreshMetrics(state.sessionId)
+            runtimeStateStore.projection.setForegroundQueuedInputCount(
+                state.sessionId,
+                handle.pendingInputs.size(),
             )
-        } ?: return null
-        val durableMessage = queued.modelMessage ?: buildJsonObject {
-            put("role", "user")
-            put("content", queued.content)
-        }
-        modelHistory.history.append(durableMessage)
-        modelHistory.refreshMetrics(state.sessionId)
-        runtimeStateStore.projection.setForegroundQueuedInputCount(
-            state.sessionId,
-            handle.pendingInputs.size(),
-        )
-        runtimeStateStore.performVisibleOperation("Chat 排队续跑快照保存失败") {
-            check(sessionStorage.enqueueCurrentSnapshot(state.sessionId)) {
-                "Chat 排队续跑前台会话已切换"
+            runtimeStateStore.performVisibleOperation("Chat 排队续跑快照保存失败") {
+                check(sessionStorage.enqueueCurrentSnapshot(state.sessionId)) {
+                    "Chat 排队续跑前台会话已切换"
+                }
             }
-        }
 
-        return starter.get().start(
-            content = queued.content,
-            memoryInput = queued.memoryInput,
-            sourceMessageId = queued.id,
-        ).also { handle.job = it }
+            return starter.get().start(
+                content = queued.content,
+                memoryInput = queued.memoryInput,
+                sourceMessageId = queued.id,
+                sessionLease = lease,
+            ).also { handle.job = it; handedOff = true }
+        } finally {
+            if (!handedOff) lease.close()
+        }
     }
 }

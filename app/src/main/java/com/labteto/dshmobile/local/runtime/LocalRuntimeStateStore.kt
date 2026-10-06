@@ -223,6 +223,21 @@ class LocalRuntimeStateStore internal constructor(
         }
     }
 
+    /** Explicit fresh input may retry a failed cancellation commit; never resurrect stopped input. */
+    internal fun prepareForegroundRestart(eventLog: LocalSessionEventLog) {
+        synchronized(foregroundRunHandle.lock) {
+            if (foregroundRunHandle.cancellationRequested) {
+                foregroundRunHandle.pendingInputs.drainCommitted { discarded ->
+                    eventLog.append(LOCAL_AGENT_INBOX_EVENT_TYPE, encodeLocalAgentInboxEvent(
+                        action = "cancelled", pending = emptyList(), affected = discarded,
+                    ))
+                }
+            }
+            foregroundRunHandle.cancellationRequested = false
+            foregroundRunHandle.recoveryBlockedReason = null
+        }
+    }
+
     private fun requestForegroundCancellation(
         eventLog: LocalSessionEventLog,
         captureOwner: (Job?) -> Unit,
@@ -233,21 +248,23 @@ class LocalRuntimeStateStore internal constructor(
             synchronized(foregroundRunHandle.lock) {
                 running = foregroundRunHandle.job
                 captureOwner(running)
-                val discarded = foregroundRunHandle.pendingInputs.drain()
+                foregroundRunHandle.cancellationRequested = true
                 try {
-                    if (discarded.isNotEmpty()) {
+                    foregroundRunHandle.pendingInputs.drainCommitted { discarded ->
                         eventLog.append(
                             LOCAL_AGENT_INBOX_EVENT_TYPE,
                             encodeLocalAgentInboxEvent(
                                 action = "cancelled",
-                                pending = foregroundRunHandle.pendingInputs.snapshot(),
+                                pending = emptyList(),
                                 affected = discarded,
                             ),
                         )
                     }
                 } finally {
                     mutable.update { current ->
-                        current.copy(kernel = current.kernel.copy(queuedInputCount = 0))
+                        current.copy(kernel = current.kernel.copy(
+                            queuedInputCount = foregroundRunHandle.pendingInputs.size(),
+                        ))
                     }
                 }
             }

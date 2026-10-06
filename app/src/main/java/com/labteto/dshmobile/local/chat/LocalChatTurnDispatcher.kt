@@ -23,12 +23,14 @@ internal class LocalChatTurnDispatcher @Inject constructor(
     private val directExecutor: LocalChatDirectTurnExecutor,
 ) {
     internal suspend fun run(
+        expectedSessionId: String,
         input: String,
         memoryInput: String = input,
         sourceMessageId: String? = null,
     ) {
         val snapshot = runtimeStateStore.state.value
-        check(snapshot.usageMode == LocalUsageMode.CHAT) {
+        check(snapshot.sessionId == expectedSessionId &&
+            runtimeStateStore.currentSessionId == expectedSessionId && snapshot.usageMode == LocalUsageMode.CHAT) {
             "Chat 回合入口只能处理 Chat 模式"
         }
 
@@ -48,7 +50,8 @@ internal class LocalChatTurnDispatcher @Inject constructor(
 
         personaCorrections.captureDirect(memoryInput)
         relationshipHydrator.hydrate()
-        directExecutor.run(
+        directExecutor.runUnderSessionOwner(
+            sessionId = expectedSessionId,
             input = input,
             memoryInput = memoryInput,
             sourceMessageId = sourceMessageId,

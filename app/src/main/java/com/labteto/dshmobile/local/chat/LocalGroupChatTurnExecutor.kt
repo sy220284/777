@@ -71,7 +71,6 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
     private val chatTurnCoordinator: LocalChatTurnCoordinator,
     private val usageTracker: DeepSeekUsageTracker,
     private val json: Json,
-    private val queue: LocalChatQueueRuntime,
 ) {
     private val sessionId: String
         get() = runtimeStateStore.currentSessionId
@@ -929,7 +928,6 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 }
             }
             persist()
-            queue.finishTurnAndStartNext(currentCoroutineContext()[Job])
         }
     }
     private suspend fun modelRequestMarkerOrNull(snapshot: LocalHarnessState): String? =

@@ -211,14 +211,14 @@ internal class LocalWorkRunBinding(
 
     private fun clearPendingForCancellation() {
         interactions.cancelAll()
-        val discarded = runHandle.pendingInputs.drain()
+        runHandle.cancellationRequested = true
         try {
-            if (discarded.isNotEmpty()) {
+            runHandle.pendingInputs.drainCommitted { discarded ->
                 eventLog.append(
                     LOCAL_AGENT_INBOX_EVENT_TYPE,
                     encodeLocalAgentInboxEvent(
                         action = "cancelled",
-                        pending = runHandle.pendingInputs.snapshot(),
+                        pending = emptyList(),
                         affected = discarded,
                     ),
                 )
@@ -231,7 +231,7 @@ internal class LocalWorkRunBinding(
                         pendingQuestion = null,
                         deviceApprovalLease = false,
                     ),
-                    kernel = current.kernel.copy(queuedInputCount = 0),
+                    kernel = current.kernel.copy(queuedInputCount = runHandle.pendingInputs.size()),
                 )
             }
         }

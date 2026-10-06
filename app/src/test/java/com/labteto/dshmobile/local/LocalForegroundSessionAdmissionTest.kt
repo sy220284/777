@@ -16,6 +16,20 @@ import org.junit.Test
 
 class LocalForegroundSessionAdmissionTest {
     @Test
+    fun idleChatSendReservesSessionBeforeMutation() {
+        val sessionId = "chat-" + UUID.randomUUID()
+        val ownership = reserveForegroundSendOwnership(
+            LocalUsageMode.CHAT, sessionId, false, false, false,
+        )
+        try {
+            assertNotNull(ownership.reservedLease)
+            assertTrue(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
+            assertNull(LocalSessionRuntimeRegistry.tryAcquire(sessionId, LocalSessionRuntimeKind.MAINTENANCE))
+        } finally { ownership.reservedLease?.close() }
+        assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
+    }
+
+    @Test
     fun idleWorkSendReservesSessionBeforeMutation() {
         val sessionId = "work-" + UUID.randomUUID()
         val ownership = reserveForegroundSendOwnership(
@@ -27,10 +41,10 @@ class LocalForegroundSessionAdmissionTest {
         )
 
         assertFalse(ownership.activeRun)
-        assertNotNull(ownership.reservedWorkLease)
+        assertNotNull(ownership.reservedLease)
         assertTrue(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
 
-        ownership.reservedWorkLease!!.close()
+        ownership.reservedLease!!.close()
         assertFalse(LocalSessionRuntimeRegistry.hasLiveOwner(sessionId))
     }
 
@@ -50,7 +64,7 @@ class LocalForegroundSessionAdmissionTest {
                 sessionTransitioning = false,
             )
             assertTrue(ownership.activeRun)
-            assertNull(ownership.reservedWorkLease)
+            assertNull(ownership.reservedLease)
         } finally {
             automation.close()
         }

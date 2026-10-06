@@ -141,9 +141,13 @@ internal class LocalForegroundSessionLoader @Inject constructor(
         )
         modelHistory.reset(restoredHistory.messages)
         buildRecoveredToolResultMessages(modelHistory.snapshot(), repaired).forEach(modelHistory::append)
-        val restoredInbox = log.latest(LOCAL_AGENT_INBOX_EVENT_TYPE)
-            ?.let { decodeLocalAgentInboxPending(it.data) }
-            .orEmpty()
+        val inboxEvent = log.latest(LOCAL_AGENT_INBOX_EVENT_TYPE)
+        val runCheckpoint = log.latest(com.labteto.dshmobile.local.runtime.LOCAL_AGENT_RUN_CHECKPOINT_EVENT)
+        val cancelledAfterInbox = runCheckpoint?.data?.get("status")?.jsonPrimitive?.contentOrNull == "cancelled" &&
+            (runCheckpoint.sequence > (inboxEvent?.sequence ?: -1L))
+        val restoredInbox = if (cancelledAfterInbox) emptyList() else inboxEvent
+            ?.let { decodeLocalAgentInboxPending(it.data) }.orEmpty()
+        runtimeStateStore.foregroundRunHandle.cancellationRequested = false
         pendingInputs.restore(restoredInbox)
 
         val modelProfiles = modelConfiguration.readProfiles()
@@ -159,6 +163,8 @@ internal class LocalForegroundSessionLoader @Inject constructor(
             pendingInputs,
             log,
         )
+        runtimeStateStore.foregroundRunHandle.recoveryBlockedReason =
+            recoveryState.error.takeUnless { recoveryState.autoResumeAllowed }
         val profile = contextComposer.userProfile()
         val restoredChat = chatRestore.restore(
             usageMode = stored.usageMode,
@@ -244,6 +250,7 @@ internal class LocalForegroundSessionLoader @Inject constructor(
         runtimeStateStore.projection.update { restoredState }
 
         LocalSessionRuntimeRegistry.submitWhenIdle(sessionId) {
+            chatRestore.repairPostTurnProjections(log)
             var wroteHistoryCheckpoint = false
             val state = runtimeStateStore.state.value
             if (state.chat.groupChat.enabled) {

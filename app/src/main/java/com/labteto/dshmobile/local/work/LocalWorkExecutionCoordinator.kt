@@ -61,7 +61,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
             workRunRegistry.enqueueIntoLiveRun(prepared)?.let { return@synchronized it }
 
             val snapshot = runtimeStateStore.state.value
-            if (snapshot.usageMode != LocalUsageMode.WORK) {
+            if ((runtimeStateStore.foregroundRunHandle.cancellationRequested && runtimeStateStore.foregroundRunHandle.hasLiveJob()) || snapshot.usageMode != LocalUsageMode.WORK) {
                 return@synchronized reject(
                     snapshot.sessionId,
                     LocalSendResult.rejected(LocalSendRejectReason.SESSION_TRANSITION),
@@ -126,6 +126,9 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                     }
                 },
                 onStart = { reservedLease ->
+                    if (runtimeStateStore.foregroundRunHandle.cancellationRequested) {
+                        runtimeStateStore.prepareForegroundRestart(eventLogFor(sessionId))
+                    }
                     started = startPreparedTurn(
                         prepared,
                         requireNotNull(reservedLease) {

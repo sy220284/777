@@ -380,6 +380,66 @@ class LocalWorkRunRegistryTest {
         replacement.eventLog.close()
     }
 
+    @Test
+    fun snapshotFailureCannotKeepFinishedBindingOrProjectionAlive() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(sessionId = "session-a", usageMode = LocalUsageMode.WORK))
+        val registry = LocalWorkRunRegistry(runtime, persistBinding = { throw java.io.IOException("snapshot full") })
+        val active = binding("session-a")
+        val completed = Job()
+        val observer = Job()
+        active.runHandle.job = completed
+        active.runHandle.projectionJob = observer
+        registry.attach(active)
+        try {
+            assertNull(registry.finishTurn(active, completed) { _, _ -> error("no queued input") })
+            assertNull(registry["session-a"])
+            assertNull(active.runHandle.job)
+            assertNull(active.runHandle.projectionJob)
+            assertTrue(observer.isCancelled)
+            assertFalse(active.state.value.kernel.running)
+            assertTrue(runtime.state.value.error.orEmpty().contains("snapshot full"))
+        } finally { completed.cancel(); active.eventLog.close() }
+    }
+
+    @Test
+    fun cancellationNeverStartsRemainderAndReturnsItToForegroundOwner() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(sessionId = "session-a", usageMode = LocalUsageMode.WORK))
+        val registry = LocalWorkRunRegistry(runtime)
+        val active = binding("session-a")
+        val completed = Job()
+        active.runHandle.job = completed
+        active.runHandle.cancellationRequested = true
+        active.runHandle.pendingInputs.offer(QueuedAgentInput("uncommitted cancellation", id = "held"))
+        registry.attach(active)
+        try {
+            assertNull(registry.finishTurn(active, completed) { _, _ -> error("cancelled must not start") })
+            assertNull(registry["session-a"])
+            assertEquals(listOf("held"), runtime.foregroundRunHandle.pendingInputs.snapshot().map { it.id })
+            assertTrue(runtime.foregroundRunHandle.cancellationRequested)
+        } finally { completed.cancel(); active.eventLog.close() }
+    }
+
+    @Test
+    fun setupFailureCleanupReleasesOnlyTheCompletedJobOwner() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(sessionId = "session-a", usageMode = LocalUsageMode.WORK))
+        val registry = LocalWorkRunRegistry(runtime)
+        val active = binding("session-a")
+        val completed = Job()
+        active.runHandle.job = completed
+        active.runHandle.projectionJob = Job()
+        registry.attach(active)
+        try {
+            registry.releaseCompletedTurn(active, Job().also { it.cancel() })
+            assertSame(active, registry["session-a"])
+            registry.releaseCompletedTurn(active, completed)
+            assertNull(registry["session-a"])
+            assertNull(active.runHandle.projectionJob)
+        } finally { completed.cancel(); active.eventLog.close() }
+    }
+
     private fun binding(sessionId: String): LocalWorkRunBinding =
         LocalWorkRunBinding(
             sessionId = sessionId,
