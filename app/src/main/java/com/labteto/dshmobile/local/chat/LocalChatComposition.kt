@@ -14,4 +14,5 @@ import javax.inject.Singleton
 internal class LocalChatComposition @Inject constructor(
     internal val turnCoordinator: LocalChatTurnCoordinator,
     internal val queue: LocalChatQueueRuntime,
+    internal val memory: LocalChatMemoryRuntime,
 )
