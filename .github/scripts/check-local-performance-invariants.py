@@ -105,6 +105,26 @@ for relative in (
 
 foreground_sources = merge_sources(chat_sources, work_sources, root_execution_sources)
 recovery_sources = merge_sources(work_sources, session_sources, runtime_sources, root_execution_sources)
+
+# Compatibility migrations may legitimately decode legacy Chat state. Only active execution
+# surfaces are forbidden from re-reading legacy context during a live turn.
+active_chat_context_sources = {
+    path: source
+    for path, source in merge_sources(chat_sources, root_execution_sources).items()
+    if path.endswith((
+        "LocalChatDirectTurnExecutor.kt",
+        "LocalChatContextRefreshCoordinator.kt",
+        "LocalGroupChatTurnExecutor.kt",
+        "LocalChatTurnCoordinator.kt",
+        "LocalChatReplyCoordinator.kt",
+    ))
+}
+active_chat_context_sources.update({
+    path: source
+    for path, source in automation_sources.items()
+    if path.endswith("LocalAutomationChatCoordinator.kt")
+})
+
 hot_sources = merge_sources(
     foreground_sources,
     session_sources,
@@ -254,11 +274,12 @@ for forbidden_fallback in (
             "foreground execution reintroduced a separate vision-model fallback: " + ", ".join(hits)
         )
 
-# Legacy chat-context fallback is only a persistence/read-boundary concern.
-for path, source in merge_sources(chat_sources, work_sources, automation_sources).items():
+# Legacy chat-context fallback is allowed only in compatibility/persistence transforms, never
+# in an active turn or proactive execution path.
+for path, source in active_chat_context_sources.items():
     if "withLegacyFallback" in source:
         violations.append(
-            f"{path} uses legacy Chat context fallback inside active Feature execution"
+            f"{path} uses legacy Chat context fallback inside active execution"
         )
 
 # The migration Engine may exist, but it must not bypass extracted capability owners.
