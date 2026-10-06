@@ -148,13 +148,12 @@ internal class LocalChatExecutionCoordinator @Inject constructor(
             requested = true
         }
         val snapshot = runtimeStateStore.state.value
-        if (
-            snapshot.sessionId == sessionId &&
-            snapshot.usageMode == LocalUsageMode.CHAT &&
-            runtimeStateStore.foregroundRunHandle.hasLiveJob()
-        ) {
-            runtimeStateStore.cancelForegroundRun(sessionStorage.eventLogs.get(sessionId))
-            requested = true
+        if (snapshot.sessionId == sessionId && snapshot.usageMode == LocalUsageMode.CHAT) {
+            requested = LocalChatPostTurnJobOwner.cancel() || requested
+            if (runtimeStateStore.foregroundRunHandle.hasLiveJob()) {
+                runtimeStateStore.cancelForegroundRun(sessionStorage.eventLogs.get(sessionId))
+                requested = true
+            }
         }
         return requested
     }
@@ -171,7 +170,7 @@ internal class LocalChatExecutionCoordinator @Inject constructor(
         }
         val snapshot = runtimeStateStore.state.value
         if (snapshot.sessionId == sessionId && snapshot.usageMode == LocalUsageMode.CHAT) {
-            LocalChatPostTurnJobOwner.cancel()
+            requested = LocalChatPostTurnJobOwner.cancelAndJoin() || requested
             if (runtimeStateStore.foregroundRunHandle.hasLiveJob()) {
                 runtimeStateStore.cancelForegroundRunAndJoin(sessionStorage.eventLogs.get(sessionId))
                 requested = true
