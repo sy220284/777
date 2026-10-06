@@ -8,6 +8,9 @@ import kotlinx.coroutines.launch
 
 internal fun canStartChatGptAccountSelection(isBusy: Boolean): Boolean = !isBusy
 
+internal fun shouldDeferBackgroundChatGptModelSync(selectFirst: Boolean, isBusy: Boolean): Boolean =
+    !selectFirst && isBusy
+
 /** Projects ChatGPT account mutations through the Model-owned state port without aggregate writes. */
 internal class LocalModelAccountStateCoordinator(
     private val configuration: LocalModelConfigurationCoordinator,
@@ -33,6 +36,7 @@ internal class LocalModelAccountStateCoordinator(
         selectFirst: Boolean,
     ) {
         if (!selectFirst && state.value.loading) state.awaitReady()
+        if (shouldDeferBackgroundChatGptModelSync(selectFirst, isBusy())) return
         val before = state.value
         val beforeActiveProfile = gateway.activeProfile()
         val profiles = configuration.saveChatGptModels(accountId, models)

@@ -1,20 +1,27 @@
 package com.labteto.dshmobile.local.presentation
 
+import com.labteto.dshmobile.local.model.LocalModelRuntime
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptAccountSummary
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator
-import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
+import com.labteto.dshmobile.local.model.chatgpt.ChatGptPlanConnectionTester
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
 import com.labteto.dshmobile.observability.AppLog
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
 
-/** Settings-facing ChatGPT account workflow; OAuth ownership remains in ChatGptAuthCoordinator. */
-internal class ChatGptSettingsController(
+internal suspend fun <T> finishChatGptAccountMutation(block: suspend () -> T): T =
+    withContext(NonCancellable) { block() }
+
+/** Presentation-facing ChatGPT account workflow; OAuth ownership remains in ChatGptAuthCoordinator. */
+@Singleton
+class ChatGptSettingsController @Inject constructor(
     private val auth: ChatGptAuthCoordinator,
-    private val requireAccountSelectionAllowed: () -> Unit,
-    private val syncModels: suspend (String, List<ChatGptModelOption>, Boolean) -> Unit,
-    private val retireProfiles: suspend (String) -> Unit,
-    private val removeProfiles: suspend (String) -> Unit,
-    private val testAccount: suspend (String) -> String,
+    private val modelRuntime: LocalModelRuntime,
+    private val planTester: ChatGptPlanConnectionTester,
 ) {
     val state: StateFlow<ChatGptUiState> = auth.state
 
@@ -30,13 +37,13 @@ internal class ChatGptSettingsController(
     }
 
     suspend fun connect(existingAccountId: String? = null, requestPlanConsent: Boolean = false) {
-        requireAccountSelectionAllowed()
+        modelRuntime.requireChatGptAccountSelectionAllowed()
         val account = auth.connect(existingAccountId, requestPlanConsent)
         reconcilePlanProfiles(selectFirstAccountId = account.id)
     }
 
     suspend fun restart(existingAccountId: String? = null) {
-        requireAccountSelectionAllowed()
+        modelRuntime.requireChatGptAccountSelectionAllowed()
         val account = auth.restartAuthorization(existingAccountId)
         reconcilePlanProfiles(selectFirstAccountId = account.id)
     }
@@ -45,7 +52,7 @@ internal class ChatGptSettingsController(
 
     /** Refresh auth state after the real probe so terminal credential failures surface immediately. */
     suspend fun test(id: String): String {
-        val result = testAccount(id)
+        val result = planTester.test(id)
         if (state.value.selectedAccountId == id) {
             auth.refresh()
             reconcilePlanProfiles()
@@ -54,39 +61,48 @@ internal class ChatGptSettingsController(
     }
 
     suspend fun select(id: String) {
-        requireAccountSelectionAllowed()
+        modelRuntime.requireChatGptAccountSelectionAllowed()
         auth.selectAccount(id)
         val snapshot = auth.state.value
-        if (!snapshot.connected) retireProfiles(id)
+        if (shouldRetireChatGptPlanProfiles(snapshot.selectedAccount)) {
+            modelRuntime.retireChatGptAccountProfiles(id)
+        }
         require(snapshot.connected) {
             snapshot.error ?: "ChatGPT 账户已登录，但套餐用量尚未启用"
         }
-        syncModels(id, snapshot.models, true)
+        modelRuntime.syncChatGptModels(id, snapshot.models, true)
     }
 
     suspend fun disconnect(id: String): String? {
-        removeProfiles(id)
-        val warning = auth.disconnect(id)
-        reconcilePlanProfiles()
-        return warning
+        modelRuntime.removeChatGptAccountProfiles(id)
+        return finishChatGptAccountMutation {
+            val warning = auth.disconnect(id)
+            reconcilePlanProfiles()
+            warning
+        }
     }
 
     suspend fun remove(id: String): String? {
-        removeProfiles(id)
-        val warning = auth.remove(id)
-        reconcilePlanProfiles()
-        return warning
+        modelRuntime.removeChatGptAccountProfiles(id)
+        return finishChatGptAccountMutation {
+            val warning = auth.remove(id)
+            reconcilePlanProfiles()
+            warning
+        }
     }
 
     private suspend fun reconcilePlanProfiles(selectFirstAccountId: String? = null) {
         val snapshot = auth.state.value
-        snapshot.accounts.filterNot { it.sharingEnabled }.forEach { account ->
-            retireProfiles(account.id)
+        snapshot.accounts.filter(::shouldRetireChatGptPlanProfiles).forEach { account ->
+            modelRuntime.retireChatGptAccountProfiles(account.id)
         }
         if (snapshot.connected) {
             snapshot.selectedAccountId?.let { accountId ->
-                syncModels(accountId, snapshot.models, accountId == selectFirstAccountId)
+                modelRuntime.syncChatGptModels(accountId, snapshot.models, accountId == selectFirstAccountId)
             }
         }
     }
 }
+
+internal fun shouldRetireChatGptPlanProfiles(account: ChatGptAccountSummary?): Boolean =
+    account == null || !account.signedIn || !account.sharingEnabled
