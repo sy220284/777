@@ -102,6 +102,15 @@
 → 用户最终看到什么
 ```
 
+系统地图至少产出四张可核对清单，禁止只画概念图：
+
+1. **入口表**：入口名称、触发条件、调用对象、前台/后台、手动/自动、是否可恢复；
+2. **所有权表**：能力 Owner、状态 Owner、配置 Owner、副作用提交者、持久化 Owner；
+3. **契约表**：公开 API / Port、DTO / Event / State、字段、Schema / version、消费者；
+4. **装配表**：DI / composition root、Feature / Page / Tool / Worker / Registry 注册、Manifest / 权限、导航与恢复入口。
+
+任一能力无法落到这四张表中的明确位置时，默认继续追查，不能直接判定边界完整。
+
 ### 3.2 横向与纵向同时检查
 
 横向比较：
@@ -158,7 +167,24 @@ Chat / Work / Automation / Subagent / Group Chat
 - 主路径更新、旁路仍停留在旧实现；
 - 每个模块单独正常，组合后出问题；
 - UI 显示成功但 durable state 未成功；
-- 部分成功留下半提交状态。
+- 部分成功留下半提交状态；
+- 磁盘满、权限失败、IO 中断后的内存状态是否错误宣告成功；
+- 并发 writer 是否会互相覆盖；
+- temp / backup / primary 的恢复优先级是否唯一且可解释；
+- 恢复完成后是否清理过期 running / pending / lease 状态；
+- migration 中途崩溃再次启动是否安全；
+- terminal state 与副作用提交顺序是否避免“副作用已发生但状态仍可重放”。
+
+横向比较不能只看“是否都调用了同一个类”，还必须逐项比较：
+
+- 正常成功状态转换；
+- 失败分类与错误传播；
+- 取消后的真实停止边界；
+- timeout 后资源释放；
+- retry 是否安全、是否仍为同一身份与路由；
+- 恢复后由谁继续拥有任务；
+- 配置变化对已启动 Run 与新 Run 的不同语义；
+- 最终持久状态与用户可见状态是否一致。
 
 ### 3.3 根因、公共短板与长期演化
 
@@ -212,6 +238,15 @@ Chat / Work / Automation / Subagent / Group Chat
 - 注释说后台继续，真实代码会取消；
 - 测试把不合理实现固化成“正确行为”。
 
+反向验证至少要给出四类证据中的适用项：
+
+- 产品声明 / UI 文案来源；
+- 真实入口与调用方；
+- 运行时状态或持久化事实；
+- 对应测试、门禁或设备行为。
+
+如果产品声明无法一路追到运行事实，必须标记为“声明存在、实现证据不足”，禁止凭代码名称推断已经支持。
+
 ### 3.5 功能成熟度判定
 
 每个功能都要判断成熟度，不能只分“有 / 无”：
@@ -237,6 +272,21 @@ Chat / Work / Automation / Subagent / Group Chat
 - 小规模好用、大规模退化；
 - 前台完整、后台不完整；
 - 当前会话完整、恢复后语义变化。
+
+成熟度判定不能只给比例，必须写清“缺的是哪一环”。至少区分：
+
+```text
+入口完整性
+业务链完整性
+异常完整性
+生命周期完整性
+持久化 / 恢复完整性
+规模化完整性
+设备 / 用户体验完整性
+验证证据完整性
+```
+
+任何一项缺失，都不得用“功能已完成”概括。
 
 ---
 
@@ -299,7 +349,13 @@ Chat / Work / Automation / Subagent / Group Chat
 - 多个平行 Manager / Registry；
 - 参数堆积掩盖职责混乱；
 - 只移动代码位置，没有移动所有权；
-- 新 Owner 接管后旧路径仍参与运行。
+- 新 Owner 接管后旧路径仍参与运行；
+- composition root / DI 同时装配新旧 Owner；
+- Feature / Page / Tool / Worker / Registry 有重复注册；
+- Shared 层开始解释 Feature 专属领域语义；
+- Feature 重新持有完整聚合可写状态；
+- Kernel / Shell / Settings 因“方便调用”重新吸收领域逻辑；
+- 已清零的 Engine / bridge / 直接消费者通过改名或新代理回归。
 
 #### 功能设计与实现度
 
@@ -352,6 +408,12 @@ UI 文案
 
 强制检查：
 
+0. **先做全量发现**
+   - 搜索能力定义、全部调用方、全部构造点和全部注册点；
+   - 搜索状态 / 配置的全部 writer、reader、collector、callback 和 serializer；
+   - 搜索同名或同语义的旧实现、兼容入口、fallback、测试替身和后台入口；
+   - 不能只从当前 UI 点击路径向下追一次就结束。
+
 1. **全入口一致性**
    - 页面操作、生命周期回调、后台任务、自动刷新、恢复、通知 / Deep Link、定时任务、快捷入口、外部事件是否进入同一权威业务边界；
    - 主路径走高层统一入口、旁路直接调用底层实现时，默认进入候选问题复核；
@@ -378,12 +440,18 @@ UI 文案
    - 禁止为了统一把无关配置全部塞进一个巨型全局配置对象；
    - 存在无依据差异、重复维护或多事实源时，按配置漂移 / 架构问题处理。
 
-5. **依赖与导入对账**
+5. **依赖、导入、声明与装配对账**
    - 同类入口是否通过同一公开 API / Port / Coordinator；
    - UI 是否直接导入领域 Store / Service / Repository / Gateway；
    - Feature 是否导入 sibling Feature internal；
    - 是否绕过统一 Registry / Policy / Gateway；
-   - 新实现接管后旧依赖是否仍参与运行。
+   - Gradle/module 依赖方向是否与架构一致；
+   - DI provider / binding / composition root 是否只装配一个权威实现；
+   - Feature catalog、页面 contribution、导航、Back / Drawer / restore 是否全部注册；
+   - Worker / Job / Tool / MCP / serializer / codec / registry 是否注册到真实生产入口；
+   - Manifest、权限、intent/filter、deep link、foreground service 等声明是否与代码入口一致；
+   - 新实现接管后旧依赖、旧注册、旧 provider、旧 worker、旧 serializer 是否完全退出；
+   - debug/test 注册不得误进入 production，production 注册也不得只在测试中存在。
 
 6. **关联功能协同**
    - 一个组件状态变化后，所有依赖该变化的组件是否收到通知并完成对应动作；
@@ -392,7 +460,18 @@ UI 文案
 
 7. **自动能力闭环**
    - 自动刷新、同步、恢复、迁移、清理、重试等能力必须从触发一直验证到最终业务状态；
-   - 定时器触发、网络请求成功、Worker 成功或 Store 写入均不能单独作为完成证据。
+   - 定时器触发、网络请求成功、Worker 成功或 Store 写入均不能单独作为完成证据；
+   - 自动入口失败后必须核对重试、退避、下次触发、错误可见性和是否留下半更新状态。
+
+8. **兼容与版本演进**
+   - 新旧 schema、无 schema、非法 version、未知字段、未知枚举 / 事件必须有明确策略；
+   - 历史数据升级、混合新旧字段、迁移重复执行、降级 / 回退边界必须验证；
+   - 新代码读取旧数据与旧数据经过新代码再次写回后均不能丢失仍受支持的信息。
+
+9. **验证证据**
+   - 每条链至少有一种能够证明真实行为的证据：单元 / conformance / instrumentation / 设备复验 / CI 门禁 / 持久化事实；
+   - 测试必须覆盖本次真正风险点，不能只覆盖相邻函数；
+   - 验证结果必须绑定当前 PR Head；Head、主线、依赖或门禁变化后旧结果失效。
 
 完成判定：
 
@@ -405,10 +484,12 @@ UI 文案
 + 独立配置差异有明确依据
 + 关联功能协同
 + 自动与手动路径语义一致
++ 注册 / DI / Manifest / Registry 装配完整
++ 兼容与版本演进路径完整
 + 生命周期完整
 + 异常路径完整
 + 最终用户结果正确
-+ 对应回归测试存在
++ 验证证据覆盖真实风险且属于当前 Head
 ```
 
 发现同一根因影响多个入口或功能时，归并为“链路闭环 / 契约一致性问题”，列出全部受影响链路。
@@ -451,7 +532,12 @@ UI 文案
 - 是否越权流转；
 - 是否进入不应进入的模型上下文；
 - 是否该删除却长期保留；
-- 是否冷数据持续侵入热路径。
+- 是否冷数据持续侵入热路径；
+- 多 Store 更新是否具备明确提交顺序、事务或补偿；
+- 同一事件是否可能被重复消费，幂等键 / 去重键是否稳定；
+- 删除、撤销、取消是否有 tombstone / generation / version 防止旧数据回潮；
+- 私有 / 可共享 / 公开等可见性是否在写入、持久化、召回、导出全链一致；
+- 数据保留、过期、归档、删除后的引用清理是否闭环。
 
 #### 字段与 Schema
 
@@ -464,7 +550,13 @@ UI 文案
 - schema / version；
 - 新旧字段迁移；
 - decode / encode / normalize / projection 是否一致；
-- 恢复后字段语义是否变化。
+- 恢复后字段语义是否变化；
+- encode → persist → decode 是否可 round-trip；
+- 未知字段是否按契约忽略 / 保留，而非意外覆盖；
+- 未知事件 / 内容类型是否保留 passthrough 或可诊断信息；
+- 无 schema / 旧 schema / 新 schema 混合时，已编辑新值是否会被旧字段覆盖；
+- 非法 version 是否明确拒绝，而非静默回退成旧格式；
+- migration 是否幂等，重复启动不能二次破坏数据。
 
 字段详细对账同时遵循 4.21。
 
@@ -524,6 +616,16 @@ UI 文案
 
 所有生命周期路径必须与手动路径做语义对账。
 
+还必须覆盖：
+
+- 页面离开 / 返回、导航栈重建；
+- 配置变化与 Activity 重建；
+- App 前后台切换；
+- 进程死亡后冷启动恢复；
+- Worker / Job 被系统停止后重调度；
+- 用户切换 Session / Account / Model 时旧任务是否失效；
+- 权限被撤销、网络恢复、存储重新可用后的状态收敛。
+
 #### 并发与异步
 
 重点检查：
@@ -549,13 +651,22 @@ UI 文案
 - 无界队列；
 - 新 Owner 接管后旧任务继续提交；
 - 前台与恢复逻辑同时拥有同一任务；
-- 执行期间读取可变全局配置改变已启动任务身份。
+- 执行期间读取可变全局配置改变已启动任务身份；
+- 同一身份离开后返回形成 ABA，旧结果误认为仍属于当前操作；
+- 同渠道后发先回，旧请求覆盖新请求；
+- 不同渠道本可并行却被全局锁串行；
+- duplicate trigger / 双击 / 重复 Worker 导致重复副作用；
+- timeout / cancellation 只停 UI，不停止真实网络、工具或后台任务；
+- retry 缺少幂等依据，对副作用未知状态盲目重放；
+- lease / generation / requestId / runId 未贯穿到最终提交点。
 
 ---
 
 ### 4.4 模型、凭据、工具与外部系统
 
-审查：
+#### 模型路由与运行身份
+
+逐项核对：
 
 - profileId；
 - provider；
@@ -565,6 +676,7 @@ UI 文案
 - protocol；
 - credentialRef；
 - route fingerprint；
+- capability snapshot；
 - context window；
 - tool schema；
 - prompt / history / memory；
@@ -572,18 +684,53 @@ UI 文案
 
 必须检查：
 
-- Run 是否冻结完整 route identity；
-- Credential 是否具备同一 Run 生命周期；
-- 恢复是否保持原路由；
-- 多账户是否串线；
-- 子代理 / Automation 是否继承正确身份；
-- Retry 是否保持同一路由；
-- 是否因失败偷偷切换供应商 / API Key；
-- Vision / Tool / MCP 是否重新进入统一 Gateway / Policy；
+- Run、子代理、Vision、Tool continuation 是否冻结同一完整 route identity；
+- 运行中切换 UI active profile 不得改变已启动 Run；
+- Retry 只在同一路由执行，不能因 429 / 5xx / 网络失败静默切供应商或 API Key；
+- capability snapshot 是否决定工具、图片、streaming、replay、temperature 等能力；
+- 已知不支持能力是否在网络请求前拒绝；
+- 成功回复、Token 和计费事实是否记录可区分但不泄密的实际 route identity；
+- 未知 / 第三方路由不能套用错误官方价格。
+
+#### 凭据、认证与账户状态
+
+检查：
+
+- API Key 与 ChatGPT 套餐 profile / credential 是否隔离；
+- OAuth callback 编码、state、nonce、PKCE、ID Token 验证是否完整；
+- access token refresh 是否 single-flight；
+- refresh token 轮换后是否原子替换；
+- “身份已登录”与“具备套餐推理 scope”是否分开建模；
+- scope 降级后是否先保存新 token / scope，再退休套餐 Profile；
+- 活动套餐失效时是否明确变为未配置，禁止静默回退到可能产生额外计费的 API Key。
+
+#### 协议、流式与兼容
+
+检查：
+
+- request / response / stream event / terminal event / error 的完整契约；
+- system / user / tool 输入是否满足各协议必填项；
+- tool call 与 tool result 是否稳定配对；
+- continuation 只用于明确 eligible 的 post-admission 失败，并有次数上限；
+- cancellation 是否传播到真实 HTTP / stream / tool 工作；
+- 未知 JSON 字段是否按契约宽松处理；
+- 未知事件 / 内容类型是否保留 passthrough 或诊断信息；
+- 缺失可选能力是否按 capability unavailable 处理；
+- 协议基线升级是否同步代码、fixture、锁定来源和一致性测试。
+
+#### Tool / MCP / 网络副作用
+
+检查：
+
+- Tool / MCP 是否经过统一 Registry、Approval、Resource 和 Security Policy；
+- 只读 / 计划作用域是否真的不能执行状态修改工具；
+- 网络工具是否按真实方法和参数判断副作用；
+- 外部进程、MCP stdio、LSP 的启动 / 停止 / 超时 / 取消是否闭环；
+- 文件和网络结果是否有大小上限，二进制响应是否走文件 / 下载能力；
+- 非安全 HTTP 方法是否禁止自动跟随重定向；
+- 大工具结果是否有界预览，不把无界正文直接塞入模型上下文；
 - 工具 Schema 是否侵占上下文；
-- 是否重复发送不必要历史；
-- Token 是否重复计算或漏归属；
-- 外部协议、终态、错误、取消、重试和 continuation 是否一次性对齐完整契约。
+- 是否重复发送不必要历史。
 
 ---
 
@@ -631,6 +778,26 @@ UI 文案
 
 > 不能只限制“最多返回多少结果”，还必须限制“为了得到这些结果最多做多少工作”。
 
+性能审计必须区分：
+
+- 冷启动 / 热路径；
+- 缓存命中 / 未命中；
+- 小数据 / 大数据；
+- 单任务 / 并发任务；
+- 前台 / 后台；
+- 真机 / JVM 测试。
+
+同时检查：
+
+- 峰值内存与对象复制；
+- GC / OOM 风险；
+- 磁盘读写次数和写放大；
+- 网络请求次数与重复拉取；
+- 解压 / 解析 / JSON 查询的输入上限；
+- 缓存容量、作用域、失效和淘汰；
+- 后台耗时、唤醒和电量影响；
+- 性能优化是否改变正确性或恢复语义。
+
 ---
 
 ### 4.6 用户体验与产品正确性
@@ -664,6 +831,22 @@ UI 文案
 - 技术实现正确时，用户体验是否仍然不合理。
 
 用户体验属于功能正确性，不作为“纯 UI 问题”降级处理。
+
+设备级至少检查适用项：
+
+- loading / empty / error / partial success / retry 状态；
+- 群聊部分失败、全部失败、单成员重试；
+- Worker / 后台任务更新是否实时投影；
+- 运行中心是否展示完整任务事实；
+- 输入法展开、输入框扩展、长消息时最后内容是否仍可见；
+- Back / Drawer / restore / 页面跳转 / 媒体或权限返回；
+- TalkBack 状态和可访问名称；
+- 130% 字号与系统大字；
+- 长时间线与大量列表项；
+- 明 / 夜 / 墨主题及高对比壁纸；
+- 权限拒绝、离线、网络恢复、账户失效后的可恢复入口。
+
+涉及这些体验的改动，静态截图或 JVM 单测不能替代真实设备复验。
 
 ---
 
@@ -773,6 +956,31 @@ UI 文案
 - 是否为诊断复制完整 Prompt；
 - 诊断本身是否拖慢系统。
 
+#### 验证与放行证据
+
+根据改动范围选择当前 `docs/VALIDATION.md` 规定的验证路径，不能自行降低。
+
+产品源码 / 资源 / Gradle / Runtime 等完整产品改动，至少核对适用的：
+
+- static-gates；
+- architecture-3-gates；
+- unit-tests / conformance；
+- arm64 构建 / lint / APK；
+- x86_64 device artifacts；
+- Android 16；
+- Android 17；
+- merge-gate。
+
+额外规则：
+
+- 官方 fixture / 上游锁定来源变化必须经过 fixture provenance / reference-validation；
+- 协议改动必须覆盖全部已注册协议的同一组语义契约；
+- UI / UX 风险必须做设备复验；
+- 只通过静态门禁不能推导单测、APK、设备或视觉体验通过；
+- 所有验证必须属于同一最新 Head；
+- Head、main、依赖、配置、fixture 或门禁变化后，旧验证结果作废；
+- 测试应验证状态、持久化、副作用次数、取消、恢复、身份隔离等真实不变量，不能只断言返回值。
+
 #### 安全性
 
 重点：
@@ -798,7 +1006,15 @@ UI 文案
 - 未脱敏日志；
 - 敏感数据进入模型；
 - Credential 生命周期错误；
-- 静态黑名单代替真实边界。
+- 静态黑名单代替真实边界；
+- API Key / OAuth token 未使用正确安全存储；
+- 完整凭据进入 Prompt、Session EventLog 或普通诊断；
+- OAuth 未验证 state / nonce / PKCE，或 callback 暴露到 LAN；
+- 文件路径未规范化，递归操作可经 symlink 越出工作区；
+- 只读子代理仍可调用有副作用工具；
+- MCP / LSP / Shell 外部进程绕过审批或取消边界；
+- 非安全 HTTP 方法自动跟随重定向；
+- 大型 / 二进制响应无界进入内存或模型上下文。
 
 ---
 
@@ -1078,6 +1294,14 @@ UI 文案
 **现有测试为什么可能发现不了**
 
 说明测试盲区。
+
+**验证证据 / 复现证据**
+
+写明用于确认问题存在的代码事实、运行事实、持久化事实、测试或设备证据；同时说明验证对应的 Head。
+
+**误报排除**
+
+写明已经核掉哪些看似相关但实际正常的路径，避免后续重复报告。
 
 **根治方向**
 
