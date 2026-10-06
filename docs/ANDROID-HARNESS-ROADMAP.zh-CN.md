@@ -96,22 +96,20 @@ audit metadata
 - 未知副作用的继续决策。
 - 终端 / MCP / LSP 生命周期诊断。
 
-## 5. Engine 继续收敛
+## 5. 架构边界继续治理
 
-架构 3.0 的 #448 当前基线、功能迁移矩阵、后续阶段与验收出口见 [架构 3.0 后续执行方案](ARCHITECTURE-3-EXECUTION-PLAN.zh-CN.md)。
+后续架构工作直接围绕当前 3.0 边界继续收敛：
 
-旧 `LocalHarnessEngine` 已删除；跨能力事实分别由 Session / Agent / Resource / Recovery 等 Shared owner 持有，进程生命周期由 `LocalRuntimeKernel` 协调。
+- Feature 继续只持有自己的领域状态、规则、写入与最小公开 API；
+- Shared Capability 继续保持中立单一事实源；
+- Session ownership、Agent run identity、资源调度与恢复协调保持单一 Shared Runtime Owner；
+- Feature / Provider 构造继续集中在应用组合根；
+- `LocalRuntimeKernel` 保持进程 start-once、生命周期 scope、bootstrap / recovery 触发与失败投影的极薄职责；
+- UI 只通过 presentation / Feature API / projection 消费；
+- FeatureCatalog 继续作为启动期路由归属事实源；
+- 数据查询、diagnostics、缓存和低频维护逻辑归入对应 Owner，不形成跨域中央入口。
 
-后续继续约束：
-
-- capability 内业务规则。
-- 数据查询。
-- UI projection。
-- 平台 provider 构造。
-- 任务专属状态。
-- 低频诊断逻辑。
-
-目标是保持 Feature / Shared Capability 单向所有权，禁止再出现承接所有产品功能的中央入口。
+目标是让所有权、调用边界、生产装配和状态事实源持续清晰，新增功能无需扩大 Kernel、Shell 或全局共享对象的业务职责。
 
 ## 6. UI 状态继续收敛
 
@@ -121,7 +119,7 @@ audit metadata
 - 高频 streaming 不推动整棵 UI。
 - 低频统计不进入主聊天热路径。
 - Dialog / Sheet 自己承担展示装配。
-- ViewModel 依赖 capability runtime，不依赖 Engine 细节。
+- ViewModel 只依赖 presentation / Feature API / projection，不直接消费领域 Store、Coordinator 或 Shared Runtime 实现。
 
 任何 UI 功能新增都同时检查认知成本和 Compose 重组成本。
 
