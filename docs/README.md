@@ -10,8 +10,9 @@
 
 | 文档 | 内容 |
 |---|---|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | 架构 3.0：Feature 分层组合、共享能力契约、运行内核、迁移阶段与架构门禁 |
-| [SYSTEM-AUDIT-GUIDE.zh-CN.md](SYSTEM-AUDIT-GUIDE.zh-CN.md) | 全量系统联审权威规范：按功能架构、数据状态、生命周期、外部能力、性能、体验与工程质量分组执行审计 |\n| [SHARED-AUDIT-CONCLUSIONS.zh-CN.md](SHARED-AUDIT-CONCLUSIONS.zh-CN.md) | 可共享审计结论库：按链路闭环、数据字段、配置依赖与所有权归组的可复用审计规则 |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | 架构 3.0：Feature 所有权、Shared Capability、应用组合根、极薄 Runtime Kernel 与架构门禁 |
+| [SYSTEM-AUDIT-GUIDE.zh-CN.md](SYSTEM-AUDIT-GUIDE.zh-CN.md) | 全量系统联审权威规范：按功能架构、数据状态、生命周期、外部能力、性能、体验与工程质量分组执行审计 |
+| [SHARED-AUDIT-CONCLUSIONS.zh-CN.md](SHARED-AUDIT-CONCLUSIONS.zh-CN.md) | 可共享审计结论库：按链路闭环、数据字段、配置依赖与所有权归组的可复用审计规则 |
 | [PROTOCOL.md](PROTOCOL.md) | 当前远程 Web 协议与本机 Session / Agent 协议边界 |
 | [COMPATIBILITY.md](COMPATIBILITY.md) | 当前 Android、ABI、本机语义参考和远程 Harness / relay 支持矩阵 |
 | [SECURITY.md](SECURITY.md) | 凭据、工作区、工具、恢复、Web、设备、数据和更新安全边界 |
@@ -41,4 +42,4 @@
 3. 历史变化写入 `CHANGELOG.md`，不要复制成新的阶段文档。
 4. 文件名不再使用已经结束的阶段编号、旧版本号或临时项目代号。
 5. 文档中的完成状态必须能够从当前代码或 CI 验证。
-6. 未列入“当前文档”表的阶段执行计划、旧迁移方案和历史说明只用于追溯；除非当前权威文档明确引用，否则不得作为现行架构、审计规则、允许依赖或完成条件。
+6. 未列入“当前文档”表的阶段执行计划、迁移记录和历史说明不属于现行规范；需要追溯时使用 Git 历史与 `CHANGELOG.md`。
