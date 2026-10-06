@@ -26,7 +26,7 @@ internal data class LocalSessionTranscriptRestore(
  * Owns local Session snapshot/projection boundaries.
  *
  * Complete transcript facts live in Session Event. The coordinator exposes only the bounded runtime
- * window and disposable snapshot acceleration state to LocalHarnessEngine.
+ * window and disposable snapshot acceleration state to the process lifecycle owner.
  */
 internal class LocalSessionCoordinator(
     private val repository: LocalSessionRepository,

@@ -16,7 +16,7 @@ import kotlinx.serialization.json.put
  * Shared authority for the visible foreground model-history projection.
  *
  * Feature code can update the already-owned foreground history without reaching through
- * LocalHarnessEngine. Durable Session EventLog remains authoritative for recovery.
+ * the Runtime Kernel. Durable Session EventLog remains authoritative for recovery.
  */
 @Singleton
 internal class LocalForegroundModelHistoryRuntime @Inject constructor(

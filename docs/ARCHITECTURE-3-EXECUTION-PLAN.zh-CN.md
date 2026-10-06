@@ -232,6 +232,8 @@ Chat send、直聊回合、人物纠正、关系恢复、时间线编辑 / regen
 
 出口：旧 Engine 业务及代理全部删除；聚合状态只为只读 UI / 兼容快照投影，不成为业务写入口；新增 Feature 不修改 Kernel 产品分支或中央页面表。
 
+当前阶段六代码迁移已完成：旧 `LocalHarnessEngine.kt` 已删除，`DshApplication` 在进程启动时显式启动 `LocalRuntimeKernel`；Kernel 只负责进程一次性启动、生命周期作用域与失败投影，具体 Runtime 初始化、启动恢复、前台队列唤醒、持久 Work recovery 与低频维护通过中立 `LocalRuntimeBootstrapPort` 交由应用组合根装配，Shared Runtime 不反向依赖产品 Feature。结构门禁已从迁移 allowlist 切换为最终永久禁止规则：旧 Engine 文件或类型引用出现即失败，同时校验 Runtime Kernel 生命周期职责、Bootstrap composition 与应用启动接线。Architecture 3.0 所有权门禁、执行不变量门禁与 `compileDebugKotlin` 均已通过；完整产品 CI / Android 设备验收继续作为提交后最终验收。
+
 ## 13. 执行批次与交付物
 
 建议按以下依赖顺序提交小型、可验收工作包；不预先要求把全部变更塞进一个巨型提交，也不在本方案中直接合并 #448。

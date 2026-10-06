@@ -49,7 +49,7 @@ import okhttp3.OkHttpClient
 /**
  * Composition root for local Harness plugins.
  *
- * Platform-specific construction and plugin lifecycle stay here so LocalHarnessEngine can focus on
+ * Platform-specific construction and plugin lifecycle stay here so LocalRuntimeKernel stays limited to
  * turn/session orchestration. Downstream agent code only receives capability contracts.
  */
 @Singleton

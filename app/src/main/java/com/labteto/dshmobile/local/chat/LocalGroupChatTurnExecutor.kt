@@ -53,7 +53,7 @@ import kotlinx.serialization.json.put
  *
  * The engine supplies only its live session boundaries and persistence/model callbacks. Group reply
  * fan-out, per-character state refresh, shared-scene consolidation and transcript projection stay
- * together here instead of expanding LocalHarnessEngine.
+ * together here under ChatFeature ownership.
  */
 @Singleton
 internal class LocalGroupChatTurnExecutor @Inject constructor(

@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
  * Process-local owner of the one scheduled direct-chat post-turn consolidation job.
  *
  * Foreground Chat stop/edit/regenerate operations cancel through this owner without reaching into
- * LocalHarnessEngine. The coordinator remains responsible for creating jobs; ownership lives here.
+ * the Runtime Kernel. The coordinator remains responsible for creating jobs; ownership lives here.
  */
 internal object LocalChatPostTurnJobOwner {
     private val lock = Any()

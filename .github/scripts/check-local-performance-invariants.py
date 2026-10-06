@@ -13,7 +13,6 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 LOCAL_ROOT = ROOT / "app/src/main/java/com/labteto/dshmobile/local"
 
-ENGINE = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
 EVENT_LOG = ROOT / "harness-core/src/main/kotlin/com/labteto/dshmobile/harness/session/SessionEventLog.kt"
 REPOSITORY = ROOT / "app/src/main/java/com/labteto/dshmobile/local/LocalSessionRepository.kt"
 DEEPSEEK = ROOT / "app/src/main/java/com/labteto/dshmobile/local/DeepSeekClient.kt"
@@ -79,7 +78,6 @@ def ordered_in_source(source: str, *tokens: str) -> bool:
     return min(positions) >= 0 and positions == sorted(positions)
 
 
-engine = strip_comments(read(ENGINE)) if ENGINE.exists() else ""
 event_log = strip_comments(read(EVENT_LOG))
 repository = strip_comments(read(REPOSITORY))
 deepseek = strip_comments(read(DEEPSEEK))
@@ -148,7 +146,6 @@ hot_sources = merge_sources(
     foreground_sources,
     session_sources,
     runtime_sources,
-    {ENGINE.relative_to(ROOT).as_posix(): engine} if engine else {},
 )
 
 
@@ -416,23 +413,6 @@ for path, source in active_chat_context_sources.items():
         violations.append(
             f"{path} uses legacy Chat context fallback inside active execution"
         )
-
-# The migration Engine may exist, but it must not bypass extracted capability owners.
-for forbidden_engine_bypass in (
-    "toolRegistry.execute(",
-    "modelClient.complete(",
-    "modelClient.completeStreaming(",
-    "AgentRequestExecutor(",
-    "sessionRepository.read(",
-    "sessionRepository.enqueue(",
-    "sessionRepository.delete(",
-    "sessionRepository.summaries()",
-):
-    if forbidden_engine_bypass in engine:
-        violations.append(
-            "LocalHarnessEngine bypassed an extracted capability owner: " + forbidden_engine_bypass
-        )
-
 
 if violations:
     print("Architecture 3.0 execution invariant guard failed:", file=sys.stderr)

@@ -24,7 +24,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * Owns the model-visible tool surface and the common permission/error boundary for foreground runs.
  *
  * Built-in implementations stay registered in [ToolRegistry]; this coordinator decides visibility,
- * capability activation, approval and structured error projection so LocalHarnessEngine no longer
+ * capability activation, approval and structured error projection so the Runtime Kernel never
  * duplicates those rules around the Agent loop.
  */
 internal class LocalToolExecutionCoordinator(

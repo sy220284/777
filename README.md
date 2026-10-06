@@ -280,7 +280,7 @@ Local Runtime Kernel
 harness-core / Android runtime / MCP / LSP / device
 ```
 
-当前正按阶段从旧的 `LocalHarnessEngine` 中迁移真实业务所有权：第一阶段已经建立 Feature Catalog 与子功能唯一归属，后续依次拆领域状态、Chat/Work 所有权、Automation Port、Feature 驱动 UI，最终把 Engine 收缩为纯运行内核。
+架构 3.0 的业务所有权迁移已经完成：Chat / Work / Automation / Tools / Settings 均由所属 Feature 与 Shared Capability 持有，Feature UI contribution 已接管产品页面，旧 `LocalHarnessEngine` 已删除；进程级启动、恢复与维护由极薄的 `LocalRuntimeKernel` 承接。
 
 完整边界、禁止依赖、迁移阶段和完成标准见 **[架构 3.0 权威文档](docs/ARCHITECTURE.md)**。
 

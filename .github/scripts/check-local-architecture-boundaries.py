@@ -16,85 +16,12 @@ APP_SOURCE_ROOT = ROOT / "app/src/main/java/com/labteto/dshmobile"
 LOCAL_SOURCE_ROOT = APP_SOURCE_ROOT / "local"
 UI_SOURCE_ROOT = APP_SOURCE_ROOT / "ui"
 
-ENGINE_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
+RETIRED_ENGINE_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalHarnessEngine.kt"
+RUNTIME_KERNEL_PATH = "app/src/main/java/com/labteto/dshmobile/local/runtime/LocalRuntimeKernel.kt"
+APPLICATION_PATH = "app/src/main/java/com/labteto/dshmobile/DshApplication.kt"
 COMPOSITION_PATH = "app/src/main/java/com/labteto/dshmobile/local/LocalFeatureExecutionPortModule.kt"
 
-# Transitional bridges are exact, shrink-only migration debt.
-ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST: set[str] = set()
-ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST: set[str] = set()
-ENGINE_COMPOSITION_BRIDGE_ALLOWLIST = (
-    ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST
-    | ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST
-)
-
-# Outside the app composition root, Architecture 3.0 code must not depend on the legacy Engine.
-ENGINE_CONSUMER_ALLOWLIST: set[str] = set()
 UI_AGGREGATE_STATE_ALLOWLIST: set[str] = set()
-
-# Feature-owned runtime surfaces that have already exited Engine are permanent exits.
-RUNTIME_ENGINE_FORBIDDEN_PATHS = (
-    "app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/work/LocalWorkRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/model/LocalModelRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolsRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/automation/LocalAutomationRuntime.kt",
-    "app/src/main/java/com/labteto/dshmobile/local/presentation/LocalSettingsRuntime.kt",
-)
-
-REMOVED_ENGINE_STAGE3_FEATURE_ROOTS = {
-    "sendChat",
-    "queueHumanTurn",
-    "queueWorkTurnLocked",
-    "queueExistingWorkTurnLocked",
-    "queueTurn",
-    "queueTurnLocked",
-    "runTurn",
-    "runAgentTurn",
-    "runWorkAgentTurn",
-    "runChatTurn",
-    "runGroupChatTurn",
-    "regenerateReplyForMode",
-    "regenerateWorkReply",
-    "editAndResendUserMessage",
-    "workSubagents",
-    "runWorkflow",
-    "exitPlanMode",
-    "scheduleChatPostTurn",
-}
-REMOVED_ENGINE_STAGE3_WORK_BUILTINS = {
-    "update_plan",
-    "exit_plan_mode",
-    "todo_write",
-    "create_goal",
-    "get_goal",
-    "update_goal",
-    "ask_user_question",
-    "subagent",
-    "spawn_subagent",
-    "subagent_fork",
-    "fork_subagent",
-    "list_subagent_models",
-    "list_agents",
-    "send_message",
-    "interrupt_agent",
-    "workflow",
-}
-REMOVED_ENGINE_PRIVATE_BUSINESS_METHODS = {
-    "captureAutoMemoryDirective",
-    "chatRelationshipMemoryContext",
-    "chatStreamFilterPhrases",
-    "compactHistoryIfNeeded",
-    "enforceChatStyle",
-    "ensureSystemMessage",
-    "executeToolBatch",
-    "modelRequestMarker",
-    "modelToolSchemas",
-    "persistChatBranchState",
-    "persistNow",
-    "rebuildGroupModelHistoryFromTranscript",
-    "sessionFileFor",
-}
 
 # Chat/Work are provider Features. Their internals may depend on Shared capabilities, never siblings.
 FEATURE_FORBIDDEN_IMPORT_PREFIXES = {
@@ -536,68 +463,60 @@ for work_semantic in ("LocalWorkCheckpoint", "<work-checkpoint>", "最近持久�
         die("Shared Agent recovery interprets WorkFeature semantics: " + work_semantic)
 
 
-# ---- Legacy Engine containment and migration ratchets ---------------------
+# ---- Final Runtime Kernel and retired Engine ------------------------------
 
-engine = strip_comments(read(ENGINE_PATH))
-composition = strip_comments(read(COMPOSITION_PATH))
+if (ROOT / RETIRED_ENGINE_PATH).exists():
+    die("retired LocalHarnessEngine source returned; Architecture 3.0 uses LocalRuntimeKernel")
 
-engine_consumers: set[str] = set()
 for path, source in kotlin_sources_under(APP_SOURCE_ROOT):
-    relative = path.relative_to(ROOT).as_posix()
-    if relative == ENGINE_PATH:
-        continue
     if references_type(source, "LocalHarnessEngine"):
-        engine_consumers.add(relative)
+        die(
+            f"{path.relative_to(ROOT)} reintroduced retired LocalHarnessEngine; "
+            "use a Feature/Shared owner or LocalRuntimeKernel lifecycle API"
+        )
 
-unexpected_engine_consumers = sorted(engine_consumers - ENGINE_CONSUMER_ALLOWLIST)
-if unexpected_engine_consumers:
-    die(
-        "new direct LocalHarnessEngine consumer(s): "
-        + ", ".join(unexpected_engine_consumers)
-        + "; only the app composition root may bridge the migration Engine"
-    )
-stale_engine_consumers = sorted(ENGINE_CONSUMER_ALLOWLIST - engine_consumers)
-if stale_engine_consumers:
-    die(
-        "stale LocalHarnessEngine consumer allowlist entries: "
-        + ", ".join(stale_engine_consumers)
-        + "; shrink the migration allowlist with the ownership move"
-    )
+runtime_kernel = strip_comments(read(RUNTIME_KERNEL_PATH))
+for required in (
+    "class LocalRuntimeKernel",
+    "bootstrap.initialize(",
+    "bootstrap.prepareAndRestore(",
+):
+    if required not in runtime_kernel:
+        die("LocalRuntimeKernel lost required process lifecycle responsibility: " + required)
 
-for relative in RUNTIME_ENGINE_FORBIDDEN_PATHS:
-    if references_type(read(relative), "LocalHarnessEngine"):
-        die(relative + " reintroduced a forbidden LocalHarnessEngine dependency")
+for forbidden in (
+    "PersonaProfile",
+    "ChatPersonaStore",
+    "LocalGroupChatState",
+    "LocalTodoItem",
+    "LocalGoal",
+    "GitHub",
+    "LocalFeaturePage",
+):
+    if forbidden in runtime_kernel:
+        die("LocalRuntimeKernel regained product/Feature semantics: " + forbidden)
 
-engine_bridges = set(re.findall(r"\bengine\s*\.\s*([A-Za-z0-9_]+)", composition))
-unexpected_bridges = sorted(engine_bridges - ENGINE_COMPOSITION_BRIDGE_ALLOWLIST)
-if unexpected_bridges:
-    die(
-        "new Engine-backed composition bridge(s): "
-        + ", ".join(unexpected_bridges)
-        + "; create a real Feature/Shared owner instead"
-    )
-stale_stage3 = sorted(ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST - engine_bridges)
-if stale_stage3:
-    die(
-        "stale Stage-3 Engine bridge allowlist entries: "
-        + ", ".join(stale_stage3)
-        + "; delete them from the ratchet in the same migration"
-    )
-stale_stage4 = sorted(ENGINE_STAGE4_AUTOMATION_BRIDGE_ALLOWLIST - engine_bridges)
-if stale_stage4:
-    die(
-        "stale Stage-4 Automation Engine bridge allowlist entries: "
-        + ", ".join(stale_stage4)
-        + "; delete them when Automation moves to execution ports"
-    )
+bootstrap_composition = strip_comments(read(
+    "app/src/main/java/com/labteto/dshmobile/local/LocalRuntimeBootstrapComposition.kt"
+))
+for required in (
+    "class LocalRuntimeBootstrapComposition",
+    "LocalRuntimeBootstrapPort",
+    "runtimeStateStore.initialize(",
+    "prepareLocalHarnessStartup(",
+    "foregroundSessionLoader.loadStartup(",
+    "work.schedulePersistentRecovery()",
+):
+    if required not in bootstrap_composition:
+        die("app Runtime bootstrap composition is incomplete: " + required)
 
-for method in REMOVED_ENGINE_STAGE3_FEATURE_ROOTS | REMOVED_ENGINE_PRIVATE_BUSINESS_METHODS:
-    if re.search(rf"\b(?:private|internal|public)?\s*(?:suspend\s+)?fun\s+{re.escape(method)}\s*\(", engine):
-        die("retired Feature business method returned to LocalHarnessEngine: " + method)
-
-for builtin in REMOVED_ENGINE_STAGE3_WORK_BUILTINS:
-    if re.search(rf'^\s*"{re.escape(builtin)}"\s*->', engine, re.MULTILINE):
-        die("Work-owned builtin dispatch returned to LocalHarnessEngine: " + builtin)
+application = strip_comments(read(APPLICATION_PATH))
+for required in (
+    "LocalRuntimeKernel",
+    "localRuntimeKernel.start()",
+):
+    if required not in application:
+        die("DshApplication must eagerly start the process Runtime Kernel: " + required)
 
 
 # Session owns transaction ordering; provider Features own domain interpretation.

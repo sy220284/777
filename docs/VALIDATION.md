@@ -328,7 +328,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - ChatGPT“测试连接”必须走该授权记录自己的套餐 profile，并以真实 Responses 完成作为成功条件；不得只用 /models 可达代替推理连通。
 - 多条授权记录可由用户显式移除；移除一条记录不得误删其他 client_id 的模型档案或凭据。
 - refresh token 被确认失效并清空后，设置页必须读取最新持久化状态并回到“需重新授权”，不得继续用旧快照显示已连接。
-- ChatGPT 套餐连通测试属于账户/模型边界职责，放在独立 tester 中；不得继续扩大 `LocalHarnessEngine` 热点文件。
+- ChatGPT 套餐连通测试属于账户/模型边界职责，放在独立 tester 中；已退役的 `LocalHarnessEngine` 不得回归，也不得把同类职责重新集中进 `LocalRuntimeKernel`。
 - `response.completed`、`response.failed`、`response.incomplete` 与流中断分别处理；收到 `response.completed` 后立即按成功终态结算，不再继续等待连接 EOF，避免终态后的 TCP/HTTP2 收尾抖动触发重复请求。
 - 统一 `withCancellableModelResponse` 只让读取/协议阶段错误决定请求成败；成功结果产生后的 `Response.close()` 清理异常必须降级为 best-effort，不能反转成功并触发重复发送。
 - `response.completed` 前发生可恢复网络中断、超时或临时服务错误时继续使用有限次数退避重试；用户主动取消、参数/权限错误、套餐限制等不可恢复状态不得盲目重放。

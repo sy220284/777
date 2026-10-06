@@ -37,7 +37,7 @@ reference-validation/     官方 Harness 差分验证
 
 app 内采用 capability runtime + projection + coordinator 的模块化单体结构。
 
-新增功能优先放到正确能力边界，不要继续向 `LocalHarnessEngine`、`LocalHarnessScreen`、`SessionStore` 堆职责。
+新增功能优先放到正确能力边界；已退役的 `LocalHarnessEngine` 不得恢复，`LocalRuntimeKernel` 也不得承接产品 Feature 业务，UI 与 Session 能力继续通过明确的 Feature / Shared owner 扩展。
 
 ## 开发规则
 

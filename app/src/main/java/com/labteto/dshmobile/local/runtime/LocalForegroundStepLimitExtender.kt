@@ -11,7 +11,7 @@ internal const val MAX_FOREGROUND_DYNAMIC_STEPS = 512
 internal const val FOREGROUND_TURN_TIMEOUT_MILLIS = 15 * 60_000L
 
 /**
- * Builds the foreground soft-step extender without making LocalHarnessEngine own budget policy.
+ * Builds the foreground soft-step extender without making the Runtime Kernel own budget policy.
  */
 internal fun localForegroundStepLimitExtender(
     enabled: Boolean,

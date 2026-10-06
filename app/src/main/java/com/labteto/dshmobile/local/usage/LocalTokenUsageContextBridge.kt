@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * Resolves model-consuming tool calls back to the Work run that triggered them.
  *
- * Keeping this lookup outside LocalHarnessEngine prevents usage analytics from adding another
+ * Keeping this lookup outside the Runtime Kernel prevents usage analytics from adding another
  * orchestration responsibility to the engine while preserving session/run/subagent attribution.
  */
 internal class LocalTokenUsageContextBridge(

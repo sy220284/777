@@ -27,7 +27,8 @@ Node / Python / Git 是 Agent 可调用的工具运行环境。
 Compose UI
 → presentation projection
 → Chat / Work / Session / Model / Tools / Automation runtimes
-→ LocalHarnessEngine
+→ Feature API / Shared Capability
+→ LocalRuntimeKernel（仅进程启动、恢复与维护）
 → coordinators / stores / repositories
 → harness-core
 → Android runtime / MCP / LSP / device providers

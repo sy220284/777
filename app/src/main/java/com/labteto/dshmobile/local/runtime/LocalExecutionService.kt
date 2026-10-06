@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 /**
  * Pins user-initiated on-device work while a work turn or background job is still alive.
  *
- * The service owns no execution itself; LocalHarnessEngine remains the single execution owner.
+ * The service owns no execution itself; Feature/Shared runtime owners remain authoritative while the process service only pins lifecycle.
  * Keeping the process in foreground is enough to stop Android from freezing a long local turn when
  * the screen locks or the app moves behind another activity.
  */

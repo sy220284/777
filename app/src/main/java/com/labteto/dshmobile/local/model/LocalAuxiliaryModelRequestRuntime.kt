@@ -19,7 +19,7 @@ import kotlinx.serialization.json.put
  * Shared bounded no-tool model request boundary for auxiliary product capabilities.
  *
  * It preserves the same frozen route, shared model-request resource, admission and retry policy as
- * foreground model steps without forcing feature code back through LocalHarnessEngine.
+ * foreground model steps without forcing feature code through the Runtime Kernel.
  */
 @Singleton
 internal class LocalAuxiliaryModelRequestRuntime @Inject constructor(

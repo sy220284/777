@@ -31,7 +31,7 @@ import kotlinx.serialization.json.put
  * This object owns platform construction only: one workspace, ToolRegistry, PluginRegistry,
  * process/terminal providers and schema/execution surfaces. Product semantics stay in Feature
  * handlers. Built-in execution is resolved lazily to break the Tool↔Feature composition cycle
- * without creating a second registry or routing execution back through LocalHarnessEngine.
+ * without creating a second registry or routing execution through the Runtime Kernel.
  */
 @Singleton
 internal class LocalToolCompositionRoot @Inject constructor(

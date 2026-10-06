@@ -91,8 +91,8 @@ internal class LocalWorkPlanModeCoordinator @Inject constructor(
 /**
  * Work-owned transition from planning into execution during an active run.
  *
- * The caller supplies only narrow Work/shared capabilities. The rule itself no longer lives in
- * LocalHarnessEngine, so Work remains the owner of plan approval semantics while Runtime keeps
+ * The caller supplies only narrow Work/shared capabilities. Work remains the owner of plan
+ * approval semantics while Runtime keeps
  * interaction, model-history and Session persistence mechanics.
  */
 internal suspend fun exitWorkPlanMode(

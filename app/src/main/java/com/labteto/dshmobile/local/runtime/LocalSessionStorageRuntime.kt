@@ -26,7 +26,7 @@ import kotlinx.serialization.json.Json
  *
  * EventLog remains the durable fact stream through [LocalSessionEventLogRegistry]. This runtime owns
  * only the snapshot repository/coordinator and publishes derived session summaries into the shared
- * runtime state. Features can persist their own state without routing through LocalHarnessEngine.
+ * runtime state. Features can persist their own state without routing through the Runtime Kernel.
  */
 @Singleton
 class LocalSessionStorageRuntime @Inject internal constructor(

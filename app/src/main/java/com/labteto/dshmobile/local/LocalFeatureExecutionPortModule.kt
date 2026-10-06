@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.chat.LocalChatTurnStarter
 import com.labteto.dshmobile.local.chat.LocalChatUserActivityPort
 import com.labteto.dshmobile.local.runtime.LocalDiagnosticsPort
 import com.labteto.dshmobile.local.runtime.LocalDiagnosticsRuntime
+import com.labteto.dshmobile.local.runtime.LocalRuntimeBootstrapPort
 import com.labteto.dshmobile.local.runtime.LocalWorkDiagnosticsProvider
 import com.labteto.dshmobile.local.session.LocalActiveSessionScopeProvider
 import com.labteto.dshmobile.local.session.LocalSessionAccessScope
@@ -30,14 +31,19 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Stage-3 app composition root for Feature execution contracts.
+ * App composition root for cross-boundary Feature/Runtime contracts.
  *
- * Engine remains an implementation source only while Work/Chat turn ownership is being migrated.
- * Feature runtimes depend on their own ports and never import Engine directly.
+ * Concrete Feature owners terminate here; Shared Runtime consumes only narrow neutral contracts.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 internal object LocalFeatureExecutionPortModule {
+    @Provides
+    @Singleton
+    fun provideLocalRuntimeBootstrapPort(
+        composition: LocalRuntimeBootstrapComposition,
+    ): LocalRuntimeBootstrapPort = composition
+
     @Provides
     @Singleton
     fun provideLocalChatUserActivityPort(

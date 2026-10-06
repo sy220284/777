@@ -233,7 +233,7 @@ private fun stripTrailingJsonCommas(raw: String): String {
 /**
  * Turns a short natural-language description (plus recent chat context) into the structured
  * default persona used by chat mode. The generated profile is returned to the UI and persisted
- * through LocalHarnessEngine.configureChatPersona so the normal persona/session path remains
+ * through the ChatFeature persona/session API so the normal path remains
  * the single source of truth.
  */
 @Singleton

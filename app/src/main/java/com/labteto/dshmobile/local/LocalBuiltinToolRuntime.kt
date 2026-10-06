@@ -47,7 +47,7 @@ import kotlinx.serialization.json.buildJsonObject
  * Process-wide dispatcher for built-in tool implementations.
  *
  * ToolRegistry/PluginComposition call this owner directly. Product-specific built-ins are delegated
- * to their Feature composition so the shared Tool graph never depends on LocalHarnessEngine.
+ * to their Feature composition so the shared Tool graph never depends on the Runtime Kernel.
  */
 @Singleton
 internal class LocalBuiltinToolRuntime @Inject constructor(
