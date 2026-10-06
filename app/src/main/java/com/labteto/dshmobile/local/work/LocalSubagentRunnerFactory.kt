@@ -35,7 +35,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonArray
 
 /**
- * Centralizes LocalSubagentRunner construction so execution wiring is not repeated inside the engine.
+ * Centralizes LocalSubagentRunner construction so execution wiring is not repeated across Work paths.
  */
 internal class LocalSubagentRunnerFactory(
     private val modelGateway: LocalModelGateway,

@@ -19,7 +19,7 @@ import kotlinx.serialization.json.put
  * Owns explicit persona corrections and undo.
  *
  * PersonaStore is the durable persona authority; Session Event records the conversation-local audit
- * trail. The visible notice is a bounded Chat projection and expires without involving Engine.
+ * trail. The visible notice is a bounded Chat projection and expires within Chat-owned state.
  */
 @Singleton
 internal class LocalChatPersonaCorrectionCoordinator internal constructor(

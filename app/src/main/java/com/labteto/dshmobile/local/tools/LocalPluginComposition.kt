@@ -50,7 +50,7 @@ import okhttp3.OkHttpClient
  * Composition root for local Harness plugins.
  *
  * Platform-specific construction and plugin lifecycle stay here so LocalRuntimeKernel stays limited to
- * turn/session orchestration. Downstream agent code only receives capability contracts.
+ * process lifecycle, bootstrap and recovery coordination. Downstream agent code only receives capability contracts.
  */
 @Singleton
 class LocalPluginCompositionFactory @Inject constructor(

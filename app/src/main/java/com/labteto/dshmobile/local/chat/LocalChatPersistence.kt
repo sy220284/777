@@ -7,7 +7,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 
-/** Single process-wide owner for local chat persistence stores shared by Engine and Chat runtime. */
+/** Single process-wide owner for Chat persistence stores shared by Chat execution paths. */
 @Singleton
 class LocalChatPersistence @Inject constructor(
     @ApplicationContext context: Context,

@@ -50,7 +50,7 @@ import kotlinx.serialization.json.put
 
 /**
  * Owns foreground model transport semantics: request logging, retry, streaming preview and overflow
- * recovery. The engine supplies only current product state and the durable compaction callback.
+ * recovery. Callers supply the bounded product snapshot and durable compaction callback.
  */
 @Singleton
 internal class LocalModelRequestCoordinator @Inject constructor(

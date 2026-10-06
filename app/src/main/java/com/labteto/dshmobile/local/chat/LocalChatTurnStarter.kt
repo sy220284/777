@@ -16,7 +16,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-/** Chat-owned lazy foreground turn starter; no Engine composition callback is required. */
+/** Chat-owned lazy foreground turn starter with no cross-Feature execution callback. */
 @Singleton
 internal class LocalChatTurnStarter @Inject constructor(
     private val dispatcher: LocalChatTurnDispatcher,

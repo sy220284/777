@@ -50,7 +50,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-/** Cross-Feature foreground Session restore/composition owner extracted from the legacy Engine. */
+/** Cross-Feature foreground Session restore/composition owner. */
 @Singleton
 internal class LocalForegroundSessionLoader @Inject constructor(
     @ApplicationContext context: Context,

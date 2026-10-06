@@ -168,8 +168,8 @@ class LocalWorkRunRegistry internal constructor(
      * Finalize one Work-owned turn and either detach the completed binding or claim its next input.
      *
      * The registry owns binding lifecycle, durable checkpointing, queue hand-off and visible
-     * projection. The caller supplies only a lazy execution factory while the Agent loop itself is
-     * still being migrated out of the legacy engine.
+     * projection. The caller supplies only a lazy execution factory; the Agent loop remains
+     * Work-owned with no process-level fallback.
      */
     internal fun finishTurn(
         binding: LocalWorkRunBinding,

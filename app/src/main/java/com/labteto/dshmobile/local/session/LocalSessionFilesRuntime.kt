@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
 /**
  * Session/File capability owning the app-private workspace views used by local conversations.
  *
- * One workspace instance is shared by Engine composition and Session UI reads so attachment import,
+ * One workspace instance is shared by runtime composition and Session UI reads so attachment import,
  * file projection and preview cannot drift into parallel filesystem owners.
  */
 @Singleton

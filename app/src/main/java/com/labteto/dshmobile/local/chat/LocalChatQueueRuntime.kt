@@ -20,7 +20,7 @@ import kotlinx.serialization.json.put
  *
  * One owner clears the completed visible Job, commits the next queued user model message, then
  * starts the next Chat turn. The Provider breaks the queue -> starter -> dispatcher -> executor
- * construction cycle without giving Engine another callback.
+ * construction cycle without adding another cross-Feature callback.
  */
 @Singleton
 internal class LocalChatQueueRuntime @Inject constructor(
