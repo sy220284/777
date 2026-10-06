@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -51,7 +52,9 @@ class SessionIndexStateTest {
         state.addPending("old", "question")
 
         assertEquals(listOf("new", "old", "older"), state.renderSessions().map { it.sessionId })
-        assertEquals("question", state.renderSessions().first { it.sessionId == "old" }.pendingInteraction)
+        val pendingRow = state.session("old")!!
+        assertEquals("question", pendingRow.pendingInteraction)
+        assertSame(pendingRow, state.renderSessions().first { it.sessionId == "old" })
 
         state.removePending("old", "question")
         assertEquals("plan-review", state.renderSessions().first { it.sessionId == "old" }.pendingInteraction)
