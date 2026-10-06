@@ -27,17 +27,18 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 
 ## CI
 
-`.github/workflows/ci.yml` 先由 `scope` 按架构 3.0 风险范围分配验证集合，`architecture-3-gates` 独立验证所有权 / 依赖与执行不变量，最终统一由 `merge-gate` 放行。混合改动取检查并集，未知产品路径保守回退到完整 CI。
+`.github/workflows/ci.yml` 先由 `scope` 自举校验 CI 控制面，再按架构 3.0 风险范围分配验证集合；`architecture-3-gates` 独立验证所有权 / 依赖与执行不变量，最终统一由 `merge-gate` 放行。混合改动取检查并集，未知产品路径保守回退到完整 CI。
 
-主线 `push` 不使用 workflow 级 `paths-ignore` 绕过控制面。所有改动先进入 `scope`；纯文档可快速结束，CI / 门禁 / 架构控制文件本身必须真实执行相应验证。
+主线 `push` 不使用 workflow 级 `paths-ignore` 绕过控制面。所有改动先进入 `scope`；分类前固定执行分类器语法 / 自测与仓库 CI 完整性检查，分类后再独立复核关键控制文件是否选中了最低必需 lane。纯文档完成控制面自举后可快速结束，CI / 门禁 / 架构权威文件本身不能通过修改分类器把自身验证跳过。
 
 当前任务类型：
 
 ```text
 普通纯文档 / 仓库说明
-→ scope → merge-gate
+→ scope（控制面自举）→ merge-gate
 
 架构 3.0 权威文档 / CI 主流程 / 架构门禁控制面
+→ scope（控制面自举 + 范围防降级）
 → static-gates → architecture-3-gates → merge-gate
 
 普通 GitHub Actions / 自动化脚本
@@ -67,21 +68,28 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 
 `.github/release-version` 直接参与 `versionName/versionCode` 计算，因此按完整产品变更处理。修改 APK 结构校验或 Android 启动 smoke 脚本仍归入完整 CI。手动 `workflow_dispatch` 始终强制完整 CI，并包含 fixture provenance。
 
+### scope
+
+`scope` 是所有 CI 的固定入口，动态范围识别之前先执行不可跳过的控制面自举：
+
+- 对 `classify-ci-scope.py` 与 `check-ci-repository-integrity.py` 做 Python 语法校验；
+- 执行范围分类器完整自测，逐类验证架构权威文件、CI 控制文件、完整 Android 验证脚本和 fixture 来源的最低验证集合；
+- 执行仓库 CI 完整性检查：外部 Action 固定 SHA、Gradle 供应链边界、单测模块覆盖、Android 共享产物、权威文档引用、CI lane / merge-gate 契约和门禁脚本可达性；
+- 收集本次真实 changed files 并执行 `git diff --check`；
+- 动态分类后再由 workflow 内独立规则复核：架构权威文件 / 控制面必须选中 `static-gates + architecture-3-gates`，fixture 与 Android 验证控制脚本不得降级所需矩阵。
+
+因此，即使范围分类器或门禁脚本本身被修改，也必须先通过当前控制面的自举验证，不能依赖“分类结果”决定是否验证分类器自己。
+
 ### static-gates
 
-该阶段只保留快速、与产品架构实现位置无关的仓库级检查：
+该阶段只保留快速、与产品架构实现位置无关的静态产品检查：
 
-- CI 范围分类器自测。
 - actionlint 工作流语义校验；下载版本和 SHA-256 固定。
-- 所有外部 GitHub Actions 固定到 40 位提交 SHA。
-- Python / Shell 语法校验。
-- Gradle Wrapper distribution SHA、依赖 verification metadata、版本目录禁止动态版本。
-- 新增 Gradle 模块如存在单元测试，必须被 CI 显式覆盖。
+- Python / Shell 自动化语法校验。
 - Android Manifest / exported component / FileProvider / 模型 HTTPS-or-loopback 安全边界。
 - UI 硬编码、Design System、通知、Kotlin 风险与构建基线。
 - Runtime 压缩器自测。
 - 发布版本格式。
-- 防止重新引入 Android 16/17 各自 `connectedDebugAndroidTest` 重复构建。
 
 ### architecture-3-gates
 
@@ -174,6 +182,7 @@ Runtime 下载使用按 OS + ABI + Runtime 脚本哈希隔离的 Actions Cache�
 
 ```text
 static-gates
+architecture-3-gates
 unit-tests
 build-arm64
 device-artifacts-x86
