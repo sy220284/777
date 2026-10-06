@@ -45,7 +45,7 @@ class WebhookExecutionTest {
         }
         runCurrent()
         job.cancelAndJoin()
-        assertEquals(listOf("running", "cancelled"), states)
+        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.CANCELLED), states)
     }
     @Test fun successfulRunStoresResult() = runTest {
         val states = mutableListOf<WebhookRunStatus>()
@@ -105,7 +105,7 @@ class WebhookExecutionTest {
         assertTrue(first.isCompleted)
         assertTrue(second.isCompleted)
         assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.FAILED), firstStates)
-        assertEquals(listOf("running", "completed"), secondStates)
+        assertEquals(listOf(WebhookRunStatus.RUNNING, WebhookRunStatus.COMPLETED), secondStates)
     }
 
 
@@ -157,7 +157,7 @@ class WebhookExecutionTest {
         assertFalse(
             shouldMarkWebhookQueuedCancellation(
                 cause = IllegalStateException("boom"),
-                currentStatus = "queued",
+                currentStatus = WebhookRunStatus.QUEUED,
             ),
         )
     }
