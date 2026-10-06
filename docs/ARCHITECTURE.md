@@ -22,7 +22,7 @@ Application Shell / Feature Host
 
 产品 Feature 之间禁止直接依赖内部实现。跨 Feature 协作只能通过共享能力契约或明确的 Feature Port。
 
-共享能力继续向下依赖运行内核；运行内核不理解人物、日记、计划、Todo、GitHub 等具体产品业务。
+共享能力通过中立契约依赖 Platform / Infrastructure。极薄进程运行内核单独负责进程启动、bootstrap / recovery 触发与生命周期协调，不参与每条 Feature 业务调用链，也不解释人物、日记、计划、Todo、GitHub 等具体产品业务。
 
 ## 2. 总体架构
 
@@ -61,6 +61,7 @@ Application Shell / Feature Host
 │ harness-core / Android runtime / MCP / LSP / device        │
 │ persistence / network / third-party integrations           │
 └────────────────────────────────────────────────────────────┘
+```
 
 进程启动侧单独存在极薄 `LocalRuntimeKernel`：
 
@@ -73,7 +74,6 @@ DshApplication
 ```
 
 Kernel 只负责进程 start-once、生命周期 scope、bootstrap / recovery 触发与初始化错误投影，不位于每条 Feature 业务调用链中。
-```
 
 ## 3. Gradle 模块边界
 
