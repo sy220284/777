@@ -30,6 +30,8 @@ import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.redactModelImages
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.toRunModelSurface
+import com.labteto.dshmobile.local.model.buildLocalRequestEvidence
+import com.labteto.dshmobile.local.model.stableJsonSha256
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
