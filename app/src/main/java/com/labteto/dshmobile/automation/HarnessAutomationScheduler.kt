@@ -474,7 +474,7 @@ class HarnessAutomationScheduler @Inject constructor(
                 quietEndMinute = quietEndMinute,
                 proactiveMinGapMinutes = proactiveMinGapMinutes,
                 proactiveMaxUnanswered = proactiveMaxUnanswered,
-                status = if (latest.status == AutomationStatus.PAUSED) "paused" else "scheduled",
+                status = if (latest.status == AutomationStatus.PAUSED) AutomationStatus.PAUSED else AutomationStatus.SCHEDULED,
                 lastError = null,
                 failureStreak = 0,
             )
@@ -507,7 +507,7 @@ class HarnessAutomationScheduler @Inject constructor(
                         current
                     } else {
                         val latestActivity = maxOf(current.lastUserActivityAt ?: Long.MIN_VALUE, userMessageAt)
-                        resumedFromWaiting = current.status == "waiting_user"
+                        resumedFromWaiting = current.status == AutomationStatus.WAITING_USER
                         if (resumedFromWaiting) {
                             current.copy(
                                 status = AutomationStatus.SCHEDULED,
@@ -520,7 +520,7 @@ class HarnessAutomationScheduler @Inject constructor(
                         }
                     }
                 } ?: return@forEach
-                if (updated.status != "scheduled" || !resumedFromWaiting) return@forEach
+                if (updated.status != AutomationStatus.SCHEDULED || !resumedFromWaiting) return@forEach
                 if (usesChainedChatScheduling(updated) || updated.recurringMinutes == null) {
                     enqueueOneTime(updated.id, updated.nextRunAt)
                 } else {
