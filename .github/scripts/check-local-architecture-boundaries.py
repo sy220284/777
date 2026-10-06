@@ -201,8 +201,9 @@ architecture_doc = read("docs/ARCHITECTURE.md")
 for contract in (
     "# 架构 3.0",
     "本文是 777 当前唯一系统架构权威文档",
-    "模块化单体 + 层级化 Feature 组合 + 共享能力契约 + 极薄运行内核",
-    "UI\n↓\nFeature API\n↓\nFeature internal\n↓\nShared Capability\n↓\nKernel / Platform",
+    "模块化单体 + 层级化 Feature 组合 + 共享能力契约 + 极薄进程运行内核",
+    "UI\n↓\npresentation / Feature API / projection\n↓\nFeature internal\n↓\nShared Capability / Shared Runtime contract（按需）\n↓\nPlatform / Infrastructure",
+    "DshApplication\n↓\nLocalRuntimeKernel\n↓\nLocalRuntimeBootstrapPort\n↓\n应用组合根",
 ):
     if contract not in architecture_doc:
         die("docs/ARCHITECTURE.md lost Architecture 3.0 authority: " + contract)
