@@ -265,6 +265,14 @@ for forbidden in (
         die("foreground composition contains Chat domain restore semantics: " + forbidden)
 
 
+# App shell lifecycle hooks must enter local product behavior through presentation boundaries.
+main_activity_imports = imports(read("app/src/main/java/com/labteto/dshmobile/MainActivity.kt"))
+if "com.labteto.dshmobile.local.model.chatgpt.ChatGptAuthCoordinator" in main_activity_imports:
+    die(
+        "MainActivity bypasses presentation ownership for ChatGPT refresh; "
+        "use the presentation account workflow so remote catalog refresh and local profile reconciliation stay atomic"
+    )
+
 # ---- Dependency direction --------------------------------------------------
 
 for feature_name, forbidden_prefixes in FEATURE_FORBIDDEN_IMPORT_PREFIXES.items():
