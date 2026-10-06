@@ -191,6 +191,8 @@ LEGACY_MOVED_IMPORTS = {
         "com.labteto.dshmobile.local.work.extractLocalWorkCueSnippet",
     "com.labteto.dshmobile.local.LocalChatContextRefreshCoordinator":
         "com.labteto.dshmobile.local.chat.LocalChatContextRefreshCoordinator",
+    "com.labteto.dshmobile.local.settings.LocalAgentRuntimeLimits":
+        "com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits",
 }
 
 RETIRED_SHARED_WORK_SEMANTIC_PATHS = (
