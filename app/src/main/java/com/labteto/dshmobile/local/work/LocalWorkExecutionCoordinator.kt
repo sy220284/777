@@ -135,7 +135,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
             LocalWorkExecutionResult(
                 sessionId = result.sessionId,
                 output = result.output,
-                status = LocalWorkExecutionStatus.valueOf(result.status.name),
+                status = result.status,
                 detail = result.detail,
             )
         } catch (timeout: TimeoutCancellationException) {
