@@ -49,6 +49,35 @@ ENGINE_STAGE3_FEATURE_ROOT_CANDIDATES = (
     "scheduleChatPostTurn",
 )
 ENGINE_STAGE3_FEATURE_ROOT_ALLOWLIST = set()
+ENGINE_STAGE3_WORK_BUILTIN_CANDIDATES = {
+    "update_plan",
+    "exit_plan_mode",
+    "todo_write",
+    "create_goal",
+    "get_goal",
+    "update_goal",
+    "ask_user_question",
+    "subagent",
+    "spawn_subagent",
+    "subagent_fork",
+    "fork_subagent",
+    "list_subagent_models",
+    "list_agents",
+    "send_message",
+    "interrupt_agent",
+    "workflow",
+}
+ENGINE_STAGE3_WORK_BUILTIN_ALLOWLIST = {
+    "subagent",
+    "spawn_subagent",
+    "subagent_fork",
+    "fork_subagent",
+    "list_subagent_models",
+    "list_agents",
+    "send_message",
+    "interrupt_agent",
+    "workflow",
+}
 ENGINE_REMOVED_PRIVATE_BUSINESS_METHODS = {
     "chatStreamFilterPhrases",
     "compactHistoryIfNeeded",
@@ -2483,6 +2512,42 @@ if stale_stage3_roots:
         "stale Stage-3 Engine business-root allowlist entries: "
         + ", ".join(stale_stage3_roots)
         + "; tighten the ratchet when ownership moves into the Feature"
+    )
+
+execute_builtin_start = engine.find("private suspend fun executeBuiltin(")
+execute_builtin_end = engine.find(
+    "\n    private fun startPersistentWebFetch(",
+    execute_builtin_start,
+)
+if execute_builtin_start < 0 or execute_builtin_end < 0:
+    die("Unable to locate LocalHarnessEngine builtin dispatch for Stage-3 ratchet")
+execute_builtin_body = engine[execute_builtin_start:execute_builtin_end]
+engine_builtin_case_names = set()
+for builtin_case_labels in re.findall(
+    r'^\s*((?:"[^"]+"\s*,\s*)*"[^"]+")\s*->',
+    execute_builtin_body,
+    re.MULTILINE,
+):
+    engine_builtin_case_names.update(re.findall(r'"([^"]+)"', builtin_case_labels))
+stage3_work_builtin_cases = (
+    engine_builtin_case_names & ENGINE_STAGE3_WORK_BUILTIN_CANDIDATES
+)
+unexpected_stage3_work_builtins = sorted(
+    stage3_work_builtin_cases - ENGINE_STAGE3_WORK_BUILTIN_ALLOWLIST
+)
+if unexpected_stage3_work_builtins:
+    die(
+        "LocalHarnessEngine regained migrated Work builtin business dispatch: "
+        + ", ".join(unexpected_stage3_work_builtins)
+    )
+stale_stage3_work_builtins = sorted(
+    ENGINE_STAGE3_WORK_BUILTIN_ALLOWLIST - stage3_work_builtin_cases
+)
+if stale_stage3_work_builtins:
+    die(
+        "stale Stage-3 Work builtin allowlist entries: "
+        + ", ".join(stale_stage3_work_builtins)
+        + "; shrink the allowlist in the same migration that moves the tool owner"
     )
 
 for transactional_chat_owner in (
