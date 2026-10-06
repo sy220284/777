@@ -251,8 +251,10 @@ data class AutomationTask(
 internal fun normalizeAutomationTask(task: AutomationTask): AutomationTask {
     val silenceMinutes = when (task.scheduleType) {
         AutomationScheduleType.SILENCE ->
-            (task.silenceMinutes ?: task.recurringMinutes ?: 60L).coerceAtLeast(60L)
-        else -> task.silenceMinutes?.coerceAtLeast(60L)
+            LocalChatAutomationPolicy.normalizeSilenceMinutes(
+                task.silenceMinutes ?: task.recurringMinutes ?: LocalChatAutomationPolicy.MIN_SILENCE_MINUTES,
+            )
+        else -> task.silenceMinutes?.let(LocalChatAutomationPolicy::normalizeSilenceMinutes)
     }
     val recurringMinutes = when (task.scheduleType) {
         AutomationScheduleType.SILENCE -> silenceMinutes
@@ -280,12 +282,12 @@ internal fun normalizeAutomationTask(task: AutomationTask): AutomationTask {
         quietEndHour = task.quietEndHour.coerceIn(0, 23),
         quietEndMinute = task.quietEndMinute.coerceIn(0, 59),
         proactiveMinGapMinutes = if (task.mode == AutomationMode.CHAT) {
-            task.proactiveMinGapMinutes.coerceAtLeast(60L)
+            LocalChatAutomationPolicy.normalizeProactiveMinGapMinutes(task.proactiveMinGapMinutes)
         } else {
             task.proactiveMinGapMinutes.coerceAtLeast(0L)
         },
         proactiveMaxUnanswered = if (task.mode == AutomationMode.CHAT) {
-            task.proactiveMaxUnanswered.coerceIn(1, 5)
+            LocalChatAutomationPolicy.normalizeProactiveMaxUnanswered(task.proactiveMaxUnanswered)
         } else {
             task.proactiveMaxUnanswered.coerceAtLeast(1)
         },
