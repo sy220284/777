@@ -14,7 +14,6 @@ ENGINE_MAX_INTERNAL_METHODS = 1
 ENGINE_MAX_CONSTRUCTOR_DEPENDENCIES = 17
 AGGREGATE_STATE_MAX_FIELDS = 28
 ENGINE_STAGE3_COMPOSITION_BRIDGE_ALLOWLIST = {
-    "chatTurnPort",
     "diagnosticsPort",
     "sessionLifecyclePort",
     "toolsManagementPort",
@@ -638,6 +637,42 @@ if "LocalSessionRuntimeRegistry.withOwner(" not in group_execution_owner_source:
     die("Group Chat must retain Shared Session ownership")
 if "runOwnedGroupChatTurn(" not in chat_turn_dispatcher_source:
     die("Chat turn dispatcher must route group turns through Chat-owned execution")
+chat_queue_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatQueueRuntime.kt")
+)
+chat_starter_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatTurnStarter.kt")
+)
+chat_composition_source = strip_comments(
+    read("app/src/main/java/com/labteto/dshmobile/local/chat/LocalChatComposition.kt")
+)
+for required_chat_queue_owner in (
+    "class LocalChatQueueRuntime",
+    "prepareNextLocked()",
+    "starter.get().start(",
+    "encodeLocalAgentInboxEvent(",
+):
+    if required_chat_queue_owner not in chat_queue_source:
+        die("Chat queue continuation ownership is incomplete: " + required_chat_queue_owner)
+if "class LocalChatTurnStarter" not in chat_starter_source or ": LocalChatTurnPort" not in chat_starter_source:
+    die("ChatFeature must own the LocalChatTurnPort implementation")
+if "class LocalChatComposition" not in chat_composition_source:
+    die("ChatFeature composition surface is missing")
+for removed_engine_chat_composition in (
+    "internal val chatTurnPort",
+    "private val chatTurnDispatcher",
+    "private val groupChatTurnExecutor",
+    "private val engineChatDirectTurnExecutor",
+    "private val engineChatTranscriptRuntime",
+    "private val engineChatPersonaCorrections",
+    "private val engineChatRelationshipHydrator",
+    "private val engineChatMemoryRuntime",
+):
+    if removed_engine_chat_composition in engine:
+        die(
+            "Chat turn composition must not return to LocalHarnessEngine: "
+            + removed_engine_chat_composition
+        )
 if "private suspend fun runGroupChatTurn(" in engine:
     die("Group-chat foreground execution proxy must not return to LocalHarnessEngine")
 if re.search(r"\brunOwnedGroupChatTurn\s*\(", strip_comments(engine)):
@@ -1149,8 +1184,12 @@ if "coordinator: LocalChatExecutionCoordinator" not in feature_execution_port_mo
     die("ChatExecutionPort must be implemented by LocalChatExecutionCoordinator")
 if "engine.chatExecutionPort" in feature_execution_port_module_source or "internal val chatExecutionPort" in engine:
     die("LocalHarnessEngine must not own the Chat product execution port")
-if "provideLocalChatTurnPort" not in feature_execution_port_module_source or "engine.chatTurnPort" not in feature_execution_port_module_source:
-    die("Chat turn composition must use the explicit migration bridge")
+if "provideLocalChatTurnPort" not in feature_execution_port_module_source:
+    die("Chat turn composition must expose the Chat-owned starter through its narrow port")
+if "starter: LocalChatTurnStarter" not in feature_execution_port_module_source:
+    die("Chat turn port must bind directly to LocalChatTurnStarter")
+if "engine.chatTurnPort" in feature_execution_port_module_source or "internal val chatTurnPort" in engine:
+    die("Chat turn composition must not route through LocalHarnessEngine")
 for removed_chat_send_root in (
     "private fun sendChat(",
     "private fun queueHumanTurn(",
