@@ -214,7 +214,7 @@ internal class LocalSubagentRunner(
         val modelOverride = spec.modelOverride
         val maxSteps = spec.maxSteps
         val subagentId = backgroundJobId
-            ?.let(::persistentSubagentId)
+            ?.let(::localPersistentSubagentId)
             ?: "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
         val recoveringHistory = recoveredHistory != null
         val history = LocalModelHistoryBuffer().apply {
@@ -856,9 +856,6 @@ internal class LocalSubagentRunner(
             is AgentEvent.TurnCancelled -> this
         }
     }
-
-    private fun persistentSubagentId(jobId: String): String =
-        "sa-" + jobId.removePrefix("job-").take(24)
 
     private fun AgentToolCall.toLocalToolCall() = LocalToolCall(id, name, arguments, rawArguments)
     private companion object {
