@@ -499,7 +499,9 @@ class HarnessJobManager(
                 ?.takeIf { ownerId == null || it.ownerId == ownerId }
                 ?: error("后台代理不存在：$id")
             check(!found.resumeKind.isNullOrBlank()) { "后台代理不是持久任务：$id" }
-            check(found.status == "running") { "后台代理当前不可进入等待态：$id [${found.status}]" }
+            check(found.status in setOf("running", "interrupted")) {
+                "后台代理当前不可进入等待态：$id [${found.status}]"
+            }
             previousOutput = found.output
             previousStatus = found.status
             previousUpdatedAt = found.updatedAt
