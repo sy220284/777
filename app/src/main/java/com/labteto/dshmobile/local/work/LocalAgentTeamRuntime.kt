@@ -67,7 +67,17 @@ internal data class LocalTeamProjection(
 /** Work-owned Agent Team domain. Durable state lives only in the lead Session EventLog. */
 internal class LocalAgentTeamRuntime(
     private val jobs: LocalJobManager,
-    private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
+    private val startTeammate: suspend (
+        binding: LocalWorkRunBinding,
+        task: String,
+        model: String?,
+        maxSteps: Int,
+    ) -> com.labteto.dshmobile.harness.jobs.JobStartResult,
+    private val sendToTeammate: (
+        agentId: String,
+        input: QueuedAgentInput,
+        sessionId: String,
+    ) -> com.labteto.dshmobile.harness.jobs.JobMessageAdmission,
     private val eventLogFor: (String) -> LocalSessionEventLog,
     projectionRegistry: SessionProjectionRegistry,
 ) {
@@ -157,15 +167,11 @@ internal class LocalAgentTeamRuntime(
         require(before.members.count { it.phase == LocalTeamMemberPhase.ACTIVE } < MAX_TEAMMATES) {
             "TEAM_MEMBER_LIMIT：最多允许 $MAX_TEAMMATES 个 active teammate"
         }
-        val snapshot = binding.aggregateSnapshot()
-        val start = persistentJobs.startReadonlySubagentResult(
-            task = buildTeamTaskPrompt(cleanName, description, task),
-            model = model,
-            maxSteps = LocalAgentRuntimeLimits.normalizeSubagentSteps(maxSteps),
-            virtualScreen = false,
-            sessionId = binding.sessionId,
-            boundState = snapshot,
-            historySnapshot = binding.runHandle.modelHistory::snapshot,
+        val start = startTeammate(
+            binding,
+            buildTeamTaskPrompt(cleanName, description, task),
+            model,
+            LocalAgentRuntimeLimits.normalizeSubagentSteps(maxSteps),
         )
         if (!start.accepted || start.id.isNullOrBlank()) {
             return "[TEAM_MEMBER_START_REJECTED] ${start.message}"
@@ -234,14 +240,14 @@ internal class LocalAgentTeamRuntime(
         member: LocalTeamMemberSnapshot,
     ): Boolean {
         val framed = "[Team message ${message.id} from ${message.senderName}] ${message.content}"
-        val admission = persistentJobs.sendInput(
-            agentId = member.jobId,
-            input = QueuedAgentInput(
+        val admission = sendToTeammate(
+            member.jobId,
+            QueuedAgentInput(
                 id = message.id,
                 content = framed,
                 memoryInput = message.content,
             ),
-            sessionId = sessionId,
+            sessionId,
         )
         if (!admission.accepted) return false
         eventLogFor(sessionId).append(
