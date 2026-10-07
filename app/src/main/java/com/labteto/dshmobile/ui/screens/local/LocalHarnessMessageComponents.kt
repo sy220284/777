@@ -121,6 +121,7 @@ internal fun localConversationModeLabel(mode: LocalConversationMode): String = s
 @Composable
 internal fun localJobStatusLabel(status: String): String = when (status) {
     "running" -> stringResource(R.string.jobs_running)
+    "idle" -> stringResource(R.string.jobs_idle)
     "completed" -> stringResource(R.string.jobs_completed)
     "killed", "cancelled" -> stringResource(R.string.jobs_killed)
     "failed" -> stringResource(R.string.jobs_failed)
