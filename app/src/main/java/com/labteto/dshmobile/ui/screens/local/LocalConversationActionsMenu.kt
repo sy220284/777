@@ -11,11 +11,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsIconButton
-import com.labteto.dshmobile.ui.components.DsPopupMenu
-import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
 import com.labteto.dshmobile.ui.theme.DsTheme
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
 @Composable
 internal fun ConversationActionsMenu(
@@ -33,28 +31,39 @@ internal fun ConversationActionsMenu(
             onClick = { expanded = true },
             tint = colors.labelSecondary,
         )
-        DsPopupMenu(
-            expanded = expanded,
-            onDismiss = { expanded = false },
-            containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.MENU, base = colors.bgBase),
-            items = listOf(
-                MenuItem(
-                    text = stringResource(if (pinned) R.string.local_unpin_session else R.string.advanced_pin),
+        if (expanded) {
+            DsBottomSheet(
+                title = stringResource(R.string.local_session_actions),
+                onDismiss = { expanded = false },
+            ) {
+                DsSheetChoiceRow(
+                    title = stringResource(
+                        if (pinned) R.string.local_unpin_session else R.string.advanced_pin,
+                    ),
                     icon = FeatherIcons.Pin,
-                    onClick = onTogglePin,
-                ),
-                MenuItem(
-                    text = stringResource(R.string.common_rename),
+                    onClick = {
+                        expanded = false
+                        onTogglePin()
+                    },
+                )
+                DsSheetChoiceRow(
+                    title = stringResource(R.string.common_rename),
                     icon = FeatherIcons.Edit3,
-                    onClick = onRename,
-                ),
-                MenuItem(
-                    text = stringResource(R.string.local_delete_session),
+                    onClick = {
+                        expanded = false
+                        onRename()
+                    },
+                )
+                DsSheetChoiceRow(
+                    title = stringResource(R.string.local_delete_session),
                     icon = FeatherIcons.Trash2,
                     danger = true,
-                    onClick = onDelete,
-                ),
-            ),
-        )
+                    onClick = {
+                        expanded = false
+                        onDelete()
+                    },
+                )
+            }
+        }
     }
 }
