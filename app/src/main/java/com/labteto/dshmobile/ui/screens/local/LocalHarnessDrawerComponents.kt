@@ -50,6 +50,8 @@ import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsCheckbox
 import com.labteto.dshmobile.ui.components.DsPill
+import com.labteto.dshmobile.ui.components.DsPopupMenu
+import com.labteto.dshmobile.ui.components.MenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.relativeTime
 import com.labteto.dshmobile.ui.theme.DsAnimations
@@ -383,10 +385,13 @@ internal fun LocalSessionDrawerRow(
     selected: Boolean,
     selectionOpen: Boolean,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
+    onSelectMultiple: () -> Unit,
+    onRename: () -> Unit,
+    onTogglePinned: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val colors = DsTheme.colors
+    var menuOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val reveal = with(density) { 76.dp.toPx() }
     var swipe by remember { mutableStateOf(0f) }
@@ -429,7 +434,7 @@ internal fun LocalSessionDrawerRow(
                         label = "sessionRowBackground",
                     ).value,
                 )
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .combinedClickable(onClick = onClick, onLongClick = { menuOpen = true })
                 .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -501,5 +506,32 @@ internal fun LocalSessionDrawerRow(
                 }
             }
         }
+        DsPopupMenu(
+            expanded = menuOpen,
+            onDismiss = { menuOpen = false },
+            items = listOf(
+                MenuItem(
+                    text = stringResource(R.string.common_rename),
+                    icon = FeatherIcons.Edit3,
+                    onClick = onRename,
+                ),
+                MenuItem(
+                    text = stringResource(R.string.local_drawer_multi_select),
+                    icon = FeatherIcons.List,
+                    onClick = onSelectMultiple,
+                ),
+                MenuItem(
+                    text = stringResource(if (pinned) R.string.local_unpin_session else R.string.advanced_pin),
+                    icon = FeatherIcons.Pin,
+                    onClick = onTogglePinned,
+                ),
+                MenuItem(
+                    text = stringResource(R.string.local_delete_session),
+                    icon = FeatherIcons.Trash2,
+                    danger = true,
+                    onClick = onDelete,
+                ),
+            ),
+        )
     }
 }
