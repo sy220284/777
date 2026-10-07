@@ -138,7 +138,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         currentModel: String,
         currentBaseUrl: String,
     ): LocalModelConfigurationResult {
-        profiles.write(remaining)
+        profiles.writeAfterRemoval(remaining)
         val candidate = if (activeRemoved) remaining.firstOrNull()
             else profiles.active(currentModel, currentBaseUrl, remaining)
         val next = candidate?.takeIf { gateway.hasCredential(it) }

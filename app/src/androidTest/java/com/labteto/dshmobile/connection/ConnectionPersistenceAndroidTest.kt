@@ -153,6 +153,93 @@ class ConnectionPersistenceAndroidTest {
     }
 
     @Test
+    fun hostAndLastSessionCorruptionRecoverAndExplicitClearRemovesBackups() = withStore { dataStore, _ ->
+        val store = HostsStore(dataStore, RelayCredentialStore(dataStore), context)
+        val hostsKey = stringPreferencesKey("hosts_json")
+        val hostsBackupKey = stringPreferencesKey("hosts_json_backup")
+        val sessionsKey = stringPreferencesKey("last_sessions_json")
+        val sessionsBackupKey = stringPreferencesKey("last_sessions_json_backup")
+
+        store.upsertHost(
+            HostConfig(
+                id = "host-a",
+                name = "Host A",
+                host = "a.example",
+                port = 443,
+                useTls = true,
+            ),
+        )
+        store.upsertHost(
+            HostConfig(
+                id = "host-b",
+                name = "Host B",
+                host = "b.example",
+                port = 443,
+                useTls = true,
+            ),
+        )
+        store.setLastSessionId("a.example:443", "session-a")
+        store.setLastSessionId("b.example:443", "session-b")
+
+        dataStore.edit { prefs ->
+            prefs[hostsKey] = "{broken-hosts"
+            prefs[sessionsKey] = "{broken-sessions"
+        }
+
+        assertEquals(listOf("host-a"), store.hosts.first().map { it.id })
+        assertEquals("session-a", store.lastSessionId("a.example:443"))
+        assertNull(store.lastSessionId("b.example:443"))
+
+        store.clearHosts()
+        val cleared = dataStore.data.first()
+        assertNull(cleared[hostsKey])
+        assertNull(cleared[hostsBackupKey])
+        assertNull(cleared[sessionsKey])
+        assertNull(cleared[sessionsBackupKey])
+        assertEquals(emptyList<HostConfig>(), store.hosts.first())
+    }
+
+    @Test
+    fun harnessSessionRemovalCreatesPostRemovalRecoveryBaseline() = withStore { dataStore, _ ->
+        val sessionsKey = stringPreferencesKey("harness_sessions_json")
+        val backupKey = stringPreferencesKey("harness_sessions_json_backup")
+        dataStore.edit { prefs ->
+            prefs[sessionsKey] = """{"host-a":"cookie-a","host-b":"cookie-b"}"""
+        }
+        val store = HarnessSessionStore(dataStore, okhttp3.OkHttpClient())
+
+        store.remove("host-a")
+        dataStore.edit { prefs -> prefs[sessionsKey] = "{broken-primary" }
+
+        assertNull(store.cookie("host-a"))
+        assertEquals("cookie-b", store.cookie("host-b"))
+
+        store.clear()
+        val cleared = dataStore.data.first()
+        assertNull(cleared[sessionsKey])
+        assertNull(cleared[backupKey])
+    }
+
+    @Test
+    fun relayCredentialRemovalCanRecoverOuterMapWithoutResurrectingDeletedEntry() = withStore { dataStore, _ ->
+        val credentialsKey = stringPreferencesKey("relay_tokens_json")
+        val backupKey = stringPreferencesKey("relay_tokens_json_backup")
+        dataStore.edit { prefs ->
+            prefs[credentialsKey] = """{"host-a":"blob-a","host-b":"blob-b"}"""
+        }
+        val store = RelayCredentialStore(dataStore)
+
+        store.remove("host-a")
+        dataStore.edit { prefs -> prefs[credentialsKey] = "{broken-primary" }
+
+        // remove() must decode the backup baseline, delete host-b, and clear both copies.
+        store.remove("host-b")
+        val cleared = dataStore.data.first()
+        assertNull(cleared[credentialsKey])
+        assertNull(cleared[backupKey])
+    }
+
+    @Test
     fun concurrentWebhookGetOrCreateReturnsOneStableToken() = withStore { dataStore, _ ->
         val store = WebhookTokenStore(dataStore)
         val tokens = java.util.Collections.synchronizedList(mutableListOf<String>())

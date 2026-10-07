@@ -7,6 +7,7 @@ internal object LocalModelConfigContract {
     const val KEY_MODEL = "model"
     const val KEY_BASE_URL = "base_url"
     const val KEY_PROFILES_V3 = "model_profiles_v3"
+    const val KEY_PROFILES_BACKUP = "model_profiles_v3_backup"
     const val KEY_PROFILES_V2 = "model_profiles_v2"
     const val KEY_ACTIVE_PROFILE_ID = "model_profile_active_v3"
     const val KEY_WORKER_PROFILE_ID = "worker_profile_id"

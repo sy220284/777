@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.model
 import android.content.SharedPreferences
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.model.chatgpt.refreshChatGptPlanProfiles
+import com.labteto.dshmobile.persistence.RecoveringJsonValue
+import com.labteto.dshmobile.persistence.recoverJsonValue
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.contentOrNull
@@ -17,10 +19,23 @@ internal class LocalModelProfileStore(
     private val preferences: SharedPreferences,
     private val json: Json,
 ) {
-    fun read(): List<LocalModelProfile> = runCatching {
-        val raw = preferences.getString(LocalModelConfigContract.KEY_PROFILES_V3, null)
-            ?: preferences.getString(LocalModelConfigContract.KEY_PROFILES_V2, "[]")
-            ?: "[]"
+    fun read(): List<LocalModelProfile> = recoverProfiles().value
+
+    private fun recoverProfiles(): RecoveringJsonValue<List<LocalModelProfile>> {
+        val primaryV3 = preferences.getString(LocalModelConfigContract.KEY_PROFILES_V3, null)
+        val primary = primaryV3 ?: preferences.getString(LocalModelConfigContract.KEY_PROFILES_V2, null)
+        val backup = if (primaryV3 != null) preferences.getString(LocalModelConfigContract.KEY_PROFILES_BACKUP, null) else null
+        return recoverJsonValue(
+            primary = primary,
+            backup = backup,
+            label = "model profiles",
+            emptyValue = { emptyList() },
+        ) { raw ->
+            decodeProfiles(raw)
+        }
+    }
+
+    private fun decodeProfiles(raw: String): List<LocalModelProfile> =
         json.parseToJsonElement(raw).jsonArray.mapNotNull { item ->
             val obj = item.jsonObject
             val storedModel = obj["model"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
@@ -53,10 +68,25 @@ internal class LocalModelProfileStore(
                 contextWindowTokensOverride = obj["contextWindowTokensOverride"]?.jsonPrimitive?.intOrNull,
             )
         }.distinctBy(LocalModelProfile::id)
-    }.getOrDefault(emptyList())
 
-    fun write(profiles: List<LocalModelProfile>) {
-        val editor = preferences.edit().putString(LocalModelConfigContract.KEY_PROFILES_V3, encode(profiles))
+    fun write(profiles: List<LocalModelProfile>) =
+        writeInternal(profiles, preservePreviousAsBackup = true)
+
+    fun writeAfterRemoval(profiles: List<LocalModelProfile>) =
+        writeInternal(profiles, preservePreviousAsBackup = false)
+
+    private fun writeInternal(
+        profiles: List<LocalModelProfile>,
+        preservePreviousAsBackup: Boolean,
+    ) {
+        val previous = recoverProfiles()
+        val encoded = encode(profiles)
+        val editor = preferences.edit()
+        editor.putString(
+            LocalModelConfigContract.KEY_PROFILES_BACKUP,
+            if (preservePreviousAsBackup) previous.raw ?: encoded else encoded,
+        )
+        editor.putString(LocalModelConfigContract.KEY_PROFILES_V3, encoded)
         preferences.getString(LocalModelConfigContract.KEY_WORKER_PROFILE_ID, null)
             ?.takeIf { workerId -> profiles.none { it.id == workerId } }
             ?.let { editor.remove(LocalModelConfigContract.KEY_WORKER_PROFILE_ID) }
@@ -64,7 +94,7 @@ internal class LocalModelProfileStore(
     }
 
     fun replaceChatGpt(accountId: String, models: List<ChatGptModelOption>): List<LocalModelProfile> =
-        refreshChatGptPlanProfiles(read(), accountId, models).also(::write)
+        refreshChatGptPlanProfiles(read(), accountId, models).also(::writeAfterRemoval)
 
     fun migrateV2IfNeeded() {
         if (preferences.contains(LocalModelConfigContract.KEY_PROFILES_V3)) return

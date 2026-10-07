@@ -1,12 +1,15 @@
 package com.labteto.dshmobile.connection
 
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.labteto.dshmobile.core.wire.HarnessSession
 import com.labteto.dshmobile.core.wire.SessionExchange
 import com.labteto.dshmobile.core.wire.WireJson
+import com.labteto.dshmobile.persistence.RecoveringJsonValue
+import com.labteto.dshmobile.persistence.recoverJsonValue
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -54,9 +57,9 @@ class HarnessSessionStore @Inject constructor(
         val outcome = HarnessSession.exchange(baseUrl, token, okHttpClient)
         if (outcome is SessionExchange.Granted) {
             dataStore.edit { prefs ->
-                val current = decodeSessions(prefs[KEY]).toMutableMap()
+                val current = decodeSessions(prefs).toMutableMap()
                 current[hostId] = outcome.cookie
-                prefs[KEY] = WireJson.encodeToString(serializer, current)
+                writeSessions(prefs, current)
             }
         }
         return outcome
@@ -65,27 +68,58 @@ class HarnessSessionStore @Inject constructor(
     /** Forget the session for [hostId]. Safe to call when there is none. */
     suspend fun remove(hostId: String) {
         dataStore.edit { prefs ->
-            val current = decodeSessions(prefs[KEY]).toMutableMap()
+            val current = decodeSessions(prefs).toMutableMap()
             if (current.remove(hostId) == null) return@edit
-            if (current.isEmpty()) prefs.remove(KEY)
-            else prefs[KEY] = WireJson.encodeToString(serializer, current)
+            if (current.isEmpty()) {
+                prefs.remove(KEY)
+                prefs.remove(BACKUP_KEY)
+            } else {
+                writeSessionsAfterRemoval(prefs, current)
+            }
         }
     }
 
     /** Forget every session — the Settings "clear data" action. */
     suspend fun clear() {
-        dataStore.edit { it.remove(KEY) }
+        dataStore.edit {
+            it.remove(KEY)
+            it.remove(BACKUP_KEY)
+        }
     }
 
-    private suspend fun sessions(): Map<String, String> =
-        decodeSessions(dataStore.data.first()[KEY])
+    private suspend fun sessions(): Map<String, String> {
+        val prefs = dataStore.data.first()
+        return recoverSessions(prefs).value
+    }
 
-    private fun decodeSessions(raw: String?): Map<String, String> {
-        if (raw == null) return emptyMap()
-        return runCatching { WireJson.decodeFromString(serializer, raw) }.getOrDefault(emptyMap())
+    private fun recoverSessions(prefs: Preferences): RecoveringJsonValue<Map<String, String>> =
+        recoverJsonValue(
+            primary = prefs[KEY],
+            backup = prefs[BACKUP_KEY],
+            label = "harness sessions",
+            emptyValue = { emptyMap() },
+        ) { raw ->
+            WireJson.decodeFromString(serializer, raw)
+        }
+
+    private fun decodeSessions(prefs: Preferences): Map<String, String> =
+        recoverSessions(prefs).value
+
+    private fun writeSessions(prefs: MutablePreferences, sessions: Map<String, String>) {
+        val previous = recoverSessions(prefs).raw
+        val encoded = WireJson.encodeToString(serializer, sessions)
+        prefs[BACKUP_KEY] = previous ?: encoded
+        prefs[KEY] = encoded
+    }
+
+    private fun writeSessionsAfterRemoval(prefs: MutablePreferences, sessions: Map<String, String>) {
+        val encoded = WireJson.encodeToString(serializer, sessions)
+        prefs[BACKUP_KEY] = encoded
+        prefs[KEY] = encoded
     }
 
     private companion object {
         val KEY = stringPreferencesKey("harness_sessions_json")
+        val BACKUP_KEY = stringPreferencesKey("harness_sessions_json_backup")
     }
 }

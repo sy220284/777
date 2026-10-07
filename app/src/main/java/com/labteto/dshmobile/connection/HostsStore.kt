@@ -2,6 +2,7 @@ package com.labteto.dshmobile.connection
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -11,6 +12,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.labteto.dshmobile.DshApplication
 import com.labteto.dshmobile.core.wire.WireJson
 import com.labteto.dshmobile.core.wire.dto.HostDescription
+import com.labteto.dshmobile.persistence.RecoveringJsonValue
+import com.labteto.dshmobile.persistence.recoverJsonValue
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -31,6 +34,7 @@ class HostsStore @Inject constructor(
 ) {
     private object Keys {
         val HOSTS = stringPreferencesKey("hosts_json")
+        val HOSTS_BACKUP = stringPreferencesKey("hosts_json_backup")
         val BACKGROUND = booleanPreferencesKey("background")
         val BACKGROUND_IMAGE = stringPreferencesKey("background_image_path")
         val SIDEBAR_AVATAR = stringPreferencesKey("sidebar_avatar_source")
@@ -47,6 +51,7 @@ class HostsStore @Inject constructor(
         // Migration-only key from builds that exposed per-app language selection.
         val RETIRED_LOCALE = stringPreferencesKey("locale")
         val LAST_SESSIONS = stringPreferencesKey("last_sessions_json")
+        val LAST_SESSIONS_BACKUP = stringPreferencesKey("last_sessions_json_backup")
         val SESSION_SORT = stringPreferencesKey("session_sort")
         val DESIRED_HOST_ID = stringPreferencesKey("desired_host_id")
     }
@@ -96,7 +101,7 @@ class HostsStore @Inject constructor(
             val current = decodeHosts(prefs).toMutableList()
             current.removeAll { it.host == config.host && it.port == config.port }
             current.add(0, config)
-            prefs[Keys.HOSTS] = WireJson.encodeToString(hostsSerializer, current)
+            writeHosts(prefs, current)
         }
     }
 
@@ -104,8 +109,8 @@ class HostsStore @Inject constructor(
         val now = System.currentTimeMillis()
         dataStore.edit { prefs ->
             val current = decodeHosts(prefs)
-            prefs[Keys.HOSTS] = WireJson.encodeToString(
-                hostsSerializer,
+            writeHosts(
+                prefs,
                 current.map {
                     if (it.host == host && it.port == port) it.copy(lastConnectedAt = now) else it
                 },
@@ -152,7 +157,7 @@ class HostsStore @Inject constructor(
             )
             current.removeAll { it.host == host && it.port == port }
             current.add(0, config)
-            prefs[Keys.HOSTS] = WireJson.encodeToString(hostsSerializer, current)
+            writeHosts(prefs, current)
             remembered = config
         }
         return checkNotNull(remembered)
@@ -163,8 +168,8 @@ class HostsStore @Inject constructor(
         dataStore.edit { prefs ->
             val current = decodeHosts(prefs)
             if (current.none { it.host == host && it.port == port }) return@edit
-            prefs[Keys.HOSTS] = WireJson.encodeToString(
-                hostsSerializer,
+            writeHosts(
+                prefs,
                 current.map {
                     if (it.host == host && it.port == port) it.copy(lastHome = description.home) else it
                 },
@@ -181,10 +186,13 @@ class HostsStore @Inject constructor(
      */
     suspend fun removeHost(id: String) {
         dataStore.edit { prefs ->
-            prefs[Keys.HOSTS] = WireJson.encodeToString(
-                hostsSerializer,
-                decodeHosts(prefs).filterNot { it.id == id },
-            )
+            val remaining = decodeHosts(prefs).filterNot { it.id == id }
+            if (remaining.isEmpty()) {
+                prefs.remove(Keys.HOSTS)
+                prefs.remove(Keys.HOSTS_BACKUP)
+            } else {
+                writeHostsAfterRemoval(prefs, remaining)
+            }
             if (prefs[Keys.DESIRED_HOST_ID] == id) prefs.remove(Keys.DESIRED_HOST_ID)
         }
         credentials.remove(id)
@@ -204,7 +212,7 @@ class HostsStore @Inject constructor(
             next[hostKey] = sessionId
             decodeLastSessions(prefs).forEach { (key, value) -> if (key != hostKey) next[key] = value }
             val trimmed = next.entries.take(MAX_REMEMBERED_HOSTS).associate { it.key to it.value }
-            prefs[Keys.LAST_SESSIONS] = WireJson.encodeToString(lastSessionsSerializer, trimmed)
+            writeLastSessions(prefs, trimmed)
         }
     }
 
@@ -212,14 +220,19 @@ class HostsStore @Inject constructor(
     suspend fun clearHosts() {
         dataStore.edit { prefs ->
             prefs.remove(Keys.HOSTS)
+            prefs.remove(Keys.HOSTS_BACKUP)
             prefs.remove(Keys.DESIRED_HOST_ID)
             prefs.remove(Keys.LAST_SESSIONS)
+            prefs.remove(Keys.LAST_SESSIONS_BACKUP)
         }
     }
 
     /** Forget every remembered landing session (the Settings "clear data" action). */
     suspend fun clearLastSessions() {
-        dataStore.edit { it.remove(Keys.LAST_SESSIONS) }
+        dataStore.edit {
+            it.remove(Keys.LAST_SESSIONS)
+            it.remove(Keys.LAST_SESSIONS_BACKUP)
+        }
     }
 
     private suspend fun lastSessions(): Map<String, String> =
@@ -243,16 +256,50 @@ class HostsStore @Inject constructor(
                 (prefs[Keys.WALLPAPER_SURFACE_TRANSPARENCY] ?: 0.5f).coerceIn(0f, 1f),
         )
 
-    private fun decodeHosts(prefs: Preferences): List<HostConfig> {
-        val raw = prefs[Keys.HOSTS] ?: return emptyList()
-        return runCatching {
+    private fun decodeHosts(prefs: Preferences): List<HostConfig> =
+        recoverHosts(prefs).value
+
+    private fun recoverHosts(prefs: Preferences): RecoveringJsonValue<List<HostConfig>> =
+        recoverJsonValue(
+            primary = prefs[Keys.HOSTS],
+            backup = prefs[Keys.HOSTS_BACKUP],
+            label = "remembered hosts",
+            emptyValue = { emptyList() },
+        ) { raw ->
             WireJson.decodeFromString(hostsSerializer, raw).sortedByDescending { it.lastConnectedAt }
-        }.getOrDefault(emptyList())
+        }
+
+    private fun writeHosts(prefs: MutablePreferences, hosts: List<HostConfig>) {
+        val previous = recoverHosts(prefs).raw
+        val encoded = WireJson.encodeToString(hostsSerializer, hosts)
+        prefs[Keys.HOSTS_BACKUP] = previous ?: encoded
+        prefs[Keys.HOSTS] = encoded
     }
 
-    private fun decodeLastSessions(prefs: Preferences): Map<String, String> {
-        val raw = prefs[Keys.LAST_SESSIONS] ?: return emptyMap()
-        return runCatching { WireJson.decodeFromString(lastSessionsSerializer, raw) }.getOrDefault(emptyMap())
+    private fun writeHostsAfterRemoval(prefs: MutablePreferences, hosts: List<HostConfig>) {
+        val encoded = WireJson.encodeToString(hostsSerializer, hosts)
+        prefs[Keys.HOSTS_BACKUP] = encoded
+        prefs[Keys.HOSTS] = encoded
+    }
+
+    private fun decodeLastSessions(prefs: Preferences): Map<String, String> =
+        recoverLastSessions(prefs).value
+
+    private fun recoverLastSessions(prefs: Preferences): RecoveringJsonValue<Map<String, String>> =
+        recoverJsonValue(
+            primary = prefs[Keys.LAST_SESSIONS],
+            backup = prefs[Keys.LAST_SESSIONS_BACKUP],
+            label = "last sessions",
+            emptyValue = { emptyMap() },
+        ) { raw ->
+            WireJson.decodeFromString(lastSessionsSerializer, raw)
+        }
+
+    private fun writeLastSessions(prefs: MutablePreferences, sessions: Map<String, String>) {
+        val previous = recoverLastSessions(prefs).raw
+        val encoded = WireJson.encodeToString(lastSessionsSerializer, sessions)
+        prefs[Keys.LAST_SESSIONS_BACKUP] = previous ?: encoded
+        prefs[Keys.LAST_SESSIONS] = encoded
     }
 
     /** Drawer session ordering: `"manual"` follows the workspace order, `"updated"` sorts by recency. */

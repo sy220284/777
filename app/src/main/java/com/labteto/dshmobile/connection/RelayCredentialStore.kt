@@ -3,10 +3,13 @@ package com.labteto.dshmobile.connection
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.labteto.dshmobile.core.wire.WireJson
+import com.labteto.dshmobile.persistence.RecoveringJsonValue
+import com.labteto.dshmobile.persistence.recoverJsonValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -68,19 +71,23 @@ class RelayCredentialStore @Inject constructor(
     suspend fun put(hostId: String, token: String) {
         val blob = withContext(Dispatchers.Default) { encrypt(token) }
         dataStore.edit { prefs ->
-            val current = decodeBlobs(prefs[KEY]).toMutableMap()
+            val current = decodeBlobs(prefs).toMutableMap()
             current[hostId] = blob
-            prefs[KEY] = WireJson.encodeToString(serializer, current)
+            writeBlobs(prefs, current)
         }
     }
 
     /** Forget the credential for [hostId]. Safe to call when there is none. */
     suspend fun remove(hostId: String) {
         dataStore.edit { prefs ->
-            val current = decodeBlobs(prefs[KEY]).toMutableMap()
+            val current = decodeBlobs(prefs).toMutableMap()
             if (current.remove(hostId) == null) return@edit
-            if (current.isEmpty()) prefs.remove(KEY)
-            else prefs[KEY] = WireJson.encodeToString(serializer, current)
+            if (current.isEmpty()) {
+                prefs.remove(KEY)
+                prefs.remove(BACKUP_KEY)
+            } else {
+                writeBlobsAfterRemoval(prefs, current)
+            }
         }
     }
 
@@ -92,25 +99,55 @@ class RelayCredentialStore @Inject constructor(
      */
     private suspend fun removeIfUnchanged(hostId: String, failedBlob: String) {
         dataStore.edit { prefs ->
-            val current = decodeBlobs(prefs[KEY]).toMutableMap()
+            val current = decodeBlobs(prefs).toMutableMap()
             if (current[hostId] != failedBlob) return@edit
             current.remove(hostId)
-            if (current.isEmpty()) prefs.remove(KEY)
-            else prefs[KEY] = WireJson.encodeToString(serializer, current)
+            if (current.isEmpty()) {
+                prefs.remove(KEY)
+                prefs.remove(BACKUP_KEY)
+            } else {
+                writeBlobsAfterRemoval(prefs, current)
+            }
         }
     }
 
     /** Forget every credential — the Settings "clear data" action, and a signed-out-everywhere relay. */
     suspend fun clear() {
-        dataStore.edit { it.remove(KEY) }
+        dataStore.edit {
+            it.remove(KEY)
+            it.remove(BACKUP_KEY)
+        }
     }
 
-    private suspend fun blobs(): Map<String, String> =
-        decodeBlobs(dataStore.data.first()[KEY])
+    private suspend fun blobs(): Map<String, String> {
+        val prefs = dataStore.data.first()
+        return recoverBlobs(prefs).value
+    }
 
-    private fun decodeBlobs(raw: String?): Map<String, String> {
-        if (raw == null) return emptyMap()
-        return runCatching { WireJson.decodeFromString(serializer, raw) }.getOrDefault(emptyMap())
+    private fun recoverBlobs(prefs: Preferences): RecoveringJsonValue<Map<String, String>> =
+        recoverJsonValue(
+            primary = prefs[KEY],
+            backup = prefs[BACKUP_KEY],
+            label = "relay credentials",
+            emptyValue = { emptyMap() },
+        ) { raw ->
+            WireJson.decodeFromString(serializer, raw)
+        }
+
+    private fun decodeBlobs(prefs: Preferences): Map<String, String> =
+        recoverBlobs(prefs).value
+
+    private fun writeBlobs(prefs: MutablePreferences, blobs: Map<String, String>) {
+        val previous = recoverBlobs(prefs).raw
+        val encoded = WireJson.encodeToString(serializer, blobs)
+        prefs[BACKUP_KEY] = previous ?: encoded
+        prefs[KEY] = encoded
+    }
+
+    private fun writeBlobsAfterRemoval(prefs: MutablePreferences, blobs: Map<String, String>) {
+        val encoded = WireJson.encodeToString(serializer, blobs)
+        prefs[BACKUP_KEY] = encoded
+        prefs[KEY] = encoded
     }
 
     /**
@@ -155,6 +192,7 @@ class RelayCredentialStore @Inject constructor(
 
     private companion object {
         val KEY = stringPreferencesKey("relay_tokens_json")
+        val BACKUP_KEY = stringPreferencesKey("relay_tokens_json_backup")
         const val PROVIDER = "AndroidKeyStore"
         const val ALIAS = "dsh_relay_tokens"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
