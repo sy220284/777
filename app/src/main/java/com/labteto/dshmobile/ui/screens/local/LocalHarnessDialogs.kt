@@ -432,6 +432,9 @@ internal fun ChatPersonaDialog(
         scrollable = true,
         dismissEnabled = !aiGenerating && !saving,
         footer = {
+            saveError?.let {
+                Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error)
+            }
         DsButton(
             text = stringResource(R.string.local_persona_save),
             onClick = {
@@ -517,15 +520,19 @@ internal fun ChatPersonaDialog(
                         aiSucceeded = false
                         aiError = null
                         coroutineScope.launch {
-                            onAutoFill(aiDescription)
-                                .onSuccess { generated ->
-                                    applyGenerated(generated)
-                                    aiSucceeded = true
-                                }
-                                .onFailure { error ->
-                                    aiError = error.message ?: "persona_autofill_failed"
-                                }
-                            aiGenerating = false
+                            try {
+                                runCatching { onAutoFill(aiDescription) }
+                                    .getOrElse { Result.failure(it) }
+                                    .onSuccess { generated ->
+                                        applyGenerated(generated)
+                                        aiSucceeded = true
+                                    }
+                                    .onFailure { error ->
+                                        aiError = error.message ?: "persona_autofill_failed"
+                                    }
+                            } finally {
+                                aiGenerating = false
+                            }
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -576,7 +583,6 @@ internal fun ChatPersonaDialog(
         PersonaTextField(stringResource(R.string.local_persona_corrections), corrections, { corrections = it })
 
 
-        saveError?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = DsTheme.colors.error) }
     }
 }
 
