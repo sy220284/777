@@ -73,6 +73,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         virtualScreen: Boolean,
         outputSchema: JsonObject? = null,
         toolAllowlist: Set<String>? = null,
+        forkParentCallId: String? = null,
         sessionId: String = currentSessionId(),
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
@@ -84,6 +85,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         virtualScreen = virtualScreen,
         outputSchema = outputSchema,
         toolAllowlist = toolAllowlist,
+        forkParentCallId = forkParentCallId,
         sessionId = sessionId,
         boundState = boundState,
         historySnapshot = historySnapshot,
@@ -97,6 +99,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         virtualScreen: Boolean,
         outputSchema: JsonObject? = null,
         toolAllowlist: Set<String>? = null,
+        forkParentCallId: String? = null,
         sessionId: String = currentSessionId(),
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
@@ -124,6 +127,26 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ),
             structuredOutputSupported = true,
         )
+        val initialHistorySeed = forkParentCallId?.let { parentCallId ->
+            val jobId = requestedJobId
+                ?: error("TEAM_FORK_REQUIRES_STABLE_JOB_ID：持久 fork 必须预分配稳定 jobId")
+            val seed = runner.prepareForkSeed(
+                task = task,
+                parentCallId = parentCallId,
+                outputSchema = outputSchema,
+            )
+            eventLogFor(sessionId).append(
+                LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+                encodeLocalSubagentHistoryCheckpoint(
+                    backgroundJobId = jobId,
+                    agentId = localPersistentSubagentId(jobId),
+                    step = 0,
+                    history = seed,
+                    claimedMessageIds = emptySet(),
+                ),
+            )
+            seed
+        }
         val payload = buildJsonObject {
             put("version", PERSISTENT_SUBAGENT_RESUME_VERSION)
             put("session_id", sessionId)
@@ -136,6 +159,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             runProfile.credentialRef?.let { put("credential_ref", it) }
             put("route_fingerprint", runProfile.routeFingerprint())
             put("max_steps", maxSteps)
+            forkParentCallId?.let { put("parent_call_id", it) }
             put("capabilities", encodeLocalSubagentCapabilities(capabilities))
         }.toString()
         return jobs.startPersistentResult(
@@ -148,13 +172,15 @@ internal class LocalPersistentJobRecoveryCoordinator(
         ) { jobId, _ ->
             withContext(LocalModelRunContext(runProfile)) {
                 runner.runResult(
-                    LocalSubagentLaunchSpec(
+                    spec = LocalSubagentLaunchSpec(
                         task = task,
                         modelOverride = null,
                         maxSteps = maxSteps,
+                        parentCallId = forkParentCallId,
                         backgroundJobId = jobId,
                         capabilities = capabilities,
                     ),
+                    recoveredHistory = initialHistorySeed,
                 ).requireCompletedOutput()
             }
         }
@@ -376,6 +402,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                             task = task,
                             modelOverride = null,
                             maxSteps = maxSteps,
+                            parentCallId = payload["parent_call_id"]?.jsonPrimitive?.contentOrNull,
                             backgroundJobId = jobId,
                             capabilities = capabilities,
                         ),
