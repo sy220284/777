@@ -21,6 +21,8 @@ import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
+import com.labteto.dshmobile.local.agent.encodeLocalSubagentCapabilities
+import com.labteto.dshmobile.local.agent.decodeLocalSubagentCapabilities
 import com.labteto.dshmobile.local.web.LocalWebTools
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -31,7 +33,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -93,7 +94,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             runProfile.credentialRef?.let { put("credential_ref", it) }
             put("route_fingerprint", runProfile.routeFingerprint())
             put("max_steps", maxSteps)
-            put("capabilities", encodeCapabilities(capabilities))
+            put("capabilities", encodeLocalSubagentCapabilities(capabilities))
         }.toString()
         return jobs.startPersistent(
             label = "子代理：${task.take(100)}",
@@ -232,7 +233,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val protocol = payload.requiredString("protocol")
         val credentialRef = payload["credential_ref"]?.jsonPrimitive?.contentOrNull
         val fingerprint = payload.requiredString("route_fingerprint")
-        val capabilities = decodeCapabilities(payload, version)
+        val capabilities = decodeLocalSubagentCapabilities(payload, version)
         val log = eventLogFor(sessionId)
         val checkpointEvent = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
             data["background_job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
@@ -362,59 +363,6 @@ internal class LocalPersistentJobRecoveryCoordinator(
             cursor = nextCursor
         }
         return recovered
-    }
-
-    private fun encodeCapabilities(
-        capabilities: LocalSubagentCapabilities,
-    ): JsonObject = buildJsonObject {
-        put("allow_mutation", capabilities.allowMutation)
-        put("continuable", capabilities.continuable)
-        put("virtual_screen", capabilities.virtualScreen)
-        put("history_mode", capabilities.historyMode.name.lowercase())
-        put("max_depth", capabilities.maxDepth)
-        capabilities.toolAllowlist?.let { allowlist ->
-            put(
-                "tool_allowlist",
-                JsonArray(allowlist.sorted().map(::JsonPrimitive)),
-            )
-        }
-    }
-
-    private fun decodeCapabilities(
-        payload: JsonObject,
-        version: Int,
-    ): LocalSubagentCapabilities {
-        if (version <= 1) {
-            return LocalSubagentCapabilities(
-                allowMutation = false,
-                continuable = true,
-                virtualScreen =
-                    payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false,
-                historyMode = LocalSubagentHistoryMode.ISOLATED,
-                maxDepth = 1,
-            )
-        }
-        val data = payload["capabilities"] as? JsonObject
-            ?: error("持久子代理 V2 缺少 capabilities")
-        val historyMode = when (
-            data["history_mode"]?.jsonPrimitive?.contentOrNull
-                ?.lowercase()
-        ) {
-            "isolated" -> LocalSubagentHistoryMode.ISOLATED
-            "inherit_parent" -> LocalSubagentHistoryMode.INHERIT_PARENT
-            else -> error("持久子代理 capabilities.history_mode 无效")
-        }
-        val toolAllowlist = (data["tool_allowlist"] as? JsonArray)
-            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
-            ?.toSet()
-        return LocalSubagentCapabilities(
-            allowMutation = data["allow_mutation"]?.jsonPrimitive?.booleanOrNull ?: false,
-            continuable = data["continuable"]?.jsonPrimitive?.booleanOrNull ?: false,
-            virtualScreen = data["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false,
-            historyMode = historyMode,
-            maxDepth = data["max_depth"]?.jsonPrimitive?.intOrNull ?: 1,
-            toolAllowlist = toolAllowlist,
-        )
     }
 
     private fun effectiveProtocol(profile: LocalModelProfile): String =
