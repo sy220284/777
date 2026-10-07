@@ -41,6 +41,7 @@ internal class LocalWorkSubagentRuntime(
         requiredEvidence: List<String>,
         modelOverride: String?,
         outputSchema: JsonObject?,
+        toolAllowlist: Set<String>?,
         binding: LocalWorkRunBinding,
         runner: LocalSubagentRunner,
     ): String {
@@ -62,6 +63,7 @@ internal class LocalWorkSubagentRuntime(
                     modelOverride = workerSelection,
                     maxSteps = binding.aggregateSnapshot().subagentMaxSteps,
                     outputSchema = outputSchema,
+                    toolAllowlist = toolAllowlist,
                 ).requireCompletedOutput()
             },
             pruneOutput = { value -> pruneOutput(binding, value) },
