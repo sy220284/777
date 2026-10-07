@@ -289,6 +289,72 @@ class HarnessJobPersistenceTest {
     }
 
     @Test
+    fun interruptedPersistentAgentCanSettleFromDurableCompletionEvidence() = runTest {
+        var durable = emptyList<JobSnapshot>()
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "running",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerId = "session-a",
+                ),
+            ),
+            onSnapshotsChanged = { durable = it },
+        )
+
+        val settled = manager.completeInterrupted(
+            id = "job-agent",
+            output = "已完成结果",
+            ownerId = "session-a",
+        )
+
+        assertTrue(settled)
+        assertTrue(manager.output("job-agent", "session-a").contains("[completed]"))
+        assertTrue(manager.output("job-agent", "session-a").contains("已完成结果"))
+        assertTrue(durable.single().status == "completed")
+        assertTrue(durable.single().output == "已完成结果")
+    }
+
+    @Test
+    fun completionSettlementRollsBackWhenDurableWriteFails() = runTest {
+        var writes = 0
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "running",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerId = "session-a",
+                    output = "进程中断前状态",
+                ),
+            ),
+            onSnapshotsChanged = {
+                writes += 1
+                if (writes >= 2) error("disk full")
+            },
+        )
+
+        val settled = manager.completeInterrupted(
+            id = "job-agent",
+            output = "不能伪装成功",
+            ownerId = "session-a",
+        )
+
+        assertFalse(settled)
+        assertTrue(manager.output("job-agent", "session-a").contains("[interrupted]"))
+        assertFalse(manager.output("job-agent", "session-a").contains("不能伪装成功"))
+    }
+
+    @Test
     fun interruptedPersistentAgentKeepsDurableInboxAndAcceptsColdResumeMessage() = runTest {
         var durable = emptyList<JobSnapshot>()
         val manager = HarnessJobManager(
