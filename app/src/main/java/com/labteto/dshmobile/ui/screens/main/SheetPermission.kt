@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +28,7 @@ import com.labteto.dshmobile.core.wire.dto.FULL_ACCESS_PRESET
 import com.labteto.dshmobile.core.wire.dto.PermissionSelect
 import com.labteto.dshmobile.core.wire.dto.displayPermissionPreset
 import com.labteto.dshmobile.ui.components.DsBottomSheet
+import com.labteto.dshmobile.ui.components.DsCheckbox
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
@@ -121,7 +121,7 @@ internal fun FullAccessConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Uni
                 .clickable { acknowledged = !acknowledged },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Checkbox(checked = acknowledged, onCheckedChange = { acknowledged = it })
+            DsCheckbox(checked = acknowledged, onCheckedChange = { acknowledged = it })
             Text(
                 stringResource(R.string.permission_confirm_ack),
                 style = DsType.small13.withReadingWeight(),
