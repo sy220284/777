@@ -25,6 +25,8 @@ import com.labteto.dshmobile.local.model.LocalPromptCacheBaselineStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheContinuityStore
 import com.labteto.dshmobile.local.model.LocalPromptCacheMode
 import com.labteto.dshmobile.local.model.LocalPromptPressureMeter
+import com.labteto.dshmobile.local.model.LocalRequestReconstruction
+import com.labteto.dshmobile.local.model.reconstructLocalModelRequest
 import com.labteto.dshmobile.local.model.LocalStreamPreview
 import com.labteto.dshmobile.local.model.modelFailureKind
 import com.labteto.dshmobile.local.model.redactModelImages
@@ -76,8 +78,18 @@ internal class LocalModelRequestCoordinator @Inject constructor(
     private val requestRuntime = LocalAgentModelRequestRuntime(modelGateway, resourceScheduler)
     private val modelStepRuntime = LocalAgentModelStepRuntime()
     private val evidenceLock = Any()
+    private val messageSurfaceEvidence = mutableMapOf<String, RequestEvidenceRef>()
     private val toolSurfaceEvidence = mutableMapOf<String, RequestEvidenceRef>()
     private val contextSurfaceEvidence = mutableMapOf<String, RequestEvidenceRef>()
+
+    fun reconstructRequest(
+        sessionId: String,
+        requestUid: String,
+    ): LocalRequestReconstruction? =
+        reconstructLocalModelRequest(
+            eventLog = sessionStorage.eventLogs.get(sessionId),
+            requestUid = requestUid,
+        )
 
     suspend fun complete(
         snapshot: LocalHarnessState,
@@ -241,8 +253,25 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             }
         }
         val requestEvidence = buildLocalRequestEvidence(requestMessages, tools)
+        val replayEvidence = buildLocalRequestEvidence(logMessages, tools)
         val evidenceKey = snapshot.sessionId + "\u0000" + routeFingerprint
         val evidenceLogSequence = log.latestSequence()
+        val messageSurfaceSeq = ensureRequestEvidenceSurface(
+            cache = messageSurfaceEvidence,
+            key = evidenceKey,
+            digest = replayEvidence.messageDigest,
+            currentLogSequence = evidenceLogSequence,
+        ) {
+            log.append("request/message-surface", buildJsonObject {
+                put("version", REQUEST_EVIDENCE_VERSION)
+                put("digest", replayEvidence.messageDigest)
+                put("messages", JsonArray(logMessages))
+                put(
+                    "redacted",
+                    replayEvidence.messageDigest != requestEvidence.messageDigest,
+                )
+            }).sequence
+        }
         val toolSurfaceSeq = ensureRequestEvidenceSurface(
             cache = toolSurfaceEvidence,
             key = evidenceKey,
@@ -258,17 +287,22 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         val contextSurfaceSeq = ensureRequestEvidenceSurface(
             cache = contextSurfaceEvidence,
             key = evidenceKey,
-            digest = requestEvidence.contextDigest,
+            digest = replayEvidence.contextDigest,
             currentLogSequence = log.latestSequence(),
         ) {
             log.append("request/context-surface", buildJsonObject {
                 put("version", REQUEST_EVIDENCE_VERSION)
-                put("digest", requestEvidence.contextDigest)
-                put("messages", requestEvidence.contextMessages)
+                put("digest", replayEvidence.contextDigest)
+                put("messages", replayEvidence.contextMessages)
+                put(
+                    "redacted",
+                    replayEvidence.contextDigest != requestEvidence.contextDigest,
+                )
             }).sequence
         }
         val requestEnvelopeFingerprint = stableJsonSha256(buildJsonArray {
             add(JsonPrimitive(routeFingerprint))
+            add(JsonPrimitive(requestEvidence.messageDigest))
             add(JsonPrimitive(requestEvidence.toolSchemaDigest))
             add(JsonPrimitive(requestEvidence.contextDigest))
         })
@@ -332,10 +366,21 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             put("tool_count", tools.size)
             put("tool_names", toolNames)
             put("message_digest", requestEvidence.messageDigest)
+            put("context_digest", requestEvidence.contextDigest)
             put("tool_schema_digest", requestEvidence.toolSchemaDigest)
-            put("context_surface_digest", requestEvidence.contextDigest)
+            put("message_surface_digest", replayEvidence.messageDigest)
+            put("context_surface_digest", replayEvidence.contextDigest)
+            put("message_surface_seq", messageSurfaceSeq)
             put("tool_surface_seq", toolSurfaceSeq)
             put("context_surface_seq", contextSurfaceSeq)
+            put(
+                "message_surface_redacted",
+                replayEvidence.messageDigest != requestEvidence.messageDigest,
+            )
+            put(
+                "context_surface_redacted",
+                replayEvidence.contextDigest != requestEvidence.contextDigest,
+            )
             put("request_envelope_fingerprint", requestEnvelopeFingerprint)
             put("plan_mode", snapshot.work.planMode)
             temperature?.let { put("temperature", it) }
@@ -754,7 +799,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
     )
 
     private companion object {
-        const val REQUEST_EVIDENCE_VERSION = 1
+        const val REQUEST_EVIDENCE_VERSION = 2
         const val MAX_ATTEMPT_STREAM_TAIL_CHARS = 4_096
     }
 }
