@@ -99,6 +99,7 @@ internal class LocalAgentTeamRuntime(
         binding: LocalWorkRunBinding,
         requestedJobId: String,
         task: String,
+        instructions: String,
         model: String?,
         maxSteps: Int,
         context: LocalTeamMemberContext,
@@ -418,7 +419,7 @@ internal class LocalAgentTeamRuntime(
                     member.jobId,
                     QueuedAgentInput(
                         id = "team-resume-" + UUID.randomUUID().toString().replace("-", "").take(20),
-                        content = buildTeamTaskPrompt(member.name, member.description, cleanTask),
+                        content = cleanTask,
                         memoryInput = cleanTask,
                     ),
                     binding.sessionId,
@@ -443,7 +444,8 @@ internal class LocalAgentTeamRuntime(
                 val started = startTeammate(
                     binding,
                     member.jobId,
-                    buildTeamTaskPrompt(member.name, member.description, cleanTask),
+                    cleanTask,
+                    buildTeamInstructions(member.name, member.description),
                     model,
                     LocalAgentRuntimeLimits.normalizeSubagentSteps(maxSteps),
                     member.context,
@@ -588,7 +590,8 @@ internal class LocalAgentTeamRuntime(
             val started = startTeammate(
                 binding,
                 jobId,
-                buildTeamTaskPrompt(cleanName, description, task),
+                task,
+                buildTeamInstructions(cleanName, description),
                 model,
                 LocalAgentRuntimeLimits.normalizeSubagentSteps(maxSteps),
                 context,
@@ -1508,6 +1511,12 @@ internal class LocalAgentTeamRuntime(
         }
     }
 
+    internal fun activityProjection(sessionId: String): LocalAgentTeamActivityProjection =
+        projectLocalAgentTeamActivity(
+            team = project(sessionId),
+            jobs = jobs.snapshotInfos(),
+        )
+
     internal fun project(sessionId: String): LocalTeamProjection = synchronized(commandLock) {
         val log = eventLogFor(sessionId)
         val generation = log.resetGeneration
@@ -1907,12 +1916,11 @@ internal class LocalAgentTeamRuntime(
         return clean
     }
 
-    private fun buildTeamTaskPrompt(name: String, description: String, task: String): String =
+    private fun buildTeamInstructions(name: String, description: String): String =
         buildString {
             append("你是 Team teammate：$name。")
             if (description.isNotBlank()) append("职责：${description.trim()}。")
             append("\n完成任务后给出可核验结论。Team Lead 后续可能通过 durable mailbox 追加消息。")
-            append("\n当前任务：$task")
         }
 
     private fun LocalTeamMemberSnapshot.toEvent(teamId: String): JsonObject = buildJsonObject {

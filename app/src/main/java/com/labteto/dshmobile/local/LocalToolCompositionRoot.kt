@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.tools.LocalPluginComposition
 import com.labteto.dshmobile.local.tools.LocalPluginCompositionFactory
+import com.labteto.dshmobile.local.tools.LocalToolActivityProjectionRuntime
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import com.labteto.dshmobile.local.tools.LocalToolsManagementPort
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
@@ -39,13 +40,14 @@ import kotlinx.serialization.json.put
 internal class LocalToolCompositionRoot @Inject constructor(
     @ApplicationContext context: Context,
     private val runtimeStateStore: LocalRuntimeStateStore,
-    sessionStorage: LocalSessionStorageRuntime,
+    private val sessionStorage: LocalSessionStorageRuntime,
     bundledRuntimeManager: LocalBundledRuntimeManager,
     modelConfiguration: LocalModelConfigurationCoordinator,
     pluginFactory: LocalPluginCompositionFactory,
     workRunRegistry: LocalWorkRunRegistry,
     builtinRuntime: Provider<LocalBuiltinToolRuntime>,
     private val approvalRuntime: LocalToolApprovalRuntime,
+    private val activityProjection: LocalToolActivityProjectionRuntime,
 ) : LocalToolsManagementPort {
     internal val workspace = sessionStorage.files.workspace
     internal val toolOutputStore = LocalToolOutputStore(
@@ -144,6 +146,9 @@ internal class LocalToolCompositionRoot @Inject constructor(
     internal val schemas: LocalToolSchemaProjection by lazy {
         LocalToolSchemaProjection(registry, execution)
     }
+
+    internal fun activitySnapshot(sessionId: String) =
+        activityProjection.snapshot(sessionStorage.eventLogs.get(sessionId))
 
     internal suspend fun installStartup() = plugins.installStartup()
 

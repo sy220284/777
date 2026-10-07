@@ -70,6 +70,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         task: String,
         model: String?,
         maxSteps: Int,
+        instructions: String = "",
         virtualScreen: Boolean,
         outputSchema: JsonObject? = null,
         toolAllowlist: Set<String>? = null,
@@ -82,6 +83,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         task = task,
         model = model,
         maxSteps = maxSteps,
+        instructions = instructions,
         virtualScreen = virtualScreen,
         outputSchema = outputSchema,
         toolAllowlist = toolAllowlist,
@@ -96,6 +98,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         task: String,
         model: String?,
         maxSteps: Int,
+        instructions: String = "",
         virtualScreen: Boolean,
         outputSchema: JsonObject? = null,
         toolAllowlist: Set<String>? = null,
@@ -120,6 +123,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         validateLocalSubagentLaunchSpec(
             LocalSubagentLaunchSpec(
                 task = task,
+                instructions = instructions,
                 modelOverride = null,
                 maxSteps = maxSteps,
                 backgroundJobId = "pending",
@@ -134,6 +138,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 task = task,
                 parentCallId = parentCallId,
                 outputSchema = outputSchema,
+                instructions = instructions,
             )
             eventLogFor(sessionId).append(
                 LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
@@ -151,6 +156,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             put("version", PERSISTENT_SUBAGENT_RESUME_VERSION)
             put("session_id", sessionId)
             put("task", task)
+            if (instructions.isNotBlank()) put("instructions", instructions)
             put("profile_id", runProfile.id)
             put("model", runProfile.model)
             put("base_url", runProfile.baseUrl)
@@ -174,6 +180,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 runner.runResult(
                     spec = LocalSubagentLaunchSpec(
                         task = task,
+                        instructions = instructions,
                         modelOverride = null,
                         maxSteps = maxSteps,
                         parentCallId = forkParentCallId,
@@ -321,6 +328,11 @@ internal class LocalPersistentJobRecoveryCoordinator(
             "持久子代理恢复版本不受支持：$version"
         }
         val task = payload.requiredString("task")
+        val instructions = if (version >= 3) {
+            payload["instructions"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        } else {
+            ""
+        }
         val profileId = payload.requiredString("profile_id")
         val model = payload.requiredString("model")
         val baseUrl = payload.requiredString("base_url")
@@ -403,6 +415,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     spec = validateLocalSubagentLaunchSpec(
                         LocalSubagentLaunchSpec(
                             task = task,
+                            instructions = instructions,
                             modelOverride = null,
                             maxSteps = maxSteps,
                             parentCallId = payload["parent_call_id"]?.jsonPrimitive?.contentOrNull,
@@ -493,7 +506,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             ?: error("恢复任务缺少 $key")
     private companion object {
         const val MIN_PERSISTENT_SUBAGENT_RESUME_VERSION = 1
-        const val PERSISTENT_SUBAGENT_RESUME_VERSION = 2
+        const val PERSISTENT_SUBAGENT_RESUME_VERSION = 3
         const val RECOVERY_EVENT_PAGE_SIZE = 200
         const val MAX_RECOVERY_EVENT_PAGES = 64
     }

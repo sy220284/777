@@ -30,6 +30,21 @@ class LocalSubagentCapabilitiesTest {
     }
 
     @Test
+    fun rejectsOversizedStableInstructionsBeforeExecution() {
+        val spec = LocalSubagentLaunchSpec(
+            task = "任务",
+            instructions = "x".repeat(16_385),
+            modelOverride = null,
+            maxSteps = 20,
+        )
+
+        assertTrue(
+            requireFailure { validateLocalSubagentLaunchSpec(spec) }
+                .contains("SUBAGENT_INSTRUCTIONS_TOO_LARGE"),
+        )
+    }
+
+    @Test
     fun rejectsContinuableMutationAndInheritedHistory() {
         val mutable = launch(
             LocalSubagentCapabilities(

@@ -259,7 +259,8 @@ Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建
 
 - Agent run identity；
 - 主 / 子代理运行契约；
-- 子代理启动规格统一声明 mutation / continuation / history / virtual screen / depth / tool filter / output schema，并在运行和恢复前执行同一套能力校验；
+- 子代理启动规格统一声明稳定 `instructions` 与本轮 `task`，并声明 mutation / continuation / history / virtual screen / depth / tool filter / output schema；稳定身份指令随持久子代理恢复元数据保存，运行和恢复前执行同一套能力校验；
+- 共享 Prompt 分层编排只负责稳定/动态层的确定性顺序、预算与缓存指纹，不解释 Chat / Work / Project 等 Feature 的业务语义；Prompt 也不作为权限、安全或副作用边界；
 - Structured Result 使用共享 `JsonSchemaValidator`；模型只收到统一的 JSON-only 结果约束，终态先校验再提交，工具参数与子代理结果不允许出现两套 Schema 解释；
 - 前台与持久子代理共享 `QueuedAgentInput` 消息契约；Inbox 有界且满载显式拒绝，禁止通过淘汰旧消息伪装成功；
 - checkpoint；
@@ -277,7 +278,8 @@ Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建
 - approval boundary；
 - tool execution；
 - structured result；
-- side-effect 语义。
+- side-effect 语义；
+- 工具活动只从 Session EventLog 中现有的 `tool/call`、`tool/execution-started`、`tool/result` 派生只读 Projection；Activity 不建立第二条持久事实流。
 
 产品 ToolsFeature 与 Tool Capability 必须区分：前者是产品功能，后者是运行能力。
 

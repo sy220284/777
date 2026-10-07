@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.interaction.LocalApproval
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -26,12 +27,14 @@ class LocalWorkApprovalCoordinatorTest {
 
     private class Preferences {
         private val values = mutableMapOf<String, Boolean>()
+        private val strings = mutableMapOf<String, String?>()
         private val editor = Proxy.newProxyInstance(
             SharedPreferences.Editor::class.java.classLoader,
             arrayOf(SharedPreferences.Editor::class.java),
         ) { proxy, method, args ->
             when (method.name) {
                 "putBoolean" -> { values[args!![0] as String] = args[1] as Boolean; proxy }
+                "putString" -> { strings[args!![0] as String] = args[1] as String?; proxy }
                 "apply" -> null
                 else -> error("Unexpected editor call: ${method.name}")
             }
@@ -40,8 +43,12 @@ class LocalWorkApprovalCoordinatorTest {
             SharedPreferences::class.java.classLoader, arrayOf(SharedPreferences::class.java),
         ) { _, method, args ->
             when (method.name) {
-                "contains" -> values.containsKey(args!![0] as String)
+                "contains" -> {
+                    val key = args!![0] as String
+                    values.containsKey(key) || strings.containsKey(key)
+                }
                 "getBoolean" -> values[args!![0] as String] ?: args[1]
+                "getString" -> strings[args!![0] as String] ?: args[1]
                 "edit" -> editor
                 else -> error("Unexpected preference call: ${method.name}")
             }
@@ -88,6 +95,31 @@ class LocalWorkApprovalCoordinatorTest {
         f.preferences.setSafeAutoApprovalEnabled(false)
         assertFalse(a.state.value.safeAutoApprovalEnabled)
         assertFalse(b.state.value.safeAutoApprovalEnabled)
+    }
+
+    @Test fun defaultModeResolvesOnlySafePendingApproval() = runTest {
+        val f = Fixture()
+        val a = f.binding("a")
+        val safe = async {
+            a.interactions.awaitApproval(
+                LocalApproval("safe", "read", "读取", "{}", "read_only", canAutoApproveSafely = true),
+            )
+        }
+        runCurrent()
+        f.approvals.useDefaultApproval()
+        assertTrue(safe.await())
+        assertEquals(LocalApprovalMode.DEFAULT, f.preferences.currentMode())
+
+        val risky = async {
+            a.interactions.awaitApproval(
+                LocalApproval("risk", "bash", "执行", "{}", "process", canAutoApproveSafely = false),
+            )
+        }
+        runCurrent()
+        f.approvals.useDefaultApproval()
+        assertFalse(risky.isCompleted)
+        a.interactions.cancelAll()
+        assertFalse(risky.await())
     }
 
     @Test fun detachedRunStopsObservingGlobalApprovalProjection() {

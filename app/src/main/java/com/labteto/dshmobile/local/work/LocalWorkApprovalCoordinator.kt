@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -41,13 +42,18 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
 
     internal fun enableAutoApproval() = synchronized(modeLock) {
         val target = currentTarget() ?: return@synchronized
-        setGlobalMode(true, target)
+        setGlobalMode(LocalApprovalMode.AUTO, target)
+    }
+
+    internal fun useDefaultApproval() = synchronized(modeLock) {
+        val target = currentTarget() ?: return@synchronized
+        setGlobalMode(LocalApprovalMode.DEFAULT, target)
     }
 
     internal fun enableAutoApprovalForPending(callId: String): Unit = synchronized(modeLock) {
         val target = currentTarget() ?: return@synchronized
         target.interactions.resolveApproval(callId) {
-            setGlobalMode(true, target, skipTargetWaiter = true)
+            setGlobalMode(LocalApprovalMode.AUTO, target, skipTargetWaiter = true)
             true
         }
         Unit
@@ -55,12 +61,16 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
 
     internal fun disableAutoApproval() = synchronized(modeLock) {
         val target = currentTarget() ?: return@synchronized
-        setGlobalMode(false, target)
+        setGlobalMode(LocalApprovalMode.MANUAL, target)
     }
 
-    private fun setGlobalMode(enabled: Boolean, target: Target, skipTargetWaiter: Boolean = false) {
+    private fun setGlobalMode(
+        mode: LocalApprovalMode,
+        target: Target,
+        skipTargetWaiter: Boolean = false,
+    ) {
         // This is the durable authority; Session snapshots do not store this device-wide setting.
-        preferences.setSafeAutoApprovalEnabled(enabled)
+        preferences.setApprovalMode(mode)
         val active = mutableListOf<Target>()
         runs.forEachBinding { binding ->
             active += Target(binding.interactions, binding.eventLog)
@@ -71,7 +81,7 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
             val pending = owner.interactions.pendingApproval()
             try {
                 owner.log.append("approval/mode", buildJsonObject {
-                    put("mode", if (enabled) "global" else "ask")
+                    put("mode", mode.name.lowercase())
                     pending?.toolName?.let { put("tool", it) }
                 })
             } catch (error: Exception) {
@@ -82,8 +92,9 @@ class LocalWorkApprovalCoordinator @Inject internal constructor(
             // The device-wide preference has already committed. A failed diagnostic append in
             // one Session cannot leave this or another Run waiting under the previous policy.
             if (
-                enabled &&
                 pending != null &&
+                (mode == LocalApprovalMode.AUTO ||
+                    (mode == LocalApprovalMode.DEFAULT && pending.canAutoApproveSafely)) &&
                 !(skipTargetWaiter && owner.interactions === target.interactions)
             ) {
                 owner.interactions.answerApproval(pending.callId, true)

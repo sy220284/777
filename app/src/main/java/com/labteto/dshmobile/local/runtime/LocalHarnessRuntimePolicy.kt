@@ -6,6 +6,7 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.interaction.LocalApproval
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.interaction.LocalApprovalImpact
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.tools.LocalAutoApprovalScope
@@ -30,6 +31,15 @@ internal fun canAutoApproveSafely(tool: HarnessTool): Boolean =
                 LocalAutoApprovalScope.READ_ONLY,
             )
         }.getOrDefault(false)
+
+internal fun shouldAutoApproveTool(
+    mode: LocalApprovalMode,
+    tool: HarnessTool,
+): Boolean = when (mode) {
+    LocalApprovalMode.AUTO -> true
+    LocalApprovalMode.DEFAULT -> canAutoApproveSafely(tool)
+    LocalApprovalMode.MANUAL -> false
+}
 
 internal fun approvalImpact(tool: HarnessTool): LocalApprovalImpact = when (tool.access) {
     ToolAccess.READ_ONLY -> LocalApprovalImpact.LOW

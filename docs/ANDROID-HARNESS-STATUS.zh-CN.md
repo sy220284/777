@@ -57,7 +57,7 @@ Android 模块负责生命周期、进程、设备、UI 和平台能力；`Local
 - reasoning / assistant / tool call / tool result 完整模型回合。
 - 有界模型请求重试。
 - 主代理与子代理统一核心循环。
-- 普通子代理、fork 子代理、持久子代理；持久只读子代理具备稳定 Agent 身份、持久 Inbox、历史 Checkpoint 与冷恢复续跑。
+- 普通子代理、fork 子代理、持久子代理；`instructions`（稳定身份规则）与 `task`（本轮任务）分离，持久只读子代理保存身份指令、持久 Inbox、历史 Checkpoint 并在冷恢复后继续使用同一身份规则。
 - 并行 / 流水线工作流。
 - Work Agent Teams / Agent 集群：Lead 持有持久 roster、queued-minus-delivered mailbox 与 revision/CAS 任务板；在原有任务依赖 DAG、claim/release/edit/complete/reopen/reassign/delete、write-scope 冲突提示和冷恢复投递之上，吸收 Kimi 集群的成员生命周期与结果回收语义：create/start/status/send/wait-for-message/disable/dismiss/stop-all。成员结果直接由持久 Child terminal checkpoint 投影为独立 Agent Message，不复制第二份结果事实；成员进度从 Child step / soft-step-limit 投影，并在每次 checkpoint 成功后通过轻量 Job report 触发实时 UI 刷新，冷恢复沿用同一链路。成员产生终态结果后任务继续保持 in_progress，由 Lead 核验后携带 result_id 和当前 revision 显式 complete；缺少输入、失败或部分结果不会解锁依赖；成员失败、停用、解雇或底层 Child 丢失时未完成任务自动 release 回任务板；Team 尚有未完成任务、未消费 durable inbox、运行成员或投影异常时，Work 完成声明会被真实性门禁拦截。stop-all 使用一次持久提交批量标记全部目标 Activation 为 interrupted，失败则整体回滚状态，再执行协程取消。
 - Goal / Todo / Plan。
@@ -115,13 +115,14 @@ Session Event Log 是主要事实源。模型历史缓冲区与 Checkpoint 是 E
 - durable Agent inbox 在启动 / 会话切换时恢复。
 - 持久只读子代理消息先落盘再确认；进程中断后从最近完整 Child History Checkpoint、全局 Step 水位与动态软预算继续，已进入检查点但尚未确认的 Inbox 消息不会重复注入。
 - 只有显式 `continuable=true` 的持久子代理在一次 Activation 结束后进入 `dormant`；无新消息时不占运行槽也不自动唤醒，收到新消息后重新激活同一 Child Agent 身份；旧版 `completed + continuable` 快照读取时兼容归一为 `dormant`。
-- 子代理启动统一使用 `LocalSubagentLaunchSpec + LocalSubagentCapabilities`；mutation、continuation、virtual screen、history mode、max depth、tool allowlist 与 output schema 由同一契约声明，未支持能力在启动前 fail closed。
-- `toolAllowlist` 直接限制模型实际可见工具 Surface；持久子代理恢复元数据升级 V2 保存 capabilities，旧 V1 映射为只读、isolated、continuable、depth=1。
+- 子代理启动统一使用 `LocalSubagentLaunchSpec + LocalSubagentCapabilities`；稳定 `instructions` 与本轮 `task` 分离，mutation、continuation、virtual screen、history mode、max depth、tool allowlist 与 output schema 由同一契约声明，未支持能力在启动前 fail closed；身份指令只能约束模型行为，不能扩大能力。
+- `toolAllowlist` 直接限制模型实际可见工具 Surface；持久子代理恢复元数据 V3 保存 capabilities 与稳定 instructions，V2 继续读取 capabilities 且 instructions 归一为空，旧 V1 映射为只读、isolated、continuable、depth=1。
 - Structured Subagent Result 已启用：`outputSchema` 先做有界 meta-schema 校验，最终回复必须是纯 JSON 对象并复用与 ToolRegistry 相同的 JSON Schema 值校验；不符合契约直接返回稳定错误码，不自动重跑整轮。
 - 结构化终态只有在 JSON 解析与 Schema 校验通过后才写 `terminal checkpoint`；校验失败不会被 Cold Resume 误结算为 completed。
 - `interrupted` 的可恢复任务与 `dormant` 的 continuable 子代理不会被普通历史裁剪静默删除；保留上限被持久对象占满时显式拒绝新任务，需先终止不再使用的持久代理。
 - 最终 assistant 已持久化但 Job 终态尚未提交时，恢复直接按终态 Checkpoint 结算；已认领但残留在 Inbox 的消息只做确认，不触发重复模型请求。
 - Session Projection 使用共享注册语义；投影拥有稳定名称、`stateVersion` 和 `asOfSequence`，Feature 持有自己的强类型句柄。
+- Tool Activity 由共享 Tool Capability 从现有 `tool/call → tool/execution-started → tool/result` 有界派生，保留 `TOOL_OUTCOME_UNKNOWN` 等恢复语义，不写第二套活动事件；Agent Team 的运行/休眠/阻塞展示同样由 durable Team phase、Child Job、Task DAG 与 Mailbox 派生，不改变持久 Team 生命周期事实。
 - Agent Teams 当前采用 Lead 编排型 Android 适配：teammate 仍保持只读 Child Agent 权限，不开放对等成员直接写 Team 状态；`team_spawn.context` 支持 `fresh | fork`。durable fork 在创建时把 Lead 当前调用前历史一次性物化为 Child `step=0` History Checkpoint，后续首轮与 Cold Resume 都只读取 Child EventLog，不放开 `continuable + INHERIT_PARENT`。
 - Team mailbox 单成员最多 64 条待投递消息，单消息最多 65,536 UTF-8 字节；成员名称永久保留，达到成员/任务/邮箱边界时 fail loud，不静默截断或复用身份。
 - 外部进程被 Android 杀死后不能伪装成透明续跑。
