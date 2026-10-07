@@ -23,6 +23,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
@@ -106,7 +107,8 @@ fun DsBottomSheet(
             if (scrollable) {
                 Column(
                     modifier = Modifier.fillMaxWidth().heightIn(max = maxBodyHeight)
-                        .verticalScroll(rememberScrollState()),
+                        .verticalScroll(rememberScrollState())
+                        .testTag("kimiSheetScrollBody"),
                     verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
                     content = content,
                 )
