@@ -351,11 +351,28 @@ internal class LocalAgentTeamRuntime(
                 next.copy(status = LocalTeamTaskStatus.PENDING, ownerId = null)
             }
             "reassign" -> {
-                require(current.status == LocalTeamTaskStatus.IN_PROGRESS) {
-                    "TEAM_TASK_STATUS_INVALID：只有 in_progress 任务可以 reassign"
+                require(
+                    current.status == LocalTeamTaskStatus.PENDING ||
+                        current.status == LocalTeamTaskStatus.IN_PROGRESS
+                ) {
+                    "TEAM_TASK_STATUS_INVALID：只有 pending 或 in_progress 任务可以 reassign"
                 }
-                val member = resolveOwner(state, ownerName)
-                next.copy(ownerId = member.id)
+                val requestedOwner = ownerName?.trim().orEmpty()
+                if (requestedOwner.isEmpty()) {
+                    next.copy(
+                        status = LocalTeamTaskStatus.PENDING,
+                        ownerId = null,
+                    )
+                } else {
+                    require(isReady(current, state.tasks)) {
+                        "TEAM_TASK_BLOCKED：依赖尚未完成"
+                    }
+                    val member = resolveOwner(state, requestedOwner)
+                    next.copy(
+                        status = LocalTeamTaskStatus.IN_PROGRESS,
+                        ownerId = member.id,
+                    )
+                }
             }
             "delete" -> {
                 val dependents = state.tasks.filter { task ->
@@ -374,12 +391,17 @@ internal class LocalAgentTeamRuntime(
                     blockedBy ?: error("TEAM_TASK_DEPENDENCIES_REQUIRED：blocked_by 必填"),
                 ),
             )
-            "edit", "update" -> next.copy(
-                subject = subject?.trim()?.take(MAX_SUBJECT_CHARS) ?: current.subject,
-                description = description?.trim()?.take(MAX_DESCRIPTION_CHARS)
-                    ?: current.description,
-                writeScopes = writeScopes?.let(::normalizeWriteScopes) ?: current.writeScopes,
-            )
+            "edit" -> {
+                require(subject != null || description != null || writeScopes != null) {
+                    "TEAM_TASK_EDIT_REQUIRED：edit 至少需要 subject、description 或 write_scopes"
+                }
+                next.copy(
+                    subject = subject?.trim()?.take(MAX_SUBJECT_CHARS) ?: current.subject,
+                    description = description?.trim()?.take(MAX_DESCRIPTION_CHARS)
+                        ?: current.description,
+                    writeScopes = writeScopes?.let(::normalizeWriteScopes) ?: current.writeScopes,
+                )
+            }
             else -> error("TEAM_TASK_ACTION_INVALID：不支持的 action=$action")
         }
         validateTaskTransition(state.tasks, previous = current, next = next)
