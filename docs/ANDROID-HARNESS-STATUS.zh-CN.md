@@ -12,8 +12,8 @@ targetSdk: 36
 compileSdk: 37
 
 官方本机语义参考:
-deepseek-ai/deepseek-harness 0.1.7-rc.2
-477b4f420553e8a52c2fbccc464d7561b239c443
+deepseek-ai/deepseek-harness 0.2.1-alpha.1
+5badb15009ae1756c3afe0ae0cef1faafc290ccc
 Session format reference: V4
 ```
 
@@ -451,3 +451,17 @@ upstream/deepseek-harness.lock.json
 - merge-gate。
 
 详见 [VALIDATION.md](VALIDATION.md)。
+
+
+## Agent Team 语义
+
+Work Lead 可以按需启用持久 Agent Team：
+
+- TeamId 直接使用 Lead SessionId，不新建第二套 Team 存储。
+- Roster、Mailbox、Task DAG 全部是 Lead Session EventLog 的事实；投影通过共享 `SessionProjectionRegistry` 重建。
+- teammate 复用现有 continuable Child Agent / durable Inbox / Cold Resume，不创建另一套 Agent Runtime。
+- 成员名称与职责在 provisioning 后不可变；成员持久 phase 为 `provisioning -> active | failed`，运行/休眠状态从现有 Job/Activation 派生。
+- Team mailbox 先写 `team/message-queued`，再以稳定 message id 投递到 Child Inbox，最后写 `team/message-delivered`；重启按 queued-minus-delivered 自动恢复，重复投递由 stable id 去重。
+- Task Board 使用单调 `task-N`、CAS revision、`blockedBy` DAG 与 deleted tombstone；依赖边必须指向未删除任务且保持无环。
+- `writeScopes` 只用于提示并发写范围重叠，不是文件锁。
+- Team 控制工具只向 Lead Work Agent 暴露，普通子代理不能绕过 Team 权限边界。
