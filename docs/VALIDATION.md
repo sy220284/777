@@ -141,7 +141,7 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 :reference-validation:test
 ```
 
-其中本机语义单测必须覆盖：模型请求证据与 Surface 关联、V2 requestUid 自动重建 / digest 校验 / 多模态脱敏 / V1 evidence-only 兼容、失败/取消 `assistant/attempt` 不进入正式历史、ModelHistory Checkpoint 水位与 V1 兼容重写、压缩来源证据、工具真实 admission execution identity、统一 Agent Inbox 落盘/回滚/满载拒绝、Child History Checkpoint 与完成态再激活/Cold Resume、终态原子结算、Session Projection 同版本共享 / 引用计数 / 异版本拒绝 / stateVersion / asOfSequence、SubagentCapabilities 启动前拒绝、toolAllowlist 实际工具面过滤、持久能力 V1/V2 兼容、Structured Result 纯 JSON / Schema mismatch / 未支持关键字拒绝 / 校验后终态提交、持久 resume payload 超限显式失败。官方黄金 fixture 继续只承担锁定参考版本的基础 AgentLoop 差分，不把本机高级语义单测包装成官方全量等价。
+其中本机语义单测必须覆盖：模型请求证据与 Surface 关联、V2 requestUid 自动重建 / digest 校验 / 多模态脱敏 / V1 evidence-only 兼容、失败/取消 `assistant/attempt` 不进入正式历史、ModelHistory Checkpoint 水位与 V1 兼容重写、压缩来源证据、工具真实 admission execution identity、统一 Agent Inbox 落盘/回滚/满载拒绝、Child History Checkpoint 与完成态再激活/Cold Resume、终态原子结算、Session Projection 同版本共享 / 引用计数 / 异版本拒绝 / stateVersion / asOfSequence、SubagentCapabilities 启动前拒绝、toolAllowlist 实际工具面过滤、持久能力 V1/V2 兼容、Structured Result 纯 JSON / Schema mismatch / 未支持关键字拒绝 / 校验后终态提交、持久 resume payload 超限显式失败、Agent Teams roster/mailbox/task DAG/revision/blockedBy 与官方 V2 whole-value event 兼容。基础 AgentLoop 和存在稳定官方可执行 seam 的高级 Projection 使用锁定官方源码生成的 golden；Android 进程恢复等平台特化语义继续由本机契约测试证明，不把自测包装成官方输出。
 
 ### relay-conformance
 
@@ -218,7 +218,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - 对比官方黄金结果。
 - 在官方基线更新时显式暴露行为差异。
 
-日常 CI 不自动追随上游最新版，防止无意改变产品语义。黄金 fixture 只证明其覆盖的基础 AgentLoop 调度语义；Session 请求重建、Checkpoint 水位、工具 admission identity、压缩来源等高级契约由对应模块测试证明，当前官方高级差分额外覆盖 Session Projection Registry 的同版本共享、引用计数、异版本拒绝、stateVersion 与 asOfSequence。Agent Teams 保持 Work-owned 领域实现，以锁定官方 0.2.1 契约逐项回归，不为差分测试破坏 Feature / Shared Capability 所有权。
+日常 CI 不自动追随上游最新版，防止无意改变产品语义。基础 golden 覆盖 AgentLoop 核心调度；advanced runner 直接运行锁定官方源码，当前验证 Session Projection Registry 的同版本共享、引用计数、异版本拒绝、stateVersion / asOfSequence，并验证官方 Agent Teams `agentTeam` Projection stateVersion=4、V2 member/task/message whole-value 事件、任务依赖与 queued-minus-delivered mailbox。Request Reconstruction、Continuable Agent 的 Android 进程恢复、Structured Result 等没有等价官方可执行 seam 的平台语义继续由对应模块契约测试证明；禁止把本机自测包装成官方 golden。
 
 ## 架构门禁
 
