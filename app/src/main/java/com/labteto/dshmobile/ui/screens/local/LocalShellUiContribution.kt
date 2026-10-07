@@ -31,6 +31,12 @@ internal fun localShellFeatureUiContribution(
     actions: LocalShellFeatureUiActions,
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
     onPushFeature: (LocalFeaturePage) -> Unit,
+    onOpenWorkspace: () -> Unit,
+    onOpenTasks: () -> Unit,
+    onOpenTools: () -> Unit,
+    onOpenPersonaGallery: () -> Unit,
+    onOpenGroupChat: () -> Unit,
+    onOpenDiary: () -> Unit,
     onNewSession: () -> Unit,
 ): LocalFeatureUiContribution {
     val scope = rememberCoroutineScope()
@@ -64,6 +70,12 @@ internal fun localShellFeatureUiContribution(
             onNewSession = onNewSession,
             onExitGroupChat = actions.exitGroupChat,
             onOpenRunCenter = { onPushFeature(LocalFeaturePage.RUN_CENTER) },
+            onOpenWorkspace = onOpenWorkspace,
+            onOpenTasks = onOpenTasks,
+            onOpenTools = onOpenTools,
+            onOpenPersonaGallery = onOpenPersonaGallery,
+            onOpenGroupChat = onOpenGroupChat,
+            onOpenDiary = onOpenDiary,
             sessionTitle = sessionTitleOverrides[surface.sessionId]
                 ?: shell.sessions.firstOrNull { it.id == surface.sessionId }?.title
                 ?: stringResource(R.string.chatlist_new_session),
