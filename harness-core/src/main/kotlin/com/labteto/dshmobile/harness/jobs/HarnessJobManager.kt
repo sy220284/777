@@ -167,6 +167,7 @@ class HarnessJobManager(
         block: suspend (String, (String) -> Unit) -> String,
     ): String {
         var previousOutput = ""
+        var previousStatus = "interrupted"
         var previousUpdatedAt = 0L
         var previousOwnerId: String? = null
         val record = synchronized(lock) {
@@ -182,6 +183,7 @@ class HarnessJobManager(
                 return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
             }
             previousOutput = found.output
+            previousStatus = found.status
             previousUpdatedAt = found.updatedAt
             previousOwnerId = found.ownerId
             if (!ownerId.isNullOrBlank()) found.ownerId = ownerId
@@ -194,7 +196,7 @@ class HarnessJobManager(
             persistCurrentSnapshots()
         } catch (error: Exception) {
             synchronized(lock) {
-                record.status = "interrupted"
+                record.status = previousStatus
                 record.output = previousOutput
                 record.ownerId = previousOwnerId
                 record.updatedAt = previousUpdatedAt
@@ -244,7 +246,9 @@ class HarnessJobManager(
     fun failInterrupted(id: String, detail: String): String {
         synchronized(lock) {
             val record = records[id] ?: return "后台任务不存在：$id"
-            if (record.status != "interrupted") return "后台任务无需标记失败：$id [${record.status}]"
+            if (record.status !in setOf("interrupted", "idle")) {
+                return "后台任务无需标记失败：$id [${record.status}]"
+            }
             record.status = "failed"
             record.output = detail.takeLast(MAX_OUTPUT)
             record.continuationState = null
