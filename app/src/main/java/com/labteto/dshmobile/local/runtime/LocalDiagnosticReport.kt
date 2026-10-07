@@ -173,6 +173,8 @@ private val DIAGNOSTIC_EVENT_KEYS = listOf(
     "output_schema_digest",
     "schema_digest",
     "output_digest",
+    "tool_filter_count",
+    "tool_filter_digest",
     "turn_id",
     "step",
     "attempt",
