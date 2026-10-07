@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -218,6 +219,29 @@ class LocalWorkspaceTest {
         assertEquals("1", cache.get("a"))
         assertEquals("3", cache.get("c"))
         assertEquals(null, cache.get("b"))
+    }
+
+    @Test
+    fun modelSkillsExposeMetadataButRejectUserOnlyInstructions() {
+        val publicDir = root.resolve(".dsh/skills/research").apply { mkdirs() }
+        publicDir.resolve("SKILL.md").writeText(
+            "---\ndescription: Verify sources\nwhen-to-use: During research\n---\n# Steps",
+        )
+        val privateDir = root.resolve(".dsh/skills/private-notes").apply { mkdirs() }
+        privateDir.resolve("SKILL.md").writeText(
+            "---\ndescription: User-only workspace\ndisable-model-invocation: true\n---\n# Notes",
+        )
+
+        val catalog = workspace.modelSkillCatalog()
+        assertTrue(catalog.contains("research：Verify sources"))
+        assertTrue(catalog.contains("适用：During research"))
+        assertFalse(catalog.contains("private-notes"))
+        assertTrue(workspace.readModelSkill("research").contains("# Steps"))
+        assertTrue(workspace.skills().contains("private-notes"))
+        assertTrue(workspace.readSkill("private-notes").contains("# Notes"))
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.readModelSkill("private-notes")
+        }
     }
 
     @Test
