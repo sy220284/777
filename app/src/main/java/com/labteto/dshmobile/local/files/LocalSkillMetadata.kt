@@ -16,7 +16,7 @@ internal fun parseLocalSkillMetadata(name: String, document: String): LocalSkill
     val lines = document.lineSequence().take(96).toList()
     if (lines.firstOrNull()?.trim() != "---") return LocalSkillMetadata(name)
     val closing = lines.indexOfFirstAfterHeader { it.trim() == "---" }
-    if (closing < 0) return LocalSkillMetadata(name)
+    if (closing < 0) return LocalSkillMetadata(name, modelInvocable = false)
     val entries = buildMap<String, String> {
         lines.subList(1, closing).forEach { line ->
             val match = SKILL_FRONT_MATTER_FIELD.matchEntire(line) ?: return@forEach

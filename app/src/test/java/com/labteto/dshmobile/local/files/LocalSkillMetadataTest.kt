@@ -29,7 +29,7 @@ class LocalSkillMetadataTest {
     @Test
     fun legacyAndMalformedMetadataPreserveExistingBehaviour() {
         assertTrue(parseLocalSkillMetadata("old", "# Normal markdown").modelInvocable)
-        assertTrue(parseLocalSkillMetadata("missing-close", "---\ndisable-model-invocation: true").modelInvocable)
+        assertFalse(parseLocalSkillMetadata("missing-close", "---\ndisable-model-invocation: true").modelInvocable)
     }
 
     @Test
