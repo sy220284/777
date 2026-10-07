@@ -261,6 +261,7 @@ internal fun parseAutomationPlan(
     val recurring = when (scheduleType) {
         AutomationScheduleType.DAILY -> 24L * 60L
         AutomationScheduleType.WEEKLY -> 7L * 24L * 60L
+        AutomationScheduleType.MONTHLY -> 30L * 24L * 60L
         AutomationScheduleType.INTERVAL -> (task.long("recurringMinutes") ?: 0L)
             .coerceAtLeast(60L)
         else -> null
@@ -310,6 +311,7 @@ private fun planningSystemPrompt(nowMillis: Long): String {
 
         可用 scheduleType：
         - ONCE：只执行一次，必须给 firstRunAtMillis。
+        - MONTHLY：每月同一天同一时间，短月对齐该月最后一天，由程序确定兼容周期。
         - DAILY：每天重复，给第一次 firstRunAtMillis。
         - WEEKLY：每周重复，给第一次 firstRunAtMillis。
         - INTERVAL：按固定间隔重复，给 firstRunAtMillis 和 recurringMinutes（至少 60）。

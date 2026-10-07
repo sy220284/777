@@ -274,6 +274,7 @@ private fun cadenceForTask(task: AutomationTask): AutomationCadence = when (task
     AutomationScheduleType.ONCE -> AutomationCadence.ONCE
     AutomationScheduleType.DAILY -> AutomationCadence.DAILY
     AutomationScheduleType.WEEKLY -> AutomationCadence.WEEKLY
+    AutomationScheduleType.MONTHLY -> AutomationCadence.MONTHLY
     AutomationScheduleType.INTERVAL -> AutomationCadence.CUSTOM
     AutomationScheduleType.LEGACY -> when (task.recurringMinutes) {
         null -> AutomationCadence.ONCE
