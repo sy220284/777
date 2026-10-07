@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -71,7 +72,7 @@ fun DsBottomSheet(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Spacer(
                     Modifier
-                        .fillMaxWidth(0.12f)
+                        .width(36.dp)
                         .height(4.dp)
                         .clip(DsShapes.pillFull)
                         .background(colors.borderL3),
@@ -83,7 +84,7 @@ fun DsBottomSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(title, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
+                        Text(title, style = DsType.headline17.withReadingWeight(), color = colors.labelPrimary)
                         if (subtitle != null) {
                             Text(subtitle, style = DsType.small13.withReadingWeight(), color = colors.labelTertiary)
                         }
