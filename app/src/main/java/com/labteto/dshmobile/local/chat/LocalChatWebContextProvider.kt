@@ -54,11 +54,18 @@ internal fun chatWebLookup(input: String): ChatWebLookup? {
     if (url != null && runCatching { URI(url).host != null }.getOrDefault(false)) {
         return ChatWebLookup.Page(url)
     }
-    val onlineIntent = Regex(
-        """(联网|上网|网页搜索|网络搜索|搜索一下|搜一下|查一下|查一查|查查|最新|实时|今日|近日|近期|本周新闻|热搜|天气预报|股价|汇率|行情|新闻|官网|recent news|latest|search the web)""",
+    val explicitlyOnline = Regex(
+        """(联网|上网|网页搜索|网络搜索|搜索一下|搜一下|查一下|查一查|查查|recent news|latest|search the web)""",
         RegexOption.IGNORE_CASE,
-    )
-    return if (onlineIntent.containsMatchIn(normalized)) {
+    ).containsMatchIn(normalized)
+    val asksForCurrentFacts = Regex(
+        """(今天|今日|最新|实时|近日|近期|最近|本周|当前)""",
+    ).containsMatchIn(normalized) && Regex(
+        """(新闻|发布|公告|版本|价格|天气|预报|股价|汇率|行情|热点|政策|赛程|比赛|动态|数据|官网)""",
+    ).containsMatchIn(normalized)
+    return if (explicitlyOnline || asksForCurrentFacts ||
+        normalized in setOf("新闻", "热搜", "天气预报", "汇率")
+    ) {
         ChatWebLookup.Search(normalized.take(300))
     } else null
 }
