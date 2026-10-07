@@ -233,8 +233,9 @@ Shared Capability 是多个 Feature 可以安全复用的纯能力边界。
 - Session owner / lease；
 - 删除与维护事务；
 - EventLog / transcript 权威事实；
-- 模型请求可重建证据、模型可见 Context / Tool Surface 版本；
+- 模型请求可重建证据、脱敏 Message / Context / Tool Surface 版本，以及按 requestUid 自动重建和一致性验证；
 - ModelHistory Checkpoint 事件水位与尾部重放；
+- Session Projection 提供统一注册底座、状态版本与 `asOfSequence` 时间切面；新接入 Projection 由 Feature 持有强类型句柄，Registry 不提供无类型全局状态读取；现有 Feature 投影按 Owner 渐进迁移，不另起第二套事实源；
 - 恢复时的所有权裁决。
 
 Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建立第二套 Session 所有权。
@@ -258,8 +259,12 @@ Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建
 
 - Agent run identity；
 - 主 / 子代理运行契约；
+- 子代理启动规格统一声明 mutation / continuation / history / virtual screen / depth / tool filter / output schema，并在运行和恢复前执行同一套能力校验；
+- Structured Result 使用共享 `JsonSchemaValidator`；模型只收到统一的 JSON-only 结果约束，终态先校验再提交，工具参数与子代理结果不允许出现两套 Schema 解释；
+- 前台与持久子代理共享 `QueuedAgentInput` 消息契约；Inbox 有界且满载显式拒绝，禁止通过淘汰旧消息伪装成功；
 - checkpoint；
 - continuation；
+- 持久 Child Agent 的稳定身份、durable inbox、history checkpoint 与 cold resume；一次 Activation 结束后显式 continuable Agent 进入 `dormant`，仅在新消息到达后重新激活，恢复保持全局 Step / 动态预算与终态结算语义；
 - run recovery；
 - tool result continuation 语义。
 

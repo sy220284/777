@@ -50,8 +50,8 @@ DSH_RUNTIME_ABIS=x86_64 ./gradlew :app:assembleDebug
 
 ```text
 deepseek-ai/deepseek-harness
-0.1.7-rc.2
-477b4f420553e8a52c2fbccc464d7561b239c443
+0.2.1-alpha.1
+5badb15009ae1756c3afe0ae0cef1faafc290ccc
 Session format reference: V4
 ```
 

@@ -5,6 +5,9 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalForegroundTurnWakeCoordinator
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
+import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
+import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
+import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.runtime.LOCAL_PROJECT_ID
@@ -137,10 +140,17 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             val result = withTimeout(budget.remainingMillis()) {
                 val execute: suspend () -> LocalSubagentResult = {
                     runner.runResult(
-                        task = executionTask,
-                        inheritHistory = false,
-                        allowMutation = true,
-                        maxSteps = boundState.subagentMaxSteps,
+                        LocalSubagentLaunchSpec(
+                            task = executionTask,
+                            modelOverride = null,
+                            maxSteps = boundState.subagentMaxSteps,
+                            capabilities = LocalSubagentCapabilities(
+                                allowMutation = true,
+                                continuable = false,
+                                virtualScreen = false,
+                                historyMode = LocalSubagentHistoryMode.ISOLATED,
+                            ),
+                        ),
                     )
                 }
                 recoveredProfile?.let { profile ->
