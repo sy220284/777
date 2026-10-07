@@ -138,7 +138,7 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 :reference-validation:test
 ```
 
-其中本机语义单测必须覆盖：模型请求证据与 Surface 关联、失败/取消 `assistant/attempt` 不进入正式历史、ModelHistory Checkpoint 水位与 V1 兼容重写、压缩来源证据、工具真实 admission execution identity。官方黄金 fixture 继续只承担锁定参考版本的基础 AgentLoop 差分，不把本机高级语义单测包装成官方全量等价。
+其中本机语义单测必须覆盖：模型请求证据与 Surface 关联、失败/取消 `assistant/attempt` 不进入正式历史、ModelHistory Checkpoint 水位与 V1 兼容重写、压缩来源证据、工具真实 admission execution identity；持久子代理还必须覆盖 Inbox 落盘/回滚、continuationState 往返、running→idle→再激活、进程中断冷恢复以及会话所有权隔离。官方黄金 fixture 继续只承担锁定参考版本的基础 AgentLoop 差分，不把本机高级语义单测包装成官方全量等价。
 
 ### build-arm64
 
