@@ -200,6 +200,11 @@ internal class LocalSubagentRunner(
             ?.let(::persistentSubagentId)
             ?: "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
         val recoveringHistory = recoveredHistory != null
+        val activationInput = if (recoveringHistory) {
+            "继续处理持久子代理已排队的新消息，并基于已有历史完成本轮任务。"
+        } else {
+            task
+        }
         val history = LocalModelHistoryBuffer().apply {
             reset(
                 recoveredHistory
@@ -278,8 +283,8 @@ internal class LocalSubagentRunner(
             policy = localAgentRunPolicy(LocalUsageMode.WORK),
             safeAutoApprovalEnabled = snapshot.safeAutoApprovalEnabled,
             maxSteps = stepLimit,
-            input = task,
-            memoryInput = task,
+            input = activationInput,
+            memoryInput = if (recoveringHistory) activationInput else task,
             kind = runKind,
             allowMutation = allowMutation,
             resourceBudget = LocalAgentRunResourceBudget(
@@ -667,7 +672,7 @@ internal class LocalSubagentRunner(
                 idFactory = { runContext?.runId ?: UUID.randomUUID().toString() },
             )
 
-            val result = loop.run(task)
+            val result = loop.run(activationInput)
             if (result.stopReason == com.labteto.dshmobile.harness.agent.AgentStopReason.COMPLETED) {
                 val output = result.answer.ifBlank { "子代理已结束，但没有返回文字。" }
                 backgroundJobId?.let { jobId ->
