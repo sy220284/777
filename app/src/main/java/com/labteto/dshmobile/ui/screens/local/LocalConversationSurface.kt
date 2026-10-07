@@ -147,6 +147,12 @@ internal fun LocalConversationSurface(
     onNewSession: () -> Unit,
     onExitGroupChat: () -> Unit,
     onOpenRunCenter: () -> Unit,
+    onOpenWorkspace: () -> Unit,
+    onOpenTasks: () -> Unit,
+    onOpenTools: () -> Unit,
+    onOpenPersonaGallery: () -> Unit,
+    onOpenGroupChat: () -> Unit,
+    onOpenDiary: () -> Unit,
     sessionTitle: String,
     sessionPinned: Boolean,
     onTogglePinSession: () -> Unit,
@@ -944,29 +950,68 @@ internal fun LocalConversationSurface(
         )
     }
     if (showAttachmentPicker) {
-        DsBottomSheet(title = stringResource(R.string.chat_composer_add_attachment), onDismiss = { showAttachmentPicker = false }) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-            ) {
-                DsQuickActionTile(
-                    icon = Icons.Outlined.Image,
-                    label = stringResource(R.string.local_attachment_image),
-                    onClick = {
-                        showAttachmentPicker = false
-                        imagePicker.launch(arrayOf("image/*"))
-                    },
-                    modifier = Modifier.weight(1f),
+        DsBottomSheet(
+            title = stringResource(R.string.chat_composer_add_attachment),
+            onDismiss = { showAttachmentPicker = false },
+        ) {
+            val actionRows = if (state.usageMode == LocalUsageMode.CHAT) {
+                listOf(
+                    listOf(
+                        Triple(FeatherIcons.Image, stringResource(R.string.local_attachment_image)) {
+                            imagePicker.launch(arrayOf("image/*"))
+                        },
+                        Triple(FeatherIcons.FilePlus, stringResource(R.string.local_attachment_file)) {
+                            filePicker.launch(arrayOf("*/*"))
+                        },
+                        Triple(FeatherIcons.User, stringResource(R.string.persona_gallery_title), onOpenPersonaGallery),
+                    ),
+                    listOf(
+                        Triple(FeatherIcons.Users, stringResource(R.string.local_group_chat_title), onOpenGroupChat),
+                        Triple(FeatherIcons.BookOpen, stringResource(R.string.chat_diary_title), onOpenDiary),
+                        Triple(FeatherIcons.Clock, stringResource(R.string.tasks_chat_title), onOpenTasks),
+                    ),
+                    listOf(
+                        Triple(FeatherIcons.Tool, stringResource(R.string.tools_title), onOpenTools),
+                    ),
                 )
-                DsQuickActionTile(
-                    icon = Icons.Outlined.AttachFile,
-                    label = stringResource(R.string.local_attachment_file),
-                    onClick = {
-                        showAttachmentPicker = false
-                        filePicker.launch(arrayOf("*/*"))
-                    },
-                    modifier = Modifier.weight(1f),
+            } else {
+                listOf(
+                    listOf(
+                        Triple(FeatherIcons.Image, stringResource(R.string.local_attachment_image)) {
+                            imagePicker.launch(arrayOf("image/*"))
+                        },
+                        Triple(FeatherIcons.FilePlus, stringResource(R.string.local_attachment_file)) {
+                            filePicker.launch(arrayOf("*/*"))
+                        },
+                        Triple(FeatherIcons.Folder, stringResource(R.string.chatlist_workspace_files), onOpenWorkspace),
+                    ),
+                    listOf(
+                        Triple(FeatherIcons.Activity, stringResource(R.string.local_run_center), onOpenRunCenter),
+                        Triple(FeatherIcons.Clock, stringResource(R.string.tasks_title), onOpenTasks),
+                        Triple(FeatherIcons.Tool, stringResource(R.string.tools_title), onOpenTools),
+                    ),
                 )
+            }
+            actionRows.forEach { row ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    row.forEach { (icon, label, action) ->
+                        DsQuickActionTile(
+                            icon = icon,
+                            label = label,
+                            onClick = {
+                                showAttachmentPicker = false
+                                action()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    repeat((3 - row.size).coerceAtLeast(0)) {
+                        Box(Modifier.weight(1f))
+                    }
+                }
             }
         }
     }
