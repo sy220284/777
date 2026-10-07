@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -323,7 +321,7 @@ private fun ImportedImageAttachmentTile(
             )
         }
         DsIconButton(
-            icon = Icons.Outlined.Close,
+            icon = FeatherIcons.X,
             contentDescription = stringResource(R.string.common_remove),
             onClick = onRemove,
             modifier = Modifier.align(Alignment.TopEnd),

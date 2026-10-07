@@ -219,7 +219,7 @@ internal fun WorkSurfaceHeader(
                 )
             }
             Icon(
-                Icons.Filled.KeyboardArrowDown,
+                FeatherIcons.ChevronDown,
                 contentDescription = null,
                 tint = colors.labelSecondary,
                 modifier = Modifier.size(16.dp),
@@ -236,7 +236,7 @@ internal fun WorkSurfaceHeader(
             tint = colors.labelSecondary,
         )
         DsIconButton(
-            icon = Icons.Filled.Add,
+            icon = FeatherIcons.Plus,
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,
             tint = colors.labelSecondary,

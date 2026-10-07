@@ -89,8 +89,8 @@ fun DsDialog(
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { appeared = true }
     val scale by animateFloatAsState(
-        targetValue = if (appeared) 1f else 0.97f,
-        animationSpec = DsAnimations.normalSpring,
+        targetValue = if (appeared) 1f else 0.985f,
+        animationSpec = DsAnimations.pageFade,
         label = "dialogScale",
     )
     val alpha by animateFloatAsState(
@@ -151,8 +151,8 @@ fun DsDialog(
                     ),
                 shape = DsShapes.dialog,
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG),
-                border = BorderStroke(1.dp, colors.borderL1),
-                shadowElevation = 4.dp,
+                border = BorderStroke(1.dp, colors.borderL2),
+                shadowElevation = 1.dp,
             ) {
                 Column(
                     Modifier.padding(com.labteto.dshmobile.ui.theme.DsSpacing.comfortable),
@@ -239,7 +239,7 @@ fun DsToastHost(state: Pair<State<String?>, (String) -> Unit>, modifier: Modifie
             Surface(
                 shape = DsShapes.toast,
                 color = DsTheme.colors.toastBg,
-                shadowElevation = 3.dp,
+                shadowElevation = 2.dp,
                 modifier = Modifier.padding(top = 16.dp),
             ) {
                 Text(
