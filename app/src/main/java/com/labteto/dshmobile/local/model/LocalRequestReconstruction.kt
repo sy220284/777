@@ -315,6 +315,27 @@ private fun reconstructProviderAttempt(
         issues += "header_seq 不匹配：期望 " + header.sequence + "，实际 " + headerSeq
     }
 
+    fun requireSameAsHeader(field: String) {
+        val expected = header.data.string(field)
+        val actual = data.string(field)
+        if (expected != null && actual != expected) {
+            issues += field + " 与 request/header 不一致"
+        }
+    }
+    listOf(
+        "model",
+        "base_url",
+        "profile_id",
+        "provider",
+        "protocol",
+        "route_fingerprint",
+    ).forEach(::requireSameAsHeader)
+    val headerTemperature = header.data["temperature"]?.jsonPrimitive?.doubleOrNull
+    val attemptTemperature = data["temperature"]?.jsonPrimitive?.doubleOrNull
+    if (headerTemperature != attemptTemperature) {
+        issues += "temperature 与 request/header 不一致"
+    }
+
     fun surface(sequenceKey: String, expectedType: String): LocalSessionEventLog.Event? {
         val sequence = data[sequenceKey]?.jsonPrimitive?.longOrNull
         if (sequence == null) {
