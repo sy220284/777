@@ -59,6 +59,7 @@ RELAY_CONFORMANCE_PATHS = {
 FIXTURE_PROVENANCE_PATHS = {
     "upstream/deepseek-harness.lock.json",
     "tools/reference-validation/official-runner.ts",
+    "tools/reference-validation/official-semantic-runner.ts",
     "tools/reference-validation/refresh-official-fixtures.sh",
     "tools/reference-validation/package.json",
     "tools/reference-validation/package-lock.json",
