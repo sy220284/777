@@ -214,20 +214,7 @@ internal fun LocalModeDrawer(
                         onClick = onNewSession,
                         tint = colors.labelPrimary,
                     )
-                    DsIconButton(
-                        icon = FeatherIcons.Search,
-                        contentDescription = stringResource(R.string.chatlist_search_hint),
-                        onClick = {
-                            if (searchOpen) {
-                                searchOpen = false
-                                historyQuery = ""
-                                keyboardController?.hide()
-                            } else {
-                                searchOpen = true
-                            }
-                        },
-                        tint = if (searchOpen) colors.accent else colors.labelPrimary,
-                    )
+
                 }
 
                 LocalUsageModePill(
@@ -236,26 +223,7 @@ internal fun LocalModeDrawer(
                     onSelect = onUsageModeChange,
                 )
 
-                DsExpandableColumn(visible = searchOpen) {
-                    DsTextField(
-                        value = historyQuery,
-                        onValueChange = { historyQuery = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(searchFocusRequester),
-                        placeholder = { Text(stringResource(R.string.chatlist_search_hint)) },
-                        leadingIcon = {
-                            Icon(
-                                FeatherIcons.Search,
-                                contentDescription = null,
-                                tint = colors.labelTertiary,
-                            )
-                        },
-                        singleLine = true,
-                        shape = DsShapes.block,
-                        flat = true,
-                    )
-                }
+
 
                 DrawerContextCard(
                     usageMode = usageMode,
@@ -444,16 +412,61 @@ internal fun LocalModeDrawer(
                         }
                     }
                 } else {
-                    DrawerGlobalAction(
-                        icon = FeatherIcons.Device,
-                        title = stringResource(R.string.local_remote_control),
-                        onClick = onRemote,
-                    )
-                    DrawerGlobalAction(
-                        icon = FeatherIcons.Sliders,
-                        title = stringResource(R.string.settings_title),
-                        onClick = onSettings,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        if (searchOpen) {
+                            DsTextField(
+                                value = historyQuery,
+                                onValueChange = { historyQuery = it },
+                                modifier = Modifier.weight(1f).focusRequester(searchFocusRequester),
+                                placeholder = { Text(stringResource(R.string.chatlist_search_hint)) },
+                                leadingIcon = {
+                                    Icon(
+                                        FeatherIcons.Search,
+                                        contentDescription = null,
+                                        tint = colors.labelTertiary,
+                                    )
+                                },
+                                singleLine = true,
+                                shape = DsShapes.pillFull,
+                                flat = true,
+                            )
+                        } else {
+                            Surface(
+                                modifier = Modifier.weight(1f),
+                                onClick = { searchOpen = true },
+                                color = colors.bgLayer1,
+                                shape = DsShapes.pillFull,
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(FeatherIcons.Search, contentDescription = null, tint = colors.labelSecondary)
+                                    Text(
+                                        stringResource(R.string.chatlist_search_hint),
+                                        style = DsType.small13.withReadingWeight(),
+                                        color = colors.labelTertiary,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+                        DsIconButton(
+                            icon = FeatherIcons.Device,
+                            contentDescription = stringResource(R.string.local_remote_control),
+                            onClick = onRemote,
+                        )
+                        DsIconButton(
+                            icon = FeatherIcons.Sliders,
+                            contentDescription = stringResource(R.string.settings_title),
+                            onClick = onSettings,
+                        )
+                    }
                 }
             }
         }
