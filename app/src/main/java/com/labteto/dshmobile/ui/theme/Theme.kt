@@ -185,7 +185,7 @@ object DsThemeTokens {
 
 }
 
-/** The full DeepSeek palette as a CompositionLocal. */
+/** The resolved 777 UI palette as a CompositionLocal. */
 val LocalDsColors = staticCompositionLocalOf { DsThemeTokens.light }
 
 data class DsReadingPreferences(
@@ -237,8 +237,8 @@ private fun materialDarkScheme(c: DsColors) = darkColorScheme(
 )
 
 /**
- * The DeepSeek Harness theme. Honors the app's theme preference
- * (light | dark | system) and always uses the DSH token palette.
+ * The 777 UI theme. It keeps platform light/dark behavior while applying the current interaction
+ * palette and the user's optional appearance overrides.
  */
 @Composable
 fun DshTheme(
@@ -263,7 +263,7 @@ fun DshTheme(
         ThemePreference.MATTE_BLACK -> DsThemeTokens.matteBlack
         ThemePreference.SYSTEM -> if (systemDark) DsThemeTokens.dark else DsThemeTokens.light
     }
-    // 用户自选传统色卡：默认青瓷（原样），其余卡覆盖 accent 家族
+    // 旧 celadon 持久值由 AccentPalettes.of 迁移为 Kimi 默认；显式色卡覆盖 accent 家族
     val palette = AccentPalettes.of(accentKey)
     val themed = if (palette.key == AccentPalettes.DEFAULT.key) ds else ds.withAccent(palette, dark)
     val scheme = if (dark) materialDarkScheme(themed) else materialLightScheme(themed)

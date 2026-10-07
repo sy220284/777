@@ -3,11 +3,9 @@ package com.labteto.dshmobile.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * 中国风传统色卡：用户可自选的 accent 主题。
+ * 777 的交互色卡。Kimi 蓝是当前默认，历史传统色继续作为显式可选外观。
  *
- * 每张卡一对主色——亮色主题取深档（对应青瓷 Celadon600），暗色主题取浅档（对应 Celadon400），
- * 保证任何卡在两种主题下都落在既定的对比度带上。色名是专有名词，保留汉字不做翻译——
- * 这是这个功能的审美本体，不是待本地化的文案。
+ * 每张卡提供亮 / 暗两档主色，只覆盖交互 accent 家族，不改变成功、警告、错误等语义色。
  */
 data class AccentPalette(
     val key: String,
