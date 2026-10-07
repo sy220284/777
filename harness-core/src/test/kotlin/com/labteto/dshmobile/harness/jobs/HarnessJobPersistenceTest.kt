@@ -7,6 +7,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -380,6 +381,67 @@ class HarnessJobPersistenceTest {
 
         assertTrue(failure is IllegalStateException)
         assertTrue(manager.peekMessages("job-agent") == listOf(QueuedAgentInput(id = "msg-old", content = "已有消息")))
+    }
+
+    @Test
+    fun uncommittedPersistentInboxIsInvisibleUntilDurableAdmissionFinishes() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val workers = Executors.newFixedThreadPool(2)
+        val writeEntered = CountDownLatch(1)
+        val releaseWrite = CountDownLatch(1)
+        val observerStarted = CountDownLatch(1)
+        val observerDone = CountDownLatch(1)
+        val writes = AtomicInteger(0)
+        val observed = AtomicReference<List<QueuedAgentInput>>(emptyList())
+        val manager = HarnessJobManager(
+            scope = scope,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "completed",
+                    output = "上一轮完成",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerId = "session-a",
+                    continuable = true,
+                ),
+            ),
+            onSnapshotsChanged = {
+                if (writes.incrementAndGet() == 2) {
+                    writeEntered.countDown()
+                    check(releaseWrite.await(5, TimeUnit.SECONDS))
+                    error("disk full")
+                }
+            },
+        )
+        try {
+            val sender = workers.submit<Throwable?> {
+                runCatching {
+                    manager.send("job-agent", "尚未落盘的消息", "session-a")
+                }.exceptionOrNull()
+            }
+            assertTrue(writeEntered.await(5, TimeUnit.SECONDS))
+
+            workers.submit {
+                observerStarted.countDown()
+                observed.set(manager.peekMessages("job-agent"))
+                observerDone.countDown()
+            }
+            assertTrue(observerStarted.await(5, TimeUnit.SECONDS))
+            assertFalse(observerDone.await(200, TimeUnit.MILLISECONDS))
+
+            releaseWrite.countDown()
+            assertTrue(sender.get(5, TimeUnit.SECONDS) is IllegalStateException)
+            assertTrue(observerDone.await(5, TimeUnit.SECONDS))
+            assertTrue(observed.get().isEmpty())
+            assertTrue(manager.peekMessages("job-agent").isEmpty())
+        } finally {
+            releaseWrite.countDown()
+            scope.cancel()
+            workers.shutdownNow()
+        }
     }
 
     @Test

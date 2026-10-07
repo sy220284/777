@@ -26,7 +26,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -45,6 +44,8 @@ internal class LocalPersistentJobRecoveryCoordinator(
     private val currentSessionId: () -> String,
     private val currentState: () -> LocalHarnessState,
     private val defaultHistory: () -> List<JsonObject>,
+    private val stateForSession: (String) -> LocalHarnessState?,
+    private val historyForSession: (String) -> List<JsonObject>?,
     private val subagentRunner: (
         sessionId: String,
         state: LocalHarnessState,
@@ -53,6 +54,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
     private val eventLogFor: (String) -> LocalSessionEventLog,
 ) {
     private val lock = Any()
+    private val pendingRecoverySessions = linkedSetOf<String>()
     private var recoveryJob: Job? = null
 
     suspend fun startReadonlySubagent(
@@ -109,40 +111,55 @@ internal class LocalPersistentJobRecoveryCoordinator(
     ): String {
         val result = jobs.send(agentId, message, sessionId)
         if (result.startsWith("消息已发送") || result.startsWith("消息已持久排队")) {
-            schedule()
+            schedule(sessionId)
         }
         return result
     }
 
-    fun schedule() {
+    fun schedule(sessionId: String = currentSessionId()) {
+        val targetSession = sessionId.trim()
+        if (targetSession.isEmpty()) return
         synchronized(lock) {
+            pendingRecoverySessions += targetSession
             if (recoveryJob?.isActive == true) return
             recoveryJob = scope.launch {
                 try {
                     while (true) {
-                        val targetSession = currentSessionId()
-                        resumePass(targetSession)
-                        val remaining =
-                            jobs.resumableSnapshots().any { snapshot ->
-                                interruptedSessionId(snapshot, targetSession) == targetSession
-                            } ||
-                                jobs.pendingContinuableAgentMessageSnapshots().any { snapshot ->
-                                    interruptedSessionId(snapshot, targetSession) == targetSession
-                                }
-                        if (!remaining) break
-                        delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
+                        val nextSession = synchronized(lock) {
+                            pendingRecoverySessions.firstOrNull()?.also { pendingRecoverySessions.remove(it) }
+                        } ?: break
+                        val deferredForMissingContext = resumePass(nextSession)
+                        val remaining = hasRemainingRecovery(nextSession)
+                        if (remaining && !deferredForMissingContext) {
+                            synchronized(lock) { pendingRecoverySessions += nextSession }
+                            delay(PERSISTENT_RECOVERY_RETRY_MILLIS)
+                        }
                     }
                 } finally {
                     val completed = currentCoroutineContext()[Job]
-                    synchronized(lock) {
+                    val restart = synchronized(lock) {
                         if (recoveryJob === completed) recoveryJob = null
+                        recoveryJob == null && pendingRecoverySessions.isNotEmpty()
+                    }
+                    if (restart) {
+                        synchronized(lock) { pendingRecoverySessions.firstOrNull() }
+                            ?.let(::schedule)
                     }
                 }
             }
         }
     }
 
-    private fun resumePass(targetSession: String) {
+    private fun hasRemainingRecovery(targetSession: String): Boolean =
+        jobs.resumableSnapshots().any { snapshot ->
+            interruptedSessionId(snapshot, targetSession) == targetSession
+        } ||
+            jobs.pendingContinuableAgentMessageSnapshots().any { snapshot ->
+                interruptedSessionId(snapshot, targetSession) == targetSession
+            }
+
+    private fun resumePass(targetSession: String): Boolean {
+        var deferredForMissingContext = false
         jobs.resumableSnapshots().forEach { snapshot ->
             val payload = decodePayload(snapshot, targetSession) ?: return@forEach
             val sessionId = payload["session_id"]?.jsonPrimitive?.contentOrNull ?: targetSession
@@ -150,7 +167,11 @@ internal class LocalPersistentJobRecoveryCoordinator(
             try {
                 when (snapshot.resumeKind) {
                     "web_fetch" -> resumeWebFetch(snapshot, sessionId, payload)
-                    "subagent_readonly" -> resumeSubagent(snapshot, sessionId, payload)
+                    "subagent_readonly" -> {
+                        if (!resumeSubagent(snapshot, sessionId, payload)) {
+                            deferredForMissingContext = true
+                        }
+                    }
                     else -> jobs.failResumable(
                         snapshot.id,
                         "任务恢复失败：不支持的恢复类型 ${snapshot.resumeKind.orEmpty()}",
@@ -163,6 +184,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 recordError(snapshot, sessionId, error)
             }
         }
+        return deferredForMissingContext
     }
 
     private fun decodePayload(snapshot: JobSnapshot, fallbackSessionId: String): JsonObject? {
@@ -199,7 +221,11 @@ internal class LocalPersistentJobRecoveryCoordinator(
         }
     }
 
-    private fun resumeSubagent(snapshot: JobSnapshot, sessionId: String, payload: JsonObject) {
+    private fun resumeSubagent(
+        snapshot: JobSnapshot,
+        sessionId: String,
+        payload: JsonObject,
+    ): Boolean {
         val version = payload["version"]?.jsonPrimitive?.intOrNull
             ?: error("旧版持久子代理缺少路由身份，已停止自动续跑")
         require(version == PERSISTENT_SUBAGENT_RESUME_VERSION) {
@@ -213,11 +239,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val protocol = payload.requiredString("protocol")
         val credentialRef = payload["credential_ref"]?.jsonPrimitive?.contentOrNull
         val fingerprint = payload.requiredString("route_fingerprint")
-        val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
-            ?.let(LocalAgentRuntimeLimits::normalizeSubagentSteps)
-            ?: currentState().subagentMaxSteps
         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
-        val runner = subagentRunner(sessionId, currentState(), defaultHistory)
         val log = eventLogFor(sessionId)
         val checkpointEvent = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
             data["background_job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
@@ -235,8 +257,17 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 ownerSessionId = sessionId,
             )
         ) {
-            return
+            return true
         }
+        // Only an actual model continuation needs a live, session-owned execution context.
+        // Terminal checkpoint settlement above is fully durable and can finish off-screen.
+        val boundState = stateForSession(sessionId) ?: return false
+        val parentHistory = historyForSession(sessionId) ?: return false
+        val maxSteps = payload["max_steps"]?.jsonPrimitive?.intOrNull
+            ?.let(LocalAgentRuntimeLimits::normalizeSubagentSteps)
+            ?: boundState.subagentMaxSteps
+        val runner = subagentRunner(sessionId, boundState) { parentHistory }
+
         // A genuinely new message may have arrived after the first Inbox snapshot.
         // Refresh before rebuilding the recovery tail so terminal settlement cannot
         // overwrite a newly queued continuation request.
@@ -258,7 +289,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 base
             } else {
                 base + recoveredTail.map { message ->
-                    buildJsonObject {
+                    message.modelMessage ?: buildJsonObject {
                         put("role", "user")
                         put("content", message.content)
                     }
@@ -296,6 +327,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                 ).requireCompletedOutput()
             }
         }
+        return true
     }
 
     private fun recoverClaimedMessagesAfterCheckpoint(
@@ -320,22 +352,15 @@ internal class LocalPersistentJobRecoveryCoordinator(
             for (event in page) {
                 if (event.sequence > scanThrough) break
                 if (
-                    event.type != "subagent/inbox-claimed" ||
+                    event.type != LOCAL_SUBAGENT_INBOX_CLAIM_EVENT ||
                     event.data["background_job_id"]?.jsonPrimitive?.contentOrNull != backgroundJobId
                 ) {
                     continue
                 }
-                val messages = event.data["messages"] as? JsonArray ?: continue
-                for (raw in messages) {
-                    val data = raw as? JsonObject ?: continue
-                    val id = data["id"]?.jsonPrimitive?.contentOrNull
-                        ?.takeIf(String::isNotBlank)
-                        ?: continue
-                    val content = data["content"]?.jsonPrimitive?.contentOrNull
-                        ?.takeIf(String::isNotBlank)
-                        ?: continue
-                    if (id in pendingIds || !seen.add(id)) continue
-                    recovered += QueuedAgentInput(id = id, content = content, memoryInput = content)
+                val messages = decodeLocalSubagentInboxClaimedMessages(event.data) ?: continue
+                for (message in messages) {
+                    if (message.id in pendingIds || !seen.add(message.id)) continue
+                    recovered += message
                 }
             }
             val nextCursor = page.last().sequence

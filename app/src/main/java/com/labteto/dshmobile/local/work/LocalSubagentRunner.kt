@@ -74,6 +74,20 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+internal fun runSubagentTurnBoundaryCleanup(
+    primaryFailure: Exception?,
+    cleanup: () -> Unit,
+) {
+    try {
+        cleanup()
+    } catch (cleanupError: Exception) {
+        if (primaryFailure == null) throw cleanupError
+        if (cleanupError !== primaryFailure) {
+            primaryFailure.addSuppressed(cleanupError)
+        }
+    }
+}
+
 internal class LocalSubagentRunner(
     private val modelGateway: LocalModelGateway,
     private val state: StateFlow<LocalHarnessState>,
@@ -348,6 +362,7 @@ internal class LocalSubagentRunner(
             }
         }
 
+        var primaryFailure: Exception? = null
         try {
             if (!recoveringHistory) {
                 if (!inheritHistory) history.append(buildJsonObject {
@@ -418,17 +433,14 @@ internal class LocalSubagentRunner(
                         val queuedMessages = jobs.peekMessages(jobId)
                             .filterNot { message -> message.id in claimedMessageIds }
                         if (queuedMessages.isNotEmpty()) {
-                            eventLog().append("subagent/inbox-claimed", buildJsonObject {
-                                put("version", 1)
-                                put("agent_id", subagentId)
-                                put("background_job_id", jobId)
-                                put("messages", JsonArray(queuedMessages.map { message ->
-                                    buildJsonObject {
-                                        put("id", message.id)
-                                        put("content", message.content)
-                                    }
-                                }))
-                            })
+                            eventLog().append(
+                                LOCAL_SUBAGENT_INBOX_CLAIM_EVENT,
+                                encodeLocalSubagentInboxClaimEvent(
+                                    agentId = subagentId,
+                                    backgroundJobId = jobId,
+                                    messages = queuedMessages,
+                                ),
+                            )
                             queuedMessages.forEach { message ->
                                 history.append(buildJsonObject {
                                     put("role", "user")
@@ -729,7 +741,10 @@ internal class LocalSubagentRunner(
             }
             return LocalSubagentResult(LocalSubagentStatus.STEP_LIMIT, output, "STEP_LIMIT")
         } catch (cancelled: CancellationException) {
-            if (!currentCoroutineContext().isActive) throw cancelled
+            if (!currentCoroutineContext().isActive) {
+                primaryFailure = cancelled
+                throw cancelled
+            }
             val partial = progress.joinToString("\n")
             val output = buildString {
                 append("[subagent][$subagentId][TASK_CANCELLED] 子代理自身被取消；同批其他子代理不会被级联取消。")
@@ -737,6 +752,11 @@ internal class LocalSubagentRunner(
                 if (partial.isNotBlank()) append("\n已完成的最近进度：\n$partial")
             }
             return LocalSubagentResult(LocalSubagentStatus.CANCELLED, output, "TASK_CANCELLED")
+        } catch (error: JobContinuationPersistenceException) {
+            // The outer persistent Job owner is the authority for this failure. Converting it into
+            // a normal subagent failure would permanently mark a safely resumable activation as failed.
+            primaryFailure = error
+            throw error
         } catch (error: LocalModelException) {
             AppLog.warn(
                 "LocalSubagentRunner",
@@ -757,13 +777,15 @@ internal class LocalSubagentRunner(
             }
             return LocalSubagentResult(LocalSubagentStatus.FAILED, output, "SUBAGENT_ERROR")
         } finally {
-            compactionPolicy.atTurnBoundary(
-                historyPolicy,
-                history,
-                subagentId,
-                runHistoryBudget,
-                runCachePolicy,
-            )
+            runSubagentTurnBoundaryCleanup(primaryFailure) {
+                compactionPolicy.atTurnBoundary(
+                    historyPolicy,
+                    history,
+                    subagentId,
+                    runHistoryBudget,
+                    runCachePolicy,
+                )
+            }
         }
     }
 

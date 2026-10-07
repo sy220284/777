@@ -118,6 +118,15 @@ internal class LocalWorkComposition @Inject constructor(
             currentSessionId = runtimeStateStore::currentSessionId,
             currentState = { runtimeStateStore.state.value },
             defaultHistory = runtimeStateStore.foregroundRunHandle.modelHistory::snapshot,
+            stateForSession = { sessionId ->
+                workRunRegistry[sessionId]?.aggregateSnapshot()
+                    ?: runtimeStateStore.state.value.takeIf { state -> state.sessionId == sessionId }
+            },
+            historyForSession = { sessionId ->
+                workRunRegistry[sessionId]?.runHandle?.modelHistory?.snapshot()
+                    ?: runtimeStateStore.foregroundRunHandle.modelHistory.snapshot()
+                        .takeIf { runtimeStateStore.state.value.sessionId == sessionId }
+            },
             subagentRunner = { sessionId, boundState, history ->
                 subagentFactory.createBound(
                     sessionId = sessionId,
