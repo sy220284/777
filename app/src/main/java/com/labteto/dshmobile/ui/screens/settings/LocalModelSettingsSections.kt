@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -37,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.memory.MemoryKind
@@ -279,10 +279,10 @@ internal fun LocalModelSettingsCard(
                     },
                 )
                 if (custom) {
-                    OutlinedTextField(model, onValueChange = { model = it.take(160); editingProfileId = null; editorGeneration++; testStatus = null },
+                    DsTextField(model, onValueChange = { model = it.take(160); editingProfileId = null; editorGeneration++; testStatus = null },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
                         label = { Text(stringResource(R.string.advanced_default_model)) })
-                    OutlinedTextField(baseUrl, onValueChange = { baseUrl = it.take(1000); editingProfileId = null; editorGeneration++; testStatus = null },
+                    DsTextField(baseUrl, onValueChange = { baseUrl = it.take(1000); editingProfileId = null; editorGeneration++; testStatus = null },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
                         label = { Text(stringResource(R.string.advanced_endpoint)) })
                     LocalModelContextWindowField(contextWindowTokens) { contextWindowTokens = it; editorGeneration++; testStatus = null }
@@ -316,7 +316,7 @@ internal fun LocalModelSettingsCard(
                     }
                 }
                 if (custom) LocalModelProtocolPicker(protocol) { protocol = it; editorGeneration++; testStatus = null }
-                OutlinedTextField(apiKey, onValueChange = { apiKey = it.take(8000); editorGeneration++; testStatus = null },
+                DsTextField(apiKey, onValueChange = { apiKey = it.take(8000); editorGeneration++; testStatus = null },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     label = { Text(stringResource(if (savedRoute) R.string.advanced_replace_model_key
                         else R.string.advanced_model_key)) },

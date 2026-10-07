@@ -3,7 +3,6 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.presentation.chatMessageHasAttachmentContext
 import com.labteto.dshmobile.local.presentation.editableChatUserText
@@ -71,7 +71,7 @@ internal fun LocalChatEditMessageSheet(
                 color = colors.labelSecondary,
             )
         }
-        OutlinedTextField(
+        DsTextField(
             value = text,
             onValueChange = {
                 text = it

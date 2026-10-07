@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.automation.AutomationMode
 import com.labteto.dshmobile.automation.AutomationScheduleType
 import com.labteto.dshmobile.local.presentation.LocalAutomationPolicyProjection
@@ -76,7 +76,7 @@ internal fun ColumnScope.TaskEditorPane(
                 style = DsType.base16Strong.withReadingWeight(),
                 color = colors.labelPrimary,
             )
-            OutlinedTextField(
+            DsTextField(
                 value = prompt,
                 onValueChange = {
                     prompt = it
@@ -131,7 +131,7 @@ internal fun ColumnScope.TaskEditorPane(
                 modifier = Modifier.fillMaxWidth(),
             )
             if (cadence == AutomationCadence.CUSTOM) {
-                OutlinedTextField(
+                DsTextField(
                     value = customHours,
                     onValueChange = {
                         customHours = it.filter(Char::isDigit).take(5)

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +28,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.core.wire.dto.PluginFiberPhase
 import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
@@ -623,7 +623,7 @@ fun ToolsScreen(
                 style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
-            OutlinedTextField(
+            DsTextField(
                 value = githubToken,
                 onValueChange = { githubToken = it.take(4096) },
                 modifier = Modifier.fillMaxWidth(),
@@ -712,7 +712,7 @@ fun ToolsScreen(
                 style = DsType.caption11.withReadingWeight(),
                 color = colors.labelTertiary,
             )
-            OutlinedTextField(
+            DsTextField(
                 value = webhookPort,
                 onValueChange = { webhookPort = it.filter(Char::isDigit).take(5) },
                 modifier = Modifier.fillMaxWidth(),
@@ -812,7 +812,7 @@ fun ToolsScreen(
                 }
             }
 
-            OutlinedTextField(
+            DsTextField(
                 value = serverId,
                 onValueChange = { serverId = it.take(24) },
                 modifier = Modifier.fillMaxWidth(),
@@ -821,7 +821,7 @@ fun ToolsScreen(
                 singleLine = true,
                 shape = DsShapes.row,
             )
-            OutlinedTextField(
+            DsTextField(
                 value = endpoint,
                 onValueChange = { endpoint = it.take(2000) },
                 modifier = Modifier.fillMaxWidth(),
@@ -848,7 +848,7 @@ fun ToolsScreen(
                 style = DsType.std14Strong.withReadingWeight(),
                 color = colors.labelPrimary,
             )
-            OutlinedTextField(
+            DsTextField(
                 value = stdioCommand,
                 onValueChange = { stdioCommand = it.take(4000) },
                 modifier = Modifier.fillMaxWidth(),
@@ -859,7 +859,7 @@ fun ToolsScreen(
                 maxLines = 6,
                 shape = DsShapes.row,
             )
-            OutlinedTextField(
+            DsTextField(
                 value = stdioWorkingDirectory,
                 onValueChange = { stdioWorkingDirectory = it.take(1000) },
                 modifier = Modifier.fillMaxWidth(),

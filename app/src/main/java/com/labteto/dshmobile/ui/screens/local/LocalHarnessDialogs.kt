@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -367,7 +367,7 @@ internal fun QuestionDialog(
                 variant = DsButtonVariant.Outline,
             )
         }
-        OutlinedTextField(
+        DsTextField(
             value = answer,
             onValueChange = { answer = it },
             modifier = Modifier.fillMaxWidth(),
@@ -476,7 +476,7 @@ internal fun ChatPersonaDialog(
                     style = DsType.small13.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                 )
-                OutlinedTextField(
+                DsTextField(
                     value = aiDescription,
                     onValueChange = { aiDescription = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -603,7 +603,7 @@ private fun PersonaTextField(
     onValueChange: (String) -> Unit,
     singleLine: Boolean = false,
 ) {
-    OutlinedTextField(
+    DsTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),

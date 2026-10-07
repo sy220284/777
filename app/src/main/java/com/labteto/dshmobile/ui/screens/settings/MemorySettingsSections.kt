@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -39,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
 import com.labteto.dshmobile.core.wire.dto.SettingsNamespaceView
 import com.labteto.dshmobile.local.memory.MemoryKind
@@ -186,7 +186,7 @@ internal fun LocalMemorySettingsCard(
             subtitle = stringResource(R.string.advanced_user_rules_hint),
             onDismiss = { showRulesEditor = false },
         ) {
-            OutlinedTextField(
+            DsTextField(
                 value = userRules,
                 onValueChange = { userRules = it.take(6_000) },
                 modifier = Modifier.fillMaxWidth(),
@@ -250,7 +250,7 @@ internal fun MemoryManagementCard(
             style = DsType.caption11.withReadingWeight(),
             color = colors.labelTertiary,
         )
-        OutlinedTextField(
+        DsTextField(
             value = query,
             onValueChange = { query = it.take(200) },
             modifier = Modifier.fillMaxWidth(),
@@ -385,7 +385,7 @@ internal fun MemoryManagementCard(
             subtitle = memoryScopeLabel(editing.scope) + " · " + memoryKindLabel(editing.kind),
             onDismiss = { editingId = null },
         ) {
-            OutlinedTextField(
+            DsTextField(
                 value = content,
                 onValueChange = { content = it.take(2_000) },
                 modifier = Modifier.fillMaxWidth(),
