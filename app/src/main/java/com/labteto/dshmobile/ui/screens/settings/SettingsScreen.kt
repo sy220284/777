@@ -456,12 +456,11 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.APPEARANCE -> {
-                        SettingsCard(stringResource(R.string.settings_appearance_preview), FeatherIcons.Sliders) {
-                            AppearanceReadingPreview()
-                        }
                         SettingsCard(stringResource(R.string.settings_appearance), FeatherIcons.Sliders) {
                             AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
                             AccentThemeRow(settings) { key -> viewModel.set { it.copy(accentTheme = key) } }
+                        }
+                        SettingsCard(stringResource(R.string.settings_reading_preferences), FeatherIcons.BookOpen) {
                             ReadingPreferencesRow(
                                 settings = settings,
                                 onTextScaleChange = { value ->
@@ -476,6 +475,8 @@ fun SettingsScreen(
                                     }
                                 },
                             )
+                        }
+                        SettingsCard(stringResource(R.string.settings_background_image), FeatherIcons.Sliders) {
                             BackgroundRow(
                                 path = settings.backgroundImagePath,
                                 adaptiveContrast = settings.backgroundAdaptiveContrast,
@@ -485,6 +486,9 @@ fun SettingsScreen(
                                 onPick = { uri -> viewModel.setBackgroundImage(uri) },
                                 onClear = { viewModel.clearBackgroundImage() },
                             )
+                        }
+                        SettingsCard(stringResource(R.string.settings_appearance_preview), FeatherIcons.MessageCircle) {
+                            AppearanceReadingPreview()
                         }
                     }
 
