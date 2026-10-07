@@ -230,6 +230,10 @@ android {
             "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
     }
 
+    sourceSets.getByName("test").resources.srcDir(
+        rootProject.file("reference-validation/src/test/resources"),
+    )
+
     sourceSets.getByName("main").apply {
         // AGP 9 rejects Provider-backed entries in the legacy SourceSet API. These providers only
         // describe deterministic build-directory paths; generating task edges remain explicit
