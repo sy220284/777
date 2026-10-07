@@ -239,7 +239,7 @@ object LocalToolCatalog {
                     add(JsonPrimitive("delete"))
                 })
             },
-            "owner" to string("claim / reassign 时必填；active teammate 名称"),
+            "owner" to string("claim 时必填；reassign 可选，留空时退回 pending；active teammate 名称"),
             "subject" to string("edit 时可选"),
             "description" to string("edit 时可选"),
             "blocked_by" to buildJsonObject {
