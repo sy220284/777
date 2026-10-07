@@ -21,6 +21,7 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
@@ -58,12 +59,13 @@ fun DsBottomSheet(
 ) {
     val colors = DsTheme.colors
     val maxBodyHeight = LocalConfiguration.current.screenHeightDp.dp * 0.67f
+    val dismissal = rememberUpdatedState(dismissEnabled)
     val state = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { next -> dismissEnabled || next != SheetValue.Hidden },
+        confirmValueChange = { next -> dismissal.value || next != SheetValue.Hidden },
     )
     ModalBottomSheet(
-        onDismissRequest = { if (dismissEnabled) onDismiss() },
+        onDismissRequest = { if (dismissal.value) onDismiss() },
         sheetState = state,
         modifier = modifier,
         shape = DsShapes.sheet,
