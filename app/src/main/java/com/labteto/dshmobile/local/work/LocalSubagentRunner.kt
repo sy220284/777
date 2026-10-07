@@ -21,10 +21,12 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.buildTokenUsageContext
+import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalSubagentCompactionPolicy
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
 import com.labteto.dshmobile.local.agent.LocalSubagentStatus
+import com.labteto.dshmobile.local.agent.parseStructuredSubagentResult
 import com.labteto.dshmobile.local.agent.LocalSubagentToolCallPolicy
 import com.labteto.dshmobile.local.agent.boundedSubagentContext
 import com.labteto.dshmobile.local.agent.inheritedHistoryBeforeToolCall
@@ -46,6 +48,7 @@ import com.labteto.dshmobile.local.model.hasMaterializedImageUrls
 import com.labteto.dshmobile.local.model.imageInputUnsupported
 import com.labteto.dshmobile.local.model.localToolHistoryMessage
 import com.labteto.dshmobile.local.model.toRunModelSurface
+import com.labteto.dshmobile.local.model.stableJsonSha256
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.runtime.LOCAL_AGENT_RUN_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.runtime.LocalAgentProgressTracker
@@ -138,6 +141,7 @@ internal class LocalSubagentRunner(
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
         virtualScreen: Boolean = false,
+        outputSchema: JsonObject? = null,
         recoveredHistory: List<JsonObject>? = null,
         recoveredClaimedMessageIds: Set<String> = emptySet(),
         recoveredStep: Int = 0,
@@ -152,6 +156,7 @@ internal class LocalSubagentRunner(
         modelOverride = modelOverride,
         maxSteps = maxSteps,
         virtualScreen = virtualScreen,
+        outputSchema = outputSchema,
         recoveredHistory = recoveredHistory,
         recoveredClaimedMessageIds = recoveredClaimedMessageIds,
         recoveredStep = recoveredStep,
@@ -168,6 +173,7 @@ internal class LocalSubagentRunner(
         modelOverride: String? = null,
         maxSteps: Int = state.value.subagentMaxSteps,
         virtualScreen: Boolean = false,
+        outputSchema: JsonObject? = null,
         recoveredHistory: List<JsonObject>? = null,
         recoveredClaimedMessageIds: Set<String> = emptySet(),
         recoveredStep: Int = 0,
@@ -182,7 +188,14 @@ internal class LocalSubagentRunner(
             if (virtualScreen) {
                 virtualScreenId = acquireVirtualScreen(task.take(80))
             }
-            runResultWithLease(
+            if (virtualScreen && virtualScreenId == null) {
+                LocalSubagentResult(
+                    status = LocalSubagentStatus.FAILED,
+                    output = "[subagent][VIRTUAL_SCREEN_UNAVAILABLE] 请求了独立虚拟屏，但当前无法分配；已拒绝静默降级。",
+                    errorCode = "VIRTUAL_SCREEN_UNAVAILABLE",
+                    retryable = true,
+                )
+            } else runResultWithLease(
                 task = task,
                 inheritHistory = inheritHistory,
                 allowMutation = allowMutation,
@@ -191,6 +204,8 @@ internal class LocalSubagentRunner(
                 modelOverride = modelOverride,
                 maxSteps = maxSteps,
                 virtualScreenId = virtualScreenId,
+                virtualScreenRequested = virtualScreen,
+                outputSchema = outputSchema,
                 recoveredHistory = recoveredHistory,
                 recoveredClaimedMessageIds = recoveredClaimedMessageIds,
                 recoveredStep = recoveredStep,
@@ -211,14 +226,29 @@ internal class LocalSubagentRunner(
         modelOverride: String?,
         maxSteps: Int,
         virtualScreenId: String?,
+        virtualScreenRequested: Boolean,
+        outputSchema: JsonObject?,
         recoveredHistory: List<JsonObject>?,
         recoveredClaimedMessageIds: Set<String>,
         recoveredStep: Int,
         recoveredSoftStepLimit: Int?,
         resumeAfterCompletion: Boolean,
     ): LocalSubagentResult {
-        require(backgroundJobId == null || !allowMutation) {
-            "持久子代理只支持只读执行，避免冷恢复重放未知副作用"
+        val capabilities = LocalSubagentCapabilities(
+            inheritHistory = inheritHistory,
+            allowMutation = allowMutation,
+            virtualScreen = virtualScreenRequested,
+            continuable = backgroundJobId != null,
+            outputSchema = outputSchema,
+        )
+        val capabilityIssues = capabilities.validateLaunch(backgroundJobId)
+        if (capabilityIssues.isNotEmpty()) {
+            return LocalSubagentResult(
+                status = LocalSubagentStatus.FAILED,
+                output = "[subagent][UNSUPPORTED_SUBAGENT_CAPABILITY] " +
+                    capabilityIssues.joinToString("；"),
+                errorCode = "UNSUPPORTED_SUBAGENT_CAPABILITY",
+            )
         }
         val subagentId = backgroundJobId
             ?.let(::persistentSubagentId)
@@ -286,6 +316,14 @@ internal class LocalSubagentRunner(
             put("base_url", runProfile.baseUrl)
             put("max_steps", stepLimit)
             put("task", task.take(2_000))
+            put("inherit_history", capabilities.inheritHistory)
+            put("allow_mutation", capabilities.allowMutation)
+            put("virtual_screen_requested", capabilities.virtualScreen)
+            put("continuable", capabilities.continuable)
+            put("structured_output", outputSchema != null)
+            outputSchema?.let { schema ->
+                put("output_schema_digest", stableJsonSha256(schema))
+            }
             virtualScreenId?.let { put("virtual_screen_id", it) }
         })
         if (!modelGateway.hasCredential(runProfile)) {
@@ -388,6 +426,16 @@ internal class LocalSubagentRunner(
                         history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
                     ) 1 else 0
                     history.insert(index, insertion)
+                }
+                outputSchema?.let { schema ->
+                    history.append(buildJsonObject {
+                        put("role", "system")
+                        put(
+                            "content",
+                            "【结构化输出】最终回答必须只输出一份合法 JSON，不要使用 Markdown 代码围栏、解释文字或前后缀。" +
+                                "输出必须符合以下 JSON Schema 子集：\n" + schema.toString(),
+                        )
+                    })
                 }
                 history.append(buildJsonObject { put("role", "user"); put("content", task) })
             }
@@ -556,7 +604,16 @@ internal class LocalSubagentRunner(
                             progressTracker.recordAssistant(reply.content.orEmpty(), reply.toolCalls.size)
                             history.append(reply.message)
                             pendingTerminalOutput = if (reply.toolCalls.isEmpty()) {
-                                reply.content.orEmpty().ifBlank { "子代理已结束，但没有返回文字。" }
+                                val candidate = reply.content.orEmpty()
+                                    .ifBlank { "子代理已结束，但没有返回文字。" }
+                                if (outputSchema == null) {
+                                    candidate
+                                } else {
+                                    parseStructuredSubagentResult(candidate, outputSchema)
+                                        .takeIf { it.valid }
+                                        ?.value
+                                        ?.toString()
+                                }
                             } else {
                                 null
                             }
@@ -640,10 +697,22 @@ internal class LocalSubagentRunner(
                                 put("status", "completed")
                                 put("steps", recoveredBaseStep + event.steps)
                             })
-                            persistContinuationCheckpoint(
-                                step = recoveredBaseStep + event.steps,
-                                terminalOutput = event.answer.ifBlank { "子代理已结束，但没有返回文字。" },
-                            )
+                            val terminalCandidate = event.answer
+                                .ifBlank { "子代理已结束，但没有返回文字。" }
+                            val durableTerminal = if (outputSchema == null) {
+                                terminalCandidate
+                            } else {
+                                parseStructuredSubagentResult(terminalCandidate, outputSchema)
+                                    .takeIf { it.valid }
+                                    ?.value
+                                    ?.toString()
+                            }
+                            durableTerminal?.let { terminal ->
+                                persistContinuationCheckpoint(
+                                    step = recoveredBaseStep + event.steps,
+                                    terminalOutput = terminal,
+                                )
+                            }
                         }
                         is AgentEvent.TurnStepLimit -> {
                             eventLog().append("subagent/end", buildJsonObject {
@@ -721,9 +790,38 @@ internal class LocalSubagentRunner(
 
             val result = loop.run(task)
             if (result.stopReason == com.labteto.dshmobile.harness.agent.AgentStopReason.COMPLETED) {
+                val finalOutput = result.answer.ifBlank { "子代理已结束，但没有返回文字。" }
+                if (outputSchema != null) {
+                    val structured = parseStructuredSubagentResult(finalOutput, outputSchema)
+                    eventLog().append("subagent/structured-output", buildJsonObject {
+                        put("agent_id", subagentId)
+                        put("status", if (structured.valid) "verified" else "invalid")
+                        put("schema_digest", stableJsonSha256(outputSchema))
+                        if (structured.valid) {
+                            put("output_digest", stableJsonSha256(requireNotNull(structured.value)))
+                        } else {
+                            put("issues", JsonArray(structured.issues.map(::JsonPrimitive)))
+                        }
+                    })
+                    if (!structured.valid) {
+                        return LocalSubagentResult(
+                            status = LocalSubagentStatus.FAILED,
+                            output = "[subagent][$subagentId][STRUCTURED_OUTPUT_INVALID] " +
+                                structured.issues.joinToString("；"),
+                            errorCode = "STRUCTURED_OUTPUT_INVALID",
+                            retryable = true,
+                        )
+                    }
+                    val value = requireNotNull(structured.value)
+                    return LocalSubagentResult(
+                        status = LocalSubagentStatus.COMPLETED,
+                        output = value.toString(),
+                        structuredResult = value,
+                    )
+                }
                 return LocalSubagentResult(
                     status = LocalSubagentStatus.COMPLETED,
-                    output = result.answer.ifBlank { "子代理已结束，但没有返回文字。" },
+                    output = finalOutput,
                 )
             }
 
