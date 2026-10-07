@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.components.DsSwitch
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -153,7 +153,7 @@ internal fun LocalMemorySettingsCard(
                 Text(stringResource(R.string.advanced_auto_recall), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                 Text(stringResource(R.string.advanced_auto_recall_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
             }
-            Switch(
+            DsSwitch(
                 checked = local.autoRecall,
                 onCheckedChange = { next ->
                     viewModel.configureLocalMemory(userRules, next, local.autoMemory)
@@ -170,7 +170,7 @@ internal fun LocalMemorySettingsCard(
                 Text(stringResource(R.string.advanced_auto_memory), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                 Text(stringResource(R.string.advanced_auto_memory_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
             }
-            Switch(
+            DsSwitch(
                 checked = local.autoMemory,
                 onCheckedChange = { next ->
                     viewModel.configureLocalMemory(userRules, local.autoRecall, next)
@@ -402,7 +402,7 @@ internal fun MemoryManagementCard(
                     Text(stringResource(R.string.advanced_pin), style = DsType.small13Strong.withReadingWeight(), color = colors.labelPrimary)
                     Text(stringResource(R.string.advanced_pin_hint), style = DsType.caption11.withReadingWeight(), color = colors.labelTertiary)
                 }
-                Switch(checked = pinned, onCheckedChange = { pinned = it })
+                DsSwitch(checked = pinned, onCheckedChange = { pinned = it })
             }
             DsButton(
                 text = stringResource(R.string.common_save),
