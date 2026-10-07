@@ -794,6 +794,52 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun agentMessageCursorReturnsEarliestUnreadResultWithoutSkippingConcurrentResults() {
+        val fixture = fixture("team-message-order")
+        appendActiveMember(fixture.log, "team-message-order")
+        val baseline = fixture.log.latestSequence()
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 1,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                terminalOutput = "结果一",
+            ),
+        )
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 2,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                terminalOutput = "结果二",
+            ),
+        )
+
+        val first = fixture.runtime.agentMessages(
+            sessionId = "team-message-order",
+            targetName = "worker",
+            limit = 1,
+            afterSequence = baseline,
+        ).single()
+        val second = fixture.runtime.agentMessages(
+            sessionId = "team-message-order",
+            targetName = "worker",
+            limit = 1,
+            afterSequence = first.sequence,
+        ).single()
+
+        assertEquals("结果一", first.content)
+        assertEquals("结果二", second.content)
+        assertTrue(second.sequence > first.sequence)
+    }
+
+    @Test
     fun discardedMailboxMessageLeavesPendingSetAndCannotLaterDeliver() {
         val fixture = fixture("team-message-discard")
         appendActiveMember(fixture.log, "team-message-discard")
