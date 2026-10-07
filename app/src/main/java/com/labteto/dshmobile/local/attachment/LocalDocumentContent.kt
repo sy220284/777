@@ -19,8 +19,9 @@ internal data class LocalDocumentText(
 
 internal object LocalDocumentContent {
     private const val DEFAULT_MAX_CHARS = 40_000
-    private const val MAX_ZIP_ENTRY_BYTES = 2 * 1024 * 1024
-    private const val MAX_ZIP_TOTAL_BYTES = 8 * 1024 * 1024
+    private const val MAX_TEXT_PREFIX_BYTES = 2 * 1024 * 1024
+    private const val MAX_ZIP_ENTRY_BYTES = 8 * 1024 * 1024
+    private const val MAX_ZIP_TOTAL_BYTES = 24 * 1024 * 1024
     private const val MAX_ARCHIVE_ENTRIES = 80
 
     private val plainTextExtensions = setOf(
@@ -113,7 +114,7 @@ internal object LocalDocumentContent {
     }
 
     private fun extractPlainText(file: File, extension: String, maxChars: Int): LocalDocumentText {
-        val bytes = readPrefix(file, MAX_ZIP_ENTRY_BYTES)
+        val bytes = readPrefix(file, MAX_TEXT_PREFIX_BYTES)
         var text = decodeText(bytes)
         if (extension in setOf("html", "htm", "xhtml")) text = htmlToText(text)
         val result = bounded(extension.ifBlank { "文本" }.uppercase(), text, maxChars)
