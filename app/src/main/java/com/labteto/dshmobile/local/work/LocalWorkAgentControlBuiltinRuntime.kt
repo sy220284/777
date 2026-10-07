@@ -4,6 +4,9 @@ import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
+import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
+import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
+import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.optionalString
@@ -56,22 +59,33 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     )
                 } else {
                     runner.run(
-                        task = task,
-                        inheritHistory = false,
-                        allowMutation = false,
-                        modelOverride = model,
-                        maxSteps = maxSteps,
-                        virtualScreen = virtualScreen,
+                        LocalSubagentLaunchSpec(
+                            task = task,
+                            modelOverride = model,
+                            maxSteps = maxSteps,
+                            capabilities = LocalSubagentCapabilities(
+                                allowMutation = false,
+                                continuable = false,
+                                virtualScreen = virtualScreen,
+                                historyMode = LocalSubagentHistoryMode.ISOLATED,
+                            ),
+                        ),
                     )
                 }
             }
             "subagent_fork", "fork_subagent" -> runner.run(
-                task = args.string("task"),
-                inheritHistory = true,
-                allowMutation = allowMutation,
-                parentCallId = call.id,
-                modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
-                maxSteps = snapshot.subagentMaxSteps,
+                LocalSubagentLaunchSpec(
+                    task = args.string("task"),
+                    modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
+                    maxSteps = snapshot.subagentMaxSteps,
+                    parentCallId = call.id,
+                    capabilities = LocalSubagentCapabilities(
+                        allowMutation = allowMutation,
+                        continuable = false,
+                        virtualScreen = false,
+                        historyMode = LocalSubagentHistoryMode.INHERIT_PARENT,
+                    ),
+                ),
             )
             "list_subagent_models" -> modelGateway.availableProfiles().joinToString("\n") {
                 "${it.id} | ${it.model} | ${it.provider} | ${it.authKind} | ${it.baseUrl}"
