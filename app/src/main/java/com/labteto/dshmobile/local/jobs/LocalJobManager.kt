@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.jobs
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.jobs.HarnessJobManager
+import com.labteto.dshmobile.harness.jobs.JobMessageAdmission
+import com.labteto.dshmobile.harness.jobs.JobStartResult
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import kotlinx.coroutines.CoroutineScope
 
@@ -35,6 +37,22 @@ internal class LocalJobManager(
         continuable: Boolean = false,
         block: suspend (String, (String) -> Unit) -> String,
     ): String = delegate.startPersistent(
+        label = label,
+        resumeKind = resumeKind,
+        resumePayload = resumePayload,
+        ownerId = ownerSessionId,
+        continuable = continuable,
+        block = block,
+    )
+
+    fun startPersistentResult(
+        label: String,
+        resumeKind: String,
+        resumePayload: String,
+        ownerSessionId: String? = null,
+        continuable: Boolean = false,
+        block: suspend (String, (String) -> Unit) -> String,
+    ): JobStartResult = delegate.startPersistentResult(
         label = label,
         resumeKind = resumeKind,
         resumePayload = resumePayload,
@@ -95,6 +113,12 @@ internal class LocalJobManager(
 
     fun send(id: String, message: String, ownerSessionId: String? = null): String =
         delegate.send(id, message, ownerSessionId)
+
+    fun sendInput(
+        id: String,
+        input: QueuedAgentInput,
+        ownerSessionId: String? = null,
+    ): JobMessageAdmission = delegate.sendInput(id, input, ownerSessionId)
 
     fun peekMessages(id: String): List<QueuedAgentInput> = delegate.peekMessages(id)
 
