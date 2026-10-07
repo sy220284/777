@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -57,8 +56,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
 
@@ -102,15 +99,14 @@ internal fun DrawerContextCard(
     val colors = DsTheme.colors
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
-        color = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING),
-        border = BorderStroke(1.dp, colors.borderL1),
-        shadowElevation = 1.dp,
+        shape = DsShapes.row,
+        color = colors.sidebarNavHover,
+        shadowElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
+                .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
@@ -175,58 +171,50 @@ internal fun DrawerQuickActions(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (usageMode == LocalUsageMode.CHAT) {
             DrawerQuickAction(
                 icon = FeatherIcons.Image,
                 title = stringResource(R.string.persona_gallery_title),
-                subtitle = stringResource(R.string.local_drawer_persona_gallery_hint),
                 badge = galleryCount.takeIf { it > 0 }?.toString(),
                 onClick = onOpenPersonaGallery,
             )
             DrawerQuickAction(
-                icon = FeatherIcons.BookOpen,
-                title = stringResource(R.string.chat_diary_title),
-                subtitle = stringResource(R.string.local_drawer_diary_hint),
-                onClick = onOpenDiary,
-            )
-            DrawerQuickAction(
                 icon = FeatherIcons.Users,
                 title = stringResource(R.string.local_group_chat_title),
-                subtitle = stringResource(R.string.local_drawer_group_chat_hint),
                 badge = groupMemberCount.takeIf { it > 0 }?.toString(),
                 onClick = onOpenGroupChat,
             )
             DrawerQuickAction(
                 icon = FeatherIcons.Clock,
                 title = stringResource(R.string.tasks_chat_title),
-                subtitle = stringResource(R.string.local_drawer_chat_tasks_hint),
                 onClick = onTasks,
+            )
+            DrawerQuickAction(
+                icon = FeatherIcons.BookOpen,
+                title = stringResource(R.string.chat_diary_title),
+                onClick = onOpenDiary,
             )
         } else {
             DrawerQuickAction(
-                icon = FeatherIcons.Folder,
-                title = stringResource(R.string.chatlist_workspace_files),
-                subtitle = stringResource(R.string.local_drawer_workspace_hint),
-                onClick = onWorkspaceFiles,
-            )
-            DrawerQuickAction(
                 icon = FeatherIcons.Activity,
                 title = stringResource(R.string.local_run_center),
-                subtitle = stringResource(R.string.local_drawer_run_center_hint),
                 onClick = onOpenRunCenter,
+            )
+            DrawerQuickAction(
+                icon = FeatherIcons.Folder,
+                title = stringResource(R.string.chatlist_workspace_files),
+                onClick = onWorkspaceFiles,
             )
             DrawerQuickAction(
                 icon = FeatherIcons.Clock,
                 title = stringResource(R.string.tasks_title),
-                subtitle = stringResource(R.string.local_drawer_work_tasks_hint),
                 onClick = onTasks,
             )
             DrawerQuickAction(
                 icon = FeatherIcons.Tool,
                 title = stringResource(R.string.tools_title),
-                subtitle = stringResource(R.string.local_drawer_tools_hint),
                 onClick = onTools,
             )
         }
@@ -258,7 +246,7 @@ internal fun DrawerQuickAction(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = DsSpacing.touchTarget)
+            .heightIn(min = 44.dp)
             .clip(DsShapes.row)
             .background(feedbackColor)
             .hoverable(interaction)
@@ -277,27 +265,14 @@ internal fun DrawerQuickAction(
             tint = colors.labelSecondary,
             modifier = Modifier.size(18.dp),
         )
-        Column(
+        Text(
+            title,
+            style = DsType.std14.withReadingWeight(),
+            color = colors.labelPrimary,
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                title,
-                style = DsType.small13Strong.withReadingWeight(),
-                color = colors.labelPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            subtitle?.takeIf(String::isNotBlank)?.let {
-                Text(
-                    it,
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.labelTertiary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         badge?.let { DsPill(text = it) }
     }
 }
@@ -373,11 +348,17 @@ internal fun DrawerSectionTitle(
     ) {
         Text(
             title,
-            style = DsType.std14.withReadingWeight(),
+            style = DsType.caption11.withReadingWeight(),
             color = DsTheme.colors.labelTertiary,
             modifier = Modifier.weight(1f),
         )
-        count?.let { DsPill(text = it.toString()) }
+        count?.let {
+            Text(
+                it.toString(),
+                style = DsType.caption11.withReadingWeight(),
+                color = DsTheme.colors.labelCaption,
+            )
+        }
     }
 }
 
@@ -443,34 +424,10 @@ internal fun LocalSessionDrawerRow(
                 .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (current && !selectionOpen) {
-                Box(
-                    Modifier
-                        .size(width = 3.dp, height = 24.dp)
-                        .clip(DsShapes.pillFull)
-                        .background(colors.accent),
-                )
-                Spacer(Modifier.width(DsSpacing.xsmall))
-            }
             if (selectionOpen) {
                 Checkbox(checked = selected, onCheckedChange = { onClick() })
             }
 
-            if (session.usageMode == LocalUsageMode.CHAT) {
-                LocalPersonaHeaderAvatar(
-                    name = galleryEntry?.persona?.name ?: displayTitle,
-                    portraitPath = galleryEntry?.portraitPath.orEmpty(),
-                )
-            } else {
-                Icon(
-                    FeatherIcons.Activity,
-                    contentDescription = null,
-                    tint = if (running) colors.accent else colors.labelTertiary,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-
-            Spacer(Modifier.width(DsSpacing.small))
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp),

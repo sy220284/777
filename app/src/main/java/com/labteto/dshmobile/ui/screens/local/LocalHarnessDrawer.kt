@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,10 +31,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -178,7 +181,7 @@ internal fun LocalModeDrawer(
             WallpaperSurfaceLevel.DRAWER,
             base = colors.sidebar,
         ),
-        modifier = Modifier.fillMaxHeight(),
+        modifier = Modifier.fillMaxHeight().width(320.dp),
     ) {
         Column(Modifier.fillMaxHeight().safeDrawingPadding()) {
             Column(
@@ -246,6 +249,13 @@ internal fun LocalModeDrawer(
                         },
                         singleLine = true,
                         shape = DsShapes.block,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = colors.bgModulePlatform,
+                            unfocusedContainerColor = colors.bgModulePlatform,
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            disabledBorderColor = Color.Transparent,
+                        ),
                     )
                 }
 
@@ -276,18 +286,6 @@ internal fun LocalModeDrawer(
                     running = running,
                 )
 
-                DrawerQuickActions(
-                    usageMode = usageMode,
-                    groupMemberCount = groupMemberCount,
-                    galleryCount = gallery.size,
-                    onOpenGroupChat = onOpenGroupChat,
-                    onOpenPersonaGallery = onOpenPersonaGallery,
-                    onOpenDiary = onOpenDiary,
-                    onTasks = onTasks,
-                    onWorkspaceFiles = onWorkspaceFiles,
-                    onOpenRunCenter = onOpenRunCenter,
-                    onTools = onTools,
-                )
             }
 
             LazyColumn(
@@ -376,6 +374,26 @@ internal fun LocalModeDrawer(
                                 horizontal = DsSpacing.small,
                                 vertical = DsSpacing.medium,
                             ),
+                        )
+                    }
+                }
+
+                item(key = "drawer-feature-actions") {
+                    Column(
+                        modifier = Modifier.padding(top = DsSpacing.medium),
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+                    ) {
+                        DrawerQuickActions(
+                            usageMode = usageMode,
+                            groupMemberCount = groupMemberCount,
+                            galleryCount = gallery.size,
+                            onOpenGroupChat = onOpenGroupChat,
+                            onOpenPersonaGallery = onOpenPersonaGallery,
+                            onOpenDiary = onOpenDiary,
+                            onTasks = onTasks,
+                            onWorkspaceFiles = onWorkspaceFiles,
+                            onOpenRunCenter = onOpenRunCenter,
+                            onTools = onTools,
                         )
                     }
                 }
