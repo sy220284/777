@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,6 +35,7 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsGroupCard
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -139,7 +139,7 @@ internal fun LocalConfiguration(
 @Composable
 internal fun ModelChoice(id: String, label: String, selected: String, onSelect: (String) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)
+        Modifier.fillMaxWidth().clip(DsShapes.row)
             .heightIn(min = DsSpacing.touchTarget)
             .selectable(selected = selected == id, onClick = { onSelect(id) })
             .padding(vertical = DsSpacing.tiny),
