@@ -13,6 +13,9 @@ internal const val LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT = "subagent/history-c
 private const val LOCAL_SUBAGENT_HISTORY_CHECKPOINT_VERSION = 1
 private const val MAX_CLAIMED_MESSAGE_IDS = 256
 
+internal fun persistentSubagentId(backgroundJobId: String): String =
+    "sa-" + backgroundJobId.removePrefix("job-").take(24)
+
 internal data class LocalSubagentHistoryCheckpoint(
     val history: List<JsonObject>,
     val claimedMessageIds: Set<String>,
