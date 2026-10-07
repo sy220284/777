@@ -27,6 +27,7 @@ import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
 import com.labteto.dshmobile.local.agent.LocalSubagentStatus
 import com.labteto.dshmobile.local.agent.parseStructuredSubagentResult
+import com.labteto.dshmobile.local.agent.validateStructuredOutputSchema
 import com.labteto.dshmobile.local.agent.LocalSubagentToolCallPolicy
 import com.labteto.dshmobile.local.agent.boundedSubagentContext
 import com.labteto.dshmobile.local.agent.inheritedHistoryBeforeToolCall
@@ -241,6 +242,16 @@ internal class LocalSubagentRunner(
             continuable = backgroundJobId != null,
             outputSchema = outputSchema,
         )
+        val schemaIssues = outputSchema
+            ?.let(::validateStructuredOutputSchema)
+            .orEmpty()
+        if (schemaIssues.isNotEmpty()) {
+            return LocalSubagentResult(
+                status = LocalSubagentStatus.FAILED,
+                output = "[subagent][INVALID_OUTPUT_SCHEMA] " + schemaIssues.joinToString("；"),
+                errorCode = "INVALID_OUTPUT_SCHEMA",
+            )
+        }
         val capabilityIssues = capabilities.validateLaunch(backgroundJobId)
         if (capabilityIssues.isNotEmpty()) {
             return LocalSubagentResult(
