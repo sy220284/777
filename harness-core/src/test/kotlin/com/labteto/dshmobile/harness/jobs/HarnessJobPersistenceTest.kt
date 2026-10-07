@@ -1027,6 +1027,69 @@ class HarnessJobPersistenceTest {
     }
 
     @Test
+    fun structuredPersistentStartReturnsStableJobIdentity() = runTest {
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            idFactory = { "job-stable" },
+        )
+
+        val result = manager.startPersistentResult(
+            label = "子代理：审计",
+            resumeKind = "subagent_readonly",
+            resumePayload = "{}",
+            ownerId = "session-a",
+            continuable = true,
+        ) { _, _ -> "完成" }
+
+        assertTrue(result.accepted)
+        assertEquals("job-stable", result.id)
+        assertTrue(result.message.contains("job-stable"))
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun stableInboxMessageIdIsIdempotentButRejectsPayloadConflict() = runTest {
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "dormant",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerId = "session-a",
+                    continuable = true,
+                ),
+            ),
+        )
+        val message = QueuedAgentInput(
+            id = "team-msg-1",
+            content = "继续检查",
+            memoryInput = "继续检查",
+        )
+
+        val first = manager.sendInput("job-agent", message, "session-a")
+        val duplicate = manager.sendInput("job-agent", message, "session-a")
+        val conflict = manager.sendInput(
+            "job-agent",
+            message.copy(content = "不同内容", memoryInput = "不同内容"),
+            "session-a",
+        )
+
+        assertTrue(first.accepted)
+        assertTrue(!first.duplicate)
+        assertTrue(first.requiresResume)
+        assertTrue(duplicate.accepted)
+        assertTrue(duplicate.duplicate)
+        assertTrue(!conflict.accepted)
+        assertTrue(conflict.duplicate)
+        assertEquals(listOf("team-msg-1"), manager.peekMessages("job-agent").map { it.id })
+    }
+
+    @Test
     fun sessionTransitionCanStopEphemeralJobsWithoutCancellingPersistentJobs() = runTest {
         val ephemeralGate = CompletableDeferred<Unit>()
         val persistentGate = CompletableDeferred<Unit>()
