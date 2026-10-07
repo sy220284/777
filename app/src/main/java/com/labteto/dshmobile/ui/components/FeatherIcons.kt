@@ -350,6 +350,54 @@ internal object FeatherIcons {
             moveTo(9f, 18f); lineTo(15f, 12f); lineTo(9f, 6f)
         }
     }
+
+    /** `check` — selected row/model state. */
+    val Check: ImageVector by lazy {
+        feather("Check") {
+            moveTo(20f, 6f); lineTo(9f, 17f); lineTo(4f, 12f)
+        }
+    }
+
+    /** `arrow-up` — send/queue action. */
+    val ArrowUp: ImageVector by lazy {
+        feather("ArrowUp") {
+            moveTo(12f, 19f); lineTo(12f, 5f)
+            moveTo(5f, 12f); lineTo(12f, 5f); lineTo(19f, 12f)
+        }
+    }
+
+    /** `square` — stop action. */
+    val Square: ImageVector by lazy {
+        feather("Square") {
+            rectangle(5f, 5f, 14f, 14f)
+        }
+    }
+
+    /** `shield` — permission/approval control. */
+    val Shield: ImageVector by lazy {
+        feather("Shield") {
+            moveTo(12f, 22f)
+            arcToRelative(10f, 10f, 0f, isMoreThanHalf = false, isPositiveArc = false, 8f, -10f)
+            verticalLineTo(5f)
+            lineTo(12f, 2f)
+            lineTo(4f, 5f)
+            verticalLineToRelative(7f)
+            arcToRelative(10f, 10f, 0f, isMoreThanHalf = false, isPositiveArc = false, 8f, 10f)
+            close()
+        }
+    }
+
+    /** `list` — plan/task mode. */
+    val List: ImageVector by lazy {
+        feather("List") {
+            moveTo(8f, 6f); lineTo(21f, 6f)
+            moveTo(8f, 12f); lineTo(21f, 12f)
+            moveTo(8f, 18f); lineTo(21f, 18f)
+            moveTo(3f, 6f); lineTo(3.01f, 6f)
+            moveTo(3f, 12f); lineTo(3.01f, 12f)
+            moveTo(3f, 18f); lineTo(3.01f, 18f)
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

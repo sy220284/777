@@ -46,7 +46,7 @@ object DsMetrics {
     val screenHorizontal = 16.dp
     val drawerHorizontal = 16.dp
     val topBarHeight = 56.dp
-    val rowHeight = 52.dp
+    val rowHeight = 56.dp
     val compactRowHeight = 48.dp
     val iconButton = 44.dp
     val icon = 20.dp

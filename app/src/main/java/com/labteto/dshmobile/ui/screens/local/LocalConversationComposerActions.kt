@@ -9,9 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ListAlt
-import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,6 +18,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.ui.components.DsComposerAction
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -64,7 +62,7 @@ internal fun LocalConversationComposerExpandedRow(
             replySuggestionsControl()
             if (state.usageMode == LocalUsageMode.WORK) {
                 DsComposerAction(
-                    icon = Icons.Outlined.ListAlt,
+                    icon = FeatherIcons.List,
                     contentDescription = stringResource(
                         if (state.planMode) R.string.local_plan_button_on
                         else R.string.local_plan_button_off,
@@ -75,7 +73,7 @@ internal fun LocalConversationComposerExpandedRow(
                     containerColor = if (state.planMode) colors.accentTertiary else Color.Transparent,
                 )
                 DsComposerAction(
-                    icon = Icons.Outlined.VerifiedUser,
+                    icon = FeatherIcons.Shield,
                     contentDescription = stringResource(R.string.local_auto_approve_short),
                     onClick = if (state.safeAutoApprovalEnabled) onDisableAutoApprove else onAutoApprove,
                     tint = if (state.safeAutoApprovalEnabled) colors.accent else colors.labelSecondary,
