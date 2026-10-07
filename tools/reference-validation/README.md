@@ -25,8 +25,9 @@ Session format reference: V4
 
 - `official-runner.ts`：只在刷新官方 fixture 时运行。
 - `refresh-official-fixtures.sh`：拉取锁定提交并重新生成官方黄金结果。
-- `reference-validation/src/test/resources/official/`：提交到仓库的固定黄金结果。
-- `:reference-validation:test`：运行 Android 原生实现并与黄金结果比较。
+- `reference-validation/src/test/resources/official/`：提交到仓库的基础 AgentLoop 黄金结果。
+- `reference-validation/src/test/resources/official-semantic/advanced.json`：锁定官方源码生成的高级语义黄金结果。
+- `:reference-validation:test`：运行 Android 原生核心实现并与适用的官方黄金结果比较。
 
 ## 覆盖
 
@@ -52,7 +53,9 @@ Session format reference: V4
 - 同 key + 不同 stateVersion fail-closed；
 - 最后一个 disposer 释放后移除 projection capability。
 
-高级 Projection 结果只存在于本次 CI 临时目录，不手写、不提交伪 golden。
+高级官方结果提交到 `official-semantic/advanced.json`，但只能由刷新脚本在锁定官方 checkout 中重生成；fixture-provenance 要求工作树与重生成结果完全一致，禁止手写伪 golden。
+
+当前高级官方差分包括 Session Projection Registry，以及官方 `agentTeam` Projection stateVersion=4 / V2 member-task-message whole-value 事件。Agent Teams 的 Android Work 生产 Projection 直接读取同一份官方 advanced golden 对照持久 roster、Task DAG 与 queued-minus-delivered mailbox，不复制一套“官方逻辑”的 Kotlin 假实现。
 
 不适合表达为模型回复向量的状态，由对应模块测试覆盖，包括：
 
@@ -67,7 +70,7 @@ Session format reference: V4
 - compaction provenance。
 - durable Agent Inbox / continuable subagent / cold resume / terminal settlement。
 - Session Projection registry / stateVersion / asOfSequence（官方高级差分）。
-- Agent Teams roster / durable mailbox / Task DAG / CAS / fail-loud bounds（Work-owned 领域回归；不为测试把 App 领域下沉到 harness-core）。
+- Agent Teams roster / durable mailbox / Task DAG / CAS / fail-loud bounds：官方可执行 Projection 部分进入 advanced golden；Android Activation / Job / Cold Resume 等平台特化行为继续由 Work-owned 领域回归覆盖，不为测试把 App 领域下沉到 harness-core。
 - Plugin Tool View。
 - Android device。
 
