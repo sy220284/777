@@ -50,7 +50,7 @@ internal class LocalSessionTranscriptPager(
         var beforeSequenceExclusive = cursor?.beforeSequenceExclusive ?: Long.MAX_VALUE
 
         cursor?.resumeEventSequence?.let { sequence ->
-            val event = eventLog.pageBefore(sequence + 1L, 1)
+            val event = eventLog.pageBeforeChronological(sequence + 1L, 1)
                 .singleOrNull { it.sequence == sequence }
             if (event != null) {
                 val decoded = decodeTranscriptMessages(event.data)
@@ -94,13 +94,13 @@ internal class LocalSessionTranscriptPager(
 
         while (collectedNewestFirst.size < messageLimit) {
             val scanBefore = beforeSequenceExclusive
-            val events = eventLog.pageBefore(
+            val events = eventLog.pageBeforeNewestFirst(
                 sequenceExclusive = scanBefore,
                 limit = scanPageSize,
             )
             if (events.isEmpty()) break
 
-            for (event in events.asReversed()) {
+            for (event in events) {
                 if (event.type == "assistant/message") {
                     replacedMessageId(event)?.let(suppressed::add)
                 }
@@ -144,7 +144,7 @@ internal class LocalSessionTranscriptPager(
                 }
             }
 
-            val oldestSequence = events.first().sequence
+            val oldestSequence = events.last().sequence
             if (oldestSequence >= scanBefore) break
             beforeSequenceExclusive = oldestSequence
         }

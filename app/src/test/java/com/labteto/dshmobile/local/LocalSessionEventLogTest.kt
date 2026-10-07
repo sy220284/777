@@ -184,11 +184,22 @@ class LocalSessionEventLogTest {
 
             assertEquals(
                 listOf(20L, 21L, 22L, 23L),
-                log.pageBefore(limit = 4).map(LocalSessionEventLog.Event::sequence),
+                log.pageBeforeChronological(limit = 4)
+                    .map(LocalSessionEventLog.Event::sequence),
+            )
+            assertEquals(
+                listOf(23L, 22L, 21L, 20L),
+                log.pageBeforeNewestFirst(limit = 4)
+                    .map(LocalSessionEventLog.Event::sequence),
             )
             assertEquals(
                 listOf(7L, 8L, 9L),
-                log.pageBefore(sequenceExclusive = 10L, limit = 3)
+                log.pageBeforeChronological(sequenceExclusive = 10L, limit = 3)
+                    .map(LocalSessionEventLog.Event::sequence),
+            )
+            assertEquals(
+                listOf(9L, 8L, 7L),
+                log.pageBeforeNewestFirst(sequenceExclusive = 10L, limit = 3)
                     .map(LocalSessionEventLog.Event::sequence),
             )
         } finally {

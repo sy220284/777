@@ -2,7 +2,8 @@
 """Guard high-risk Kotlin patterns that have caused real regressions in this app.
 
 This is deliberately small and deterministic. Android lint covers platform/resource issues; this
-check covers coroutine/process patterns that lint does not reliably flag in this repository.
+check covers coroutine/process and event-ordering patterns that lint does not reliably flag in this
+repository.
 """
 
 from pathlib import Path
@@ -45,6 +46,20 @@ for path in SOURCES:
 
     if "android.util.Log" in text and rel not in ANDROID_LOG_ALLOW:
         violations.append(f"{rel}: route production logging through AppLog")
+
+    if re.search(r"\.\s*pageBefore\s*\(", text):
+        violations.append(
+            f"{rel}: ambiguous pageBefore call is forbidden; choose "
+            "pageBeforeChronological or pageBeforeNewestFirst"
+        )
+
+    if re.search(
+        r"pageBefore(?:Chronological|NewestFirst)\b\s*\([^()]*\)\s*\.asReversed\s*\(",
+        text,
+    ):
+        violations.append(
+            f"{rel}: do not reverse an explicitly ordered event page; choose the opposite page API"
+        )
 
 if violations:
     print("Kotlin risk-pattern guard failed:", file=sys.stderr)
