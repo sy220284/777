@@ -194,6 +194,68 @@ object LocalToolCatalog {
             "model" to string("可选；子任务使用的模型档案编号或模型名。留空时按 Worker 路由策略选择。"),
             "output_schema" to jsonSchemaObject("可选；要求每个 Workflow 子代理最终都返回符合该 JSON Schema 的对象"),
         ), listOf("tasks")))
+        add(tool("team_members", "查看当前 Work Agent Team 的 Lead、teammate 与运行状态", properties()))
+        add(tool("team_spawn", "创建一个具备持久身份和 durable mailbox 的只读 teammate", properties(
+            "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
+            "description" to string("可选；职责说明"),
+            "task" to string("首个任务"),
+            "model" to string("可选；模型档案编号或无歧义模型名"),
+            "max_steps" to integer("单次执行预算，默认沿用当前 Work 子代理配置"),
+        ), listOf("name", "task")))
+        add(tool("team_send_message", "向指定 teammate 的持久 mailbox 发送消息；空闲成员会安全冷恢复", properties(
+            "target" to string("teammate 名称"),
+            "message" to string("消息内容"),
+        ), listOf("target", "message")))
+        add(tool("team_task_create", "在 Team 共享任务板创建 pending 任务", properties(
+            "subject" to string("任务标题"),
+            "description" to string("可选；任务说明"),
+            "blocked_by" to buildJsonObject {
+                put("type", "array")
+                put("items", buildJsonObject { put("type", "string") })
+            },
+            "write_scopes" to buildJsonObject {
+                put("type", "array")
+                put("description", "可选；提示性路径前缀，用于检测并发写范围重叠，不作为文件锁")
+                put("items", buildJsonObject { put("type", "string") })
+            },
+        ), listOf("subject")))
+        add(tool("team_task_get", "读取 Team 任务（包括 deleted tombstone）", properties(
+            "task_id" to string("task-N"),
+        ), listOf("task_id")))
+        add(tool("team_task_list", "列出 Team 当前未删除任务及 readiness / owner / write-scope 警告", properties()))
+        add(tool("team_task_update", "用 compare-and-set revision 更新 Team 任务", properties(
+            "task_id" to string("task-N"),
+            "expected_revision" to integer("当前任务 revision；不匹配会拒绝写入"),
+            "action" to buildJsonObject {
+                put("type", "string")
+                put("enum", buildJsonArray {
+                    add(JsonPrimitive("claim"))
+                    add(JsonPrimitive("release"))
+                    add(JsonPrimitive("complete"))
+                    add(JsonPrimitive("delete"))
+                    add(JsonPrimitive("set_dependencies"))
+                    add(JsonPrimitive("update"))
+                })
+            },
+            "owner" to string("claim 时必填；active teammate 名称"),
+            "subject" to string("update 时可选"),
+            "description" to string("update 时可选"),
+            "blocked_by" to buildJsonObject {
+                put("type", "array")
+                put("items", buildJsonObject { put("type", "string") })
+            },
+            "write_scopes" to buildJsonObject {
+                put("type", "array")
+                put("items", buildJsonObject { put("type", "string") })
+            },
+        ), listOf("task_id", "expected_revision", "action")))
+        add(tool("team_interrupt", "中断指定 teammate 当前 Activation；不会清空其 durable mailbox", properties(
+            "target" to string("teammate 名称"),
+        ), listOf("target")))
+        add(tool("team_wait", "等待 Team 事件或成员运行状态发生变化", properties(
+            "timeout_ms" to integer("等待毫秒数，1000–60000，默认 10000"),
+        )))
+
         add(tool("session_event_search", "分页搜索当前会话的追加式事件日志；单页结果受上下文安全上限约束", properties(
             "query" to string("搜索内容"),
             "session_id" to string("可选；留空使用当前会话"),
