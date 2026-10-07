@@ -8,6 +8,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.VisualTransformation
@@ -45,6 +46,7 @@ fun DsTextField(
     singleLine: Boolean = false,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
     minLines: Int = 1,
+    flat: Boolean = false,
     shape: Shape = DsShapes.row,
     colors: TextFieldColors? = null,
 ) {
@@ -53,13 +55,13 @@ fun DsTextField(
         focusedTextColor = ds.labelPrimary,
         unfocusedTextColor = ds.labelPrimary,
         disabledTextColor = ds.labelTertiary,
-        focusedContainerColor = ds.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
-        unfocusedContainerColor = ds.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+        focusedContainerColor = if (flat) ds.bgModulePlatform else ds.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
+        unfocusedContainerColor = if (flat) ds.bgModulePlatform else ds.wallpaperSurface(WallpaperSurfaceLevel.INPUT),
         disabledContainerColor = ds.bgModulePlatform,
         cursorColor = ds.accent,
-        focusedBorderColor = ds.accent,
-        unfocusedBorderColor = ds.borderL2,
-        disabledBorderColor = ds.borderL1,
+        focusedBorderColor = if (flat) Color.Transparent else ds.accent,
+        unfocusedBorderColor = if (flat) Color.Transparent else ds.borderL2,
+        disabledBorderColor = if (flat) Color.Transparent else ds.borderL1,
         focusedLabelColor = ds.accent,
         unfocusedLabelColor = ds.labelTertiary,
         disabledLabelColor = ds.labelDimmed,

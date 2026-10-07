@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,6 +31,7 @@ import com.labteto.dshmobile.core.session.AssistantMessageNode
 import com.labteto.dshmobile.core.session.ConversationSnapshot
 import com.labteto.dshmobile.core.wire.dto.SubagentListEntry
 import com.labteto.dshmobile.data.SessionStore
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -201,7 +201,7 @@ internal fun SubagentsSheet(
                     )
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextField(
+                        DsTextField(
                             value = draft,
                             onValueChange = { draft = it },
                             enabled = !sending && !queueOperation.value,
@@ -216,7 +216,6 @@ internal fun SubagentsSheet(
                             placeholder = {
                                 Text(stringResource(R.string.subagents_message), style = DsType.std14.withReadingWeight())
                             },
-                            colors = dialogTextFieldColors(),
                         )
                         Spacer(Modifier.width(DsSpacing.small))
                         if (childRunning) {

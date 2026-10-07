@@ -23,8 +23,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.data.SessionRow
 import com.labteto.dshmobile.data.WorkspaceRow
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -482,13 +481,12 @@ internal fun ManageWorkspacesDialog(
 internal fun NewWorkspaceDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
     var pathText by remember { mutableStateOf("") }
     DsDialog(title = stringResource(R.string.chatlist_new_workspace), onDismiss = onDismiss) {
-        TextField(
+        DsTextField(
             value = pathText,
             onValueChange = { pathText = it },
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text(stringResource(R.string.chatlist_workspace_path), style = DsType.std14.withReadingWeight()) },
             singleLine = true,
-            colors = dialogTextFieldColors(),
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             DsButton(

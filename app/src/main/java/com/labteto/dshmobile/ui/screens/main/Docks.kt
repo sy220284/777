@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +26,7 @@ import com.labteto.dshmobile.core.session.QueueItem
 import com.labteto.dshmobile.core.wire.dto.GoalPhase
 import com.labteto.dshmobile.core.wire.dto.GoalSnapshot
 import com.labteto.dshmobile.data.SessionStore
+import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
@@ -134,13 +134,12 @@ internal fun GoalBar(goal: GoalSnapshot, store: SessionStore, modifier: Modifier
     }
     if (editing) {
         DsDialog(title = stringResource(R.string.goal_edit), onDismiss = { editing = false }) {
-            TextField(
+            DsTextField(
                 value = editText,
                 onValueChange = { editText = it },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 8,
                 placeholder = { Text(stringResource(R.string.goal_title), style = DsType.std14.withReadingWeight()) },
-                colors = dialogTextFieldColors(),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DsButton(
@@ -237,13 +236,12 @@ internal fun QueueDock(queue: List<QueueItem>, store: SessionStore, modifier: Mo
 
     editingId?.let { id ->
         DsDialog(title = stringResource(R.string.chat_queue_edit), onDismiss = { editingId = null }) {
-            TextField(
+            DsTextField(
                 value = editText,
                 onValueChange = { editText = it },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 8,
                 placeholder = { Text(stringResource(R.string.chat_composer_hint), style = DsType.std14.withReadingWeight()) },
-                colors = dialogTextFieldColors(),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DsButton(
