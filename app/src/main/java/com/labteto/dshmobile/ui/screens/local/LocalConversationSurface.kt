@@ -137,7 +137,11 @@ internal fun LocalConversationSurface(
     onStop: () -> Unit,
     onNewSession: () -> Unit,
     onExitGroupChat: () -> Unit,
+    onOpenWorkspace: () -> Unit,
     onOpenRunCenter: () -> Unit,
+    onOpenTasks: () -> Unit,
+    onOpenTools: () -> Unit,
+    onOpenDiary: () -> Unit,
     sessionTitle: String,
     sessionPinned: Boolean,
     onTogglePinSession: () -> Unit,
@@ -935,29 +939,130 @@ internal fun LocalConversationSurface(
         )
     }
     if (showAttachmentPicker) {
-        DsBottomSheet(title = stringResource(R.string.chat_composer_add_attachment), onDismiss = { showAttachmentPicker = false }) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.medium),
-            ) {
-                DsQuickActionTile(
-                    icon = FeatherIcons.Image,
-                    label = stringResource(R.string.local_attachment_image),
-                    onClick = {
-                        showAttachmentPicker = false
-                        imagePicker.launch(arrayOf("image/*"))
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-                DsQuickActionTile(
-                    icon = FeatherIcons.Paperclip,
-                    label = stringResource(R.string.local_attachment_file),
-                    onClick = {
-                        showAttachmentPicker = false
-                        filePicker.launch(arrayOf("*/*"))
-                    },
-                    modifier = Modifier.weight(1f),
-                )
+        DsBottomSheet(
+            title = stringResource(R.string.chat_composer_add_attachment),
+            onDismiss = { showAttachmentPicker = false },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                ) {
+                    DsQuickActionTile(
+                        icon = FeatherIcons.Image,
+                        label = stringResource(R.string.local_attachment_image),
+                        onClick = {
+                            showAttachmentPicker = false
+                            imagePicker.launch(arrayOf("image/*"))
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                    DsQuickActionTile(
+                        icon = FeatherIcons.Paperclip,
+                        label = stringResource(R.string.local_attachment_file),
+                        onClick = {
+                            showAttachmentPicker = false
+                            filePicker.launch(arrayOf("*/*"))
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                if (state.usageMode == LocalUsageMode.CHAT) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsQuickActionTile(
+                            icon = FeatherIcons.User,
+                            label = stringResource(R.string.local_persona_picker_title),
+                            onClick = {
+                                showAttachmentPicker = false
+                                showPersonaPicker = true
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Users,
+                            label = stringResource(R.string.local_group_chat_title),
+                            onClick = {
+                                showAttachmentPicker = false
+                                showGroupMemberPicker = true
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Clock,
+                            label = stringResource(R.string.tasks_chat_title),
+                            onClick = {
+                                showAttachmentPicker = false
+                                onOpenTasks()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        DsQuickActionTile(
+                            icon = FeatherIcons.BookOpen,
+                            label = stringResource(R.string.chat_diary_title),
+                            onClick = {
+                                showAttachmentPicker = false
+                                onOpenDiary()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                } else {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Folder,
+                            label = stringResource(R.string.chatlist_workspace_files),
+                            onClick = {
+                                showAttachmentPicker = false
+                                onOpenWorkspace()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Activity,
+                            label = stringResource(R.string.local_run_center),
+                            onClick = {
+                                showAttachmentPicker = false
+                                onOpenRunCenter()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Clock,
+                            label = stringResource(R.string.tasks_title),
+                            onClick = {
+                                showAttachmentPicker = false
+                                onOpenTasks()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Tool,
+                            label = stringResource(R.string.tools_title),
+                            onClick = {
+                                showAttachmentPicker = false
+                                onOpenTools()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
         }
     }
