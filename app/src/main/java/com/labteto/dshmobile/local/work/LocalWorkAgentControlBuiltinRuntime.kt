@@ -11,6 +11,7 @@ import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.optionalString
 import com.labteto.dshmobile.local.tools.string
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -47,12 +48,14 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     args.int("max_steps", snapshot.subagentMaxSteps),
                 )
                 val virtualScreen = args.boolean("virtual_screen", false)
+                val outputSchema = args["output_schema"] as? JsonObject
                 if (args.boolean("run_in_background", false)) {
                     persistentJobs.startReadonlySubagent(
                         task = task,
                         model = model,
                         maxSteps = maxSteps,
                         virtualScreen = virtualScreen,
+                        outputSchema = outputSchema,
                         sessionId = run.sessionId,
                         boundState = snapshot,
                         historySnapshot = run.runHandle.modelHistory::snapshot,
@@ -68,6 +71,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                                 continuable = false,
                                 virtualScreen = virtualScreen,
                                 historyMode = LocalSubagentHistoryMode.ISOLATED,
+                                outputSchema = outputSchema,
                             ),
                         ),
                     )
@@ -84,6 +88,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                         continuable = false,
                         virtualScreen = false,
                         historyMode = LocalSubagentHistoryMode.INHERIT_PARENT,
+                        outputSchema = args["output_schema"] as? JsonObject,
                     ),
                 ),
             )
