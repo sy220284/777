@@ -81,7 +81,7 @@ internal fun TerminalPanel(store: SessionStore, state: PanelState, modifier: Mod
             DsTextButton(onClick = { operation { refresh() } }, enabled = !busy) { Text(stringResource(R.string.common_retry)) }
         }
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        error?.let { Text(it, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.error) }
+        error?.let { Text(it, Modifier.padding(12.dp), color = DsTheme.colors.error) }
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             state.terminals.forEach { terminal -> DsTextButton(onClick = { state.selectedTerminal = terminal.id }) { Text(terminal.title) } }
         }
@@ -269,7 +269,7 @@ private fun TerminalScreen(store: SessionStore, key: ComposerKey, initial: WebTe
             DsTextButton(onClick = { reconnect++ }) { Text(stringResource(if (connected) R.string.terminal_control else R.string.common_retry)) }
         }
         if (info.state != "running") Text(stringResource(if (info.state == "failed") R.string.common_error else R.string.chat_stopped) + " (${info.exitCode ?: "—"})", Modifier.padding(12.dp))
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp)) }
+        error?.let { Text(it, color = DsTheme.colors.error, modifier = Modifier.padding(12.dp)) }
         AndroidView(factory = { view }, modifier = Modifier.weight(1f).fillMaxWidth())
     }
 }
