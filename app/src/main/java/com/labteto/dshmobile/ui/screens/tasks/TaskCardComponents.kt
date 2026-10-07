@@ -5,6 +5,7 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -49,7 +51,6 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsStatusPill
@@ -59,6 +60,7 @@ import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.EmptyHero
 import com.labteto.dshmobile.ui.components.rememberDsToast
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -74,6 +76,33 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+
+@Composable
+private fun KimiTaskCardSurface(
+    status: AutomationStatus,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = DsTheme.colors
+    val borderColor = when (status) {
+        AutomationStatus.RUNNING, AutomationStatus.QUEUED -> colors.accent.copy(alpha = 0.28f)
+        AutomationStatus.WAITING_USER -> colors.warn.copy(alpha = 0.34f)
+        AutomationStatus.FAILED, AutomationStatus.BLOCKED -> colors.error.copy(alpha = 0.28f)
+        else -> colors.borderL1
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = DsShapes.block,
+        color = colors.bgLayer1,
+        border = BorderStroke(1.dp, borderColor),
+        tonalElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(DsSpacing.comfortable),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            content = content,
+        )
+    }
+}
 
 @Composable
 internal fun TaskCard(
@@ -144,7 +173,7 @@ internal fun TaskCard(
             stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
     }
 
-    DsGroupCard {
+    KimiTaskCardSurface(status = task.status) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
