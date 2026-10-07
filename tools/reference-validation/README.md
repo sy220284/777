@@ -44,7 +44,7 @@ Session format reference: V4
 
 基础黄金 fixture 证明锁定官方版本的 AgentLoop 核心调度结果。
 
-此外，刷新脚本会在同一个锁定官方 checkout 中运行 `official-advanced-runner.ts`，并与 777 `harness-core` 的 native advanced runner 直接比较：
+此外，刷新脚本会在同一个锁定官方 checkout 中运行 `official-advanced-runner.ts`。官方结果作为 777 的语义下限，不作为能力上限；777 可以提高 stateVersion、增加字段和扩展行为，但不能丢失或弱化官方已经验证的语义。基础 Projection Registry 仍做严格差分；应用层 Agent Team 使用“官方子集必须被原生实现完整覆盖”的兼容下限校验：
 
 - Session Projection `stateVersion`；
 - per-projection `asOfSequence` 水位；
@@ -55,7 +55,7 @@ Session format reference: V4
 
 高级官方结果提交到 `official-semantic/advanced.json`，但只能由刷新脚本在锁定官方 checkout 中重生成；fixture-provenance 要求工作树与重生成结果完全一致，禁止手写伪 golden。
 
-当前高级官方差分包括 Session Projection Registry，以及官方 `agentTeam` Projection stateVersion=4 / V2 member-task-message whole-value 事件。Agent Teams 的 Android Work 生产 Projection 直接读取同一份官方 advanced golden 对照持久 roster、Task DAG 与 queued-minus-delivered mailbox，不复制一套“官方逻辑”的 Kotlin 假实现。
+当前高级官方差分包括 Session Projection Registry，以及官方 `agentTeam` Projection stateVersion=4 / V2 member-task-message whole-value 事件。Agent Teams 的 Android Work 生产 Projection 直接读取同一份官方 advanced golden 作为保底基线：官方已有字段、值、顺序与 mailbox / Task DAG 语义必须继续成立；777 的 stateVersion 只允许等于或高于官方，允许新增字段和更强能力，不复制一套“官方逻辑”的 Kotlin 假实现。
 
 不适合表达为模型回复向量的状态，由对应模块测试覆盖，包括：
 
@@ -89,7 +89,7 @@ git diff --exit-code -- reference-validation/src/test/resources/official
 
 - fixture 不能手写冒充官方输出。
 - 锁定 commit 改变后必须重新生成。
-- 本机行为偏离官方语义会在差分测试里显式暴露。
+- 本机行为低于或破坏官方已有语义会在验证中显式暴露；高于官方的版本、字段和增强能力允许保留。
 
 ## 刷新基线
 

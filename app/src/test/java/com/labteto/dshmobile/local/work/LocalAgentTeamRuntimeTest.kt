@@ -12,7 +12,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -38,7 +40,7 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
-    fun productionProjectionMatchesOfficialAgentTeamGolden() {
+    fun productionProjectionCoversOfficialAgentTeamGolden() {
         val official = requireNotNull(
             javaClass.classLoader?.getResourceAsStream("official-semantic/advanced.json"),
         ).bufferedReader().use { reader ->
@@ -142,7 +144,71 @@ class LocalAgentTeamRuntimeTest {
             put("failure", projection.failure?.let(::JsonPrimitive) ?: JsonNull)
         }
 
-        assertEquals(official, native)
+        assertOfficialAgentTeamBaseline(official, native)
+    }
+
+    private fun assertOfficialAgentTeamBaseline(
+        official: JsonObject,
+        native: JsonObject,
+    ) {
+        official.forEach { (key, officialValue) ->
+            val nativeValue = native[key]
+            assertNotNull("777 缺少官方 Agent Team 字段：$key", nativeValue)
+            if (key == "stateVersion") {
+                val officialVersion = officialValue.jsonPrimitive.content.toInt()
+                val nativeVersion = requireNotNull(nativeValue).jsonPrimitive.content.toInt()
+                assertTrue(
+                    "777 Agent Team stateVersion=$nativeVersion 低于官方基线 $officialVersion",
+                    nativeVersion >= officialVersion,
+                )
+            } else {
+                assertOfficialSemanticCovered(
+                    official = officialValue,
+                    native = requireNotNull(nativeValue),
+                    path = "agentTeam.$key",
+                )
+            }
+        }
+    }
+
+    private fun assertOfficialSemanticCovered(
+        official: JsonElement,
+        native: JsonElement,
+        path: String,
+    ) {
+        when (official) {
+            is JsonObject -> {
+                assertTrue("$path 类型低于官方基线：期望对象", native is JsonObject)
+                val nativeObject = native as JsonObject
+                official.forEach { (key, officialValue) ->
+                    val nativeValue = nativeObject[key]
+                    assertNotNull("$path 缺少官方字段：$key", nativeValue)
+                    assertOfficialSemanticCovered(
+                        official = officialValue,
+                        native = requireNotNull(nativeValue),
+                        path = "$path.$key",
+                    )
+                }
+            }
+
+            is JsonArray -> {
+                assertTrue("$path 类型低于官方基线：期望数组", native is JsonArray)
+                val nativeArray = native as JsonArray
+                assertTrue(
+                    "$path 项目数量低于官方基线：${nativeArray.size} < ${official.size}",
+                    nativeArray.size >= official.size,
+                )
+                official.forEachIndexed { index, officialValue ->
+                    assertOfficialSemanticCovered(
+                        official = officialValue,
+                        native = nativeArray[index],
+                        path = "$path[$index]",
+                    )
+                }
+            }
+
+            else -> assertEquals("$path 偏离官方语义基线", official, native)
+        }
     }
 
     @Test
