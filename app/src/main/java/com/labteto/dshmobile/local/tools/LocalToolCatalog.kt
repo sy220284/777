@@ -204,6 +204,14 @@ object LocalToolCatalog {
             "task" to string("首个任务"),
             "model" to string("可选；模型档案编号或无歧义模型名"),
             "max_steps" to integer("单次执行预算，默认沿用当前 Work 子代理配置"),
+            "context" to buildJsonObject {
+                put("type", "string")
+                put("description", "上下文模式；fresh 使用独立新上下文，fork 在创建时把 Lead 当前历史物化为 Child 初始检查点；默认 fresh")
+                put("enum", buildJsonArray {
+                    add(JsonPrimitive("fresh"))
+                    add(JsonPrimitive("fork"))
+                })
+            },
         ), listOf("name", "task")))
         add(tool("team_send_message", "向指定 teammate 的持久 mailbox 发送消息；空闲成员会安全冷恢复", properties(
             "target" to string("teammate 名称"),
