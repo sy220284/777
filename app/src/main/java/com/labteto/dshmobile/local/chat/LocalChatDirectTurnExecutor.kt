@@ -68,6 +68,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
     private val branchCoordinator: LocalChatBranchCoordinator,
     private val postTurn: LocalChatContextRefreshCoordinator,
     private val queue: LocalChatQueueRuntime,
+    private val webContext: LocalChatWebContextProvider,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val imageCapabilities
@@ -169,7 +170,8 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 relationshipMemory = relationshipMemory,
             )
             val turnContext = preparedChat.context
-            val dynamicContext = preparedChat.dynamicContext
+            val networkContext = webContext.forInput(input)
+            val dynamicContext = networkContext + preparedChat.dynamicContext
             check(
                 modelHistory.compactChatIfNeeded(
                     expectedSessionId = sessionId,
