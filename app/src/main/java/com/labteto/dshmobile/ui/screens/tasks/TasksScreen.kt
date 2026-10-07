@@ -169,6 +169,7 @@ private fun WorkTasksScreen(
                         onBack = navigateBack,
                         backContentDescription = stringResource(R.string.common_back),
                         largeTitle = false,
+                        backIcon = FeatherIcons.X,
                     )
                     if (!showCreate) {
                         Box(Modifier.align(Alignment.CenterEnd)) {
