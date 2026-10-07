@@ -1,25 +1,24 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -30,10 +29,10 @@ import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
-import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 internal fun localHarnessModeSwitchEnabled(
     current: LocalUsageMode,
@@ -48,43 +47,51 @@ internal fun LocalUsageModePill(
 ) {
     val colors = DsTheme.colors
     val backgroundState = LocalAppBackgroundState.current
-    val density = LocalDensity.current
     val containerColor = colors.wallpaperSurface(
         level = WallpaperSurfaceLevel.FLOATING,
         region = BackgroundRegion.TOP,
         base = colors.bgModulePlatform,
     )
+    val thumbColor = colors.wallpaperSurface(
+        level = WallpaperSurfaceLevel.FLOATING,
+        region = BackgroundRegion.TOP,
+        base = colors.bgLayer1,
+    )
 
     Surface(
-        modifier = Modifier.fillMaxWidth().widthIn(max = 264.dp).height(56.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 264.dp)
+            .height(56.dp),
         shape = DsShapes.pillFull,
         color = containerColor,
         border = BorderStroke(1.dp, colors.borderL2),
         tonalElevation = 0.dp,
         shadowElevation = if (backgroundState.hasImage) 1.dp else 0.dp,
     ) {
-        BoxWithConstraints(Modifier.padding(4.dp)) {
+        BoxWithConstraints(Modifier.padding(3.dp)) {
             val segmentWidth = maxWidth / 2
-            val indicatorTargetPx = with(density) {
-                if (selected == LocalUsageMode.CHAT) 0f else segmentWidth.toPx()
-            }
-            val indicatorOffsetPx by animateFloatAsState(
-                targetValue = indicatorTargetPx,
-                animationSpec = DsAnimations.fastSpring,
-                label = "usage mode indicator",
+            val thumbOffset by animateDpAsState(
+                targetValue = if (selected == LocalUsageMode.CHAT) 0.dp else segmentWidth,
+                animationSpec = DsAnimations.segmentSlide,
+                label = "usage mode thumb",
             )
+
+            // 只有这一枚选中滑块会绘制胶囊背景；两个模式本身只是等宽点击区，
+            // 避免轨道、选中项和未选中项叠出“两枚胶囊”的轮廓。
             Surface(
                 modifier = Modifier
-                    .graphicsLayer { translationX = indicatorOffsetPx }
+                    .offset(x = thumbOffset)
                     .width(segmentWidth)
-                    .height(48.dp),
+                    .fillMaxHeight(),
                 shape = DsShapes.pillFull,
-                color = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP, colors.bgLayer1),
-                border = BorderStroke(1.dp, colors.borderL1),
-                shadowElevation = 2.dp,
+                color = thumbColor,
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
             ) {}
+
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 listOf(
@@ -94,8 +101,7 @@ internal fun LocalUsageModePill(
                     Box(
                         modifier = Modifier
                             .width(segmentWidth)
-                            .height(48.dp)
-                            .clip(DsShapes.pillFull)
+                            .fillMaxHeight()
                             .selectable(
                                 selected = selected == mode,
                                 enabled = enabled,
@@ -106,7 +112,8 @@ internal fun LocalUsageModePill(
                     ) {
                         Text(
                             stringResource(labelRes),
-                            style = (if (selected == mode) DsType.std14Strong else DsType.std14).withReadingWeight(),
+                            style = (if (selected == mode) DsType.std14Strong else DsType.std14)
+                                .withReadingWeight(),
                             color = when {
                                 !enabled -> colors.labelTertiary
                                 selected == mode -> colors.labelPrimary
