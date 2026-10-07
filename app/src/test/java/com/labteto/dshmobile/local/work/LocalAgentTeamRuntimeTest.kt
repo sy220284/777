@@ -146,6 +146,68 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun taskRevisionGapIsRejectedAndLastValidRevisionSurvives() {
+        val fixture = fixture("team-revision")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task("team-revision", "task-1", 1, blockedBy = emptyList()),
+        )
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_TASK_EVENT,
+            task("team-revision", "task-1", 3, blockedBy = emptyList()),
+        )
+
+        val projection = fixture.runtime.project("team-revision")
+
+        assertNotNull(projection.failure)
+        assertTrue(projection.failure!!.contains("REVISION"))
+        assertEquals(1, projection.tasks.single { it.id == "task-1" }.revision)
+    }
+
+    @Test
+    fun rosterAndPendingMailboxRebuildFromSameEventLogAfterRuntimeRecreation() {
+        val fixture = fixture("team-restart")
+        appendActiveMember(fixture.log, "team-restart")
+        fixture.log.append(
+            LocalAgentTeamRuntime.TEAM_MESSAGE_QUEUED,
+            buildJsonObject {
+                put("team_id", "team-restart")
+                put("id", "team-msg-restart")
+                put("sender_id", "team-restart")
+                put("sender_name", "lead")
+                put("target_id", "member-1")
+                put("content", "重启后继续投递")
+            },
+        )
+
+        val recreated = LocalAgentTeamRuntime(
+            jobs = LocalJobManager(
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined).also(scopes::add),
+                onChanged = {},
+            ),
+            startTeammate = { _, _, _, _ ->
+                JobStartResult(false, null, "重建测试不启动子代理")
+            },
+            sendToTeammate = { _, _, _ ->
+                JobMessageAdmission(
+                    accepted = false,
+                    duplicate = false,
+                    requiresResume = false,
+                    message = "重建测试不投递",
+                )
+            },
+            eventLogFor = { fixture.log },
+            projectionRegistry = SessionProjectionRegistry(),
+        )
+
+        val projection = recreated.project("team-restart")
+
+        assertEquals(listOf("member-1"), projection.members.map { it.id })
+        assertEquals(listOf("team-msg-restart"), projection.pendingMessages.map { it.id })
+        assertNull(projection.failure)
+    }
+
+    @Test
     fun taskDagRejectsCycleAndFreezesAtLastValidState() {
         val fixture = fixture("team-a")
         fixture.log.append(
