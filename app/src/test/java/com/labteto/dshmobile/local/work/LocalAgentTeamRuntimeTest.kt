@@ -971,6 +971,7 @@ class LocalAgentTeamRuntimeTest {
                         put("after_sequence", firstSequence)
                         put("timeout_ms", 1_000)
                     },
+                    rawArguments = "{}",
                 ),
                 binding,
             ),
