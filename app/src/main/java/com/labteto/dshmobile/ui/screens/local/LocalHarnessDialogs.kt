@@ -398,6 +398,7 @@ internal fun ChatPersonaDialog(
     var aiSucceeded by remember(profile.id) { mutableStateOf(false) }
     var aiError by remember(profile.id) { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
+    val saveFailedText = stringResource(R.string.persona_gallery_save_failed)
 
     fun lines(value: String): List<String> = value.lineSequence()
         .map(String::trim)
@@ -461,7 +462,7 @@ internal fun ChatPersonaDialog(
                         )
                     }.getOrElse { Result.failure(it) }
                     result.onSuccess { onDismiss() }
-                        .onFailure { saveError = it.message ?: "保存失败" }
+                        .onFailure { saveError = it.message ?: saveFailedText }
                     saving = false
                 }
             },
