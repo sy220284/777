@@ -22,8 +22,8 @@ Code: core.DshCore.PROTOCOL_BASELINE / PROTOCOL_COMMIT
 ### 本机语义参考
 
 ```text
-Harness semantic reference: 0.1.7-rc.2
-Commit: 477b4f420553e8a52c2fbccc464d7561b239c443
+Harness semantic reference: 0.2.1-alpha.1
+Commit: 5badb15009ae1756c3afe0ae0cef1faafc290ccc
 Session format reference: V4
 Source: upstream/deepseek-harness.lock.json
 ```
