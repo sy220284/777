@@ -12,47 +12,66 @@ fun main(args: Array<String>) {
     require(args.size == 1) { "usage: AdvancedConformanceMain <output.json>" }
 
     val registry = SessionProjectionRegistry()
-    val projection = registry.register(
+    val first = registry.register(
         name = "777/advanced-count",
         stateVersion = 7,
         initial = { 0 },
         reducer = SessionReducer<Int> { state, _ -> state + 1 },
     )
-    var duplicateKeyRejected = false
+    val second = registry.register(
+        name = "777/advanced-count",
+        stateVersion = 7,
+        initial = { 999 },
+        reducer = SessionReducer<Int> { state, _ -> state + 999 },
+    )
+
+    var differentVersionRejected = false
     runCatching {
         registry.register(
             name = "777/advanced-count",
-            stateVersion = 7,
+            stateVersion = 8,
             initial = { 0 },
             reducer = SessionReducer<Int> { state, _ -> state },
         )
     }.onFailure {
-        duplicateKeyRejected = true
+        differentVersionRejected = true
     }
 
-    val snapshot = projection.fold(
-        listOf(
-            SessionEvent(
-                sequence = 0,
-                type = "turn/start",
-                createdAt = 1,
-                data = buildJsonObject { put("turn", 1) },
-            ),
-            SessionEvent(
-                sequence = 1,
-                type = "turn/end",
-                createdAt = 2,
-                data = buildJsonObject { put("turn", 1) },
-            ),
+    val events = listOf(
+        SessionEvent(
+            sequence = 0,
+            type = "turn/start",
+            createdAt = 1,
+            data = buildJsonObject { put("turn", 1) },
+        ),
+        SessionEvent(
+            sequence = 1,
+            type = "turn/end",
+            createdAt = 2,
+            data = buildJsonObject { put("turn", 1) },
         ),
     )
+    val firstSnapshot = first.fold(events)
+    val secondSnapshot = second.fold(events)
+    val sameVersionShared =
+        firstSnapshot.state == 2 &&
+            secondSnapshot.state == firstSnapshot.state &&
+            registry.names() == listOf("777/advanced-count")
+
+    first.dispose()
+    val survivesFirstDispose = registry.names() == listOf("777/advanced-count")
+    second.dispose()
+    val removedAfterLastDispose = registry.names().isEmpty()
 
     val result = buildJsonObject {
         put("projection", buildJsonObject {
-            put("stateVersion", snapshot.stateVersion)
-            put("asOfSequence", snapshot.asOfSequence)
-            put("value", snapshot.state)
-            put("duplicateKeyRejected", duplicateKeyRejected)
+            put("stateVersion", firstSnapshot.stateVersion)
+            put("asOfSequence", firstSnapshot.asOfSequence)
+            put("value", firstSnapshot.state)
+            put("sameVersionShared", sameVersionShared)
+            put("differentVersionRejected", differentVersionRejected)
+            put("survivesFirstDispose", survivesFirstDispose)
+            put("removedAfterLastDispose", removedAfterLastDispose)
         })
     }
     File(args.single()).apply {
