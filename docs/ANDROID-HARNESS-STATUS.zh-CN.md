@@ -84,9 +84,11 @@ Session Event Log 是主要事实源。模型历史缓冲区与 Checkpoint 是 E
 
 模型请求同时记录可重建证据：
 
-- `request/header` 持有 `request_uid`、路由身份、最终消息摘要、工具 Schema 摘要、上下文摘要以及对应 Surface 事件序号；
+- `request/header` 持有 `request_uid`、路由身份、原始请求不可逆摘要以及对应 Surface 事件序号；
+- V2 新增 `request/message-surface`：文本请求可完整重建；多模态请求只持久化脱敏后的模型可见消息，图片原始数据不复制进 EventLog；
 - `request/tool-surface` 只在工具 Schema Surface 变化时记录完整 Schema；
-- `request/context-surface` 只在 system / developer 模型可见上下文变化时记录完整上下文切片；
+- `request/context-surface` 只在 system / developer 模型可见上下文变化时记录脱敏后的上下文切片；
+- `reconstructRequest(sessionId, requestUid)` 按 Surface 序号重建消息、工具和 Context，重新计算 digest / envelope fingerprint；V1 标记为 evidence-only，V2 区分 exact verified、redacted verified 与 invalid；
 - retry / error / cancelled / completed / `assistant/attempt` 使用同一个 `request_uid` 关联，失败尝试不会伪造正式 assistant 历史；
 - `tool/execution-started` 在真实执行 admission 后记录独立 `execution_id` 与 `root_call_id`，与模型声明的 `tool/call` 分离。
 
