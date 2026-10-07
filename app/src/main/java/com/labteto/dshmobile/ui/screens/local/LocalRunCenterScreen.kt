@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
@@ -79,7 +80,8 @@ internal fun LocalRunCenterScreen(
                 onBack = onDismiss,
                 backContentDescription = stringResource(R.string.common_back),
                 largeTitle = false,
-                actionIcon = FeatherIcons.Plus,
+                actionIcon = null,
+                actionPainter = painterResource(R.drawable.ic_kimi_create_subagent),
                 actionContentDescription = stringResource(R.string.local_run_agent_start),
                 onAction = { showAgentLauncher = true },
                 modifier = Modifier.padding(horizontal = DsSpacing.medium),

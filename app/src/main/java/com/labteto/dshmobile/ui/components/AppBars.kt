@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -44,6 +45,7 @@ fun DsTopBar(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     actionIcon: ImageVector? = null,
+    actionPainter: Painter? = null,
     actionContentDescription: String? = null,
     actionEnabled: Boolean = true,
     onAction: (() -> Unit)? = null,
@@ -84,9 +86,10 @@ fun DsTopBar(
                 )
             }
         }
-        if (actionIcon != null && onAction != null) {
+        if ((actionIcon != null || actionPainter != null) && onAction != null) {
             DsIconButton(
                 icon = actionIcon,
+                iconPainter = actionPainter,
                 contentDescription = actionContentDescription,
                 onClick = onAction,
                 enabled = actionEnabled,
