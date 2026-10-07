@@ -863,6 +863,9 @@ internal class LocalAgentTeamRuntime(
         require(state.tasks.count { it.status != LocalTeamTaskStatus.DELETED } < MAX_TASKS) {
             "TEAM_TASK_LIMIT：最多允许 $MAX_TASKS 个活动任务"
         }
+        require(state.tasks.size < MAX_TEAM_TASK_HISTORY) {
+            "TEAM_TASK_HISTORY_LIMIT：历史任务已达 $MAX_TEAM_TASK_HISTORY 个"
+        }
         val id = nextTaskId(state.tasks)
         val task = LocalTeamTaskSnapshot(
             id = id,
@@ -1965,6 +1968,7 @@ internal class LocalAgentTeamRuntime(
         private const val MAX_MESSAGE_BYTES = 65_536
         private const val MAX_PENDING_MESSAGES_PER_MEMBER = 64
         private const val MAX_TASKS = 256
+        private const val MAX_TEAM_TASK_HISTORY = 2_048
         private const val MAX_ERROR_CHARS = 1_000
         private const val MAX_BLOCKERS = 32
         private const val MAX_WRITE_SCOPES = 32
