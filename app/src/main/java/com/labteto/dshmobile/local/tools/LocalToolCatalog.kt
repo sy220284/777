@@ -197,7 +197,27 @@ object LocalToolCatalog {
             "output_schema" to jsonSchemaObject("可选；要求每个 Workflow 子代理最终都返回符合该 JSON Schema 的对象"),
             "allowed_tools" to stringArray("可选；所有 Workflow 子任务共享的工具 allowlist"),
         ), listOf("tasks")))
-        add(tool("team_members", "查看当前 Work Agent Team 的 Lead、teammate 与运行状态", properties()))
+        add(tool("team_members", "查看当前 Work Agent Team 的 Lead、成员、实时状态、进度与结果数量", properties()))
+        add(tool("team_member_status", "查看一个 Team 成员的生命周期、运行状态、进度、当前任务与最近结果", properties(
+            "target" to string("teammate 名称"),
+        ), listOf("target")))
+        add(tool("team_create_member", "只创建稳定 Team 成员身份，不立即启动模型执行；后续用 team_start_member 派活", properties(
+            "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
+            "description" to string("可选；职责说明"),
+            "context" to buildJsonObject {
+                put("type", "string")
+                put("enum", buildJsonArray {
+                    add(JsonPrimitive("fresh"))
+                    add(JsonPrimitive("fork"))
+                })
+            },
+        ), listOf("name")))
+        add(tool("team_start_member", "启动已创建或已停用的 Team 成员；停用成员会复用原身份和 durable mailbox", properties(
+            "target" to string("teammate 名称"),
+            "task" to string("本次任务"),
+            "model" to string("可选；模型档案编号或无歧义模型名"),
+            "max_steps" to integer("单次执行预算，默认沿用当前 Work 子代理配置"),
+        ), listOf("target", "task")))
         add(tool("team_spawn", "创建一个具备持久身份和 durable mailbox 的只读 teammate", properties(
             "name" to string("不可变 teammate 名称；仅字母、数字、下划线和短横线"),
             "description" to string("可选；职责说明"),
@@ -217,6 +237,16 @@ object LocalToolCatalog {
             "target" to string("teammate 名称"),
             "message" to string("消息内容"),
         ), listOf("target", "message")))
+        add(tool("team_messages", "读取 Team 成员独立结果消息流；返回 durable EventLog sequence 作为结果游标", properties(
+            "target" to string("可选；限定 teammate 名称"),
+            "after_sequence" to integer("可选；仅返回该 EventLog sequence 之后的结果"),
+            "limit" to integer("返回最近消息数，默认 20，最大 100"),
+        )))
+        add(tool("team_wait_for_message", "等待 Team 成员结果；after_sequence 后已有结果立即返回，否则等待新结果", properties(
+            "target" to string("可选；限定 teammate 名称"),
+            "after_sequence" to integer("结果游标；默认 -1，可把上一次返回的 sequence 传回以等待下一条"),
+            "timeout_ms" to integer("等待毫秒数，1000–60000，默认 10000"),
+        )))
         add(tool("team_task_create", "在 Team 共享任务板创建 pending 任务", properties(
             "subject" to string("任务标题"),
             "description" to string("可选；任务说明"),
@@ -263,9 +293,16 @@ object LocalToolCatalog {
                 put("items", buildJsonObject { put("type", "string") })
             },
         ), listOf("task_id", "expected_revision", "action")))
-        add(tool("team_interrupt", "中断指定 teammate 当前 Activation；不会清空其 durable mailbox", properties(
+        add(tool("team_interrupt", "只中断指定 teammate 当前 Activation；身份、任务归属和 durable mailbox 保留", properties(
             "target" to string("teammate 名称"),
         ), listOf("target")))
+        add(tool("team_disable_member", "停用 teammate；保留稳定身份和 mailbox，并自动释放其未完成 Team 任务", properties(
+            "target" to string("teammate 名称"),
+        ), listOf("target")))
+        add(tool("team_dismiss_member", "永久解雇 teammate；终止其 Agent，并自动释放其未完成 Team 任务", properties(
+            "target" to string("teammate 名称"),
+        ), listOf("target")))
+        add(tool("team_stop_all", "一次停止当前 Team 所有正在运行的成员 Activation；保留成员身份与可恢复状态", properties()))
         add(tool("team_wait", "等待 Team 事件或成员运行状态发生变化", properties(
             "timeout_ms" to integer("等待毫秒数，1000–60000，默认 10000"),
         )))

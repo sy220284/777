@@ -104,6 +104,16 @@ internal fun decodeLocalSubagentInboxClaimedMessages(
     return decoded.takeIf { it.size == rawMessages.size }
 }
 
+internal fun isDuplicateLocalSubagentTerminalCheckpoint(
+    previousStep: Int?,
+    previousOutput: String?,
+    step: Int,
+    terminalOutput: String?,
+): Boolean =
+    !terminalOutput.isNullOrBlank() &&
+        previousStep == step &&
+        previousOutput == terminalOutput
+
 internal fun shouldSettleCompletedSubagentCheckpoint(
     checkpoint: LocalSubagentHistoryCheckpoint?,
     pendingMessageIds: Set<String>,

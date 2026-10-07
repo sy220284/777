@@ -164,6 +164,7 @@ internal class LocalSubagentRunner(
         recoveredStep: Int = 0,
         recoveredSoftStepLimit: Int? = null,
         resumeAfterCompletion: Boolean = false,
+        onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)? = null,
     ): LocalSubagentResult {
         val validated = validateLocalSubagentLaunchSpec(
             spec,
@@ -189,6 +190,7 @@ internal class LocalSubagentRunner(
                     recoveredStep = recoveredStep,
                     recoveredSoftStepLimit = recoveredSoftStepLimit,
                     resumeAfterCompletion = resumeAfterCompletion,
+                    onCheckpointProgress = onCheckpointProgress,
                 )
             } finally {
                 virtualScreenId?.let(releaseVirtualScreen)
@@ -204,6 +206,7 @@ internal class LocalSubagentRunner(
         recoveredStep: Int,
         recoveredSoftStepLimit: Int?,
         resumeAfterCompletion: Boolean,
+        onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)?,
     ): LocalSubagentResult {
         val task = spec.task
         val capabilities: LocalSubagentCapabilities = spec.capabilities
@@ -344,11 +347,24 @@ internal class LocalSubagentRunner(
             agentId = subagentId,
         )
 
+        var lastTerminalCheckpointStep: Int? = null
+        var lastTerminalCheckpointOutput: String? = null
+
         fun persistContinuationCheckpoint(
             step: Int,
             terminalOutput: String? = null,
         ) {
             val jobId = backgroundJobId ?: return
+            if (
+                isDuplicateLocalSubagentTerminalCheckpoint(
+                    previousStep = lastTerminalCheckpointStep,
+                    previousOutput = lastTerminalCheckpointOutput,
+                    step = step,
+                    terminalOutput = terminalOutput,
+                )
+            ) {
+                return
+            }
             try {
                 eventLog().append(
                     LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
@@ -362,6 +378,20 @@ internal class LocalSubagentRunner(
                         terminalOutput = terminalOutput,
                     ),
                 )
+                if (!terminalOutput.isNullOrBlank()) {
+                    lastTerminalCheckpointStep = step
+                    lastTerminalCheckpointOutput = terminalOutput
+                }
+                onCheckpointProgress?.let { sink ->
+                    runCatching { sink(step, totalBudgetLimit) }
+                        .onFailure { error ->
+                            AppLog.warn(
+                                "LocalSubagentRunner",
+                                "子智能体进度上报失败 agent=$subagentId step=$step",
+                                error,
+                            )
+                        }
+                }
             } catch (error: Exception) {
                 throw JobContinuationPersistenceException(
                     "持久子代理历史检查点写入失败",

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.observability.AppLog
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
@@ -9,6 +10,7 @@ import com.labteto.dshmobile.local.LocalToolApprovalRuntime
 import com.labteto.dshmobile.local.LocalToolCompositionRoot
 import com.labteto.dshmobile.local.context.ContextComposer
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.memory.MemoryManager
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
@@ -23,11 +25,13 @@ import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.string
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.update
@@ -60,6 +64,12 @@ internal class LocalWorkComposition @Inject constructor(
     json: Json,
 ) : LocalWorkAgentUiPort {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private data class TeamJobSignal(
+        val status: String,
+        val updatedAt: Long,
+        val pendingMessageCount: Int,
+    )
+    private val teamJobSignals = ConcurrentHashMap<String, TeamJobSignal>()
     private val toolResultRuntime = LocalWorkToolResultRuntime(
         runtimeStateStore = runtimeStateStore,
         toolOutputStore = tools.toolOutputStore,
@@ -229,6 +239,62 @@ internal class LocalWorkComposition @Inject constructor(
         runTurn = turnExecutor::run,
     )
 
+    init {
+        runtimeStateStore.observeJobSnapshots(::observeTeamJobTransitions)
+    }
+
+    private fun observeTeamJobTransitions(jobs: List<LocalJobInfo>) {
+        val teamJobs = jobs.filter { LocalAgentTeamRuntime.isTeamJobId(it.id) }
+        val visibleIds = teamJobs.mapTo(hashSetOf(), LocalJobInfo::id)
+        teamJobSignals.keys.toList()
+            .filterNot(visibleIds::contains)
+            .forEach(teamJobSignals::remove)
+
+        data class SessionRefresh(
+            var reconcile: Boolean = false,
+        )
+        val sessions = linkedMapOf<String, SessionRefresh>()
+
+        teamJobs.forEach { job ->
+            val current = TeamJobSignal(
+                status = job.status,
+                updatedAt = job.updatedAt,
+                pendingMessageCount = job.pendingMessageCount,
+            )
+            val previous = teamJobSignals.put(job.id, current)
+            if (previous == current) return@forEach
+
+            val sessionId = job.ownerSessionId ?: return@forEach
+            val refresh = sessions.getOrPut(sessionId, ::SessionRefresh)
+            if (job.status in TEAM_RECONCILE_JOB_STATUSES) {
+                refresh.reconcile = true
+            }
+        }
+
+        sessions.forEach { (sessionId, refresh) ->
+            scope.launch {
+                if (refresh.reconcile) {
+                    runCatching { agentTeams.recoverMailbox(sessionId) }
+                        .onFailure { error ->
+                            AppLog.warn(
+                                "LocalWorkComposition",
+                                "Agent Team 后台状态恢复失败 session=$sessionId",
+                                error,
+                            )
+                        }
+                }
+                runCatching { publishTeamUiState(sessionId) }
+                    .onFailure { error ->
+                        AppLog.warn(
+                            "LocalWorkComposition",
+                            "Agent Team UI 投影刷新失败 session=$sessionId",
+                            error,
+                        )
+                    }
+            }
+        }
+    }
+
     internal suspend fun executeBuiltin(
         call: LocalToolCall,
         allowMutation: Boolean,
@@ -269,7 +335,21 @@ internal class LocalWorkComposition @Inject constructor(
     internal fun schedulePersistentRecovery() {
         val sessionId = runtimeStateStore.currentSessionId
         runCatching { agentTeams.recoverMailbox(sessionId) }
+            .onFailure { error ->
+                AppLog.warn(
+                    "LocalWorkComposition",
+                    "Agent Team 启动恢复失败 session=$sessionId",
+                    error,
+                )
+            }
         runCatching { publishTeamUiState(sessionId) }
+            .onFailure { error ->
+                AppLog.warn(
+                    "LocalWorkComposition",
+                    "Agent Team 启动投影刷新失败 session=$sessionId",
+                    error,
+                )
+            }
         persistentJobs.schedule(sessionId)
     }
 
@@ -410,6 +490,16 @@ internal class LocalWorkComposition @Inject constructor(
                 )
             }
         }
+
+    private companion object {
+        val TEAM_RECONCILE_JOB_STATUSES = setOf(
+            "dormant",
+            "completed",
+            "failed",
+            "cancelled",
+            "killed",
+        )
+    }
 
     private suspend fun executeAutomationSubagentTool(
         call: LocalToolCall,
