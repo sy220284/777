@@ -457,16 +457,20 @@ class HarnessJobManager(
                 return JobStartResult(false, null, "会话正在移除，无法启动后台任务")
             }
             pruneRetainedLocked()
+            val running = records.values.count { it.occupiesSlot() }
+            if (running >= maxConcurrentJobs) {
+                return JobStartResult(
+                    false,
+                    null,
+                    "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务",
+                )
+            }
             if (records.size >= maxRetainedJobs) {
                 return JobStartResult(
                     false,
                     null,
                     "后台任务保留上限已满：请先终止不再需要的持久代理或清理已结束任务",
                 )
-            }
-            val running = records.values.count { it.occupiesSlot() }
-            if (running >= maxConcurrentJobs) {
-                return "后台任务并发已满：最多同时运行 $maxConcurrentJobs 个任务"
             }
             val id = allocateUniqueIdLocked()
             val startedAt = System.currentTimeMillis()
