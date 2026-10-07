@@ -68,6 +68,7 @@ class HarnessJobManager(
         var job: Job? = null,
         val inbox: MutableList<JobInboxMessage> = mutableListOf(),
         var continuationState: String? = null,
+        var idleAfterSuccess: Boolean = false,
         val resumeKind: String? = null,
         val resumePayload: String? = null,
         var ownerId: String? = null,
@@ -176,7 +177,11 @@ class HarnessJobManager(
             if (found.resumeKind.isNullOrBlank()) return "后台任务不可恢复：$id"
             val resumable =
                 found.status == "interrupted" ||
-                    (found.status == "idle" && found.inbox.isNotEmpty())
+                    (
+                        found.status == "idle" &&
+                            found.inbox.isNotEmpty() &&
+                            found.job?.isCompleted != false
+                    )
             if (!resumable) return "后台任务无需恢复：$id [${found.status}]"
             val running = records.values.count { it.occupiesSlot() }
             if (running >= maxConcurrentJobs) {
@@ -221,7 +226,11 @@ class HarnessJobManager(
                 !record.resumeKind.isNullOrBlank() &&
                     (
                         record.status == "interrupted" ||
-                            (record.status == "idle" && record.inbox.isNotEmpty())
+                            (
+                                record.status == "idle" &&
+                                    record.inbox.isNotEmpty() &&
+                                    record.job?.isCompleted != false
+                            )
                     )
             }
             .map(::snapshot)
@@ -343,8 +352,13 @@ class HarnessJobManager(
                     when (record.status) {
                         "running" -> {
                             record.output = result
-                            record.status = "completed"
-                            record.continuationState = null
+                            if (record.idleAfterSuccess) {
+                                record.status = "idle"
+                                record.idleAfterSuccess = false
+                            } else {
+                                record.status = "completed"
+                                record.continuationState = null
+                            }
                             record.updatedAt = System.currentTimeMillis()
                         }
                         "idle" -> {
@@ -359,6 +373,7 @@ class HarnessJobManager(
                     record.status = "cancelled"
                     record.output = "任务已取消"
                     record.continuationState = null
+                    record.idleAfterSuccess = false
                     record.updatedAt = System.currentTimeMillis()
                 }
                 throw cancelled
@@ -368,6 +383,7 @@ class HarnessJobManager(
                     record.status = "failed"
                     record.output = "任务失败：${error.message ?: error::class.java.simpleName}"
                     record.continuationState = null
+                    record.idleAfterSuccess = false
                     record.updatedAt = System.currentTimeMillis()
                 }
             } finally {
@@ -424,6 +440,7 @@ class HarnessJobManager(
             record.status = "cancelled"
             record.output = "任务已取消"
             record.continuationState = null
+            record.idleAfterSuccess = false
             record.inbox.clear()
             record.updatedAt = System.currentTimeMillis()
             record.job
@@ -497,6 +514,7 @@ class HarnessJobManager(
     ) {
         var previousOutput = ""
         var previousStatus = ""
+        var previousIdleAfterSuccess = false
         var previousUpdatedAt = 0L
         val record = synchronized(lock) {
             val found = records[id]
@@ -508,9 +526,17 @@ class HarnessJobManager(
             }
             previousOutput = found.output
             previousStatus = found.status
+            previousIdleAfterSuccess = found.idleAfterSuccess
             previousUpdatedAt = found.updatedAt
-            found.status = "idle"
             found.output = output.takeLast(MAX_OUTPUT)
+            if (found.status == "running" && found.job?.isCompleted == false) {
+                // The activation is still inside its own coroutine. Keep it running until the
+                // block returns, then let launchRecord settle running -> idle atomically.
+                found.idleAfterSuccess = true
+            } else {
+                found.status = "idle"
+                found.idleAfterSuccess = false
+            }
             found.updatedAt = System.currentTimeMillis()
             found
         }
@@ -520,6 +546,7 @@ class HarnessJobManager(
             synchronized(lock) {
                 record.status = previousStatus
                 record.output = previousOutput
+                record.idleAfterSuccess = previousIdleAfterSuccess
                 record.updatedAt = previousUpdatedAt
             }
             notifyChanged()
