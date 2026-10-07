@@ -16,6 +16,7 @@ data class ContextRequest(
     val projectId: String?,
     val lineageId: String?,
     val handoffSummary: String?,
+    val projectInstructions: String = "",
 )
 
 data class ContextComposition(
@@ -78,6 +79,14 @@ class ContextComposer @Inject constructor(
                         memories = emptyList(),
                         handoffSummary = null,
                     ),
+                ),
+                PromptLayer(
+                    id = "project-instructions",
+                    priority = 300,
+                    stability = PromptLayerStability.STABLE,
+                    content = request.projectInstructions.takeIf {
+                        request.projectId != null && request.mode != LocalConversationMode.INDEPENDENT
+                    }.orEmpty(),
                 ),
                 PromptLayer(
                     id = "query-recall",
