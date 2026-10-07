@@ -3,11 +3,8 @@ package com.labteto.dshmobile.data
 import android.util.Base64
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.connection.ConnectionManager
-import com.labteto.dshmobile.connection.ConnectionPhase
 import com.labteto.dshmobile.connection.HostsStore
-import com.labteto.dshmobile.core.session.ChunkRows
 import com.labteto.dshmobile.core.session.ConversationSnapshot
-import com.labteto.dshmobile.core.session.EventFold
 import com.labteto.dshmobile.core.session.QueueItem
 import com.labteto.dshmobile.core.session.SessionEventEnvelope
 import com.labteto.dshmobile.core.wire.DshApiClient
@@ -44,14 +41,12 @@ import com.labteto.dshmobile.core.wire.dto.QueuedInboxItem
 import com.labteto.dshmobile.core.wire.dto.RemoteEventFrame
 import com.labteto.dshmobile.core.wire.dto.RemoteEventOutcome
 import com.labteto.dshmobile.core.wire.dto.RemoteEventRejection
-import com.labteto.dshmobile.core.wire.dto.SessionAddress
 import com.labteto.dshmobile.core.wire.dto.SessionAttachmentRequest
 import com.labteto.dshmobile.core.wire.dto.SessionControlFrame
 import com.labteto.dshmobile.core.wire.dto.SessionEvent
 import com.labteto.dshmobile.core.wire.dto.SessionFollowFrame
 import com.labteto.dshmobile.core.wire.dto.SessionHistoryRecord
 import com.labteto.dshmobile.core.wire.dto.SessionModelsValue
-import com.labteto.dshmobile.core.wire.dto.SessionPageRequest
 import com.labteto.dshmobile.core.wire.dto.SessionSelectModelRequest
 import com.labteto.dshmobile.core.wire.dto.SessionStatsView
 import com.labteto.dshmobile.core.wire.dto.SessionSummary
@@ -74,9 +69,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -89,13 +82,11 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 /**
@@ -110,7 +101,6 @@ class SessionStore @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val lock = Any()
-    private val baselineRefreshGate = ConflatedRefreshGate()
     val connectionState = connectionManager.state
     val activeHostKey: String? get() = connectionManager.state.value.host?.let { "${it.baseUrl}|${it.id}" }
     internal val panels = com.labteto.dshmobile.ui.screens.main.PanelRepository()
@@ -126,9 +116,6 @@ class SessionStore @Inject constructor(
     private val queuesBySession = MutableStateFlow<Map<String, List<QueueItem>>>(emptyMap())
     val sessionQueues: StateFlow<Map<String, List<QueueItem>>> = queuesBySession.asStateFlow()
 
-
-    /** Coalesces transcript rebuilds during a stream; see [observeRebuildTicks]. */
-    private val rebuildTicks = Channel<Unit>(Channel.CONFLATED)
 
     // ------------------------------------------------------------------ public StateFlows
     private val _sessions = MutableStateFlow<List<SessionRow>>(emptyList())
@@ -306,24 +293,39 @@ class SessionStore @Inject constructor(
     // ------------------------------------------------------------------ internal state (guarded by `lock`)
     private val indexState = SessionIndexState()
 
-    // Open-session fold state.
+    // Current Remote Session identity remains facade-owned; the fold/read path is delegated.
     private var currentId: String? = null
-    private val openSessionState = OpenSessionFoldState()
+
+    private val ingress = RemoteSessionIngress(
+        emit = ::applyRemoteMutation,
+        logger = { message -> log(message) },
+    )
+
+    private val conversationRuntime = RemoteConversationRuntime(
+        scope = scope,
+        lock = lock,
+        currentSessionId = { currentId },
+        runningForSession = indexState::running,
+        apiProvider = ::apiOrNull,
+        followSession = { sessionId, maxMessages ->
+            remoteStreams.followSession(sessionId, maxMessages)
+        },
+        conversation = _currentConversation,
+        loadingOlder = _loadingOlder,
+        loadOlderFailed = _loadOlderFailed,
+        onDurableEvent = ::handleSessionEventMetadata,
+        onConnectionRecovered = ::clearConnectionError,
+        logger = { message -> log(message) },
+    )
 
     private val remoteStreams = SessionRemoteStreamCoordinator(
         scope = scope,
         streamProvider = { endpoint, args ->
             connectionManager.generation?.mux?.openStream(endpoint, args)
         },
-        onControlFrame = ::handleControlFrame,
-        onWorkspaceFrame = ::handleWorkspaceFrame,
-        onFollowFrame = { sessionId, frame ->
-            when (frame) {
-                is SessionFollowFrame.Snapshot -> applyFollowSnapshot(sessionId, frame)
-                is SessionFollowFrame.Entry -> applyFollowEntry(sessionId, frame.record)
-                is SessionFollowFrame.AssistantStream -> applyAssistantFrame(sessionId, frame)
-            }
-        },
+        onControlFrame = ingress::acceptControlFrame,
+        onWorkspaceFrame = ingress::acceptWorkspaceFrame,
+        onFollowFrame = ingress::acceptFollowFrame,
         onFailure = { failure ->
             when {
                 failure.endpoint == "session/follow" && failure.undecodable ->
@@ -365,6 +367,16 @@ class SessionStore @Inject constructor(
         onConnectionError = ::setConnectionError,
     )
 
+    private val hostSync = RemoteSessionHostSync(
+        scope = scope,
+        connectionState = connectionManager.state,
+        eventFrames = connectionManager.eventFrames,
+        onGenerationRetired = interactionRuntime::clearRetiredGeneration,
+        runBaseline = ::baseline,
+        onEventFrame = ingress::acceptHostFrame,
+        logger = ::log,
+    )
+
     val pendingApproval: StateFlow<PendingApproval?> get() = interactionRuntime.pendingApproval
     val pendingQuestions: StateFlow<PendingQuestions?> get() = interactionRuntime.pendingQuestions
     val pendingPermission: StateFlow<String?> get() = interactionRuntime.pendingPermission
@@ -374,10 +386,8 @@ class SessionStore @Inject constructor(
     val subagentMode: StateFlow<String?> get() = subagentRuntime.mode
 
     init {
-        observeConnection()
-        observeEvents()
+        hostSync.start()
         observePermissionSettlement()
-        observeRebuildTicks()
     }
 
     /**
@@ -392,71 +402,7 @@ class SessionStore @Inject constructor(
         }
     }
 
-    /**
-     * Drives [rebuildCurrentLocked] for the live event stream, at most once per
-     * [REBUILD_INTERVAL_MS].
-     *
-     * A rebuild re-folds the whole transcript, so its cost is proportional to the length of the
-     * session. Running one per event made streaming quadratic: a turn arrives as a long run of
-     * `assistant/chunk` deltas, and each delta was re-folding every event before it and publishing
-     * a fresh snapshot for the transcript to recompose against. On a session of any size that
-     * allocated hundreds of megabytes a second and eventually exhausted the heap.
-     *
-     * The channel is conflated because a rebuild is idempotent and reads whatever state exists when
-     * it runs: a burst of deltas collapses into one rebuild, and no delta can be lost by it — the
-     * event is already in the open-session fold before the tick is sent. The interval is a display frame
-     * rather than a debounce, so the tail of a stream still lands promptly.
-     */
-    private fun observeRebuildTicks() {
-        scope.launch {
-            for (tick in rebuildTicks) {
-                synchronized(lock) { rebuildCurrentLocked() }
-                delay(REBUILD_INTERVAL_MS)
-            }
-        }
-    }
-
     // ------------------------------------------------------------------ connection lifecycle
-    private fun observeConnection() {
-        scope.launch {
-            var prev = connectionManager.state.value
-            connectionManager.state.collect { state ->
-                val initialConnect = !prev.hasConnected && state.hasConnected
-                val reconnect = prev.hasConnected &&
-                    prev.phase == ConnectionPhase.RECONNECTING &&
-                    state.phase == ConnectionPhase.CONNECTED
-                val retiredGeneration =
-                    prev.phase == ConnectionPhase.CONNECTED &&
-                        state.phase != ConnectionPhase.CONNECTED
-                if (retiredGeneration) interactionRuntime.clearRetiredGeneration()
-                prev = state
-                if (initialConnect || reconnect) triggerBaseline()
-            }
-        }
-    }
-
-    private fun observeEvents() {
-        scope.launch {
-            connectionManager.eventFrames.collect { handleEventFrame(it) }
-        }
-    }
-
-    /** Decode one stream item, or null when it does not match the expected frame union. */
-    private fun <T> decodeOrNull(serializer: kotlinx.serialization.KSerializer<T>, item: JsonElement): T? =
-        runCatching { decodeFromJsonElement(serializer, item) }.getOrNull()
-
-    private fun triggerBaseline() {
-        scope.launch {
-            baselineRefreshGate.request {
-                try {
-                    baseline()
-                } catch (e: Exception) {
-                    log("baseline failed", e)
-                }
-            }
-        }
-    }
-
     private suspend fun baseline() {
         // Whether content search works is a fact about the harness we just reached, so a fresh
         // connection re-earns the answer rather than inheriting the previous host's.
@@ -507,59 +453,31 @@ class SessionStore @Inject constructor(
     private fun hostKey(): String? =
         connectionManager.state.value.host?.let { "${it.host}:${it.port}" }
 
-    // ------------------------------------------------------------------ host event frames
-    /**
-     * One frame of the host's `$events` stream.
-     *
-     * This is the whole of what arrives unbidden in 0.1.2. Session events are not here — they
-     * belong to a per-session `session/follow` stream — and neither is queue, job or projection
-     * state, which belongs to `session/control`. What is left is notifications and the two
-     * agent-scoped waterfalls.
-     */
-    private fun handleEventFrame(frame: RemoteEventFrame) {
-        when (frame) {
-            is RemoteEventFrame.Emit -> handleNotification(frame.event, frame.args)
-            is RemoteEventFrame.Waterfall -> handleWaterfall(frame)
-            is RemoteEventFrame.Cancel -> handleWaterfallCancelled(frame.eventId)
-            // Consumed by the connection loop's handshake; it never forwards one.
-            is RemoteEventFrame.Ready -> Unit
-            is RemoteEventFrame.Unknown -> log("unknown host event frame ${frame.type}")
-        }
-    }
-
-    /**
-     * One ordinary host notification.
-     *
-     * Arguments are positional — the host forwards the Cordis listener's own argument list — so
-     * these read by index rather than by key. None of them is replayed after a reconnect, which
-     * is why every one of them is either repairable from the session list baseline or purely
-     * advisory.
-     */
-    private fun handleNotification(event: String, args: List<JsonElement>) {
-        fun str(i: Int) = args.getOrNull(i)?.jsonPrimitive?.contentOrNull
-        when (event) {
-            "api-session/added" -> args.firstOrNull()?.let { onSessionAdded(it) }
-            "api-session/removed" -> str(0)?.let { onSessionRemoved(it) }
-            "api-session/status" -> {
-                val sid = str(0) ?: return
-                val running = args.getOrNull(1)?.jsonPrimitive?.booleanOrNull ?: false
-                setRunning(sid, running)
-            }
-            "permission-presets/catalog-changed" -> scope.launch { refreshPermissionCatalog() }
-            "api-session/activity" -> {
-                // Only reorders the list; the durable value is the session's own projection, so a
-                // missed one is corrected by the next list read rather than lost.
-                val sid = str(0) ?: return
-                val updatedAt = args.getOrNull(1)?.jsonPrimitive?.longOrNull ?: return
-                setUpdatedAt(sid, updatedAt)
-            }
-            "api-session/error" -> setConnectionError(str(1))
-            "commands/change" -> scope.launch { refreshCommands() }
-            "agent-preset/selected" -> scope.launch {
+    // ------------------------------------------------------------------ Remote Session ingress
+    private fun applyRemoteMutation(mutation: RemoteSessionMutation) {
+        when (mutation) {
+            is RemoteSessionMutation.SessionAdded -> onSessionAdded(mutation.summary)
+            is RemoteSessionMutation.SessionRemoved -> onSessionRemoved(mutation.sessionId)
+            is RemoteSessionMutation.RunningChanged ->
+                setRunning(mutation.sessionId, mutation.running)
+            is RemoteSessionMutation.ActivityChanged ->
+                setUpdatedAt(mutation.sessionId, mutation.updatedAt)
+            is RemoteSessionMutation.ConnectionError -> setConnectionError(mutation.message)
+            RemoteSessionMutation.PermissionCatalogChanged ->
+                scope.launch { refreshPermissionCatalog() }
+            RemoteSessionMutation.CommandsChanged ->
+                scope.launch { refreshCommands() }
+            RemoteSessionMutation.AgentPresetSelected -> scope.launch {
                 refreshAgentPresets()
                 refreshCommands()
             }
-            else -> Unit
+            is RemoteSessionMutation.Waterfall -> handleWaterfall(mutation.frame)
+            is RemoteSessionMutation.WaterfallCancelled ->
+                handleWaterfallCancelled(mutation.eventId)
+            is RemoteSessionMutation.Control -> handleControlFrame(mutation.frame)
+            is RemoteSessionMutation.Workspace -> handleWorkspaceFrame(mutation.frame)
+            is RemoteSessionMutation.Follow ->
+                conversationRuntime.handleFollowFrame(mutation.sessionId, mutation.frame)
         }
     }
 
@@ -613,24 +531,16 @@ class SessionStore @Inject constructor(
             }
             is SessionControlFrame.Queue -> applyQueue(frame.sessionId, frame.items)
             is SessionControlFrame.Jobs -> applyJobs(frame.sessionId, frame.jobs)
-            is SessionControlFrame.Projection -> synchronized(lock) {
-                if (frame.sessionId == currentId) {
-                    openSessionState.mergeProjection(frame.key, frame.seq, frame.value)
-                    rebuildCurrentLocked()
-                }
-            }
+            is SessionControlFrame.Projection ->
+                conversationRuntime.mergeProjection(frame.sessionId, frame.key, frame.seq, frame.value)
             is SessionControlFrame.Unknown -> log("unknown control frame ${frame.type}")
         }
     }
 
     private fun applyQueue(sessionId: String, items: List<QueuedInboxItem>) {
-        queuesBySession.value = queuesBySession.value + (sessionId to items.map(::queuedInboxItemToQueueItem))
-        synchronized(lock) {
-            if (sessionId == currentId) {
-                openSessionState.setQueue(items.map { queuedInboxItemToQueueItem(it) })
-                rebuildCurrentLocked()
-            }
-        }
+        val queue = items.map(::queuedInboxItemToQueueItem)
+        queuesBySession.value = queuesBySession.value + (sessionId to queue)
+        conversationRuntime.applyQueue(sessionId, queue)
     }
 
     private fun applyJobs(sessionId: String, jobs: List<JobView>) {
@@ -639,23 +549,8 @@ class SessionStore @Inject constructor(
         }
     }
 
-    /**
-     * Merge a projection baseline for one session.
-     *
-     * The tail page's baseline and the control stream's are produced independently, so neither is
-     * authoritative on its own; [OpenSessionFoldState.mergeProjection] keeps whichever carries the higher
-     * watermark.
-     */
-    private fun applyProjectionBaseline(sessionId: String, block: JsonObject) {
-        synchronized(lock) {
-            if (sessionId != currentId) return@synchronized
-            val asOf = block["asOfSeq"]?.jsonPrimitive?.intOrNull ?: 0
-            (block["values"] as? JsonObject)?.forEach { (key, value) ->
-                openSessionState.mergeProjection(key, asOf, value)
-            }
-            rebuildCurrentLocked()
-        }
-    }
+    private fun applyProjectionBaseline(sessionId: String, block: JsonObject) =
+        conversationRuntime.applyProjectionBaseline(sessionId, block)
 
     // ------------------------------------------------------------------ workspace stream
     /**
@@ -684,14 +579,12 @@ class SessionStore @Inject constructor(
     }
 
     /**
-     * One event from the open session's follow stream.
+     * Apply list-level metadata carried by one durable event.
      *
-     * Through 0.1.1 this arrived for every session at once on the mux, which is how the store
-     * kept list state for sessions nobody had opened. 0.1.2 has no such stream: an event is only
-     * seen for the session actually being followed, and everything else about the list comes from
-     * a notification or a list read.
+     * The conversation fold itself is owned by [RemoteConversationRuntime]; this callback only
+     * updates host-wide Session metadata and forwards completion notifications.
      */
-    private fun handleSessionEvent(sessionId: String, envelope: SessionEventEnvelope) {
+    private fun handleSessionEventMetadata(sessionId: String, envelope: SessionEventEnvelope) {
         when (envelope.type) {
             "turn/start" -> {
                 setRunning(sessionId, true)
@@ -704,18 +597,7 @@ class SessionStore @Inject constructor(
                 if (title != null) setTitle(sessionId, title)
             }
         }
-        // Completion notifications used to be classified from the all-session mux. That stream is
-        // gone, so the session that owns the event forwards it to whoever is watching for one.
         notificationSink?.invoke(sessionId, envelope)
-        synchronized(lock) {
-            if (sessionId == currentId) {
-                // The durable settlement and the transient rows say the same thing; the moment
-                // the settlement lands the preview is redundant, and a fold that saw both would
-                // show the reply twice.
-                openSessionState.acceptDurable(envelope)
-                rebuildTicks.trySend(Unit)
-            }
-        }
     }
 
     /**
@@ -759,7 +641,7 @@ class SessionStore @Inject constructor(
     private fun setRunning(sessionId: String, running: Boolean) {
         synchronized(lock) {
             indexState.setRunning(sessionId, running)
-            if (sessionId == currentId) rebuildCurrentLocked()
+            if (sessionId == currentId) conversationRuntime.rebuild()
             emitSessionsLocked()
         }
     }
@@ -775,7 +657,7 @@ class SessionStore @Inject constructor(
     private fun setBlank(sessionId: String, blank: Boolean) {
         synchronized(lock) {
             indexState.setBlank(sessionId, blank)
-            if (sessionId == currentId) openSessionState.setBlank(blank)
+            if (sessionId == currentId) conversationRuntime.setBlank(blank)
             emitSessionsLocked()
         }
     }
@@ -830,10 +712,6 @@ class SessionStore @Inject constructor(
     }
 
     // ------------------------------------------------------------------ open-session fold
-    private fun rebuildCurrentLocked() {
-        val sid = currentId ?: return
-        _currentConversation.value = openSessionState.rebuild(sid, indexState.running(sid))
-    }
 
     private fun emitSessionsLocked() {
         _sessions.value = indexState.renderSessions()
@@ -868,21 +746,22 @@ class SessionStore @Inject constructor(
 
     suspend fun openSession(sessionId: String) = withContext(Dispatchers.Default) {
         val api = apiOrNull() ?: return@withContext
-        _loadOlderFailed.value = false
         synchronized(lock) {
             val same = currentId == sessionId
             currentId = sessionId
             _currentSessionId.value = sessionId
             interactionRuntime.syncVisible()
-            openSessionState.reset(indexState.session(sessionId)?.blank ?: true)
+            conversationRuntime.reset(
+                blank = indexState.session(sessionId)?.blank ?: true,
+                clearPublished = !same,
+            )
             if (!same) {
-                _currentConversation.value = null
                 _jobs.value = emptyList()
                 catalogs.resetSession()
                 subagentRuntime.resetSession()
             }
         }
-        startFollow(sessionId)
+        conversationRuntime.startFollow(sessionId)
         // Everything past the follow stream furnishes the chrome around the transcript — the skill
         // and model pickers, the subagent list, the command catalog — and none of it is needed to
         // paint a single message. Run in series they stacked four round trips onto every session
@@ -900,121 +779,8 @@ class SessionStore @Inject constructor(
         }
     }
 
-    /**
-     * Open the live journal for one session, replacing whatever was open.
-     *
-     * There is no separate history read any more. `session/follow` opens with a complete snapshot
-     * carrying the first page, its projections, and the log cut the generation opened at; every
-     * later item is one live event. A reconnect re-opens the stream and sends another complete
-     * snapshot, so the window is replaced wholesale rather than patched — which is why the
-     * snapshot handler clears the buffer instead of merging into it.
-     *
-     * The stream is opened with `assistantStream`, because since harness 0.1.3 that is the only
-     * way to see a reply while it is written: the durable log holds one settlement per model
-     * attempt and no deltas. The frames it adds are process-local presentation — never replayed,
-     * never paged — and are folded after the durable window as a provisional message.
-     *
-     * Following does not resume a stopped agent: the host publishes a cold session's prepared
-     * snapshot immediately and promotes it in the background, so opening a transcript is an
-     * observation rather than an execution.
-     */
-    private fun startFollow(sessionId: String) {
-        openSessionState.clearFollowCursor()
-        if (!remoteStreams.followSession(sessionId, HISTORY_PAGE_SIZE)) {
-            log("cannot follow $sessionId: no connection generation")
-        }
-    }
-
-    /** Install one complete opening window, replacing any previous one for this session. */
-    private fun applyFollowSnapshot(sessionId: String, frame: SessionFollowFrame.Snapshot) {
-        clearConnectionError()
-        val envelopes = expandRecords(frame.records)
-        val page = historyTail(envelopes)
-        val overDelivered = envelopes.size > page.size
-        synchronized(lock) {
-            if (currentId != sessionId) return@synchronized
-            openSessionState.installSnapshot(frame, page, overDelivered)
-            rebuildCurrentLocked()
-        }
-    }
-
-    /** One live event. */
-    private fun applyFollowEntry(sessionId: String, record: SessionHistoryRecord) {
-        for (envelope in expandRecords(listOf(record))) {
-            handleSessionEvent(sessionId, envelope)
-        }
-    }
-
-    /** One process-local assistant frame: the reply being written, a chunk at a time. */
-    private fun applyAssistantFrame(sessionId: String, frame: SessionFollowFrame.AssistantStream) {
-        val changed = synchronized(lock) {
-            if (currentId != sessionId) return
-            openSessionState.acceptAssistant(frame)
-        }
-        if (changed) rebuildTicks.trySend(Unit)
-    }
-
-    /**
-     * History records are plain events since harness 0.1.3, but a 0.1.2 host still packs runs of
-     * consecutive assistant deltas into one record. Expanding those back into scalar events is
-     * what keeps the journal's sequence numbers contiguous; see
-     * [com.labteto.dshmobile.core.session.ChunkRows].
-     */
-    private fun expandRecords(records: List<SessionHistoryRecord>): List<SessionEventEnvelope> =
-        ChunkRows.expandAll(records).map { wireEventToEnvelope(it) }
-
-    /**
-     * Page one screen further back.
-     *
-     * Called from the transcript's scroll position, so it has to be safe to call repeatedly: the
-     * in-flight flag collapses a burst of scroll emissions into one request, and a page that adds
-     * nothing new ends the paging rather than leaving `hasMore` set for the trigger to fire on
-     * again.
-     */
-    suspend fun loadOlder() = withContext(Dispatchers.Default) {
-        val sid = currentSessionId.value ?: return@withContext
-        val api = apiOrNull() ?: return@withContext
-        if (!_loadingOlder.compareAndSet(expect = false, update = true)) return@withContext
-        try {
-            val (oldestSeq, cursor) = synchronized(lock) {
-                openSessionState.pageAnchor()
-            }
-            // A page is pinned to the follow generation's log cut, and there is no page without
-            // one. Before the opening snapshot lands there is nothing to pin to, so this waits
-            // for the next scroll rather than guessing a cut the host would reject.
-            if (cursor == null) {
-                log("cannot page $sid: no follow cursor yet")
-                return@withContext
-            }
-            val request = SessionPageRequest(
-                address = SessionAddress.Session(sessionId = sid),
-                throughSeq = cursor,
-                beforeSeq = oldestSeq?.toInt(),
-                maxMessages = HISTORY_PAGE_SIZE,
-            )
-            when (val r = api.sessionPage(request)) {
-                is RpcResult.Ok -> {
-                    clearConnectionError()
-                    _loadOlderFailed.value = false
-                    // Same guard as the opening window, so paging backwards stays bounded instead
-                    // of pulling the whole log at once.
-                    val envelopes = expandRecords(r.value.records)
-                    val page = historyTail(envelopes)
-                    val overDelivered = envelopes.size > page.size
-                    synchronized(lock) {
-                        if (currentId != sid) return@synchronized
-                        openSessionState.prependPage(page, r.value.hasMore, overDelivered)
-                        rebuildCurrentLocked()
-                    }
-                }
-                // Not a connection fault: the session is healthy and the tail still streams, so this
-                // offers a retry in the transcript rather than raising a connection banner over it.
-                is RpcResult.Err -> _loadOlderFailed.value = true
-            }
-        } finally {
-            _loadingOlder.value = false
-        }
-    }
+    /** Load one bounded page of older events for the current Remote Session. */
+    suspend fun loadOlder() = conversationRuntime.loadOlder()
 
     suspend fun createSession(cwd: String? = null, workspaceId: String? = null) =
         sessionLifecycleRuntime.create(cwd, workspaceId)
@@ -1260,7 +1026,7 @@ class SessionStore @Inject constructor(
 
     // ------------------------------------------------------------------ internal helpers
     private fun goalRefFromProjectionLocked(): GoalRef? {
-        val value = openSessionState.projection("goal") ?: return null
+        val value = conversationRuntime.projection("goal") ?: return null
         return runCatching {
             val snapshot = decodeFromJsonElement(GoalSnapshot.serializer(), value)
             GoalRef(snapshot.id, snapshot.revision)
@@ -1272,32 +1038,6 @@ class SessionStore @Inject constructor(
     private suspend fun loadSkills(sessionId: String) = catalogs.loadSkills(sessionId)
 
     private suspend fun loadModels(sessionId: String) = catalogs.loadModels(sessionId)
-
-    /**
-     * The tail slice of a history page the host over-delivered.
-     *
-     * `maxMessages` is a bound on *messages*, and not every harness build honours it — one was
-     * observed answering a 60-message request with ~29k events (several MB), which folds slowly
-     * enough to stall the first paint. Trimming is not as simple as keeping the last N events
-     * though: a single assistant message can be hundreds of `assistant/chunk` deltas, so a fixed
-     * event count yields a page with almost nothing readable in it. This walks back until it has
-     * [HISTORY_PAGE_SIZE] actual messages, with a hard event ceiling so a pathological log still
-     * cannot stall the fold. Anything trimmed is reported as `hasMore`, which is what
-     * "Load older" is for.
-     */
-    private fun historyTail(entries: List<SessionEventEnvelope>): List<SessionEventEnvelope> {
-        if (entries.size <= MAX_PAGE_EVENTS) return entries
-        var messages = 0
-        var index = entries.lastIndex
-        while (index > 0 && entries.size - index < MAX_PAGE_EVENTS) {
-            if (entries[index].type in SURFACE_EVENT_TYPES) {
-                messages++
-                if (messages >= HISTORY_PAGE_SIZE) break
-            }
-            index--
-        }
-        return entries.subList(index.coerceAtLeast(0), entries.size)
-    }
 
     /**
      * Whether this connection's harness carries attachments on a slash command.
@@ -1326,21 +1066,5 @@ class SessionStore @Inject constructor(
 
     private companion object {
         const val TAG = "SessionStore"
-
-        const val HISTORY_PAGE_SIZE = 60
-
-        /** Ceiling on events folded per page, whatever the host sends. */
-        const val MAX_PAGE_EVENTS = 4_000
-
-        /** The event types that produce a visible message; everything else frames them. */
-        val SURFACE_EVENT_TYPES = setOf("user/message", "assistant/message", "tool/result")
-
-        /**
-         * Floor on the gap between transcript rebuilds while a turn streams.
-         *
-         * One display frame. Nothing is gained by republishing a transcript faster than it can be
-         * drawn, and the deltas of a single turn arrive far faster than that.
-         */
-        const val REBUILD_INTERVAL_MS = 50L
     }
 }
