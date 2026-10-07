@@ -245,7 +245,11 @@
     <string name="settings_plugins_inventory">插件清单</string>
     <string name="settings_appearance">外观</string>
     <string name="settings_page_appearance">外观与阅读</string>
-    <string name="settings_appearance_reading_subtitle">澄境主题、传统色、背景、字号与阅读</string>
+    <string name="settings_page_theme_background">主题与背景</string>
+    <string name="settings_theme_background_subtitle">明暗主题、强调色与自定义背景</string>
+    <string name="settings_page_reading">字体与阅读</string>
+    <string name="settings_reading_subtitle">字号、字重与界面通透度</string>
+    <string name="settings_appearance_reading_subtitle">主题、背景、字号与阅读体验</string>
     <string name="settings_appearance_preview">实时效果预览</string>
     <string name="settings_appearance_preview_assistant">这是一段助手回复示例，用来检查正文与背景的可读性。</string>
     <string name="settings_appearance_preview_user">好呀</string>
@@ -580,8 +584,11 @@
     <string name="settings_session_subtitle">会话排序与聊天流式过滤</string>
     <string name="settings_permissions_subtitle">远程连接、后台连接与设备授权</string>
     <string name="settings_notifications_subtitle">完成、目标与需要处理的提醒</string>
-    <string name="settings_advanced_subtitle">智能体执行、项目配置与诊断</string>
+    <string name="settings_advanced_subtitle">工作区、智能体执行与诊断</string>
+    <string name="settings_page_workspace_storage">工作区与存储</string>
+    <string name="settings_workspace_storage_subtitle">项目配置、本地会话存储与清理</string>
     <string name="settings_runtime_diagnostics">运行与诊断</string>
+    <string name="settings_runtime_diagnostics_subtitle">智能体运行、网络与环境诊断</string>
     <string name="settings_local_session_storage">本地会话存储</string>
     <string name="settings_local_session_storage_usage">已用 %1$s · 软预算 %2$s</string>
     <string name="settings_local_session_storage_free">设备可用 %1$s · %2$d 个会话</string>
