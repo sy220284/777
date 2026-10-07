@@ -27,6 +27,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
     private val modelGateway: LocalModelGateway,
     private val subagents: LocalWorkSubagentRuntime,
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
+    private val teams: LocalAgentTeamRuntime,
 ) {
     internal suspend fun execute(
         call: LocalToolCall,
@@ -39,6 +40,8 @@ internal class LocalWorkAgentControlBuiltinRuntime(
         val args = call.arguments
         val snapshot = run.aggregateSnapshot()
         val runner = subagents.runner(run)
+
+        teams.execute(call, run)?.let { return it }
 
         return when (call.name) {
             "subagent", "spawn_subagent" -> {
@@ -132,6 +135,6 @@ internal class LocalWorkAgentControlBuiltinRuntime(
             "send_message",
             "interrupt_agent",
             "workflow",
-        )
+        ) + LocalAgentTeamRuntime.TOOL_NAMES
     }
 }
