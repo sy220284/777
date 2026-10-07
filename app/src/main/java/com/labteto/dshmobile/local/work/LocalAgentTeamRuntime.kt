@@ -1953,6 +1953,7 @@ internal class LocalAgentTeamRuntime(
         private const val MAX_AGENT_MESSAGE_LIMIT = 100
         private const val MAX_RENDERED_MESSAGE_CHARS = 8_000
         private const val AGENT_MESSAGE_SCAN_PAGE = 160
+        private const val MAX_RECENT_AGENT_MESSAGE_SCAN_PAGES = 16
         private const val MIN_WAIT_MS = 1_000
         private const val MAX_WAIT_MS = 60_000
         private const val WAIT_POLL_MS = 250L
