@@ -267,6 +267,7 @@ object LocalToolCatalog {
         add(tool("team_task_update", "用 compare-and-set revision 更新 Team 任务", properties(
             "task_id" to string("task-N"),
             "expected_revision" to integer("当前任务 revision；不匹配会拒绝写入"),
+            "result_id" to string("complete 必填：核验通过的 team_messages 结果 ID；须晚于当前任务 revision"),
             "action" to buildJsonObject {
                 put("type", "string")
                 put("enum", buildJsonArray {

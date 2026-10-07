@@ -72,32 +72,73 @@ class LocalModelProfileStoreRecoveryTest {
         }
     }
 
+    @Test
+    fun failedConfigurationCommitRestoresMemoryAndDoesNotAdvanceTransaction() {
+        var failNext = false
+        val fixture = fakePreferences { if (failNext) { failNext = false; false } else true }
+        val store = LocalModelProfileStore(fixture.preferences, Json)
+        val old = LocalModelProfile("old", "old-model", "https://old.example/v1")
+        val next = LocalModelProfile("next", "next-model", "https://next.example/v1")
+        store.commitConfiguration(listOf(old), old, "confirmed")
+        val before = store.configurationSnapshot()
+        failNext = true
+        assertThrows(java.io.IOException::class.java) { store.commitConfiguration(listOf(next), next, "failed") }
+        assertEquals(before, store.configurationSnapshot())
+        assertEquals(listOf(old), store.read())
+        assertEquals("confirmed", store.transactionId())
+        assertEquals(old, store.active(old.model, old.baseUrl))
+    }
+
+    @Test
+    fun configurationAndActiveSelectionAreCommittedTogetherAndRemovalBackupCannotResurrect() {
+        var commits = 0
+        val fixture = fakePreferences { commits++; true }
+        val store = LocalModelProfileStore(fixture.preferences, Json)
+        val first = LocalModelProfile("first", "first", "https://first.example/v1")
+        val second = LocalModelProfile("second", "second", "https://second.example/v1")
+        store.commitConfiguration(listOf(first, second), first, "first-transaction")
+        commits = 0
+        store.commitConfiguration(listOf(second), second, "remove-transaction")
+        assertEquals(1, commits)
+        fixture.values[LocalModelConfigContract.KEY_PROFILES_V3] = "{broken"
+        assertEquals(listOf(second), store.read())
+        assertEquals(second, store.active(second.model, second.baseUrl))
+    }
+
     private data class PreferencesFixture(
         val preferences: SharedPreferences,
         val values: MutableMap<String, Any?>,
     )
 
-    private fun fakePreferences(): PreferencesFixture {
+    private fun fakePreferences(commitResult: () -> Boolean = { true }): PreferencesFixture {
         val values = linkedMapOf<String, Any?>()
+        val pending = linkedMapOf<String, Any?>()
+        var clearPending = false
+        fun flush() {
+            if (clearPending) values.clear()
+            pending.forEach { (key, value) -> if (value == null) values.remove(key) else values[key] = value }
+            pending.clear()
+            clearPending = false
+        }
         val editor = Proxy.newProxyInstance(
             SharedPreferences.Editor::class.java.classLoader,
             arrayOf(SharedPreferences.Editor::class.java),
         ) { proxy, method, args ->
             when (method.name) {
                 "putInt", "putString", "putBoolean", "putLong", "putFloat", "putStringSet" -> {
-                    values[args!![0] as String] = args[1]
+                    pending[args!![0] as String] = args[1]
                     proxy
                 }
                 "remove" -> {
-                    values.remove(args!![0] as String)
+                    pending[args!![0] as String] = null
                     proxy
                 }
                 "clear" -> {
-                    values.clear()
+                    clearPending = true
                     proxy
                 }
-                "apply" -> null
-                "commit" -> true
+                "apply" -> { flush(); null }
+                "commit" -> { flush(); commitResult() }
                 "toString" -> "FakeSharedPreferences.Editor"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === args?.get(0)

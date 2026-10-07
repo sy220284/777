@@ -227,6 +227,7 @@ internal class LocalSubagentRunner(
                     },
             )
         }
+        history.reset(history.snapshot().map { JsonObject(it - LOCAL_WORK_EXECUTION_MODE_KEY) })
         val claimedMessageIds = linkedSetOf<String>().apply {
             addAll(recoveredClaimedMessageIds)
         }
@@ -344,11 +345,17 @@ internal class LocalSubagentRunner(
             agentId = subagentId,
         )
 
+        val resultIds = mutableMapOf<Int, String>()
+
         fun persistContinuationCheckpoint(
             step: Int,
             terminalOutput: String? = null,
         ) {
             val jobId = backgroundJobId ?: return
+            val previousResultId = resultIds[step]
+            val resultId = terminalOutput?.takeIf(String::isNotBlank)?.let {
+                previousResultId ?: UUID.randomUUID().toString()
+            }
             try {
                 eventLog().append(
                     LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
@@ -360,8 +367,11 @@ internal class LocalSubagentRunner(
                         claimedMessageIds = claimedMessageIds,
                         softStepLimit = totalBudgetLimit,
                         terminalOutput = terminalOutput,
+                        resultId = resultId,
+                        resultFirst = previousResultId == null,
                     ),
                 )
+                if (resultId != null) resultIds[step] = resultId
             } catch (error: Exception) {
                 throw JobContinuationPersistenceException(
                     "持久子代理历史检查点写入失败",

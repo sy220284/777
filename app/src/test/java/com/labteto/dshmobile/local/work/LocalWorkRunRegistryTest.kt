@@ -16,6 +16,7 @@ import com.labteto.dshmobile.local.send.LocalPreparedSend
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
 import com.labteto.dshmobile.local.send.LocalSendResult
 import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalMessageBlock
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
@@ -166,21 +167,38 @@ class LocalWorkRunRegistryTest {
         try {
             val result = registry.enqueueIntoLiveRun(
                 LocalPreparedSend(
-                    content = "追加条件",
+                    content = "追加条件\n\n本次附件已导入本机工作区：\n- 图片：cat.jpg → .dsh/attachments/cat.jpg（12 B）",
+                    visibleContent = "追加条件",
                     memoryInput = "追加条件",
                     modelMessage = buildJsonObject {
                         put("role", "user")
                         put("content", "追加条件")
                     },
+                    blocks = listOf(
+                        LocalMessageBlock.Text("追加条件"),
+                        LocalMessageBlock.Image(
+                            relativePath = ".dsh/attachments/cat.jpg",
+                            mediaType = "image/jpeg",
+                            name = "cat.jpg",
+                            bytes = 12L,
+                            width = 640,
+                            height = 480,
+                        ),
+                    ),
                 ),
             )
 
             assertEquals(LocalSendResult.Queued, result)
             assertEquals(1, active.runHandle.pendingInputs.size())
             assertEquals(1, active.state.value.kernel.queuedInputCount)
-            assertEquals("追加条件", active.state.value.messages.last().content)
+            val projected = active.state.value.messages.last()
+            assertEquals("追加条件", projected.content)
+            assertEquals(2, projected.blocks.size)
+            assertTrue(projected.blocks[1] is LocalMessageBlock.Image)
+            assertFalse(projected.content.contains("本次附件已导入本机工作区"))
             assertEquals("session-a", persisted?.id)
             assertEquals(1, persisted?.transcriptWindow?.size)
+            assertEquals(2, persisted?.transcriptWindow?.single()?.blocks?.size)
         } finally {
             activeJob.cancel()
             active.eventLog.close()

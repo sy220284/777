@@ -59,7 +59,7 @@ Android 模块负责生命周期、进程、设备、UI 和平台能力；`Local
 - 主代理与子代理统一核心循环。
 - 普通子代理、fork 子代理、持久子代理；持久只读子代理具备稳定 Agent 身份、持久 Inbox、历史 Checkpoint 与冷恢复续跑。
 - 并行 / 流水线工作流。
-- Work Agent Teams / Agent 集群：Lead 持有持久 roster、queued-minus-delivered mailbox 与 revision/CAS 任务板；在原有任务依赖 DAG、claim/release/edit/complete/reopen/reassign/delete、write-scope 冲突提示和冷恢复投递之上，吸收 Kimi 集群的成员生命周期与结果回收语义：create/start/status/send/wait-for-message/disable/dismiss/stop-all。成员结果直接由持久 Child terminal checkpoint 投影为独立 Agent Message，不复制第二份结果事实；成员进度从 Child step / soft-step-limit 投影。单一认领任务在成员产生新终态结果后自动 complete；成员失败、停用或解雇时未完成任务自动 release 回任务板；Team 尚有未完成任务或运行成员时，Work 完成声明会被真实性门禁拦截。stop-all 使用一次持久提交批量标记全部目标 Activation 为 interrupted，失败则整体回滚状态，再执行协程取消。
+- Work Agent Teams / Agent 集群：Lead 持有持久 roster、queued-minus-delivered mailbox 与 revision/CAS 任务板；在原有任务依赖 DAG、claim/release/edit/complete/reopen/reassign/delete、write-scope 冲突提示和冷恢复投递之上，吸收 Kimi 集群的成员生命周期与结果回收语义：create/start/status/send/wait-for-message/disable/dismiss/stop-all。成员结果直接由持久 Child terminal checkpoint 投影为独立 Agent Message，不复制第二份结果事实；成员进度从 Child step / soft-step-limit 投影。成员产生终态结果后任务继续保持 in_progress，由 Lead 核验后携带 result_id 和当前 revision 显式 complete；缺少输入、失败或部分结果不会解锁依赖；成员失败、停用或解雇时未完成任务自动 release 回任务板；Team 尚有未完成任务或运行成员时，Work 完成声明会被真实性门禁拦截。stop-all 使用一次持久提交批量标记全部目标 Activation 为 interrupted，失败则整体回滚状态，再执行协程取消。
 - Goal / Todo / Plan。
 - 用户提问与审批。
 - 取消、停止和受控结束。

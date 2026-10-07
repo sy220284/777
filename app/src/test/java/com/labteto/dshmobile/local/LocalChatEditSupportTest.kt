@@ -185,7 +185,7 @@ class LocalChatEditSupportTest {
                 activeTranscript = listOf(message("u-active", "当前分支")),
             )
 
-            val events = log.pageBefore(Long.MAX_VALUE, 10)
+            val events = log.pageBeforeChronological(Long.MAX_VALUE, 10)
             assertEquals(listOf("chat/active-transcript"), events.map { it.type })
         }
     }
@@ -199,7 +199,7 @@ class LocalChatEditSupportTest {
                 activeTranscript = listOf(message("u-edited", "改写分支")),
             )
 
-            val events = log.pageBefore(Long.MAX_VALUE, 10)
+            val events = log.pageBeforeChronological(Long.MAX_VALUE, 10)
             assertEquals(
                 listOf("chat/branch-state", "chat/active-transcript"),
                 events.map { it.type },

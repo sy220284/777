@@ -77,7 +77,7 @@ class LocalSessionStorageManagerTest {
         assertEquals(1, after.compressedSegmentCount)
 
         val reopened = LocalSessionEventLog(File(root, "legacy.events.jsonl"), json)
-        assertEquals("保留我", reopened.pageBefore(limit = 10).single().data["content"]?.toString()?.trim('"'))
+        assertEquals("保留我", reopened.pageBeforeChronological(limit = 10).single().data["content"]?.toString()?.trim('"'))
     }
 
     @Test

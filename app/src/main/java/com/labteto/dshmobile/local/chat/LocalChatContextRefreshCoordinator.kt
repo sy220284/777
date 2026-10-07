@@ -114,13 +114,13 @@ internal fun findChatContinuitySourceUserMessageId(
     var before = beforeSequenceExclusive
     val boundedPageSize = pageSize.coerceIn(1, 500)
     while (true) {
-        val page = eventLog.pageBefore(
+        val page = eventLog.pageBeforeNewestFirst(
             sequenceExclusive = before,
             limit = boundedPageSize,
         )
         if (page.isEmpty()) return null
 
-        page.asReversed().forEach { event ->
+        page.forEach { event ->
             decodeTranscriptMessages(event.data).orEmpty()
                 .asReversed()
                 .firstOrNull { message ->
@@ -593,12 +593,12 @@ internal class LocalChatContextRefreshCoordinator internal constructor(
     ): Long? {
         var beforeSequenceExclusive = Long.MAX_VALUE
         while (true) {
-            val page = eventLog.pageBefore(
+            val page = eventLog.pageBeforeNewestFirst(
                 sequenceExclusive = beforeSequenceExclusive,
                 limit = EVENT_SCAN_PAGE_SIZE,
             )
             if (page.isEmpty()) return null
-            page.asReversed().firstOrNull { event ->
+            page.firstOrNull { event ->
                 event.type == type &&
                     decodeTranscriptMessages(event.data).orEmpty()
                         .any { message -> message.id == messageId }

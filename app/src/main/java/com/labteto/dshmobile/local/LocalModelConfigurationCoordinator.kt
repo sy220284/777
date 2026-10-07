@@ -19,6 +19,18 @@ import com.labteto.dshmobile.local.model.LocalModelConfigContract
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.Json
 
 internal data class LocalModelConfigurationResult(
@@ -34,22 +46,22 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
     private val apiKeys: LocalApiKeyStore,
     private val gateway: LocalModelGateway,
     private val tester: LocalModelConnectionTester,
-    json: Json,
+    private val json: Json,
 ) {
     private val preferences = LocalHarnessPreferences.from(context)
     private val profiles = LocalModelProfileStore(preferences, json)
+    private val unconfirmedTransactions = mutableSetOf<String>()
     private val startup = LocalModelStartupMigrator(preferences, profiles, apiKeys, gateway)
     internal suspend fun save(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null): LocalModelConfigurationResult =
         LocalModelMutationGate.run {
+            recoverMutation()
             require(model.isNotBlank()) { "模型名称不能为空" }
             val existingProfiles = profiles.read()
             val draft = resolveLocalModelApiKeyDraft(apiKey, normalizeModel(model), baseUrl, protocol,
                 existingProfiles, apiKeys::getFor, profileId, contextWindowTokensOverride)
             val profile = draft.profile
-            if (apiKey.isNotBlank()) apiKeys.putFor(profile.id, draft.key)
             val all = existingProfiles.filterNot { it.id == profile.id } + profile
-            profiles.write(all)
-            activate(profile)
+            persistConfiguration(all, profile, if (apiKey.isNotBlank()) mapOf(profile.id to draft.key) else emptyMap())
             LocalModelConfigurationResult(true, profile.model, profile.baseUrl, all, profile.id)
         }
 
@@ -57,17 +69,23 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         accountId: String,
         models: List<ChatGptModelOption>,
     ): List<LocalModelProfile> = LocalModelMutationGate.run {
-        profiles.replaceChatGpt(accountId, models)
+        recoverMutation()
+        val all = com.labteto.dshmobile.local.model.chatgpt.refreshChatGptPlanProfiles(profiles.read(), accountId, models)
+        val active = gateway.activeProfile()?.let { previous -> all.firstOrNull { it.id == previous.id } }
+        persistConfiguration(all, active)
+        all
     }
 
     internal suspend fun select(
         id: String,
         all: List<LocalModelProfile> = profiles.read(),
     ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
-        val selected = all.firstOrNull { it.id == id } ?: return@run null
+        recoverMutation()
+        val current = profiles.read()
+        val selected = current.firstOrNull { it.id == id } ?: return@run null
         require(gateway.hasCredential(selected)) { credentialError(selected) }
-        activate(selected)
-        LocalModelConfigurationResult(true, selected.model, selected.baseUrl, all, selected.id)
+        persistConfiguration(current, selected)
+        LocalModelConfigurationResult(true, selected.model, selected.baseUrl, current, selected.id)
     }
 
     internal suspend fun remove(
@@ -75,11 +93,12 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         currentModel: String,
         currentBaseUrl: String,
     ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
+        recoverMutation()
         val all = profiles.read()
         val removed = all.firstOrNull { it.id == id } ?: return@run null
         val activeRemoved = profiles.active(currentModel, currentBaseUrl, all)?.id == id
-        if (removed.authKind == LocalModelAuthKind.API_KEY) apiKeys.clearFor(id)
-        finishRemoval(all.filterNot { it.id == id }, activeRemoved, currentModel, currentBaseUrl)
+        finishRemoval(all.filterNot { it.id == id }, activeRemoved, currentModel, currentBaseUrl,
+            if (removed.authKind == LocalModelAuthKind.API_KEY) mapOf(id to null) else emptyMap())
     }
 
     internal suspend fun removeChatGptAccount(
@@ -87,6 +106,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         currentModel: String,
         currentBaseUrl: String,
     ): LocalModelConfigurationResult? = LocalModelMutationGate.run {
+        recoverMutation()
         val all = profiles.read()
         val removed = all.filter {
             it.authKind == LocalModelAuthKind.CHATGPT_PLAN && it.credentialRef == accountId
@@ -106,13 +126,16 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         currentModel: String,
         currentBaseUrl: String,
     ): LocalModelConfigurationResult = LocalModelMutationGate.run {
+        recoverMutation()
         val all = profiles.read()
         val active = profiles.active(currentModel, currentBaseUrl, all)
-        if (active?.authKind == LocalModelAuthKind.API_KEY) apiKeys.clearFor(active.id)
-        finishRemoval(all.filterNot { it.id == active?.id }, true, currentModel, currentBaseUrl)
+        finishRemoval(all.filterNot { it.id == active?.id }, true, currentModel, currentBaseUrl,
+            if (active?.authKind == LocalModelAuthKind.API_KEY) mapOf(active.id to null) else emptyMap())
     }
 
-    internal suspend fun prepareStartup(model: String, baseUrl: String) = startup.prepare(model, baseUrl)
+    internal suspend fun prepareStartup(model: String, baseUrl: String) = LocalModelMutationGate.run {
+        withContext(Dispatchers.IO) { recoverMutation(); startup.prepare(model, baseUrl) }
+    }
 
     internal suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null): String {
         if (model.isBlank()) return "请选择模型"
@@ -137,12 +160,12 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         activeRemoved: Boolean,
         currentModel: String,
         currentBaseUrl: String,
+        credentialChanges: Map<String, String?> = emptyMap(),
     ): LocalModelConfigurationResult {
-        profiles.writeAfterRemoval(remaining)
         val candidate = if (activeRemoved) remaining.firstOrNull()
             else profiles.active(currentModel, currentBaseUrl, remaining)
         val next = candidate?.takeIf { gateway.hasCredential(it) }
-        if (next != null) activate(next) else reset()
+        persistConfiguration(remaining, next, credentialChanges)
         return LocalModelConfigurationResult(
             configured = next != null,
             model = next?.model ?: LocalModelConfigContract.DEFAULT_MODEL,
@@ -152,15 +175,64 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         )
     }
 
-    private suspend fun activate(profile: LocalModelProfile) {
-        gateway.synchronizeCredentialSelection(profile)
-        profiles.setActive(profile)
-        gateway.activate(profile)
+    /** Journal before secret changes; one confirmed metadata commit is the transaction decision. */
+    private suspend fun persistConfiguration(
+        all: List<LocalModelProfile>,
+        active: LocalModelProfile?,
+        credentialChanges: Map<String, String?> = emptyMap(),
+    ) = withContext(Dispatchers.IO + NonCancellable) {
+        recoverMutation()
+        val token = UUID.randomUUID().toString()
+        val oldMetadata = profiles.configurationSnapshot()
+        val previous = gateway.activeProfile()
+        val oldKeys = credentialChanges.keys.associateWith { apiKeys.getFor(it) }
+        val journal = buildJsonObject {
+            put("transaction", token)
+            put("metadata", buildJsonObject { oldMetadata.forEach { (key, value) -> put(key, value?.let(::JsonPrimitive) ?: JsonNull) } })
+            put("keys", buildJsonObject { oldKeys.forEach { (key, value) -> put(key, value?.let(::JsonPrimitive) ?: JsonNull) } })
+        }
+        apiKeys.writeMutationJournal(journal.toString())
+        unconfirmedTransactions.add(token)
+        try {
+            credentialChanges.forEach { (id, key) -> if (key == null) apiKeys.clearFor(id) else apiKeys.putFor(id, key) }
+            active?.let { gateway.synchronizeCredentialSelection(it) }
+            profiles.commitConfiguration(all, active, token)
+            unconfirmedTransactions.remove(token)
+        } catch (failure: Exception) {
+            // commit(false) changes SharedPreferences memory too: restore explicitly, retain the
+            // encrypted journal if any rollback write fails so startup can finish recovery.
+            try {
+                restoreJournal(journal)
+                previous?.let { gateway.synchronizeCredentialSelection(it) }
+                apiKeys.clearMutationJournal()
+                unconfirmedTransactions.remove(token)
+            } catch (rollback: Exception) {
+                failure.addSuppressed(rollback)
+            }
+            throw failure
+        }
+        if (active != null) gateway.activate(active) else {
+            gateway.clearActive()
+            apiKeys.activate(modelProfileId(LocalModelConfigContract.DEFAULT_MODEL, LocalModelConfigContract.DEFAULT_BASE_URL))
+        }
+        apiKeys.clearMutationJournal()
     }
 
-    private fun reset() {
-        profiles.clearActive(LocalModelConfigContract.DEFAULT_MODEL, LocalModelConfigContract.DEFAULT_BASE_URL); gateway.clearActive()
-        apiKeys.activate(modelProfileId(LocalModelConfigContract.DEFAULT_MODEL, LocalModelConfigContract.DEFAULT_BASE_URL))
+    private suspend fun recoverMutation() {
+        val raw = apiKeys.readMutationJournal() ?: return
+        val journal = json.parseToJsonElement(raw).jsonObject
+        val token = journal["transaction"]?.jsonPrimitive?.contentOrNull
+        if (token in unconfirmedTransactions || profiles.transactionId() != token) restoreJournal(journal)
+        apiKeys.clearMutationJournal()
+        unconfirmedTransactions.remove(token)
+    }
+
+    private suspend fun restoreJournal(journal: JsonObject) {
+        journal["keys"]!!.jsonObject.forEach { (id, value) ->
+            val key = value.jsonPrimitive.contentOrNull
+            if (key == null) apiKeys.clearFor(id) else apiKeys.putFor(id, key)
+        }
+        profiles.restoreConfiguration(journal["metadata"]!!.jsonObject.mapValues { it.value.jsonPrimitive.contentOrNull })
     }
 
     private fun credentialError(profile: LocalModelProfile): String =

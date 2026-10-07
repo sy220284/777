@@ -179,13 +179,13 @@ private fun findDurableUserModelMessage(
 ): JsonObject? {
     var beforeSequenceExclusive = Long.MAX_VALUE
     while (true) {
-        val page = eventLog.pageBefore(
+        val page = eventLog.pageBeforeNewestFirst(
             sequenceExclusive = beforeSequenceExclusive,
             limit = CHAT_EVENT_SCAN_PAGE_SIZE,
         )
         if (page.isEmpty()) return null
 
-        page.asReversed().forEach { event ->
+        page.forEach { event ->
             val containsTarget = decodeTranscriptMessages(event.data)
                 .orEmpty()
                 .any { message -> message.id == messageId }
@@ -223,13 +223,13 @@ private fun loadDurableUserModelMessages(
     var beforeSequenceExclusive = Long.MAX_VALUE
 
     while (remaining.isNotEmpty()) {
-        val page = eventLog.pageBefore(
+        val page = eventLog.pageBeforeNewestFirst(
             sequenceExclusive = beforeSequenceExclusive,
             limit = CHAT_EVENT_SCAN_PAGE_SIZE,
         )
         if (page.isEmpty()) break
 
-        page.asReversed().forEach { event ->
+        page.forEach { event ->
             val transcriptUsers = decodeTranscriptMessages(event.data)
                 .orEmpty()
                 .asSequence()
@@ -285,13 +285,13 @@ private fun loadDurableAssistantModelMessages(
     var beforeSequenceExclusive = Long.MAX_VALUE
 
     while (remaining.isNotEmpty()) {
-        val page = eventLog.pageBefore(
+        val page = eventLog.pageBeforeNewestFirst(
             sequenceExclusive = beforeSequenceExclusive,
             limit = CHAT_EVENT_SCAN_PAGE_SIZE,
         )
         if (page.isEmpty()) break
 
-        page.asReversed().forEach { event ->
+        page.forEach { event ->
             if (event.type != "assistant/message") return@forEach
             val transcriptAssistants = decodeTranscriptMessages(event.data)
                 .orEmpty()

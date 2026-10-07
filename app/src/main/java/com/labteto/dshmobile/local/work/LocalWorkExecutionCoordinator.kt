@@ -32,17 +32,19 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
-private val LOCAL_AGENT_TEAM_DIRECTIVE = """
+internal val LOCAL_AGENT_TEAM_DIRECTIVE = """
     【本轮执行方式：Agent 集群】
     用户已明确选择 Agent 集群。你是 Lead，必须使用 Agent Team 能力组织本轮任务。
     先读取当前 Team 与任务板；能复用现有成员时优先复用，避免重复创建身份。
     复杂任务先建立共享任务与依赖，再按职责创建/启动成员；team_spawn 可用于一步创建并启动。
     每个成员认领任务后再执行。成员产出通过 team_wait_for_message / team_messages 回收，不依赖猜测后台状态。
-    等待前先调用 team_messages 获取 next_cursor；之后始终把该值作为 after_sequence 传给 team_wait_for_message，并用每次返回的新 next_cursor 继续等待，避免重复或漏掉提前到达的结果。
-    收到可核验结果后交叉检查；运行时会在成员单一认领任务且结果晚于认领时自动结算该任务。
+    等待前先调用 team_messages 获取 next_cursor；之后始终把该值作为 after_sequence 传给 team_wait_for_message，并用每次返回的新 next_cursor 继续等待，避免重复或漏掉提前到达的结果。team_messages 返回 has_more=true 时继续分页，不把扫描预算耗尽当作没有结果。
+    收到结果后核验任务要求；缺少输入、失败或部分结果不能结算。核验通过后由 Lead 调用 team_task_update action=complete，附上 result_id 与当前 expected_revision。
     成员失败、停用或解雇后，其未完成任务会自动释放回任务板，由 Lead 重新分配。
     临时停止用 team_interrupt；保留成员但停止使用可 team_disable_member；永久移除用 team_dismiss_member；整体暂停用 team_stop_all。
     关键任务未完成、仍有成员运行或结果尚未回收时禁止宣称整体完成。
@@ -54,10 +56,8 @@ internal fun prepareLocalAgentTeamSend(
     attachments: List<LocalImportedAttachment>,
 ): LocalPreparedSend? {
     val prepared = prepareLocalSend(text, attachments) ?: return null
-    val modelContent = LOCAL_AGENT_TEAM_DIRECTIVE + "\n\n" + prepared.content
     return prepared.copy(
-        content = modelContent,
-        modelMessage = buildLocalUserModelMessage(modelContent, attachments),
+        modelMessage = JsonObject(prepared.modelMessage + (LOCAL_WORK_EXECUTION_MODE_KEY to JsonPrimitive("agent_team"))),
     )
 }
 

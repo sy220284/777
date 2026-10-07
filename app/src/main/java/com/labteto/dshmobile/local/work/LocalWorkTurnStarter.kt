@@ -48,20 +48,20 @@ internal class LocalWorkTurnStarter(
         sessionLease: LocalSessionRuntimeLease,
     ): Job = startFresh(
         content = prepared.content,
+        visibleContent = prepared.visibleContent,
+        blocks = prepared.blocks,
         memoryInput = prepared.memoryInput,
         modelMessage = prepared.modelMessage,
         sessionLease = sessionLease,
-        visibleContent = prepared.visibleContent,
-        visibleBlocks = prepared.blocks,
     )
 
     internal fun startFresh(
         content: String,
+        visibleContent: String = content,
+        blocks: List<LocalMessageBlock> = emptyList(),
         memoryInput: String,
         modelMessage: JsonObject?,
         sessionLease: LocalSessionRuntimeLease,
-        visibleContent: String = content,
-        visibleBlocks: List<LocalMessageBlock> = emptyList(),
     ): Job {
         val sessionId = requireWorkSession()
         val durableMessage = modelMessage ?: buildJsonObject {
@@ -73,7 +73,8 @@ internal class LocalWorkTurnStarter(
             role = "user",
             content = visibleContent,
             createdAt = System.currentTimeMillis(),
-            blocks = visibleBlocks,
+            blocks = blocks,
+
         )
         val eventLog = sessionStorage.eventLogs.get(sessionId)
         val event = eventLog.append("user/message", buildJsonObject {

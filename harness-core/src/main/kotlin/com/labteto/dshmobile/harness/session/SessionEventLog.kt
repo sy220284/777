@@ -140,16 +140,51 @@ class SessionEventLog(
     }
 
     /**
-     * Return one chronological page strictly older than [sequenceExclusive].
+     * Compatibility alias for callers that historically expected a chronological page.
      *
-     * The implementation walks rotated segments newest-first and decodes JSONL rows backwards, so
-     * loading one history page is proportional to the requested page instead of the session age.
-     * Malformed/torn rows are skipped just like restart recovery.
+     * New code must choose an explicit direction via [pageBeforeChronological] or
+     * [pageBeforeNewestFirst]. The old name hid an important contract and previously allowed a
+     * second reversal to feed descending sequence values into SessionProjection.
      */
+    @Deprecated(
+        message = "方向语义不明确；请显式使用 pageBeforeChronological 或 pageBeforeNewestFirst",
+        replaceWith = ReplaceWith("pageBeforeChronological(sequenceExclusive, limit)"),
+    )
     fun pageBefore(
         sequenceExclusive: Long = Long.MAX_VALUE,
         limit: Int = DEFAULT_PAGE_EVENTS,
+    ): List<SessionEvent> = pageBeforeChronological(sequenceExclusive, limit)
+
+    /**
+     * Return one chronological page strictly older than [sequenceExclusive].
+     *
+     * Returned sequence values are strictly increasing. Use this for projection/fold inputs and
+     * any caller that consumes events from old to new.
+     */
+    fun pageBeforeChronological(
+        sequenceExclusive: Long = Long.MAX_VALUE,
+        limit: Int = DEFAULT_PAGE_EVENTS,
     ): List<SessionEvent> = synchronized(lock) {
+        pageBeforeNewestFirstUnsafe(sequenceExclusive, limit).asReversed()
+    }
+
+    /**
+     * Return one newest-first page strictly older than [sequenceExclusive].
+     *
+     * Returned sequence values are strictly decreasing. Use this for backward lookup/recovery so
+     * callers never need to reverse a chronological page by hand.
+     */
+    fun pageBeforeNewestFirst(
+        sequenceExclusive: Long = Long.MAX_VALUE,
+        limit: Int = DEFAULT_PAGE_EVENTS,
+    ): List<SessionEvent> = synchronized(lock) {
+        pageBeforeNewestFirstUnsafe(sequenceExclusive, limit)
+    }
+
+    private fun pageBeforeNewestFirstUnsafe(
+        sequenceExclusive: Long,
+        limit: Int,
+    ): List<SessionEvent> {
         val wanted = limit.coerceIn(1, MAX_PAGE_EVENTS)
         val newestFirst = ArrayList<SessionEvent>(wanted)
         for (source in orderedFilesUnsafe().asReversed()) {
@@ -161,7 +196,7 @@ class SessionEventLog(
             }
             if (!completed || newestFirst.size >= wanted) break
         }
-        newestFirst.asReversed()
+        return newestFirst
     }
 
     /** One bounded chronological page newer than the cursor; old segments are skipped. */

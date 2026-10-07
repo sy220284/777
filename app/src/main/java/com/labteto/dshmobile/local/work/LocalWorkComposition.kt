@@ -238,6 +238,11 @@ internal class LocalWorkComposition @Inject constructor(
         runTurn = turnExecutor::run,
     )
 
+    private val teamRefreshQueue = LocalTeamRefreshQueue(scope) { sessionId, reconcile ->
+        if (reconcile) runCatching { agentTeams.recoverMailbox(sessionId) }
+        runCatching { publishTeamUiState(sessionId) }
+    }
+
     init {
         runtimeStateStore.observeJobSnapshots(::observeTeamJobTransitions)
     }
@@ -265,18 +270,15 @@ internal class LocalWorkComposition @Inject constructor(
 
             val sessionId = job.ownerSessionId ?: return@forEach
             val refresh = sessions.getOrPut(sessionId, ::SessionRefresh)
-            if (job.status in TEAM_RECONCILE_JOB_STATUSES) {
+            if (job.status in TEAM_RECONCILE_JOB_STATUSES &&
+                (previous?.status != current.status || previous.pendingMessageCount != current.pendingMessageCount)
+            ) {
                 refresh.reconcile = true
             }
         }
 
         sessions.forEach { (sessionId, refresh) ->
-            scope.launch {
-                if (refresh.reconcile) {
-                    runCatching { agentTeams.recoverMailbox(sessionId) }
-                }
-                runCatching { publishTeamUiState(sessionId) }
-            }
+            teamRefreshQueue.schedule(sessionId, refresh.reconcile)
         }
     }
 

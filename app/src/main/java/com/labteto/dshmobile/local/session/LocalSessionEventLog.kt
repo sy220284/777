@@ -59,11 +59,28 @@ class LocalSessionEventLog(
         event.toLocalEvent()
     }
 
-    /** One chronological page strictly older than [sequenceExclusive], read newest-first on disk. */
+    @Deprecated(
+        message = "方向语义不明确；请显式使用 pageBeforeChronological 或 pageBeforeNewestFirst",
+        replaceWith = ReplaceWith("pageBeforeChronological(sequenceExclusive, limit)"),
+    )
     fun pageBefore(
         sequenceExclusive: Long = Long.MAX_VALUE,
         limit: Int = 80,
-    ): List<Event> = delegate.pageBefore(sequenceExclusive, limit).map { event ->
+    ): List<Event> = pageBeforeChronological(sequenceExclusive, limit)
+
+    /** 按 sequence 递增返回旧事件页，适合 Projection / fold 等从旧到新的消费路径。 */
+    fun pageBeforeChronological(
+        sequenceExclusive: Long = Long.MAX_VALUE,
+        limit: Int = 80,
+    ): List<Event> = delegate.pageBeforeChronological(sequenceExclusive, limit).map { event ->
+        event.toLocalEvent()
+    }
+
+    /** 按 sequence 递减返回旧事件页，适合从最新事件向历史倒查。 */
+    fun pageBeforeNewestFirst(
+        sequenceExclusive: Long = Long.MAX_VALUE,
+        limit: Int = 80,
+    ): List<Event> = delegate.pageBeforeNewestFirst(sequenceExclusive, limit).map { event ->
         event.toLocalEvent()
     }
 
@@ -134,7 +151,13 @@ class LocalSessionEventLog(
     fun latestOf(types: Set<String>): Event? =
         delegate.latestOf(types)?.toLocalEvent()
 
-    fun clear() = delegate.clear()
+    @Volatile internal var resetGeneration: Long = 0L
+        private set
+
+    fun clear() = synchronized(this) {
+        delegate.clear()
+        resetGeneration += 1L
+    }
 
     private fun com.labteto.dshmobile.harness.session.SessionEvent.toLocalEvent() = Event(
         sequence = sequence,
