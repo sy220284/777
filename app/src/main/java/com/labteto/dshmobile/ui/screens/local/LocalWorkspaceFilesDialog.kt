@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -26,7 +28,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.session.LocalConversationFiles
@@ -256,12 +260,31 @@ internal fun LocalWorkspaceFilesDialog(
 
 @Composable
 private fun LocalFilesEmpty(title: String, body: String) {
-    DsPageEmptyState(
-        icon = FeatherIcons.Folder,
-        title = title,
-        body = body,
-        modifier = Modifier.fillMaxSize(),
-    )
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = DsSpacing.xlarge),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.ic_kimi_project_empty),
+            contentDescription = null,
+            modifier = Modifier.size(100.dp),
+        )
+        Text(
+            title,
+            style = DsType.base16Strong.withReadingWeight(),
+            color = DsTheme.colors.labelPrimary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = DsSpacing.small),
+        )
+        Text(
+            body,
+            style = DsType.small13.withReadingWeight(),
+            color = DsTheme.colors.labelTertiary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = DsSpacing.xsmall),
+        )
+    }
 }
 
 @Composable
