@@ -260,6 +260,7 @@ Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建
 - Agent run identity；
 - 主 / 子代理运行契约；
 - 子代理启动规格统一声明 mutation / continuation / history / virtual screen / depth / tool filter / output schema，并在运行和恢复前执行同一套能力校验；
+- Structured Result 使用共享 `JsonSchemaValidator`；模型只收到统一的 JSON-only 结果约束，终态先校验再提交，工具参数与子代理结果不允许出现两套 Schema 解释；
 - 前台与持久子代理共享 `QueuedAgentInput` 消息契约；Inbox 有界且满载显式拒绝，禁止通过淘汰旧消息伪装成功；
 - checkpoint；
 - continuation；
