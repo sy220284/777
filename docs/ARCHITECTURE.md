@@ -252,6 +252,8 @@ Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建
 
 一次 Run 启动后模型身份不可因前台设置变化而漂移。
 
+持久子代理的 Session/History 事实与进程内 Activation 分离：进程内执行对象可以结束或被系统回收，Job Snapshot 中的 continuation 与 Inbox 继续存在；重新激活必须复用冻结路由身份。正常完成的一轮进入 `idle`，进程异常中断进入 `interrupted`，二者不得混用。
+
 ### Agent Capability
 
 负责：
@@ -261,6 +263,7 @@ Chat、Work、Automation 都可以依赖 Session Capability，但不得各自建
 - checkpoint；
 - continuation；
 - run recovery；
+- 持久 Child Agent 的 running / idle / interrupted 激活状态与持久 Inbox；
 - tool result continuation 语义。
 
 ### Tool Capability
