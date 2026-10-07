@@ -31,7 +31,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
- * The app's sheet surface, themed to the harness tokens.
+ * Kimi-parity bottom sheet: 20dp top radius, compact grabber and white/charcoal grouped surface.
  *
  * Sheets rather than dialogs for pickers: they arrive from the thumb's end of the screen, size
  * themselves to their content, and let a long list scroll without fighting a fixed-height plate.
@@ -63,7 +63,7 @@ fun DsBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .imePadding()
-                .padding(horizontal = DsSpacing.comfortable, vertical = DsSpacing.medium),
+                .padding(horizontal = DsSpacing.large, vertical = DsSpacing.small),
             verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
             // A short grabber stands in for the platform drag handle so the sheet still reads as
@@ -71,7 +71,7 @@ fun DsBottomSheet(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Spacer(
                     Modifier
-                        .fillMaxWidth(0.12f)
+                        .fillMaxWidth(0.10f)
                         .height(4.dp)
                         .clip(DsShapes.pillFull)
                         .background(colors.borderL3),
@@ -83,7 +83,7 @@ fun DsBottomSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(title, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
+                        Text(title, style = DsType.headline17.withReadingWeight(), color = colors.labelPrimary)
                         if (subtitle != null) {
                             Text(subtitle, style = DsType.small13.withReadingWeight(), color = colors.labelTertiary)
                         }

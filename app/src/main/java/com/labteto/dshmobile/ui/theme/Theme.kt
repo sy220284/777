@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.Density
 /** Theme preference exposed by the app Appearance row. */
 enum class ThemePreference { LIGHT, DARK, MATTE_BLACK, SYSTEM }
 
-/** Full DeepSeek Harness semantic palette for one scheme. */
+/** Full 777 semantic palette, aligned to the Kimi mobile shell. */
 data class DsColors(
     val bgBase: Color,
     val bgLayer1: Color,
@@ -85,8 +85,8 @@ object DsThemeTokens {
         labelDimmed = DsLight.labelDimmed,
         accent = DsLight.accent, onAccent = DsLight.onAccent,
         accentTertiary = DsLight.accentTertiary,
-        characterAccent = Ds.FamilyPurple,
-        characterAccentTertiary = Ds.FamilyPurple.copy(alpha = 0.14f),
+        characterAccent = DsLight.accent,
+        characterAccentTertiary = DsLight.accentTertiary,
         accentHover = DsLight.accentHover,
         hover = DsLight.hover, hoverSolid = DsLight.hoverSolid, hoverAccent = DsLight.hoverAccent,
         active = DsLight.active, dangerHover = DsLight.dangerHover,
@@ -118,8 +118,8 @@ object DsThemeTokens {
         labelDimmed = DsDark.labelDimmed,
         accent = DsDark.accent, onAccent = DsDark.onAccent,
         accentTertiary = DsDark.accentTertiary,
-        characterAccent = Ds.FamilyPurple,
-        characterAccentTertiary = Ds.FamilyPurpleDeep,
+        characterAccent = DsDark.accent,
+        characterAccentTertiary = DsDark.accentTertiary,
         accentHover = DsDark.accentHover,
         hover = DsDark.hover, hoverSolid = DsDark.hoverSolid, hoverAccent = DsDark.hoverAccent,
         active = DsDark.active, dangerHover = DsDark.dangerHover,
@@ -185,7 +185,7 @@ object DsThemeTokens {
 
 }
 
-/** The full DeepSeek palette as a CompositionLocal. */
+/** The full 777/Kimi-parity palette as a CompositionLocal. */
 val LocalDsColors = staticCompositionLocalOf { DsThemeTokens.light }
 
 data class DsReadingPreferences(

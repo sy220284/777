@@ -239,8 +239,6 @@ fun ChatListDrawer(
                 contentDescription = stringResource(R.string.chatlist_new_session),
                 onClick = { newSessionOpen = true },
                 tint = colors.labelPrimary,
-                containerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.FLOATING, BackgroundRegion.TOP),
-                shadowElevation = 2.dp,
             )
         }
 
@@ -258,10 +256,10 @@ fun ChatListDrawer(
                 )
             },
             singleLine = true,
-            shape = DsShapes.pillFull,
+            shape = DsShapes.row,
             colors = TextFieldDefaults.colors(
-                focusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, BackgroundRegion.TOP),
-                unfocusedContainerColor = colors.wallpaperSurface(WallpaperSurfaceLevel.INPUT, BackgroundRegion.TOP),
+                focusedContainerColor = colors.bgModulePlatform,
+                unfocusedContainerColor = colors.bgModulePlatform,
                 focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                 unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                 cursorColor = colors.accent,

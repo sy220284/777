@@ -74,8 +74,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
- * Modal dialog: dim overlay (platform scrim ~ overlayMask), r24 bgLayer2 plate
- * with a hairline border. [content] receives a [ColumnScope].
+ * Kimi-parity modal dialog: restrained scrim, compact 16dp plate and 180ms motion. [content] receives a [ColumnScope].
  */
 @Composable
 fun DsDialog(
@@ -91,12 +90,12 @@ fun DsDialog(
     LaunchedEffect(Unit) { appeared = true }
     val scale by animateFloatAsState(
         targetValue = if (appeared) 1f else 0.97f,
-        animationSpec = DsAnimations.normalSpring,
+        animationSpec = DsAnimations.dialogEnter,
         label = "dialogScale",
     )
     val alpha by animateFloatAsState(
         targetValue = if (appeared) 1f else 0f,
-        animationSpec = DsAnimations.fade,
+        animationSpec = DsAnimations.dialogEnter,
         label = "dialogAlpha",
     )
     Dialog(
@@ -153,7 +152,7 @@ fun DsDialog(
                 shape = DsShapes.dialog,
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.DIALOG),
                 border = BorderStroke(1.dp, colors.borderL1),
-                shadowElevation = 4.dp,
+                shadowElevation = 0.dp,
             ) {
                 Column(
                     Modifier.padding(com.labteto.dshmobile.ui.theme.DsSpacing.comfortable),

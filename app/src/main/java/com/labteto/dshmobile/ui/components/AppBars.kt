@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
@@ -30,8 +29,6 @@ import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
-import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
-import com.labteto.dshmobile.ui.theme.wallpaperSurface
 
 /** Shared full-page top bar aligned across local utility screens. */
 @Composable
@@ -48,11 +45,7 @@ fun DsTopBar(
     largeTitle: Boolean = false,
 ) {
     val colors = DsTheme.colors
-    val floating = colors.wallpaperSurface(
-        WallpaperSurfaceLevel.FLOATING,
-        BackgroundRegion.TOP,
-    )
-
+    // Kimi title bars float directly on the page; icon buttons provide interaction feedback.
     if (largeTitle) {
         Column(modifier = modifier.fillMaxWidth()) {
             Row(
@@ -63,7 +56,6 @@ fun DsTopBar(
                     icon = FeatherIcons.ArrowLeft,
                     contentDescription = backContentDescription,
                     onClick = onBack,
-                    containerColor = floating,
                 )
                 Spacer(Modifier.weight(1f))
                 if (actionIcon != null && onAction != null) {
@@ -72,7 +64,6 @@ fun DsTopBar(
                         contentDescription = actionContentDescription,
                         onClick = onAction,
                         enabled = actionEnabled,
-                        containerColor = floating,
                     )
                 } else {
                     Box(Modifier.size(DsSpacing.touchTarget))
@@ -103,23 +94,25 @@ fun DsTopBar(
             }
         }
     } else {
-        Row(
+        Box(
             modifier = modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
             DsIconButton(
                 icon = FeatherIcons.ArrowLeft,
                 contentDescription = backContentDescription,
                 onClick = onBack,
-                containerColor = floating,
+                modifier = Modifier.align(Alignment.CenterStart),
             )
             Column(
-                modifier = Modifier.weight(1f).padding(horizontal = DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 64.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(1.dp),
             ) {
                 Text(
                     title,
-                    style = DsType.headline17.withReadingWeight(),
+                    style = DsType.base16Strong.withReadingWeight(),
                     color = colors.labelPrimary,
                     maxLines = 1,
                 )
@@ -138,10 +131,10 @@ fun DsTopBar(
                     contentDescription = actionContentDescription,
                     onClick = onAction,
                     enabled = actionEnabled,
-                    containerColor = floating,
+                    modifier = Modifier.align(Alignment.CenterEnd),
                 )
             } else {
-                Box(Modifier.size(DsSpacing.touchTarget))
+                Box(Modifier.size(DsSpacing.touchTarget).align(Alignment.CenterEnd))
             }
         }
     }
@@ -156,13 +149,12 @@ fun DsSegmentedTabs(
     modifier: Modifier = Modifier,
 ) {
     val colors = DsTheme.colors
-    val background = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD)
-    val selectedBackground = colors.accentTertiary
+    val selectedBackground = colors.bgLayer1
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(DsShapes.row)
-            .background(background)
+            .background(colors.bgModulePlatform)
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -190,7 +182,7 @@ fun DsSegmentedTabs(
                 Text(
                     label,
                     style = (if (selected) DsType.small13Strong else DsType.small13).withReadingWeight(),
-                    color = if (selected) colors.accent else colors.labelSecondary,
+                    color = if (selected) colors.labelPrimary else colors.labelSecondary,
                     maxLines = 1,
                 )
             }

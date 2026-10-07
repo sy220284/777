@@ -61,8 +61,8 @@ fun DsGroupCard(
 }
 
 /**
- * One mobile-first category row. The icon establishes the function family, the subtitle explains
- * scope, and the trailing value keeps current state visible before the row is opened.
+ * Kimi-parity category row. Icons are monochrome; hierarchy comes from label opacity, spacing and
+ * state rather than function-family colors.
  */
 @Composable
 fun DsCategoryRow(
@@ -82,7 +82,7 @@ fun DsCategoryRow(
     val feedbackColor by animateColorAsState(
         targetValue = when {
             onClick == null -> Color.Transparent
-            pressed -> colors.hoverAccent
+            pressed -> colors.active
             hovered -> colors.hover
             else -> Color.Transparent
         },
@@ -116,7 +116,7 @@ fun DsCategoryRow(
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 title,
-                style = DsType.base16Strong.withReadingWeight(),
+                style = DsType.std14Strong.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

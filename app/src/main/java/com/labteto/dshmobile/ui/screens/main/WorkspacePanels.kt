@@ -28,6 +28,8 @@ import com.labteto.dshmobile.core.wire.RpcResult
 import com.labteto.dshmobile.core.wire.dto.*
 import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.ui.components.DsFullScreenDialog
+import com.labteto.dshmobile.ui.components.DsSegmentedTabs
+import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -93,25 +95,28 @@ internal fun WorkspacePanels(
     DsFullScreenDialog(onDismiss = onDismiss) {
         Surface(Modifier.fillMaxSize(), color = DsTheme.colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_back)) }
-                    Text(
+                DsTopBar(
+                    title = stringResource(
+                        if (mode == WorkspacePanelMode.CONVERSATION) R.string.panel_conversation_files
+                        else R.string.panel_workspace,
+                    ),
+                    onBack = onDismiss,
+                    backContentDescription = stringResource(R.string.common_back),
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                DsSegmentedTabs(
+                    labels = listOf(
                         stringResource(
                             if (mode == WorkspacePanelMode.CONVERSATION) R.string.panel_conversation_files
-                            else R.string.panel_workspace,
+                            else R.string.panel_files,
                         ),
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
-                TabRow(selectedTabIndex = state.section) {
-                    listOf(
-                        if (mode == WorkspacePanelMode.CONVERSATION) R.string.panel_conversation_files else R.string.panel_files,
-                        R.string.panel_preview,
-                        R.string.panel_terminal,
-                    ).forEachIndexed { i, title ->
-                        Tab(selected = state.section == i, onClick = { state.section = i }, text = { Text(stringResource(title)) })
-                    }
-                }
+                        stringResource(R.string.panel_preview),
+                        stringResource(R.string.panel_terminal),
+                    ),
+                    selectedIndex = state.section,
+                    onSelect = { state.section = it },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
                 when (state.section) {
                     0 -> {
                         if (mode == WorkspacePanelMode.CONVERSATION) {

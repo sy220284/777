@@ -1,6 +1,12 @@
 package com.labteto.dshmobile.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +43,7 @@ import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.screens.settings.SettingsScreen
 import com.labteto.dshmobile.ui.screens.tasks.TasksScreen
 import com.labteto.dshmobile.ui.screens.tools.ToolsScreen
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -113,136 +120,167 @@ fun AppRoot(
             }
         }
 
-        when (overlay) {
-            RootOverlay.TASKS -> TasksScreen(
-                onClose = {
-                    overlay = overlayReturn
-                    overlayReturn = null
-                    taskMode = null
-                },
-                onOpenSession = { sessionId ->
-                    overlay = null
-                    overlayReturn = null
-                    viewModel.disconnectRemote()
-                    relayClaimed = false
-                    rootSurface = RootSurface.LOCAL
-                    localNavigationSessionId = sessionId
-                    taskMode = null
-                },
-                initialMode = taskMode,
-            )
-
-            RootOverlay.TOOLS -> ToolsScreen(
-                onClose = { overlay = null },
-                onOpenTasks = {
-                    overlayReturn = RootOverlay.TOOLS
-                    taskMode = AutomationMode.WORK
-                    overlay = RootOverlay.TASKS
-                },
-                onOpenSettings = { destination ->
-                    overlayReturn = RootOverlay.TOOLS
-                    settingsDestination = destination
-                    overlay = RootOverlay.SETTINGS
-                },
-            )
-
-            RootOverlay.SETTINGS -> SettingsScreen(
-                onClose = {
-                    overlay = overlayReturn
-                    overlayReturn = null
-                },
-                initialDestination = settingsDestination,
-                onCheckUpdate = {
-                    viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
-                },
-                updateStatus = updateInstallStatus,
-            )
-
-            RootOverlay.PAIR -> PairScreen(
-                autoScanOnOpen = autoScanPair,
-                onClose = {
-                    overlay = null
-                    autoScanPair = false
-                    relayClaimed = false
-                    rootSurface = RootSurface.LOCAL
-                },
-                onPaired = {
-                    overlay = null
-                    autoScanPair = false
-                    relayClaimed = true
-                    rootSurface = RootSurface.REMOTE
-                },
-            )
-
-            null -> when {
-                rootSurface == RootSurface.LOCAL -> LocalHarnessScreen(
-                    requestedSessionId = effectiveLocalSessionId,
-                    onSessionRequestConsumed = {
-                        if (!requestedLocalSessionId.isNullOrBlank()) {
-                            onLocalSessionRequestConsumed()
-                        }
-                        localNavigationSessionId = null
+        AnimatedContent(
+            targetState = overlay,
+            transitionSpec = {
+                when {
+                    initialState == null && targetState != null -> {
+                        (
+                            slideInHorizontally(DsAnimations.featurePageForward) { width -> width / 16 } +
+                                fadeIn(DsAnimations.featurePageEnterFade)
+                            ).togetherWith(
+                            slideOutHorizontally(DsAnimations.featurePageForward) { width -> -width / 32 } +
+                                fadeOut(DsAnimations.featurePageExitFade),
+                        )
+                    }
+                    initialState != null && targetState == null -> {
+                        (
+                            slideInHorizontally(DsAnimations.featurePageBackward) { width -> -width / 32 } +
+                                fadeIn(DsAnimations.featurePageEnterFade)
+                            ).togetherWith(
+                            slideOutHorizontally(DsAnimations.featurePageBackward) { width -> width / 16 } +
+                                fadeOut(DsAnimations.featurePageExitFade),
+                        )
+                    }
+                    else -> {
+                        fadeIn(DsAnimations.featurePageEnterFade)
+                            .togetherWith(fadeOut(DsAnimations.featurePageExitFade))
+                    }
+                }
+            },
+            label = "rootOverlayPage",
+        ) { renderedOverlay ->
+            when (renderedOverlay) {
+                RootOverlay.TASKS -> TasksScreen(
+                    onClose = {
+                        overlay = overlayReturn
+                        overlayReturn = null
+                        taskMode = null
                     },
-                    onOpenRemote = {
+                    onOpenSession = { sessionId ->
+                        overlay = null
+                        overlayReturn = null
+                        viewModel.disconnectRemote()
                         relayClaimed = false
-                        rootSurface = RootSurface.REMOTE
-                        autoScanPair = true
-                        overlay = RootOverlay.PAIR
+                        rootSurface = RootSurface.LOCAL
+                        localNavigationSessionId = sessionId
+                        taskMode = null
                     },
+                    initialMode = taskMode,
+                )
+
+                RootOverlay.TOOLS -> ToolsScreen(
+                    onClose = { overlay = null },
+                    onOpenTasks = {
+                        overlayReturn = RootOverlay.TOOLS
+                        taskMode = AutomationMode.WORK
+                        overlay = RootOverlay.TASKS
+                    },
+                    onOpenSettings = { destination ->
+                        overlayReturn = RootOverlay.TOOLS
+                        settingsDestination = destination
+                        overlay = RootOverlay.SETTINGS
+                    },
+                )
+
+                RootOverlay.SETTINGS -> SettingsScreen(
+                    onClose = {
+                        overlay = overlayReturn
+                        overlayReturn = null
+                    },
+                    initialDestination = settingsDestination,
                     onCheckUpdate = {
                         viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
                     },
                     updateStatus = updateInstallStatus,
                 )
 
-                showMain && selectedRemoteMatches -> MainScreen(
-                    onOpenSettings = {
-                        overlayReturn = null
-                        settingsDestination = SettingsDestination.ROOT
-                        overlay = RootOverlay.SETTINGS
-                    },
-                    onOpenTasks = {
-                        overlayReturn = null
-                        taskMode = AutomationMode.WORK
-                        overlay = RootOverlay.TASKS
-                    },
-                    onOpenTools = {
-                        overlayReturn = null
-                        overlay = RootOverlay.TOOLS
-                    },
-                    onOpenLocalHarness = {
-                        viewModel.disconnectRemote()
-                        relayClaimed = false
-                        rootSurface = RootSurface.LOCAL
-                    },
-                )
-
-                rootSurface == RootSurface.REMOTE && relayClaimed -> RemoteRelayStatus(
-                    failed = connection.failure != null ||
-                        (connection.phase == ConnectionPhase.DISCONNECTED && connection.host == null),
-                    onRetryPairing = {
-                        viewModel.disconnectRemote()
-                        relayClaimed = false
-                        autoScanPair = false
-                        overlay = RootOverlay.PAIR
-                    },
-                    onBack = {
-                        viewModel.disconnectRemote()
-                        relayClaimed = false
-                        rootSurface = RootSurface.LOCAL
-                    },
-                )
-
-                else -> PairScreen(
+                RootOverlay.PAIR -> PairScreen(
+                    autoScanOnOpen = autoScanPair,
                     onClose = {
+                        overlay = null
+                        autoScanPair = false
                         relayClaimed = false
                         rootSurface = RootSurface.LOCAL
                     },
                     onPaired = {
+                        overlay = null
+                        autoScanPair = false
                         relayClaimed = true
                         rootSurface = RootSurface.REMOTE
                     },
                 )
+
+                null -> when {
+                    rootSurface == RootSurface.LOCAL -> LocalHarnessScreen(
+                        requestedSessionId = effectiveLocalSessionId,
+                        onSessionRequestConsumed = {
+                            if (!requestedLocalSessionId.isNullOrBlank()) {
+                                onLocalSessionRequestConsumed()
+                            }
+                            localNavigationSessionId = null
+                        },
+                        onOpenRemote = {
+                            relayClaimed = false
+                            rootSurface = RootSurface.REMOTE
+                            autoScanPair = true
+                            overlay = RootOverlay.PAIR
+                        },
+                        onCheckUpdate = {
+                            viewModel.checkForUpdateAndInstall(BuildConfig.VERSION_NAME)
+                        },
+                        updateStatus = updateInstallStatus,
+                    )
+
+                    showMain && selectedRemoteMatches -> MainScreen(
+                        onOpenSettings = {
+                            overlayReturn = null
+                            settingsDestination = SettingsDestination.ROOT
+                            overlay = RootOverlay.SETTINGS
+                        },
+                        onOpenTasks = {
+                            overlayReturn = null
+                            taskMode = AutomationMode.WORK
+                            overlay = RootOverlay.TASKS
+                        },
+                        onOpenTools = {
+                            overlayReturn = null
+                            overlay = RootOverlay.TOOLS
+                        },
+                        onOpenLocalHarness = {
+                            viewModel.disconnectRemote()
+                            relayClaimed = false
+                            rootSurface = RootSurface.LOCAL
+                        },
+                    )
+
+                    rootSurface == RootSurface.REMOTE && relayClaimed -> RemoteRelayStatus(
+                        failed = connection.failure != null ||
+                            (connection.phase == ConnectionPhase.DISCONNECTED && connection.host == null),
+                        onRetryPairing = {
+                            viewModel.disconnectRemote()
+                            relayClaimed = false
+                            autoScanPair = false
+                            overlay = RootOverlay.PAIR
+                        },
+                        onBack = {
+                            viewModel.disconnectRemote()
+                            relayClaimed = false
+                            rootSurface = RootSurface.LOCAL
+                        },
+                    )
+
+                    else -> PairScreen(
+                        onClose = {
+                            relayClaimed = false
+                            rootSurface = RootSurface.LOCAL
+                        },
+                        onPaired = {
+                            relayClaimed = true
+                            rootSurface = RootSurface.REMOTE
+                        },
+                    )
+                }
             }
         }
     }

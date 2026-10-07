@@ -45,13 +45,13 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.coroutines.delay
 
-/** Button variants mirroring the harness primary/info/ghost/outline/danger palette. */
+/** Kimi-parity button roles: KMBlue primary, neutral secondary, ghost, outline and danger. */
 enum class DsButtonVariant { Primary, Info, Ghost, Outline, Danger }
 
 /** Button sizes: [Normal] is h36 r18, [Small] is h28 r14. */
 enum class DsButtonSize { Normal, Small }
 
-/** Ink/ghost/outline button in the DeepSeek Harness style. */
+/** Shared Kimi-parity button used across 777 feature pages. */
 @Composable
 fun DsButton(
     text: String,
@@ -89,7 +89,7 @@ fun DsButton(
     
     val (fill, content) = when (variant) {
         DsButtonVariant.Primary -> colors.accent to colors.onAccent
-        DsButtonVariant.Info -> colors.accentTertiary to colors.accent
+        DsButtonVariant.Info -> colors.bgModulePlatform to colors.labelPrimary
         DsButtonVariant.Ghost -> Color.Transparent to colors.labelPrimary
         DsButtonVariant.Outline -> Color.Transparent to colors.labelPrimary
         DsButtonVariant.Danger -> colors.error to colors.onAccent
@@ -101,7 +101,7 @@ fun DsButton(
         }
         hovered -> when (variant) {
             DsButtonVariant.Primary -> colors.accentHover
-            DsButtonVariant.Info -> colors.hoverAccent
+            DsButtonVariant.Info -> colors.active
             DsButtonVariant.Ghost, DsButtonVariant.Outline -> colors.hover
             DsButtonVariant.Danger -> lerp(colors.error, Color.Black, 0.15f)
         }

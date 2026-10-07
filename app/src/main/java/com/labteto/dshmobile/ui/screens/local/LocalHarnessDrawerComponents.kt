@@ -175,59 +175,50 @@ internal fun DrawerQuickActions(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        // Kimi-style global entries stay visible regardless of chat/work mode.
+        DrawerQuickAction(
+            icon = FeatherIcons.Folder,
+            title = stringResource(R.string.chatlist_workspace_files),
+            onClick = onWorkspaceFiles,
+        )
+        DrawerQuickAction(
+            icon = FeatherIcons.Clock,
+            title = stringResource(
+                if (usageMode == LocalUsageMode.CHAT) R.string.tasks_chat_title else R.string.tasks_title,
+            ),
+            onClick = onTasks,
+        )
+        DrawerQuickAction(
+            icon = FeatherIcons.Tool,
+            title = stringResource(R.string.tools_title),
+            onClick = onTools,
+        )
+
         if (usageMode == LocalUsageMode.CHAT) {
             DrawerQuickAction(
                 icon = FeatherIcons.Image,
                 title = stringResource(R.string.persona_gallery_title),
-                subtitle = stringResource(R.string.local_drawer_persona_gallery_hint),
                 badge = galleryCount.takeIf { it > 0 }?.toString(),
                 onClick = onOpenPersonaGallery,
             )
             DrawerQuickAction(
                 icon = FeatherIcons.BookOpen,
                 title = stringResource(R.string.chat_diary_title),
-                subtitle = stringResource(R.string.local_drawer_diary_hint),
                 onClick = onOpenDiary,
             )
             DrawerQuickAction(
                 icon = FeatherIcons.Users,
                 title = stringResource(R.string.local_group_chat_title),
-                subtitle = stringResource(R.string.local_drawer_group_chat_hint),
                 badge = groupMemberCount.takeIf { it > 0 }?.toString(),
                 onClick = onOpenGroupChat,
             )
-            DrawerQuickAction(
-                icon = FeatherIcons.Clock,
-                title = stringResource(R.string.tasks_chat_title),
-                subtitle = stringResource(R.string.local_drawer_chat_tasks_hint),
-                onClick = onTasks,
-            )
         } else {
-            DrawerQuickAction(
-                icon = FeatherIcons.Folder,
-                title = stringResource(R.string.chatlist_workspace_files),
-                subtitle = stringResource(R.string.local_drawer_workspace_hint),
-                onClick = onWorkspaceFiles,
-            )
             DrawerQuickAction(
                 icon = FeatherIcons.Activity,
                 title = stringResource(R.string.local_run_center),
-                subtitle = stringResource(R.string.local_drawer_run_center_hint),
                 onClick = onOpenRunCenter,
-            )
-            DrawerQuickAction(
-                icon = FeatherIcons.Clock,
-                title = stringResource(R.string.tasks_title),
-                subtitle = stringResource(R.string.local_drawer_work_tasks_hint),
-                onClick = onTasks,
-            )
-            DrawerQuickAction(
-                icon = FeatherIcons.Tool,
-                title = stringResource(R.string.tools_title),
-                subtitle = stringResource(R.string.local_drawer_tools_hint),
-                onClick = onTools,
             )
         }
     }
@@ -248,7 +239,7 @@ internal fun DrawerQuickAction(
     val hovered by interaction.collectIsHoveredAsState()
     val feedbackColor by animateColorAsState(
         targetValue = when {
-            pressed -> colors.hoverAccent
+            pressed -> colors.active
             hovered -> colors.hover
             else -> Color.Transparent
         },
@@ -314,7 +305,7 @@ internal fun DrawerGlobalAction(
     val hovered by interaction.collectIsHoveredAsState()
     val feedbackColor by animateColorAsState(
         targetValue = when {
-            pressed -> colors.hoverAccent
+            pressed -> colors.active
             hovered -> colors.hover
             else -> Color.Transparent
         },
@@ -373,7 +364,7 @@ internal fun DrawerSectionTitle(
     ) {
         Text(
             title,
-            style = DsType.std14.withReadingWeight(),
+            style = DsType.caption11Strong.withReadingWeight(),
             color = DsTheme.colors.labelTertiary,
             modifier = Modifier.weight(1f),
         )
@@ -443,15 +434,6 @@ internal fun LocalSessionDrawerRow(
                 .padding(horizontal = DsSpacing.small, vertical = DsSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (current && !selectionOpen) {
-                Box(
-                    Modifier
-                        .size(width = 3.dp, height = 24.dp)
-                        .clip(DsShapes.pillFull)
-                        .background(colors.accent),
-                )
-                Spacer(Modifier.width(DsSpacing.xsmall))
-            }
             if (selectionOpen) {
                 Checkbox(checked = selected, onCheckedChange = { onClick() })
             }

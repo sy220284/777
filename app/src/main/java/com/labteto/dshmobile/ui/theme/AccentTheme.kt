@@ -3,7 +3,7 @@ package com.labteto.dshmobile.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * 中国风传统色卡：用户可自选的 accent 主题。
+ * 可选 accent 主题。默认项与 Kimi 3.1.3 的 KMBlue 保持一致；其余主题保留为 777 用户自定义能力。
  *
  * 每张卡一对主色——亮色主题取深档（对应青瓷 Celadon600），暗色主题取浅档（对应 Celadon400），
  * 保证任何卡在两种主题下都落在既定的对比度带上。色名是专有名词，保留汉字不做翻译——
@@ -20,9 +20,9 @@ data class AccentPalette(
 
 object AccentPalettes {
 
-    /** 青瓷为默认（与设计系统同源），其余五张为可选换装。 */
+    /** 默认项沿用历史 key 以兼容已存设置，但视觉值切到 Kimi KMBlue。 */
     val ALL = listOf(
-        AccentPalette("celadon", "青瓷", Color(0xFF3E8E8C), Color(0xFF63B3AC)),
+        AccentPalette("celadon", "经典蓝", Color(0xFF1783FF), Color(0xFF1A88FF), onDark = Color(0xFFFFFFFF)),
         AccentPalette("dailan", "黛蓝", Color(0xFF44618C), Color(0xFF8FB0D9), onDark = Color(0xFF0D1520)),
         AccentPalette("zhusha", "朱砂", Color(0xFFA64B44), Color(0xFFDE8B84), onDark = Color(0xFF1C0D0C)),
         AccentPalette("xianghuang", "缃黄", Color(0xFFA67C32), Color(0xFFD9BC7A), onDark = Color(0xFF1A150A)),
