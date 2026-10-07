@@ -26,6 +26,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -63,6 +64,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         maxSteps: Int,
         virtualScreen: Boolean,
         outputSchema: JsonObject? = null,
+        toolAllowlist: Set<String>? = null,
         sessionId: String = currentSessionId(),
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
@@ -90,6 +92,9 @@ internal class LocalPersistentJobRecoveryCoordinator(
             put("max_steps", maxSteps)
             put("virtual_screen", virtualScreen)
             outputSchema?.let { put("output_schema", it) }
+            toolAllowlist?.let { tools ->
+                put("tool_allowlist", JsonArray(tools.sorted().map(::JsonPrimitive)))
+            }
         }.toString()
         return jobs.startPersistent(
             label = "子代理：${task.take(100)}",
@@ -108,6 +113,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     maxSteps = maxSteps,
                     virtualScreen = virtualScreen,
                     outputSchema = outputSchema,
+                    toolAllowlist = toolAllowlist,
                 ).requireCompletedOutput()
             }
         }
@@ -233,6 +239,17 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val outputSchema = payload["output_schema"]?.let { raw ->
             raw as? JsonObject ?: error("持久子代理 output_schema 损坏")
         }
+        val toolAllowlist = payload["tool_allowlist"]?.let { raw ->
+            val array = raw as? JsonArray ?: error("持久子代理 tool_allowlist 损坏")
+            array.map { item ->
+                val name = (item as? JsonPrimitive)
+                    ?.takeIf { it.isString }
+                    ?.contentOrNull
+                    ?.takeIf(String::isNotBlank)
+                    ?: error("持久子代理 tool_allowlist 包含非法工具名")
+                name
+            }.toSet()
+        }
         val log = eventLogFor(sessionId)
         val checkpointEvent = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
             data["background_job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
@@ -312,6 +329,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     maxSteps = maxSteps,
                     virtualScreen = virtualScreen,
                     outputSchema = outputSchema,
+                    toolAllowlist = toolAllowlist,
                     recoveredHistory = recoveredHistory,
                     recoveredClaimedMessageIds = recoveredClaimedIds,
                     recoveredStep = continuation?.step ?: 0,
