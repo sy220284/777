@@ -987,7 +987,11 @@ internal fun LocalConversationSurface(
                             label = stringResource(R.string.local_group_chat_title),
                             onClick = {
                                 showAttachmentPicker = false
-                                showGroupMemberPicker = true
+                                if (state.groupChat.enabled) {
+                                    showGroupMemberPicker = true
+                                } else {
+                                    onNewSession()
+                                }
                             },
                             modifier = Modifier.weight(1f),
                         )
