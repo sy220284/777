@@ -76,6 +76,11 @@ internal data class LocalChatFeatureUiActions(
     val startFromGallery: (String, String?, Boolean) -> Boolean,
 )
 
+internal data class LocalWorkUiActionResult(
+    val accepted: Boolean,
+    val message: String,
+)
+
 internal data class LocalWorkFeatureUiActions(
     val workState: StateFlow<LocalWorkUiState>,
     val workspaceFiles: suspend () -> List<LocalWorkspaceFile>,
@@ -83,6 +88,8 @@ internal data class LocalWorkFeatureUiActions(
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
     val backgroundJobOutput: (String) -> String,
     val stopBackgroundJob: (String) -> String,
+    val startBackgroundAgent: suspend (String) -> LocalWorkUiActionResult,
+    val sendBackgroundAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
 )
 
 internal data class LocalAutomationFeatureUiActions(

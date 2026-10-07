@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,11 +24,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.presentation.LocalWorkUiState
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsExpandableColumn
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
@@ -41,23 +44,25 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun ExecutionStatusCard(
     state: LocalWorkUiState,
     onJobOutput: (String) -> String,
     onStopJob: (String) -> String,
+    onSendAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
     onOpenResults: () -> Unit,
     modifier: Modifier = Modifier,
     showHeader: Boolean = true,
 ) {
     val colors = DsTheme.colors
-    var expandedJobId by remember(state.sessionId) { mutableStateOf<String?>(null) }
-    var expandedJobOutput by remember(state.sessionId) { mutableStateOf("") }
     var technicalDetailsExpanded by remember(state.sessionId) { mutableStateOf(false) }
     var showAll by remember(state.sessionId) { mutableStateOf(false) }
     val completed = state.todos.count { it.status == "completed" }
     val total = state.todos.size
+    val actionRequiredJobs = state.jobs.filter(LocalJobInfo::needsUserAttention)
+    val backgroundJobs = state.jobs.filterNot(LocalJobInfo::needsUserAttention)
     val resourceSummary = stringResource(
         R.string.local_resource_summary,
         state.activeAgents,
@@ -107,6 +112,19 @@ internal fun ExecutionStatusCard(
                 }
             }
 
+
+
+            if (actionRequiredJobs.isNotEmpty()) {
+                RunCenterJobsSection(
+                    jobs = actionRequiredJobs,
+                    attention = true,
+                    showAll = showAll,
+                    onJobOutput = onJobOutput,
+                    onStopJob = onStopJob,
+                    onSendAgentMessage = onSendAgentMessage,
+                )
+            }
+
             state.goal?.let { goal ->
                 Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
                     Text(
@@ -130,6 +148,19 @@ internal fun ExecutionStatusCard(
                     color = colors.warnLabel,
                 )
             }
+
+            if (backgroundJobs.isNotEmpty()) {
+                RunCenterJobsSection(
+                    jobs = backgroundJobs,
+                    attention = false,
+                    showAll = showAll,
+                    onJobOutput = onJobOutput,
+                    onStopJob = onStopJob,
+                    onSendAgentMessage = onSendAgentMessage,
+                )
+            }
+
+
 
             if (state.plan.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny)) {
@@ -178,107 +209,14 @@ internal fun ExecutionStatusCard(
                 }
             }
 
-            if (state.jobs.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                    Text(
-                        stringResource(R.string.local_run_background),
-                        style = DsType.caption11Strong.withReadingWeight(),
-                        color = colors.labelTertiary,
-                    )
-                    (if (showAll) state.jobs else state.jobs.sortedBy { it.status !in setOf("running", "interrupted") }.take(4)).forEach { job ->
-                        val expanded = expandedJobId == job.id
-                        Surface(
-                            shape = DsShapes.row,
-                            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(DsSpacing.small),
-                                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-                            ) {
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                                ) {
-                                    Text(
-                                        job.label,
-                                        style = DsType.small13.withReadingWeight(),
-                                        color = colors.labelSecondary,
-                                        modifier = Modifier.weight(1f),
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        localJobStatusLabel(job.status),
-                                        style = DsType.caption11.withReadingWeight(),
-                                        color = colors.labelTertiary,
-                                    )
-                                    DsButton(
-                                        text = stringResource(
-                                            if (expanded) R.string.local_run_job_hide
-                                            else R.string.local_run_job_view,
-                                        ),
-                                        onClick = {
-                                            if (expanded) {
-                                                expandedJobId = null
-                                                expandedJobOutput = ""
-                                            } else {
-                                                expandedJobId = job.id
-                                                expandedJobOutput = onJobOutput(job.id)
-                                            }
-                                        },
-                                        variant = DsButtonVariant.Ghost,
-                                        size = DsButtonSize.Small,
-                                    )
-                                }
-                                DsExpandableColumn(
-                                    visible = expanded,
-                                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
-                                ) {
-                                        Text(
-                                            stringResource(R.string.local_run_job_output),
-                                            style = DsType.caption11Strong.withReadingWeight(),
-                                            color = colors.labelTertiary,
-                                        )
-                                        Text(
-                                            expandedJobOutput.ifBlank {
-                                                stringResource(R.string.local_run_job_output_empty)
-                                            },
-                                            style = DsType.caption11.withReadingWeight(),
-                                            color = colors.labelSecondary,
-                                            maxLines = 12,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.End,
-                                        ) {
-                                            DsButton(
-                                                text = stringResource(R.string.local_run_job_refresh),
-                                                onClick = { expandedJobOutput = onJobOutput(job.id) },
-                                                variant = DsButtonVariant.Ghost,
-                                                size = DsButtonSize.Small,
-                                            )
-                                            if (job.status == "running") {
-                                                DsButton(
-                                                    text = stringResource(R.string.local_run_job_stop),
-                                                    onClick = {
-                                                        onStopJob(job.id)
-                                                        expandedJobOutput = onJobOutput(job.id)
-                                                    },
-                                                    variant = DsButtonVariant.Danger,
-                                                    size = DsButtonSize.Small,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
 
-            if (state.plan.size > 5 || state.todos.size > 5 || state.jobs.size > 4) {
+
+            if (
+                state.plan.size > 5 ||
+                state.todos.size > 5 ||
+                actionRequiredJobs.size > 4 ||
+                backgroundJobs.size > 4
+            ) {
                 DsButton(
                     text = stringResource(if (showAll) R.string.audit_show_summary else R.string.audit_show_all),
                     onClick = { showAll = !showAll },
@@ -338,3 +276,206 @@ internal fun ExecutionStatusCard(
             }
         }
     }
+
+private fun LocalJobInfo.needsUserAttention(): Boolean =
+    isAgent && (status == "dormant" || pendingMessageCount > 0)
+
+@Composable
+private fun RunCenterJobsSection(
+    jobs: List<LocalJobInfo>,
+    attention: Boolean,
+    showAll: Boolean,
+    onJobOutput: (String) -> String,
+    onStopJob: (String) -> String,
+    onSendAgentMessage: suspend (String, String) -> LocalWorkUiActionResult,
+) {
+    val colors = DsTheme.colors
+    val scope = rememberCoroutineScope()
+    var agentMessageDraft by remember { mutableStateOf("") }
+    var agentMessageFeedback by remember { mutableStateOf("") }
+    var agentMessageSending by remember { mutableStateOf(false) }
+    var expandedJobId by remember { mutableStateOf<String?>(null) }
+    var expandedJobOutput by remember { mutableStateOf("") }
+    val orderedJobs = jobs.sortedWith(
+        compareBy<LocalJobInfo> {
+            when {
+                it.needsUserAttention() -> 0
+                it.status in setOf("running", "interrupted") -> 1
+                else -> 2
+            }
+        }.thenByDescending(LocalJobInfo::pendingMessageCount),
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
+        Text(
+            if (attention) {
+                stringResource(R.string.local_run_needs_attention, jobs.size)
+            } else {
+                stringResource(R.string.local_run_background)
+            },
+            style = DsType.caption11Strong.withReadingWeight(),
+            color = if (attention) colors.warnLabel else colors.labelTertiary,
+        )
+        (if (showAll) orderedJobs else orderedJobs.take(4)).forEach { job ->
+            val expanded = expandedJobId == job.id
+            Surface(
+                shape = DsShapes.row,
+                color = colors.wallpaperSurface(
+                    if (attention) WallpaperSurfaceLevel.FLOATING else WallpaperSurfaceLevel.CARD,
+                ),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(DsSpacing.small),
+                    verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        Text(
+                            job.label,
+                            style = DsType.small13.withReadingWeight(),
+                            color = if (attention) colors.labelPrimary else colors.labelSecondary,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            localJobStatusLabel(job.status),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = if (attention) colors.warnLabel else colors.labelTertiary,
+                        )
+                        DsButton(
+                            text = stringResource(
+                                if (expanded) R.string.local_run_job_hide
+                                else R.string.local_run_job_view,
+                            ),
+                            onClick = {
+                                if (expanded) {
+                                    expandedJobId = null
+                                    expandedJobOutput = ""
+                                } else {
+                                    expandedJobId = job.id
+                                    expandedJobOutput = onJobOutput(job.id)
+                                    agentMessageDraft = ""
+                                    agentMessageFeedback = ""
+                                }
+                            },
+                            variant = DsButtonVariant.Ghost,
+                            size = DsButtonSize.Small,
+                        )
+                    }
+                    DsExpandableColumn(
+                        visible = expanded,
+                        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+                    ) {
+                        Text(
+                            stringResource(R.string.local_run_job_output),
+                            style = DsType.caption11Strong.withReadingWeight(),
+                            color = colors.labelTertiary,
+                        )
+                        Text(
+                            expandedJobOutput.ifBlank {
+                                stringResource(R.string.local_run_job_output_empty)
+                            },
+                            style = DsType.caption11.withReadingWeight(),
+                            color = colors.labelSecondary,
+                            maxLines = 12,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (job.isAgent) {
+                            if (job.status == "dormant") {
+                                Text(
+                                    stringResource(R.string.local_run_agent_dormant_hint),
+                                    style = DsType.caption11.withReadingWeight(),
+                                    color = colors.labelSecondary,
+                                )
+                            }
+                            if (job.pendingMessageCount > 0) {
+                                Text(
+                                    stringResource(
+                                        R.string.local_run_agent_pending_messages,
+                                        job.pendingMessageCount,
+                                    ),
+                                    style = DsType.caption11.withReadingWeight(),
+                                    color = colors.labelTertiary,
+                                )
+                            }
+                            if (job.canMessage) {
+                                DsComposerField(
+                                    value = agentMessageDraft,
+                                    onValueChange = {
+                                        agentMessageDraft = it
+                                        agentMessageFeedback = ""
+                                    },
+                                    placeholder = stringResource(R.string.local_run_agent_message_hint),
+                                    maxLines = 4,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
+                                    DsButton(
+                                        text = stringResource(R.string.local_run_agent_send),
+                                        onClick = {
+                                            val message = agentMessageDraft.trim()
+                                            if (message.isNotEmpty() && !agentMessageSending) {
+                                                scope.launch {
+                                                    agentMessageSending = true
+                                                    try {
+                                                        val result = onSendAgentMessage(job.id, message)
+                                                        agentMessageFeedback = result.message
+                                                        if (result.accepted) agentMessageDraft = ""
+                                                    } finally {
+                                                        agentMessageSending = false
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        enabled = agentMessageDraft.isNotBlank() && !agentMessageSending,
+                                        loading = agentMessageSending,
+                                        variant = DsButtonVariant.Outline,
+                                        size = DsButtonSize.Small,
+                                    )
+                                }
+                                if (agentMessageFeedback.isNotBlank()) {
+                                    Text(
+                                        agentMessageFeedback,
+                                        style = DsType.caption11.withReadingWeight(),
+                                        color = colors.labelSecondary,
+                                    )
+                                }
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                        ) {
+                            DsButton(
+                                text = stringResource(R.string.local_run_job_refresh),
+                                onClick = { expandedJobOutput = onJobOutput(job.id) },
+                                variant = DsButtonVariant.Ghost,
+                                size = DsButtonSize.Small,
+                            )
+                            if (job.status in setOf("running", "dormant", "interrupted")) {
+                                DsButton(
+                                    text = stringResource(R.string.local_run_job_stop),
+                                    onClick = {
+                                        onStopJob(job.id)
+                                        expandedJobOutput = onJobOutput(job.id)
+                                    },
+                                    variant = DsButtonVariant.Danger,
+                                    size = DsButtonSize.Small,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

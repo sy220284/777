@@ -22,6 +22,7 @@ data class CharacterBehaviorTuning(
     val relationshipPace: Int = 50,
     val lockRelationshipStage: Boolean = false,
     val updatedAt: Long = 0L,
+    val expressionVariation: Int = 50,
 ) {
     fun normalized(): CharacterBehaviorTuning = copy(
         intimacy = intimacy.coerceIn(0, 100),
@@ -34,12 +35,14 @@ data class CharacterBehaviorTuning(
         loreAdherence = loreAdherence.coerceIn(0, 100),
         relationshipPace = relationshipPace.coerceIn(0, 100),
         updatedAt = updatedAt.coerceAtLeast(0L),
+        expressionVariation = expressionVariation.coerceIn(0, 100),
     )
 
     fun isNatural(): Boolean =
         intimacy == 50 && persistence == 50 && initiative == 50 && openness == 50 &&
             evolution == 50 && emotionalAfterglow == 50 && novelty == 50 &&
-            loreAdherence == 50 && relationshipPace == 50 && !lockRelationshipStage
+            loreAdherence == 50 && relationshipPace == 50 && !lockRelationshipStage &&
+            expressionVariation == 50
 
     internal fun transientTtl(base: Int): Int =
         scaleAroundNatural(base, persistence, low = 0.6f, high = 2.0f).coerceAtLeast(1)
@@ -60,6 +63,14 @@ data class CharacterBehaviorTuning(
         else -> 0
     }
 
+    /**
+     * Maps the user-facing "expression variation" axis to a restrained sampling range.
+     * Natural stays at the historical 0.85; supported routes may vary from 0.55 to 1.15.
+     * Routes that reject temperature already strip the field in LocalModelGateway.
+     */
+    internal fun roleplayTemperature(): Double =
+        0.55 + expressionVariation.coerceIn(0, 100) * 0.006
+
     internal fun evolutionStepBonus(): Int = when {
         evolution <= 20 -> -1
         evolution >= 85 -> 2
@@ -70,7 +81,7 @@ data class CharacterBehaviorTuning(
     internal fun signature(): String = listOf(
         intimacy, persistence, initiative, openness, evolution,
         emotionalAfterglow, novelty, loreAdherence, relationshipPace,
-        if (lockRelationshipStage) 1 else 0,
+        if (lockRelationshipStage) 1 else 0, expressionVariation,
     ).joinToString(",")
 }
 
@@ -107,6 +118,12 @@ internal fun StringBuilder.appendCharacterBehaviorTuningContext(tuning: Characte
             "互动新鲜度=" + axisLabel(clean.novelty, "保持习惯", "自然", "多变化") + "｜" +
                 "原设遵循=" + axisLabel(clean.loreAdherence, "自由演绎", "自然", "严格原设") + "｜" +
                 "关系节奏=" + axisLabel(clean.relationshipPace, "慢热", "自然", "升温较快"),
+        )
+    }
+    if (clean.expressionVariation != 50) {
+        appendLine(
+            "表达变化=" + axisLabel(clean.expressionVariation, "更稳定", "自然", "更丰富") +
+                "；只影响措辞与采样变化，不改变人物事实。",
         )
     }
     if (clean.lockRelationshipStage) appendLine("关系阶段已锁定：保持当前阶段，除非用户关闭锁定。")

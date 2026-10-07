@@ -5,6 +5,7 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -116,6 +117,7 @@ import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
 import com.labteto.dshmobile.ui.screens.main.RenameDialog
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
+import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsMetrics
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -128,6 +130,7 @@ import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
@@ -187,6 +190,7 @@ fun LocalHarnessScreen(
     var pendingUsageMode by remember { mutableStateOf<LocalUsageMode?>(null) }
     val featurePage = localFeatureCurrent(featureStack)
     val featureStateHolder = rememberSaveableStateHolder()
+    val predictiveBackProgress = remember { Animatable(0f) }
 
     fun pushFeature(page: LocalFeaturePage) {
         drawerFeatureOriginStack = null
@@ -276,6 +280,8 @@ fun LocalHarnessScreen(
         previewWorkspaceFile = viewModel::previewWorkspaceFile,
         backgroundJobOutput = viewModel::backgroundJobOutput,
         stopBackgroundJob = viewModel::stopBackgroundJob,
+        startBackgroundAgent = viewModel::startBackgroundAgent,
+        sendBackgroundAgentMessage = viewModel::sendBackgroundAgentMessage,
     )
     val automationActions = LocalAutomationFeatureUiActions(
         switchSession = viewModel::switchSession,
@@ -438,13 +444,39 @@ fun LocalHarnessScreen(
         enabled = !drawerState.isOpen && featurePage != LocalFeaturePage.HOME,
     ) { progress ->
         var swipeEdge: Int? = null
-        progress.collect { event ->
-            if (swipeEdge == null) swipeEdge = event.swipeEdge
-        }
-        when (localFeatureOwnedBackAction(featurePage, swipeEdge, featureContributions)) {
-            LocalFeatureBackAction.OPEN_DRAWER -> drawerState.open()
-            LocalFeatureBackAction.POP_FEATURE -> popFeature()
-            null -> Unit
+        try {
+            progress.collect { event ->
+                if (swipeEdge == null) swipeEdge = event.swipeEdge
+                when (localFeatureOwnedBackAction(featurePage, event.swipeEdge, featureContributions)) {
+                    LocalFeatureBackAction.POP_FEATURE ->
+                        predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
+
+                    LocalFeatureBackAction.OPEN_DRAWER, null ->
+                        if (predictiveBackProgress.value != 0f) predictiveBackProgress.snapTo(0f)
+                }
+            }
+
+            when (localFeatureOwnedBackAction(featurePage, swipeEdge, featureContributions)) {
+                LocalFeatureBackAction.OPEN_DRAWER -> {
+                    predictiveBackProgress.snapTo(0f)
+                    drawerState.open()
+                }
+
+                LocalFeatureBackAction.POP_FEATURE -> {
+                    popFeature()
+                    predictiveBackProgress.snapTo(0f)
+                }
+
+                null -> predictiveBackProgress.snapTo(0f)
+            }
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) {
+                predictiveBackProgress.animateTo(
+                    targetValue = 0f,
+                    animationSpec = DsAnimations.predictiveBackSettle,
+                )
+            }
+            throw cancelled
         }
     }
 
@@ -503,6 +535,7 @@ fun LocalHarnessScreen(
     ) {
         LocalFeatureAnimatedHost(
             stack = featureStack,
+            predictiveBackProgress = predictiveBackProgress.value,
             modifier = Modifier.fillMaxSize(),
         ) { renderedPage ->
             featureStateHolder.SaveableStateProvider(renderedPage.name) {

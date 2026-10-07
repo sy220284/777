@@ -41,6 +41,7 @@ import com.labteto.dshmobile.core.wire.dto.PluginInventorySnapshot
 import com.labteto.dshmobile.interop.mcp.McpServerSnapshot
 import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.local.presentation.LocalToolsUiFacade
+import com.labteto.dshmobile.local.presentation.LocalWebhookUiState
 import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
@@ -87,7 +88,10 @@ data class ToolsUiState(
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
     val remotePlugins: PluginInventorySnapshot? = null,
+    val webhook: LocalWebhookUiState = LocalWebhookUiState(),
     val notice: ToolsNotice? = null,
+    val feedback: String? = null,
+    val feedbackRes: Int? = null,
 )
 
 internal class ToolsOperationGate {
@@ -121,6 +125,10 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+    fun acknowledgeFeedback() {
+        _state.value = _state.value.copy(feedback = null, feedbackRes = null)
+    }
+
     fun refresh() {
         launchOperation {
             _state.value = _state.value.copy(loading = true, notice = null)
@@ -133,6 +141,7 @@ class ToolsViewModel @Inject constructor(
                     githubConfigured = localTools.githubConfigured(),
                     localPlugins = plugins,
                     remotePlugins = sessionStore.plugins.value,
+                    webhook = localTools.webhookStatus(),
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -253,6 +262,95 @@ class ToolsViewModel @Inject constructor(
             }
         }
     }
+
+    fun startWebhook(port: Int) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val message = localTools.startWebhook(port)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    webhook = localTools.webhookStatus(),
+                    feedback = message,
+                    feedbackRes = null,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    feedback = error.message,
+                    feedbackRes = if (error.message == null) R.string.tools_webhook_start_failed else null,
+                )
+            }
+        }
+    }
+
+    fun stopWebhook() {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                localTools.stopWebhook()
+                _state.value = _state.value.copy(
+                    loading = false,
+                    webhook = localTools.webhookStatus(),
+                    feedback = null,
+                    feedbackRes = R.string.tools_webhook_stopped,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    feedback = error.message,
+                    feedbackRes = if (error.message == null) R.string.tools_webhook_stop_failed else null,
+                )
+            }
+        }
+    }
+
+    fun copyWebhookToken() {
+        launchOperation {
+            try {
+                val message = localTools.copyWebhookToken()
+                _state.value = _state.value.copy(
+                    webhook = localTools.webhookStatus(),
+                    feedback = message,
+                    feedbackRes = null,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(
+                    feedback = error.message,
+                    feedbackRes = if (error.message == null) R.string.tools_webhook_copy_token_failed else null,
+                )
+            }
+        }
+    }
+
+    fun rotateWebhookToken() {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                val message = localTools.rotateWebhookToken()
+                _state.value = _state.value.copy(
+                    loading = false,
+                    webhook = localTools.webhookStatus(),
+                    feedback = message,
+                    feedbackRes = null,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    feedback = error.message,
+                    feedbackRes = if (error.message == null) R.string.tools_webhook_rotate_token_failed else null,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -273,6 +371,9 @@ fun ToolsScreen(
     var githubToken by remember { mutableStateOf("") }
     var showGitHubConfig by remember { mutableStateOf(false) }
     var showExternalConfig by remember { mutableStateOf(false) }
+    var showWebhookConfig by remember { mutableStateOf(false) }
+    var capabilityDetail by remember { mutableStateOf<String?>(null) }
+    var webhookPort by remember { mutableStateOf("8765") }
     var confirmClearGitHub by remember { mutableStateOf(false) }
 
     val noticeMessage = state.notice?.let { notice ->
@@ -309,6 +410,14 @@ fun ToolsScreen(
         }
         state.notice?.takeUnless { it == ToolsNotice.CONNECTING }
             ?.let(viewModel::acknowledgeNotice)
+    }
+
+    val feedbackMessage = state.feedback ?: state.feedbackRes?.let { stringResource(it) }
+    LaunchedEffect(feedbackMessage) {
+        feedbackMessage?.let { message ->
+            toast.second(message)
+            viewModel.acknowledgeFeedback()
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -377,11 +486,11 @@ fun ToolsScreen(
                         DsCategoryRow(
                             icon = FeatherIcons.Code,
                             title = stringResource(R.string.tools_capability_code),
-                            subtitle = stringResource(R.string.tools_capability_agent_available),
+                            subtitle = stringResource(R.string.tools_capability_code_hint),
                             value = capabilityStateLabel(
                                 "local-language-server" in state.localPlugins,
                             ),
-                            onClick = { onOpenSettings(SettingsDestination.ADVANCED) },
+                            onClick = { capabilityDetail = "code" },
                         )
                         DsCategoryRow(
                             icon = FeatherIcons.Device,
@@ -393,9 +502,9 @@ fun ToolsScreen(
                         DsCategoryRow(
                             icon = FeatherIcons.Image,
                             title = stringResource(R.string.tools_capability_vision),
-                            subtitle = stringResource(R.string.tools_capability_agent_available),
+                            subtitle = stringResource(R.string.tools_capability_vision_hint),
                             value = capabilityStateLabel("local-vision" in state.localPlugins),
-                            onClick = { onOpenSettings(SettingsDestination.MODELS) },
+                            onClick = { capabilityDetail = "vision" },
                         )
                         DsCategoryRow(
                             icon = FeatherIcons.Clock,
@@ -431,6 +540,19 @@ fun ToolsScreen(
                             subtitle = stringResource(R.string.tools_external_services_hint),
                             value = state.servers.size.toString(),
                             onClick = { showExternalConfig = true },
+                        )
+                        DsCategoryRow(
+                            icon = FeatherIcons.Zap,
+                            title = stringResource(R.string.tools_webhook_title),
+                            subtitle = stringResource(R.string.tools_webhook_hint),
+                            value = stringResource(
+                                if (state.webhook.enabled) R.string.tools_webhook_enabled
+                                else R.string.tools_webhook_disabled,
+                            ),
+                            onClick = {
+                                webhookPort = state.webhook.port.toString()
+                                showWebhookConfig = true
+                            },
                         )
                     }
 
@@ -498,6 +620,16 @@ fun ToolsScreen(
             subtitle = stringResource(R.string.tools_github_connector_hint),
             onDismiss = { showGitHubConfig = false },
         ) {
+            Text(
+                stringResource(R.string.tools_github_capabilities),
+                style = DsType.small13.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+            Text(
+                stringResource(R.string.tools_github_write_approval),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelTertiary,
+            )
             OutlinedTextField(
                 value = githubToken,
                 onValueChange = { githubToken = it.take(4096) },
@@ -531,6 +663,110 @@ fun ToolsScreen(
                     )
                 }
             }
+        }
+    }
+
+    capabilityDetail?.let { detail ->
+        val isCode = detail == "code"
+        DsBottomSheet(
+            title = stringResource(
+                if (isCode) R.string.tools_capability_code else R.string.tools_capability_vision,
+            ),
+            subtitle = stringResource(
+                if (isCode) R.string.tools_capability_code_detail
+                else R.string.tools_capability_vision_detail,
+            ),
+            onDismiss = { capabilityDetail = null },
+        ) {
+            Text(
+                stringResource(
+                    if (isCode) R.string.tools_capability_code_features
+                    else R.string.tools_capability_vision_features,
+                ),
+                style = DsType.small13.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+            DsButton(
+                text = stringResource(R.string.tools_capability_open_settings),
+                onClick = {
+                    capabilityDetail = null
+                    onOpenSettings(
+                        if (isCode) SettingsDestination.ADVANCED else SettingsDestination.MODELS,
+                    )
+                },
+                variant = DsButtonVariant.Outline,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+
+    if (showWebhookConfig) {
+        DsBottomSheet(
+            title = stringResource(R.string.tools_webhook_title),
+            subtitle = stringResource(R.string.tools_webhook_local_only_hint),
+            onDismiss = { if (!state.loading) showWebhookConfig = false },
+        ) {
+            Text(
+                stringResource(R.string.tools_webhook_address, state.webhook.port),
+                style = DsType.std14Strong.withReadingWeight(),
+                color = colors.labelPrimary,
+            )
+            Text(
+                stringResource(
+                    R.string.tools_webhook_token_hint,
+                    state.webhook.tokenHint ?: "—",
+                ),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.labelTertiary,
+            )
+            OutlinedTextField(
+                value = webhookPort,
+                onValueChange = { webhookPort = it.filter(Char::isDigit).take(5) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.tools_webhook_port)) },
+                supportingText = { Text(stringResource(R.string.tools_webhook_port_hint)) },
+                enabled = !state.loading && !state.webhook.enabled,
+                singleLine = true,
+                shape = DsShapes.row,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsButton(
+                    text = stringResource(
+                        if (state.webhook.enabled) R.string.tools_webhook_stop
+                        else R.string.tools_webhook_start,
+                    ),
+                    onClick = {
+                        if (state.webhook.enabled) {
+                            viewModel.stopWebhook()
+                        } else {
+                            webhookPort.toIntOrNull()?.let(viewModel::startWebhook)
+                        }
+                    },
+                    enabled = !state.loading &&
+                        (
+                            state.webhook.enabled ||
+                                webhookPort.toIntOrNull()?.let { it in 1024..65535 } == true
+                        ),
+                    modifier = Modifier.weight(1f),
+                )
+                DsButton(
+                    text = stringResource(R.string.tools_webhook_copy_token),
+                    onClick = viewModel::copyWebhookToken,
+                    enabled = !state.loading,
+                    modifier = Modifier.weight(1f),
+                    variant = DsButtonVariant.Outline,
+                )
+            }
+            DsButton(
+                text = stringResource(R.string.tools_webhook_rotate_token),
+                onClick = viewModel::rotateWebhookToken,
+                enabled = !state.loading,
+                modifier = Modifier.fillMaxWidth(),
+                variant = DsButtonVariant.Ghost,
+            )
         }
     }
 

@@ -311,6 +311,9 @@ private fun WorkScreenshot() {
             ),
             onJobOutput = { "" },
             onStopJob = { "" },
+            onSendAgentMessage = { _, _ ->
+                LocalWorkUiActionResult(false, "")
+            },
             onOpenResults = {},
         )
         Spacer(Modifier.weight(1f))

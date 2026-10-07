@@ -360,4 +360,45 @@ class LocalJobManagerTest {
             root.deleteRecursively()
         }
     }
+
+    @Test
+    fun restoredContinuableAgentKeepsRunCenterCapabilitiesInSnapshotProjection() = runTest {
+        val root = createTempDir(prefix = "restored-agent-ui-projection-")
+        try {
+            val store = LocalPersistentJobStore(
+                file = File(root, "jobs.json"),
+                json = Json { ignoreUnknownKeys = true },
+            )
+            store.write(
+                listOf(
+                    JobSnapshot(
+                        id = "job-agent",
+                        label = "子代理：恢复检查",
+                        status = "completed",
+                        resumeKind = "subagent_readonly",
+                        resumePayload = """{"session_id":"session-a"}""",
+                        ownerId = "session-a",
+                        continuable = true,
+                        inbox = listOf(
+                            QueuedAgentInput(id = "msg-1", content = "继续检查"),
+                        ),
+                    ),
+                ),
+            )
+
+            val restarted = LocalJobManager(this, store) { }
+            val info = restarted.snapshotInfos().single()
+
+            assertEquals("job-agent", info.id)
+            assertEquals("dormant", info.status)
+            assertEquals("session-a", info.ownerSessionId)
+            assertTrue(info.isAgent)
+            assertTrue(info.canMessage)
+            assertTrue(info.continuable)
+            assertEquals(1, info.pendingMessageCount)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
 }

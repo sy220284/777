@@ -121,6 +121,7 @@ internal fun localConversationModeLabel(mode: LocalConversationMode): String = s
 @Composable
 internal fun localJobStatusLabel(status: String): String = when (status) {
     "running" -> stringResource(R.string.jobs_running)
+    "dormant" -> stringResource(R.string.jobs_waiting_message)
     "completed" -> stringResource(R.string.jobs_completed)
     "killed", "cancelled" -> stringResource(R.string.jobs_killed)
     "failed" -> stringResource(R.string.jobs_failed)
@@ -409,4 +410,3 @@ internal fun decodeLocalAttachmentThumbnail(
         BitmapFactory.Options().apply { inSampleSize = sample },
     )?.asImageBitmap()
 }.getOrNull()
-

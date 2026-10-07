@@ -75,6 +75,7 @@ internal fun CharacterBehaviorTuningDialogHost(
     persona: PersonaProfile,
     portraitPath: String,
     state: ChatCharacterState,
+    temperatureTuningAvailable: Boolean = true,
     onConfigurePersona: suspend (PersonaProfile) -> Result<Unit>,
     onDismiss: () -> Unit,
 ) {
@@ -86,6 +87,7 @@ internal fun CharacterBehaviorTuningDialogHost(
         mood = state.mood,
         evolution = state.evolution,
         initial = state.behaviorTuning,
+        temperatureTuningAvailable = temperatureTuningAvailable,
         onSave = { tuning ->
             onConfigurePersona(persona.copy(behaviorTuning = tuning))
         },
@@ -102,6 +104,7 @@ internal fun CharacterBehaviorTuningDialog(
     mood: String,
     evolution: CharacterEvolutionState,
     initial: CharacterBehaviorTuning,
+    temperatureTuningAvailable: Boolean = true,
     onSave: suspend (CharacterBehaviorTuning) -> Result<Unit>,
     onDismiss: () -> Unit,
 ) {
@@ -381,6 +384,16 @@ internal fun CharacterBehaviorTuningDialog(
                     onValueChange = { draft = draft.copy(novelty = it) },
                     enabled = !saving,
                 )
+                if (temperatureTuningAvailable) {
+                    BehaviorSlider(
+                        title = stringResource(R.string.local_character_tuning_expression_variation),
+                        low = stringResource(R.string.local_character_tuning_expression_variation_low),
+                        high = stringResource(R.string.local_character_tuning_expression_variation_high),
+                        value = draft.expressionVariation,
+                        onValueChange = { draft = draft.copy(expressionVariation = it) },
+                        enabled = !saving,
+                    )
+                }
                 BehaviorSlider(
                     title = stringResource(R.string.local_character_tuning_lore),
                     low = stringResource(R.string.local_character_tuning_lore_low),

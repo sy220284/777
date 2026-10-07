@@ -43,6 +43,8 @@ internal fun localWorkFeatureUiContribution(
                 state = workState,
                 onJobOutput = actions.backgroundJobOutput,
                 onStopJob = actions.stopBackgroundJob,
+                onStartBackgroundAgent = actions.startBackgroundAgent,
+                onSendAgentMessage = actions.sendBackgroundAgentMessage,
                 onOpenResults = {
                     onFilesModeChange(LocalFilesMode.CONVERSATION)
                     onPushFeature(LocalFeaturePage.WORKSPACE)

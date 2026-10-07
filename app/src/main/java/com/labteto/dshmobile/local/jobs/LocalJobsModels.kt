@@ -8,4 +8,8 @@ data class LocalJobInfo(
     val label: String,
     val status: String,
     val ownerSessionId: String? = null,
+    val isAgent: Boolean = false,
+    val canMessage: Boolean = false,
+    val continuable: Boolean = false,
+    val pendingMessageCount: Int = 0,
 )

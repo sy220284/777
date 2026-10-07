@@ -93,6 +93,32 @@ class CharacterBehaviorTuningDialogTest {
     }
 
     @Test
+    fun expressionVariationIsHiddenWhenTemperatureTuningIsUnavailable() {
+        compose.setContent {
+            DshTheme {
+                CharacterBehaviorTuningDialog(
+                    personaName = "角色",
+                    portraitPath = "",
+                    relationshipState = "熟悉",
+                    mood = "平静",
+                    evolution = CharacterEvolutionState(),
+                    initial = CharacterBehaviorTuning(),
+                    temperatureTuningAvailable = false,
+                    onSave = { Result.success(Unit) },
+                    onDismiss = {},
+                )
+            }
+        }
+
+        val advanced = context.getString(R.string.local_character_tuning_advanced)
+        val expressionVariation =
+            context.getString(R.string.local_character_tuning_expression_variation)
+
+        compose.onNodeWithText(advanced).performScrollTo().performClick()
+        compose.onNodeWithText(expressionVariation).assertDoesNotExist()
+    }
+
+    @Test
     fun advancedParametersStayHiddenUntilRequestedAndRemainReachable() {
         compose.setContent {
             DshTheme {

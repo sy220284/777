@@ -195,6 +195,18 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
     fun backgroundJobOutput(jobId: String): String = runtime.work.backgroundJobOutputForUi(jobId)
     fun stopBackgroundJob(jobId: String): String = runtime.work.stopBackgroundJobForUi(jobId)
+    internal suspend fun startBackgroundAgent(task: String): LocalWorkUiActionResult {
+        val result = runtime.work.startBackgroundAgentForUi(task)
+        return LocalWorkUiActionResult(result.accepted, result.message)
+    }
+
+    internal suspend fun sendBackgroundAgentMessage(
+        agentId: String,
+        message: String,
+    ): LocalWorkUiActionResult {
+        val result = runtime.work.sendBackgroundAgentMessageForUi(agentId, message)
+        return LocalWorkUiActionResult(result.accepted, result.message)
+    }
     fun approve(callId: String) = runtime.work.answerApproval(callId, true)
     fun deny(callId: String) = runtime.work.answerApproval(callId, false)
     fun enableAutoApproval() = runtime.work.enableAutoApproval()

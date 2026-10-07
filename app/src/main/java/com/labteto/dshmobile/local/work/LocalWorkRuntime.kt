@@ -15,6 +15,7 @@ class LocalWorkRuntime @Inject internal constructor(
     private val approvals: LocalWorkApprovalCoordinator,
     private val planMode: LocalWorkPlanModeCoordinator,
     private val execution: LocalWorkExecutionPort,
+    private val agentUi: LocalWorkAgentUiPort,
 ) {
     internal fun send(
         text: String,
@@ -27,6 +28,10 @@ class LocalWorkRuntime @Inject internal constructor(
         runtimeStateStore.jobManager.output(jobId, runtimeStateStore.currentSessionId)
     internal fun stopBackgroundJobForUi(jobId: String): String =
         runtimeStateStore.jobManager.kill(jobId, runtimeStateStore.currentSessionId)
+    internal suspend fun startBackgroundAgentForUi(task: String): LocalWorkAgentUiResult =
+        agentUi.startBackgroundAgent(task)
+    internal suspend fun sendBackgroundAgentMessageForUi(agentId: String, message: String): LocalWorkAgentUiResult =
+        agentUi.sendMessage(agentId, message)
     internal fun answerApproval(callId: String, approved: Boolean) {
         val binding = workRunRegistry[runtimeStateStore.currentSessionId]
         if (binding?.interactions?.answerApproval(callId, approved) == true) return

@@ -79,6 +79,7 @@ import com.labteto.dshmobile.local.presentation.chatBranchInfo
 import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
@@ -800,10 +801,23 @@ internal fun LocalConversationSurface(
         )
     }
     CharacterBehaviorTuningDialogHost(
-        showCharacterTuning && state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled,
-        state.chatPersona, currentGalleryEntry?.portraitPath.orEmpty(), state.chatState,
-        onConfigureChatPersona,
-    ) { showCharacterTuning = false }
+        visible = showCharacterTuning &&
+            state.usageMode == LocalUsageMode.CHAT &&
+            !state.groupChat.enabled,
+        persona = state.chatPersona,
+        portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
+        state = state.chatState,
+        temperatureTuningAvailable = activeModelProfile?.let { profile ->
+            LocalModelPresets.runtimeCapabilitiesFor(
+                model = profile.model,
+                baseUrl = profile.baseUrl,
+                protocol = profile.protocol,
+                authKind = profile.authKind,
+            ).temperature
+        } ?: true,
+        onConfigurePersona = onConfigureChatPersona,
+        onDismiss = { showCharacterTuning = false },
+    )
     if (
         showPersonaPicker &&
         state.usageMode == LocalUsageMode.CHAT &&

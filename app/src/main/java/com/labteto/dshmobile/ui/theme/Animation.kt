@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 
 /**
  * The app's motion vocabulary. Screens reach for these instead of inlining `tween(…)` so that
@@ -88,6 +89,38 @@ object DsAnimations {
 
     /** Page opacity settles slightly before geometry so navigation never feels floaty. */
     val pageFade: FiniteAnimationSpec<Float> = tween(140, easing = FastOutSlowInEasing)
+
+    /**
+     * Feature hierarchy push. Kept separate from [pageSlide] because overlays still need the
+     * slightly broader generic page motion while navigation pages use a calmer spatial grammar.
+     */
+    val featurePageForward: FiniteAnimationSpec<IntOffset> =
+        tween(210, easing = FastOutSlowInEasing)
+
+    /** Feature hierarchy pop mirrors push but settles a touch faster. */
+    val featurePageBackward: FiniteAnimationSpec<IntOffset> =
+        tween(200, easing = FastOutSlowInEasing)
+
+    /** Switching between drawer peers is mostly a cross-fade with only a tiny positional cue. */
+    val featurePagePeer: FiniteAnimationSpec<IntOffset> =
+        tween(165, easing = FastOutSlowInEasing)
+
+    /** Incoming page opacity: finishes before the larger geometry motion. */
+    val featurePageEnterFade: FiniteAnimationSpec<Float> =
+        tween(150, easing = FastOutSlowInEasing)
+
+    /** Outgoing page opacity leaves first so navigation feels crisp instead of floaty. */
+    val featurePageExitFade: FiniteAnimationSpec<Float> =
+        tween(110, easing = FastOutSlowInEasing)
+
+    /** Cancelled predictive-back gestures return without overshoot. */
+    val predictiveBackSettle: FiniteAnimationSpec<Float> = spring(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMedium,
+    )
+
+    /** Maximum direct-manipulation offset while a predictive-back gesture is in progress. */
+    val predictiveBackMaxOffset: Dp = 28.dp
 
     /** One half of the restrained breathing loop used only by live loading/running semantics. */
     val semanticPulse = tween<Float>(900, easing = FastOutSlowInEasing)

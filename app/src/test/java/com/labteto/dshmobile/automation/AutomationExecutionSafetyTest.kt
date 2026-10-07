@@ -64,6 +64,51 @@ class AutomationExecutionSafetyTest {
     }
 
     @Test
+    fun interactionPolicyUpdatePreservesScheduleAndWaitingState() {
+        val original = AutomationTask(
+            id = "policy-chat",
+            prompt = "继续互动",
+            createdAt = 1L,
+            nextRunAt = 9_999L,
+            recurringMinutes = 120L,
+            scheduleType = AutomationScheduleType.INTERVAL,
+            scheduleGeneration = 7L,
+            mode = AutomationMode.CHAT,
+            targetSessionId = "session-a",
+            status = AutomationStatus.WAITING_USER,
+            quietHoursEnabled = false,
+            proactiveMinGapMinutes = 360L,
+            proactiveMaxUnanswered = 3,
+            notify = true,
+        )
+
+        val updated = original.withChatInteractionPolicy(
+            quietHoursEnabled = true,
+            quietStartHour = 23,
+            quietStartMinute = 30,
+            quietEndHour = 8,
+            quietEndMinute = 15,
+            proactiveMinGapMinutes = 720L,
+            proactiveMaxUnanswered = 2,
+            notify = false,
+        )
+
+        assertEquals(9_999L, updated.nextRunAt)
+        assertEquals(7L, updated.scheduleGeneration)
+        assertEquals(AutomationStatus.WAITING_USER, updated.status)
+        assertEquals(AutomationScheduleType.INTERVAL, updated.scheduleType)
+        assertEquals(120L, updated.recurringMinutes)
+        assertEquals(true, updated.quietHoursEnabled)
+        assertEquals(23, updated.quietStartHour)
+        assertEquals(30, updated.quietStartMinute)
+        assertEquals(8, updated.quietEndHour)
+        assertEquals(15, updated.quietEndMinute)
+        assertEquals(720L, updated.proactiveMinGapMinutes)
+        assertEquals(2, updated.proactiveMaxUnanswered)
+        assertEquals(false, updated.notify)
+    }
+
+    @Test
     fun userActivityRescheduleUsesActivityTimeInsteadOfOldWaitingSnapshot() {
         val task = AutomationTask(
             id = "chat-a",

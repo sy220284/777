@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.jobs
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.jobs.HarnessJobManager
+import com.labteto.dshmobile.harness.jobs.JobInfo
 import com.labteto.dshmobile.harness.jobs.JobMessageAdmission
 import com.labteto.dshmobile.harness.jobs.JobStartResult
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
@@ -16,7 +17,7 @@ internal class LocalJobManager(
     private val delegate = HarnessJobManager(
         scope = scope,
         onChanged = { jobs ->
-            onChanged(jobs.map { LocalJobInfo(it.id, it.label, it.status, it.ownerId) })
+            onChanged(jobs.map { it.toLocalJobInfo() })
         },
         initialSnapshots = store?.read().orEmpty(),
         onSnapshotsChanged = { snapshots -> store?.write(snapshots) },
@@ -103,9 +104,7 @@ internal class LocalJobManager(
         block: suspend (String, (String) -> Unit) -> String,
     ): String = delegate.resumePersistent(id, ownerSessionId, block)
 
-    fun snapshotInfos(): List<LocalJobInfo> = delegate.snapshots().map {
-        LocalJobInfo(it.id, it.label, it.status, it.ownerId)
-    }
+    fun snapshotInfos(): List<LocalJobInfo> = delegate.infos().map { it.toLocalJobInfo() }
 
     fun list(ownerSessionId: String? = null): String = delegate.list(ownerSessionId)
 
@@ -150,3 +149,14 @@ internal class LocalJobManager(
 
     suspend fun removeOwnedAndJoin(sessionIds: Set<String>) = delegate.removeOwnedAndJoin(sessionIds)
 }
+
+private fun JobInfo.toLocalJobInfo(): LocalJobInfo = LocalJobInfo(
+    id = id,
+    label = label,
+    status = status,
+    ownerSessionId = ownerId,
+    isAgent = isAgent,
+    canMessage = canMessage,
+    continuable = continuable,
+    pendingMessageCount = pendingMessageCount,
+)

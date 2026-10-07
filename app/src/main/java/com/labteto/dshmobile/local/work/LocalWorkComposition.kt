@@ -2,7 +2,9 @@ package com.labteto.dshmobile.local.work
 
 import android.content.Context
 import com.labteto.dshmobile.harness.agent.AgentToolResult
+import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.local.LocalModelRequestCoordinator
+import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.LocalToolApprovalRuntime
 import com.labteto.dshmobile.local.LocalToolCompositionRoot
 import com.labteto.dshmobile.local.context.ContextComposer
@@ -26,6 +28,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -54,7 +57,7 @@ internal class LocalWorkComposition @Inject constructor(
     memoryManager: MemoryManager,
     private val toolApproval: LocalToolApprovalRuntime,
     json: Json,
-) {
+) : LocalWorkAgentUiPort {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val toolResultRuntime = LocalWorkToolResultRuntime(
         runtimeStateStore = runtimeStateStore,
@@ -267,6 +270,71 @@ internal class LocalWorkComposition @Inject constructor(
         runCatching { agentTeams.recoverMailbox(sessionId) }
         persistentJobs.schedule(sessionId)
     }
+
+    override suspend fun startBackgroundAgent(task: String): LocalWorkAgentUiResult =
+        withContext(Dispatchers.IO) {
+            val clean = task.trim()
+            if (clean.isEmpty()) {
+                return@withContext LocalWorkAgentUiResult(false, "请输入要交给后台子代理的任务")
+            }
+            val sessionId = runtimeStateStore.currentSessionId
+            val snapshot = runtimeStateStore.state.value
+            if (snapshot.sessionId != sessionId || snapshot.usageMode != LocalUsageMode.WORK) {
+                return@withContext LocalWorkAgentUiResult(false, "请先进入当前工作会话再启动后台子代理")
+            }
+            try {
+                val result = persistentJobs.startReadonlySubagentResult(
+                    task = clean,
+                    model = LocalWorkerModelRouter.resolve(null, snapshot),
+                    maxSteps = snapshot.subagentMaxSteps,
+                    virtualScreen = false,
+                    sessionId = sessionId,
+                    boundState = snapshot,
+                    historySnapshot = runtimeStateStore.foregroundRunHandle.modelHistory::snapshot,
+                )
+                LocalWorkAgentUiResult(
+                    accepted = result.accepted,
+                    message = result.message,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                LocalWorkAgentUiResult(
+                    false,
+                    "后台子代理启动失败：" + (error.message ?: error::class.java.simpleName),
+                )
+            }
+        }
+
+    override suspend fun sendMessage(agentId: String, message: String): LocalWorkAgentUiResult =
+        withContext(Dispatchers.IO) {
+            val clean = message.trim()
+            if (clean.isEmpty()) {
+                return@withContext LocalWorkAgentUiResult(false, "请输入要追加给子代理的消息")
+            }
+            try {
+                val admission = persistentJobs.sendInput(
+                    agentId = agentId,
+                    input = QueuedAgentInput(
+                        id = "ui-msg-" + java.util.UUID.randomUUID().toString().replace("-", "").take(16),
+                        content = clean,
+                        memoryInput = clean,
+                    ),
+                    sessionId = runtimeStateStore.currentSessionId,
+                )
+                LocalWorkAgentUiResult(
+                    accepted = admission.accepted,
+                    message = admission.message,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                LocalWorkAgentUiResult(
+                    false,
+                    "消息发送失败：" + (error.message ?: error::class.java.simpleName),
+                )
+            }
+        }
 
     private suspend fun executeAutomationSubagentTool(
         call: LocalToolCall,

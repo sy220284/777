@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -42,6 +43,7 @@ internal data class TaskEditorStateRefs(
     val cadence: MutableState<AutomationCadence>,
     val firstRunAt: MutableState<Long>,
     val customHours: MutableState<String>,
+    val notify: MutableState<Boolean>,
     val createError: MutableState<String?>,
 )
 
@@ -57,6 +59,7 @@ internal fun ColumnScope.TaskEditorPane(
     var cadence by state.cadence
     var firstRunAt by state.firstRunAt
     var customHours by state.customHours
+    var notify by state.notify
     var createError by state.createError
     val context = LocalContext.current
     val colors = DsTheme.colors
@@ -140,6 +143,27 @@ internal fun ColumnScope.TaskEditorPane(
                     singleLine = true,
                 )
             }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.tasks_notify_title),
+                        style = DsType.small13Strong.withReadingWeight(),
+                        color = colors.labelPrimary,
+                    )
+                    Text(
+                        stringResource(R.string.tasks_notify_hint),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = colors.labelTertiary,
+                    )
+                }
+                Switch(
+                    checked = notify,
+                    onCheckedChange = { notify = it },
+                )
+            }
             createError?.let {
                 Text(
                     it,
@@ -191,6 +215,7 @@ internal fun ColumnScope.TaskEditorPane(
                                 quietEndMinute = LocalAutomationPolicyProjection.defaults.quietEndMinute,
                                 proactiveMinGapMinutes = LocalAutomationPolicyProjection.defaults.proactiveMinGapMinutes,
                                 proactiveMaxUnanswered = LocalAutomationPolicyProjection.defaults.proactiveMaxUnanswered,
+                                notify = notify,
                             )
                         } ?: viewModel.createAt(
                             prompt = prompt,
@@ -198,6 +223,7 @@ internal fun ColumnScope.TaskEditorPane(
                             recurringMinutes = recurringMinutes,
                             mode = AutomationMode.WORK,
                             scheduleType = scheduleType,
+                            notify = notify,
                         )
                         if (ok) onReset() else createError = createInvalidMessage
                     },
