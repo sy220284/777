@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +27,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.DsTextField
+import com.labteto.dshmobile.ui.components.DsCheckbox
 import com.labteto.dshmobile.local.presentation.MAX_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.presentation.MIN_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -170,7 +170,7 @@ internal fun GroupChatMemberPickerSheet(
                                         )
                                     }
                                 }
-                                Checkbox(
+                                DsCheckbox(
                                     checked = checked,
                                     onCheckedChange = null,
                                     enabled = enabled && canAdd,
