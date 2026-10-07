@@ -109,6 +109,8 @@ enum class SettingsDestination {
     ROOT,
     SESSION,
     APPEARANCE,
+    THEME_BACKGROUND,
+    READING,
     CHAT,
     MODELS,
     MODEL_USAGE,
@@ -120,6 +122,8 @@ enum class SettingsDestination {
     PERMISSIONS,
     NOTIFICATIONS,
     ADVANCED,
+    WORKSPACE_STORAGE,
+    RUNTIME_DIAGNOSTICS,
 }
 
 private fun SettingsDestination.parentDestination(): SettingsDestination? = when (this) {
@@ -132,7 +136,11 @@ private fun SettingsDestination.parentDestination(): SettingsDestination? = when
     SettingsDestination.PERMISSIONS,
     SettingsDestination.NOTIFICATIONS,
     SettingsDestination.ADVANCED -> SettingsDestination.ROOT
+    SettingsDestination.THEME_BACKGROUND,
+    SettingsDestination.READING -> SettingsDestination.APPEARANCE
     SettingsDestination.CHAT -> SettingsDestination.SESSION
+    SettingsDestination.WORKSPACE_STORAGE,
+    SettingsDestination.RUNTIME_DIAGNOSTICS -> SettingsDestination.ADVANCED
     SettingsDestination.PRICING,
     SettingsDestination.USAGE -> SettingsDestination.MODEL_USAGE
     SettingsDestination.USAGE_LOG -> SettingsDestination.USAGE
@@ -275,7 +283,7 @@ fun SettingsScreen(
     LaunchedEffect(page) {
         scrollState.scrollTo(0)
         if (page == SettingsDestination.MEMORY) viewModel.refreshMemories()
-        if (page == SettingsDestination.ADVANCED) {
+        if (page == SettingsDestination.WORKSPACE_STORAGE) {
             localSessionStorageStatus = runCatching { viewModel.localSessionStorageStatus() }.getOrNull()
         }
     }
@@ -291,6 +299,8 @@ fun SettingsScreen(
         SettingsDestination.ROOT -> stringResource(R.string.settings_title)
         SettingsDestination.SESSION -> stringResource(R.string.settings_page_session)
         SettingsDestination.APPEARANCE -> stringResource(R.string.settings_page_appearance)
+        SettingsDestination.THEME_BACKGROUND -> stringResource(R.string.settings_page_theme_background)
+        SettingsDestination.READING -> stringResource(R.string.settings_page_reading)
         SettingsDestination.CHAT -> stringResource(R.string.settings_page_chat)
         SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
         SettingsDestination.MODEL_USAGE -> stringResource(R.string.settings_page_model_usage)
@@ -305,6 +315,8 @@ fun SettingsScreen(
         SettingsDestination.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
         SettingsDestination.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
         SettingsDestination.ADVANCED -> stringResource(R.string.settings_page_advanced)
+        SettingsDestination.WORKSPACE_STORAGE -> stringResource(R.string.settings_page_workspace_storage)
+        SettingsDestination.RUNTIME_DIAGNOSTICS -> stringResource(R.string.settings_runtime_diagnostics)
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
@@ -469,12 +481,48 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.APPEARANCE -> {
+                        DsGroupCard {
+                            DsCategoryRow(
+                                icon = FeatherIcons.Image,
+                                title = stringResource(R.string.settings_page_theme_background),
+                                subtitle = stringResource(R.string.settings_theme_background_subtitle),
+                                value = appearanceThemeLabel(settings.themePreference),
+                                onClick = { page = SettingsDestination.THEME_BACKGROUND },
+                            )
+                            DsCategoryRow(
+                                icon = FeatherIcons.Sliders,
+                                title = stringResource(R.string.settings_page_reading),
+                                subtitle = stringResource(R.string.settings_reading_subtitle),
+                                value = stringResource(
+                                    R.string.settings_text_scale_value,
+                                    (settings.textScale * 100).toInt(),
+                                ),
+                                onClick = { page = SettingsDestination.READING },
+                            )
+                        }
+                    }
+
+                    SettingsDestination.THEME_BACKGROUND -> {
+                        SettingsCard(stringResource(R.string.settings_appearance), FeatherIcons.Image) {
+                            AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
+                            AccentThemeRow(settings) { key -> viewModel.set { it.copy(accentTheme = key) } }
+                            BackgroundRow(
+                                path = settings.backgroundImagePath,
+                                adaptiveContrast = settings.backgroundAdaptiveContrast,
+                                onAdaptiveContrastChange = { enabled ->
+                                    viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) }
+                                },
+                                onPick = { uri -> viewModel.setBackgroundImage(uri) },
+                                onClear = { viewModel.clearBackgroundImage() },
+                            )
+                        }
+                    }
+
+                    SettingsDestination.READING -> {
                         SettingsCard(stringResource(R.string.settings_appearance_preview), FeatherIcons.Sliders) {
                             AppearanceReadingPreview()
                         }
-                        SettingsCard(stringResource(R.string.settings_appearance), FeatherIcons.Sliders) {
-                            AppearanceRow(settings) { mode -> viewModel.set { it.copy(themePreference = mode) } }
-                            AccentThemeRow(settings) { key -> viewModel.set { it.copy(accentTheme = key) } }
+                        SettingsCard(stringResource(R.string.settings_page_reading), FeatherIcons.Sliders) {
                             ReadingPreferencesRow(
                                 settings = settings,
                                 onTextScaleChange = { value ->
@@ -488,15 +536,6 @@ fun SettingsScreen(
                                         it.copy(wallpaperSurfaceTransparency = value.coerceIn(0f, 1f))
                                     }
                                 },
-                            )
-                            BackgroundRow(
-                                path = settings.backgroundImagePath,
-                                adaptiveContrast = settings.backgroundAdaptiveContrast,
-                                onAdaptiveContrastChange = { enabled ->
-                                    viewModel.set { it.copy(backgroundAdaptiveContrast = enabled) }
-                                },
-                                onPick = { uri -> viewModel.setBackgroundImage(uri) },
-                                onClear = { viewModel.clearBackgroundImage() },
                             )
                         }
                     }
@@ -772,7 +811,23 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.ADVANCED -> {
-                        LocalAgentSettingsCard(localHarness, viewModel, toast.second)
+                        DsGroupCard {
+                            DsCategoryRow(
+                                icon = FeatherIcons.Folder,
+                                title = stringResource(R.string.settings_page_workspace_storage),
+                                subtitle = stringResource(R.string.settings_workspace_storage_subtitle),
+                                onClick = { page = SettingsDestination.WORKSPACE_STORAGE },
+                            )
+                            DsCategoryRow(
+                                icon = FeatherIcons.Activity,
+                                title = stringResource(R.string.settings_runtime_diagnostics),
+                                subtitle = stringResource(R.string.settings_runtime_diagnostics_subtitle),
+                                onClick = { page = SettingsDestination.RUNTIME_DIAGNOSTICS },
+                            )
+                        }
+                    }
+
+                    SettingsDestination.WORKSPACE_STORAGE -> {
                         ProjectSettingsCard(projectSettings, viewModel, toast.second)
                         LocalSessionStorageCard(
                             status = localSessionStorageStatus,
@@ -793,6 +848,10 @@ fun SettingsScreen(
                             onExport = { sessionStorageExporter.launch("777-local-sessions.zip") },
                             onCleanup = onClose,
                         )
+                    }
+
+                    SettingsDestination.RUNTIME_DIAGNOSTICS -> {
+                        LocalAgentSettingsCard(localHarness, viewModel, toast.second)
                         SettingsCard(stringResource(R.string.settings_runtime_diagnostics), FeatherIcons.Info) {
                             DsCategoryRow(
                                 icon = FeatherIcons.Link,
