@@ -41,7 +41,7 @@ internal class LocalWorkSessionProjectionRuntime @Inject constructor(
 internal fun localWorkStructuredProjectionEvents(
     eventLog: LocalSessionEventLog,
 ): List<SessionEvent> =
-    eventLog.pageBefore(limit = LOCAL_STRUCTURED_EVENT_SCAN_LIMIT)
+    eventLog.pageBeforeChronological(limit = LOCAL_STRUCTURED_EVENT_SCAN_LIMIT)
         .map { event ->
             SessionEvent(
                 sequence = event.sequence,

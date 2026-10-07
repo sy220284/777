@@ -56,13 +56,13 @@ internal fun appendLocalDiagnosticDetails(
     val events = ArrayDeque<LocalSessionEventLog.Event>(MAX_DIAGNOSTIC_EVENTS)
     var cursor = Long.MAX_VALUE
     while (events.size < MAX_DIAGNOSTIC_EVENTS) {
-        val page = eventLog.pageBefore(
+        val page = eventLog.pageBeforeNewestFirst(
             sequenceExclusive = cursor,
             limit = minOf(EVENT_PAGE_SIZE, MAX_DIAGNOSTIC_EVENTS - events.size),
         )
         if (page.isEmpty()) break
-        page.asReversed().forEach { event -> events.addFirst(event) }
-        val nextCursor = page.first().sequence
+        page.forEach { event -> events.addFirst(event) }
+        val nextCursor = page.last().sequence
         if (nextCursor >= cursor) break
         cursor = nextCursor
     }

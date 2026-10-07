@@ -24,13 +24,13 @@ internal fun recoverAutomationChatOutput(
     var turnEnded = false
     var recovered: Pair<Long, String>? = null
     while (true) {
-        val page = eventLog.pageBefore(
+        val page = eventLog.pageBeforeNewestFirst(
             sequenceExclusive = beforeSequenceExclusive,
             limit = AUTOMATION_RECOVERY_PAGE_SIZE,
         )
         if (page.isEmpty()) break
 
-        page.asReversed().forEach { event ->
+        page.forEach { event ->
             if (event.sequence <= start.sequence) return@forEach
             when (event.type) {
                 "turn/end" -> turnEnded = true
@@ -72,13 +72,13 @@ private fun findLatestProactiveTurnStart(
 ): LocalSessionEventLog.Event? {
     var beforeSequenceExclusive = Long.MAX_VALUE
     while (true) {
-        val page = eventLog.pageBefore(
+        val page = eventLog.pageBeforeNewestFirst(
             sequenceExclusive = beforeSequenceExclusive,
             limit = AUTOMATION_RECOVERY_PAGE_SIZE,
         )
         if (page.isEmpty()) return null
 
-        page.asReversed().firstOrNull { event ->
+        page.firstOrNull { event ->
             event.createdAt >= threshold &&
                 event.type == "turn/start" &&
                 event.data["automation"]?.jsonPrimitive?.booleanOrNull == true &&
