@@ -4,8 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LOCK="$ROOT/upstream/deepseek-harness.lock.json"
 RUNNER="$ROOT/tools/reference-validation/official-runner.ts"
+SEMANTIC_RUNNER="$ROOT/tools/reference-validation/official-semantic-runner.ts"
 VECTOR_DIR="$ROOT/reference-validation/src/test/resources/vectors"
 OUTPUT_DIR="$ROOT/reference-validation/src/test/resources/official"
+SEMANTIC_OUTPUT_DIR="$ROOT/reference-validation/src/test/resources/official-semantic"
 
 REPOSITORY="$(node -e "const f=require('fs');const j=JSON.parse(f.readFileSync(process.argv[1],'utf8'));process.stdout.write(j.repository)" "$LOCK")"
 COMMIT="$(node -e "const f=require('fs');const j=JSON.parse(f.readFileSync(process.argv[1],'utf8'));process.stdout.write(j.commit)" "$LOCK")"
@@ -17,6 +19,7 @@ UPSTREAM="$TMP/deepseek-harness"
 git clone --filter=blob:none "https://github.com/$REPOSITORY.git" "$UPSTREAM"
 git -C "$UPSTREAM" checkout --detach "$COMMIT"
 cp "$RUNNER" "$UPSTREAM/.777-reference-runner.ts"
+cp "$SEMANTIC_RUNNER" "$UPSTREAM/.777-semantic-runner.ts"
 
 (
   cd "$UPSTREAM"
@@ -33,3 +36,10 @@ for vector in "$VECTOR_DIR"/*.json; do
   ) > "$OUTPUT_DIR/$name"
   echo "refreshed $name from $REPOSITORY@$COMMIT"
 done
+
+mkdir -p "$SEMANTIC_OUTPUT_DIR"
+(
+  cd "$UPSTREAM"
+  corepack pnpm exec tsx .777-semantic-runner.ts
+) > "$SEMANTIC_OUTPUT_DIR/session-projection-registry.json"
+echo "refreshed session-projection-registry.json from $REPOSITORY@$COMMIT"
