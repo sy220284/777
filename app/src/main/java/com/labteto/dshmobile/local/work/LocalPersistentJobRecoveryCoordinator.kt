@@ -61,6 +61,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         model: String?,
         maxSteps: Int,
         virtualScreen: Boolean,
+        outputSchema: JsonObject? = null,
         sessionId: String = currentSessionId(),
         boundState: LocalHarnessState = currentState(),
         historySnapshot: () -> List<JsonObject> = defaultHistory,
@@ -81,6 +82,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
             put("route_fingerprint", runProfile.routeFingerprint())
             put("max_steps", maxSteps)
             put("virtual_screen", virtualScreen)
+            outputSchema?.let { put("output_schema", it) }
         }.toString()
         return jobs.startPersistent(
             label = "子代理：${task.take(100)}",
@@ -98,6 +100,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     modelOverride = null,
                     maxSteps = maxSteps,
                     virtualScreen = virtualScreen,
+                    outputSchema = outputSchema,
                 ).requireCompletedOutput()
             }
         }
@@ -220,6 +223,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
         val credentialRef = payload["credential_ref"]?.jsonPrimitive?.contentOrNull
         val fingerprint = payload.requiredString("route_fingerprint")
         val virtualScreen = payload["virtual_screen"]?.jsonPrimitive?.booleanOrNull ?: false
+        val outputSchema = payload["output_schema"] as? JsonObject
         val log = eventLogFor(sessionId)
         val checkpointEvent = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
             data["background_job_id"]?.jsonPrimitive?.contentOrNull == snapshot.id
@@ -298,6 +302,7 @@ internal class LocalPersistentJobRecoveryCoordinator(
                     modelOverride = null,
                     maxSteps = maxSteps,
                     virtualScreen = virtualScreen,
+                    outputSchema = outputSchema,
                     recoveredHistory = recoveredHistory,
                     recoveredClaimedMessageIds = recoveredClaimedIds,
                     recoveredStep = continuation?.step ?: 0,
