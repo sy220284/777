@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -43,6 +44,7 @@ import com.labteto.dshmobile.ui.agentOperationStatusRes
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
+import com.labteto.dshmobile.ui.components.DsIconBox
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
 import com.labteto.dshmobile.ui.components.DsTimeline
@@ -219,9 +221,10 @@ internal fun WorkProcessRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
         ) {
-            StateDot(
-                state = processStateDot,
-                size = 9.dp,
+            WorkOperationIcon(
+                kind = latestNode.kind,
+                running = processStatus == DsStatus.Running,
+                failed = processStatus == DsStatus.Failed || processStatus == DsStatus.Warning,
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -320,6 +323,49 @@ internal fun WorkProcessRow(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun WorkOperationIcon(
+    kind: AgentOperationKind,
+    running: Boolean,
+    failed: Boolean,
+) {
+    @Suppress("UNUSED_VARIABLE")
+    val failureState = failed
+    when (kind) {
+        AgentOperationKind.Delegate -> DsIconBox(
+            icon = null,
+            iconPainter = painterResource(R.drawable.ic_kimi_create_subagent),
+            active = running,
+            modifier = Modifier.size(30.dp),
+        )
+        AgentOperationKind.External -> DsIconBox(
+            icon = null,
+            iconPainter = painterResource(R.drawable.ic_kimi_plugin),
+            active = running,
+            modifier = Modifier.size(30.dp),
+        )
+        else -> {
+            val icon = when (kind) {
+                AgentOperationKind.Inspect -> FeatherIcons.FileText
+                AgentOperationKind.Search -> FeatherIcons.Search
+                AgentOperationKind.Update -> FeatherIcons.Edit3
+                AgentOperationKind.Execute -> FeatherIcons.Code
+                AgentOperationKind.Web -> FeatherIcons.Globe
+                AgentOperationKind.Device -> FeatherIcons.Device
+                AgentOperationKind.Image -> FeatherIcons.Image
+                AgentOperationKind.Background -> FeatherIcons.Clock
+                AgentOperationKind.Generic -> FeatherIcons.Tool
+                AgentOperationKind.Delegate, AgentOperationKind.External -> FeatherIcons.Tool
+            }
+            DsIconBox(
+                icon = icon,
+                active = running,
+                modifier = Modifier.size(30.dp),
+            )
         }
     }
 }
