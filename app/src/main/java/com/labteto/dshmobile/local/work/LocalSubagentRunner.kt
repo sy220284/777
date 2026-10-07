@@ -339,6 +339,38 @@ internal class LocalSubagentRunner(
             }
         }
 
+        fun claimQueuedMessages(): Int {
+            val jobId = backgroundJobId ?: return 0
+            val queuedMessages = jobs.peekMessages(jobId)
+                .filterNot { message -> message.id in claimedMessageIds }
+            if (queuedMessages.isEmpty()) return 0
+            eventLog().append("subagent/inbox-claimed", buildJsonObject {
+                put("version", 1)
+                put("agent_id", subagentId)
+                put("background_job_id", jobId)
+                put("messages", JsonArray(queuedMessages.map { message ->
+                    buildJsonObject {
+                        put("id", message.id)
+                        put("content", message.content)
+                    }
+                }))
+            })
+            queuedMessages.forEach { message ->
+                history.append(buildJsonObject {
+                    put("role", "user")
+                    put("content", message.content)
+                })
+                claimedMessageIds += message.id
+            }
+            persistContinuationCheckpoint(step = modelStep)
+            jobs.acknowledgeMessages(
+                jobId,
+                queuedMessages.mapTo(linkedSetOf()) { it.id },
+                runSessionId(),
+            )
+            return queuedMessages.size
+        }
+
         try {
             if (!recoveringHistory) {
                 if (!inheritHistory) history.append(buildJsonObject {
