@@ -1181,7 +1181,11 @@ internal class LocalAgentTeamRuntime(
         afterSequence: Long,
         timeoutMs: Int,
     ): String {
-        var scanAfter = afterSequence
+        var scanAfter = if (afterSequence >= 0L) {
+            afterSequence
+        } else {
+            eventLogFor(sessionId).latestSequence()
+        }
 
         fun scanNext(): LocalTeamAgentMessageSnapshot? {
             val scan = nextAgentMessageAfter(

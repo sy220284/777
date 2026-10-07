@@ -15,6 +15,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -1081,6 +1083,73 @@ class LocalAgentTeamRuntimeTest {
         assertTrue(result.contains("第二条结果"))
         assertTrue(!result.contains("第三条结果"))
         assertTrue(result.contains("next_cursor=" + secondSequence))
+    }
+
+    @Test
+    fun waitWithoutCursorIgnoresHistoricalResultAndReturnsNextNewResult() = runBlocking {
+        val sessionId = "team-wait-future"
+        val fixture = fixture(sessionId)
+        appendActiveMember(fixture.log, sessionId)
+        fixture.log.append(
+            LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint(
+                backgroundJobId = "job-team-1",
+                agentId = localPersistentSubagentId("job-team-1"),
+                step = 1,
+                history = emptyList(),
+                claimedMessageIds = emptySet(),
+                terminalOutput = "历史结果",
+            ),
+        )
+        val binding = LocalWorkRunBinding(
+            sessionId = sessionId,
+            initialState = LocalHarnessState(
+                sessionId = sessionId,
+                usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(
+                id = sessionId,
+                usageMode = LocalUsageMode.WORK,
+            ),
+            runHandle = LocalAgentRunHandle(
+                initialSessionId = sessionId,
+                maxPendingInputs = 8,
+            ),
+            eventLog = fixture.log,
+        )
+        val producer = launch {
+            delay(50)
+            fixture.log.append(
+                LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+                encodeLocalSubagentHistoryCheckpoint(
+                    backgroundJobId = "job-team-1",
+                    agentId = localPersistentSubagentId("job-team-1"),
+                    step = 2,
+                    history = emptyList(),
+                    claimedMessageIds = emptySet(),
+                    terminalOutput = "新结果",
+                ),
+            )
+        }
+
+        val result = requireNotNull(
+            fixture.runtime.execute(
+                LocalToolCall(
+                    id = "call-wait-future",
+                    name = "team_wait_for_message",
+                    arguments = buildJsonObject {
+                        put("target", "worker")
+                        put("timeout_ms", 1_000)
+                    },
+                    rawArguments = "{}",
+                ),
+                binding,
+            ),
+        )
+        producer.join()
+
+        assertTrue(result.contains("新结果"))
+        assertTrue(!result.contains("历史结果"))
     }
 
     private data class Fixture(
