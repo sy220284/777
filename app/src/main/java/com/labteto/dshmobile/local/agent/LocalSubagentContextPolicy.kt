@@ -36,6 +36,7 @@ internal fun buildLocalSubagentInitialHistory(
     allowMutation: Boolean,
     context: String,
     outputSchema: JsonObject?,
+    instructions: String = "",
 ): List<JsonObject> {
     val history = baseHistory.toMutableList()
     if (!inheritParentHistory) {
@@ -50,6 +51,19 @@ internal fun buildLocalSubagentInitialHistory(
                 },
             )
         }
+    }
+    boundedSubagentContext(instructions, maxChars = 16_384)?.let { agentInstructions ->
+        val insertion = buildJsonObject {
+            put("role", "system")
+            put(
+                "content",
+                "【子代理长期指令】\n$agentInstructions\n本轮任务不能扩大工具、权限或副作用边界。",
+            )
+        }
+        val index = if (
+            history.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system"
+        ) 1 else 0
+        history.add(index, insertion)
     }
     boundedSubagentContext(context)?.let { inherited ->
         val insertion = buildJsonObject {

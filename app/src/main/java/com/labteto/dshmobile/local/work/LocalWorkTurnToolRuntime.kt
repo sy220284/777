@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.runtime.approvalImpact
 import com.labteto.dshmobile.local.runtime.canAutoApproveSafely
 import com.labteto.dshmobile.local.runtime.canUseDeviceApprovalLease
 import com.labteto.dshmobile.local.runtime.isolatedParallelMap
+import com.labteto.dshmobile.local.runtime.shouldAutoApproveTool
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import kotlinx.serialization.json.JsonArray
@@ -127,13 +128,14 @@ internal class LocalWorkTurnToolRuntime(
             })
             return true
         }
-        if (approvalPreferences.isSafeAutoApprovalEnabled()) {
+        val approvalMode = approvalPreferences.currentMode()
+        if (shouldAutoApproveTool(approvalMode, tool)) {
             binding.eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
                 put("access", tool.access.name.lowercase())
                 put("impact", approvalImpact(tool).name.lowercase())
-                put("mode", "global")
+                put("mode", approvalMode.name.lowercase())
             })
             return true
         }

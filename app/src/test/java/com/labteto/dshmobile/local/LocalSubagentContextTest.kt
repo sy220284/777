@@ -54,6 +54,27 @@ class LocalSubagentContextTest {
     }
 
     @Test
+    fun stableAgentInstructionsAreSeparateFromTheTurnTask() {
+        val seed = buildLocalSubagentInitialHistory(
+            baseHistory = emptyList(),
+            task = "核查 Android 17",
+            inheritParentHistory = false,
+            allowMutation = false,
+            context = "",
+            outputSchema = null,
+            instructions = "只采用可核验证据",
+        )
+
+        assertEquals("system", seed[0]["role"]?.jsonPrimitive?.contentOrNull)
+        assertEquals(
+            true,
+            seed[1]["content"]?.jsonPrimitive?.contentOrNull?.contains("只采用可核验证据"),
+        )
+        assertEquals("user", seed.last()["role"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("核查 Android 17", seed.last()["content"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
     fun durableForkSeedUsesParentCutAndAppendsChildTask() {
         val history = listOf(
             message("system", "系统"),

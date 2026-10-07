@@ -29,6 +29,7 @@ internal data class LocalSubagentCapabilities(
 
 internal data class LocalSubagentLaunchSpec(
     val task: String,
+    val instructions: String = "",
     val modelOverride: String?,
     val maxSteps: Int,
     val parentCallId: String? = null,
@@ -41,6 +42,9 @@ internal fun validateLocalSubagentLaunchSpec(
     structuredOutputSupported: Boolean = false,
 ): LocalSubagentLaunchSpec {
     require(spec.task.isNotBlank()) { "SUBAGENT_TASK_REQUIRED：子代理任务不能为空" }
+    require(spec.instructions.length <= MAX_SUBAGENT_INSTRUCTIONS_CHARS) {
+        "SUBAGENT_INSTRUCTIONS_TOO_LARGE：子代理长期指令超过大小上限"
+    }
     require(spec.maxSteps in LocalAgentRuntimeLimits.SUBAGENT_MIN_STEPS..LocalAgentRuntimeLimits.MAX_CONFIGURED_STEPS) {
         "SUBAGENT_STEP_LIMIT_INVALID：子代理步数超出允许范围"
     }
@@ -83,6 +87,7 @@ internal fun validateLocalSubagentLaunchSpec(
 
 
 private const val MAX_SUBAGENT_OUTPUT_SCHEMA_CHARS = 32_768
+private const val MAX_SUBAGENT_INSTRUCTIONS_CHARS = 16_384
 
 internal fun validateLocalSubagentToolAllowlist(
     source: JsonArray,

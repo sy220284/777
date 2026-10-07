@@ -21,6 +21,7 @@ import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.runtime.MAX_EVENT_CHARS
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
+import com.labteto.dshmobile.local.runtime.shouldAutoApproveTool
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.int
 import com.labteto.dshmobile.local.tools.string
@@ -182,6 +183,7 @@ internal class LocalWorkComposition @Inject constructor(
                     binding,
                     requestedJobId,
                     task,
+                    instructions,
                     model,
                     maxSteps,
                     context,
@@ -191,6 +193,7 @@ internal class LocalWorkComposition @Inject constructor(
                     task = task,
                     model = model,
                     maxSteps = maxSteps,
+                    instructions = instructions,
                     virtualScreen = false,
                     forkParentCallId =
                         parentCallId.takeIf { context == LocalTeamMemberContext.FORK },
@@ -586,11 +589,12 @@ internal class LocalWorkComposition @Inject constructor(
             allowMutation = allowMutation,
             planModeEnabled = false,
             approval = { call, tool, _ ->
-                if (approvalPreferences.isSafeAutoApprovalEnabled()) {
+                val approvalMode = approvalPreferences.currentMode()
+                if (shouldAutoApproveTool(approvalMode, tool)) {
                     sessionStorage.eventLogs.get(sessionId).append("approval/auto", buildJsonObject {
                         put("tool", call.name)
                         put("access", tool.access.name.lowercase())
-                        put("mode", "automation-global")
+                        put("mode", "automation-" + approvalMode.name.lowercase())
                     })
                     true
                 } else {
@@ -692,7 +696,7 @@ internal class LocalWorkComposition @Inject constructor(
                     if (sessionId == runtimeStateStore.currentSessionId) {
                         toolApproval.approve(normalized, tool, summary)
                     } else {
-                        approvalPreferences.isSafeAutoApprovalEnabled()
+                        shouldAutoApproveTool(approvalPreferences.currentMode(), tool)
                     }
                 },
             )
