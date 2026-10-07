@@ -266,7 +266,7 @@ internal fun UsageDayChart(
                                     Modifier
                                         .fillMaxWidth()
                                         .weight((1f - inputFraction).coerceAtLeast(0.05f))
-                                        .background(colors.characterAccent),
+                                        .background(colors.labelTertiary),
                                 )
                             }
                         }
