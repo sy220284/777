@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.agent
 import com.labteto.dshmobile.harness.tools.JsonSchemaValidator
 import com.labteto.dshmobile.local.model.stableJsonSha256
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 internal data class LocalStructuredSubagentOutput(
@@ -74,16 +76,31 @@ internal fun validateLocalStructuredSubagentOutput(
         )
     }
 
-    val canonical = value.toString()
+    val normalizedValue = canonicalizeStructuredJson(value) as JsonObject
+    val normalizedSchema = canonicalizeStructuredJson(schema)
+    val canonical = normalizedValue.toString()
     return Result.success(
         LocalStructuredSubagentOutput(
-            value = value,
+            value = normalizedValue,
             canonicalJson = canonical,
-            schemaDigest = stableJsonSha256(schema),
-            resultDigest = stableJsonSha256(value),
+            schemaDigest = stableJsonSha256(normalizedSchema),
+            resultDigest = stableJsonSha256(normalizedValue),
         ),
     )
 }
+
+internal fun canonicalizeStructuredJson(value: JsonElement): JsonElement =
+    when (value) {
+        is JsonObject -> JsonObject(
+            value.entries
+                .sortedBy { it.key }
+                .associate { (key, child) ->
+                    key to canonicalizeStructuredJson(child)
+                },
+        )
+        is JsonArray -> JsonArray(value.map(::canonicalizeStructuredJson))
+        else -> value
+    }
 
 internal class LocalStructuredSubagentOutputException(
     val failure: LocalStructuredSubagentOutputFailure,
