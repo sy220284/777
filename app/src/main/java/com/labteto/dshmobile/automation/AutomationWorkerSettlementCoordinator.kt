@@ -34,7 +34,7 @@ internal class AutomationWorkerSettlementCoordinator(
         run: LocalAutomationRunResult,
     ) {
         val finished = System.currentTimeMillis()
-        val chained = !manualRun && usesChainedChatScheduling(task)
+        val chained = !manualRun && usesChainedAutomationScheduling(task)
         val waitingRequested = !manualRun &&
             run.waitingForUserReply &&
             task.mode == AutomationMode.CHAT &&
@@ -112,7 +112,7 @@ internal class AutomationWorkerSettlementCoordinator(
         if (
             updated?.status == AutomationStatus.SCHEDULED &&
             committedNext != null &&
-            (usesChainedChatScheduling(updated) || updated.recurringMinutes == null)
+            (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null)
         ) {
             scheduler.enqueueNextChained(id, requireNotNull(committedNext), requestedGeneration)
         }
@@ -211,7 +211,7 @@ internal class AutomationWorkerSettlementCoordinator(
         ) { current ->
             val nextFailureStreak = current.failureStreak.saturatingIncrement()
             autoPaused = shouldAutoPauseChatAutomation(current, nextFailureStreak)
-            val chained = usesChainedChatScheduling(current)
+            val chained = usesChainedAutomationScheduling(current)
             committedNext = if (chained) {
                 nextAnchoredAutomationRun(current, finished)
             } else {
@@ -257,7 +257,7 @@ internal class AutomationWorkerSettlementCoordinator(
                         .cancelUniqueWork(HarnessAutomationScheduler.manualWorkName(id))
                 }
             }
-            usesChainedChatScheduling(updated) &&
+            usesChainedAutomationScheduling(updated) &&
                 committedNext != null &&
                 updated.status == AutomationStatus.SCHEDULED ->
                 scheduler.enqueueNextChained(id, requireNotNull(committedNext), requestedGeneration)

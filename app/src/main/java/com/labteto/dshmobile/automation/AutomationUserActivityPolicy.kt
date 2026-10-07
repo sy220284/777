@@ -16,7 +16,7 @@ internal fun nextAutomationRunAfterUserActivity(
             requireNotNull(task.recurringMinutes),
             "任务周期",
         )
-    usesChainedChatScheduling(task) ->
+    usesChainedAutomationScheduling(task) ->
         nextAnchoredAutomationRun(task, userMessageAt) ?: userMessageAt
     task.recurringMinutes != null ->
         maxOf(

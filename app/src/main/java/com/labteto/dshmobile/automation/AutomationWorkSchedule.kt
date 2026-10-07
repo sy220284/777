@@ -8,15 +8,15 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
 
-internal fun usesChainedChatScheduling(task: AutomationTask): Boolean =
-    task.mode == AutomationMode.CHAT &&
-        task.scheduleType in setOf(
+internal fun usesChainedAutomationScheduling(task: AutomationTask): Boolean =
+    task.scheduleType == AutomationScheduleType.MONTHLY ||
+        (task.mode == AutomationMode.CHAT && task.scheduleType in setOf(
             AutomationScheduleType.INTERVAL,
             AutomationScheduleType.DAILY,
             AutomationScheduleType.WEEKLY,
             AutomationScheduleType.SILENCE,
             AutomationScheduleType.WINDOW,
-        )
+        ))
 
 internal fun automationWorkName(id: String, generation: Long): String =
     if (generation == 0L) "harness-automation-$id" else "harness-automation-$id-g$generation"
@@ -79,7 +79,7 @@ internal fun reconcileAutomationSchedules(
         .filter { it.status == AutomationStatus.SCHEDULED }
         .forEach { task ->
             val runAt = task.nextRunAt.coerceAtLeast(System.currentTimeMillis())
-            if (usesChainedChatScheduling(task) || task.recurringMinutes == null) {
+            if (usesChainedAutomationScheduling(task) || task.recurringMinutes == null) {
                 enqueueAutomationOneTime(
                     workManager,
                     task.id,

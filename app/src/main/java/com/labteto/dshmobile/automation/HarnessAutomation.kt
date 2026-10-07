@@ -71,6 +71,7 @@ enum class AutomationScheduleType {
     INTERVAL,
     DAILY,
     WEEKLY,
+    MONTHLY,
     SILENCE,
     WINDOW,
 }
