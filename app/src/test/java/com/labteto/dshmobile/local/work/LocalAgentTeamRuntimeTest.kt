@@ -1524,6 +1524,40 @@ class LocalAgentTeamRuntimeTest {
         assertNull(ui.failure)
     }
 
+    @Test
+    fun historicalResultAndItsLaterRecoveryCheckpointCannotVerifyNewTask() = runBlocking {
+        val session = "team-stale-result"
+        val fixture = fixture(session)
+        appendActiveMember(fixture.log, session)
+        fixture.jobs.startPersistent(
+            label = "子代理：worker", resumeKind = "subagent_readonly", resumePayload = "{}",
+            ownerSessionId = session, continuable = true, requestedId = "job-team-1",
+        ) { _, _ -> "旧任务结果" }
+        fun legacyCheckpoint() = fixture.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint("job-team-1", "sa-team-1", 1, emptyList(), emptySet(),
+                terminalOutput = "旧任务结果"))
+        legacyCheckpoint()
+        fixture.log.append(LocalAgentTeamRuntime.TEAM_TASK_EVENT, task(session, "task-1", 1, emptyList()))
+        fixture.log.append(LocalAgentTeamRuntime.TEAM_TASK_EVENT, task(session, "task-1", 2, emptyList(),
+            status = "in_progress", ownerId = "member-1"))
+        legacyCheckpoint()
+        assertEquals(1, fixture.runtime.uiState(session).members.single().resultMessageCount)
+        assertTrue(!fixture.runtime.uiState(session).members.single().awaitingReview)
+        val failure = runCatching {
+            fixture.runtime.execute(LocalToolCall("complete-stale", "team_task_update", buildJsonObject {
+                put("task_id", "task-1"); put("expected_revision", 2); put("action", "complete")
+                put("result_id", "legacy-result-job-team-1-1")
+            }, "{}"), teamBinding(fixture, session))
+        }.exceptionOrNull()
+        assertNotNull(failure)
+        assertTrue(failure!!.message.orEmpty().contains("TEAM_TASK_RESULT_STALE"))
+        assertEquals(2, fixture.runtime.project(session).tasks.single().revision)
+        fixture.log.append(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
+            encodeLocalSubagentHistoryCheckpoint("job-team-1", "sa-team-1", 2, emptyList(), emptySet(),
+                terminalOutput = "新任务结果", resultId = "fresh-result"))
+        assertTrue(fixture.runtime.uiState(session).members.single().awaitingReview)
+    }
+
     private data class Fixture(
         val runtime: LocalAgentTeamRuntime,
         val log: LocalSessionEventLog,

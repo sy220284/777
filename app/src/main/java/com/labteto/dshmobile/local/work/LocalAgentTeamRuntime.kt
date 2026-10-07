@@ -271,7 +271,7 @@ internal class LocalAgentTeamRuntime(
             }
             val currentTask = visibleTasks.firstOrNull {
                 it.ownerId == member.id && it.status == LocalTeamTaskStatus.IN_PROGRESS
-            }?.subject
+            }
             LocalAgentTeamMemberUiState(
                 id = member.id,
                 jobId = member.jobId,
@@ -279,7 +279,9 @@ internal class LocalAgentTeamRuntime(
                 description = member.description,
                 phase = member.phase.name.lowercase(),
                 activity = activity,
-                currentTask = currentTask,
+                currentTask = currentTask?.subject,
+                hasCurrentTaskResult = currentTask != null && activity in setOf("dormant", "completed") &&
+                    hasFreshTaskResult(sessionId, currentTask, member.jobId),
                 progressPercent = memberProgressPercent(sessionId, member, activity),
                 resultMessageCount = messageCounts[member.id] ?: 0,
                 pendingMessageCount =
@@ -949,22 +951,7 @@ internal class LocalAgentTeamRuntime(
                         ?: error("TEAM_TASK_RESULT_REQUIRED：complete 必须提供已核验的 result_id")
                     val owner = state.members.singleOrNull { it.id == current.ownerId }
                         ?: error("TEAM_TASK_OWNER_REQUIRED：任务负责人不存在")
-                    val log = eventLogFor(sessionId)
-                    val taskSequence = log.latestMatching(setOf(TEAM_TASK_EVENT)) { data ->
-                        val raw = data["task"] as? JsonObject ?: return@latestMatching false
-                        raw["id"]?.jsonPrimitive?.contentOrNull == current.id &&
-                            raw["revision"]?.jsonPrimitive?.intOrNull == current.revision
-                    }?.sequence ?: error("TEAM_TASK_RESULT_REQUIRED：任务 revision 证据缺失")
-                    val result = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT)) { data ->
-                        val id = data["result_id"]?.jsonPrimitive?.contentOrNull ?: (
-                            "legacy-result-" + data["background_job_id"]?.jsonPrimitive?.contentOrNull +
-                                "-" + data["step"]?.jsonPrimitive?.intOrNull
-                        )
-                        (data["result_first"]?.jsonPrimitive?.booleanOrNull != false) &&
-                            id == verifiedResultId && data["background_job_id"]?.jsonPrimitive?.contentOrNull == owner.jobId &&
-                            !data["terminal_output"]?.jsonPrimitive?.contentOrNull.isNullOrBlank()
-                    }
-                    require(result != null && result.sequence > taskSequence) {
+                    require(hasFreshTaskResult(sessionId, current, owner.jobId, verifiedResultId)) {
                         "TEAM_TASK_RESULT_STALE：结果必须属于当前负责人且晚于当前任务 revision"
                     }
                     next.copy(status = LocalTeamTaskStatus.COMPLETED)
@@ -1087,10 +1074,38 @@ internal class LocalAgentTeamRuntime(
         }
     }
 
+    private fun hasFreshTaskResult(
+        sessionId: String,
+        task: LocalTeamTaskSnapshot,
+        jobId: String,
+        resultId: String? = null,
+    ): Boolean {
+        val log = eventLogFor(sessionId)
+        val taskSequence = log.latestMatching(setOf(TEAM_TASK_EVENT)) { data ->
+            val raw = data["task"] as? JsonObject ?: return@latestMatching false
+            raw["id"]?.jsonPrimitive?.contentOrNull == task.id &&
+                raw["revision"]?.jsonPrimitive?.intOrNull == task.revision
+        }?.sequence ?: return false
+        var before = Long.MAX_VALUE
+        while (true) {
+            val event = log.latestMatching(setOf(LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT), before) { data ->
+                data["background_job_id"]?.jsonPrimitive?.contentOrNull == jobId &&
+                    (resultId == null || resultIdentity(data) == resultId) &&
+                    !data["terminal_output"]?.jsonPrimitive?.contentOrNull.isNullOrBlank()
+            } ?: return false
+            if (event.sequence <= taskSequence) return false
+            if (isFirstResultCheckpoint(log, event)) return true
+            before = event.sequence
+        }
+    }
+
     private fun resultIdentity(event: LocalSessionEventLog.Event): String =
-        event.data["result_id"]?.jsonPrimitive?.contentOrNull ?: (
-            "legacy-result-" + event.data["background_job_id"]?.jsonPrimitive?.contentOrNull +
-                "-" + event.data["step"]?.jsonPrimitive?.intOrNull
+        resultIdentity(event.data)
+
+    private fun resultIdentity(data: JsonObject): String =
+        data["result_id"]?.jsonPrimitive?.contentOrNull ?: (
+            "legacy-result-" + data["background_job_id"]?.jsonPrimitive?.contentOrNull +
+                "-" + data["step"]?.jsonPrimitive?.intOrNull
         )
 
     private fun isFirstResultCheckpoint(log: LocalSessionEventLog, event: LocalSessionEventLog.Event): Boolean {

@@ -58,9 +58,10 @@ data class LocalAgentTeamMemberUiState(
     val resultMessageCount: Int = 0,
     val pendingMessageCount: Int = 0,
     val error: String? = null,
+    val hasCurrentTaskResult: Boolean = false,
 ) {
     val awaitingReview: Boolean
-        get() = currentTask != null && resultMessageCount > 0 && activity in setOf("dormant", "completed")
+        get() = hasCurrentTaskResult && activity in setOf("dormant", "completed")
 }
 
 data class LocalAgentTeamTaskUiState(
