@@ -31,6 +31,7 @@ import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsMenu
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsStatus
@@ -447,7 +448,7 @@ internal fun ChatGptAccountPanel(
     }
 
     if (showWelcome) {
-        DsDialog(
+        DsBottomSheet(
             title = stringResource(R.string.chatgpt_welcome_title),
             onDismiss = {
                 welcomePrefs.edit().putBoolean("plan_welcome_seen_v1", true).apply()
