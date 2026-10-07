@@ -80,6 +80,7 @@ import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelPresets
+import com.labteto.dshmobile.local.model.SUPPORTED_LOCAL_IMAGE_TYPES
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
 import com.labteto.dshmobile.local.send.LocalSendRejectReason
@@ -278,9 +279,11 @@ internal fun LocalConversationSurface(
                 uris.take(available).forEach { uri ->
                     try {
                         val imported = onImportAttachment(uri)
-                        val duplicate = imported.attachmentId != null &&
-                            attachments.any { it.attachmentId == imported.attachmentId }
-                        if (!duplicate) attachments += imported
+                        when (localComposerAttachmentDecision(attachments, imported)) {
+                            LocalComposerAttachmentDecision.ACCEPT -> attachments += imported
+                            LocalComposerAttachmentDecision.DUPLICATE -> Unit
+                            LocalComposerAttachmentDecision.IMAGE_LIMIT -> failure = imageLimitMessage
+                        }
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Exception) {
@@ -295,8 +298,15 @@ internal fun LocalConversationSurface(
         if (uri != null) {
             scope.launch {
                 try {
-                    attachments += onImportAttachment(uri)
-                    attachmentError = null
+                    val imported = onImportAttachment(uri)
+                    attachmentError = when (localComposerAttachmentDecision(attachments, imported)) {
+                        LocalComposerAttachmentDecision.ACCEPT -> {
+                            attachments += imported
+                            null
+                        }
+                        LocalComposerAttachmentDecision.DUPLICATE -> null
+                        LocalComposerAttachmentDecision.IMAGE_LIMIT -> imageLimitMessage
+                    }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
@@ -954,7 +964,7 @@ internal fun LocalConversationSurface(
                     label = stringResource(R.string.local_attachment_image),
                     onClick = {
                         showAttachmentPicker = false
-                        imagePicker.launch(arrayOf("image/*"))
+                        imagePicker.launch(SUPPORTED_LOCAL_IMAGE_TYPES.toTypedArray())
                     },
                     modifier = Modifier.weight(1f),
                 )
@@ -970,6 +980,30 @@ internal fun LocalConversationSurface(
             }
         }
     }
+}
+
+internal enum class LocalComposerAttachmentDecision {
+    ACCEPT,
+    DUPLICATE,
+    IMAGE_LIMIT,
+}
+
+internal fun localComposerAttachmentDecision(
+    current: List<LocalImportedAttachment>,
+    candidate: LocalImportedAttachment,
+    maxImages: Int = MAX_LOCAL_IMAGE_SELECTION,
+): LocalComposerAttachmentDecision {
+    require(maxImages > 0) { "图片数量上限必须大于 0" }
+    if (candidate.attachmentId != null && current.any { it.attachmentId == candidate.attachmentId }) {
+        return LocalComposerAttachmentDecision.DUPLICATE
+    }
+    if (
+        candidate.mediaType.startsWith("image/") &&
+        current.count { it.mediaType.startsWith("image/") } >= maxImages
+    ) {
+        return LocalComposerAttachmentDecision.IMAGE_LIMIT
+    }
+    return LocalComposerAttachmentDecision.ACCEPT
 }
 
 @Composable
