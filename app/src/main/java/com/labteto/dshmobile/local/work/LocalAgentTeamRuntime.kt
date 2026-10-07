@@ -330,6 +330,15 @@ internal class LocalAgentTeamRuntime(
         return jobs.interruptContinuableAgents(runningIds, sessionId)
     }
 
+    private fun requireMemberCapacity(state: LocalTeamProjection) {
+        require(state.members.count { it.phase != LocalTeamMemberPhase.DISMISSED } < MAX_TEAMMATES) {
+            "TEAM_MEMBER_LIMIT：当前最多允许 " + MAX_TEAMMATES + " 个未解雇 teammate"
+        }
+        require(state.members.size < MAX_TEAM_MEMBER_HISTORY) {
+            "TEAM_MEMBER_HISTORY_LIMIT：历史成员已达 " + MAX_TEAM_MEMBER_HISTORY + " 个"
+        }
+    }
+
     private fun createMember(
         sessionId: String,
         name: String,
@@ -341,9 +350,7 @@ internal class LocalAgentTeamRuntime(
         require(before.members.none { it.name == cleanName }) {
             "TEAM_MEMBER_NAME_CONFLICT：成员名称一经使用不可复用：" + cleanName
         }
-        require(before.members.size < MAX_TEAMMATES) {
-            "TEAM_MEMBER_LIMIT：最多允许 " + MAX_TEAMMATES + " 个 teammate"
-        }
+        requireMemberCapacity(before)
         val memberId = TEAM_MEMBER_ID_PREFIX + UUID.randomUUID().toString().replace("-", "").take(16)
         val member = LocalTeamMemberSnapshot(
             id = memberId,
@@ -521,9 +528,7 @@ internal class LocalAgentTeamRuntime(
         require(before.members.none { it.name == cleanName }) {
             "TEAM_MEMBER_NAME_CONFLICT：成员名称一经使用不可复用：$cleanName"
         }
-        require(before.members.size < MAX_TEAMMATES) {
-            "TEAM_MEMBER_LIMIT：最多允许 $MAX_TEAMMATES 个 teammate（包括 failed）"
-        }
+        requireMemberCapacity(before)
         val memberId = TEAM_MEMBER_ID_PREFIX + UUID.randomUUID().toString().replace("-", "").take(16)
         val jobId = teamJobId(memberId)
         val provisioning = LocalTeamMemberSnapshot(
@@ -700,7 +705,7 @@ internal class LocalAgentTeamRuntime(
                         },
                     )
                 }
-                runCatching { appendMember(sessionId, terminal) }
+                appendMember(sessionId, terminal)
             }
     }
 
@@ -723,15 +728,13 @@ internal class LocalAgentTeamRuntime(
                             .singleOrNull { it.id == member.id }
                             ?: return@forEach
                         if (current.phase == LocalTeamMemberPhase.ACTIVE) {
-                            runCatching {
-                                appendMember(
-                                    sessionId,
-                                    current.copy(
-                                        phase = LocalTeamMemberPhase.FAILED,
-                                        error = "TEAM_MEMBER_CHILD_" + status.uppercase(),
-                                    ),
-                                )
-                            }
+                            appendMember(
+                                sessionId,
+                                current.copy(
+                                    phase = LocalTeamMemberPhase.FAILED,
+                                    error = "TEAM_MEMBER_CHILD_" + status.uppercase(),
+                                ),
+                            )
                         }
                     }
                 }
@@ -1916,6 +1919,7 @@ internal class LocalAgentTeamRuntime(
         private const val TEAM_JOB_ID_PREFIX = "job-team-"
         private const val LOCAL_SUBAGENT_PROVIDER = "local-subagent"
         private const val MAX_TEAMMATES = 16
+        private const val MAX_TEAM_MEMBER_HISTORY = 256
         private const val MAX_NAME_CHARS = 48
         private const val MAX_SUBJECT_CHARS = 240
         private const val MAX_DESCRIPTION_CHARS = 2_000
