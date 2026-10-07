@@ -1086,9 +1086,10 @@ internal class LocalAgentTeamRuntime(
 
         val result = ArrayList<LocalTeamAgentMessageSnapshot>(bounded)
         var before = Long.MAX_VALUE
-        while (result.size < bounded) {
+        repeat(MAX_RECENT_AGENT_MESSAGE_SCAN_PAGES) {
+            if (result.size >= bounded) return@repeat
             val page = log.pageBefore(before, AGENT_MESSAGE_SCAN_PAGE)
-            if (page.isEmpty()) break
+            if (page.isEmpty()) return@repeat
             page.asSequence()
                 .sortedByDescending(LocalSessionEventLog.Event::sequence)
                 .forEach { event ->
@@ -1096,7 +1097,7 @@ internal class LocalAgentTeamRuntime(
                     decode(event)?.let(result::add)
                 }
             before = page.minOf(LocalSessionEventLog.Event::sequence)
-            if (page.size < AGENT_MESSAGE_SCAN_PAGE) break
+            if (page.size < AGENT_MESSAGE_SCAN_PAGE) return@repeat
         }
         return result
             .distinctBy(LocalTeamAgentMessageSnapshot::sequence)
