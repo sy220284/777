@@ -251,7 +251,7 @@ private fun KimiTaskEmptyState(
             text = stringResource(R.string.tasks_create_manual),
             onClick = onManualCreate,
             variant = DsButtonVariant.Info,
-            size = DsButtonSize.Medium,
+            size = DsButtonSize.Normal,
             modifier = Modifier.fillMaxWidth(),
         )
         Text(
@@ -264,7 +264,7 @@ private fun KimiTaskEmptyState(
             text = stringResource(R.string.tasks_create_via_chat),
             onClick = onCreateViaChat,
             variant = DsButtonVariant.Ghost,
-            size = DsButtonSize.Medium,
+            size = DsButtonSize.Normal,
             modifier = Modifier.fillMaxWidth(),
         )
     }
