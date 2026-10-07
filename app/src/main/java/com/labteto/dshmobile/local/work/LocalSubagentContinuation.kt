@@ -38,6 +38,7 @@ internal fun encodeLocalSubagentHistoryCheckpoint(
         "claimed_message_ids",
         JsonArray(
             claimedMessageIds
+                .toList()
                 .takeLast(MAX_CLAIMED_MESSAGE_IDS)
                 .map(::JsonPrimitive),
         ),
