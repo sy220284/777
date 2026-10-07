@@ -218,7 +218,7 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - 对比官方黄金结果。
 - 在官方基线更新时显式暴露行为差异。
 
-日常 CI 不自动追随上游最新版，防止无意改变产品语义。黄金 fixture 只证明其覆盖的基础 AgentLoop 调度语义；Session 请求重建、Checkpoint 水位、工具 admission identity、压缩来源等高级契约由对应模块测试证明，升级锁定版本时再逐项扩充官方差分向量。
+日常 CI 不自动追随上游最新版，防止无意改变产品语义。黄金 fixture 分两层：基础 AgentLoop 回复向量继续证明核心调度语义；高级官方语义快照用于无法自然表达成模型回复向量的契约。当前高级快照已覆盖 Session Projection Registry 的 stateVersion、共享注册/卸载和一致 asOfSequence 切面。Request Reconstruction、Checkpoint 水位、工具 admission identity、压缩来源、Continuable Subagent 等仍由对应模块测试证明，并按官方可执行 seam 逐项迁入高级 fixture，禁止把 777 自测包装成官方 golden。
 
 ## 架构门禁
 
