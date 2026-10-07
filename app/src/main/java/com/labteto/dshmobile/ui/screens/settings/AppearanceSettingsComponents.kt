@@ -216,8 +216,9 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
             modifier = Modifier.horizontalScroll(rememberScrollState()),
         ) {
+            val resolvedAccentKey = AccentPalettes.of(settings.accentTheme).key
             AccentPalettes.ALL.forEach { palette ->
-                val selected = settings.accentTheme == palette.key
+                val selected = resolvedAccentKey == palette.key
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier

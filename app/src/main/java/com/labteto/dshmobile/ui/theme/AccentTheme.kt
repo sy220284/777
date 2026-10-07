@@ -20,10 +20,10 @@ data class AccentPalette(
 
 object AccentPalettes {
 
-    /** Kimi 蓝为默认交互色；原有传统色卡继续保留给既有用户。 */
+    /** Kimi 蓝为默认交互色；旧版持久化默认 "celadon" 在 [of] 中迁移为 Kimi。 */
     val ALL = listOf(
         AccentPalette("kimi", "Kimi", Color(0xFF1783FF), Color(0xFF5A9BFF), onDark = Color(0xFF07111F)),
-        AccentPalette("celadon", "青瓷", Color(0xFF3E8E8C), Color(0xFF63B3AC)),
+        AccentPalette("celadon_explicit", "青瓷", Color(0xFF3E8E8C), Color(0xFF63B3AC)),
         AccentPalette("dailan", "黛蓝", Color(0xFF44618C), Color(0xFF8FB0D9), onDark = Color(0xFF0D1520)),
         AccentPalette("zhusha", "朱砂", Color(0xFFA64B44), Color(0xFFDE8B84), onDark = Color(0xFF1C0D0C)),
         AccentPalette("xianghuang", "缃黄", Color(0xFFA67C32), Color(0xFFD9BC7A), onDark = Color(0xFF1A150A)),
@@ -33,7 +33,10 @@ object AccentPalettes {
 
     val DEFAULT = ALL.first()
 
-    fun of(key: String?): AccentPalette = ALL.firstOrNull { it.key == key } ?: DEFAULT
+    fun of(key: String?): AccentPalette = when (key) {
+        null, "", "celadon" -> DEFAULT
+        else -> ALL.firstOrNull { it.key == key } ?: DEFAULT
+    }
 }
 
 /**
