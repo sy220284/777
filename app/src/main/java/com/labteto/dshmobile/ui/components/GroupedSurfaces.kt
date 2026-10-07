@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -167,8 +168,9 @@ fun DsCategoryRow(
 /** Compact add-panel tile: monochrome icon, neutral fill, no function-family color coding. */
 @Composable
 fun DsQuickActionTile(
-    icon: ImageVector,
+    icon: ImageVector?,
     label: String,
+    iconPainter: Painter? = null,
     onClick: () -> Unit,
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
@@ -186,12 +188,20 @@ fun DsQuickActionTile(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (enabled) colors.labelSecondary else colors.labelCaption,
-                modifier = Modifier.size(22.dp),
-            )
+            when {
+                iconPainter != null -> Icon(
+                    painter = iconPainter,
+                    contentDescription = null,
+                    tint = if (enabled) colors.labelSecondary else colors.labelCaption,
+                    modifier = Modifier.size(22.dp),
+                )
+                icon != null -> Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (enabled) colors.labelSecondary else colors.labelCaption,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
             Text(
                 text = label,
                 style = DsType.small13.withReadingWeight(),

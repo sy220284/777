@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -1076,7 +1077,8 @@ internal fun LocalConversationSurface(
                         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
                     ) {
                         DsQuickActionTile(
-                            icon = FeatherIcons.Folder,
+                            icon = null,
+                            iconPainter = painterResource(R.drawable.ic_kimi_project),
                             label = stringResource(R.string.chatlist_workspace_files),
                             onClick = {
                                 showAttachmentPicker = false
