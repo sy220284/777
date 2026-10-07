@@ -47,7 +47,7 @@ import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsSlider
 import com.labteto.dshmobile.ui.components.DsSwitch
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -171,7 +171,7 @@ internal fun CharacterBehaviorTuningDialog(
         if (advanced) R.string.common_state_expanded else R.string.common_state_collapsed,
     )
 
-    DsDialog(title = null, onDismiss = { if (!saving) onDismiss() }) {
+    DsBottomSheet(title = null, onDismiss = { if (!saving) onDismiss() }, scrollable = true, dismissEnabled = !saving) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,

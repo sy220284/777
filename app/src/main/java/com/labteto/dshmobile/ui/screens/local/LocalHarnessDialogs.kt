@@ -28,7 +28,7 @@ import com.labteto.dshmobile.ui.agentApprovalPurposeRes
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
@@ -46,10 +46,9 @@ internal fun NewSessionModeDialog(
 ) {
     val colors = DsTheme.colors
     val chatMode = usageMode == LocalUsageMode.CHAT
-    DsDialog(
+    DsBottomSheet(
         title = stringResource(R.string.local_new_session_dialog_title),
         onDismiss = onDismiss,
-        dismissOnScrimTap = true,
     ) {
         Text(
             stringResource(
@@ -111,10 +110,9 @@ internal fun GroupNewSessionDialog(
     onNewSingle: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    DsDialog(
+    DsBottomSheet(
         title = stringResource(R.string.local_group_new_session_title),
         onDismiss = onDismiss,
-        dismissOnScrimTap = true,
     ) {
         Text(
             stringResource(R.string.local_group_new_session_intro),
@@ -146,7 +144,7 @@ internal fun ChatPersonaPickerDialog(
     onDismiss: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    DsDialog(title = stringResource(R.string.local_persona_picker_title), onDismiss = onDismiss) {
+    DsBottomSheet(title = stringResource(R.string.local_persona_picker_title), onDismiss = onDismiss, scrollable = true) {
         Text(
             stringResource(R.string.local_persona_picker_intro),
             style = DsType.small13.withReadingWeight(),
@@ -258,7 +256,7 @@ internal fun ApprovalDialog(
             LocalApprovalImpact.CRITICAL -> R.string.local_approval_impact_critical
         },
     )
-    DsDialog(title = stringResource(R.string.local_approval_title), onDismiss = onDeny) {
+    DsBottomSheet(title = stringResource(R.string.local_approval_title), onDismiss = onDeny, scrollable = true) {
         Text(
             stringResource(agentOperationLabelRes(approval.toolName)),
             style = DsType.base16Strong.withReadingWeight(),
@@ -354,9 +352,10 @@ internal fun QuestionDialog(
 ) {
     val colors = DsTheme.colors
     var answer by rememberSaveable(question) { mutableStateOf("") }
-    DsDialog(
+    DsBottomSheet(
         title = stringResource(R.string.local_question_title),
         onDismiss = onDismiss,
+        scrollable = true,
     ) {
         Text(question, style = DsType.base16Strong.withReadingWeight(), color = colors.labelPrimary)
         options.forEach { option ->
@@ -450,7 +449,7 @@ internal fun ChatPersonaDialog(
         corrections = generated.corrections.joinToString("\n")
     }
 
-    DsDialog(title = stringResource(R.string.local_persona_title), onDismiss = onDismiss) {
+    DsBottomSheet(title = stringResource(R.string.local_persona_title), onDismiss = onDismiss, scrollable = true, dismissEnabled = !aiGenerating && !saving) {
         Text(
             stringResource(R.string.local_persona_intro_v3),
             style = DsType.small13.withReadingWeight(),
