@@ -45,7 +45,9 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 → static-gates → merge-gate
 
 架构 3.0 范围内的 JVM / 单元测试
-→ static-gates → architecture-3-gates → unit-tests → merge-gate
+→ static-gates → architecture-3-gates → unit-tests
+→ 涉及 Relay 契约时额外执行 relay-conformance
+→ merge-gate
 
 普通 JVM / Reference Validation / Mock Harness
 → static-gates → unit-tests → merge-gate
@@ -61,7 +63,7 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 
 产品源码 / 资源 / Gradle / Runtime / 未知路径
 → static-gates → architecture-3-gates
-→ unit-tests + build-arm64 + device-artifacts-x86（三路并行）
+→ unit-tests + relay-conformance + build-arm64 + device-artifacts-x86（并行）
 → Android 16 + Android 17（并行，共用 device-artifacts-x86）
 → merge-gate
 ```
@@ -88,6 +90,7 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 - Python / Shell 自动化语法校验。
 - Android Manifest / exported component / FileProvider / 模型 HTTPS-or-loopback 安全边界。
 - UI 硬编码、Design System、通知、Kotlin 风险与构建基线。
+- 测试质量门禁：禁止禁用测试、伪断言、未审计的环境跳过与真实阻塞等待；真实 Relay 一致性测试不得携带工作站本地默认路径。
 - Runtime 压缩器自测。
 - 发布版本格式。
 
@@ -140,6 +143,15 @@ Remote protocol baseline: 0.1.6-alpha.1 / 0d1f5000...
 
 其中本机语义单测必须覆盖：模型请求证据与 Surface 关联、失败/取消 `assistant/attempt` 不进入正式历史、ModelHistory Checkpoint 水位与 V1 兼容重写、压缩来源证据、工具真实 admission execution identity、统一 Agent Inbox 落盘/回滚/满载拒绝、Child History Checkpoint 与完成态再激活/Cold Resume、终态原子结算、Session Projection 注册唯一性 / stateVersion / asOfSequence。官方黄金 fixture 继续只承担锁定参考版本的基础 AgentLoop 差分，不把本机高级语义单测包装成官方全量等价。
 
+### relay-conformance
+
+该 lane 驱动真实 `dsh-relay`，用于证明 Android 客户端与真实中继实现的一致性，避免客户端与 Mock 同时理解错误却仍然全绿。
+
+- 上游固定为 `sorsama/deepseek-harness-relay` 的 `0.2.1` 对应提交 `10c2758e77192413d9450a4d641daafb2a675286`；
+- CI 显式设置 `DSH_RELAY_CONFORMANCE_REQUIRED=true`，缺少源码、Node 或可用网络地址时直接失败，不允许通过 JUnit assumption 静默跳过；
+- 覆盖真实配对、Bearer 认证、未认证拒绝、WebSocket 升级与 TLS 公钥固定；
+- Relay 测试本身、CI Relay 控制面和完整产品改动必须执行该 lane。
+
 ### build-arm64
 
 同一次 Gradle invocation 执行：
@@ -174,6 +186,7 @@ Runtime 下载使用按 OS + ABI + Runtime 脚本哈希隔离的 Actions Cache�
 - 下载同一 `android-x86_64-test-apks`。
 - 安装 debug + androidTest APK。
 - 直接调用 `AndroidJUnitRunner` 执行 instrumentation。
+- Compose 高风险交互回归启用 Accessibility Test Framework 自动检查；TalkBack 等真实辅助技术体验仍保留设备复验。
 - 验证 debug 启动。
 - 安装相同 optimized APK 并执行 startup smoke。
 - Android 17 继续使用 Android 37 / 16 KiB page-size 系统镜像。
@@ -186,6 +199,7 @@ Runtime 下载使用按 OS + ABI + Runtime 脚本哈希隔离的 Actions Cache�
 static-gates
 architecture-3-gates
 unit-tests
+relay-conformance
 build-arm64
 device-artifacts-x86
 android-16-instrumented

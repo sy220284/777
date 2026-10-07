@@ -288,7 +288,6 @@ tasks.matching { it.name.contains("lint", ignoreCase = true) }.configureEach {
     )
 }
 
-
 /*
  * CI 必须能指出长时间运行的 JVM 单测停在哪个用例。这里只记录开始与失败事件，
  * 不改变测试选择、超时、并行度或通过条件。
@@ -355,6 +354,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4.accessibility)
     androidTestImplementation(libs.androidx.test.runner)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

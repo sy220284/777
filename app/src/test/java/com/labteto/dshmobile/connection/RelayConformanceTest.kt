@@ -40,9 +40,9 @@ import java.util.concurrent.TimeUnit
  * `dsh-relay` implementation, so the pairing shape, the header it wants, the status it answers
  * with, and the key it publishes are checked against the code that will really be on the other end.
  *
- * Skipped unless the plugin's sources are on this machine and Node can run them, so CI and anyone
- * without the relay checked out are unaffected. Set `DSH_RELAY_SRC` to run it against a
- * different checkout.
+ * Local runs may skip when the relay source checkout is not configured. CI sets
+ * `DSH_RELAY_CONFORMANCE_REQUIRED=true` and pins `DSH_RELAY_SRC` to the supported relay source,
+ * so missing sources, Node, or a usable non-loopback address are hard failures there.
  *
  * The relay is deliberately configured with `compat.addressGrants: false`. That bridge accepts a
  * request purely because of the address it came from, and leaving it on would let every request
@@ -52,14 +52,18 @@ import java.util.concurrent.TimeUnit
 class RelayConformanceTest {
 
     private lateinit var upstream: MockHarness
+    private lateinit var relayRoot: File
     private var upstreamPort: Int = -1
     private var relay: Process? = null
     private val http = OkHttpClient()
 
     @Before
     fun setUp() {
-        assumeTrue("relay sources not present", File(pluginRoot(), "src/server.ts").isFile)
-        assumeTrue("node not on PATH", node() != null)
+        val configuredRoot = System.getenv(SRC_ENV)?.takeIf(String::isNotBlank)
+        requireOrAssume(configuredRoot != null, "$SRC_ENV is not set")
+        relayRoot = File(checkNotNull(configuredRoot))
+        requireOrAssume(File(relayRoot, "src/server.ts").isFile, "relay sources not present: $relayRoot")
+        requireOrAssume(node() != null, "node not on PATH")
         runBlocking {
             upstream = MockHarness(port = 0)
             upstreamPort = upstream.start()
@@ -133,9 +137,10 @@ class RelayConformanceTest {
      * The relay's fence, which is what "untrusted-host" in the harness log actually is.
      *
      * It runs before every route, so even the unauthenticated liveness probe gets it. An address
-     * the relay does not know itself by — an emulator's host alias, a name it was never told —
-     * answers 403 to everything, and reading that as "nothing there" is how a running relay looks
-     * like a missing one.
+     * the relay does not know itself by — for example a DNS name it was never told — answers 403
+     * to everything, and reading that as "nothing there" is how a running relay looks like a
+     * missing one. The Android emulator alias 10.0.2.2 is intentionally excluded here because
+     * dsh-relay 0.2.1 explicitly admits that one alias from a direct loopback peer.
      */
     @Test
     fun `an address the relay does not answer to is reported, not hidden`() = runBlocking {
@@ -145,7 +150,7 @@ class RelayConformanceTest {
         // way to reproduce from this machine what a phone produces by simply being on the LAN.
         val request = Request.Builder()
             .url("$origin${RelayPairing.HEALTH_PATH}")
-            .header("Host", "10.0.2.2:${started.port}")
+            .header("Host", "untrusted.example:${started.port}")
             .header("Accept", "application/json")
             .get()
             .build()
@@ -219,7 +224,7 @@ class RelayConformanceTest {
             node()!!.absolutePath,
             "--experimental-transform-types",
             driver.absolutePath,
-            pluginRoot().toURI().toString().trimEnd('/'),
+            relayRoot.toURI().toString().trimEnd('/'),
             upstreamPort.toString(),
             tls,
         ).redirectErrorStream(false).start()
@@ -231,7 +236,7 @@ class RelayConformanceTest {
         val started = WireJson.decodeFromString(Started.serializer(), line)
         // Nothing here can be checked from a machine with no LAN address: every request would be
         // loopback, which the relay answers as the operator without reading a credential.
-        assumeTrue("no non-loopback address on this machine", started.host != null)
+        requireOrAssume(started.host != null, "no non-loopback address on this machine")
         return started
     }
 
@@ -252,9 +257,13 @@ class RelayConformanceTest {
         }
         .build()
 
-    // An environment variable rather than a system property: Gradle does not forward `-D` to the
-    // test JVM without extra wiring, so a property would have silently always been the default.
-    private fun pluginRoot(): File = File(System.getenv(SRC_ENV) ?: DEFAULT_SRC)
+    private fun requireOrAssume(condition: Boolean, message: String) {
+        if (System.getenv(REQUIRED_ENV).equals("true", ignoreCase = true)) {
+            assertTrue(message, condition)
+        } else {
+            assumeTrue(message, condition)
+        }
+    }
 
     private fun node(): File? = System.getenv("PATH").orEmpty().split(File.pathSeparator)
         .flatMap { listOf(File(it, "node.exe"), File(it, "node")) }
@@ -281,7 +290,7 @@ class RelayConformanceTest {
 
     private companion object {
         const val SRC_ENV = "DSH_RELAY_SRC"
-        const val DEFAULT_SRC = "D:/LabTeto/deepseek-harness-mobile-plugin"
+        const val REQUIRED_ENV = "DSH_RELAY_CONFORMANCE_REQUIRED"
 
         /**
          * Written beside the relay's own sources so its relative imports resolve, and so the
