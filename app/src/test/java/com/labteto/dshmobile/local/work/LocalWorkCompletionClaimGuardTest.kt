@@ -105,6 +105,21 @@ class LocalWorkCompletionClaimGuardTest {
     }
 
     @Test
+    fun teamProjectionFailureBlocksGlobalCompletionClaimEvenWithoutOpenTasks() {
+        val state = LocalWorkState(
+            team = LocalAgentTeamUiState(
+                failure = "TEAM_EVENT_VERSION_UNSUPPORTED",
+            ),
+        )
+
+        val result = LocalWorkCompletionClaimGuard.inspect("全部完成，可以交付。", state)
+
+        assertTrue(result.changed)
+        assertTrue(result.findings.contains("完成声明与 Agent Team 异常状态冲突"))
+        assertTrue(result.text.contains("Agent Team 当前存在异常状态"))
+    }
+
+    @Test
     fun localProgressClaimIsNotMistakenForWholeTaskCompletion() {
         val state = LocalHarnessState(
             usageMode = LocalUsageMode.WORK,
