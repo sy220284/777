@@ -29,6 +29,7 @@ internal class LocalTranscriptRuntime(
         contentAlreadyBounded: Boolean = false,
         toolIsError: Boolean? = null,
         toolErrorCode: String? = null,
+        blocks: List<LocalMessageBlock> = emptyList(),
     ): LocalHarnessMessage = LocalHarnessMessage(
         id = UUID.randomUUID().toString(),
         role = role,
@@ -39,6 +40,7 @@ internal class LocalTranscriptRuntime(
         speakerId = speakerId,
         speakerName = speakerName,
         createdAt = System.currentTimeMillis(),
+        blocks = blocks,
     )
 
     fun withTranscript(

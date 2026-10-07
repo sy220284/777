@@ -278,9 +278,11 @@ internal fun LocalConversationSurface(
                 uris.take(available).forEach { uri ->
                     try {
                         val imported = onImportAttachment(uri)
-                        val duplicate = imported.attachmentId != null &&
-                            attachments.any { it.attachmentId == imported.attachmentId }
-                        if (!duplicate) attachments += imported
+                        when (localComposerAttachmentDecision(attachments, imported)) {
+                            LocalComposerAttachmentDecision.ACCEPT -> attachments += imported
+                            LocalComposerAttachmentDecision.DUPLICATE -> Unit
+                            LocalComposerAttachmentDecision.IMAGE_LIMIT -> failure = imageLimitMessage
+                        }
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Exception) {
@@ -295,8 +297,15 @@ internal fun LocalConversationSurface(
         if (uri != null) {
             scope.launch {
                 try {
-                    attachments += onImportAttachment(uri)
-                    attachmentError = null
+                    val imported = onImportAttachment(uri)
+                    attachmentError = when (localComposerAttachmentDecision(attachments, imported)) {
+                        LocalComposerAttachmentDecision.ACCEPT -> {
+                            attachments += imported
+                            null
+                        }
+                        LocalComposerAttachmentDecision.DUPLICATE -> null
+                        LocalComposerAttachmentDecision.IMAGE_LIMIT -> imageLimitMessage
+                    }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
@@ -970,6 +979,30 @@ internal fun LocalConversationSurface(
             }
         }
     }
+}
+
+internal enum class LocalComposerAttachmentDecision {
+    ACCEPT,
+    DUPLICATE,
+    IMAGE_LIMIT,
+}
+
+internal fun localComposerAttachmentDecision(
+    current: List<LocalImportedAttachment>,
+    candidate: LocalImportedAttachment,
+    maxImages: Int = MAX_LOCAL_IMAGE_SELECTION,
+): LocalComposerAttachmentDecision {
+    require(maxImages > 0)
+    if (candidate.attachmentId != null && current.any { it.attachmentId == candidate.attachmentId }) {
+        return LocalComposerAttachmentDecision.DUPLICATE
+    }
+    if (
+        candidate.mediaType.startsWith("image/") &&
+        current.count { it.mediaType.startsWith("image/") } >= maxImages
+    ) {
+        return LocalComposerAttachmentDecision.IMAGE_LIMIT
+    }
+    return LocalComposerAttachmentDecision.ACCEPT
 }
 
 @Composable
