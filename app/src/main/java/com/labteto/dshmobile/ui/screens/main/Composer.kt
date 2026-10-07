@@ -182,7 +182,7 @@ internal fun Composer(
         Box {
             DsComposerAction(
                 icon = FeatherIcons.Plus,
-                contentDescription = stringResource(R.string.chat_composer_attach_file),
+                contentDescription = stringResource(R.string.local_composer_more_actions),
                 onClick = { composerMenuOpen = true },
                 enabled = enabled && !preparing,
                 tint = colors.labelPrimary,
