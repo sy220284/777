@@ -77,6 +77,8 @@ internal class LocalAgentTeamRuntime(
         task: String,
         model: String?,
         maxSteps: Int,
+        context: LocalTeamMemberContext,
+        parentCallId: String?,
     ) -> com.labteto.dshmobile.harness.jobs.JobStartResult,
     private val sendToTeammate: (
         agentId: String,
@@ -112,6 +114,8 @@ internal class LocalAgentTeamRuntime(
                 model = args.optionalTeamString("model"),
                 maxSteps = args["max_steps"]?.jsonPrimitive?.intOrNull
                     ?: binding.aggregateSnapshot().subagentMaxSteps,
+                context = args.optionalTeamContext(),
+                parentCallId = call.id,
             )
             "team_send_message" -> sendMessage(
                 sessionId = binding.sessionId,
@@ -163,6 +167,8 @@ internal class LocalAgentTeamRuntime(
         task: String,
         model: String?,
         maxSteps: Int,
+        context: LocalTeamMemberContext,
+        parentCallId: String,
     ): String {
         val cleanName = normalizeName(name)
         val before = project(binding.sessionId)
@@ -185,7 +191,7 @@ internal class LocalAgentTeamRuntime(
                 allowEmpty = true,
             ),
             provider = LOCAL_SUBAGENT_PROVIDER,
-            context = LocalTeamMemberContext.FRESH,
+            context = context,
             phase = LocalTeamMemberPhase.PROVISIONING,
         )
         appendMember(binding.sessionId, provisioning)
@@ -197,6 +203,8 @@ internal class LocalAgentTeamRuntime(
                 buildTeamTaskPrompt(cleanName, description, task),
                 model,
                 LocalAgentRuntimeLimits.normalizeSubagentSteps(maxSteps),
+                context,
+                parentCallId.takeIf { context == LocalTeamMemberContext.FORK },
             )
             if (!started.accepted || started.id != jobId) {
                 appendMember(
