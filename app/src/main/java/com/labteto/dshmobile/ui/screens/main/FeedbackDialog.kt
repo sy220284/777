@@ -17,7 +17,7 @@ import com.labteto.dshmobile.data.SessionStore
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsDialog
+import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -71,9 +71,10 @@ internal fun FeedbackDialog(store: SessionStore, key: ComposerKey, messageId: St
         catch (e: Exception) { error = e.message }
         finally { busy = false }
     }
-    DsDialog(
+    DsBottomSheet(
         title = stringResource(if (positive) R.string.chat_feedback_up else R.string.chat_feedback_down),
         onDismiss = { if (!busy) onDismiss() },
+        dismissEnabled = !busy,
     ) {
         DsTextField(
             value = note,
