@@ -88,6 +88,46 @@ class LocalSubagentContinuationTest {
     }
 
     @Test
+    fun duplicateTerminalCheckpointRequiresSameStepAndOutput() {
+        assertEquals(
+            true,
+            isDuplicateLocalSubagentTerminalCheckpoint(
+                previousStep = 4,
+                previousOutput = "完成",
+                step = 4,
+                terminalOutput = "完成",
+            ),
+        )
+        assertEquals(
+            false,
+            isDuplicateLocalSubagentTerminalCheckpoint(
+                previousStep = 4,
+                previousOutput = "完成",
+                step = 5,
+                terminalOutput = "完成",
+            ),
+        )
+        assertEquals(
+            false,
+            isDuplicateLocalSubagentTerminalCheckpoint(
+                previousStep = 4,
+                previousOutput = "完成",
+                step = 4,
+                terminalOutput = "补充结果",
+            ),
+        )
+        assertEquals(
+            false,
+            isDuplicateLocalSubagentTerminalCheckpoint(
+                previousStep = 4,
+                previousOutput = "完成",
+                step = 4,
+                terminalOutput = null,
+            ),
+        )
+    }
+
+    @Test
     fun terminalCheckpointRoundTripsCompletionOutput() {
         val encoded = encodeLocalSubagentHistoryCheckpoint(
             backgroundJobId = "job-1",

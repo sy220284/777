@@ -344,11 +344,24 @@ internal class LocalSubagentRunner(
             agentId = subagentId,
         )
 
+        var lastTerminalCheckpointStep: Int? = null
+        var lastTerminalCheckpointOutput: String? = null
+
         fun persistContinuationCheckpoint(
             step: Int,
             terminalOutput: String? = null,
         ) {
             val jobId = backgroundJobId ?: return
+            if (
+                isDuplicateLocalSubagentTerminalCheckpoint(
+                    previousStep = lastTerminalCheckpointStep,
+                    previousOutput = lastTerminalCheckpointOutput,
+                    step = step,
+                    terminalOutput = terminalOutput,
+                )
+            ) {
+                return
+            }
             try {
                 eventLog().append(
                     LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT,
@@ -362,6 +375,10 @@ internal class LocalSubagentRunner(
                         terminalOutput = terminalOutput,
                     ),
                 )
+                if (!terminalOutput.isNullOrBlank()) {
+                    lastTerminalCheckpointStep = step
+                    lastTerminalCheckpointOutput = terminalOutput
+                }
             } catch (error: Exception) {
                 throw JobContinuationPersistenceException(
                     "持久子代理历史检查点写入失败",
