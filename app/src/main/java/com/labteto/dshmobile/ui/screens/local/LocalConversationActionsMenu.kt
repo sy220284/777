@@ -1,8 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +39,7 @@ internal fun ConversationActionsMenu(
             items = listOf(
                 MenuItem(
                     text = stringResource(if (pinned) R.string.local_unpin_session else R.string.advanced_pin),
-                    icon = Icons.Outlined.PushPin,
+                    icon = FeatherIcons.Pin,
                     onClick = onTogglePin,
                 ),
                 MenuItem(
