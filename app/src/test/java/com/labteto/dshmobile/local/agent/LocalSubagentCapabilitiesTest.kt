@@ -107,6 +107,26 @@ class LocalSubagentCapabilitiesTest {
     }
 
     @Test
+    fun unavailableToolAllowlistFailsClosedBeforeExecution() {
+        val schemas = JsonArray(
+            listOf(
+                functionSchema("read"),
+                functionSchema("grep"),
+            ),
+        )
+        val capabilities = LocalSubagentCapabilities(
+            toolAllowlist = setOf("read", "missing_tool"),
+        )
+
+        val message = requireFailure {
+            validateLocalSubagentToolAllowlist(schemas, capabilities)
+        }
+
+        assertTrue(message.contains("SUBAGENT_TOOL_FILTER_UNAVAILABLE"))
+        assertTrue(message.contains("missing_tool"))
+    }
+
+    @Test
     fun versionTwoCapabilitiesRoundTripIncludingFutureOutputSchema() {
         val capabilities = LocalSubagentCapabilities(
             allowMutation = false,
