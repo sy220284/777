@@ -347,14 +347,25 @@ fun SettingsScreen(
                 ) {
                 when (page) {
                     SettingsDestination.ROOT -> {
-                        // Kimi-style progressive disclosure: first-level rows show the destination,
-                        // while descriptions and editable controls live on the next level.
-                        SettingsGroupTitle(stringResource(R.string.settings_group_experience))
+                        // The main settings view is a calm navigation list.
+                        // The first card contains frequently used destinations; details belong to subpages.
                         AppSettingsSection {
+                            AppSettingsRow(
+                                icon = FeatherIcons.Device,
+                                title = stringResource(R.string.settings_page_permissions),
+                                trailing = { StateDot(deviceCapabilitiesState(deviceCapabilities)) },
+                                onClick = { page = SettingsDestination.PERMISSIONS },
+                            )
+                            AppSettingsDivider()
+                            AppSettingsRow(
+                                icon = FeatherIcons.Bell,
+                                title = stringResource(R.string.settings_page_notifications),
+                                onClick = { page = SettingsDestination.NOTIFICATIONS },
+                            )
+                            AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.Sliders,
                                 title = stringResource(R.string.settings_page_appearance),
-                                value = appearanceThemeLabel(settings.themePreference),
                                 onClick = { page = SettingsDestination.APPEARANCE },
                             )
                             AppSettingsDivider()
@@ -365,22 +376,14 @@ fun SettingsScreen(
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
-                                icon = FeatherIcons.BookOpen,
-                                title = stringResource(R.string.settings_page_memory),
-                                value = memories.size.toString(),
-                                onClick = { page = SettingsDestination.MEMORY },
+                                icon = FeatherIcons.Globe,
+                                title = stringResource(R.string.settings_page_models),
+                                onClick = { page = SettingsDestination.MODELS },
                             )
                         }
 
                         SettingsGroupTitle(stringResource(R.string.settings_group_models))
                         AppSettingsSection {
-                            AppSettingsRow(
-                                icon = FeatherIcons.Globe,
-                                title = stringResource(R.string.settings_page_models),
-                                value = localHarness.model.takeIf { it.isNotBlank() },
-                                onClick = { page = SettingsDestination.MODELS },
-                            )
-                            AppSettingsDivider()
                             AppSettingsRow(
                                 icon = FeatherIcons.Clock,
                                 title = stringResource(R.string.settings_page_model_usage),
@@ -388,20 +391,12 @@ fun SettingsScreen(
                             )
                         }
 
-                        SettingsGroupTitle(stringResource(R.string.settings_group_system))
+                        SettingsGroupTitle(stringResource(R.string.settings_group_experience))
                         AppSettingsSection {
                             AppSettingsRow(
-                                icon = FeatherIcons.Device,
-                                title = stringResource(R.string.settings_page_permissions),
-                                onClick = { page = SettingsDestination.PERMISSIONS },
-                                trailing = { StateDot(deviceCapabilitiesState(deviceCapabilities)) },
-                            )
-                            AppSettingsDivider()
-                            AppSettingsRow(
-                                icon = FeatherIcons.Bell,
-                                title = stringResource(R.string.settings_page_notifications),
-                                value = enabledNotificationCount(settings).toString(),
-                                onClick = { page = SettingsDestination.NOTIFICATIONS },
+                                icon = FeatherIcons.BookOpen,
+                                title = stringResource(R.string.settings_page_memory),
+                                onClick = { page = SettingsDestination.MEMORY },
                             )
                         }
 
