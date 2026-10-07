@@ -1064,20 +1064,13 @@ internal fun LocalConversationSurface(
                         )
                     }
                 } else {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                    ) {
-                        DsQuickActionTile(
-                            icon = FeatherIcons.Users,
-                            label = stringResource(R.string.local_team_title),
-                            onClick = {
-                                teamDispatchSelected = !teamDispatchSelected
-                                showAttachmentPicker = false
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+                    LocalAgentSwarmLaunchEntry(
+                        selected = teamDispatchSelected,
+                        onClick = {
+                            teamDispatchSelected = !teamDispatchSelected
+                            showAttachmentPicker = false
+                        },
+                    )
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),

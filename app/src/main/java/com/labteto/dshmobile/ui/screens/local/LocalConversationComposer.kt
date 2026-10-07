@@ -235,14 +235,6 @@ internal fun LocalConversationComposer(
                 )
             }
         }
-        if (state.usageMode == LocalUsageMode.WORK && teamDispatchSelected) {
-            Text(
-                stringResource(R.string.local_team_high_usage_tip),
-                style = DsType.caption11.withReadingWeight(),
-                color = colors.labelTertiary,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
         val imageAttachments = attachments.mapIndexedNotNull { index, attachment ->
             (index to attachment).takeIf { attachment.mediaType.startsWith("image/") }
         }

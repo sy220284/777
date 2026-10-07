@@ -60,6 +60,63 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
+internal fun LocalAgentSwarmLaunchEntry(
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = DsTheme.colors
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
+        border = BorderStroke(
+            1.dp,
+            if (selected) colors.accent.copy(alpha = 0.32f) else colors.borderL2,
+        ),
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = DsSpacing.medium,
+                vertical = DsSpacing.small,
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Icon(
+                imageVector = FeatherIcons.Users,
+                contentDescription = null,
+                tint = if (selected) colors.accent else colors.labelPrimary,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Text(
+                    stringResource(R.string.local_team_title),
+                    style = DsType.std14Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                )
+                Text(
+                    stringResource(R.string.local_team_high_usage_tip),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(
+                imageVector = if (selected) FeatherIcons.Check else FeatherIcons.ChevronRight,
+                contentDescription = null,
+                tint = if (selected) colors.accent else colors.labelCaption,
+            )
+        }
+    }
+}
+
+@Composable
 internal fun LocalAgentTeamStatusBar(
     team: LocalAgentTeamUiState,
     launchPending: Boolean,
