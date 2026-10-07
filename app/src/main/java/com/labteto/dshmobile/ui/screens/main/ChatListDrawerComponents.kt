@@ -54,6 +54,7 @@ import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsMenu
+import com.labteto.dshmobile.ui.components.DsPopupMenu
 import com.labteto.dshmobile.ui.components.EmptyHero
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
@@ -305,29 +306,40 @@ internal fun SessionRowItem(
             }
         }
 
-        if (menuOpen) {
-            DsBottomSheet(title = null, onDismiss = { menuOpen = false }) {
-                if (archived) {
-                    DsSheetChoiceRow(title = stringResource(R.string.archived_restore)) {
-                        menuOpen = false
-                        scope.launch { restoreFailed = !actions.unarchive(session.sessionId) }
-                    }
-                } else {
-                    DsSheetChoiceRow(title = stringResource(R.string.chatlist_session_rename)) {
-                        menuOpen = false
-                        renameOpen = true
-                    }
-                    DsSheetChoiceRow(title = stringResource(R.string.chatlist_session_fork)) {
-                        menuOpen = false
-                        scope.launch { actions.fork(session.sessionId) }
-                    }
-                    DsSheetChoiceRow(title = stringResource(R.string.chatlist_session_archive), danger = true) {
-                        menuOpen = false
-                        archiveConfirmOpen = true
-                    }
-                }
-            }
-        }
+        DsPopupMenu(
+            expanded = menuOpen,
+            onDismiss = { menuOpen = false },
+            items = if (archived) {
+                listOf(
+                    MenuItem(
+                        text = stringResource(R.string.archived_restore),
+                        icon = FeatherIcons.RefreshCw,
+                        onClick = {
+                            scope.launch { restoreFailed = !actions.unarchive(session.sessionId) }
+                        },
+                    ),
+                )
+            } else {
+                listOf(
+                    MenuItem(
+                        text = stringResource(R.string.chatlist_session_rename),
+                        icon = FeatherIcons.Edit3,
+                        onClick = { renameOpen = true },
+                    ),
+                    MenuItem(
+                        text = stringResource(R.string.chatlist_session_fork),
+                        icon = FeatherIcons.GitBranch,
+                        onClick = { scope.launch { actions.fork(session.sessionId) } },
+                    ),
+                    MenuItem(
+                        text = stringResource(R.string.chatlist_session_archive),
+                        icon = FeatherIcons.Trash2,
+                        danger = true,
+                        onClick = { archiveConfirmOpen = true },
+                    ),
+                )
+            },
+        )
     }
 
     if (restoreFailed) {
