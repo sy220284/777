@@ -23,7 +23,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
- * Kimi-like single-choice row for short-lived bottom sheets.
+ * 统一单选行 for short-lived bottom sheets.
  * The explanation belongs to the same touch target as the action.
  */
 @Composable
