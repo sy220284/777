@@ -1074,6 +1074,26 @@ internal fun LocalConversationSurface(
                         )
                     }
                 } else {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    ) {
+                        DsQuickActionTile(
+                            icon = FeatherIcons.List,
+                            label = stringResource(if (state.planMode) R.string.local_plan_button_on else R.string.local_plan_button_off),
+                            onClick = { onPlanModeChange(!state.planMode); showAttachmentPicker = false },
+                            modifier = Modifier.weight(1f),
+                        )
+                        DsQuickActionTile(
+                            icon = FeatherIcons.Shield,
+                            label = stringResource(if (state.safeAutoApprovalEnabled) R.string.kimi_auto_approval_enabled else R.string.local_auto_approve_short),
+                            onClick = {
+                                showAttachmentPicker = false
+                                if (state.safeAutoApprovalEnabled) onDisableAutoApprove() else onAutoApprove()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                     LocalAgentSwarmLaunchEntry(
                         selected = teamDispatchSelected,
                         onClick = {

@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -173,50 +174,58 @@ internal fun DrawerQuickActions(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        if (usageMode == LocalUsageMode.CHAT) {
-            DrawerQuickAction(
-                icon = FeatherIcons.Image,
-                title = stringResource(R.string.persona_gallery_title),
-                badge = galleryCount.takeIf { it > 0 }?.toString(),
-                onClick = onOpenPersonaGallery,
-            )
-            DrawerQuickAction(
-                icon = FeatherIcons.Users,
-                title = stringResource(R.string.local_group_chat_title),
-                badge = groupMemberCount.takeIf { it > 0 }?.toString(),
-                onClick = onOpenGroupChat,
-            )
-            DrawerQuickAction(
-                icon = FeatherIcons.Clock,
-                title = stringResource(R.string.tasks_chat_title),
-                onClick = onTasks,
-            )
-            DrawerQuickAction(
-                icon = FeatherIcons.BookOpen,
-                title = stringResource(R.string.chat_diary_title),
-                onClick = onOpenDiary,
-            )
-        } else {
-            DrawerQuickAction(
-                icon = FeatherIcons.Activity,
-                title = stringResource(R.string.local_run_center),
-                onClick = onOpenRunCenter,
-            )
-            DrawerQuickAction(
-                icon = FeatherIcons.Folder,
-                title = stringResource(R.string.chatlist_workspace_files),
-                onClick = onWorkspaceFiles,
-            )
-            DrawerQuickAction(
-                icon = FeatherIcons.Clock,
-                title = stringResource(R.string.tasks_title),
-                onClick = onTasks,
-            )
-            DrawerQuickAction(
-                icon = FeatherIcons.Tool,
-                title = stringResource(R.string.tools_title),
-                onClick = onTools,
-            )
+        var expanded by rememberSaveable(usageMode) { mutableStateOf(false) }
+        DrawerQuickAction(
+            icon = if (expanded) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
+            title = stringResource(R.string.kimi_extended_capabilities),
+            onClick = { expanded = !expanded },
+        )
+        if (expanded) {
+            if (usageMode == LocalUsageMode.CHAT) {
+                DrawerQuickAction(
+                    icon = FeatherIcons.Image,
+                    title = stringResource(R.string.persona_gallery_title),
+                    badge = galleryCount.takeIf { it > 0 }?.toString(),
+                    onClick = onOpenPersonaGallery,
+                )
+                DrawerQuickAction(
+                    icon = FeatherIcons.Users,
+                    title = stringResource(R.string.local_group_chat_title),
+                    badge = groupMemberCount.takeIf { it > 0 }?.toString(),
+                    onClick = onOpenGroupChat,
+                )
+                DrawerQuickAction(
+                    icon = FeatherIcons.Clock,
+                    title = stringResource(R.string.tasks_chat_title),
+                    onClick = onTasks,
+                )
+                DrawerQuickAction(
+                    icon = FeatherIcons.BookOpen,
+                    title = stringResource(R.string.chat_diary_title),
+                    onClick = onOpenDiary,
+                )
+            } else {
+                DrawerQuickAction(
+                    icon = FeatherIcons.Activity,
+                    title = stringResource(R.string.local_run_center),
+                    onClick = onOpenRunCenter,
+                )
+                DrawerQuickAction(
+                    icon = FeatherIcons.Folder,
+                    title = stringResource(R.string.chatlist_workspace_files),
+                    onClick = onWorkspaceFiles,
+                )
+                DrawerQuickAction(
+                    icon = FeatherIcons.Clock,
+                    title = stringResource(R.string.tasks_title),
+                    onClick = onTasks,
+                )
+                DrawerQuickAction(
+                    icon = FeatherIcons.Tool,
+                    title = stringResource(R.string.tools_title),
+                    onClick = onTools,
+                )
+            }
         }
     }
 }
