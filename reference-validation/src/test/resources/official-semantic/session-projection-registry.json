@@ -1,0 +1,9 @@
+{
+  "stateVersionZeroAccepted": false,
+  "sameVersionShared": false,
+  "differentVersionRejected": false,
+  "asOfSeqAfterTwoEvents": -1,
+  "valueAfterTwoEvents": -1,
+  "survivesFirstDispose": false,
+  "removedAfterLastDispose": false
+}
