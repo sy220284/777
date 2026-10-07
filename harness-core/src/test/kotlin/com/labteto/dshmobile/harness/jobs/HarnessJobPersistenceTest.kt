@@ -289,6 +289,100 @@ class HarnessJobPersistenceTest {
     }
 
     @Test
+    fun interruptedPersistentAgentKeepsDurableInboxAndAcceptsColdResumeMessage() = runTest {
+        var durable = emptyList<JobSnapshot>()
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "running",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = """{"session_id":"session-a"}""",
+                    ownerId = "session-a",
+                    inbox = listOf(JobInboxMessage("msg-old", "已有消息")),
+                ),
+            ),
+            onSnapshotsChanged = { durable = it },
+        )
+
+        assertTrue(manager.output("job-agent", "session-a").contains("[interrupted]"))
+        val result = manager.send("job-agent", "恢复后继续核查", "session-a")
+
+        assertTrue(result.contains("持久排队"))
+        assertTrue(manager.peekMessages("job-agent").map { it.content } == listOf("已有消息", "恢复后继续核查"))
+        assertTrue(durable.single().inbox.size == 2)
+        assertTrue(durable.single().inbox.last().content == "恢复后继续核查")
+    }
+
+    @Test
+    fun persistentAgentMessageRollsBackWhenDurableWriteFails() = runTest {
+        var writes = 0
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "running",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerId = "session-a",
+                    inbox = listOf(JobInboxMessage("msg-old", "已有消息")),
+                ),
+            ),
+            onSnapshotsChanged = {
+                writes += 1
+                if (writes >= 2) error("disk full")
+            },
+        )
+
+        val failure = runCatching {
+            manager.send("job-agent", "不能伪装成功", "session-a")
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalStateException)
+        assertTrue(manager.peekMessages("job-agent") == listOf(JobInboxMessage("msg-old", "已有消息")))
+    }
+
+    @Test
+    fun persistentAgentInboxAcknowledgementIsDurableAndScoped() = runTest {
+        var durable = emptyList<JobSnapshot>()
+        val manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            initialSnapshots = listOf(
+                JobSnapshot(
+                    id = "job-agent",
+                    label = "子代理：审计",
+                    status = "running",
+                    resumeKind = "subagent_readonly",
+                    resumePayload = "{}",
+                    ownerId = "session-a",
+                    inbox = listOf(
+                        JobInboxMessage("msg-1", "第一条"),
+                        JobInboxMessage("msg-2", "第二条"),
+                    ),
+                ),
+            ),
+            onSnapshotsChanged = { durable = it },
+        )
+
+        manager.acknowledgeMessages("job-agent", setOf("msg-1"), "session-a")
+
+        assertTrue(manager.peekMessages("job-agent").map { it.id } == listOf("msg-2"))
+        assertTrue(durable.single().inbox.map { it.id } == listOf("msg-2"))
+        val failure = runCatching {
+            manager.acknowledgeMessages("job-agent", setOf("msg-2"), "session-b")
+        }.exceptionOrNull()
+        assertTrue(failure != null)
+        assertTrue(manager.peekMessages("job-agent").single().id == "msg-2")
+    }
+
+    @Test
     fun sessionTransitionCanStopEphemeralJobsWithoutCancellingPersistentJobs() = runTest {
         val ephemeralGate = CompletableDeferred<Unit>()
         val persistentGate = CompletableDeferred<Unit>()
