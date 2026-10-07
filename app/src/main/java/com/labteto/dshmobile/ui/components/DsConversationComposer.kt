@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -100,6 +101,7 @@ fun DsConversationComposer(
 fun DsComposerAction(
     icon: ImageVector?,
     contentDescription: String,
+    iconPainter: Painter? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -142,6 +144,12 @@ fun DsComposerAction(
             ) {
                 when {
                     content != null -> content()
+                    iconPainter != null -> Icon(
+                        painter = iconPainter,
+                        contentDescription = null,
+                        tint = resolvedTint,
+                        modifier = Modifier.size(iconSize),
+                    )
                     icon != null -> Icon(
                         imageVector = icon,
                         contentDescription = null,

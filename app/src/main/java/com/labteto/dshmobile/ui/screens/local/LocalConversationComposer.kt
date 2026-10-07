@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
@@ -146,7 +147,8 @@ internal fun LocalConversationComposer(
     fun AttachmentControl() {
         if (state.running) return
         DsComposerAction(
-            icon = FeatherIcons.Plus,
+            icon = null,
+            iconPainter = painterResource(R.drawable.ic_kimi_add),
             contentDescription = moreActionsLabel,
             onClick = onOpenAttachmentPicker,
             tint = colors.labelPrimary,
@@ -174,7 +176,8 @@ internal fun LocalConversationComposer(
     @Composable
     fun SendControl(queue: Boolean = false) {
         DsComposerAction(
-            icon = FeatherIcons.ArrowUp,
+            icon = null,
+            iconPainter = painterResource(R.drawable.ic_kimi_send),
             contentDescription = if (queue && state.queuedInputCount > 0) {
                 stringResource(R.string.local_queue_message_count, state.queuedInputCount)
             } else if (queue) {
@@ -193,7 +196,8 @@ internal fun LocalConversationComposer(
     @Composable
     fun StopControl() {
         DsComposerAction(
-            icon = FeatherIcons.Square,
+            icon = null,
+            iconPainter = painterResource(R.drawable.ic_kimi_stop),
             contentDescription = stringResource(R.string.chat_composer_stop),
             onClick = onStop,
             tint = colors.onAccent,
