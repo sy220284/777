@@ -16,14 +16,14 @@ async function main(): Promise<void> {
     stateSchema: z.number().int().nonnegative(),
     init: () => 0,
     apply: (state: number) => state + 1,
-    stateVersion: 7,
+    stateVersion: 0,
   })
   const disposeSecond = projections.register({
     key: '777/advanced-count',
     stateSchema: z.number().int().nonnegative(),
     init: () => 999,
     apply: (state: number) => state + 999,
-    stateVersion: 7,
+    stateVersion: 0,
   })
 
   let differentVersionRejected = false
@@ -33,7 +33,7 @@ async function main(): Promise<void> {
       stateSchema: z.number().int().nonnegative(),
       init: () => 0,
       apply: (state: number) => state,
-      stateVersion: 8,
+      stateVersion: 1,
     })
   } catch {
     differentVersionRejected = true
@@ -45,12 +45,14 @@ async function main(): Promise<void> {
 
   const row = projections.checkpoint(session)['777/advanced-count']
   if (row === undefined) throw new Error('advanced projection checkpoint missing')
+  const sameVersionShared = row.val === 2 && row.ver === 0
 
-  const sameVersionShared = row.val === 2
   disposeFirst()
-  const survivesFirstDispose = projections.stateOf(session, '777/advanced-count') !== undefined
+  const survivesFirstDispose =
+    projections.checkpoint(session)['777/advanced-count'] !== undefined
   disposeSecond()
-  const removedAfterLastDispose = projections.stateOf(session, '777/advanced-count') === undefined
+  const removedAfterLastDispose =
+    projections.checkpoint(session)['777/advanced-count'] === undefined
 
   process.stdout.write(`${JSON.stringify({
     projection: {
