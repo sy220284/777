@@ -659,73 +659,132 @@ class HarnessJobManager(
     }
 
     fun send(id: String, message: String, ownerId: String? = null): String {
-        return synchronized(publicationLock) {
-            val clean = message.trim()
-            require(clean.isNotEmpty()) { "消息不能为空" }
-            var requiresResume = false
-            var persistent = false
-            var infos: List<JobInfo>? = null
-            val response = synchronized(lock) {
-                val found = records[id]
-                    ?.takeIf { ownerId == null || it.ownerId == ownerId }
-                    ?: return "后台代理不存在：$id"
-                if (!found.label.startsWith(AGENT_PREFIX)) {
-                    return "目标不是后台代理：$id"
-                }
-                persistent = !found.resumeKind.isNullOrBlank()
-                requiresResume =
-                    persistent &&
-                        (
-                            found.status == "interrupted" ||
-                                found.isIdleContinuableAgent()
-                            )
-                if (found.status != "running" && !requiresResume) {
-                    return "目标后台代理当前不可接收消息：$id [${found.status}]"
-                }
-                if (found.inbox.size >= MAX_INBOX_MESSAGES) {
-                    return "后台代理消息队列已满：最多保留 $MAX_INBOX_MESSAGES 条待处理消息"
-                }
+        val clean = message.trim()
+        require(clean.isNotEmpty()) { "消息不能为空" }
+        return sendInput(
+            id = id,
+            input = QueuedAgentInput(
+                id = "msg-" + UUID.randomUUID().toString().replace("-", "").take(16),
+                content = clean.take(MAX_INBOX_MESSAGE),
+                memoryInput = clean.take(MAX_INBOX_MESSAGE),
+            ),
+            ownerId = ownerId,
+        ).message
+    }
 
-                val previousInbox = found.inbox.toList()
-                val previousUpdatedAt = found.updatedAt
-                found.inbox += QueuedAgentInput(
-                    id = "msg-" + UUID.randomUUID().toString().replace("-", "").take(16),
-                    content = clean.take(MAX_INBOX_MESSAGE),
-                    memoryInput = clean.take(MAX_INBOX_MESSAGE),
+    fun sendInput(
+        id: String,
+        input: QueuedAgentInput,
+        ownerId: String? = null,
+    ): JobMessageAdmission = synchronized(publicationLock) {
+        val messageId = input.id.trim()
+        require(messageId.isNotEmpty()) { "消息编号不能为空" }
+        require(messageId.length <= MAX_INBOX_ID) {
+            "消息编号过长：最多允许 $MAX_INBOX_ID 个字符"
+        }
+        val content = input.content.trim()
+        require(content.isNotEmpty()) { "消息不能为空" }
+        val normalized = input.copy(
+            id = messageId,
+            content = content.take(MAX_INBOX_MESSAGE),
+            memoryInput = input.memoryInput.take(MAX_INBOX_MESSAGE),
+        )
+        var infos: List<JobInfo>? = null
+        val admission = synchronized(lock) {
+            val found = records[id]
+                ?.takeIf { ownerId == null || it.ownerId == ownerId }
+                ?: return JobMessageAdmission(
+                    accepted = false,
+                    duplicate = false,
+                    requiresResume = false,
+                    message = "后台代理不存在：$id",
                 )
-                found.updatedAt = System.currentTimeMillis()
+            if (!found.label.startsWith(AGENT_PREFIX)) {
+                return JobMessageAdmission(
+                    accepted = false,
+                    duplicate = false,
+                    requiresResume = false,
+                    message = "目标不是后台代理：$id",
+                )
+            }
+            val persistent = !found.resumeKind.isNullOrBlank()
+            val requiresResume =
+                persistent &&
+                    (
+                        found.status == "interrupted" ||
+                            found.isIdleContinuableAgent()
+                        )
+            if (found.status != "running" && !requiresResume) {
+                return JobMessageAdmission(
+                    accepted = false,
+                    duplicate = false,
+                    requiresResume = false,
+                    message = "目标后台代理当前不可接收消息：$id [${found.status}]",
+                )
+            }
 
-                if (persistent) {
-                    try {
-                        // Persistent Inbox admission is one publication transaction. Keeping the
-                        // record lock through the durable callback prevents another send/ack from
-                        // observing or building on an Inbox generation that may still roll back.
-                        onSnapshotsChanged(records.values.map(::snapshot))
-                    } catch (error: Exception) {
-                        found.inbox.clear()
-                        found.inbox.addAll(previousInbox)
-                        found.updatedAt = previousUpdatedAt
-                        throw IllegalStateException("后台代理消息持久化失败，消息未发送", error)
-                    }
-                    infos = records.values.map { record ->
-                        JobInfo(record.id, record.label, record.status, record.ownerId)
-                    }
+            val existing = found.inbox.firstOrNull { it.id == messageId }
+            if (existing != null) {
+                if (existing != normalized) {
+                    return JobMessageAdmission(
+                        accepted = false,
+                        duplicate = true,
+                        requiresResume = requiresResume,
+                        message = "后台代理消息编号冲突：$messageId",
+                    )
                 }
+                return JobMessageAdmission(
+                    accepted = true,
+                    duplicate = true,
+                    requiresResume = requiresResume,
+                    message = "消息已存在于后台代理队列：$id",
+                )
+            }
+            if (found.inbox.size >= MAX_INBOX_MESSAGES) {
+                return JobMessageAdmission(
+                    accepted = false,
+                    duplicate = false,
+                    requiresResume = requiresResume,
+                    message = "后台代理消息队列已满：最多保留 $MAX_INBOX_MESSAGES 条待处理消息",
+                )
+            }
 
-                if (requiresResume) {
+            val previousInbox = found.inbox.toList()
+            val previousUpdatedAt = found.updatedAt
+            found.inbox += normalized
+            found.updatedAt = System.currentTimeMillis()
+
+            if (persistent) {
+                try {
+                    onSnapshotsChanged(records.values.map(::snapshot))
+                } catch (error: Exception) {
+                    found.inbox.clear()
+                    found.inbox.addAll(previousInbox)
+                    found.updatedAt = previousUpdatedAt
+                    throw IllegalStateException("后台代理消息持久化失败，消息未发送", error)
+                }
+                infos = records.values.map { record ->
+                    JobInfo(record.id, record.label, record.status, record.ownerId)
+                }
+            }
+
+            JobMessageAdmission(
+                accepted = true,
+                duplicate = false,
+                requiresResume = requiresResume,
+                message = if (requiresResume) {
                     "消息已持久排队，后台代理将在恢复后接收：$id"
                 } else {
                     "消息已发送给后台代理：$id"
-                }
-            }
-
-            if (persistent) {
-                infos?.let(onChanged)
-            } else {
-                publish()
-            }
-            response
+                },
+            )
         }
+
+        infos?.let(onChanged)
+        if (infos == null && admission.accepted && !admission.duplicate) {
+            publish()
+        }
+        admission
     }
     fun peekMessages(id: String): List<QueuedAgentInput> = synchronized(lock) {
         records[id]?.inbox?.toList().orEmpty()
