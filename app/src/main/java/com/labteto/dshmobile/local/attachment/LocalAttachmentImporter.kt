@@ -55,7 +55,16 @@ internal class LocalAttachmentImporter(
             .replace(Regex("[^A-Za-z0-9._()\\-\\u4e00-\\u9fff]"), "_")
             .take(120)
             .ifBlank { "attachment-${System.currentTimeMillis()}" }
-        val declaredMediaType = resolver.getType(uri)?.lowercase() ?: "application/octet-stream"
+        val originalMediaType = resolver.getType(uri)?.lowercase() ?: "application/octet-stream"
+        // SVG is text/XML and should stay a document attachment instead of entering the raster-image path.
+        val declaredMediaType = if (
+            originalMediaType == "image/svg+xml" ||
+            safeName.endsWith(".svg", ignoreCase = true)
+        ) {
+            "application/xml"
+        } else {
+            originalMediaType
+        }
         val dir = File(workspace.path, ".dsh/attachments").apply { mkdirs() }
         val incoming = File(dir, ".incoming-${UUID.randomUUID()}")
         val digest = MessageDigest.getInstance("SHA-256")
