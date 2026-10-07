@@ -426,6 +426,63 @@ class HarnessJobPersistenceTest {
     }
 
     @Test
+    fun persistentAgentCanParkReceiveMessageAndReactivate() = runTest {
+        lateinit var manager: HarnessJobManager
+        manager = HarnessJobManager(
+            scope = this,
+            onChanged = { },
+            idFactory = { "job-agent-idle" },
+        )
+
+        manager.startPersistent(
+            label = "子代理：持续审计",
+            resumeKind = "subagent_readonly",
+            resumePayload = """{"session_id":"session-a"}""",
+            ownerId = "session-a",
+        ) { id, _ ->
+            manager.updateContinuationState(
+                id = id,
+                state = """{"version":1,"history":[]}""",
+                ownerId = "session-a",
+            )
+            manager.parkPersistent(id, "第一轮完成", "session-a")
+            "第一轮完成"
+        }
+        advanceUntilIdle()
+
+        val parked = manager.snapshots().single { it.id == "job-agent-idle" }
+        assertTrue(parked.status == "idle")
+        assertTrue(parked.continuationState != null)
+        assertTrue(manager.availableSlots() >= 1)
+
+        val sent = manager.send("job-agent-idle", "继续检查第二部分", "session-a")
+        assertTrue(sent.contains("持久排队"))
+        assertTrue(manager.resumableSnapshots().single().id == "job-agent-idle")
+
+        manager.resumePersistent("job-agent-idle", "session-a") { id, _ ->
+            val queued = manager.peekMessages(id)
+            assertTrue(queued.single().content == "继续检查第二部分")
+            manager.acknowledgeMessages(
+                id,
+                queued.mapTo(linkedSetOf()) { it.id },
+                "session-a",
+            )
+            manager.parkPersistent(id, "第二轮完成", "session-a")
+            "第二轮完成"
+        }
+        advanceUntilIdle()
+
+        val resumed = manager.snapshots().single { it.id == "job-agent-idle" }
+        assertTrue(resumed.status == "idle")
+        assertTrue(resumed.inbox.isEmpty())
+        assertTrue(manager.output("job-agent-idle", "session-a").contains("第二轮完成"))
+
+        manager.kill("job-agent-idle", "session-a")
+        assertTrue(manager.snapshots().single().status == "cancelled")
+        assertTrue(manager.snapshots().single().continuationState == null)
+    }
+
+    @Test
     fun sessionTransitionCanStopEphemeralJobsWithoutCancellingPersistentJobs() = runTest {
         val ephemeralGate = CompletableDeferred<Unit>()
         val persistentGate = CompletableDeferred<Unit>()
