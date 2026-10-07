@@ -171,7 +171,43 @@ internal fun CharacterBehaviorTuningDialog(
         if (advanced) R.string.common_state_expanded else R.string.common_state_collapsed,
     )
 
-    DsBottomSheet(title = null, onDismiss = { if (!saving) onDismiss() }, scrollable = true, dismissEnabled = !saving) {
+    DsBottomSheet(
+        title = null,
+        onDismiss = { if (!saving) onDismiss() },
+        scrollable = true,
+        dismissEnabled = !saving,
+        footer = {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DsButton(
+                text = stringResource(R.string.local_character_tuning_restore),
+                onClick = { draft = CharacterBehaviorTuning(updatedAt = draft.updatedAt) },
+                variant = DsButtonVariant.Ghost,
+                enabled = !saving,
+            )
+            Spacer(Modifier.width(DsSpacing.small))
+            DsButton(
+                text = stringResource(R.string.local_character_tuning_done),
+                onClick = {
+                    if (saving) return@DsButton
+                    val submitted = draft.normalized().copy(updatedAt = System.currentTimeMillis())
+                    saving = true
+                    saveError = null
+                    coroutineScope.launch {
+                        onSave(submitted)
+                            .onSuccess { onDismiss() }
+                            .onFailure { saveError = it.message ?: saveFailedText }
+                        saving = false
+                    }
+                },
+                enabled = !saving,
+            )
+        }
+        },
+    ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = DsShapes.block,
@@ -444,35 +480,7 @@ internal fun CharacterBehaviorTuningDialog(
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DsButton(
-                text = stringResource(R.string.local_character_tuning_restore),
-                onClick = { draft = CharacterBehaviorTuning(updatedAt = draft.updatedAt) },
-                variant = DsButtonVariant.Ghost,
-                enabled = !saving,
-            )
-            Spacer(Modifier.width(DsSpacing.small))
-            DsButton(
-                text = stringResource(R.string.local_character_tuning_done),
-                onClick = {
-                    if (saving) return@DsButton
-                    val submitted = draft.normalized().copy(updatedAt = System.currentTimeMillis())
-                    saving = true
-                    saveError = null
-                    coroutineScope.launch {
-                        onSave(submitted)
-                            .onSuccess { onDismiss() }
-                            .onFailure { saveError = it.message ?: saveFailedText }
-                        saving = false
-                    }
-                },
-                enabled = !saving,
-            )
-        }
+
         saveError?.let {
             Text(it, style = DsType.caption11.withReadingWeight(), color = colors.error)
         }
