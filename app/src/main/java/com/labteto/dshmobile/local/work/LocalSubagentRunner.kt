@@ -593,6 +593,7 @@ internal class LocalSubagentRunner(
                         is AgentEvent.TurnCompleted -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
+                                backgroundJobId?.let { put("background_job_id", it) }
                                 put("status", "completed")
                                 put("steps", durableEvent.steps)
                             })
@@ -600,6 +601,7 @@ internal class LocalSubagentRunner(
                         is AgentEvent.TurnStepLimit -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
+                                backgroundJobId?.let { put("background_job_id", it) }
                                 put("status", "step_limit")
                                 put("steps", durableEvent.steps)
                             })
@@ -607,12 +609,14 @@ internal class LocalSubagentRunner(
                         is AgentEvent.TurnCancelled -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
+                                backgroundJobId?.let { put("background_job_id", it) }
                                 put("status", "cancelled")
                             })
                         }
                         is AgentEvent.TurnFailed -> {
                             eventLog().append("subagent/end", buildJsonObject {
                                 put("agent_id", subagentId)
+                                backgroundJobId?.let { put("background_job_id", it) }
                                 put("status", "failed")
                                 put("detail", durableEvent.reason.take(2_000))
                             })
@@ -664,9 +668,17 @@ internal class LocalSubagentRunner(
 
             val result = loop.run(task)
             if (result.stopReason == com.labteto.dshmobile.harness.agent.AgentStopReason.COMPLETED) {
+                val output = result.answer.ifBlank { "子代理已结束，但没有返回文字。" }
+                backgroundJobId?.let { jobId ->
+                    jobs.parkPersistent(
+                        id = jobId,
+                        output = output,
+                        ownerSessionId = runSessionId(),
+                    )
+                }
                 return LocalSubagentResult(
                     status = LocalSubagentStatus.COMPLETED,
-                    output = result.answer.ifBlank { "子代理已结束，但没有返回文字。" },
+                    output = output,
                 )
             }
 
