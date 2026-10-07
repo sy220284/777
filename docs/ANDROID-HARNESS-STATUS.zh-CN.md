@@ -89,6 +89,7 @@ Session Event Log 是主要事实源。模型历史缓冲区与 Checkpoint 是 E
 - `request/tool-surface` 只在工具 Schema Surface 变化时记录完整 Schema；
 - `request/context-surface` 只在 system / developer 模型可见上下文变化时记录脱敏后的上下文切片；
 - `reconstructRequest(sessionId, requestUid)` 按 Surface 序号重建消息、工具和 Context，重新计算 digest / envelope fingerprint；V1 标记为 evidence-only，V2 区分 exact verified、redacted verified 与 invalid；
+- 每次通过本地 admission、真正准备调用 Provider 时额外写入 `request/provider-attempt`：记录实际 `activeMessages` 对应 Surface、恢复轮次、真实冻结模型/协议、temperature 与 Prompt Cache 运行参数；Context Overflow 后压缩产生的新请求因此可逐次重建，未通过本地 admission 的请求不会伪造 Provider Attempt；
 - retry / error / cancelled / completed / `assistant/attempt` 使用同一个 `request_uid` 关联，失败尝试不会伪造正式 assistant 历史；
 - `tool/execution-started` 在真实执行 admission 后记录独立 `execution_id` 与 `root_call_id`，与模型声明的 `tool/call` 分离。
 
