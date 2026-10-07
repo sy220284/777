@@ -40,7 +40,7 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("team-a")
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("team-a", "member-1", "job-1", "worker", "active"),
+            member("team-a", "member-1", "worker", "active"),
         )
 
         val projection = fixture.runtime.project("team-a")
@@ -64,7 +64,17 @@ class LocalAgentTeamRuntimeTest {
                     put("senderId", "team-a")
                     put("senderName", "lead")
                     put("targetId", "member-1")
-                    put("content", "检查结果")
+                    put(
+                        "content",
+                        JsonArray(
+                            listOf(
+                                buildJsonObject {
+                                    put("type", "text")
+                                    put("text", "检查结果")
+                                },
+                            ),
+                        ),
+                    )
                 })
             },
         )
@@ -92,15 +102,15 @@ class LocalAgentTeamRuntimeTest {
         val fixture = fixture("fork-b")
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("ancestor-a", "member-old", "job-old", "old", "provisioning"),
+            member("ancestor-a", "member-old", "old", "provisioning"),
         )
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("fork-b", "member-new", "job-new", "new", "provisioning"),
+            member("fork-b", "member-new", "new", "provisioning"),
         )
         fixture.log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member("fork-b", "member-new", "job-new", "new", "active"),
+            member("fork-b", "member-new", "new", "active"),
         )
 
         val projection = fixture.runtime.project("fork-b")
@@ -119,9 +129,10 @@ class LocalAgentTeamRuntimeTest {
                 put("teamId", "team-a")
                 put("member", buildJsonObject {
                     put("id", "job-1")
-                    put("jobId", "job-1")
                     put("name", "worker")
                     put("description", "")
+                    put("provider", "local-subagent")
+                    put("context", "fresh")
                     put("phase", "provisioning")
                 })
             },
@@ -193,18 +204,17 @@ class LocalAgentTeamRuntimeTest {
     private fun appendActiveMember(log: LocalSessionEventLog, teamId: String) {
         log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member(teamId, "member-1", "job-1", "worker", "provisioning"),
+            member(teamId, "member-1", "worker", "provisioning"),
         )
         log.append(
             LocalAgentTeamRuntime.TEAM_MEMBER_EVENT,
-            member(teamId, "member-1", "job-1", "worker", "active"),
+            member(teamId, "member-1", "worker", "active"),
         )
     }
 
     private fun member(
         teamId: String,
         id: String,
-        jobId: String,
         name: String,
         phase: String,
     ) = buildJsonObject {
@@ -212,9 +222,10 @@ class LocalAgentTeamRuntimeTest {
         put("teamId", teamId)
         put("member", buildJsonObject {
             put("id", id)
-            put("jobId", jobId)
             put("name", name)
             put("description", "")
+            put("provider", "local-subagent")
+            put("context", "fresh")
             put("phase", phase)
         })
     }
