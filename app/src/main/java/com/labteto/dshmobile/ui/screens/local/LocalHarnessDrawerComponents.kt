@@ -167,6 +167,7 @@ internal fun DrawerQuickActions(
     onOpenDiary: () -> Unit,
     onTasks: () -> Unit,
     onWorkspaceFiles: () -> Unit,
+    onProjects: () -> Unit,
     onOpenRunCenter: () -> Unit,
     onTools: () -> Unit,
 ) {
@@ -181,6 +182,11 @@ internal fun DrawerQuickActions(
             onClick = { expanded = !expanded },
         )
         if (expanded) {
+            DrawerQuickAction(
+                icon = FeatherIcons.Folder,
+                title = stringResource(R.string.local_project_management_title),
+                onClick = onProjects,
+            )
             if (usageMode == LocalUsageMode.CHAT) {
                 DrawerQuickAction(
                     icon = FeatherIcons.Image,
