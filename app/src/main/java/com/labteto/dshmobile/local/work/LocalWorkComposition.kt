@@ -161,12 +161,20 @@ internal class LocalWorkComposition @Inject constructor(
         persist = { binding -> sessionStorage.coordinator.enqueue(binding.persistenceSnapshot()) },
         updateContextMetrics = workModelHistoryRuntime::updateContextMetrics,
     )
+    private val agentTeams by lazy {
+        LocalAgentTeamRuntime(
+            jobs = runtimeStateStore.jobManager,
+            persistentJobs = persistentJobs,
+            eventLogFor = sessionStorage.eventLogs::get,
+        )
+    }
     private val agentControlBuiltins by lazy {
         LocalWorkAgentControlBuiltinRuntime(
             jobs = runtimeStateStore.jobManager,
             modelGateway = modelGateway,
             subagents = subagents,
             persistentJobs = persistentJobs,
+            teams = agentTeams,
         )
     }
     private val turnExecutor = LocalWorkAgentTurnExecutor(
