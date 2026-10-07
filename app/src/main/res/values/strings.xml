@@ -526,10 +526,13 @@
     <string name="chat_view_mode">对话视图</string>
     <string name="chat_view_concise">简洁</string>
     <string name="chat_view_full">完整</string>
-    <string name="tasks_title">自动化</string>
+    <string name="tasks_title">定时任务</string>
     <string name="tasks_subtitle">查看计划任务、周期任务和最近执行结果</string>
-    <string name="tasks_empty_title">暂无后台任务</string>
-    <string name="tasks_empty_subtitle">直接在对话里告诉智能体“明天提醒我…”或“每周执行…”，任务会出现在这里。</string>
+    <string name="tasks_empty_title">创建定时任务</string>
+    <string name="tasks_empty_subtitle">解放双手，Kimi 按预设时间自动执行任务\n股票变动定时抓取、新闻定时收集、习惯养成提醒</string>
+    <string name="tasks_empty_or">或</string>
+    <string name="tasks_create_manual">手动创建</string>
+    <string name="tasks_create_via_chat">通过会话创建</string>
     <string name="tasks_cancelled">任务已删除</string>
     <string name="tasks_missing">任务已经不存在</string>
     <string name="tasks_delete_confirm_title">删除这个任务？</string>
