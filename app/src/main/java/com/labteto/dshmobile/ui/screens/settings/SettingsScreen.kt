@@ -942,8 +942,18 @@ internal fun SettingsCard(
             Icon(icon, contentDescription = null, tint = colors.labelTertiary, modifier = Modifier.size(18.dp))
             Text(title, style = DsType.std14.withReadingWeight(), color = colors.labelTertiary)
         }
-        AppSettingsSection {
-            content()
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = DsShapes.block,
+            color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+            tonalElevation = 0.dp,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(DsSpacing.medium),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                content()
+            }
         }
     }
 }
