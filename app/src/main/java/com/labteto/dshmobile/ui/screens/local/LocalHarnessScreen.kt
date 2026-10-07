@@ -451,17 +451,12 @@ fun LocalHarnessScreen(
                     LocalFeatureBackAction.POP_FEATURE ->
                         predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
 
-                    LocalFeatureBackAction.OPEN_DRAWER, null ->
+                    null ->
                         if (predictiveBackProgress.value != 0f) predictiveBackProgress.snapTo(0f)
                 }
             }
 
             when (localFeatureOwnedBackAction(featurePage, swipeEdge, featureContributions)) {
-                LocalFeatureBackAction.OPEN_DRAWER -> {
-                    predictiveBackProgress.snapTo(0f)
-                    drawerState.open()
-                }
-
                 LocalFeatureBackAction.POP_FEATURE -> {
                     popFeature()
                     predictiveBackProgress.snapTo(0f)

@@ -18,8 +18,8 @@ import com.labteto.dshmobile.ui.theme.DsAnimations
  * Screens provide the semantic page; this host alone decides how push/pop/peer swaps should move
  * so feature pages cannot drift into different transition directions or timings.
  *
- * Predictive back is intentionally a small direct-manipulation cue. It never claims the left-edge
- * product gesture, which is reserved for opening the drawer by [localFeatureProductBackAction].
+ * Predictive back is intentionally a small direct-manipulation cue. Both system edges are Back;
+ * opening the drawer is a separate content-area gesture owned by ModalNavigationDrawer.
  */
 @Composable
 internal fun LocalFeatureAnimatedHost(

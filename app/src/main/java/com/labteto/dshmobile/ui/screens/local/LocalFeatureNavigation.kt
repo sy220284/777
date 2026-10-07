@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import androidx.activity.BackEventCompat
 import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
 import com.labteto.dshmobile.local.feature.LocalFeatureRoute
 import com.labteto.dshmobile.local.session.LocalSessionSummary
@@ -24,13 +23,18 @@ internal data class LocalFeatureDrawerOpenResult(
 )
 
 internal enum class LocalFeatureBackAction {
-    OPEN_DRAWER,
     POP_FEATURE,
 }
 
+/**
+ * Android reserves inward swipes from both screen edges for system Back.
+ *
+ * Drawer opening is owned by the content-area gesture of [androidx.compose.material3.ModalNavigationDrawer],
+ * so feature pages must never reinterpret a system-edge Back gesture as "open drawer".
+ */
+@Suppress("UNUSED_PARAMETER")
 internal fun localFeatureProductBackAction(swipeEdge: Int?): LocalFeatureBackAction =
-    if (swipeEdge == BackEventCompat.EDGE_LEFT) LocalFeatureBackAction.OPEN_DRAWER
-    else LocalFeatureBackAction.POP_FEATURE
+    LocalFeatureBackAction.POP_FEATURE
 
 internal fun localFeatureRestoreOwnedPage(page: LocalFeaturePage): LocalFeaturePage = page
 
