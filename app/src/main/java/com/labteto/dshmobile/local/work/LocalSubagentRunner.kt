@@ -27,6 +27,7 @@ import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
 import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
+import com.labteto.dshmobile.local.agent.filterLocalSubagentSchemas
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
 import com.labteto.dshmobile.local.agent.LocalSubagentStatus
 import com.labteto.dshmobile.local.agent.LocalSubagentToolCallPolicy
@@ -300,13 +301,13 @@ internal class LocalSubagentRunner(
                 maxVirtualDisplays = snapshot.kernel.resources.maxVirtualDisplays,
                 maxLanguageServers = snapshot.kernel.resources.maxLanguageServers,
             ),
-            toolNames = filteredSubagentSchemas(
+            toolNames = filterLocalSubagentSchemas(
                 schemas(
                     allowMutation,
                     virtualScreenId != null,
                     enabledOptionalTools,
                 ),
-                capabilities.toolAllowlist,
+                capabilities,
             ).mapNotNull { element ->
                 val function = (element as? JsonObject)?.get("function") as? JsonObject
                 (function?.get("name") as? JsonPrimitive)?.content
@@ -465,13 +466,13 @@ internal class LocalSubagentRunner(
                             history = preparedHistory,
                             tools = modelToolStepSurface.capture(
                                 runToolSurface.next(
-                                    filteredSubagentSchemas(
+                                    filterLocalSubagentSchemas(
                                         schemas(
                                             allowMutation,
                                             virtualScreenId != null,
                                             enabledOptionalTools,
                                         ),
-                                        capabilities.toolAllowlist,
+                                        capabilities,
                                     ),
                                 ),
                             ),
@@ -794,20 +795,6 @@ internal class LocalSubagentRunner(
             is AgentEvent.TurnFailed,
             is AgentEvent.TurnCancelled -> this
         }
-    }
-
-    private fun filteredSubagentSchemas(
-        source: JsonArray,
-        allowlist: Set<String>?,
-    ): JsonArray {
-        if (allowlist == null) return source
-        return JsonArray(
-            source.filter { element ->
-                val function = (element as? JsonObject)?.get("function") as? JsonObject
-                val name = function?.get("name")?.jsonPrimitive?.contentOrNull
-                name != null && name in allowlist
-            },
-        )
     }
 
     private fun persistentSubagentId(jobId: String): String =
