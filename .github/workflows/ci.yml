@@ -220,9 +220,46 @@ jobs:
       - name: Unit tests and Harness conformance
         run: |
           set -euo pipefail
+
+          run_with_watchdog() {
+            label="$1"
+            timeout_seconds="$2"
+            shift 2
+            "$@" &
+            gradle_pid=$!
+            (
+              sleep "$timeout_seconds"
+              if kill -0 "$gradle_pid" 2>/dev/null; then
+                echo "::error::$label 超过 ${timeout_seconds} 秒，开始转储 JVM 线程栈"
+                jps -lv || true
+                while read -r java_pid _; do
+                  [[ -n "$java_pid" ]] || continue
+                  echo "===== jcmd $java_pid Thread.print ====="
+                  jcmd "$java_pid" Thread.print || true
+                done < <(jps -l || true)
+                kill -TERM "$gradle_pid" 2>/dev/null || true
+                sleep 5
+                kill -KILL "$gradle_pid" 2>/dev/null || true
+              fi
+            ) &
+            watchdog_pid=$!
+
+            set +e
+            wait "$gradle_pid"
+            status=$?
+            set -e
+            kill "$watchdog_pid" 2>/dev/null || true
+            wait "$watchdog_pid" 2>/dev/null || true
+            return "$status"
+          }
+
+          # Harness Core contains the durable Agent/Session concurrency tests. Keep it isolated so
+          # a deadlock cannot consume the whole 20-minute lane without a thread dump.
+          run_with_watchdog "Harness Core 单测" 240 \
+            ./gradlew :harness-core:test --info --stacktrace
+
           ./gradlew \
             :core:test \
-            :harness-core:test \
             :harness-runtime-android:test \
             :harness-interop:test \
             :harness-device-android:testDebugUnitTest \
@@ -230,32 +267,8 @@ jobs:
             :reference-validation:test \
             --stacktrace
 
-          ./gradlew :app:testDebugUnitTest --stacktrace &
-          gradle_pid=$!
-          (
-            sleep 180
-            if kill -0 "$gradle_pid" 2>/dev/null; then
-              echo "::error::App 单测超过 180 秒，开始转储 JVM 线程栈"
-              jps -lv || true
-              while read -r java_pid _; do
-                [[ -n "$java_pid" ]] || continue
-                echo "===== jcmd $java_pid Thread.print ====="
-                jcmd "$java_pid" Thread.print || true
-              done < <(jps -l || true)
-              kill -TERM "$gradle_pid" 2>/dev/null || true
-              sleep 5
-              kill -KILL "$gradle_pid" 2>/dev/null || true
-            fi
-          ) &
-          watchdog_pid=$!
-
-          set +e
-          wait "$gradle_pid"
-          status=$?
-          set -e
-          kill "$watchdog_pid" 2>/dev/null || true
-          wait "$watchdog_pid" 2>/dev/null || true
-          exit "$status"
+          run_with_watchdog "App 单测" 180 \
+            ./gradlew :app:testDebugUnitTest --stacktrace
       - name: Verify JVM 21 bytecode output
         run: python3 .github/scripts/check-jvm21-bytecode.py
 
