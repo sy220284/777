@@ -10,6 +10,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 internal data class LocalSubagentCapabilities(
     val inheritHistory: Boolean = false,
@@ -70,6 +71,10 @@ internal fun parseStructuredSubagentResult(
 
 internal fun validateStructuredOutputSchema(schema: JsonObject): List<String> {
     val issues = mutableListOf<String>()
+    if (schema.toString().length > MAX_SCHEMA_CHARS) {
+        issues += "$ 超过最大 Schema 大小 $MAX_SCHEMA_CHARS 字符"
+        return issues
+    }
     validateSchemaNode(
         schema = schema,
         path = "$",
@@ -103,9 +108,25 @@ private fun validateSchemaNode(
         issues += "$path 不支持的 type：$type"
         return
     }
+    val allowedKeywords = COMMON_SCHEMA_KEYS + when (type) {
+        "object" -> OBJECT_SCHEMA_KEYS
+        "array" -> ARRAY_SCHEMA_KEYS
+        else -> emptySet()
+    }
+    schema.keys
+        .filterNot { it in allowedKeywords }
+        .forEach { key ->
+            issues += "$path 不支持的 Schema 关键字：$key"
+        }
     val enumValues = schema["enum"]
     if (enumValues != null && enumValues !is JsonArray) {
         issues += "$path 的 enum 必须是数组"
+    } else if (enumValues is JsonArray) {
+        enumValues.forEach { value ->
+            if (!matchesType(value, type)) {
+                issues += "$path 的 enum 值类型与 $type 不一致"
+            }
+        }
     }
     when (type) {
         "object" -> {
@@ -256,7 +277,7 @@ private fun matchesType(value: JsonElement, type: String): Boolean = when (type)
     "array" -> value is JsonArray
     "string" -> (value as? JsonPrimitive)?.isString == true
     "boolean" -> (value as? JsonPrimitive)?.booleanOrNull != null
-    "integer" -> (value as? JsonPrimitive)?.intOrNull != null
+    "integer" -> (value as? JsonPrimitive)?.longOrNull != null
     "number" -> (value as? JsonPrimitive)
         ?.takeIf { !it.isString }
         ?.contentOrNull
@@ -277,3 +298,4 @@ private val SUPPORTED_TYPES = setOf(
 
 private const val MAX_SCHEMA_DEPTH = 8
 private const val MAX_SCHEMA_PROPERTIES = 64
+private const val MAX_SCHEMA_CHARS = 16_384
