@@ -37,6 +37,12 @@ internal class LocalJobManager(
 
     fun interruptedSnapshots(): List<JobSnapshot> = delegate.interruptedSnapshots()
 
+    fun completeInterrupted(
+        id: String,
+        output: String,
+        ownerSessionId: String? = null,
+    ): Boolean = delegate.completeInterrupted(id, output, ownerSessionId)
+
     fun availableSlots(): Int = delegate.availableSlots()
 
     fun failInterrupted(id: String, detail: String): String = delegate.failInterrupted(id, detail)
