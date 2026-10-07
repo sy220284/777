@@ -141,13 +141,11 @@ async function main(): Promise<void> {
     agentTeam: {
       stateVersion: teamRow.ver,
       asOfSequence: Number(teamRow.seq),
-      members: teamView.members,
-      tasks: teamView.tasks,
+      members: teamState.members,
+      tasks: teamState.tasks.filter((task: any) => task.status !== 'deleted'),
       pendingMessageIds: teamState.messages
         .filter((message: any) => !teamState.delivered.includes(message.id))
         .map((message: any) => message.id),
-      deliveredMessageIds: [...teamState.delivered],
-      nextTaskNumber: teamState.nextTaskNumber,
       failure: teamView.failure ?? null,
     },
   }, null, 2)}\n`)
