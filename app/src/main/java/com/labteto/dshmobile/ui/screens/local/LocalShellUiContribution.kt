@@ -67,7 +67,7 @@ internal fun localShellFeatureUiContribution(
             onOpenRunCenter = { onPushFeature(LocalFeaturePage.RUN_CENTER) },
             onOpenTasks = { onPushFeature(LocalFeaturePage.TASKS) },
             onOpenTools = { onPushFeature(LocalFeaturePage.TOOLS) },
-            onOpenDiary = { onPushFeature(LocalFeaturePage.DIARY) },
+            onOpenPersonaGallery = { onPushFeature(LocalFeaturePage.PERSONA_GALLERY) },
             sessionTitle = sessionTitleOverrides[surface.sessionId]
                 ?: shell.sessions.firstOrNull { it.id == surface.sessionId }?.title
                 ?: stringResource(R.string.chatlist_new_session),
