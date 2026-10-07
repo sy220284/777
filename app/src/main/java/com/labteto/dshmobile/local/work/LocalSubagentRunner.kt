@@ -145,6 +145,7 @@ internal class LocalSubagentRunner(
         task: String,
         parentCallId: String,
         outputSchema: JsonObject? = null,
+        instructions: String = "",
     ): List<JsonObject> =
         durableModelHistorySnapshot(
             buildLocalSubagentInitialHistory(
@@ -154,6 +155,7 @@ internal class LocalSubagentRunner(
                 allowMutation = false,
                 context = contextSnapshot(task),
                 outputSchema = outputSchema,
+                instructions = instructions,
             ),
         )
 
@@ -209,6 +211,7 @@ internal class LocalSubagentRunner(
         onCheckpointProgress: ((step: Int, totalLimit: Int) -> Unit)?,
     ): LocalSubagentResult {
         val task = spec.task
+        val instructions = spec.instructions
         val capabilities: LocalSubagentCapabilities = spec.capabilities
         val inheritHistory = capabilities.historyMode == LocalSubagentHistoryMode.INHERIT_PARENT
         val allowMutation = capabilities.allowMutation
@@ -253,7 +256,7 @@ internal class LocalSubagentRunner(
         val stepLimit = adaptiveAgentStepLimit(
             configuredBase = maxSteps,
             task = task,
-            contextChars = history.encodedChars + task.length,
+            contextChars = history.encodedChars + task.length + instructions.length,
             contextBudgetChars = runHistoryBudget?.maxHistoryChars ?: snapshot.kernel.contextBudgetChars,
             pressure = resourceScheduler.snapshot().pressure,
             kind = runKind,
@@ -292,6 +295,7 @@ internal class LocalSubagentRunner(
             put("base_url", runProfile.baseUrl)
             put("max_steps", stepLimit)
             put("task", task.take(2_000))
+            put("instructions_chars", instructions.length)
             put("allow_mutation", capabilities.allowMutation)
             put("continuable", capabilities.continuable)
             put("history_mode", capabilities.historyMode.name.lowercase())
@@ -343,7 +347,7 @@ internal class LocalSubagentRunner(
                 val function = (element as? JsonObject)?.get("function") as? JsonObject
                 (function?.get("name") as? JsonPrimitive)?.content
             },
-            contextChars = history.encodedChars + task.length,
+            contextChars = history.encodedChars + task.length + instructions.length,
             parentRunId = parentRunId,
             agentId = subagentId,
         )
@@ -404,6 +408,7 @@ internal class LocalSubagentRunner(
                         allowMutation = allowMutation,
                         context = contextSnapshot(task),
                         outputSchema = capabilities.outputSchema,
+                        instructions = instructions,
                     ),
                 )
             }

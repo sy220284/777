@@ -154,6 +154,7 @@ object LocalToolCatalog {
         )))
         add(tool("subagent", "启动一个只读子代理处理独立子任务；同一工具块中的多个子代理可并行且互不级联取消", properties(
             "task" to string("交给子代理的完整任务"),
+            "instructions" to string("可选；该子代理持续遵循的工作规则，不会扩大工具或权限"),
             "model" to string("可选；使用 list_subagent_models 返回的 profileId，或无歧义的模型名；留空继承父代理模型"),
             "max_steps" to integer("最大模型/工具循环步数，默认 20，可配置 1 到 512"),
             "virtual_screen" to boolean("是否为子代理分配独立虚拟屏；用于并行操作 Android 界面，默认 false"),
@@ -163,6 +164,7 @@ object LocalToolCatalog {
         ), listOf("task")))
         add(tool("subagent_fork", "继承当前会话上下文并启动子代理", properties(
             "task" to string("需要结合当前上下文处理的任务"),
+            "instructions" to string("可选；继承上下文之外，额外约束该子代理持续遵循的工作规则"),
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
             "allowed_tools" to stringArray("可选；限制 fork 子代理可见且可执行的工具名"),
         ), listOf("task")))

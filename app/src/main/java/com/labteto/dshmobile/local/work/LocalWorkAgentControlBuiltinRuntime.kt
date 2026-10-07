@@ -48,6 +48,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
         return when (call.name) {
             "subagent", "spawn_subagent" -> {
                 val task = args.string("task")
+                val instructions = args.optionalString("instructions").orEmpty()
                 val model = LocalWorkerModelRouter.resolve(args.optionalString("model"), snapshot)
                 val maxSteps = LocalAgentRuntimeLimits.normalizeSubagentSteps(
                     args.int("max_steps", snapshot.subagentMaxSteps),
@@ -60,6 +61,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                         task = task,
                         model = model,
                         maxSteps = maxSteps,
+                        instructions = instructions,
                         virtualScreen = virtualScreen,
                         outputSchema = outputSchema,
                         toolAllowlist = toolAllowlist,
@@ -71,6 +73,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     runner.run(
                         LocalSubagentLaunchSpec(
                             task = task,
+                            instructions = instructions,
                             modelOverride = model,
                             maxSteps = maxSteps,
                             capabilities = LocalSubagentCapabilities(
@@ -88,6 +91,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
             "subagent_fork", "fork_subagent" -> runner.run(
                 LocalSubagentLaunchSpec(
                     task = args.string("task"),
+                    instructions = args.optionalString("instructions").orEmpty(),
                     modelOverride = LocalWorkerModelRouter.resolve(null, snapshot),
                     maxSteps = snapshot.subagentMaxSteps,
                     parentCallId = call.id,

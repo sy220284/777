@@ -33,6 +33,7 @@ class ContextComposer @Inject constructor(
     private val memoryStore: MemoryStore,
 ) {
     private val assembler = AgentContextAssembler()
+    private val layers = PromptLayerComposer()
 
     fun userProfile() = profileStore.read()
 
@@ -66,19 +67,35 @@ class ContextComposer @Inject constructor(
                 content = memory.content,
             )
         }
+        val layered = layers.compose(
+            listOf(
+                PromptLayer(
+                    id = "user-rules",
+                    priority = 200,
+                    stability = PromptLayerStability.STABLE,
+                    content = assembler.compose(
+                        rules = profile.customRules,
+                        memories = emptyList(),
+                        handoffSummary = null,
+                    ),
+                ),
+                PromptLayer(
+                    id = "query-recall",
+                    priority = 600,
+                    stability = PromptLayerStability.DYNAMIC,
+                    content = assembler.compose(
+                        rules = "",
+                        memories = mappedMemories,
+                        handoffSummary = request.handoffSummary.takeIf {
+                            request.mode == LocalConversationMode.CONTINUATION
+                        },
+                    ),
+                ),
+            ),
+        )
         return ContextComposition(
-            stable = assembler.compose(
-                rules = profile.customRules,
-                memories = emptyList(),
-                handoffSummary = null,
-            ),
-            dynamic = assembler.compose(
-                rules = "",
-                memories = mappedMemories,
-                handoffSummary = request.handoffSummary.takeIf {
-                    request.mode == LocalConversationMode.CONTINUATION
-                },
-            ),
+            stable = layered.stable,
+            dynamic = layered.dynamic,
         )
     }
 

@@ -3,9 +3,11 @@ package com.labteto.dshmobile.local
 import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import java.util.UUID
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -29,37 +31,44 @@ class LocalApprovalPreferencesAndroidTest {
     }
 
     @Test
-    fun safeApprovalDefaultsOnAndExplicitDisablePersists() {
+    fun freshInstallDefaultsToDefaultModeWithoutFullAuto() {
         val shared = context.getSharedPreferences(name, Context.MODE_PRIVATE)
-        assertTrue(LocalApprovalPreferences(shared).isSafeAutoApprovalEnabled())
+        val preferences = LocalApprovalPreferences(shared)
 
-        LocalApprovalPreferences(shared).setSafeAutoApprovalEnabled(false)
-        assertFalse(LocalApprovalPreferences(shared).isSafeAutoApprovalEnabled())
+        assertEquals(LocalApprovalMode.DEFAULT, preferences.currentMode())
+        assertFalse(preferences.isSafeAutoApprovalEnabled())
     }
 
     @Test
-    fun safeApprovalSurvivesNewPreferenceWrapper() {
+    fun explicitModesSurviveNewPreferenceWrapper() {
         val shared = context.getSharedPreferences(name, Context.MODE_PRIVATE)
-        LocalApprovalPreferences(shared).setSafeAutoApprovalEnabled(true)
+        LocalApprovalPreferences(shared).setApprovalMode(LocalApprovalMode.AUTO)
+        assertEquals(LocalApprovalMode.AUTO, LocalApprovalPreferences(shared).currentMode())
 
-        assertTrue(LocalApprovalPreferences(shared).isSafeAutoApprovalEnabled())
+        LocalApprovalPreferences(shared).setApprovalMode(LocalApprovalMode.MANUAL)
+        val restored = LocalApprovalPreferences(shared)
+        assertEquals(LocalApprovalMode.MANUAL, restored.currentMode())
+        assertFalse(restored.isSafeAutoApprovalEnabled())
     }
 
     @Test
-    fun explicitDisableWinsOverLegacySessionFlag() {
+    fun legacyBooleanMigratesToEquivalentMode() {
         val shared = context.getSharedPreferences(name, Context.MODE_PRIVATE)
-        val first = LocalApprovalPreferences(shared)
-        first.setSafeAutoApprovalEnabled(true)
-        first.setSafeAutoApprovalEnabled(false)
+        shared.edit().putBoolean("safe_auto_approval", true).commit()
 
-        assertFalse(LocalApprovalPreferences(shared).isSafeAutoApprovalEnabled(legacySessionValue = true))
+        val restored = LocalApprovalPreferences(shared)
+        assertEquals(LocalApprovalMode.AUTO, restored.currentMode())
+        assertTrue(restored.isSafeAutoApprovalEnabled())
     }
 
     @Test
-    fun legacySessionFlagMigratesOnlyWhenGlobalChoiceIsAbsent() {
+    fun explicitModeWinsOverLegacySessionFlag() {
         val shared = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+        LocalApprovalPreferences(shared).setApprovalMode(LocalApprovalMode.MANUAL)
 
-        assertTrue(LocalApprovalPreferences(shared).isSafeAutoApprovalEnabled(legacySessionValue = true))
-        assertTrue(LocalApprovalPreferences(shared).isSafeAutoApprovalEnabled(legacySessionValue = false))
+        assertEquals(
+            LocalApprovalMode.MANUAL,
+            LocalApprovalPreferences(shared).currentMode(legacySessionValue = true),
+        )
     }
 }

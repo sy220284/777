@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.approvalImpact
 import com.labteto.dshmobile.local.runtime.canAutoApproveSafely
 import com.labteto.dshmobile.local.runtime.canUseDeviceApprovalLease
+import com.labteto.dshmobile.local.runtime.shouldAutoApproveTool
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.buildJsonObject
@@ -38,13 +39,14 @@ internal class LocalToolApprovalRuntime @Inject constructor(
             })
             return true
         }
-        if (approvalPreferences.isSafeAutoApprovalEnabled()) {
+        val approvalMode = approvalPreferences.currentMode()
+        if (shouldAutoApproveTool(approvalMode, tool)) {
             eventLog.append("approval/auto", buildJsonObject {
                 put("tool", call.name)
                 put("summary", summary)
                 put("access", tool.access.name.lowercase())
                 put("impact", approvalImpact(tool).name.lowercase())
-                put("mode", "global")
+                put("mode", approvalMode.name.lowercase())
             })
             return true
         }

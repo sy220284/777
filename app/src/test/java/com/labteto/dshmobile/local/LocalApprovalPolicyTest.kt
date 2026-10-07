@@ -10,10 +10,12 @@ import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalApprovalImpact
+import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.runtime.approvalImpact
 import com.labteto.dshmobile.local.runtime.canAutoApproveSafely
 import com.labteto.dshmobile.local.runtime.canResolvePendingByEnablingAutoApproval
 import com.labteto.dshmobile.local.runtime.canUseDeviceApprovalLease
+import com.labteto.dshmobile.local.runtime.shouldAutoApproveTool
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertFalse
@@ -36,6 +38,19 @@ class LocalApprovalPolicyTest {
         assertFalse(canAutoApproveSafely(tool("http_request", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS)))
         assertFalse(canAutoApproveSafely(tool("memory_forget", ToolAccess.SESSION_WRITE, ToolApprovalPolicy.ALWAYS)))
         assertFalse(canAutoApproveSafely(tool("plugin_external_write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS)))
+    }
+
+    @Test
+    fun approvalModesSeparateSafeDefaultManualAndFullAuto() {
+        val safe = tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.ALWAYS)
+        val risky = tool("bash", ToolAccess.PROCESS, ToolApprovalPolicy.ALWAYS)
+
+        assertTrue(shouldAutoApproveTool(LocalApprovalMode.DEFAULT, safe))
+        assertFalse(shouldAutoApproveTool(LocalApprovalMode.DEFAULT, risky))
+        assertFalse(shouldAutoApproveTool(LocalApprovalMode.MANUAL, safe))
+        assertFalse(shouldAutoApproveTool(LocalApprovalMode.MANUAL, risky))
+        assertTrue(shouldAutoApproveTool(LocalApprovalMode.AUTO, safe))
+        assertTrue(shouldAutoApproveTool(LocalApprovalMode.AUTO, risky))
     }
 
     @Test
