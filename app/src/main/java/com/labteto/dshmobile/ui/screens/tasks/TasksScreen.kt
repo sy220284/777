@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,8 +38,13 @@ import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
 import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.DsPopupMenu
+import com.labteto.dshmobile.ui.components.MenuItem
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.theme.DsSpacing
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -94,6 +100,7 @@ private fun WorkTasksScreen(
     val visibleTasks = state.tasks.filter { it.mode == AutomationMode.WORK }
     val createInvalidMessage = stringResource(R.string.tasks_create_invalid)
     var showCreate by rememberSaveable { mutableStateOf(false) }
+    var createMenuOpen by rememberSaveable { mutableStateOf(false) }
     val editingTaskIdState = rememberSaveable { mutableStateOf<String?>(null) }
     val promptState = rememberSaveable { mutableStateOf("") }
     val cadenceState = rememberSaveable { mutableStateOf(AutomationCadence.ONCE) }
@@ -156,16 +163,40 @@ private fun WorkTasksScreen(
                     .padding(horizontal = DsSpacing.large, vertical = DsSpacing.medium),
                 verticalArrangement = Arrangement.spacedBy(DsSpacing.medium),
             ) {
-                DsTopBar(
-                    title = stringResource(R.string.tasks_title),
-                    onBack = navigateBack,
-                    backContentDescription = stringResource(R.string.common_back),
-                    largeTitle = false,
-                    actionIcon = null,
-                    actionPainter = if (showCreate) null else painterResource(R.drawable.ic_ui_add),
-                    actionContentDescription = stringResource(R.string.tasks_new),
-                    onAction = ::startCreate,
-                )
+                Box(Modifier.fillMaxWidth()) {
+                    DsTopBar(
+                        title = stringResource(R.string.tasks_title),
+                        onBack = navigateBack,
+                        backContentDescription = stringResource(R.string.common_back),
+                        largeTitle = false,
+                    )
+                    if (!showCreate) {
+                        Box(Modifier.align(Alignment.CenterEnd)) {
+                            DsIconButton(
+                                icon = FeatherIcons.Plus,
+                                contentDescription = stringResource(R.string.tasks_new),
+                                onClick = { createMenuOpen = true },
+                                tint = colors.labelPrimary,
+                            )
+                            DsPopupMenu(
+                                expanded = createMenuOpen,
+                                onDismiss = { createMenuOpen = false },
+                                items = listOf(
+                                    MenuItem(
+                                        text = stringResource(R.string.tasks_create_manual),
+                                        icon = FeatherIcons.Edit3,
+                                        onClick = ::startCreate,
+                                    ),
+                                    MenuItem(
+                                        text = stringResource(R.string.tasks_create_via_chat),
+                                        icon = FeatherIcons.MessageCircle,
+                                        onClick = onClose,
+                                    ),
+                                ),
+                            )
+                        }
+                    }
+                }
 
                 when {
                     showCreate -> TaskEditorPane(
@@ -219,54 +250,66 @@ private fun TaskEmptyState(
     onCreateViaChat: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = DsSpacing.xlarge),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Image(
-            painter = painterResource(R.drawable.ic_ui_task_empty),
-            contentDescription = null,
-            modifier = Modifier.padding(bottom = DsSpacing.medium),
-        )
-        Text(
-            stringResource(R.string.tasks_empty_title),
-            style = DsType.base16Strong.withReadingWeight(),
-            color = colors.labelPrimary,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            stringResource(R.string.tasks_empty_subtitle),
-            style = DsType.small13.withReadingWeight(),
-            color = colors.labelTertiary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(
-                top = DsSpacing.xsmall,
-                bottom = DsSpacing.large,
-            ),
-        )
-        DsButton(
-            text = stringResource(R.string.tasks_create_manual),
-            onClick = onManualCreate,
-            variant = DsButtonVariant.Info,
-            size = DsButtonSize.Normal,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            stringResource(R.string.tasks_empty_or),
-            style = DsType.caption11.withReadingWeight(),
-            color = colors.labelCaption,
-            modifier = Modifier.padding(vertical = DsSpacing.xsmall),
-        )
-        DsButton(
-            text = stringResource(R.string.tasks_create_via_chat),
-            onClick = onCreateViaChat,
-            variant = DsButtonVariant.Ghost,
-            size = DsButtonSize.Normal,
-            modifier = Modifier.fillMaxWidth(),
-        )
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.align(Alignment.Center).fillMaxWidth()
+                .padding(horizontal = DsSpacing.xlarge),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_ui_task_empty),
+                contentDescription = null,
+                modifier = Modifier.padding(bottom = DsSpacing.medium),
+            )
+            Text(
+                stringResource(R.string.tasks_empty_title),
+                style = DsType.base16Strong.withReadingWeight(),
+                color = colors.labelPrimary,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                stringResource(R.string.tasks_empty_subtitle),
+                style = DsType.small13.withReadingWeight(),
+                color = colors.labelTertiary,
+                textAlign = TextAlign.Center,
+            )
+        }
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .padding(bottom = DsSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Surface(
+                onClick = onManualCreate,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                color = colors.brandPrimary,
+                contentColor = colors.onBrandPrimary,
+                shape = DsShapes.buttonCapsule,
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(DsSpacing.medium)) {
+                    Text(
+                        stringResource(R.string.tasks_create_manual),
+                        style = DsType.std14Strong.withReadingWeight(),
+                        color = colors.onBrandPrimary,
+                    )
+                }
+            }
+            Surface(
+                onClick = onCreateViaChat,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                color = colors.bgModulePlatform,
+                shape = DsShapes.buttonCapsule,
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(DsSpacing.medium)) {
+                    Text(
+                        stringResource(R.string.tasks_create_via_chat),
+                        style = DsType.std14Strong.withReadingWeight(),
+                        color = colors.labelPrimary,
+                    )
+                }
+            }
+        }
     }
 }
 
