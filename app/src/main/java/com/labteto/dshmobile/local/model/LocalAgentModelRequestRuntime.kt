@@ -70,9 +70,11 @@ internal class LocalAgentModelRequestRuntime(
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
         admission: LocalModelAdmissionPort? = null,
+        beforeProviderInvoke: suspend () -> Unit = {},
         onDelta: (LocalModelDelta) -> Unit = {},
     ): LocalModelReply {
         val completeProvider: suspend () -> LocalModelReply = {
+            beforeProviderInvoke()
             if (streaming) {
                 modelGateway.completeStreaming(
                     model = surface.model,
