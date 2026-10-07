@@ -122,7 +122,7 @@ Session Event Log 是主要事实源。模型历史缓冲区与 Checkpoint 是 E
 - `interrupted` 的可恢复任务与 `dormant` 的 continuable 子代理不会被普通历史裁剪静默删除；保留上限被持久对象占满时显式拒绝新任务，需先终止不再使用的持久代理。
 - 最终 assistant 已持久化但 Job 终态尚未提交时，恢复直接按终态 Checkpoint 结算；已认领但残留在 Inbox 的消息只做确认，不触发重复模型请求。
 - Session Projection 使用共享注册语义；投影拥有稳定名称、`stateVersion` 和 `asOfSequence`，Feature 持有自己的强类型句柄。
-- Agent Teams 当前采用 Lead 编排型 Android 适配：teammate 仍保持只读 Child Agent 权限，不开放对等成员直接写 Team 状态；`team_spawn` 当前创建 fresh teammate，不把不安全的持久 history fork 伪装成已支持。
+- Agent Teams 当前采用 Lead 编排型 Android 适配：teammate 仍保持只读 Child Agent 权限，不开放对等成员直接写 Team 状态；`team_spawn.context` 支持 `fresh | fork`。durable fork 在创建时把 Lead 当前调用前历史一次性物化为 Child `step=0` History Checkpoint，后续首轮与 Cold Resume 都只读取 Child EventLog，不放开 `continuable + INHERIT_PARENT`。
 - Team mailbox 单成员最多 64 条待投递消息，单消息最多 65,536 UTF-8 字节；成员名称永久保留，达到成员/任务/邮箱边界时 fail loud，不静默截断或复用身份。
 - 外部进程被 Android 杀死后不能伪装成透明续跑。
 
