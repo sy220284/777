@@ -91,6 +91,7 @@ import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsPill
 import com.labteto.dshmobile.ui.components.DsPopupMenu
+import com.labteto.dshmobile.ui.components.DsSheetChoiceRow
 import com.labteto.dshmobile.ui.components.DsQuickActionTile
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MenuItem
@@ -992,163 +993,117 @@ internal fun LocalConversationSurface(
         DsBottomSheet(
             title = stringResource(R.string.local_composer_more_actions),
             onDismiss = { showAttachmentPicker = false },
+            scrollable = true,
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                ) {
-                    DsQuickActionTile(
-                        icon = FeatherIcons.Image,
-                        label = stringResource(R.string.local_attachment_image),
-                        onClick = {
-                            showAttachmentPicker = false
-                            imagePicker.launch(arrayOf("image/*"))
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                    DsQuickActionTile(
-                        icon = FeatherIcons.Paperclip,
-                        label = stringResource(R.string.local_attachment_file),
-                        onClick = {
-                            showAttachmentPicker = false
-                            filePicker.launch(arrayOf("*/*"))
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-
+            // The first row is a compact source picker; tools and work modes
+            // stay in a separate, full-width action list with clear hierarchy.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                DsQuickActionTile(
+                    icon = FeatherIcons.Image,
+                    label = stringResource(R.string.local_attachment_image),
+                    onClick = {
+                        showAttachmentPicker = false
+                        imagePicker.launch(arrayOf("image/*"))
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                DsQuickActionTile(
+                    icon = FeatherIcons.Paperclip,
+                    label = stringResource(R.string.local_attachment_file),
+                    onClick = {
+                        showAttachmentPicker = false
+                        filePicker.launch(arrayOf("*/*"))
+                    },
+                    modifier = Modifier.weight(1f),
+                )
                 if (state.usageMode == LocalUsageMode.CHAT) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                    ) {
-                        DsQuickActionTile(
-                            icon = FeatherIcons.User,
-                            label = stringResource(R.string.local_persona_picker_title),
-                            onClick = {
-                                showAttachmentPicker = false
-                                if (state.groupChat.enabled) {
-                                    onOpenPersonaGallery()
-                                } else {
-                                    showPersonaPicker = true
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                        DsQuickActionTile(
-                            icon = FeatherIcons.Users,
-                            label = stringResource(R.string.local_group_chat_title),
-                            onClick = {
-                                showAttachmentPicker = false
-                                if (state.groupChat.enabled) {
-                                    showGroupMemberPicker = true
-                                } else {
-                                    onNewSession()
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                    ) {
-                        DsQuickActionTile(
-                            icon = FeatherIcons.Clock,
-                            label = stringResource(R.string.tasks_chat_title),
-                            onClick = {
-                                showAttachmentPicker = false
-                                onOpenTasks()
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                        DsQuickActionTile(
-                            icon = FeatherIcons.Tool,
-                            label = stringResource(R.string.tools_title),
-                            onClick = {
-                                showAttachmentPicker = false
-                                onOpenTools()
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                } else {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                    ) {
-                        DsQuickActionTile(
-                            icon = FeatherIcons.List,
-                            label = stringResource(if (state.planMode) R.string.local_plan_button_on else R.string.local_plan_button_off),
-                            onClick = { onPlanModeChange(!state.planMode); showAttachmentPicker = false },
-                            modifier = Modifier.weight(1f),
-                        )
-                        DsQuickActionTile(
-                            icon = FeatherIcons.Shield,
-                            label = stringResource(if (state.safeAutoApprovalEnabled) R.string.app_auto_approval_enabled else R.string.local_auto_approve_short),
-                            onClick = {
-                                showAttachmentPicker = false
-                                if (state.safeAutoApprovalEnabled) onDisableAutoApprove() else onAutoApprove()
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    LocalAgentSwarmLaunchEntry(
-                        selected = teamDispatchSelected,
+                    DsQuickActionTile(
+                        icon = FeatherIcons.User,
+                        label = stringResource(R.string.local_persona_picker_title),
                         onClick = {
-                            teamDispatchSelected = !teamDispatchSelected
+                            showAttachmentPicker = false
+                            if (state.groupChat.enabled) onOpenPersonaGallery()
+                            else showPersonaPicker = true
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                    DsQuickActionTile(
+                        icon = FeatherIcons.Users,
+                        label = stringResource(R.string.local_group_chat_title),
+                        onClick = {
+                            showAttachmentPicker = false
+                            if (state.groupChat.enabled) showGroupMemberPicker = true
+                            else onNewSession()
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    DsQuickActionTile(
+                        icon = FeatherIcons.List,
+                        label = stringResource(if (state.planMode) R.string.local_plan_button_on else R.string.local_plan_button_off),
+                        onClick = {
+                            onPlanModeChange(!state.planMode)
                             showAttachmentPicker = false
                         },
+                        modifier = Modifier.weight(1f),
                     )
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                    ) {
-                        DsQuickActionTile(
-                            icon = null,
-                            iconPainter = painterResource(R.drawable.ic_ui_project),
-                            label = stringResource(R.string.chatlist_workspace_files),
-                            onClick = {
-                                showAttachmentPicker = false
-                                onOpenWorkspace()
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                        DsQuickActionTile(
-                            icon = FeatherIcons.Activity,
-                            label = stringResource(R.string.local_run_center),
-                            onClick = {
-                                showAttachmentPicker = false
-                                onOpenRunCenter()
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
-                    ) {
-                        DsQuickActionTile(
-                            icon = FeatherIcons.Clock,
-                            label = stringResource(R.string.tasks_title),
-                            onClick = {
-                                showAttachmentPicker = false
-                                onOpenTasks()
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                        DsQuickActionTile(
-                            icon = FeatherIcons.Tool,
-                            label = stringResource(R.string.tools_title),
-                            onClick = {
-                                showAttachmentPicker = false
-                                onOpenTools()
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+                    DsQuickActionTile(
+                        icon = FeatherIcons.Shield,
+                        label = stringResource(if (state.safeAutoApprovalEnabled) R.string.app_auto_approval_enabled else R.string.local_auto_approve_short),
+                        onClick = {
+                            showAttachmentPicker = false
+                            if (state.safeAutoApprovalEnabled) onDisableAutoApprove()
+                            else onAutoApprove()
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
                 }
+            }
+
+            DsSheetChoiceRow(
+                title = stringResource(R.string.tools_title),
+                subtitle = stringResource(R.string.tools_subtitle),
+                icon = FeatherIcons.Tool,
+                onClick = {
+                    showAttachmentPicker = false
+                    onOpenTools()
+                },
+            )
+            DsSheetChoiceRow(
+                title = stringResource(if (state.usageMode == LocalUsageMode.CHAT) R.string.tasks_chat_title else R.string.tasks_title),
+                icon = FeatherIcons.Clock,
+                onClick = {
+                    showAttachmentPicker = false
+                    onOpenTasks()
+                },
+            )
+            if (state.usageMode == LocalUsageMode.WORK) {
+                LocalAgentSwarmLaunchEntry(
+                    selected = teamDispatchSelected,
+                    onClick = {
+                        teamDispatchSelected = !teamDispatchSelected
+                        showAttachmentPicker = false
+                    },
+                )
+                DsSheetChoiceRow(
+                    title = stringResource(R.string.chatlist_workspace_files),
+                    icon = FeatherIcons.List,
+                    onClick = {
+                        showAttachmentPicker = false
+                        onOpenWorkspace()
+                    },
+                )
+                DsSheetChoiceRow(
+                    title = stringResource(R.string.local_run_center),
+                    icon = FeatherIcons.Activity,
+                    onClick = {
+                        showAttachmentPicker = false
+                        onOpenRunCenter()
+                    },
+                )
             }
         }
     }
