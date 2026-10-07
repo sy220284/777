@@ -19,7 +19,8 @@ UPSTREAM="$TMP/deepseek-harness"
 git clone --filter=blob:none "https://github.com/$REPOSITORY.git" "$UPSTREAM"
 git -C "$UPSTREAM" checkout --detach "$COMMIT"
 cp "$RUNNER" "$UPSTREAM/.777-reference-runner.ts"
-cp "$SEMANTIC_RUNNER" "$UPSTREAM/.777-semantic-runner.ts"
+SEMANTIC_RUNNER_TARGET="$UPSTREAM/packages/session/session-projection/.777-semantic-runner.ts"
+cp "$SEMANTIC_RUNNER" "$SEMANTIC_RUNNER_TARGET"
 
 (
   cd "$UPSTREAM"
@@ -40,6 +41,6 @@ done
 mkdir -p "$SEMANTIC_OUTPUT_DIR"
 (
   cd "$UPSTREAM"
-  corepack pnpm exec tsx .777-semantic-runner.ts
+  corepack pnpm exec tsx packages/session/session-projection/.777-semantic-runner.ts
 ) > "$SEMANTIC_OUTPUT_DIR/session-projection-registry.json"
 echo "refreshed session-projection-registry.json from $REPOSITORY@$COMMIT"
