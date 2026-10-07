@@ -164,6 +164,7 @@ class LocalRequestReconstructionTest {
                 originalMessages = originalMessages,
                 replayMessages = originalMessages,
                 tools = tools,
+                temperature = 0.4,
             )
             appendProviderAttempt(
                 log = log,
@@ -237,6 +238,43 @@ class LocalRequestReconstructionTest {
             assertEquals(false, reconstructed.providerAttempts.single().fingerprintVerified)
             assertTrue(
                 reconstructed.issues.any { it.contains("provider_attempt_fingerprint") },
+            )
+        }
+    }
+
+    @Test
+    fun providerAttemptRouteMetadataTamperInvalidatesWholeRequest() {
+        withLog("request-reconstruct-provider-route-tamper") { log ->
+            val messages = listOf(message("user", "任务"))
+            val tools = JsonArray(emptyList())
+            val header = appendVersionTwoRequest(
+                log = log,
+                requestUid = "req-route-tamper",
+                routeFingerprint = "route-route-tamper",
+                originalMessages = messages,
+                replayMessages = messages,
+                tools = tools,
+            )
+            appendProviderAttempt(
+                log = log,
+                headerSequence = header.sequence,
+                requestUid = "req-route-tamper",
+                routeFingerprint = "route-route-tamper",
+                messages = messages,
+                tools = tools,
+                attempt = 1,
+                recoveryRound = 0,
+                temperature = null,
+                modelOverride = "tampered-model",
+            )
+
+            val reconstructed = requireNotNull(
+                reconstructLocalModelRequest(log, "req-route-tamper"),
+            )
+
+            assertEquals(LocalRequestReconstructionStatus.INVALID, reconstructed.status)
+            assertTrue(
+                reconstructed.issues.any { it.contains("model 与 request/header 不一致") },
             )
         }
     }
@@ -398,6 +436,7 @@ class LocalRequestReconstructionTest {
         originalMessages: List<kotlinx.serialization.json.JsonObject>,
         replayMessages: List<kotlinx.serialization.json.JsonObject>,
         tools: JsonArray,
+        temperature: Double? = null,
     ): LocalSessionEventLog.Event {
         val original = buildLocalRequestEvidence(originalMessages, tools)
         val replay = buildLocalRequestEvidence(replayMessages, tools)
@@ -427,6 +466,12 @@ class LocalRequestReconstructionTest {
         return log.append("request/header", buildJsonObject {
             put("version", 2)
             put("request_uid", requestUid)
+            put("model", modelOverride ?: "deepseek-chat")
+            put("base_url", "https://example.invalid")
+            put("profile_id", "profile-test")
+            put("provider", "test")
+            put("protocol", "OPENAI_CHAT_COMPLETIONS")
+            temperature?.let { put("temperature", it) }
             put("route_fingerprint", routeFingerprint)
             put("message_digest", original.messageDigest)
             put("context_digest", original.contextDigest)
@@ -453,6 +498,7 @@ class LocalRequestReconstructionTest {
         recoveryRound: Int,
         temperature: Double?,
         fingerprintOverride: String? = null,
+        modelOverride: String? = null,
     ): LocalSessionEventLog.Event {
         val original = buildLocalRequestEvidence(messages, tools)
         val replayMessages = redactModelImages(messages)
