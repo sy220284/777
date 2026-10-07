@@ -14,28 +14,24 @@ fun main(args: Array<String>) {
     val registry = SessionProjectionRegistry()
     val first = registry.register(
         name = "777/advanced-count",
-        stateVersion = 7,
+        stateVersion = 0,
         initial = { 0 },
         reducer = SessionReducer<Int> { state, _ -> state + 1 },
     )
     val second = registry.register(
         name = "777/advanced-count",
-        stateVersion = 7,
+        stateVersion = 0,
         initial = { 999 },
         reducer = SessionReducer<Int> { state, _ -> state + 999 },
     )
-
-    var differentVersionRejected = false
-    runCatching {
+    val differentVersionRejected = runCatching {
         registry.register(
             name = "777/advanced-count",
-            stateVersion = 8,
+            stateVersion = 1,
             initial = { 0 },
             reducer = SessionReducer<Int> { state, _ -> state },
         )
-    }.onFailure {
-        differentVersionRejected = true
-    }
+    }.isFailure
 
     val events = listOf(
         SessionEvent(
@@ -56,7 +52,7 @@ fun main(args: Array<String>) {
     val sameVersionShared =
         firstSnapshot.state == 2 &&
             secondSnapshot.state == firstSnapshot.state &&
-            registry.names() == listOf("777/advanced-count")
+            secondSnapshot.stateVersion == firstSnapshot.stateVersion
 
     first.dispose()
     val survivesFirstDispose = registry.names() == listOf("777/advanced-count")
