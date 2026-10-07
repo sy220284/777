@@ -88,7 +88,7 @@ fun DsTopBar(
             ) {
                 Text(
                     title,
-                    style = DsType.largeTitle28.withReadingWeight(),
+                    style = DsType.display24.withReadingWeight(),
                     color = colors.labelPrimary,
                     maxLines = 2,
                 )

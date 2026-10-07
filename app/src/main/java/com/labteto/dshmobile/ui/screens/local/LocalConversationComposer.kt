@@ -15,12 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,6 +47,7 @@ import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
 import com.labteto.dshmobile.ui.components.DsIconButton
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -140,11 +135,11 @@ internal fun LocalConversationComposer(
     fun AttachmentControl() {
         if (state.running) return
         DsComposerAction(
-            icon = Icons.Filled.Add,
+            icon = FeatherIcons.Plus,
             contentDescription = attachmentLabel,
             onClick = onOpenAttachmentPicker,
             tint = colors.labelPrimary,
-            containerColor = colors.hoverSolid,
+            containerColor = Color.Transparent,
         )
     }
 
@@ -152,7 +147,7 @@ internal fun LocalConversationComposer(
     fun ReplySuggestionsControl() {
         if (!replySuggestionsAvailable) return
         DsComposerAction(
-            icon = Icons.Outlined.AutoAwesome,
+            icon = FeatherIcons.Sparkles,
             contentDescription = if (replySuggestionsLoading) {
                 stringResource(R.string.common_loading)
             } else {
@@ -168,7 +163,7 @@ internal fun LocalConversationComposer(
     @Composable
     fun SendControl(queue: Boolean = false) {
         DsComposerAction(
-            icon = Icons.Filled.ArrowUpward,
+            icon = FeatherIcons.ArrowUp,
             contentDescription = if (queue && state.queuedInputCount > 0) {
                 stringResource(R.string.local_queue_message_count, state.queuedInputCount)
             } else if (queue) {
@@ -187,11 +182,11 @@ internal fun LocalConversationComposer(
     @Composable
     fun StopControl() {
         DsComposerAction(
-            icon = Icons.Filled.Stop,
+            icon = FeatherIcons.Square,
             contentDescription = stringResource(R.string.chat_composer_stop),
             onClick = onStop,
-            tint = colors.onAccent,
-            containerColor = colors.error,
+                        tint = colors.bgBase,
+            containerColor = colors.labelPrimary,
             visualSize = DsComposerMetrics.primaryActionVisualSize,
         )
     }
@@ -316,7 +311,7 @@ private fun ImportedImageAttachmentTile(
             .size(88.dp)
             .clip(DsShapes.block)
             .background(colors.hoverSolid)
-            .border(1.dp, colors.borderL3, DsShapes.block),
+            .border(1.dp, colors.borderL1, DsShapes.block),
     ) {
         thumbnail?.let { image ->
             Image(
@@ -326,7 +321,7 @@ private fun ImportedImageAttachmentTile(
             )
         }
         DsIconButton(
-            icon = Icons.Outlined.Close,
+            icon = FeatherIcons.X,
             contentDescription = stringResource(R.string.common_remove),
             onClick = onRemove,
             modifier = Modifier.align(Alignment.TopEnd),

@@ -10,10 +10,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -125,7 +121,7 @@ internal fun ChatSurfaceHeader(
                     }
                 }
                 Icon(
-                    Icons.Filled.KeyboardArrowDown,
+                    FeatherIcons.ChevronDown,
                     contentDescription = null,
                     tint = colors.labelSecondary,
                     modifier = Modifier.size(16.dp),
@@ -137,9 +133,9 @@ internal fun ChatSurfaceHeader(
                     contentDescription = stringResource(R.string.local_character_tuning_open),
                     onClick = onOpenCharacterTuning,
                     enabled = !running,
-                    tint = if (behaviorTuningCustomized) colors.characterAccent else colors.labelSecondary,
+                    tint = colors.labelSecondary,
                     iconSize = 18.dp,
-                    containerColor = if (behaviorTuningCustomized) colors.characterAccentTertiary else androidx.compose.ui.graphics.Color.Transparent,
+                    containerColor = if (behaviorTuningCustomized) colors.hoverSolid else androidx.compose.ui.graphics.Color.Transparent,
                 )
             }
         }
@@ -153,7 +149,7 @@ internal fun ChatSurfaceHeader(
             )
         }
         DsIconButton(
-            icon = Icons.Filled.Add,
+            icon = FeatherIcons.Plus,
             contentDescription = stringResource(R.string.chatlist_new_session),
             onClick = onNewSession,
             tint = colors.labelSecondary,
@@ -198,7 +194,7 @@ internal fun WorkSurfaceHeader(
             horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
         ) {
             Icon(
-                Icons.Outlined.Tune,
+                FeatherIcons.Sliders,
                 contentDescription = null,
                 tint = colors.labelSecondary,
                 modifier = Modifier.size(16.dp),

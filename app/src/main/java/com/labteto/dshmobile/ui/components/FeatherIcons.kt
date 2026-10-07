@@ -23,6 +23,78 @@ import androidx.compose.ui.unit.dp
  */
 internal object FeatherIcons {
 
+    /** `message-circle` — chat/session settings. */
+    val Chat: ImageVector by lazy {
+        feather("Chat") {
+            circle(12f, 11f, 9f)
+            moveTo(8f, 19f); lineTo(4f, 22f); lineTo(5.5f, 16.5f)
+        }
+    }
+
+    /** `cloud` — account/cloud capability. */
+    val Cloud: ImageVector by lazy {
+        feather("Cloud") {
+            moveTo(18f, 18f); horizontalLineTo(6f)
+            arcToRelative(4f, 4f, 0f, isMoreThanHalf = false, isPositiveArc = true, -0.5f, -8f)
+            arcToRelative(7f, 7f, 0f, isMoreThanHalf = false, isPositiveArc = true, 13.5f, 2f)
+            arcToRelative(3f, 3f, 0f, isMoreThanHalf = false, isPositiveArc = true, -1f, 6f)
+        }
+    }
+
+    /** `cpu` — model/runtime memory and compute. */
+    val Cpu: ImageVector by lazy {
+        feather("Cpu") {
+            rectangle(7f, 7f, 10f, 10f)
+            rectangle(10f, 10f, 4f, 4f)
+            moveTo(9f, 2f); lineTo(9f, 7f)
+            moveTo(15f, 2f); lineTo(15f, 7f)
+            moveTo(9f, 17f); lineTo(9f, 22f)
+            moveTo(15f, 17f); lineTo(15f, 22f)
+            moveTo(2f, 9f); lineTo(7f, 9f)
+            moveTo(2f, 15f); lineTo(7f, 15f)
+            moveTo(17f, 9f); lineTo(22f, 9f)
+            moveTo(17f, 15f); lineTo(22f, 15f)
+        }
+    }
+
+    /** `bell` — notifications. */
+    val Bell: ImageVector by lazy {
+        feather("Bell") {
+            moveTo(18f, 8f)
+            arcToRelative(6f, 6f, 0f, isMoreThanHalf = false, isPositiveArc = false, -12f, 0f)
+            curveTo(6f, 15f, 3f, 17f, 3f, 17f)
+            horizontalLineTo(21f)
+            curveTo(21f, 17f, 18f, 15f, 18f, 8f)
+            moveTo(10f, 21f)
+            arcToRelative(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = false, 4f, 0f)
+        }
+    }
+
+    /** `download` — app/update download. */
+    val Download: ImageVector by lazy {
+        feather("Download") {
+            moveTo(12f, 3f); lineTo(12f, 15f)
+            moveTo(7f, 10f); lineTo(12f, 15f); lineTo(17f, 10f)
+            moveTo(5f, 21f); lineTo(19f, 21f)
+        }
+    }
+
+    /** `link` — connection/integration entry. */
+    val Link: ImageVector by lazy {
+        feather("Link") {
+            moveTo(10f, 13f)
+            arcToRelative(5f, 5f, 0f, isMoreThanHalf = false, isPositiveArc = true, 0f, -7f)
+            lineTo(12f, 4f)
+            arcToRelative(5f, 5f, 0f, isMoreThanHalf = false, isPositiveArc = true, 7f, 7f)
+            lineTo(17f, 13f)
+            moveTo(14f, 11f)
+            arcToRelative(5f, 5f, 0f, isMoreThanHalf = false, isPositiveArc = true, 0f, 7f)
+            lineTo(12f, 20f)
+            arcToRelative(5f, 5f, 0f, isMoreThanHalf = false, isPositiveArc = true, -7f, -7f)
+            lineTo(7f, 11f)
+        }
+    }
+
     /** `terminal` — the shell tools (bash, pwsh). */
     val Terminal: ImageVector by lazy {
         feather("Terminal") {

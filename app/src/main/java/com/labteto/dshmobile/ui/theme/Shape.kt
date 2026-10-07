@@ -9,22 +9,22 @@ import androidx.compose.ui.unit.dp
  * Semantic names remain so components describe intent without inventing new radii.
  */
 object DsShapes {
-    val buttonCapsule = RoundedCornerShape(16.dp)
-    val buttonSmall = RoundedCornerShape(12.dp)
-    val bubble = RoundedCornerShape(20.dp)
+    val buttonCapsule = RoundedCornerShape(14.dp)
+    val buttonSmall = RoundedCornerShape(10.dp)
+    val bubble = RoundedCornerShape(16.dp)
     val composer = RoundedCornerShape(20.dp)
-    val approvalCard = RoundedCornerShape(20.dp)
-    val dialog = RoundedCornerShape(20.dp)
-    val sheet = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    val menu = RoundedCornerShape(16.dp)
+    val approvalCard = RoundedCornerShape(16.dp)
+    val dialog = RoundedCornerShape(16.dp)
+    val sheet = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    val menu = RoundedCornerShape(12.dp)
     val toast = RoundedCornerShape(12.dp)
     val tooltip = RoundedCornerShape(8.dp)
-    val block = RoundedCornerShape(16.dp)
-    val pill = RoundedCornerShape(12.dp)
+    val block = RoundedCornerShape(12.dp)
+    val pill = RoundedCornerShape(10.dp)
     val pillFull = RoundedCornerShape(999.dp)
     val chip = RoundedCornerShape(6.dp)
-    val row = RoundedCornerShape(12.dp)
-    val cube = RoundedCornerShape(16.dp)
+    val row = RoundedCornerShape(10.dp)
+    val cube = RoundedCornerShape(12.dp)
 }
 
 val DsMaterialShapes = Shapes(

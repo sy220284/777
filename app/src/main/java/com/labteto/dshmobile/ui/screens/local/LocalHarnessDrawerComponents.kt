@@ -175,7 +175,7 @@ internal fun DrawerQuickActions(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (usageMode == LocalUsageMode.CHAT) {
             DrawerQuickAction(
@@ -198,38 +198,36 @@ internal fun DrawerQuickActions(
                 badge = groupMemberCount.takeIf { it > 0 }?.toString(),
                 onClick = onOpenGroupChat,
             )
-            DrawerQuickAction(
-                icon = FeatherIcons.Clock,
-                title = stringResource(R.string.tasks_chat_title),
-                subtitle = stringResource(R.string.local_drawer_chat_tasks_hint),
-                onClick = onTasks,
-            )
-        } else {
-            DrawerQuickAction(
-                icon = FeatherIcons.Folder,
-                title = stringResource(R.string.chatlist_workspace_files),
-                subtitle = stringResource(R.string.local_drawer_workspace_hint),
-                onClick = onWorkspaceFiles,
-            )
-            DrawerQuickAction(
-                icon = FeatherIcons.Activity,
-                title = stringResource(R.string.local_run_center),
-                subtitle = stringResource(R.string.local_drawer_run_center_hint),
-                onClick = onOpenRunCenter,
-            )
-            DrawerQuickAction(
-                icon = FeatherIcons.Clock,
-                title = stringResource(R.string.tasks_title),
-                subtitle = stringResource(R.string.local_drawer_work_tasks_hint),
-                onClick = onTasks,
-            )
-            DrawerQuickAction(
-                icon = FeatherIcons.Tool,
-                title = stringResource(R.string.tools_title),
-                subtitle = stringResource(R.string.local_drawer_tools_hint),
-                onClick = onTools,
-            )
         }
+
+        DrawerQuickAction(
+            icon = FeatherIcons.Folder,
+            title = stringResource(R.string.chatlist_workspace_files),
+            subtitle = stringResource(R.string.local_drawer_workspace_hint),
+            onClick = onWorkspaceFiles,
+        )
+        DrawerQuickAction(
+            icon = FeatherIcons.Activity,
+            title = stringResource(R.string.local_run_center),
+            subtitle = stringResource(R.string.local_drawer_run_center_hint),
+            onClick = onOpenRunCenter,
+        )
+        DrawerQuickAction(
+            icon = FeatherIcons.Clock,
+            title = stringResource(R.string.tasks_title),
+            subtitle = if (usageMode == LocalUsageMode.CHAT) {
+                stringResource(R.string.local_drawer_chat_tasks_hint)
+            } else {
+                stringResource(R.string.local_drawer_work_tasks_hint)
+            },
+            onClick = onTasks,
+        )
+        DrawerQuickAction(
+            icon = FeatherIcons.Tool,
+            title = stringResource(R.string.tools_title),
+            subtitle = stringResource(R.string.local_drawer_tools_hint),
+            onClick = onTools,
+        )
     }
 }
 

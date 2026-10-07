@@ -46,7 +46,16 @@ object Ds {
     val Celadon800 = Color(0xFF2E5A58)
     val Celadon900 = Color(0xFF28403F)
 
-    // Function-family hues for icon containers and badges (muted, 同一饱和度带).
+    // Kimi-style action blue. The UI stays mostly monochrome; this color is reserved for
+    // primary actions, selected controls and focus states instead of function-category icons.
+    val KimiBlue50 = Color(0xFFF0F5FF)
+    val KimiBlue100 = Color(0xFFE6EEFF)
+    val KimiBlue400 = Color(0xFF6B98FF)
+    val KimiBlue500 = Color(0xFF5280FD)
+    val KimiBlue600 = Color(0xFF3B7BFF)
+
+    // Function-family hues remain for compatibility with user-selectable themes and legacy
+    // semantic data, but the shared icon system no longer paints categories with these colors.
     val FamilyPurple = Color(0xFF9B8EC9)
     val FamilyCyan = Color(0xFF6FA3C2)
     val FamilyPurpleDeep = Color(0xFF4A4370)
@@ -101,11 +110,11 @@ object Ds {
 object DsLight {
     // Paper canvas with white floating surfaces, matching the mobile-first hierarchy used
     // across the refreshed home, drawer and settings screens.
-    val bgBase = Color(0xFFF7F7F5)
+    val bgBase = Color(0xFFF8F8F8)
     val bgLayer1 = Color(0xFFFFFFFF)
     val bgLayer2 = Color(0xFFFFFFFF)
     val bgLayer3 = Color(0xFFFFFFFF)
-    val bgModulePlatform = Color(0xFFF1F1EF)
+    val bgModulePlatform = Color(0xFFF5F5F5)
     val borderL1 = Color(0x08000000) // rgba(0,0,0,.03)
     val borderL2 = Color(0x12000000) // rgba(0,0,0,.07)
     val borderL3 = Color(0x1F000000) // rgba(0,0,0,.12)
@@ -116,10 +125,10 @@ object DsLight {
     val labelTertiary = Ds.Bluish600
     val labelCaption = Ds.Bluish400
     val labelDimmed = Ds.Bluish200
-    val accent = Ds.Celadon600
+    val accent = Ds.KimiBlue500
     val onAccent = Color(0xFFFFFFFF)
-    val accentTertiary = Ds.Celadon100
-    val accentHover = Ds.Celadon500
+    val accentTertiary = Ds.KimiBlue50
+    val accentHover = Ds.KimiBlue600
     val hover = Color(0x0F1E3230) // rgba(30,50,48,.06)
     val hoverSolid = Color(0xFFF1F1EF)
     val hoverAccent = Color(0x241E3230) // rgba(30,50,48,.14)
@@ -127,8 +136,8 @@ object DsLight {
     val dangerHover = Color(0x0DEC1313) // rgba(236,19,19,.05)
     val buttonPrimaryHover = Ds.Bluish750
     val buttonPrimaryDimmed = Ds.Bluish100
-    val buttonInfoFill = Ds.Celadon600
-    val buttonInfoHover = Ds.Celadon500
+    val buttonInfoFill = Ds.KimiBlue500
+    val buttonInfoHover = Ds.KimiBlue600
     val error = Ds.Red600
     val errorSecondary = Ds.Red400
     val errorTertiary = Ds.Red50
@@ -150,13 +159,13 @@ object DsLight {
      * shape stopped reading, and a message you cannot tell apart from the assistant's is a worse
      * failure than a fill that is a shade off the reference.
      */
-    val userBubble = Ds.Celadon100
-    val userBubbleHighlight = Ds.Celadon200
-    val composerCard = Color(0xFFFFFFFF)
-    val sidebar = Color(0xFFF7F7F5)
-    val sidebarNavActive = Color(0xFFE9E9E6)
-    val sidebarNavAccent = Ds.Celadon100
-    val sidebarNavHover = Color(0xFFF1F1EF)
+    val userBubble = Color(0xFFF5F5F5)
+    val userBubbleHighlight = Color(0xFFEFEFEF)
+    val composerCard = Color(0xFFF5F5F5)
+    val sidebar = Color(0xFFFAFAFA)
+    val sidebarNavActive = Color(0xFFEFEFEF)
+    val sidebarNavAccent = Ds.KimiBlue50
+    val sidebarNavHover = Color(0xFFF3F3F3)
     val tipSurface = Ds.Bluish60
     val codeBlockBg = Ds.Bluish50
     val codeBlockBanner = Ds.Bluish50
@@ -168,11 +177,11 @@ object DsLight {
 
 /** Semantic alias tokens for the dark theme. */
 object DsDark {
-    val bgBase = Color(0xFF10100F)
-    val bgLayer1 = Color(0xFF191918)
-    val bgLayer2 = Color(0xFF222220)
-    val bgLayer3 = Color(0xFF2B2B28)
-    val bgModulePlatform = Color(0xFF222220)
+    val bgBase = Color(0xFF191919)
+    val bgLayer1 = Color(0xFF202020)
+    val bgLayer2 = Color(0xFF292929)
+    val bgLayer3 = Color(0xFF333333)
+    val bgModulePlatform = Color(0xFF292929)
     val borderL1 = Color(0x0FFFFFFF) // rgba(255,255,255,.06)
     val borderL2 = Color(0x1FFFFFFF) // rgba(255,255,255,.12)
     val borderL3 = Color(0x29FFFFFF) // rgba(255,255,255,.16)
@@ -183,10 +192,10 @@ object DsDark {
     val labelTertiary = Color(0xFF92908A)
     val labelCaption = Ds.Bluish600
     val labelDimmed = Ds.Bluish750
-    val accent = Ds.Celadon400
+    val accent = Ds.KimiBlue400
     val onAccent = Color(0xFF0C1A19)
-    val accentTertiary = Ds.Celadon900
-    val accentHover = Ds.Celadon500
+    val accentTertiary = Color(0xFF26344F)
+    val accentHover = Ds.KimiBlue500
     val hover = Color(0x14FFFFFF) // rgba(255,255,255,.08)
     val hoverSolid = Ds.Bluish850
     val hoverAccent = Color(0x3DFFFFFF) // rgba(255,255,255,.24)
@@ -194,8 +203,8 @@ object DsDark {
     val dangerHover = Color(0x26DE7A72) // rgba(222,122,114,.15)
     val buttonPrimaryHover = Ds.Bluish100
     val buttonPrimaryDimmed = Ds.Bluish750
-    val buttonInfoFill = Ds.Celadon400
-    val buttonInfoHover = Ds.Celadon500
+    val buttonInfoFill = Ds.KimiBlue500
+    val buttonInfoHover = Ds.KimiBlue400
     val error = Ds.Red400
     val errorSecondary = Ds.Red400
     val errorTertiary = Ds.Red900
@@ -208,13 +217,13 @@ object DsDark {
     val warnTertiary = Ds.Amber900
     val toastBg = Ds.Bluish750
     val tooltipBg = Ds.Bluish750
-    val userBubble = Ds.Bluish850
-    val userBubbleHighlight = Ds.Bluish750
-    val composerCard = Color(0xFF222220)
-    val sidebar = Color(0xFF151514)
-    val sidebarNavActive = Color(0xFF2B2B28)
-    val sidebarNavAccent = Ds.Bluish800
-    val sidebarNavHover = Color(0xFF222220)
+    val userBubble = Color(0xFF292929)
+    val userBubbleHighlight = Color(0xFF333333)
+    val composerCard = Color(0xFF292929)
+    val sidebar = Color(0xFF191919)
+    val sidebarNavActive = Color(0xFF2D2D2D)
+    val sidebarNavAccent = Color(0xFF26344F)
+    val sidebarNavHover = Color(0xFF252525)
     val tipSurface = Ds.Bluish800
     val codeBlockBg = Ds.Bluish900
     val codeBlockBanner = Ds.Bluish875

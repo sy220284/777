@@ -184,8 +184,8 @@ internal fun LocalModeDrawer(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = DsSpacing.medium, end = DsSpacing.medium, top = DsSpacing.medium),
-                verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+                    .padding(start = DsSpacing.medium, end = DsSpacing.medium, top = DsSpacing.small),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -245,7 +245,7 @@ internal fun LocalModeDrawer(
                             )
                         },
                         singleLine = true,
-                        shape = DsShapes.block,
+                        shape = DsShapes.row,
                     )
                 }
 

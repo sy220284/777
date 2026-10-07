@@ -62,10 +62,10 @@ internal fun LocalUsageModePill(
         modifier = Modifier
             .fillMaxWidth()
             .widthIn(max = 264.dp)
-            .height(56.dp),
+            .height(44.dp),
         shape = DsShapes.pillFull,
         color = containerColor,
-        border = BorderStroke(1.dp, colors.borderL2),
+        border = BorderStroke(1.dp, colors.borderL1),
         tonalElevation = 0.dp,
         shadowElevation = if (backgroundState.hasImage) 1.dp else 0.dp,
     ) {

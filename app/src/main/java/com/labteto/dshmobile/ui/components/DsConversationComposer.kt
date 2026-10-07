@@ -62,7 +62,7 @@ fun DsConversationComposer(
         BackgroundRegion.BOTTOM,
         DsTheme.colors.composerCard,
     ),
-    shadowElevation: Dp = 1.dp,
+    shadowElevation: Dp = 0.dp,
     animateSize: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -78,7 +78,7 @@ fun DsConversationComposer(
             ),
         shape = DsShapes.composer,
         color = surfaceColor,
-        border = BorderStroke(1.dp, colors.borderL1),
+        border = BorderStroke(1.dp, colors.borderL2),
         shadowElevation = shadowElevation,
     ) {
         Column(

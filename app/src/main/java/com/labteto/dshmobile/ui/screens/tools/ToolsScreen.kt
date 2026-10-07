@@ -14,7 +14,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Refresh
@@ -848,7 +847,7 @@ fun ToolsScreen(
                 enabled = !state.loading && serverId.isNotBlank() && endpoint.isNotBlank(),
                 variant = DsButtonVariant.Outline,
                 modifier = Modifier.fillMaxWidth(),
-                icon = Icons.Outlined.Link,
+                icon = FeatherIcons.Link,
             )
             Text(
                 stringResource(R.string.tools_stdio_title),

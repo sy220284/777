@@ -116,7 +116,7 @@ fun DsCategoryRow(
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 title,
-                style = DsType.base16Strong.withReadingWeight(),
+                style = DsType.std14Strong.withReadingWeight(),
                 color = colors.labelPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -183,7 +183,7 @@ fun DsQuickActionTile(
                 icon,
                 contentDescription = null,
                 tint = if (enabled) colors.labelPrimary else colors.labelCaption,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(20.dp),
             )
             Text(
                 label,

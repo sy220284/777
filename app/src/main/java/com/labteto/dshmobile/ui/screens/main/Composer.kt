@@ -21,13 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.AttachFile
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -188,12 +181,12 @@ internal fun Composer(
     fun ComposerMenuControl() {
         Box {
             DsComposerAction(
-                icon = Icons.Filled.Add,
+                icon = FeatherIcons.Plus,
                 contentDescription = stringResource(R.string.chat_composer_attach_file),
                 onClick = { composerMenuOpen = true },
                 enabled = enabled && !preparing,
                 tint = colors.labelPrimary,
-                containerColor = colors.hoverSolid,
+                containerColor = Color.Transparent,
             )
             DsPopupMenu(
                 expanded = composerMenuOpen,
@@ -202,7 +195,7 @@ internal fun Composer(
                 items = listOf(
                     MenuItem(
                         text = stringResource(R.string.chat_composer_attach_file),
-                        icon = Icons.Outlined.AttachFile,
+                        icon = FeatherIcons.FilePlus,
                         onClick = onOpenAttachments,
                     ),
                     MenuItem(
@@ -218,7 +211,7 @@ internal fun Composer(
     @Composable
     fun SendControl() {
         DsComposerAction(
-            icon = Icons.Filled.ArrowUpward,
+            icon = FeatherIcons.ArrowUp,
             contentDescription = stringResource(R.string.chat_composer_send),
             onClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -240,8 +233,8 @@ internal fun Composer(
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 onStop()
             },
-            tint = colors.onAccent,
-            containerColor = colors.error,
+            tint = colors.bgBase,
+            containerColor = colors.labelPrimary,
             visualSize = DsComposerMetrics.primaryActionVisualSize,
         ) {
             Box(
@@ -345,12 +338,12 @@ private fun PermissionChip(
 
     Box {
         DsComposerAction(
-            icon = Icons.Outlined.Shield,
+            icon = FeatherIcons.Shield,
             contentDescription = label,
             onClick = { menuOpen = true },
             enabled = enabled && pending == null,
-            tint = if (effective == FULL_ACCESS_PRESET) colors.warnLabel else colors.labelSecondary,
-            containerColor = if (effective == FULL_ACCESS_PRESET) colors.warnTertiary else Color.Transparent,
+            tint = colors.labelPrimary,
+            containerColor = if (effective == FULL_ACCESS_PRESET) colors.hoverSolid else Color.Transparent,
         )
         if (menuOpen) {
             PermissionMenu(
@@ -426,7 +419,7 @@ private fun AttachmentStrip(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            Icons.Filled.Close,
+                            FeatherIcons.X,
                             contentDescription = stringResource(
                                 if (attachment is PendingAttachment.File) R.string.chat_composer_remove_file
                                 else R.string.chat_composer_remove_image,
@@ -474,7 +467,7 @@ private fun FileAttachmentChip(file: PendingAttachment.File, onRetry: () -> Unit
                 strokeWidth = 2.dp,
             )
             else -> Icon(
-                Icons.Outlined.Description,
+                FeatherIcons.FileText,
                 contentDescription = null,
                 tint = if (failed) colors.error else colors.labelSecondary,
                 modifier = Modifier.size(18.dp),
