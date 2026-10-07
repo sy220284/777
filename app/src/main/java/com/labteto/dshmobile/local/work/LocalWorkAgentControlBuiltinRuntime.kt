@@ -113,6 +113,7 @@ internal class LocalWorkAgentControlBuiltinRuntime(
                     ?.mapNotNull { it.jsonPrimitive.contentOrNull }
                     .orEmpty(),
                 modelOverride = args.optionalString("model"),
+                outputSchema = args["output_schema"] as? JsonObject,
                 binding = run,
                 runner = runner,
             )
