@@ -22,7 +22,11 @@ import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.buildTokenUsageContext
 import com.labteto.dshmobile.local.agent.LocalSubagentCompactionPolicy
+import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
+import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
+import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.LocalSubagentModelStepExecutor
+import com.labteto.dshmobile.local.agent.validateLocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.agent.LocalSubagentResult
 import com.labteto.dshmobile.local.agent.LocalSubagentStatus
 import com.labteto.dshmobile.local.agent.LocalSubagentToolCallPolicy
@@ -130,86 +134,47 @@ internal class LocalSubagentRunner(
     )
 
     suspend fun run(
-        task: String,
-        inheritHistory: Boolean,
-        allowMutation: Boolean,
-        backgroundJobId: String? = null,
-        parentCallId: String? = null,
-        modelOverride: String? = null,
-        maxSteps: Int = state.value.subagentMaxSteps,
-        virtualScreen: Boolean = false,
-        recoveredHistory: List<JsonObject>? = null,
-        recoveredClaimedMessageIds: Set<String> = emptySet(),
-        recoveredStep: Int = 0,
-        recoveredSoftStepLimit: Int? = null,
-        resumeAfterCompletion: Boolean = false,
-    ): String = runResult(
-        task = task,
-        inheritHistory = inheritHistory,
-        allowMutation = allowMutation,
-        backgroundJobId = backgroundJobId,
-        parentCallId = parentCallId,
-        modelOverride = modelOverride,
-        maxSteps = maxSteps,
-        virtualScreen = virtualScreen,
-        recoveredHistory = recoveredHistory,
-        recoveredClaimedMessageIds = recoveredClaimedMessageIds,
-        recoveredStep = recoveredStep,
-        recoveredSoftStepLimit = recoveredSoftStepLimit,
-        resumeAfterCompletion = resumeAfterCompletion,
-    ).output
+        spec: LocalSubagentLaunchSpec,
+    ): String = runResult(spec).output
 
     suspend fun runResult(
-        task: String,
-        inheritHistory: Boolean,
-        allowMutation: Boolean,
-        backgroundJobId: String? = null,
-        parentCallId: String? = null,
-        modelOverride: String? = null,
-        maxSteps: Int = state.value.subagentMaxSteps,
-        virtualScreen: Boolean = false,
+        spec: LocalSubagentLaunchSpec,
         recoveredHistory: List<JsonObject>? = null,
         recoveredClaimedMessageIds: Set<String> = emptySet(),
         recoveredStep: Int = 0,
         recoveredSoftStepLimit: Int? = null,
         resumeAfterCompletion: Boolean = false,
-    ): LocalSubagentResult = resourceScheduler.withResource(
-        HarnessResourceKind.AGENT,
-        owner = "subagent:" + task.take(80),
-    ) {
-        var virtualScreenId: String? = null
-        try {
-            if (virtualScreen) {
-                virtualScreenId = acquireVirtualScreen(task.take(80))
+    ): LocalSubagentResult {
+        val validated = validateLocalSubagentLaunchSpec(spec)
+        return resourceScheduler.withResource(
+            HarnessResourceKind.AGENT,
+            owner = "subagent:" + validated.task.take(80),
+        ) {
+            var virtualScreenId: String? = null
+            try {
+                if (validated.capabilities.virtualScreen) {
+                    virtualScreenId = acquireVirtualScreen(validated.task.take(80))
+                    require(virtualScreenId != null) {
+                        "SUBAGENT_VIRTUAL_SCREEN_UNAVAILABLE：请求了独立虚拟屏，但当前无法分配"
+                    }
+                }
+                runResultWithLease(
+                    spec = validated,
+                    virtualScreenId = virtualScreenId,
+                    recoveredHistory = recoveredHistory,
+                    recoveredClaimedMessageIds = recoveredClaimedMessageIds,
+                    recoveredStep = recoveredStep,
+                    recoveredSoftStepLimit = recoveredSoftStepLimit,
+                    resumeAfterCompletion = resumeAfterCompletion,
+                )
+            } finally {
+                virtualScreenId?.let(releaseVirtualScreen)
             }
-            runResultWithLease(
-                task = task,
-                inheritHistory = inheritHistory,
-                allowMutation = allowMutation,
-                backgroundJobId = backgroundJobId,
-                parentCallId = parentCallId,
-                modelOverride = modelOverride,
-                maxSteps = maxSteps,
-                virtualScreenId = virtualScreenId,
-                recoveredHistory = recoveredHistory,
-                recoveredClaimedMessageIds = recoveredClaimedMessageIds,
-                recoveredStep = recoveredStep,
-                recoveredSoftStepLimit = recoveredSoftStepLimit,
-                resumeAfterCompletion = resumeAfterCompletion,
-            )
-        } finally {
-            virtualScreenId?.let(releaseVirtualScreen)
         }
     }
 
     private suspend fun runResultWithLease(
-        task: String,
-        inheritHistory: Boolean,
-        allowMutation: Boolean,
-        backgroundJobId: String?,
-        parentCallId: String?,
-        modelOverride: String?,
-        maxSteps: Int,
+        spec: LocalSubagentLaunchSpec,
         virtualScreenId: String?,
         recoveredHistory: List<JsonObject>?,
         recoveredClaimedMessageIds: Set<String>,
@@ -217,9 +182,14 @@ internal class LocalSubagentRunner(
         recoveredSoftStepLimit: Int?,
         resumeAfterCompletion: Boolean,
     ): LocalSubagentResult {
-        require(backgroundJobId == null || !allowMutation) {
-            "持久子代理只支持只读执行，避免冷恢复重放未知副作用"
-        }
+        val task = spec.task
+        val capabilities: LocalSubagentCapabilities = spec.capabilities
+        val inheritHistory = capabilities.historyMode == LocalSubagentHistoryMode.INHERIT_PARENT
+        val allowMutation = capabilities.allowMutation
+        val backgroundJobId = spec.backgroundJobId
+        val parentCallId = spec.parentCallId
+        val modelOverride = spec.modelOverride
+        val maxSteps = spec.maxSteps
         val subagentId = backgroundJobId
             ?.let(::persistentSubagentId)
             ?: "sa-" + UUID.randomUUID().toString().replace("-", "").take(12)
@@ -286,6 +256,13 @@ internal class LocalSubagentRunner(
             put("base_url", runProfile.baseUrl)
             put("max_steps", stepLimit)
             put("task", task.take(2_000))
+            put("allow_mutation", capabilities.allowMutation)
+            put("continuable", capabilities.continuable)
+            put("history_mode", capabilities.historyMode.name.lowercase())
+            put("max_depth", capabilities.maxDepth)
+            capabilities.toolAllowlist?.let { allowlist ->
+                put("tool_allowlist", JsonArray(allowlist.sorted().map(::JsonPrimitive)))
+            }
             virtualScreenId?.let { put("virtual_screen_id", it) }
         })
         if (!modelGateway.hasCredential(runProfile)) {
@@ -323,10 +300,13 @@ internal class LocalSubagentRunner(
                 maxVirtualDisplays = snapshot.kernel.resources.maxVirtualDisplays,
                 maxLanguageServers = snapshot.kernel.resources.maxLanguageServers,
             ),
-            toolNames = schemas(
-                allowMutation,
-                virtualScreenId != null,
-                enabledOptionalTools,
+            toolNames = filteredSubagentSchemas(
+                schemas(
+                    allowMutation,
+                    virtualScreenId != null,
+                    enabledOptionalTools,
+                ),
+                capabilities.toolAllowlist,
             ).mapNotNull { element ->
                 val function = (element as? JsonObject)?.get("function") as? JsonObject
                 (function?.get("name") as? JsonPrimitive)?.content
@@ -483,7 +463,18 @@ internal class LocalSubagentRunner(
                         modelStepExecutor.complete(
                             surface = runSurface,
                             history = preparedHistory,
-                            tools = modelToolStepSurface.capture(runToolSurface.next(schemas(allowMutation, virtualScreenId != null, enabledOptionalTools))),
+                            tools = modelToolStepSurface.capture(
+                                runToolSurface.next(
+                                    filteredSubagentSchemas(
+                                        schemas(
+                                            allowMutation,
+                                            virtualScreenId != null,
+                                            enabledOptionalTools,
+                                        ),
+                                        capabilities.toolAllowlist,
+                                    ),
+                                ),
+                            ),
                             subagentId = subagentId,
                             step = modelStep,
                             durableHistory = history,
@@ -803,6 +794,20 @@ internal class LocalSubagentRunner(
             is AgentEvent.TurnFailed,
             is AgentEvent.TurnCancelled -> this
         }
+    }
+
+    private fun filteredSubagentSchemas(
+        source: JsonArray,
+        allowlist: Set<String>?,
+    ): JsonArray {
+        if (allowlist == null) return source
+        return JsonArray(
+            source.filter { element ->
+                val function = (element as? JsonObject)?.get("function") as? JsonObject
+                val name = function?.get("name")?.jsonPrimitive?.contentOrNull
+                name != null && name in allowlist
+            },
+        )
     }
 
     private fun persistentSubagentId(jobId: String): String =
