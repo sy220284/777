@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
@@ -400,7 +399,7 @@ internal fun LocalConversationSurface(
         modeIntro?.let { mode ->
             Surface(
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                shape = RoundedCornerShape(12.dp),
+                shape = DsShapes.block,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
@@ -429,7 +428,7 @@ internal fun LocalConversationSurface(
         }?.let { notice ->
             Surface(
                 color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
-                shape = RoundedCornerShape(12.dp),
+                shape = DsShapes.block,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
@@ -460,7 +459,7 @@ internal fun LocalConversationSurface(
         if (state.usageMode == LocalUsageMode.WORK && state.deviceApprovalLease) {
             Surface(
                 color = colors.warnTertiary,
-                shape = RoundedCornerShape(12.dp),
+                shape = DsShapes.block,
                 modifier = Modifier.fillMaxWidth()
                     .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.tiny),
             ) {

@@ -75,6 +75,7 @@ import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsTopBar
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -558,7 +559,7 @@ internal fun PersonaGalleryScreen(
             notice?.let {
                 Surface(
                     color = DsTheme.colors.characterAccentTertiary,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = DsShapes.block,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(

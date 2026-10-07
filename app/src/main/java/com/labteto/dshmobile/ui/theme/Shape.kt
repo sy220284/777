@@ -5,8 +5,11 @@ import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
 /**
- * Radius tokens intentionally collapse to six visual levels: 6 / 8 / 12 / 16 / 20 / full.
- * Semantic names remain so components describe intent without inventing new radii.
+ * Kimi-aligned semantic radius scale:
+ * 6 chip / 8 tooltip / 10 row / 12 menu / 14 control+block /
+ * 16 dialog+approval / 18 composer+bubble / 20 sheet / full capsule.
+ *
+ * Screens consume semantic names so page code does not invent local radii.
  */
 object DsShapes {
     val buttonCapsule = RoundedCornerShape(14.dp)
@@ -29,8 +32,8 @@ object DsShapes {
 
 val DsMaterialShapes = Shapes(
     extraSmall = DsShapes.chip,
-    small = DsShapes.menu,
+    small = DsShapes.row,
     medium = DsShapes.block,
-    large = DsShapes.composer,
-    extraLarge = DsShapes.dialog,
+    large = DsShapes.dialog,
+    extraLarge = DsShapes.composer,
 )

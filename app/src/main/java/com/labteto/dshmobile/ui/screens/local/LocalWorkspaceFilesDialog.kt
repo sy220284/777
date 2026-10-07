@@ -17,7 +17,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,9 +42,11 @@ import com.labteto.dshmobile.ui.components.DsTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
+import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -278,7 +279,7 @@ private fun ConversationLocalFileList(
             item(key = "local-artifacts-header") {
                 Text(
                     stringResource(R.string.panel_artifacts),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 )
@@ -291,7 +292,7 @@ private fun ConversationLocalFileList(
             item(key = "local-involved-header") {
                 Text(
                     stringResource(R.string.panel_involved_files),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                     modifier = Modifier.padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
                 )
@@ -377,7 +378,7 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
     ) {
         Text(
             "${preview.file.path} · ${formatBytes(preview.file.bytes)}",
-            style = MaterialTheme.typography.bodySmall,
+            style = DsType.caption11.withReadingWeight(),
             color = DsTheme.colors.labelSecondary,
         )
         if (preview.text == null) {
@@ -390,7 +391,7 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
             if (preview.truncated) {
                 Text(
                     stringResource(R.string.local_files_truncated_hint),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = DsType.caption11.withReadingWeight(),
                     color = DsTheme.colors.labelTertiary,
                 )
             }
@@ -398,7 +399,7 @@ private fun LocalFilePreviewBody(preview: LocalWorkspaceFilePreview) {
                 Text(
                     preview.text,
                     modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = DsType.mdCode,
                 )
             }
         }

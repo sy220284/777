@@ -198,7 +198,7 @@ private fun ConversationFileList(
                 Text(
                     stringResource(R.string.panel_artifacts),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = DsTheme.colors.labelSecondary,
                 )
             }

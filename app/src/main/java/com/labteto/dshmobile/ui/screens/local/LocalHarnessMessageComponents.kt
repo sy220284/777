@@ -245,7 +245,7 @@ internal fun LocalMessageRow(
                             level = WallpaperSurfaceLevel.CARD,
                             region = BackgroundRegion.MIDDLE,
                         ),
-                        RoundedCornerShape(18.dp),
+                        DsShapes.block,
                     )
                     .border(
                         width = 1.dp,
@@ -254,7 +254,7 @@ internal fun LocalMessageRow(
                         } else {
                             Color.Black.copy(alpha = 0.22f)
                         },
-                        shape = RoundedCornerShape(18.dp),
+                        shape = DsShapes.block,
                     )
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             } else {

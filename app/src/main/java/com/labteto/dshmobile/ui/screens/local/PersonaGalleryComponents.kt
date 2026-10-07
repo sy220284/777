@@ -69,6 +69,7 @@ import com.labteto.dshmobile.ui.components.DsCard
 import com.labteto.dshmobile.ui.components.DsDialog
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -602,7 +603,7 @@ private fun ArchivedDialogueRow(
                 onClick = onLongClick,
                 onLongClick = onLongClick,
             ),
-        shape = RoundedCornerShape(10.dp),
+        shape = DsShapes.row,
         color = DsTheme.colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, base = DsTheme.colors.bgLayer2),
     ) {
         Text(

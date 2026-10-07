@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -338,7 +337,7 @@ fun DsPopupMenu(
                     onDismiss()
                     item.onClick()
                 },
-                modifier = Modifier.heightIn(min = com.labteto.dshmobile.ui.theme.DsSpacing.touchTarget).clip(RoundedCornerShape(10.dp)),
+                modifier = Modifier.heightIn(min = com.labteto.dshmobile.ui.theme.DsSpacing.touchTarget).clip(DsShapes.row),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             )
         }
@@ -413,7 +412,7 @@ fun DsContextActionMenu(
                         modifier = Modifier
                             .widthIn(min = 64.dp)
                             .heightIn(min = 64.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(DsShapes.row)
                             .clickable {
                                 onDismiss()
                                 item.onClick()

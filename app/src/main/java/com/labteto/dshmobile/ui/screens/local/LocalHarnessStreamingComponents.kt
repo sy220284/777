@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,6 +26,7 @@ import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.forSurface
 import com.labteto.dshmobile.local.model.takeLastWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -105,7 +105,7 @@ internal fun LocalStreamingWorkPreview(
     Surface(
         modifier = Modifier.fillMaxWidth()
             .padding(horizontal = DsSpacing.medium, vertical = DsSpacing.small),
-        shape = RoundedCornerShape(18.dp),
+        shape = DsShapes.block,
         color = surfaceColor,
     ) {
         Column(
