@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.model
 import java.security.MessageDigest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 internal enum class LocalPromptPrefixContinuity {
     COLD,
@@ -45,6 +47,7 @@ internal class LocalPromptCacheContinuityStore {
         routeFingerprint: String,
         messages: List<JsonObject>,
         tools: JsonArray,
+        nativeTools: JsonArray = JsonArray(emptyList()),
     ): LocalPromptPrefixAssessment {
         val key = seriesKey(sessionId, routeFingerprint)
         val previous = entries[key]
@@ -56,7 +59,7 @@ internal class LocalPromptCacheContinuityStore {
                 toolSurfaceStable = false,
                 messagePrefixStable = false,
             )
-        val toolsStable = previous.toolFingerprint == fingerprint(tools.toString())
+        val toolsStable = previous.toolFingerprint == fingerprintToolSurface(tools, nativeTools)
         val prefixStable =
             messages.size >= previous.messageCount &&
                 previous.messageFingerprint == fingerprintMessages(messages.take(previous.messageCount))
@@ -82,12 +85,13 @@ internal class LocalPromptCacheContinuityStore {
         messages: List<JsonObject>,
         tools: JsonArray,
         generation: Int,
+        nativeTools: JsonArray = JsonArray(emptyList()),
     ) {
         entries[seriesKey(sessionId, routeFingerprint)] = Entry(
             generation = generation.coerceAtLeast(1),
             messageCount = messages.size,
             messageFingerprint = fingerprintMessages(messages),
-            toolFingerprint = fingerprint(tools.toString()),
+            toolFingerprint = fingerprintToolSurface(tools, nativeTools),
         )
     }
 
@@ -105,6 +109,12 @@ internal class LocalPromptCacheContinuityStore {
 
     private fun fingerprintMessages(messages: List<JsonObject>): String =
         fingerprint(messages.joinToString("\u0000") { it.toString() })
+
+    private fun fingerprintToolSurface(tools: JsonArray, nativeTools: JsonArray): String =
+        fingerprint(buildJsonObject {
+            put("schemas", tools)
+            put("native_tools", nativeTools)
+        }.toString())
 
     private fun fingerprint(value: String): String =
         MessageDigest.getInstance("SHA-256")

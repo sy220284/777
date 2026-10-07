@@ -18,10 +18,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
@@ -40,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,11 +50,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -66,6 +71,8 @@ import com.labteto.dshmobile.local.presentation.editableChatUserText
 import com.labteto.dshmobile.local.presentation.groupMessageVisibleContent
 import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.LocalMessageBlock
+import com.labteto.dshmobile.local.session.visibleBlocks
 import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.agentOperationKind
 import com.labteto.dshmobile.ui.agentOperationLabelRes
@@ -98,7 +105,9 @@ import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun localResourcePressureLabel(pressure: String): String = stringResource(
@@ -134,6 +143,7 @@ internal fun localJobStatusLabel(status: String): String = when (status) {
 internal fun LocalMessageRow(
     message: LocalHarnessMessage,
     chatMode: Boolean,
+    workspacePath: String = "",
     groupMode: Boolean,
     canEdit: Boolean,
     canRegenerate: Boolean,
@@ -184,7 +194,10 @@ internal fun LocalMessageRow(
                             onLongClick = { actionsOpen = true },
                         ),
                     ) {
-                        UserBubble(message.content)
+                        LocalUserMessageContent(
+                            message = message,
+                            workspacePath = workspacePath,
+                        )
                     }
                     DsContextActionMenu(
                         expanded = actionsOpen,
@@ -274,9 +287,11 @@ internal fun LocalMessageRow(
                     }
                 }
                 val visibleContent = if (groupMode) groupMessageVisibleContent(message) else message.content
-                MarkdownText(
-                    visibleContent,
-                    bodyStyle = if (chatMode) DsType.chatBody else DsType.mdBody,
+                LocalAssistantMessageContent(
+                    message = message,
+                    workspacePath = workspacePath,
+                    groupMode = groupMode,
+                    chatMode = chatMode,
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -291,14 +306,16 @@ internal fun LocalMessageRow(
                             onSelectVariant = selectVariantWithFeedback,
                         )
                     }
-                    CompactMessageAction(
-                        icon = Icons.Outlined.ContentCopy,
-                        contentDescription = stringResource(R.string.chat_copy_answer),
-                        onClick = {
-                            clipboard.setText(AnnotatedString(visibleContent))
-                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
-                        },
-                    )
+                    if (visibleContent.isNotBlank()) {
+                        CompactMessageAction(
+                            icon = Icons.Outlined.ContentCopy,
+                            contentDescription = stringResource(R.string.chat_copy_answer),
+                            onClick = {
+                                clipboard.setText(AnnotatedString(visibleContent))
+                                Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                            },
+                        )
+                    }
                     if (canRegenerate) CompactMessageAction(
                         icon = Icons.Outlined.Refresh,
                         contentDescription = stringResource(R.string.local_regenerate_reply),
@@ -310,6 +327,172 @@ internal fun LocalMessageRow(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun LocalUserMessageContent(
+    message: LocalHarnessMessage,
+    workspacePath: String,
+) {
+    Column(
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(DsSpacing.small),
+    ) {
+        message.visibleBlocks().forEach { block ->
+            when (block) {
+                is LocalMessageBlock.Text -> if (block.text.isNotBlank()) {
+                    UserBubble(block.text)
+                }
+                is LocalMessageBlock.Image -> LocalTranscriptImage(
+                    image = block,
+                    workspacePath = workspacePath,
+                )
+                is LocalMessageBlock.File -> LocalTranscriptFile(block)
+                is LocalMessageBlock.Unknown -> LocalTranscriptUnknown(block)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalAssistantMessageContent(
+    message: LocalHarnessMessage,
+    workspacePath: String,
+    groupMode: Boolean,
+    chatMode: Boolean,
+) {
+    var firstText = true
+    message.visibleBlocks().forEach { block ->
+        when (block) {
+            is LocalMessageBlock.Text -> {
+                val text = if (groupMode && firstText) {
+                    groupMessageVisibleContent(message)
+                } else {
+                    block.text
+                }
+                firstText = false
+                if (text.isNotBlank()) {
+                    MarkdownText(
+                        text,
+                        bodyStyle = if (chatMode) DsType.chatBody else DsType.mdBody,
+                    )
+                }
+            }
+            is LocalMessageBlock.Image -> LocalTranscriptImage(
+                image = block,
+                workspacePath = workspacePath,
+            )
+            is LocalMessageBlock.File -> LocalTranscriptFile(block)
+            is LocalMessageBlock.Unknown -> LocalTranscriptUnknown(block)
+        }
+    }
+}
+
+@Composable
+private fun LocalTranscriptImage(
+    image: LocalMessageBlock.Image,
+    workspacePath: String,
+) {
+    val colors = DsTheme.colors
+    var bitmap by remember(workspacePath, image.relativePath) {
+        mutableStateOf<ImageBitmap?>(null)
+    }
+    LaunchedEffect(workspacePath, image.relativePath) {
+        bitmap = if (workspacePath.isBlank()) {
+            null
+        } else {
+            withContext(Dispatchers.IO) {
+                decodeLocalAttachmentThumbnail(
+                    workspacePath = workspacePath,
+                    relativePath = image.relativePath,
+                    targetPx = 720,
+                )
+            }
+        }
+    }
+    val ratio = if (
+        image.width != null &&
+        image.height != null &&
+        image.width > 0 &&
+        image.height > 0
+    ) {
+        (image.width.toFloat() / image.height.toFloat()).coerceIn(0.45f, 2.2f)
+    } else {
+        1f
+    }
+    val modifier = Modifier
+        .fillMaxWidth(0.72f)
+        .widthIn(max = 440.dp)
+        .aspectRatio(ratio)
+        .clip(DsShapes.block)
+        .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
+        .border(1.dp, colors.borderL3, DsShapes.block)
+    val loaded = bitmap
+    if (loaded != null) {
+        Image(
+            bitmap = loaded,
+            contentDescription = image.name,
+            contentScale = ContentScale.Fit,
+            modifier = modifier,
+        )
+    } else {
+        Box(
+            modifier = modifier,
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.Image,
+                contentDescription = image.name,
+                tint = colors.labelTertiary,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocalTranscriptUnknown(block: LocalMessageBlock.Unknown) {
+    val colors = DsTheme.colors
+    Surface(
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL3),
+    ) {
+        Text(
+            text = stringResource(R.string.local_unknown_message_block, block.kind),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            style = DsType.small13.withReadingWeight(),
+            color = colors.labelSecondary,
+        )
+    }
+}
+
+@Composable
+private fun LocalTranscriptFile(file: LocalMessageBlock.File) {
+    val colors = DsTheme.colors
+    Surface(
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD),
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderL3),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Icon(
+                Icons.Outlined.Extension,
+                contentDescription = null,
+                tint = colors.labelSecondary,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                file.name,
+                style = DsType.small13.withReadingWeight(),
+                color = colors.labelPrimary,
+            )
         }
     }
 }
@@ -394,6 +577,7 @@ internal const val MAX_LOCAL_IMAGE_SELECTION = 20
 internal fun decodeLocalAttachmentThumbnail(
     workspacePath: String,
     relativePath: String,
+    targetPx: Int = 160,
 ): androidx.compose.ui.graphics.ImageBitmap? = runCatching {
     val root = File(workspacePath).canonicalFile
     val file = File(root, relativePath).canonicalFile
@@ -402,7 +586,8 @@ internal fun decodeLocalAttachmentThumbnail(
     BitmapFactory.decodeFile(file.absolutePath, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
     var sample = 1
-    while (bounds.outWidth / (sample * 2) >= 160 || bounds.outHeight / (sample * 2) >= 160) {
+    val target = targetPx.coerceIn(64, 2_048)
+    while (bounds.outWidth / (sample * 2) >= target || bounds.outHeight / (sample * 2) >= target) {
         sample *= 2
     }
     BitmapFactory.decodeFile(

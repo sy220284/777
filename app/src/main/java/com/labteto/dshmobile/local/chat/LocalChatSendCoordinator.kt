@@ -132,8 +132,9 @@ internal class LocalChatSendCoordinator @Inject constructor(
         val transcriptMessage = LocalHarnessMessage(
             id = queuedInput?.id ?: UUID.randomUUID().toString(),
             role = "user",
-            content = prepared.content,
+            content = prepared.visibleContent,
             createdAt = System.currentTimeMillis(),
+            blocks = prepared.blocks,
         )
         val userEvent = if (queuedInput != null) {
             eventLog.append(

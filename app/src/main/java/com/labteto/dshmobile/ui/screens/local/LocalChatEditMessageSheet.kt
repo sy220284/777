@@ -55,6 +55,22 @@ internal fun LocalChatEditMessageSheet(
             style = DsType.small13.withReadingWeight(),
             color = colors.labelSecondary,
         )
+        if (chatMessageHasAttachmentContext(message)) {
+            val retainedNames = message.blocks.mapNotNull { block ->
+                when (block) {
+                    is com.labteto.dshmobile.local.session.LocalMessageBlock.Image -> block.name
+                    is com.labteto.dshmobile.local.session.LocalMessageBlock.File -> block.name
+                    else -> null
+                }
+            }.joinToString("、").ifBlank {
+                stringResource(R.string.local_edit_user_message_attachment_legacy)
+            }
+            Text(
+                stringResource(R.string.local_edit_user_message_keeps_attachments, retainedNames),
+                style = DsType.small13.withReadingWeight(),
+                color = colors.labelSecondary,
+            )
+        }
         OutlinedTextField(
             value = text,
             onValueChange = {

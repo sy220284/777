@@ -19,7 +19,9 @@ import com.labteto.dshmobile.local.chat.LocalGroupChatMember
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.chat.stripGroupSpeakerPrefix
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
+import com.labteto.dshmobile.local.model.LocalCanonicalContent
 import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.model.OpenAiResponsesClient
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
 import javax.inject.Inject
@@ -63,12 +65,25 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             taskLabel = usage.taskLabel ?: userMessage,
             step = step,
         )
-        if (snapshot.usageMode != LocalUsageMode.CHAT || reply.toolCalls.isNotEmpty()) {
+        val imageOnly = reply.content.isNullOrBlank() &&
+            reply.canonicalMessage?.content?.any { it is LocalCanonicalContent.Image } == true
+        if (
+            snapshot.usageMode != LocalUsageMode.CHAT ||
+            reply.toolCalls.isNotEmpty() ||
+            imageOnly
+        ) {
             usageTracker.record(snapshot, reply, usageContext)
             return reply
         }
         val persona = chatTurnCoordinator.persona(snapshot)
         val repairBudget = ChatReplyRepairBudget()
+
+        suspend fun repairTextOnly(hint: String): LocalModelReply =
+            preserveLocalChatReplyMediaForTextRepair(
+                original = reply,
+                repaired = repairBudget.repair(hint, retryRaw),
+            )
+
         suspend fun finalizeCandidate(
             candidate: LocalModelReply,
             candidateUsageContext: TokenUsageContext,
@@ -96,7 +111,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             contentOf = { checked -> checked.content.orEmpty() },
             retry = { immersionHint ->
                 finalizeCandidate(
-                    repairBudget.repair(immersionHint, retryRaw),
+                    repairTextOnly(immersionHint),
                     candidateUsageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
                 )
             },
@@ -118,7 +133,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             contentOf = { candidate -> candidate.content.orEmpty() },
             retry = { repairHint ->
                 finalizeImmersedCandidate(
-                    repairBudget.repair(repairHint, retryRaw),
+                    repairTextOnly(repairHint),
                     usageContext.copy(action = TokenUsageAction.CHAT_REPAIR),
                 )
             },
@@ -374,5 +389,36 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             recordStyleGuardHits(violations)
             onStyleGuard(action, violations)
         },
+    )
+}
+
+internal fun preserveLocalChatReplyMediaForTextRepair(
+    original: LocalModelReply,
+    repaired: LocalModelReply,
+): LocalModelReply {
+    val originalImages = original.canonicalMessage?.content
+        ?.filterIsInstance<LocalCanonicalContent.Image>()
+        .orEmpty()
+    if (originalImages.isEmpty()) return repaired
+
+    val merged = ChatStyleGuard.withContent(original, repaired.content.orEmpty())
+    val canonical = original.canonicalMessage?.copy(
+        content = buildList {
+            repaired.content?.takeIf(String::isNotBlank)
+                ?.let { add(LocalCanonicalContent.Text(it)) }
+            addAll(originalImages)
+        },
+        replay = null,
+    )
+    return merged.copy(
+        message = JsonObject(merged.message - OpenAiResponsesClient.RESPONSES_OUTPUT_KEY),
+        canonicalMessage = canonical,
+        reasoning = repaired.reasoning,
+        toolCalls = repaired.toolCalls,
+        usage = repaired.usage,
+        requestId = repaired.requestId,
+        promptBreakdown = repaired.promptBreakdown,
+        routeIdentity = repaired.routeIdentity,
+        promptCacheDiagnostic = repaired.promptCacheDiagnostic,
     )
 }

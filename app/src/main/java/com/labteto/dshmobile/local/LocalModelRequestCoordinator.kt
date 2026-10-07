@@ -33,7 +33,9 @@ import com.labteto.dshmobile.local.model.redactModelImages
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.toRunModelSurface
 import com.labteto.dshmobile.local.model.takeLastWithoutSplittingSurrogatePair
+import com.labteto.dshmobile.local.model.LOCAL_NATIVE_TOOL_IMAGE_GENERATION
 import com.labteto.dshmobile.local.model.buildLocalRequestEvidence
+import com.labteto.dshmobile.local.model.resolveLocalNativeToolNames
 import com.labteto.dshmobile.local.model.stableJsonSha256
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
@@ -107,6 +109,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         previewGuard: () -> Boolean = { true },
         overflowPersister: ((LocalHarnessState, LocalHistorySummaryMode) -> Unit)? = null,
         contextPolicy: LocalRequestContextPolicy? = null,
+        allowImageGeneration: Boolean = false,
         admission: LocalModelAdmissionPort? = null,
     ): LocalModelReply {
         val tools = toolsOverride ?: JsonArray(emptyList())
@@ -170,12 +173,17 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             },
         )
         val requestMessages = contextProjection.messages
+        val nativeToolNames = resolveLocalNativeToolNames(runSurface, allowImageGeneration)
+        val nativeTools = JsonArray(nativeToolNames.map(::JsonPrimitive))
+        val effectiveImageGeneration =
+            LOCAL_NATIVE_TOOL_IMAGE_GENERATION in nativeToolNames
         val prefixAssessment = if (cachePolicy.mode != LocalPromptCacheMode.NONE) {
             promptCacheContinuity.assess(
                 snapshot.sessionId,
                 routeFingerprint,
                 requestMessages,
                 tools,
+                nativeTools,
             )
         } else {
             null
@@ -252,8 +260,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 }
             }
         }
-        val requestEvidence = buildLocalRequestEvidence(requestMessages, tools)
-        val replayEvidence = buildLocalRequestEvidence(logMessages, tools)
+        val requestEvidence = buildLocalRequestEvidence(requestMessages, tools, nativeTools)
+        val replayEvidence = buildLocalRequestEvidence(logMessages, tools, nativeTools)
         val evidenceKey = snapshot.sessionId + "\u0000" + routeFingerprint
         val evidenceLogSequence = log.latestSequence()
         val messageSurfaceSeq = ensureRequestEvidenceSurface(
@@ -275,13 +283,15 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         val toolSurfaceSeq = ensureRequestEvidenceSurface(
             cache = toolSurfaceEvidence,
             key = evidenceKey,
-            digest = requestEvidence.toolSchemaDigest,
+            digest = requestEvidence.resolvedToolSurfaceDigest,
             currentLogSequence = evidenceLogSequence,
         ) {
             log.append("request/tool-surface", buildJsonObject {
                 put("version", REQUEST_EVIDENCE_VERSION)
-                put("digest", requestEvidence.toolSchemaDigest)
+                put("digest", requestEvidence.resolvedToolSurfaceDigest)
+                put("schema_digest", requestEvidence.toolSchemaDigest)
                 put("schemas", tools)
+                put("native_tools", nativeTools)
             }).sequence
         }
         val contextSurfaceSeq = ensureRequestEvidenceSurface(
@@ -303,7 +313,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         val requestEnvelopeFingerprint = stableJsonSha256(buildJsonArray {
             add(JsonPrimitive(routeFingerprint))
             add(JsonPrimitive(requestEvidence.messageDigest))
-            add(JsonPrimitive(requestEvidence.toolSchemaDigest))
+            add(JsonPrimitive(requestEvidence.resolvedToolSurfaceDigest))
             add(JsonPrimitive(requestEvidence.contextDigest))
         })
         val requestHeader = log.append("request/header", buildJsonObject {
@@ -319,6 +329,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             put("prompt_cache_mode", cachePolicy.mode.name.lowercase())
             put("prompt_cache_key_enabled", promptCacheKey != null)
             put("prompt_cache_ttl_enabled", promptCacheTtl != null)
+            put("image_generation_requested", allowImageGeneration)
+            put("image_generation_enabled", effectiveImageGeneration)
             put("cache_preserve_tool_surface", cachePolicy.preserveToolSurface)
             prefixAssessment?.let { cache ->
                 put("cache_series_generation", cache.generation)
@@ -365,9 +377,12 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             }
             put("tool_count", tools.size)
             put("tool_names", toolNames)
+            put("native_tool_count", nativeTools.size)
+            put("native_tool_names", nativeTools)
             put("message_digest", requestEvidence.messageDigest)
             put("context_digest", requestEvidence.contextDigest)
             put("tool_schema_digest", requestEvidence.toolSchemaDigest)
+            put("resolved_tool_surface_digest", requestEvidence.resolvedToolSurfaceDigest)
             put("message_surface_digest", replayEvidence.messageDigest)
             put("context_surface_digest", replayEvidence.contextDigest)
             put("message_surface_seq", messageSurfaceSeq)
@@ -398,6 +413,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             put("operational_input_limit_tokens", pressure.operationalLimitTokens)
             put("tool_count", tools.size)
             put("tool_names", toolNames)
+            put("native_tool_count", nativeTools.size)
+            put("native_tool_names", nativeTools)
+            put("resolved_tool_surface_digest", requestEvidence.resolvedToolSurfaceDigest)
         })
 
         var failureContextDiagnosticLogged = false
@@ -610,6 +628,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     routeFingerprint,
                     activeMessages,
                     tools,
+                    nativeTools,
                 )
             } else {
                 null
@@ -617,8 +636,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             try {
                 executor.execute { providerAttempt ->
                     val activeLogMessages = redactModelImages(activeMessages)
-                    val activeEvidence = buildLocalRequestEvidence(activeMessages, tools)
-                    val activeReplayEvidence = buildLocalRequestEvidence(activeLogMessages, tools)
+                    val activeEvidence = buildLocalRequestEvidence(activeMessages, tools, nativeTools)
+                    val activeReplayEvidence = buildLocalRequestEvidence(activeLogMessages, tools, nativeTools)
                     val activeMessageSurfaceSeq = ensureRequestEvidenceSurface(
                         cache = messageSurfaceEvidence,
                         key = evidenceKey,
@@ -654,7 +673,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     val providerAttemptFingerprint = stableJsonSha256(buildJsonArray {
                         add(JsonPrimitive(routeFingerprint))
                         add(JsonPrimitive(activeEvidence.messageDigest))
-                        add(JsonPrimitive(activeEvidence.toolSchemaDigest))
+                        add(JsonPrimitive(activeEvidence.resolvedToolSurfaceDigest))
                         add(JsonPrimitive(activeEvidence.contextDigest))
                         add(JsonPrimitive(temperature?.toString() ?: "null"))
                         add(JsonPrimitive(cacheComparisonResponseId ?: "null"))
@@ -676,6 +695,9 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             put("protocol", runSurface.protocol.name)
                             put("route_fingerprint", routeFingerprint)
                             put("streaming", true)
+                            put("image_generation_requested", allowImageGeneration)
+                            put("image_generation_enabled", effectiveImageGeneration)
+                            put("native_tool_names", nativeTools)
                             temperature?.let { put("temperature", it) }
                             cacheComparisonResponseId?.let {
                                 put("prompt_cache_comparison_response_id", it)
@@ -697,6 +719,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 activeReplayEvidence.contextDigest != activeEvidence.contextDigest,
                             )
                             put("tool_schema_digest", activeEvidence.toolSchemaDigest)
+                            put("resolved_tool_surface_digest", activeEvidence.resolvedToolSurfaceDigest)
                             put("tool_surface_seq", toolSurfaceSeq)
                             put("provider_attempt_fingerprint", providerAttemptFingerprint)
                         })
@@ -735,6 +758,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 promptCacheComparisonResponseId = cacheComparisonResponseId,
                                 promptCacheKey = promptCacheKey,
                             promptCacheTtl = promptCacheTtl,
+                            allowImageGeneration = effectiveImageGeneration,
                             admission = admission,
                             beforeProviderInvoke = persistProviderAttempt,
                             onDelta = { delta ->
@@ -791,6 +815,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                     activeMessages,
                                     tools,
                                     cache.generation,
+                                    nativeTools,
                                 )
                             }
                             if (reply.usage.reported) {
@@ -885,8 +910,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
     )
 
     private companion object {
-        const val REQUEST_EVIDENCE_VERSION = 2
-        const val PROVIDER_ATTEMPT_EVIDENCE_VERSION = 1
+        const val REQUEST_EVIDENCE_VERSION = 3
+        const val PROVIDER_ATTEMPT_EVIDENCE_VERSION = 2
         const val MAX_ATTEMPT_STREAM_TAIL_CHARS = 4_096
     }
 }

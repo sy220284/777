@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalHarnessSession
+import com.labteto.dshmobile.local.session.LocalMessageBlock
+import com.labteto.dshmobile.local.session.LocalMessageMediaSource
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.assistantModelMessageFromEvent
 import com.labteto.dshmobile.local.session.decodeTranscriptMessages
@@ -258,6 +260,61 @@ class LocalSessionTranscriptProjectionTest {
 
         assertEquals(listOf(tool), projected.messages)
         assertEquals(0L, projected.projectedThroughSequence)
+    }
+
+    @Test
+    fun transcriptRoundTripPreservesUnknownBlocksVerbatim() {
+        val payload = buildJsonObject {
+            put("kind", "video")
+            put("codec", "av1")
+            put("future_field", "keep-me")
+        }
+        val original = LocalHarnessMessage(
+            id = "unknown-1",
+            role = "assistant",
+            content = "",
+            createdAt = 99L,
+            blocks = listOf(LocalMessageBlock.Unknown("video", payload)),
+        )
+
+        val data = buildJsonObject {
+            put("transcript", encodeTranscriptMessages(listOf(original)))
+        }
+        val restored = decodeTranscriptMessages(data)!!.single()
+
+        assertEquals(original, restored)
+        assertEquals(payload, (restored.blocks.single() as LocalMessageBlock.Unknown).payload)
+    }
+
+    @Test
+    fun transcriptRoundTripPreservesOrderedMultimodalBlocks() {
+        val original = LocalHarnessMessage(
+            id = "multi-1",
+            role = "assistant",
+            content = "给你生成好了。",
+            createdAt = 100L,
+            blocks = listOf(
+                LocalMessageBlock.Text("给你生成好了。"),
+                LocalMessageBlock.Image(
+                    relativePath = ".dsh/attachments/abc.png",
+                    mediaType = "image/png",
+                    name = "模型图片.png",
+                    bytes = 128L,
+                    attachmentId = "abc",
+                    width = 1024,
+                    height = 768,
+                    source = LocalMessageMediaSource.MODEL,
+                ),
+            ),
+        )
+
+        val data = buildJsonObject {
+            put("transcript", encodeTranscriptMessages(listOf(original)))
+        }
+        val restored = decodeTranscriptMessages(data)!!.single()
+
+        assertEquals(original, restored)
+        assertEquals(LocalMessageMediaSource.MODEL, (restored.blocks[1] as LocalMessageBlock.Image).source)
     }
 
     private fun event(sequence: Long, transcript: JsonArray) = LocalSessionEventLog.Event(

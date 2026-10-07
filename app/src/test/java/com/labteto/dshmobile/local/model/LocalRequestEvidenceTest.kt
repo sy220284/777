@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -45,6 +46,30 @@ class LocalRequestEvidenceTest {
         assertEquals(
             listOf("system", "developer"),
             first.contextMessages.map { it.jsonObject["role"]!!.jsonPrimitive.content },
+        )
+    }
+
+    @Test
+    fun nativeToolSurfaceChangesResolvedDigestWithoutChangingFunctionSchemaDigest() {
+        val messages = listOf(
+            buildJsonObject {
+                put("role", "user")
+                put("content", "画一张图")
+            },
+        )
+        val tools = JsonArray(emptyList())
+        val withoutNative = buildLocalRequestEvidence(messages, tools)
+        val withImageGeneration = buildLocalRequestEvidence(
+            messages = messages,
+            tools = tools,
+            nativeTools = JsonArray(listOf(JsonPrimitive("image_generation"))),
+        )
+
+        assertEquals(withoutNative.messageDigest, withImageGeneration.messageDigest)
+        assertEquals(withoutNative.toolSchemaDigest, withImageGeneration.toolSchemaDigest)
+        assertNotEquals(
+            withoutNative.resolvedToolSurfaceDigest,
+            withImageGeneration.resolvedToolSurfaceDigest,
         )
     }
 

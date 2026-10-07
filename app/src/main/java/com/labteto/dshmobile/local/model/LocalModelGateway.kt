@@ -84,6 +84,7 @@ class LocalModelGateway @Inject constructor(
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
+    allowImageGeneration: Boolean = false,
     ): LocalModelReply =
         completeResolved(
             route = resolveRoute(model, baseUrl, profile),
@@ -95,6 +96,7 @@ class LocalModelGateway @Inject constructor(
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
             promptCacheKey = promptCacheKey,
             promptCacheTtl = promptCacheTtl,
+        allowImageGeneration = allowImageGeneration,
         )
 
     suspend fun completeStreaming(
@@ -108,6 +110,7 @@ class LocalModelGateway @Inject constructor(
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
+    allowImageGeneration: Boolean = false,
     ): LocalModelReply =
         completeResolved(
             route = resolveRoute(model, baseUrl, profile),
@@ -119,6 +122,7 @@ class LocalModelGateway @Inject constructor(
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
             promptCacheKey = promptCacheKey,
             promptCacheTtl = promptCacheTtl,
+        allowImageGeneration = allowImageGeneration,
         )
 
     suspend fun probeApiKey(
@@ -200,6 +204,7 @@ class LocalModelGateway @Inject constructor(
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
+    allowImageGeneration: Boolean = false,
     ): LocalModelReply {
         val prepared = prepareLocalModelAdapterRequest(
             route = route,
@@ -210,6 +215,7 @@ class LocalModelGateway @Inject constructor(
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
             promptCacheKey = promptCacheKey,
             promptCacheTtl = promptCacheTtl,
+        allowImageGeneration = allowImageGeneration,
         )
         return adapters.adapter(route.protocol).complete(
             request = prepared.request,
@@ -238,6 +244,7 @@ internal fun prepareLocalModelAdapterRequest(
     promptCacheComparisonResponseId: String? = null,
     promptCacheKey: String? = null,
     promptCacheTtl: String? = null,
+    allowImageGeneration: Boolean = false,
 ): LocalPreparedModelRequest {
     val canonicalMessages = LocalCanonicalModelCodec.messages(messages).filterNot(::isEmptyCanonicalAssistant)
     validateCanonicalModelHistory(canonicalMessages)
@@ -281,6 +288,7 @@ internal fun prepareLocalModelAdapterRequest(
             messages = routedMessages,
             tools = canonicalTools,
             temperature = routedTemperature,
+            allowImageGeneration = allowImageGeneration && route.protocol == LocalModelProtocol.RESPONSES,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId
                 ?.takeIf { route.protocol == LocalModelProtocol.RESPONSES && route.capabilities.promptCacheDiagnostics },
             promptCacheKey = promptCacheKey

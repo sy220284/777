@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.model.LocalPromptCacheContinuityStore
 import com.labteto.dshmobile.local.model.LocalPromptPrefixContinuity
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -11,6 +12,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalPromptCacheContinuityStoreTest {
+    @Test
+    fun nativeToolSurfaceChangeBreaksPrefixContinuity() {
+        val store = LocalPromptCacheContinuityStore()
+        val messages = listOf(message("user", "画图"))
+        val tools = JsonArray(emptyList())
+        val none = JsonArray(emptyList())
+        val image = JsonArray(listOf(JsonPrimitive("image_generation")))
+
+        val cold = store.assess("s", "route", messages, tools, none)
+        store.recordSuccess("s", "route", messages, tools, cold.generation, none)
+        val changed = store.assess("s", "route", messages, tools, image)
+
+        assertEquals(LocalPromptPrefixContinuity.BROKEN, changed.continuity)
+        assertFalse(changed.toolSurfaceStable)
+    }
+
+
     private fun message(role: String, content: String) = buildJsonObject {
         put("role", role)
         put("content", content)

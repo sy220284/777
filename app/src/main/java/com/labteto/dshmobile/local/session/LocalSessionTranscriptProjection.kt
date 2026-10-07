@@ -34,6 +34,7 @@ private fun encodeTranscriptMessage(message: LocalHarnessMessage): JsonObject =
             put("id", JsonPrimitive(message.id))
             put("role", JsonPrimitive(message.role))
             put("content", JsonPrimitive(message.content))
+            if (message.blocks.isNotEmpty()) put("blocks", encodeTranscriptBlocks(message.blocks))
             put("created_at", JsonPrimitive(message.createdAt))
             message.toolName?.let { put("tool_name", JsonPrimitive(it)) }
             message.toolIsError?.let { put("tool_is_error", JsonPrimitive(it)) }
@@ -43,6 +44,78 @@ private fun encodeTranscriptMessage(message: LocalHarnessMessage): JsonObject =
             if (message.proactive) put("proactive", JsonPrimitive(true))
         },
     )
+
+private fun encodeTranscriptBlocks(blocks: List<LocalMessageBlock>): JsonArray =
+    JsonArray(blocks.map { block ->
+        when (block) {
+            is LocalMessageBlock.Text -> JsonObject(buildMap {
+                put("kind", JsonPrimitive("text"))
+                put("text", JsonPrimitive(block.text))
+            })
+            is LocalMessageBlock.Image -> JsonObject(buildMap {
+                put("kind", JsonPrimitive("image"))
+                put("path", JsonPrimitive(block.relativePath))
+                put("media_type", JsonPrimitive(block.mediaType))
+                put("name", JsonPrimitive(block.name))
+                put("bytes", JsonPrimitive(block.bytes))
+                block.attachmentId?.let { put("attachment_id", JsonPrimitive(it)) }
+                block.width?.let { put("width", JsonPrimitive(it)) }
+                block.height?.let { put("height", JsonPrimitive(it)) }
+                put("source", JsonPrimitive(block.source.name.lowercase()))
+            })
+            is LocalMessageBlock.File -> JsonObject(buildMap {
+                put("kind", JsonPrimitive("file"))
+                put("path", JsonPrimitive(block.relativePath))
+                put("media_type", JsonPrimitive(block.mediaType))
+                put("name", JsonPrimitive(block.name))
+                put("bytes", JsonPrimitive(block.bytes))
+                block.attachmentId?.let { put("attachment_id", JsonPrimitive(it)) }
+                put("source", JsonPrimitive(block.source.name.lowercase()))
+            })
+            is LocalMessageBlock.Unknown -> block.payload
+        }
+    })
+
+private fun decodeTranscriptBlocks(value: JsonArray?): List<LocalMessageBlock>? {
+    if (value == null) return emptyList()
+    val blocks = mutableListOf<LocalMessageBlock>()
+    for (element in value) {
+        val item = element as? JsonObject ?: return null
+        val kind = (item["kind"] as? JsonPrimitive)?.contentOrNull ?: return null
+        fun string(key: String): String? =
+            (item[key] as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.contentOrNull
+        fun long(key: String): Long? = (item[key] as? JsonPrimitive)?.longOrNull
+        val source = string("source")
+            ?.let { runCatching { LocalMessageMediaSource.valueOf(it.uppercase()) }.getOrNull() }
+            ?: LocalMessageMediaSource.USER
+        when (kind) {
+            "text" -> blocks += LocalMessageBlock.Text(string("text") ?: return null)
+            "image" -> blocks += LocalMessageBlock.Image(
+                relativePath = string("path") ?: return null,
+                mediaType = string("media_type") ?: return null,
+                name = string("name") ?: return null,
+                bytes = long("bytes") ?: return null,
+                attachmentId = string("attachment_id"),
+                width = long("width")?.toInt(),
+                height = long("height")?.toInt(),
+                source = source,
+            )
+            "file" -> blocks += LocalMessageBlock.File(
+                relativePath = string("path") ?: return null,
+                mediaType = string("media_type") ?: return null,
+                name = string("name") ?: return null,
+                bytes = long("bytes") ?: return null,
+                attachmentId = string("attachment_id"),
+                source = source,
+            )
+            else -> blocks += LocalMessageBlock.Unknown(
+                kind = kind,
+                payload = item,
+            )
+        }
+    }
+    return blocks
+}
 
 internal fun assistantModelMessageFromEvent(data: JsonObject): JsonObject =
     (data["message"] as? JsonObject) ?: JsonObject(
@@ -120,6 +193,7 @@ internal fun decodeTranscriptMessages(data: JsonObject): List<LocalHarnessMessag
             it in setOf("user", "reasoning", "assistant", "progress", "tool", "system")
         } ?: return null
         val content = contentValue.contentOrNull ?: return null
+        val blocks = decodeTranscriptBlocks(item["blocks"] as? JsonArray) ?: return null
         val createdAt = createdAtValue.longOrNull ?: return null
         fun optionalString(key: String): String? {
             val value = item[key] ?: return null
@@ -144,6 +218,7 @@ internal fun decodeTranscriptMessages(data: JsonObject): List<LocalHarnessMessag
             speakerName = speakerName,
             createdAt = createdAt,
             proactive = proactive,
+            blocks = blocks,
         )
     }
     return decoded

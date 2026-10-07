@@ -6,15 +6,21 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +52,7 @@ import com.labteto.dshmobile.ui.components.DsComposerAction
 import com.labteto.dshmobile.ui.components.DsComposerField
 import com.labteto.dshmobile.ui.components.DsComposerMetrics
 import com.labteto.dshmobile.ui.components.DsConversationComposer
+import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsSpacing
@@ -197,12 +204,34 @@ internal fun LocalConversationComposer(
         animateSize = false,
     ) {
         ChatGptPlanUsageBar(activeModelProfile)
+        val imageAttachments = attachments.mapIndexedNotNull { index, attachment ->
+            (index to attachment).takeIf { attachment.mediaType.startsWith("image/") }
+        }
+        if (imageAttachments.isNotEmpty()) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+            ) {
+                items(
+                    items = imageAttachments,
+                    key = { (index, attachment) -> "$index:${attachment.relativePath}" },
+                ) { (index, attachment) ->
+                    ImportedImageAttachmentTile(
+                        attachment = attachment,
+                        workspacePath = state.workspacePath,
+                        onRemove = { onRemoveAttachment(index) },
+                    )
+                }
+            }
+        }
         attachments.forEachIndexed { index, attachment ->
-            ImportedAttachmentRow(
-                attachment = attachment,
-                workspacePath = state.workspacePath,
-                onRemove = { onRemoveAttachment(index) },
-            )
+            if (!attachment.mediaType.startsWith("image/")) {
+                ImportedAttachmentRow(
+                    attachment = attachment,
+                    workspacePath = state.workspacePath,
+                    onRemove = { onRemoveAttachment(index) },
+                )
+            }
         }
 
         Row(
@@ -259,6 +288,51 @@ internal fun LocalConversationComposer(
             onPlanModeChange = onPlanModeChange,
             onAutoApprove = onAutoApprove,
             onDisableAutoApprove = onDisableAutoApprove,
+        )
+    }
+}
+
+@Composable
+private fun ImportedImageAttachmentTile(
+    attachment: LocalImportedAttachment,
+    workspacePath: String,
+    onRemove: () -> Unit,
+) {
+    val colors = DsTheme.colors
+    var thumbnail by remember(attachment.relativePath, workspacePath) {
+        mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
+    }
+    LaunchedEffect(attachment.relativePath, workspacePath) {
+        thumbnail = withContext(Dispatchers.IO) {
+            decodeLocalAttachmentThumbnail(
+                workspacePath = workspacePath,
+                relativePath = attachment.relativePath,
+                targetPx = 256,
+            )
+        }
+    }
+    Box(
+        modifier = Modifier
+            .size(88.dp)
+            .clip(DsShapes.block)
+            .background(colors.hoverSolid)
+            .border(1.dp, colors.borderL3, DsShapes.block),
+    ) {
+        thumbnail?.let { image ->
+            Image(
+                bitmap = image,
+                contentDescription = attachment.name,
+                modifier = Modifier.fillMaxWidth().size(88.dp).clip(DsShapes.block),
+            )
+        }
+        DsIconButton(
+            icon = Icons.Outlined.Close,
+            contentDescription = stringResource(R.string.common_remove),
+            onClick = onRemove,
+            modifier = Modifier.align(Alignment.TopEnd),
+            iconSize = 16.dp,
+            tint = colors.labelPrimary,
+            containerColor = colors.bgBase.copy(alpha = 0.82f),
         )
     }
 }

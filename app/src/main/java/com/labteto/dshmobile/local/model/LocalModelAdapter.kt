@@ -33,6 +33,7 @@ internal data class LocalModelAdapterRequest(
     val messages: List<LocalCanonicalMessage>,
     val tools: List<LocalCanonicalToolDefinition>,
     val temperature: Double?,
+    val allowImageGeneration: Boolean = false,
     val promptCacheComparisonResponseId: String? = null,
     val promptCacheKey: String? = null,
     val promptCacheTtl: String? = null,
@@ -120,6 +121,7 @@ internal class OpenAiResponsesAdapter @Inject constructor(
             promptCacheComparisonResponseId = request.promptCacheComparisonResponseId,
             promptCacheKey = request.promptCacheKey,
             promptCacheTtl = request.promptCacheTtl,
+            allowImageGeneration = request.allowImageGeneration,
             onDelta = if (streaming) onDelta else { _: LocalModelDelta -> },
         )
         return LocalCanonicalModelCodec.canonicalizeReply(reply, id, request.route.fingerprint)
