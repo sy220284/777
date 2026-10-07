@@ -101,6 +101,8 @@ internal class LocalToolExecutionCoordinator(
         target: MutableSet<String>? = null,
     ) {
         val resolvedTarget = target ?: enabledOptionalTools
+        // Model-independent default network capabilities for every Work turn.
+        enableOptionalTools(DEFAULT_NETWORK_TOOLS, resolvedTarget)
         enableTaskRelevantOptionalTools(taskContext, resolvedTarget)
         if (enableGitHub) enableGitHubConnectorTools(resolvedTarget)
     }
@@ -112,6 +114,10 @@ internal class LocalToolExecutionCoordinator(
             }
             .map(HarnessTool::name)
         enableOptionalTools(githubTools, target)
+    }
+
+    private companion object {
+        val DEFAULT_NETWORK_TOOLS = listOf("web_search", "web_fetch")
     }
 
     private fun isGitHubConnectorTool(tool: HarnessTool): Boolean =
