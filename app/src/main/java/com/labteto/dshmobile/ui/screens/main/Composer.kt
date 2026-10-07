@@ -21,10 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.AttachFile
-import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -199,7 +195,7 @@ internal fun Composer(
                 items = listOf(
                     MenuItem(
                         text = stringResource(R.string.chat_composer_attach_file),
-                        icon = Icons.Outlined.AttachFile,
+                        icon = FeatherIcons.Paperclip,
                         onClick = onOpenAttachments,
                     ),
                     MenuItem(
@@ -423,7 +419,7 @@ private fun AttachmentStrip(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            Icons.Filled.Close,
+                            FeatherIcons.X,
                             contentDescription = stringResource(
                                 if (attachment is PendingAttachment.File) R.string.chat_composer_remove_file
                                 else R.string.chat_composer_remove_image,
@@ -471,7 +467,7 @@ private fun FileAttachmentChip(file: PendingAttachment.File, onRetry: () -> Unit
                 strokeWidth = 2.dp,
             )
             else -> Icon(
-                Icons.Outlined.Description,
+                FeatherIcons.FileText,
                 contentDescription = null,
                 tint = if (failed) colors.error else colors.labelSecondary,
                 modifier = Modifier.size(18.dp),

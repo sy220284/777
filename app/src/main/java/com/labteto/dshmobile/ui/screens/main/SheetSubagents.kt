@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -44,6 +41,7 @@ import com.labteto.dshmobile.ui.components.DsToastHost
 import com.labteto.dshmobile.ui.components.rememberDsToast
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
+import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsSpacing
 import com.labteto.dshmobile.ui.theme.DsTheme
 import com.labteto.dshmobile.ui.theme.DsType
@@ -213,7 +211,7 @@ internal fun SubagentsSheet(
                         run {
                             DsButton(
                                 text = "",
-                                icon = Icons.Filled.ArrowUpward,
+                                icon = FeatherIcons.ArrowUp,
                                 onClick = { sendChild() },
                                 variant = DsButtonVariant.Info,
                                 enabled = draft.isNotBlank() && childId != null && !sending && !queueOperation.value,
@@ -270,7 +268,7 @@ private fun SubagentRow(entry: SubagentListEntry, selected: Boolean, onClick: ()
         if (selected) {
             Spacer(Modifier.width(DsSpacing.xsmall))
             Icon(
-                Icons.Filled.Check,
+                FeatherIcons.Check,
                 contentDescription = null,
                 tint = colors.accent,
                 modifier = Modifier.size(16.dp),

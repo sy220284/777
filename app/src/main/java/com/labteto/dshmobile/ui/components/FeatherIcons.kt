@@ -360,6 +360,38 @@ internal object FeatherIcons {
         }
     }
 
+    /** `more-vertical` — overflow/action menu. */
+    val MoreVertical: ImageVector by lazy {
+        feather("MoreVertical") {
+            circle(12f, 5f, 1f)
+            circle(12f, 12f, 1f)
+            circle(12f, 19f, 1f)
+        }
+    }
+
+    /** `download` — export / save action. */
+    val Download: ImageVector by lazy {
+        feather("Download") {
+            moveTo(21f, 15f); verticalLineTo(19f)
+            arcToRelative(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, -2f, 2f)
+            horizontalLineTo(5f)
+            arcToRelative(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, -2f, -2f)
+            verticalLineTo(15f)
+            moveTo(7f, 10f); lineTo(12f, 15f); lineTo(17f, 10f)
+            moveTo(12f, 15f); verticalLineTo(3f)
+        }
+    }
+
+    /** `arrow-up-down` — ordering/sort control. */
+    val ArrowUpDown: ImageVector by lazy {
+        feather("ArrowUpDown") {
+            moveTo(7f, 15f); lineTo(7f, 3f)
+            moveTo(3f, 7f); lineTo(7f, 3f); lineTo(11f, 7f)
+            moveTo(17f, 9f); lineTo(17f, 21f)
+            moveTo(13f, 17f); lineTo(17f, 21f); lineTo(21f, 17f)
+        }
+    }
+
     /** `refresh-cw` — retry / reload while keeping the same outlined chrome language. */
     val RefreshCw: ImageVector by lazy {
         feather("RefreshCw") {
