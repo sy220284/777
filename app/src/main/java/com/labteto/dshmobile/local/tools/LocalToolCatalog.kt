@@ -158,11 +158,13 @@ object LocalToolCatalog {
             "max_steps" to integer("最大模型/工具循环步数，默认 20，可配置 1 到 512"),
             "virtual_screen" to boolean("是否为子代理分配独立虚拟屏；用于并行操作 Android 界面，默认 false"),
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
+            "allowed_tools" to stringArray("可选；限制子代理本次可见且可执行的工具名；包含当前不可用工具时启动直接失败"),
             "run_in_background" to boolean("是否转为后台任务，默认 false"),
         ), listOf("task")))
         add(tool("subagent_fork", "继承当前会话上下文并启动子代理", properties(
             "task" to string("需要结合当前上下文处理的任务"),
             "output_schema" to jsonSchemaObject("可选；要求子代理最终只返回符合该 JSON Schema 的对象"),
+            "allowed_tools" to stringArray("可选；限制 fork 子代理可见且可执行的工具名"),
         ), listOf("task")))
         add(tool("list_subagent_models", "列出安卓本机子代理可使用的模型路由", properties()))
         add(tool("list_agents", "列出当前会话启动的后台代理", properties()))
@@ -193,6 +195,7 @@ object LocalToolCatalog {
             },
             "model" to string("可选；子任务使用的模型档案编号或模型名。留空时按 Worker 路由策略选择。"),
             "output_schema" to jsonSchemaObject("可选；要求每个 Workflow 子代理最终都返回符合该 JSON Schema 的对象"),
+            "allowed_tools" to stringArray("可选；所有 Workflow 子任务共享的工具 allowlist"),
         ), listOf("tasks")))
         add(tool("team_members", "查看当前 Work Agent Team 的 Lead、teammate 与运行状态", properties()))
         add(tool("team_spawn", "创建一个具备持久身份和 durable mailbox 的只读 teammate", properties(
@@ -363,6 +366,12 @@ object LocalToolCatalog {
     private fun boolean(description: String) = buildJsonObject {
         put("type", "boolean")
         put("description", description)
+    }
+
+    private fun stringArray(description: String) = buildJsonObject {
+        put("type", "array")
+        put("description", description)
+        put("items", buildJsonObject { put("type", "string") })
     }
 
     private fun jsonSchemaObject(description: String) = buildJsonObject {
