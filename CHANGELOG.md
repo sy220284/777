@@ -1040,8 +1040,9 @@ Initial release.
   (HTTP unary + dual WebSocket event streams, reconnect with backoff).
 - Discovery: manual host entry, active Wi-Fi subnet scan, remembered hosts,
   loopback (same-device) connection, auto-connect toggles.
-- Discord-style navigation: swipe from the left edge opens the workspace-
-  grouped chat list; right-edge swipe opens the session details panel.
+- Discord-style navigation: swipe right in the content area opens the workspace-
+  grouped chat list; swipe left closes an open drawer; inward swipes from either
+  system edge remain Android Back. Session details open from the top bar.
 - Chat: streamed turns, reasoning disclosure, markdown, tool cards
   (terminal/diff/read/search/web/generic), queue dock (edit/remove/steer),
   history paging, image attachments.

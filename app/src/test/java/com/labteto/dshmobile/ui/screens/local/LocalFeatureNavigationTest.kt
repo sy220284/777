@@ -15,9 +15,9 @@ import org.junit.Test
 
 class LocalFeatureNavigationTest {
     @Test
-    fun leftEdgeBackGestureOpensDrawerWhileOtherBackInputsPopFeature() {
+    fun bothSystemEdgesAndButtonBackPopFeature() {
         assertEquals(
-            LocalFeatureBackAction.OPEN_DRAWER,
+            LocalFeatureBackAction.POP_FEATURE,
             localFeatureProductBackAction(BackEventCompat.EDGE_LEFT),
         )
         assertEquals(
@@ -180,7 +180,7 @@ class LocalFeatureNavigationTest {
                 opened.stack,
             )
             assertEquals(
-                LocalFeatureBackAction.OPEN_DRAWER,
+                LocalFeatureBackAction.POP_FEATURE,
                 localFeatureProductBackAction(BackEventCompat.EDGE_LEFT),
             )
             assertEquals(page, localFeatureCurrent(opened.stack))
@@ -265,7 +265,7 @@ class LocalFeatureNavigationTest {
         localFeatureDrawerAction(LocalFeatureDrawerEntry.WORKSPACE, contributions)?.invoke()
         assertTrue(drawerOpened)
         assertEquals(
-            LocalFeatureBackAction.OPEN_DRAWER,
+            LocalFeatureBackAction.POP_FEATURE,
             localFeatureOwnedBackAction(LocalFeaturePage.WORKSPACE, BackEventCompat.EDGE_LEFT, contributions),
         )
         assertEquals(

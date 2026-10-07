@@ -33,16 +33,16 @@ import kotlinx.coroutines.launch
 
 /**
  * Discord-style shell:
- *  - swipe right from the LEFT edge (or anywhere on the content) opens the chat-list drawer
- *    (ModalNavigationDrawer's built-in gesture; swipe left on the drawer
- *    content closes it, scrim tap and Back also work)
+ *  - swipe right in the content area to open the chat-list drawer
+ *  - inward swipes from either system edge remain Android Back gestures
+ *  - swipe left while the drawer is open closes it
  *  - the explicit top-bar affordance opens the session Details panel
- *  - swipe right on the open Details panel closes it
+ *  - swipe right inside the open Details panel closes it
  *
  * Opening Details deliberately avoids a right-edge gesture: Android reserves both screen edges
- * for system back navigation, so claiming that band makes a core app action compete with the OS.
+ * for system back navigation, so claiming either edge makes a core app action compete with the OS.
  * The detector below exists only while Details is open and only claims rightward drags that start
- * inside the panel.
+ * inside the visible Details panel.
  */
 @Composable
 fun MainScreen(
@@ -66,6 +66,7 @@ fun MainScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = !detailsOpen,
         drawerContent = {
             ChatListDrawer(
                 onClose = { scope.launch { drawerState.close() } },
@@ -104,10 +105,12 @@ fun MainScreen(
                         .pointerInput(detailsOpen) {
                             if (!detailsOpen) return@pointerInput
                             val width = size.width.toFloat()
-                            val detailsAreaPx = detailsWidth.toPx() * 0.9f
+                            val detailsWidthPx = detailsWidth.toPx()
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
-                                if (down.position.x > detailsAreaPx) return@awaitEachGesture
+                                if (!detailsPanelOwnsRightSwipe(down.position.x, width, detailsWidthPx)) {
+                                    return@awaitEachGesture
+                                }
 
                                 var claimed = false
                                 awaitHorizontalTouchSlopOrCancellation(down.id) { change, overSlop ->
@@ -151,4 +154,17 @@ fun MainScreen(
             }
         }
     }
+}
+
+internal fun detailsPanelOwnsRightSwipe(
+    startX: Float,
+    containerWidth: Float,
+    panelWidth: Float,
+): Boolean {
+    if (!startX.isFinite() || !containerWidth.isFinite() || !panelWidth.isFinite()) return false
+    if (containerWidth <= 0f || panelWidth <= 0f) return false
+
+    val visiblePanelWidth = panelWidth.coerceAtMost(containerWidth)
+    val panelStartX = containerWidth - visiblePanelWidth
+    return startX in panelStartX..containerWidth
 }
