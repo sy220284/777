@@ -225,7 +225,7 @@
     <string name="local_team_progress_count">已完成 %1$d / %2$d</string>
     <string name="local_team_progress_compact">%1$d / %2$d</string>
     <string name="local_team_sheet_summary">%1$d 个助手 · %2$d / %3$d 项任务完成</string>
-    <string name="local_team_assistants">助手</string>
+    <string name="local_team_assistants">助手</string>\n    <string name="local_team_recruit_title">助手招募</string>
     <string name="local_team_more_assistants">还有 %1$d 个助手，点开查看</string>
     <string name="local_team_activity">活动轨迹</string>
     <string name="local_team_messages">助手消息</string>
@@ -247,7 +247,7 @@
     <string name="local_team_stop_confirm_message">停止所有助手正在运行的任务，任务已消耗额度不会返还</string>
     <string name="local_team_state_booting">等待开机</string>
     <string name="local_team_state_thinking">思考中</string>
-    <string name="local_team_state_completed">已完成</string>
+    <string name="local_team_state_completed">已完成</string>\n    <string name="local_team_state_task_done">已完成任务</string>\n    <string name="local_team_state_dismissed">已解雇</string>
     <string name="local_team_state_stopped">已停止</string>
     <string name="local_team_state_offwork">已下班</string>
     <string name="local_team_state_failed">任务失败</string>

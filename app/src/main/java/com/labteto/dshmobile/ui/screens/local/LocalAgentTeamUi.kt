@@ -39,9 +39,7 @@ import com.labteto.dshmobile.ui.components.DsBottomSheet
 import com.labteto.dshmobile.ui.components.DsButton
 import com.labteto.dshmobile.ui.components.DsButtonSize
 import com.labteto.dshmobile.ui.components.DsButtonVariant
-import com.labteto.dshmobile.ui.components.DsCategoryRow
 import com.labteto.dshmobile.ui.components.DsDialog
-import com.labteto.dshmobile.ui.components.DsGroupCard
 import com.labteto.dshmobile.ui.components.DsIconButton
 import com.labteto.dshmobile.ui.components.DsTextField
 import com.labteto.dshmobile.ui.components.DsToastHost
@@ -238,7 +236,7 @@ internal fun LocalAgentTeamSheet(
             TeamProgressBlock(team)
 
             Text(
-                stringResource(R.string.local_team_assistants),
+                stringResource(if (team.provisioningMemberCount > 0) R.string.local_team_recruit_title else R.string.local_team_assistants),
                 style = DsType.small13Strong.withReadingWeight(),
                 color = colors.labelTertiary,
             )
@@ -249,7 +247,7 @@ internal fun LocalAgentTeamSheet(
                     color = colors.labelSecondary,
                 )
             } else {
-                DsGroupCard {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.small)) {
                     team.members.sortedBy(::teamMemberPriority).forEach { member ->
                         TeamMemberRow(
                             member = member,
@@ -284,7 +282,7 @@ internal fun LocalAgentTeamSheet(
                     style = DsType.small13Strong.withReadingWeight(),
                     color = colors.labelTertiary,
                 )
-                DsGroupCard {
+                Column(verticalArrangement = Arrangement.spacedBy(DsSpacing.xsmall)) {
                     team.tasks.forEach { task -> TeamTaskRow(task) }
                 }
             }
@@ -408,28 +406,64 @@ private fun TeamMemberRow(
     onClick: () -> Unit,
 ) {
     val colors = DsTheme.colors
-    DsCategoryRow(
-        icon = FeatherIcons.User,
-        title = member.name,
-        subtitle = member.currentTask
-            ?: member.description.takeIf(String::isNotBlank)
-            ?: stringResource(R.string.local_team_waiting_task),
-        value = memberStatusLabel(member),
+    Surface(
         onClick = onClick,
-        trailing = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DsSpacing.xsmall),
+        modifier = Modifier.fillMaxWidth(),
+        shape = DsShapes.block,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
+        border = BorderStroke(
+            1.dp,
+            if (selected) colors.accent.copy(alpha = 0.32f) else colors.borderL2,
+        ),
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = DsSpacing.medium,
+                vertical = DsSpacing.small,
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            StateDot(memberDotState(member), size = 8.dp)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
             ) {
-                StateDot(memberDotState(member), size = 7.dp)
+                Text(
+                    member.name,
+                    style = DsType.std14Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                    maxLines = 1,
+                )
+                Text(
+                    member.currentTask
+                        ?: member.description.takeIf(String::isNotBlank)
+                        ?: stringResource(R.string.local_team_waiting_task),
+                    style = DsType.caption11.withReadingWeight(),
+                    color = colors.labelSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    memberStatusLabel(member),
+                    style = DsType.caption11Strong.withReadingWeight(),
+                    color = if (memberDotState(member) == StateDotState.Running) {
+                        colors.accent
+                    } else {
+                        colors.labelTertiary
+                    },
+                )
                 Icon(
                     if (selected) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
                     contentDescription = null,
                     tint = colors.labelCaption,
                 )
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -580,6 +614,7 @@ private fun TeamMemberDetail(
 
 @Composable
 private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
+    val colors = DsTheme.colors
     val blocked = task.status == "pending" && !task.ready && task.blockedByTitles.isNotEmpty()
     val detail = when {
         blocked -> stringResource(
@@ -591,12 +626,54 @@ private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
         task.description.isNotBlank() -> task.description
         else -> null
     }
-    DsCategoryRow(
-        icon = if (task.status == "completed") FeatherIcons.Check else FeatherIcons.CheckSquare,
-        title = task.subject,
-        subtitle = detail,
-        value = taskStatusLabel(task),
-    )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = DsShapes.row,
+        color = colors.wallpaperSurface(WallpaperSurfaceLevel.CARD, BackgroundRegion.BOTTOM),
+        border = BorderStroke(1.dp, colors.borderL2),
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = DsSpacing.medium,
+                vertical = DsSpacing.small,
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DsSpacing.small),
+        ) {
+            Icon(
+                imageVector = if (task.status == "completed") FeatherIcons.Check else FeatherIcons.CheckSquare,
+                contentDescription = null,
+                tint = if (task.status == "completed") colors.accent else colors.labelSecondary,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(DsSpacing.tiny),
+            ) {
+                Text(
+                    task.subject,
+                    style = DsType.small13Strong.withReadingWeight(),
+                    color = colors.labelPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                detail?.let {
+                    Text(
+                        it,
+                        style = DsType.caption11.withReadingWeight(),
+                        color = if (task.writeConflict || blocked) colors.warnLabel else colors.labelSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Text(
+                taskStatusLabel(task),
+                style = DsType.caption11Strong.withReadingWeight(),
+                color = if (task.status == "in_progress") colors.accent else colors.labelTertiary,
+            )
+        }
+    }
 }
 
 @Composable
@@ -663,8 +740,9 @@ private fun memberStatusLabel(member: LocalAgentTeamMemberUiState): String = str
         member.phase == "failed" || member.activity == "failed" -> R.string.local_team_state_failed
         member.phase == "provisioning" -> R.string.local_team_state_booting
         member.activity == "running" || member.activity == "stopping" -> R.string.local_team_state_thinking
-        member.activity == "completed" -> R.string.local_team_state_completed
-        member.activity == "killed" || member.activity == "cancelled" || member.activity == "interrupted" -> R.string.local_team_state_stopped
+        member.activity == "completed" -> R.string.local_team_state_task_done
+        member.activity == "killed" -> R.string.local_team_state_dismissed
+        member.activity == "cancelled" || member.activity == "interrupted" -> R.string.local_team_state_stopped
         member.activity == "dormant" -> R.string.local_team_state_offwork
         else -> R.string.local_team_state_waiting
     },
