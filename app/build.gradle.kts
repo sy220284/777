@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -299,7 +301,7 @@ if (System.getenv("CI") == "true") {
         }
         if (name == "testDebugUnitTest") {
             // 该任务在健康基线中约半秒完成；两分钟只用于快速识别挂死/死锁。
-            timeout.set(java.time.Duration.ofMinutes(2))
+            timeout.set(Duration.ofMinutes(2))
         }
     }
 }
