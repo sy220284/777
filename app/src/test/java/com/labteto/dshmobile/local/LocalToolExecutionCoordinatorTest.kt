@@ -62,6 +62,40 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun workEnablesNetworkToolsByDefaultWithoutEnablingWrites() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool(
+                name = "web_search", access = ToolAccess.NETWORK,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "网络",
+            ) { ToolResult("ok") })
+            register(tool(
+                name = "web_fetch", access = ToolAccess.NETWORK,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "网络",
+            ) { ToolResult("ok") })
+            register(tool(
+                name = "write", access = ToolAccess.WORKSPACE_WRITE,
+                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+            ) { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        val detached = linkedSetOf<String>()
+        coordinator.prepareWorkTurnCapabilities("整理代码", emptyList(), { false }, detached)
+        assertEquals(setOf("web_search", "web_fetch"), detached)
+        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
+        val projection = LocalToolSchemaProjection(registry, coordinator)
+        val schemas = projection.modelSchemas(
+            policy = localAgentRunPolicy(LocalUsageMode.WORK),
+            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
+            planModeEnabled = false,
+            history = emptyList(),
+            enabledOptional = detached,
+        )
+        assertEquals(setOf("web_search", "web_fetch"), projection.names(schemas).toSet())
+    }
+
+    @Test
     fun workIntentDoesNotReadGitHubCredentialsForUnrelatedTaskAndPropagatesCancellation() = runBlocking {
         val coordinator = coordinator(ToolRegistry())
         var reads = 0
