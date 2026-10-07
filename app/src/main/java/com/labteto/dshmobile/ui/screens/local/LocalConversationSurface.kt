@@ -141,7 +141,7 @@ internal fun LocalConversationSurface(
     onOpenRunCenter: () -> Unit,
     onOpenTasks: () -> Unit,
     onOpenTools: () -> Unit,
-    onOpenDiary: () -> Unit,
+    onOpenPersonaGallery: () -> Unit,
     sessionTitle: String,
     sessionPinned: Boolean,
     onTogglePinSession: () -> Unit,
@@ -978,7 +978,11 @@ internal fun LocalConversationSurface(
                             label = stringResource(R.string.local_persona_picker_title),
                             onClick = {
                                 showAttachmentPicker = false
-                                showPersonaPicker = true
+                                if (state.groupChat.enabled) {
+                                    onOpenPersonaGallery()
+                                } else {
+                                    showPersonaPicker = true
+                                }
                             },
                             modifier = Modifier.weight(1f),
                         )
@@ -1010,11 +1014,11 @@ internal fun LocalConversationSurface(
                             modifier = Modifier.weight(1f),
                         )
                         DsQuickActionTile(
-                            icon = FeatherIcons.BookOpen,
-                            label = stringResource(R.string.chat_diary_title),
+                            icon = FeatherIcons.Tool,
+                            label = stringResource(R.string.tools_title),
                             onClick = {
                                 showAttachmentPicker = false
-                                onOpenDiary()
+                                onOpenTools()
                             },
                             modifier = Modifier.weight(1f),
                         )
