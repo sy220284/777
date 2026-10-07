@@ -354,6 +354,8 @@ fixture 来源变化再额外要求 `fixture-provenance`。
 - 子代理按 profileId 绑定独立 model/baseUrl/protocol/authKind/credentialRef；不得修改父代理活动档案。同名 API/套餐或多账户模型必须消除来源歧义。
 - 子代理能力契约必须在模型执行前校验：持久 Agent 禁止可变副作用，continuable 必须绑定持久 Job，请求独立虚拟屏时分配失败必须显式失败。
 - 子代理 `output_schema` 必须拒绝未实现的 JSON Schema 关键字与错误类型；结构化终态只有在 Schema 校验通过后才允许写入 terminal checkpoint，失败结果不得伪装 completed。
+- 子代理 `allowed_tools` 必须同时约束模型可见 Schema 与真实执行 admission；allowlist 中不存在/当前不可用工具必须启动前拒绝，越权 tool call 不得进入执行器。
+- 当前 `maxDepth` 仅支持 1；任何更深递归配置必须在模型调用前失败，禁止接受后忽略。
 - list_subagent_models 只展示有凭据的已保存档案，不硬编码 DeepSeek 列表。
 - 自定义 API 协议选择要同时用于保存和连接测试，并在重新加载、替换 Key 后保留。
 - 套餐模型目录结构异常必须报错，不得静默解释为空目录而覆盖已有档案；标准 API data[].id 不能被当作套餐共享授权依据。
